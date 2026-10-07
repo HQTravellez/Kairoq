@@ -153,11 +153,11 @@ const WAN2GP_IMAGE_MODEL = String(process.env.WAN2GP_IMAGE_MODEL || "qwen_image"
 const WAN2GP_VIDEO_MODEL = String(process.env.WAN2GP_VIDEO_MODEL || "wan22_t2v").trim();
 const WAN2GP_IMAGE_TO_VIDEO_MODEL = String(process.env.WAN2GP_IMAGE_TO_VIDEO_MODEL || "wan22_i2v").trim();
 const WAN2GP_TOUR_IMAGE_TO_VIDEO_MODEL = String(process.env.WAN2GP_TOUR_IMAGE_TO_VIDEO_MODEL || "i2v-1-3B").trim();
-const QWEN_IMAGE_MODEL = process.env.QWEN_IMAGE_MODEL || "Qwen/Qwen-Image";
+const QWEN_IMAGE_MODEL = process.env.FLUX_IMAGE_MODEL || process.env.QWEN_IMAGE_MODEL || "black-forest-labs/FLUX.1-schnell";
 const QWEN_IMAGE_EDIT_MODEL = process.env.QWEN_IMAGE_EDIT_MODEL || "Qwen/Qwen-Image-Edit";
 const WAN_VIDEO_MODEL = process.env.WAN_VIDEO_MODEL || "Wan-AI/Wan2.2-T2V";
 const WAN_IMAGE_TO_VIDEO_MODEL = process.env.WAN_IMAGE_TO_VIDEO_MODEL || "Wan-AI/Wan2.2-I2V";
-const MEDIA_PROVIDER_ORDER = String(process.env.MEDIA_PROVIDER_ORDER || "localsd,wan2gp,selfhost,pollinations,higgsfield,openrouter,fal")
+const MEDIA_PROVIDER_ORDER = String(process.env.MEDIA_PROVIDER_ORDER || "selfhost,wan2gp,localsd,pollinations,higgsfield,openrouter,fal")
   .split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
 const GENERATED_MEDIA_DIR = path.join(PUBLIC_DIR, "generated");
 const STORE_PREVIEW_DIR = path.join(GENERATED_MEDIA_DIR, "store-previews");
@@ -4402,7 +4402,7 @@ function mediaProviderOrderForBudget(mode="cheap"){
   const m=ZERO_COST_MODE?"free":String(mode||"cheap").toLowerCase();
   // API keys and open-weight model licenses do not imply free inference.
   // In zero-cost mode only user-operated workers are eligible.
-  if(m==="free") return ["localsd","wan2gp","selfhost"];
+  if(m==="free") return ["selfhost","wan2gp","localsd"];
   if(m==="best") return ["higgsfield","openrouter","wan2gp","selfhost","localsd","pollinations","fal"];
   if(m==="balanced") return ["localsd","wan2gp","selfhost","higgsfield","openrouter","pollinations","fal"];
   return ["localsd","wan2gp","selfhost","pollinations","higgsfield","openrouter","fal"];
