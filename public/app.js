@@ -1106,6 +1106,7 @@ function fillModelSelect(){
 }
 
 function updateModelUI(){
+  if(freeOnlyEl.checked && ["smart-auto","openrouter/auto"].includes(modelSelect.value)) modelSelect.value="openrouter/free";
   ui.lastModel=modelSelect.value;saveAll();
   const info=modelInfo(modelSelect.value);
   modelBadge.textContent=modelSelect.value==="openrouter/free"?"⚡ Free Auto":modelSelect.value==="smart-auto"?"✦ Smart Auto":`${info.name}${info.isFree?" · FREE":""}`;

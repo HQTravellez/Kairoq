@@ -579,6 +579,14 @@ async function getModels(force = false) {
   return models;
 }
 
+function resolveAutoModel(model, { freeOnly = true, zeroCostMode = ZERO_COST_MODE, paidEnabled = PAID_LLM_ENABLED } = {}) {
+  const requested = model || "openrouter/free";
+  if (requested === "smart-auto" || requested === "openrouter/auto") {
+    return freeOnly || zeroCostMode || !paidEnabled ? "openrouter/free" : "openrouter/auto";
+  }
+  return requested;
+}
+
 function freeFallbacks(models, primary = "", limit = 3) {
   return models
     .filter(m => m.isFree && m.id !== primary && !isLocalModelId(m.id) && m.id !== "openrouter/free")
@@ -1218,7 +1226,7 @@ function buildReadOnlyBackgroundTools({ allowWeb = true } = {}) {
 
 async function runBackgroundAgent(job) {
   let model = job.model || "openrouter/free";
-  if (model === "smart-auto") model = "openrouter/auto";
+  model = resolveAutoModel(model, { freeOnly: job.freeOnly !== false });
 
   const persona = agentPersona(job.agentType || "general");
   const memory = [
@@ -3625,7 +3633,7 @@ async function handleAgentRun(req, res) {
     if (!goal) return json(res, 400, { error: "Agent goal is required." });
 
     let model = typeof body.model === "string" && body.model ? body.model : "openrouter/free";
-    if (model === "smart-auto") model = "openrouter/auto";
+    model = resolveAutoModel(model, { freeOnly: body.freeOnly !== false });
 
     const agentType = typeof body.agentType === "string" ? body.agentType : "atlas";
     const useWeb = body.webSearch !== false;
@@ -4043,7 +4051,7 @@ async function handleChat(req, res) {
     const models=await getModels();
     const map=new Map(models.map(m=>[m.id,m]));
     let requestedModel=typeof body.model==="string"&&body.model?body.model:"openrouter/free";
-    if(requestedModel==="smart-auto")requestedModel="openrouter/auto";
+    requestedModel=resolveAutoModel(requestedModel,{freeOnly:body.freeOnly!==false});
     const freeOnly=body.freeOnly!==false;
     const smartFallback=body.smartFallback!==false;
     const webSearch=body.webSearch===true;
@@ -6473,6 +6481,6 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
-  encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
+  resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };

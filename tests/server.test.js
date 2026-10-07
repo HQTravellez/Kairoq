@@ -7,6 +7,7 @@ process.env.NODE_ENV = "test";
 process.env.APP_ENCRYPTION_KEY = "test-key-that-is-not-used-in-production";
 
 const {
+  resolveAutoModel,
   encryptJson,
   decryptJson,
   sanitizeAuditData,
@@ -722,4 +723,15 @@ test("v16 Marketing Agent uploads generated media to Postiz before approved sche
   assert.match(server,/did not schedule a text-only fallback/);
   assert.match(server,/post_type='post'/);
   assert.match(js,/generated image\/video is uploaded with the approved post/);
+});
+
+test("automatic routing honors free mode and explicit paid opt-in", () => {
+  for (const model of ["smart-auto", "openrouter/auto"]) {
+    assert.equal(resolveAutoModel(model, {freeOnly:true,zeroCostMode:false,paidEnabled:true}), "openrouter/free");
+    assert.equal(resolveAutoModel(model, {freeOnly:false,zeroCostMode:true,paidEnabled:true}), "openrouter/free");
+    assert.equal(resolveAutoModel(model, {freeOnly:false,zeroCostMode:false,paidEnabled:false}), "openrouter/free");
+    assert.equal(resolveAutoModel(model, {freeOnly:false,zeroCostMode:false,paidEnabled:true}), "openrouter/auto");
+  }
+  assert.equal(resolveAutoModel("local/auto"), "local/auto");
+  assert.equal(resolveAutoModel("vendor/paid-model"), "vendor/paid-model");
 });
