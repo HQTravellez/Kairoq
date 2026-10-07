@@ -858,6 +858,12 @@ function renderMarkdown(markdown=""){
       codes.push(`<code>${esc(c)}</code>`);
       return `@@INLINECODE_${idx}@@`;
     });
+    // Render saved /generated assets as real media; escape and restrict paths first.
+    x=x.replace(/!\[([^\]]*)\]\((\/generated\/[a-zA-Z0-9_./%-]+\.(?:png|jpe?g|webp|gif))\)/gi,(_,alt,url)=>{
+      const safeUrl=url.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+      return '<a class="generated-media-link" href="'+safeUrl+'" target="_blank" rel="noopener noreferrer"><img class="generated-media-image" loading="lazy" src="'+safeUrl+'" alt="'+alt+'"></a>';
+    });
+    x=x.replace(/\[\[VIDEO:(\/generated\/[a-zA-Z0-9_./%-]+\.mp4)\]\]/gi,(_,url)=>'<video class="generated-media-video" src="'+url+'" controls playsinline preload="metadata"></video>');
     x=x
       .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
       .replace(/__([^_]+)__/g,"<strong>$1</strong>")
