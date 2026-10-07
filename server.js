@@ -4136,7 +4136,27 @@ async function handleChat(req, res) {
       writeSSE(res,"status",{message:"Reading public website directly…"});
       try{
         const page=await readPublicWebsiteForChat(siteUrl);
-        const output="I opened **"+page.url+"** and retrieved the public homepage.\n\n**Page title:** "+page.title+(page.description?"\n\n**Description:** "+page.description:"")+(page.headings.length?"\n\n**Page sections:** "+page.headings.join(" · "):"")+"\n\n**Page excerpt:** "+page.excerpt.slice(0,1800)+"\n\nI can use this page content for more detailed analysis.";
+        const asksPricing=/\b(pric(?:e|ing)|cost|fee|plan|subscription|how much)\b/i.test(lastUserText);
+        const bodyText=[page.description,...page.headings,page.excerpt].join(" ");
+        const visiblyEmpty=page.excerpt.length<180 || /enable javascript to view/i.test(page.excerpt);
+        const numbers=[...bodyText.matchAll(/(?:CA\$|US\$|CAD\s*\$|USD\s*\$|\$)\s?\d[\d,.]*(?:\s*\/(?:mo|month|user|booking|trip|year))?/gi)].map(x=>x[0]).slice(0,12);
+        const lines=["**Source:** "+page.url,"**Page title:** "+page.title];
+        if(asksPricing){
+          if(visiblyEmpty){
+            lines.push("**Pricing:** I could access the URL, but it returned only a JavaScript application shell. I cannot verify any pricing figures from this response. This site needs JavaScript rendering to read the pricing section.");
+          }else if(numbers.length){
+            lines.push("**Prices visible in page text:** "+[...new Set(numbers)].join(", ")+". These figures may refer to examples or travel expenses rather than platform subscription prices; check their context.");
+          }else{
+            lines.push("**Pricing:** No numeric prices are shown in the publicly fetched HTML. I cannot confirm subscription rates from this page.");
+          }
+        }else if(visiblyEmpty){
+          lines.push("This page requires JavaScript rendering; its main content was not available to this reader.");
+        }else{
+          if(page.description)lines.push("**Description:** "+page.description);
+          if(page.headings.length)lines.push("**Sections:** "+page.headings.join(" · "));
+          lines.push("**Page content:** "+page.excerpt.slice(0,3000));
+        }
+        const output=lines.join("\\n\\n");
         writeSSE(res,"token",{text:output});
         writeSSE(res,"meta",{model:"kairoq/website-reader",usage:{cost:0}});
         writeSSE(res,"done",{ok:true,provider:"website-reader",zeroCost:true});
