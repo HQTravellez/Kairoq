@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0b0d10">
   <title>Kairoq</title>
   <link rel="stylesheet" href="/styles.css?v=153">
+  <link rel="stylesheet" href="/calm.css?v=17">
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay hidden">
@@ -25,15 +26,18 @@
         <div class="brand-mark">K</div>
         <div>
           <div class="brand-title">Kairoq</div>
-          <div class="brand-subtitle">Outcome operating system</div>
+          <div class="brand-subtitle">Your AI workspace</div>
         </div>
       </div>
 
-      <button id="commandCenterBtn" class="new-chat command-center-nav active">⌂ Today</button>
-      <button id="newChat" class="new-chat">＋ New task</button>
+      <button id="commandCenterBtn" class="new-chat command-center-nav active">⌂ Overview</button>
+      <button id="newChat" class="new-chat">＋ New chat</button>
       <button id="outcomesNavBtn" class="new-chat primary-nav-secondary">✓ Outcomes</button>
       <button id="historyNavBtn" class="new-chat primary-nav-secondary">◴ History</button>
       <button id="studioSideBtn" class="new-chat primary-nav-secondary">▣ Studio</button>
+      <div class="agent-nav-label">AGENTS</div>
+      <button id="salesNavBtn" class="new-chat primary-nav-secondary">↗ Sales agent</button>
+      <button id="marketingNavBtn" class="new-chat primary-nav-secondary">✎ Marketing agent</button>
       <button id="workspaceBtn" class="new-chat secondary-action">◫ Memory</button>
       <div class="project-picker">
         <label>PROJECT</label>
@@ -101,13 +105,14 @@
       <div id="historyList" class="history-list"></div>
 
       <div class="sidebar-footer">
-        <div><span class="status-dot"></span>API key stays server-side</div>
+        <div><span class="status-dot"></span>Your workspace</div>
         <div id="usageMini" class="usage-mini">Usage: —</div>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar simple-topbar">
+        <button id="sidebarToggle" class="icon-btn sidebar-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
         <div>
           <div id="mainViewTitle" class="topbar-title">Today</div>
           <div id="mainViewSubtitle" class="topbar-subtitle">What needs to happen?</div>
@@ -786,7 +791,7 @@
         <div id="statusBar" class="status-bar"></div>
 
         <div class="composer">
-          <textarea id="prompt" rows="1" placeholder="What needs to happen?"></textarea>
+          <textarea id="prompt" rows="1" placeholder="How can I help you today?"></textarea>
           <div class="composer-bottom">
             <div class="composer-tools inline-controls">
               <input id="fileInput" type="file" multiple hidden accept="image/*,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.py,.html,.css,.xml,.yaml,.yml,.log">
@@ -833,7 +838,7 @@
         </div>
 
         <div class="fineprint">
-          Kairoq prefers free or cheaper routes when possible. Some connected services and generation providers can still charge usage fees.
+          Review important details. Connected services may charge usage fees.
         </div>
       </div>
     </main>
@@ -1466,6 +1471,6 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=153"></script>
+  <script src="/app.js?v=17"></script>
 </body>
 </html>

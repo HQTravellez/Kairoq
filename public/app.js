@@ -42,7 +42,7 @@ let selectedAgentType = "atlas";
 let currentApproval = null;
 let imageMode = false;
 let videoMode = false;
-let mainView = localStorage.getItem("pai-main-view") || "command";
+let mainView = localStorage.getItem("pai-main-view") || "chat";
 let simpleMode = JSON.parse(localStorage.getItem("pai-simple-mode") || "true");
 let spendMode = localStorage.getItem("pai-spend-mode") || "cheap";
 
@@ -240,6 +240,9 @@ function setMainView(view="command"){
   if(view==="command") document.body.classList.remove("history-focus");
   mainView = ["chat","command","studio"].includes(view) ? view : "command";
   localStorage.setItem("pai-main-view", mainView);
+  $(".main").dataset.view = mainView;
+  document.body.classList.remove("nav-open");
+  $("#sidebarToggle")?.setAttribute("aria-expanded", "false");
 
   const command = $("#commandCenter");
   const messages = $("#messages");
@@ -262,7 +265,7 @@ function setMainView(view="command"){
   if(!imageMode && !videoMode && promptEl){
     promptEl.placeholder = mainView === "studio"
       ? "Studio is open above — or ask Kairoq anything here."
-      : "What needs to happen?";
+      : "How can I help you today?";
   }
 
   if(mainView === "command") refreshCommandCenter();
@@ -1031,7 +1034,7 @@ function appendMessage(msg,index,scroll=true){
 
 function welcome(){
   const w=document.createElement("div");w.className="welcome";
-  w.innerHTML=`<div class="orb">✦</div><h1>Your AI workspace.</h1><p>Ask anything. Choose a model only when you want to.</p><div class="suggestions"><button>Help me debug some code</button><button>Research the latest developments</button><button>Improve this business idea</button><button>Rewrite a professional email</button></div>`;
+  w.innerHTML=`<div class="orb">✦</div><h1>What would you like to work on?</h1><p>Make space for your next idea.</p><div class="suggestions"><button>Draft an email</button><button>Research a company</button><button>Plan my content</button><button>Find new leads</button></div>`;
   w.querySelectorAll(".suggestions button").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent;resizePrompt();promptEl.focus()});
   return w;
 }
@@ -3421,3 +3424,15 @@ $('#listingForm')?.addEventListener('submit',async e=>{e.preventDefault();try{aw
 $('#listingSalesReadyBtn')?.addEventListener('click',()=>makeListingSalesReadyUI());
 $('#listingVideoBtn')?.addEventListener('click',()=>createListingVideoUI());
 $('#listingProposalBtn')?.addEventListener('click',()=>createListingProposalUI());
+
+// Calm workspace navigation; existing conversations and settings are preserved.
+$("#sidebarToggle")?.addEventListener("click", () => {
+ const open = document.body.classList.toggle("nav-open");
+ $("#sidebarToggle").setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("keydown", e => {
+ if(e.key === "Escape") { document.body.classList.remove("nav-open"); $("#sidebarToggle")?.setAttribute("aria-expanded", "false"); }
+});
+for (const [id, tab] of [["salesNavBtn", "salesAgent"], ["marketingNavBtn", "marketingAgent"]]) {
+ $("#" + id)?.addEventListener("click", () => { setMainView("studio"); switchStudioTab(tab); refreshStudio(); });
+}
