@@ -2129,11 +2129,11 @@ async function loadDeadLetters(){
 async function loadConnectorStatus(){
   try{
     const res=await fetch("/api/connectors/status");
-    if(!res.ok)return;
+    if(!res.ok)throw new Error("Could not refresh connection status");
     const data=await res.json();
 
     $("#googleConnectorStatus").textContent = !data.google?.configured
-      ? "Not configured — add Google OAuth credentials to .env"
+      ? "Not configured — add Google OAuth credentials in Railway Variables"
       : data.google?.connected
         ? "Connected — Gmail + Calendar available to agents"
         : "Configured but not connected";
@@ -2143,7 +2143,7 @@ async function loadConnectorStatus(){
 
     if($("#microsoftConnectorStatus")){
       $("#microsoftConnectorStatus").textContent=!data.microsoft?.configured
-        ? "Not configured — add Microsoft OAuth credentials to .env"
+        ? "Not configured — add Microsoft OAuth credentials in Railway Variables"
         : data.microsoft?.connected
           ? `Connected — OneDrive + Office${data.microsoft?.outlook_enabled?" + Outlook/Calendar":""}${data.microsoft?.teams_enabled?" + Teams":""}${data.microsoft?.sharepoint_enabled?" + SharePoint":""}`
           : "Configured but not connected";
@@ -2178,7 +2178,7 @@ async function loadConnectorStatus(){
     $("#webhookConnectorStatus").textContent = data.webhook?.configured
       ? "Configured"
       : "Not configured";
-  }catch{}
+  }catch{document.querySelectorAll("#connectorsDialog .connector-row small").forEach(el=>el.textContent="Unable to check status — try Refresh status");}
 }
 
 
