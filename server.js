@@ -4072,7 +4072,20 @@ async function readPublicWebsiteForChat(rawUrl){
   const meta=(html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)/i)||html.match(/<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description/i)||[])[1]||"";
   const headings=[...html.matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/gi)].slice(0,12).map(m=>m[1].replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
   const content=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/\s+/g," ").trim();
-  return {url:u.toString(),title:title.replace(/<[^>]*>/g," ").trim().slice(0,250),description:meta.trim().slice(0,750),headings,excerpt:content.slice(0,4500)};
+  // JavaScript-heavy sites render an empty HTML shell. Use Jina's browser-rendered
+  // public Reader endpoint as a free, rate-limited fallback; no API key is sent.
+  let readable=content,rendered=false,readerError="";
+  if(content.length<500 || (headings.length===0&&content.length<1400)){
+    try{
+      const renderUrl="https://r.jina.ai/"+u.toString();
+      const renderedResponse=await fetch(renderUrl,{redirect:"error",signal:AbortSignal.timeout(25000),headers:{"Accept":"text/plain","X-Return-Format":"markdown","X-No-Cache":"true"}});
+      if(!renderedResponse.ok)throw new Error("rendered reader HTTP "+renderedResponse.status);
+      const result=await renderedResponse.text();
+      if(result.trim().length>content.length+80){readable=result.slice(0,16000);rendered=true}
+      else readerError="The rendered reader returned no additional page content.";
+    }catch(e){readerError=e.message}
+  }
+  return {url:u.toString(),title:title.replace(/<[^>]*>/g," ").trim().slice(0,250),description:meta.trim().slice(0,750),headings,excerpt:readable.slice(0,12000),rendered,readerError};
 }
 
 async function handleChat(req, res) {
@@ -4138,16 +4151,16 @@ async function handleChat(req, res) {
         const page=await readPublicWebsiteForChat(siteUrl);
         const asksPricing=/\b(pric(?:e|ing)|cost|fee|plan|subscription|how much)\b/i.test(lastUserText);
         const bodyText=[page.description,...page.headings,page.excerpt].join(" ");
-        const visiblyEmpty=page.excerpt.length<180 || /enable javascript to view/i.test(page.excerpt);
+        const visiblyEmpty=page.excerpt.length<250 || (/enable javascript to view/i.test(page.excerpt)&&!page.rendered);
         const numbers=[...bodyText.matchAll(/(?:CA\$|US\$|CAD\s*\$|USD\s*\$|\$)\s?\d[\d,.]*(?:\s*\/(?:mo|month|user|booking|trip|year))?/gi)].map(x=>x[0]).slice(0,12);
         const lines=["**Source:** "+page.url,"**Page title:** "+page.title];
         if(asksPricing){
           if(visiblyEmpty){
-            lines.push("**Pricing:** I could access the URL, but it returned only a JavaScript application shell. I cannot verify any pricing figures from this response. This site needs JavaScript rendering to read the pricing section.");
+            lines.push("**Pricing:** I tried both direct HTML and browser-rendered reading, but the page did not expose verifiable pricing. "+(page.readerError||"")+" I will not invent rates.");
           }else if(numbers.length){
-            lines.push("**Prices visible in page text:** "+[...new Set(numbers)].join(", ")+". These figures may refer to examples or travel expenses rather than platform subscription prices; check their context.");
+            lines.push("**Prices visible in the retrieved page:** "+[...new Set(numbers)].join(", ")+". These figures are not independently confirmed subscription prices.\n\n**Relevant page text:** "+page.excerpt.slice(0,4200));
           }else{
-            lines.push("**Pricing:** No numeric prices are shown in the publicly fetched HTML. I cannot confirm subscription rates from this page.");
+            lines.push("**Pricing:** No numeric prices were found in the retrieved page. I cannot confirm subscription rates.\n\n**Relevant page text:** "+page.excerpt.slice(0,2400));
           }
         }else if(visiblyEmpty){
           lines.push("This page requires JavaScript rendering; its main content was not available to this reader.");
@@ -4156,7 +4169,7 @@ async function handleChat(req, res) {
           if(page.headings.length)lines.push("**Sections:** "+page.headings.join(" · "));
           lines.push("**Page content:** "+page.excerpt.slice(0,3000));
         }
-        const output=lines.join("\\n\\n");
+        const output=lines.join("\n\n");
         writeSSE(res,"token",{text:output});
         writeSSE(res,"meta",{model:"kairoq/website-reader",usage:{cost:0}});
         writeSSE(res,"done",{ok:true,provider:"website-reader",zeroCost:true});
