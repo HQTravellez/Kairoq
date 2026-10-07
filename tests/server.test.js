@@ -735,3 +735,14 @@ test("automatic routing honors free mode and explicit paid opt-in", () => {
   assert.equal(resolveAutoModel("local/auto"), "local/auto");
   assert.equal(resolveAutoModel("vendor/paid-model"), "vendor/paid-model");
 });
+
+ test("news discovery falls back after Google returns 503", async () => {
+ const {googleNewsSignals}=require("../server");const urls=[];
+ const rows=await googleNewsSignals("Canada expansion",12,async url=>{
+ urls.push(url);if(url.includes("news.google"))return {ok:false,status:503};
+ return {ok:true,text:async()=>'<rss><channel><item><title>Company opens office</title><link>https://example.com/news</link><pubDate>Wed, 7 Oct 2026</pubDate></item></channel></rss>'};
+ });assert.equal(urls.length,2);assert.equal(rows[0].title,"Company opens office");assert.equal(rows[0].source,"Bing News");
+ });
+ test("news provider outage reports failure without inventing results",async()=>{
+ const {googleNewsSignals}=require("../server");await assert.rejects(googleNewsSignals("Canada",12,async()=>({ok:false,status:503})),err=>err.status===503&&err.providerFailures.length===2);
+ });

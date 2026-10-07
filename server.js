@@ -5549,12 +5549,25 @@ function extractCompanyFromHeadline(title="",source=""){
   for(const re of patterns){const m=t.match(re);if(m&&m[1])return m[1].trim().replace(/^\W+|\W+$/g,"").slice(0,120)}
   return String(source||"Potential account").slice(0,120);
 }
-async function googleNewsSignals(query,limit=12){
-  const url=`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-CA&gl=CA&ceid=CA:en`;
-  const response=await fetchWithRetry(url,{headers:{"User-Agent":"Mozilla/5.0 Kairoq-Pursuit/1.0"},signal:AbortSignal.timeout(15000)},{retries:1});
-  if(!response.ok)throw new Error(`Public news search failed (${response.status})`); const xml=await response.text();
-  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0,Math.max(1,Math.min(30,limit))).map(m=>{const b=m[1];return{title:rssTag(b,"title"),link:rssTag(b,"link"),published_at:rssTag(b,"pubDate"),source:rssTag(b,"source"),summary:rssTag(b,"description")}}).filter(x=>x.title&&x.link);
+async function googleNewsSignals(query,limit=12,fetcher=fetchWithRetry){
+  const providers=[
+    {name:"Google News",url:`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-CA&gl=CA&ceid=CA:en`},
+    {name:"Bing News",url:`https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss`}
+  ];
+  const failures=[];
+  for(const provider of providers){
+    try{
+      const response=await fetcher(provider.url,{headers:{"User-Agent":"Kairoq/1.0"},signal:AbortSignal.timeout(15000)},{retries:0});
+      if(!response.ok)throw new Error(`HTTP ${response.status}`);
+      const xml=await response.text();
+      if(!/<(?:rss|feed)\b/i.test(xml))throw new Error("Invalid news feed");
+      return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0,Math.max(1,Math.min(30,limit))).map(m=>{const b=m[1];return{title:rssTag(b,"title"),link:rssTag(b,"link"),published_at:rssTag(b,"pubDate"),source:rssTag(b,"source")||provider.name,summary:rssTag(b,"description")}}).filter(x=>x.title&&x.link);
+    }catch(err){failures.push(`${provider.name}: ${err.message}`)}
+  }
+  const error=new Error("News providers are temporarily unavailable. Your saved leads are safe. Try again shortly or add a company website manually.");
+  error.status=503;error.providerFailures=failures;throw error;
 }
+
 async function discoverPursuits({geography="Canada",market="corporate housing",signals="",limit=18}={}){
   const signalText=String(signals||"contract awarded OR new office OR expansion OR hiring OR relocation OR construction project OR interns OR displaced").trim();
   const query=`${geography} (${signalText})`;
@@ -6486,6 +6499,6 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
-  resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
+  googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };
