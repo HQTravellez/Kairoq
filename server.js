@@ -4399,8 +4399,10 @@ async function generateVideoSelfHost({ prompt, duration = 4, referenceImage = ""
 
 function higgsfieldConfigured(){return Boolean(HIGGSFIELD_CREDENTIALS)}
 function mediaProviderOrderForBudget(mode="cheap"){
-  const m=String(mode||"cheap").toLowerCase();
-  if(m==="free") return ["localsd","wan2gp","selfhost","pollinations","openrouter","fal"];
+  const m=ZERO_COST_MODE?"free":String(mode||"cheap").toLowerCase();
+  // API keys and open-weight model licenses do not imply free inference.
+  // In zero-cost mode only user-operated workers are eligible.
+  if(m==="free") return ["localsd","wan2gp","selfhost"];
   if(m==="best") return ["higgsfield","openrouter","wan2gp","selfhost","localsd","pollinations","fal"];
   if(m==="balanced") return ["localsd","wan2gp","selfhost","higgsfield","openrouter","pollinations","fal"];
   return ["localsd","wan2gp","selfhost","pollinations","higgsfield","openrouter","fal"];
@@ -5947,9 +5949,9 @@ function saveStudioHistory(items){writeJsonFileSafe(STUDIO_HISTORY_FILE,items.sl
 function upsertStudioHistoryItem(input={}){const items=loadStudioHistory(),item=normalizeStudioHistoryItem(input),i=items.findIndex(x=>x.id===item.id);if(i>=0)items[i]=item;else items.unshift(item);saveStudioHistory(items);return item}
 
 function estimateStudioCost({kind='image', duration=4, budget_mode='balanced', references=[], wants_avatar=false}={}){
-  const freeImage = localSdConfigured() || wan2gpConfigured() || !!SELF_HOST_MEDIA_BASE_URL || !!POLLINATIONS_API_KEY;
-  const freeVideo = wan2gpConfigured() || !!SELF_HOST_MEDIA_BASE_URL || !!POLLINATIONS_API_KEY;
-  if (String(budget_mode||'').toLowerCase()==='free') return 0;
+  const freeImage = localSdConfigured() || wan2gpConfigured() || !!SELF_HOST_MEDIA_BASE_URL;
+  const freeVideo = wan2gpConfigured() || !!SELF_HOST_MEDIA_BASE_URL;
+  if (ZERO_COST_MODE || String(budget_mode||'').toLowerCase()==='free') return 0;
   if (kind==='image') {
     if (freeImage) return 0;
     if (higgsfieldConfigured()) return references?.length ? 0.08 : 0.06;
