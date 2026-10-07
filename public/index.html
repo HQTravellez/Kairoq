@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b0d10">
   <title>Kairoq</title>
   <link rel="stylesheet" href="/styles.css?v=153">
-  <link rel="stylesheet" href="/calm.css?v=18">
+  <link rel="stylesheet" href="/calm.css?v=19">
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay hidden">
@@ -424,8 +424,10 @@
               <div class="studio-panel-head"><h2>AI Sales Agent</h2><span>Discover → enrich → qualify → personalize → follow up.</span></div>
               <div class="agent-principle"><strong>Outcome:</strong> create qualified conversations, not a pile of scraped contacts. Evidence stays attached to every lead.</div>
               <form id="salesAgentSettingsForm" class="studio-form">
+                <div class="agent-principle"><strong>Travellez knowledge</strong><p>Read your website, confirm the offer, then build a focused campaign.</p><button id="readTravellezWebsite" type="button" class="cc-secondary-btn">Read travellez.com</button><small id="businessKnowledgeStatus">Website knowledge has not been imported.</small></div>
+                <label>Approved business knowledge<textarea id="salesKnowledge" rows="4" placeholder="Product facts, limitations, proof, exclusions and objections"></textarea></label>
                 <label>Sales goal<input id="salesGoal" type="text" placeholder="Create qualified sales conversations"></label>
-                <label>Ideal customer profile<textarea id="salesIcp" rows="3" placeholder="Corporate housing operators, relocation companies, travel buyers..."></textarea></label>
+                <label>Ideal customer profile<textarea id="salesIcp" rows="3" placeholder="Canadian SME finance, operations and travel buyers..."></textarea></label>
                 <div class="studio-grid two">
                   <label>Geography<input id="salesGeography" type="text" placeholder="Canada and United States"></label>
                   <label>Sender name<input id="salesSenderName" type="text" placeholder="Karan"></label>
@@ -433,6 +435,7 @@
                 <label>What are we selling?<textarea id="salesOffer" rows="3" placeholder="Describe the offer, strongest proof, and who it helps. Facts only."></textarea></label>
                 <div class="studio-inline-actions">
                   <button type="submit" class="cc-secondary-btn">Save strategy</button>
+                  <button id="salesStrategyBtn" type="button" class="cc-primary-btn">Build campaign strategy</button>
                   <button id="salesDiscoverBtn" type="button" class="cc-primary-btn">✦ Find opportunities</button>
                   <button id="salesRunBtn" type="button" class="cc-primary-btn">▶ Research & prepare</button>
                 </div>
@@ -452,6 +455,7 @@
               <div class="agent-metric-grid">
                 <div><strong id="salesMetricTotal">0</strong><span>tracked</span></div><div><strong id="salesMetricReady">0</strong><span>ready</span></div><div><strong id="salesMetricOutreach">0</strong><span>in outreach</span></div><div><strong id="salesMetricWon">0</strong><span>won</span></div>
               </div>
+              <div id="salesCampaignStrategy" class="campaign-strategy"></div>
               <div id="salesLeadList" class="agent-card-list"><div class="studio-result empty">Add an account or discover public demand signals.</div></div>
             </section>
           </div>
@@ -461,20 +465,21 @@
               <div class="studio-panel-head"><h2>AI Marketing Agent</h2><span>Plan → write → review → create → schedule → learn.</span></div>
               <div class="agent-principle"><strong>Quality loop:</strong> Kairoq drafts, then runs a second editorial pass before anything reaches the content queue.</div>
               <form id="marketingAgentSettingsForm" class="studio-form">
+                <label>Approved business knowledge<textarea id="marketingKnowledge" rows="4" placeholder="Confirmed facts and claims we can use"></textarea></label>
                 <label>Business / brand<input id="marketingBusiness" type="text" placeholder="Kairoq"></label>
                 <label>Audience<textarea id="marketingAudience" rows="3" placeholder="Who exactly should care about this content?"></textarea></label>
                 <label>Offer / product<textarea id="marketingOffer" rows="3" placeholder="What we sell and the factual value proposition."></textarea></label>
                 <div class="studio-grid two"><label>Marketing goal<input id="marketingGoal" type="text" placeholder="Generate qualified demand"></label><label>Voice<input id="marketingVoice" type="text" placeholder="Clear, credible, useful, human"></label></div>
                 <label>Content pillars<input id="marketingPillars" type="text" placeholder="education, proof, point of view, product"></label>
                 <label>Channels<div class="agent-check-row"><label><input class="marketing-channel" type="checkbox" value="LinkedIn" checked> LinkedIn</label><label><input class="marketing-channel" type="checkbox" value="Instagram" checked> Instagram</label><label><input class="marketing-channel" type="checkbox" value="X" checked> X</label></div></label>
-                <div class="studio-inline-actions"><button type="submit" class="cc-secondary-btn">Save strategy</button><button id="marketingGenerateBtn" type="button" class="cc-primary-btn">✦ Generate 7-day plan</button></div>
+                <div class="studio-inline-actions"><button type="submit" class="cc-secondary-btn">Save strategy</button><button id="marketingStrategyBtn" type="button" class="cc-primary-btn">Build campaign strategy</button><button id="marketingGenerateBtn" type="button" class="cc-primary-btn">✦ Generate 7-day plan</button></div>
                 <small id="marketingPostizNote" class="agent-provider-note">Checking publishing channels…</small>
               </form>
             </section>
             <section class="studio-panel result-panel">
               <div class="studio-panel-head"><h2>Content queue</h2><span id="marketingAgentMeta">0 pieces</span></div>
               <div id="marketingIntegrationChips" class="agent-integration-chips"></div>
-              <div id="marketingContentList" class="agent-card-list"><div class="studio-result empty">Set the strategy and generate the first content plan.</div></div>
+              <div id="marketingCampaignStrategy" class="campaign-strategy"></div><div id="marketingContentList" class="agent-card-list"><div class="studio-result empty">Set the strategy and generate the first content plan.</div></div>
             </section>
           </div>
 
@@ -1471,7 +1476,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=18"></script>
+  <script src="/app.js?v=19"></script>
 <script src="/connections.js?v=18"></script>
 </body>
 </html>

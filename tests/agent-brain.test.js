@@ -1,0 +1,6 @@
+const test=require('node:test');const assert=require('node:assert/strict');
+const {profile,groundQualification,planCampaign}=require('../agent-brain');
+test('Travellez profile preserves approved overrides and beta constraints',()=>{assert.equal(profile().business,'Travellez');assert.match(profile().knowledge,/private beta/);assert.equal(profile({offer:'Approved offer'}).offer,'Approved offer')});
+test('email or invented evidence cannot qualify an account',()=>{const x=groundQualification({decision:'qualified',fit_score:99,supporting_facts:[{quote:'We travel every week'}]},{email:'real@example.com',signal:'New office'});assert.equal(x.decision,'needs_research');assert.ok(x.fit_score<50)});
+test('qualification keeps exact evidence and bounds the fit score',()=>{const x=groundQualification({decision:'qualified',fit_score:1000,supporting_facts:[{quote:'Our team travels to client sites'}]},{evidence:[{summary:'Our team travels to client sites'}]});assert.equal(x.decision,'qualified');assert.equal(x.fit_score,95);assert.equal(x.supporting_facts.length,1)});
+test('incomplete strategy output fails instead of producing generic advice',async()=>{await assert.rejects(planCampaign({},'sales',async()=>({})),/complete campaign/)});
