@@ -4046,6 +4046,35 @@ async function handleLogin(req, res) {
   return json(res, 200, { ok: true }, { "Set-Cookie": cookie });
 }
 
+
+async function readPublicWebsiteForChat(rawUrl){
+  const dns=require("dns").promises,net=require("net");
+  const u=new URL(rawUrl);
+  if(u.protocol!=="https:" || u.username || u.password || u.port)throw new Error("Only public HTTPS websites are supported.");
+  const host=u.hostname.toLowerCase();
+  if(host==="localhost"||host.endsWith(".local")||host.endsWith(".internal")||!host.includes(".")||net.isIP(host))throw new Error("Private hostnames are blocked.");
+  const addresses=await dns.lookup(host,{all:true});
+  if(!addresses.length||addresses.some(({address,family})=>{
+    if(family===4){
+      const a=address.split(".").map(Number);
+      return a[0]===0||a[0]===10||a[0]===127||a[0]>=224||(a[0]===169&&a[1]===254)||(a[0]===172&&a[1]>=16&&a[1]<=31)||(a[0]===192&&a[1]===168)||(a[0]===100&&a[1]>=64&&a[1]<=127);
+    }
+    return /^(::1|fe80:|fc|fd|::ffff:|2001:db8:)/i.test(address);
+  }))throw new Error("Private network destinations are blocked.");
+  const response=await fetch(u.toString(),{redirect:"manual",signal:AbortSignal.timeout(12000),headers:{"Accept":"text/html","User-Agent":"KairoqPublicWebsiteReader/1.0"}});
+  if(response.status>=300&&response.status<400)throw new Error("Website redirected. Please send its final HTTPS URL.");
+  if(!response.ok)throw new Error("Website returned HTTP "+response.status);
+  if(!String(response.headers.get("content-type")||"").toLowerCase().includes("text/html"))throw new Error("The URL did not return an HTML page.");
+  const reader=response.body.getReader();const decoder=new TextDecoder();let html="",bytes=0;
+  while(bytes<220000){const {value,done}=await reader.read();if(done)break;const take=Math.min(value.byteLength,220000-bytes);bytes+=take;html+=decoder.decode(value.subarray(0,take),{stream:true})}
+  await reader.cancel().catch(()=>{});
+  const title=(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||host;
+  const meta=(html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)/i)||html.match(/<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description/i)||[])[1]||"";
+  const headings=[...html.matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/gi)].slice(0,12).map(m=>m[1].replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
+  const content=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/\s+/g," ").trim();
+  return {url:u.toString(),title:title.replace(/<[^>]*>/g," ").trim().slice(0,250),description:meta.trim().slice(0,750),headings,excerpt:content.slice(0,4500)};
+}
+
 async function handleChat(req, res) {
   let sseStarted=false;
   try{
@@ -4100,6 +4129,24 @@ async function handleChat(req, res) {
     });
     sseStarted=true;
 
+    const lastUserText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
+    const websiteUrlMatch=lastUserText.match(/https:\/\/[^\s<>\])"'\x60]+/i);
+    if(websiteUrlMatch && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about/i.test(lastUserText))){
+      const siteUrl=websiteUrlMatch[0].replace(/[.,;!?]+$/,"");
+      writeSSE(res,"status",{message:"Reading public website directly…"});
+      try{
+        const page=await readPublicWebsiteForChat(siteUrl);
+        const output="I opened **"+page.url+"** and retrieved the public homepage.\n\n**Page title:** "+page.title+(page.description?"\n\n**Description:** "+page.description:"")+(page.headings.length?"\n\n**Page sections:** "+page.headings.join(" · "):"")+"\n\n**Page excerpt:** "+page.excerpt.slice(0,1800)+"\n\nI can use this page content for more detailed analysis.";
+        writeSSE(res,"token",{text:output});
+        writeSSE(res,"meta",{model:"kairoq/website-reader",usage:{cost:0}});
+        writeSSE(res,"done",{ok:true,provider:"website-reader",zeroCost:true});
+        return res.end();
+      }catch(siteError){
+        writeSSE(res,"token",{text:"I tried to open "+siteUrl+" but could not retrieve the page: "+siteError.message+". This is a website access error, not a limitation of the text model."});
+        writeSSE(res,"done",{ok:false,provider:"website-reader",zeroCost:true});
+        return res.end();
+      }
+    }
     if(ZERO_COST_MODE){
       const preferredLocal=isLocalModelId(requestedModel)&&requestedModel!=="local/auto"?stripLocalModelId(requestedModel):await resolveLocalLlmModel();
       if(preferredLocal){
