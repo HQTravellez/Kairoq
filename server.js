@@ -6,6 +6,11 @@ const zlib = require("zlib");
 const { execFile } = require("child_process");
 
 loadEnv();
+// Accept the variable name used by the existing Railway deployment.
+if (!process.env.OPENROUTER_API_KEY && process.env.OPEN_ROUTER) {
+  process.env.OPENROUTER_API_KEY = process.env.OPEN_ROUTER.trim();
+}
+
 
 const PORT = Number(process.env.PORT || 3002);
 const SITE_NAME = process.env.SITE_NAME || "Kairoq";
