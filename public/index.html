@@ -436,12 +436,23 @@
                 <div class="studio-inline-actions">
                   <button type="submit" class="cc-secondary-btn">Save strategy</button>
                   <button id="salesStrategyBtn" type="button" class="cc-primary-btn">Build campaign strategy</button>
-                  <button id="salesDiscoverBtn" type="button" class="cc-primary-btn">✦ Find opportunities</button>
+                  <button id="salesDiscoverBtn" type="button" class="cc-primary-btn">✦ Find public signals</button>
                   <button id="salesRunBtn" type="button" class="cc-primary-btn">▶ Research & prepare</button>
                 </div>
                 <small id="salesAgentProviderNote" class="agent-provider-note">Checking enrichment and email connectors…</small>
               </form>
               <div class="studio-divider"></div>
+              <details class="agent-principle">
+                <summary><strong>Import real prospects</strong> · OpenOutFind or CSV</summary>
+                <p>Bring a lead export into your pipeline. Imported prospects are researched against the Travellez campaign before outreach.</p>
+                <form id="salesImportForm" class="studio-form">
+                  <label>CSV or JSONL file<input id="salesImportFile" type="file" accept=".csv,.jsonl,.json,text/csv,application/json"></label>
+                  <label>Or paste the export<textarea id="salesImportText" rows="4" placeholder="company,website,full_name,title,email,reason"></textarea></label>
+                  <button type="submit" class="cc-secondary-btn">Import prospects</button>
+                  <small id="salesImportStatus">Up to 500 prospects · duplicates skipped · no messages sent</small>
+                </form>
+                <small>Live contact discovery needs a lead data connection. <a href="https://github.com/eracle/OpenOutFind" target="_blank" rel="noopener">OpenOutFind</a> exports supported. Free enrichment uses <a href="https://github.com/HQTravellez/Kairoq/tree/main/vendor/openenrich" target="_blank" rel="noopener">OpenEnrich · source and license</a>.</small>
+              </details>
               <div class="studio-panel-head compact"><h3>Add a lead</h3><span>Useful when you already know the account or domain.</span></div>
               <form id="salesLeadForm" class="studio-form">
                 <div class="studio-grid two"><label>Company<input id="salesLeadCompany" required type="text" placeholder="Acme Inc."></label><label>Website / domain<input id="salesLeadWebsite" type="text" placeholder="acme.com"></label></div>
@@ -1476,7 +1487,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=19"></script>
+  <script src="/app.js?v=20"></script>
 <script src="/connections.js?v=18"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ const zlib = require("zlib");
 const { execFile } = require("child_process");
 
 const agentBrain = require("./agent-brain");
+const salesOpenSource = require("./sales-open-source");
 
 loadEnv();
 // Accept the variable name used by the existing Railway deployment.
@@ -85,7 +86,6 @@ const SALES_AGENT_FILE = path.join(__dirname, "workspace", ".sales-agent.json");
 const MARKETING_AGENT_FILE = path.join(__dirname, "workspace", ".marketing-agent.json");
 const POSTIZ_API_BASE = String(process.env.POSTIZ_API_BASE || "https://api.postiz.com/public/v1").replace(/\/$/, "");
 const POSTIZ_API_KEY = String(process.env.POSTIZ_API_KEY || "").trim();
-const OPENENRICH_BIN = String(process.env.OPENENRICH_BIN || "").trim();
 const ARRIVALBRIEFS_DIR = path.join(__dirname, "public", "generated", "arrivalbrief");
 fs.mkdirSync(ARRIVALBRIEFS_DIR, { recursive: true });
 const LISTINGS_DIR = path.join(__dirname, "public", "generated", "listings");
@@ -5610,12 +5610,8 @@ async function fetchPublicCompanyPage(url){
   return (await r.text()).slice(0,1_500_000);
 }
 async function tryOpenEnrich(lead){
-  if(!OPENENRICH_BIN||!lead.contact_name||!lead.domain)return null;
-  try{
-    const {stdout}=await execFileP(OPENENRICH_BIN,["find",lead.contact_name,lead.domain]);
-    const email=(String(stdout).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)||[])[0]||"";
-    return email?{email:email.toLowerCase(),source:"OpenEnrich local",raw:compactText(stdout,1200)}:null;
-  }catch(err){return {error:compactText(err.message,500),source:"OpenEnrich local"}}
+  try{return await salesOpenSource.enrichContact(lead,WORKSPACE_DIR)}
+  catch(err){return {source:"OpenEnrich",status:"failed",error:compactText(err.message,500)}}
 }
 function normalizeSalesLead(input={}){
   const now=new Date().toISOString(); const website=String(input.website||"").trim(); const domain=String(input.domain||domainFromLead(website)).trim().toLowerCase();
@@ -5652,7 +5648,7 @@ async function enrichSalesLeadItem(lead){
     if(enrichment.website_title||enrichment.description)evidence.push({type:"website",url:pages[0],title:enrichment.website_title,summary:enrichment.description});
   }
   if(next.company){try{const news=await googleNewsSignals(`"${next.company}"`,4);enrichment.recent_news=news.slice(0,4);for(const n of enrichment.recent_news)evidence.push({type:"news",url:n.link,title:n.title,source:n.source,published_at:n.published_at})}catch{}}
-  const oe=await tryOpenEnrich(next); if(oe){enrichment.openenrich=oe;if(oe.email&&!next.email){next.email=oe.email;evidence.push({type:"email_enrichment",source:oe.source,email:oe.email})}}
+  const oe=await tryOpenEnrich(next); if(oe){enrichment.openenrich=oe;if(oe.email&&oe.selectable&&!next.email){next.email=oe.email;evidence.push({type:"email_enrichment",source:oe.source,email:oe.email})}}
   next=normalizeSalesLead({...next,enrichment,evidence:[...new Map(evidence.filter(Boolean).map(x=>[JSON.stringify([x.type,x.url,x.email,x.title]),x])).values()].slice(0,30),status:"researching"});
   const state=loadSalesState();
   const qualification=await agentBrain.qualifyAccount(next,state.settings,state.strategy,callFreeLlmJSON);
@@ -5752,9 +5748,16 @@ async function handleBusinessKnowledge(req,res){try{
   return json(res,200,{pages:sources.length,sources:sources.map(x=>({url:x.url,title:x.title})),message:"Website knowledge saved for Sales and Marketing. Build a campaign strategy next."});
 }catch(err){return json(res,502,{error:err.message})}}
 async function handleAgentStrategy(req,res){try{const body=await getBody(req,500000);const kind=body.kind==="marketing"?"marketing":"sales";const state=kind==="sales"?loadSalesState():loadMarketingState();state.strategy=await agentBrain.planCampaign(state.settings,kind,callFreeLlmJSON);if(kind==="sales")saveSalesState(state);else saveMarketingState(state);return json(res,200,{strategy:state.strategy})}catch(err){return json(res,502,{error:err.message})}}
-async function handleAgentsStatus(_req,res){const sales=loadSalesState(),marketing=loadMarketingState();let integrations=[];if(postizConfigured()){try{integrations=await postizIntegrations()}catch{}}return json(res,200,{sales:{strategy:sales.strategy,settings:sales.settings,leads:sales.leads,runs:sales.runs.slice(0,20),summary:{total:sales.leads.length,ready:sales.leads.filter(x=>x.status==="ready").length,outreach:sales.leads.filter(x=>["outreach","follow-up"].includes(x.status)).length,won:sales.leads.filter(x=>x.status==="won").length},openenrich_configured:!!OPENENRICH_BIN,email_provider:googleConfigured()?"Gmail":microsoftConfigured()?"Outlook":null},marketing:{strategy:marketing.strategy,settings:marketing.settings,items:marketing.items,runs:marketing.runs.slice(0,20),postiz_configured:postizConfigured(),integrations}})}
+async function handleAgentsStatus(_req,res){const sales=loadSalesState(),marketing=loadMarketingState();let integrations=[];if(postizConfigured()){try{integrations=await postizIntegrations()}catch{}}return json(res,200,{sales:{strategy:sales.strategy,settings:sales.settings,leads:sales.leads,runs:sales.runs.slice(0,20),summary:{total:sales.leads.length,ready:sales.leads.filter(x=>x.status==="ready").length,outreach:sales.leads.filter(x=>["outreach","follow-up"].includes(x.status)).length,won:sales.leads.filter(x=>x.status==="won").length},openenrich_configured:true,lead_discovery:{mode:"public_signals",openoutfind_import:true,live_contact_database:false},email_provider:googleConfigured()?"Gmail":microsoftConfigured()?"Outlook":null},marketing:{strategy:marketing.strategy,settings:marketing.settings,items:marketing.items,runs:marketing.runs.slice(0,20),postiz_configured:postizConfigured(),integrations}})}
 async function handleSalesSettings(req,res){try{const body=await getBody(req,500_000),state=loadSalesState();if(Object.entries(body).some(([k,v])=>JSON.stringify(state.settings[k])!==JSON.stringify(v)))state.strategy=null;state.settings={...state.settings,...body};saveSalesState(state);return json(res,200,{settings:loadSalesState().settings})}catch(err){return json(res,400,{error:err.message})}}
 async function handleSalesLeadSave(req,res){try{const body=await getBody(req,1_000_000);return json(res,200,{lead:upsertSalesLead(body)})}catch(err){return json(res,400,{error:err.message})}}
+async function handleSalesImport(req,res){try{
+  const body=await getBody(req,1_100_000),rows=await salesOpenSource.parseLeadExport(body.text);
+  const state=loadSalesState(),keys=new Set(state.leads.map(salesOpenSource.leadKey));let imported=0,duplicates=0;
+  for(const row of rows){const lead=normalizeSalesLead(row),key=salesOpenSource.leadKey(lead);if(keys.has(key)){duplicates++;continue}keys.add(key);state.leads.unshift(lead);imported++}
+  state.runs.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),type:"lead_export_import",count:imported,duplicates});saveSalesState(state);
+  return json(res,200,{imported,duplicates,message:"Prospects imported. Research and qualify them before outreach."});
+}catch(err){return json(res,400,{error:err.message||"Lead import failed."})}}
 async function handleSalesDiscover(req,res){try{const body=await getBody(req,500_000),leads=await salesAgentDiscover(body);return json(res,200,{leads,count:leads.length})}catch(err){return json(res,500,{error:err.message||"Lead discovery failed."})}}
 async function handleSalesEnrich(req,res){try{const body=await getBody(req,500_000),lead=loadSalesState().leads.find(x=>x.id===String(body.id||""));if(!lead)return json(res,404,{error:"Lead not found."});return json(res,200,{lead:await enrichSalesLeadItem(lead)})}catch(err){return json(res,500,{error:err.message||"Lead enrichment failed."})}}
 async function handleSalesDraft(req,res){try{const body=await getBody(req,500_000),lead=loadSalesState().leads.find(x=>x.id===String(body.id||""));if(!lead)return json(res,404,{error:"Lead not found."});return json(res,200,{lead:await draftSalesOutreach(lead)})}catch(err){return json(res,500,{error:err.message||"Could not draft outreach."})}}
@@ -6442,6 +6445,7 @@ const server = http.createServer(async (req, res) => {
   if(req.method==="POST"&&url==="/api/agents/strategy"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleAgentStrategy(req,res)}
   if (req.method === "POST" && url === "/api/agents/sales/settings") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleSalesSettings(req,res); }
   if (req.method === "POST" && url === "/api/agents/sales/lead") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleSalesLeadSave(req,res); }
+  if(req.method==="POST"&&url==="/api/agents/sales/import"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleSalesImport(req,res)}
   if (req.method === "POST" && url === "/api/agents/sales/discover") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleSalesDiscover(req,res); }
   if (req.method === "POST" && url === "/api/agents/sales/enrich") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleSalesEnrich(req,res); }
   if (req.method === "POST" && url === "/api/agents/sales/draft") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleSalesDraft(req,res); }

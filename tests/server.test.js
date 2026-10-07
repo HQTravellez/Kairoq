@@ -705,10 +705,10 @@ test("v16 optional integrations are environment-driven and not hard-coded", () =
   const fs=require("node:fs"),path=require("node:path");
   const env=fs.readFileSync(path.join(__dirname,"..",".env.example"),"utf8");
   const server=fs.readFileSync(path.join(__dirname,"..","server.js"),"utf8");
-  assert.match(env,/OPENENRICH_BIN=/);
+  assert.match(server,/salesOpenSource\.enrichContact/);
   assert.match(env,/POSTIZ_API_KEY=/);
   assert.match(server,/process\.env\.POSTIZ_API_KEY/);
-  assert.match(server,/process\.env\.OPENENRICH_BIN/);
+  assert.match(server,/openenrich_configured:true/);
 });
 
 test("v16 Marketing Agent uploads generated media to Postiz before approved scheduling", () => {

@@ -6,7 +6,13 @@ Kairoq now surfaces two outcome-focused workers first, while keeping the existin
 
 The Sales Agent owns the path from **account → evidence → qualification → personalized outreach → follow-up state**. It can discover timing signals from public news, accept manual accounts/domains, crawl public company pages, keep the source evidence on the lead, score readiness, and draft outreach without inventing facts. A batch **Research & prepare** action researches and prepares multiple leads in one run. Sending is consequential: Kairoq requires explicit approval and uses the connected Gmail or Microsoft Outlook account.
 
-Quality is intentionally layered. Kairoq's built-in enrichment uses public website/news evidence. You can optionally point `OPENENRICH_BIN` at a separately installed OpenEnrich CLI for local email finding/verification when a contact name + domain are known. Kairoq does not copy or bundle OpenEnrich's AGPL source code; it treats the tool as an optional external process.
+OpenEnrich is now bundled at a pinned upstream commit with its source and AGPL-3.0 license in `vendor/openenrich`. Enrichment uses only the free website/pattern providers, a zero-dollar budget, and no SMTP probing. Published email evidence can populate a missing contact; an unverified pattern remains a suggestion and is never automatically selected. Domain knowledge persists under the Railway volume's workspace.
+
+Use **Import real prospects** to upload or paste an OpenOutFind CSV/JSONL export (up to 500 records / 1 MB). The importer retains profile evidence, deduplicates contacts, and sets every new prospect to `new`; imported qualifications and outreach drafts are not trusted. Imported email addresses are labeled unverified. No model call or sending occurs during import.
+
+OpenOutFind was inspected at commit `a7a2e08653bbc7757eb850a81db9c8db2e363c48`. Its default runtime contributes discovered profiles and resolved contacts to `hub.openoutreach.app`. Kairoq supports its export format but does not run that sharing client. Autonomous licensed contact discovery is not yet connected; **Find public signals** remains a news research action. A provider key and a privacy-reviewed discovery implementation are required for live contact discovery.
+
+Source and license for the bundled enrichment component: https://github.com/HQTravellez/Kairoq/tree/main/vendor/openenrich . See `vendor/openenrich/UPSTREAM.md` for reproducible source/build details.
 
 ## AI Marketing Agent
 
@@ -19,12 +25,11 @@ For publishing, set `POSTIZ_API_KEY` locally or in Railway. Kairoq reads the con
 ### v16 environment additions
 
 ```env
-OPENENRICH_BIN=
 POSTIZ_API_KEY=
 POSTIZ_API_BASE=https://api.postiz.com/public/v1
 ```
 
-`OPENENRICH_BIN` is optional. If omitted, Sales still performs public website + news enrichment. `POSTIZ_API_KEY` is optional. If omitted, Marketing still plans, writes, reviews, and generates media; only social scheduling is unavailable.
+`POSTIZ_API_KEY` is optional. If omitted, Marketing still plans, writes, reviews, and generates media; only social scheduling is unavailable.
 
 ### What is deliberately not automated without approval
 
