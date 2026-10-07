@@ -1,0 +1,1471 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b0d10">
+  <title>Kairoq</title>
+  <link rel="stylesheet" href="/styles.css?v=153">
+</head>
+<body>
+  <div id="loginOverlay" class="login-overlay hidden">
+    <form id="loginForm" class="login-card">
+      <div class="brand-mark big">K</div>
+      <h1>Kairoq</h1>
+      <p>This deployment is password protected.</p>
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+      <button type="submit">Unlock</button>
+      <div id="loginError" class="login-error"></div>
+    </form>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">K</div>
+        <div>
+          <div class="brand-title">Kairoq</div>
+          <div class="brand-subtitle">Outcome operating system</div>
+        </div>
+      </div>
+
+      <button id="commandCenterBtn" class="new-chat command-center-nav active">⌂ Today</button>
+      <button id="newChat" class="new-chat">＋ New task</button>
+      <button id="outcomesNavBtn" class="new-chat primary-nav-secondary">✓ Outcomes</button>
+      <button id="historyNavBtn" class="new-chat primary-nav-secondary">◴ History</button>
+      <button id="studioSideBtn" class="new-chat primary-nav-secondary">▣ Studio</button>
+      <button id="workspaceBtn" class="new-chat secondary-action">◫ Memory</button>
+      <div class="project-picker">
+        <label>PROJECT</label>
+        <select id="projectSelect"></select>
+        <button id="newProjectBtn" title="New project">＋</button>
+      </div>
+      <button id="compareBtn" class="new-chat secondary-action">⇄ Compare models</button>
+      <button id="agentBtn" class="new-chat secondary-action">◆ Specialists</button>
+      <button id="connectorsBtn" class="new-chat secondary-action">⌁ Connections</button>
+      <button id="botsBtn" class="new-chat secondary-action">◷ Watchers</button>
+      <button id="templatesBtn" class="new-chat secondary-action">▤ Templates</button>
+      <button id="playbookBtn" class="new-chat secondary-action">⬡ How We Work</button>
+      <button id="workflowsBtn" class="new-chat secondary-action">◫ Outcomes</button>
+      <button id="opsBtn" class="new-chat secondary-action">⚿ Security</button>
+
+      <div class="protection-card">
+        <div class="protection-row">
+          <div>
+            <strong>Free Only</strong>
+            <small>Hard-block paid models</small>
+          </div>
+          <label class="switch"><input id="freeOnly" type="checkbox" checked><span></span></label>
+        </div>
+        <div class="protection-row">
+          <div>
+            <strong>Smart fallback</strong>
+            <small>Retry another free model</small>
+          </div>
+          <label class="switch"><input id="smartFallback" type="checkbox" checked><span></span></label>
+        </div>
+        <div class="protection-row">
+          <div>
+            <strong>Web search</strong>
+            <small>OpenRouter server search</small>
+          </div>
+          <label class="switch"><input id="webSearch" type="checkbox"><span></span></label>
+        </div>
+      </div>
+
+      <div class="side-label">PRESETS</div>
+      <div id="presetList" class="preset-list">
+        <button data-preset="quick" class="preset active">⚡ Quick</button>
+        <button data-preset="smart" class="preset">◐ Smart</button>
+        <button data-preset="deep" class="preset">✦ Deep reasoning</button>
+        <button data-preset="coding" class="preset">⌘ Coding</button>
+        <button data-preset="research" class="preset">⌕ Research</button>
+        <button data-preset="writing" class="preset">✎ Writing</button>
+        <button data-preset="vision" class="preset">◉ Vision</button>
+      </div>
+
+      <div class="side-label">RECOMMENDED</div>
+      <div class="recommended-grid">
+        <button data-reco="fast">Fast</button>
+        <button data-reco="bestfree">Best Free</button>
+        <button data-reco="coding">Coding</button>
+        <button data-reco="reasoning">Reasoning</button>
+        <button data-reco="vision">Vision</button>
+        <button data-reco="premium">Premium</button>
+      </div>
+
+      <div class="history-head">
+        <div class="side-label">CHATS</div>
+        <button id="clearChats" title="Clear all chats">Clear</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
+
+      <div class="sidebar-footer">
+        <div><span class="status-dot"></span>API key stays server-side</div>
+        <div id="usageMini" class="usage-mini">Usage: —</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar simple-topbar">
+        <div>
+          <div id="mainViewTitle" class="topbar-title">Today</div>
+          <div id="mainViewSubtitle" class="topbar-subtitle">What needs to happen?</div>
+        </div>
+        <div class="header-actions">
+          <button id="studioNavBtn" class="topbar-chat-btn">▣ Studio</button>
+          <button id="chatViewBtn" class="topbar-chat-btn">✦ Ask Kairoq</button>
+          <button id="shellModeBtn" class="topbar-chat-btn ghost">Simple</button>
+          <span id="zeroCostPill" class="zero-cost-pill">LOCAL + FREE</span><div id="freePill" class="free-pill">FREE FIRST</div>
+          <button id="settingsBtn" class="icon-btn" title="Settings">⚙</button>
+        </div>
+      </header>
+
+
+      <section id="commandCenter" class="command-center-view">
+        <div class="cc-shell">
+          <div class="cc-hero atlas-hero">
+            <div>
+              <div class="cc-kicker">KAIROQ</div>
+              <h1>What needs to happen?</h1>
+              <p>Give Kairoq an outcome. It keeps track of what is unfinished, works across your apps, and comes back when something needs you.</p>
+              <div class="atlas-chip-row">
+                <button id="finishItBtn" class="atlas-chip finish-it-chip">✦ What am I forgetting?</button>
+                <button class="atlas-chip work-studio-chip" data-prompt="Create the actual work file I need. Ask only for essential missing information, then produce a real Excel, Word, PowerPoint, PDF, or CSV file — not just instructions." data-agent="atlas">▦ Create a file</button>
+                <button class="atlas-chip creative-engine-chip" data-prompt="Create a polished image for me using the local/free creative engine. Keep the rendering job as an Outcome until the file is actually ready." data-agent="atlas">✦ Create for me</button>
+                <button class="atlas-chip browser-operator-chip" data-prompt="Go on the web and handle this for me. Decide whether to search, inspect pages, or use the browser. Do all read-only work automatically. If a website change is required, prepare one precise approval with the exact change and then continue after I approve." data-agent="atlas">◎ Do it on the web</button>
+                <button class="atlas-chip" data-prompt="Review my important emails and tell me what needs a reply first." data-agent="relay">Review my email</button>
+                <button class="atlas-chip" data-prompt="Prepare me for tomorrow. Check my calendar and build a short meeting brief." data-agent="orbit">Prepare tomorrow</button>
+                <button class="atlas-chip" data-prompt="Help me plan a business trip. Ask only for the details you really need first." data-agent="compass">Plan a trip</button>
+                <button class="atlas-chip" data-prompt="Research a competitor and show only the important changes and actions." data-agent="scout">Research competitor</button>
+                <button class="atlas-chip" data-prompt="Create a premium social media image for my business." data-agent="writer" data-media="image">Create image</button>
+                <button class="atlas-chip" data-prompt="Animate this into a short social video." data-agent="writer" data-media="video">Create video</button>
+                <button class="atlas-chip commerce-chip" data-prompt="Build me a complete premium Shopify store. Start by creating a full concept preview first: brand, visual direction, homepage, products, collections, About and FAQ pages. Keep everything as draft and show me the preview before changing Shopify. Ask only for essential missing information." data-agent="atlas">Build Shopify store</button>
+                <button class="atlas-chip autopilot-chip" data-prompt="Operate my Shopify store like an owner. Check store health, identify the highest-value problems, create evidence-based optimization experiments, and keep unresolved issues as open loops. Do not change the live store without approval." data-agent="atlas">Run my store</button>
+              </div>
+            </div>
+            <div class="cc-hero-actions">
+              <button id="ccRefresh" class="cc-secondary-btn">↻ Refresh</button>
+              <button id="ccOpenWorkflows" class="cc-primary-btn">View all work</button>
+            </div>
+          </div>
+
+          <div class="cc-metrics">
+            <button class="cc-metric attention" data-cc-open="workflows">
+              <span class="cc-metric-icon">!</span>
+              <span>
+                <strong id="ccAttentionCount">0</strong>
+                <small>Needs attention</small>
+              </span>
+            </button>
+            <button class="cc-metric" data-cc-open="workflows">
+              <span class="cc-metric-icon">◫</span>
+              <span>
+                <strong id="ccActiveCount">0</strong>
+                <small>Active work</small>
+              </span>
+            </button>
+            <button class="cc-metric" data-cc-open="bots">
+              <span class="cc-metric-icon">◷</span>
+              <span>
+                <strong id="ccBotCount">0</strong>
+                <small>Watchers</small>
+              </span>
+            </button>
+            <button class="cc-metric" data-cc-open="connectors">
+              <span class="cc-metric-icon">⌁</span>
+              <span>
+                <strong id="ccConnectorCount">0</strong>
+                <small>Connected apps</small>
+              </span>
+            </button>
+          </div>
+
+          <div class="cc-layout atlas-top-strip">
+            <section class="cc-panel atlas-capability-panel">
+              <div class="cc-panel-head">
+                <div>
+                  <span class="cc-panel-kicker">CONNECTED</span>
+                  <h2>Connected abilities</h2>
+                </div>
+              </div>
+              <div id="atlasCapabilityList" class="atlas-capability-list">
+                <div class="cc-empty">Checking connected apps…</div>
+              </div>
+            </section>
+
+            <section class="cc-panel atlas-budget-panel">
+              <div class="cc-panel-head">
+                <div>
+                  <span class="cc-panel-kicker">SPEND CONTROL</span>
+                  <h2>Cost-aware by default</h2>
+                </div>
+              </div>
+              <div class="atlas-budget-copy">Atlas can prefer free/community routes, the cheapest internal route, or the best quality route depending on your goal.</div>
+              <div class="atlas-budget-row">
+                <label for="spendModeSelect">Generation mode</label>
+                <select id="spendModeSelect">
+                  <option value="free">Free first</option>
+                  <option value="cheap" selected>Cheap first</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="best">Best quality</option>
+                </select>
+              </div>
+              <div id="atlasBudgetHint" class="atlas-budget-hint">Kairoq will prefer cheaper routes first.</div>
+            </section>
+          </div>
+
+          <section id="storeOperatorPanel" class="cc-panel store-operator-panel">
+            <div class="cc-panel-head">
+              <div>
+                <span class="cc-panel-kicker">COMMERCE OPERATOR</span>
+                <h2>Store autopilot</h2>
+                <p class="open-loops-sub">Real Shopify signals → problems → experiments → Outcomes.</p>
+              </div>
+              <div class="open-loop-actions">
+                <button id="storeAnalyzeBtn" class="cc-secondary-btn">↻ Analyze store</button>
+                <button id="storeImproveBtn" class="cc-primary-btn">✦ Find growth moves</button>
+              </div>
+            </div>
+            <div id="storeHealthEmpty" class="store-health-empty">Connect Shopify to see live store health.</div>
+            <div id="storeHealthContent" class="hidden">
+              <div class="store-score-row">
+                <div class="store-score"><strong id="storeHealthScore">—</strong><small>health</small></div>
+                <div class="store-stat"><strong id="storeRevenue">—</strong><small>30d order value</small></div>
+                <div class="store-stat"><strong id="storeOrders">—</strong><small>orders</small></div>
+                <div class="store-stat"><strong id="storeAov">—</strong><small>AOV</small></div>
+                <div class="store-stat"><strong id="storeIssueCount">—</strong><small>issues</small></div>
+              </div>
+              <div id="storeIssueList" class="store-issue-list"></div>
+              <div class="growth-divider"></div>
+              <div class="growth-head">
+                <div><strong>Growth intelligence</strong><small>Shopify + abandoned checkout + connected ads</small></div>
+                <button id="growthRefreshBtn" class="cc-link-btn">Refresh funnel →</button>
+              </div>
+              <div class="growth-metrics">
+                <div><strong id="growthAdSpend">—</strong><small>ad spend</small></div>
+                <div><strong id="growthBlendedRoas">—</strong><small>blended ROAS</small></div>
+                <div><strong id="growthAbandonedValue">—</strong><small>checkout value open</small></div>
+                <div><strong id="growthAbandonedCount">—</strong><small>open checkouts</small></div>
+              </div>
+              <div id="growthSourceNote" class="growth-note">Connect Meta Ads or Google Ads to compare acquisition spend with Shopify outcomes.</div>
+            </div>
+          </section>
+
+          <section class="cc-panel open-loops-panel">
+            <div class="cc-panel-head">
+              <div>
+                <span class="cc-panel-kicker">OUTCOMES</span>
+                <h2>Outcomes</h2>
+                <p class="open-loops-sub">Things Kairoq keeps owning until there is evidence they are actually finished.</p>
+              </div>
+              <div class="open-loop-actions">
+                <button id="scanLoopsBtn" class="cc-secondary-btn">✦ Find unfinished work</button>
+                <button id="addLoopBtn" class="cc-primary-btn">＋ Add outcome</button>
+              </div>
+            </div>
+            <div class="open-loop-summary">
+              <div><strong id="loopCount">0</strong><small>active</small></div>
+              <div><strong id="loopOverdueCount">0</strong><small>overdue</small></div>
+              <div><strong id="loopValue">$0</strong><small>value at stake</small></div>
+            </div>
+            <div id="openLoopsList" class="open-loops-list">
+              <div class="cc-empty">No active outcomes yet.</div>
+            </div>
+          </section>
+
+          <section class="cc-panel work-studio-panel">
+            <div class="cc-panel-head">
+              <div>
+                <span class="cc-panel-kicker">WORK STUDIO</span>
+                <h2>Files Kairoq made</h2>
+                <p class="open-loops-sub">Excel, Word, PowerPoint, PDF and CSV — create locally, then save to OneDrive or SharePoint when Microsoft 365 is connected.</p>
+              </div>
+              <button id="workProductsRefreshBtn" class="cc-link-btn">Refresh →</button>
+            </div>
+            <div class="work-format-strip">
+              <span>XLSX</span><span>DOCX</span><span>PPTX</span><span>PDF</span><span>CSV</span>
+            </div>
+            <div id="workProductsList" class="work-products-list">
+              <div class="cc-empty">No work files yet.</div>
+            </div>
+          </section>
+
+          <div class="cc-layout">
+            <section class="cc-panel cc-priority-panel">
+              <div class="cc-panel-head">
+                <div>
+                  <span class="cc-panel-kicker">PRIORITY QUEUE</span>
+                  <h2>What needs you</h2>
+                </div>
+                <button id="ccPriorityOpen" class="cc-link-btn">Open workflows →</button>
+              </div>
+              <div id="ccPriorityList" class="cc-priority-list">
+                <div class="cc-empty">Loading your work…</div>
+              </div>
+            </section>
+
+            <section class="cc-panel cc-team-panel">
+              <div class="cc-panel-head">
+                <div>
+                  <span class="cc-panel-kicker">YOUR AI TEAM</span>
+                  <h2>Ready to work</h2>
+                </div>
+                <button id="ccTeamOpen" class="cc-link-btn">All agents →</button>
+              </div>
+              <div id="ccAgentGrid" class="cc-agent-grid"></div>
+            </section>
+          </div>
+
+          <div class="cc-layout cc-lower">
+            <section class="cc-panel">
+              <div class="cc-panel-head">
+                <div>
+                  <span class="cc-panel-kicker">QUICK START</span>
+                  <h2>Give Kairoq an outcome</h2>
+                </div>
+              </div>
+              <div class="cc-quick-grid">
+                <button class="cc-quick" data-prompt="Review my important emails and tell me what needs a reply first." data-agent="relay">
+                  <span>⇄</span><strong>Review inbox</strong><small>Find priority messages and draft replies</small>
+                </button>
+                <button class="cc-quick" data-prompt="Help me plan a business trip. Ask only for details you actually need, then find the best options." data-agent="compass">
+                  <span>◇</span><strong>Plan a trip</strong><small>Research options, policy and itinerary</small>
+                </button>
+                <button class="cc-quick" data-prompt="Research a competitor and give me the important changes, evidence, and actions." data-agent="scout">
+                  <span>◉</span><strong>Research competitor</strong><small>Web research and intelligence</small>
+                </button>
+                <button class="cc-quick" data-prompt="Draft a concise professional follow-up email based on the context I provide." data-agent="writer">
+                  <span>✎</span><strong>Draft message</strong><small>Emails, documents and follow-ups</small>
+                </button>
+                <button class="cc-quick work-quick" data-prompt="Create the actual business file I need. Choose Excel, Word, PowerPoint, PDF, or CSV based on my request, build it professionally, and give me the file." data-agent="atlas">
+                  <span>▦</span><strong>Create work file</strong><small>Excel, Word, PowerPoint, PDF or CSV</small>
+                </button>
+                <button class="cc-quick" data-prompt="Create a premium social media image for my business." data-agent="writer" data-media="image">
+                  <span>🎨</span><strong>Create image</strong><small>Generate or edit visual content</small>
+                </button>
+                <button class="cc-quick" data-prompt="Create a short premium promotional video for my business." data-agent="writer" data-media="video">
+                  <span>🎬</span><strong>Create video</strong><small>Generate or animate video</small>
+                </button>
+                <button class="cc-quick commerce-quick" data-prompt="Build me a premium Shopify store from one sentence. Create the store concept and preview first, then prepare draft Shopify products, collections and pages for my approval. Do not publish anything live." data-agent="atlas">
+                  <span>🛍️</span><strong>Build a store</strong><small>Prompt → preview → Shopify draft</small>
+                </button>
+              </div>
+            </section>
+
+            <section class="cc-panel atlas-anywhere-panel">
+              <div class="cc-panel-head">
+                <div>
+                  <span class="cc-panel-kicker">ATLAS ANYWHERE</span>
+                  <h2>Message Atlas without opening the app</h2>
+                </div>
+              </div>
+              <p class="atlas-anywhere-copy">Send Atlas a task from Telegram, WhatsApp, or SMS. Read/research work can finish in the conversation; consequential actions are queued for approval.</p>
+              <div id="atlasChannelStatus" class="atlas-channel-list">
+                <div class="cc-empty">Checking channels…</div>
+              </div>
+              <button id="atlasOpenConnectors" class="cc-secondary-btn atlas-channel-button">Set up channels</button>
+            </section>
+
+            <section class="cc-panel">
+              <div class="cc-panel-head">
+                <div>
+                  <span class="cc-panel-kicker">RECENT ACTIVITY</span>
+                  <h2>Today</h2>
+                </div>
+                <span id="ccLastUpdated" class="cc-updated">—</span>
+              </div>
+              <div id="ccRecentActivity" class="cc-activity-list">
+                <div class="cc-empty">No activity yet.</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+
+      <section id="studioView" class="studio-view hidden">
+        <div class="studio-shell">
+          <div class="studio-header-card">
+            <div>
+              <div class="studio-kicker">KAIROQ OUTCOME AGENTS</div>
+              <h1>Give the goal. Sales and Marketing keep the work moving.</h1>
+              <p>Sales researches and prepares opportunities. Marketing plans, generates, reviews, and can schedule approved content. The existing Studio tools remain available underneath.</p>
+            </div>
+            <div class="studio-status-bar">
+              <div class="studio-status-item"><strong id="studioAvatarCount">0</strong><small>avatars</small></div>
+              <div class="studio-status-item"><strong id="studioProjectCount">0</strong><small>projects</small></div>
+              <div class="studio-status-item"><strong id="studioPromptCount">0</strong><small>prompts</small></div>
+              <div class="studio-status-item"><strong id="studioHistoryCount">0</strong><small>generations</small></div>
+            </div>
+          </div>
+
+          <div class="studio-subnav">
+            <button class="studio-tab active" data-studio-tab="salesAgent">Sales Agent</button>
+            <button class="studio-tab" data-studio-tab="marketingAgent">Marketing Agent</button>
+            <button class="studio-tab" data-studio-tab="create">Create</button>
+            <button class="studio-tab" data-studio-tab="listings">Listings</button>
+            <button class="studio-tab" data-studio-tab="pursuit">Pursuit</button>
+            <button class="studio-tab" data-studio-tab="arrival">ArrivalBrief</button>
+            <button class="studio-tab" data-studio-tab="tours">Tours</button>
+            <button class="studio-tab" data-studio-tab="avatars">Avatars</button>
+            <button class="studio-tab" data-studio-tab="ugc">UGC</button>
+            <button class="studio-tab" data-studio-tab="projects">Projects</button>
+            <button class="studio-tab" data-studio-tab="library">Library</button>
+          </div>
+
+          <div id="studioSalesAgentTab" class="studio-panel-grid">
+            <section class="studio-panel form-panel agent-control-panel">
+              <div class="studio-panel-head"><h2>AI Sales Agent</h2><span>Discover → enrich → qualify → personalize → follow up.</span></div>
+              <div class="agent-principle"><strong>Outcome:</strong> create qualified conversations, not a pile of scraped contacts. Evidence stays attached to every lead.</div>
+              <form id="salesAgentSettingsForm" class="studio-form">
+                <label>Sales goal<input id="salesGoal" type="text" placeholder="Create qualified sales conversations"></label>
+                <label>Ideal customer profile<textarea id="salesIcp" rows="3" placeholder="Corporate housing operators, relocation companies, travel buyers..."></textarea></label>
+                <div class="studio-grid two">
+                  <label>Geography<input id="salesGeography" type="text" placeholder="Canada and United States"></label>
+                  <label>Sender name<input id="salesSenderName" type="text" placeholder="Karan"></label>
+                </div>
+                <label>What are we selling?<textarea id="salesOffer" rows="3" placeholder="Describe the offer, strongest proof, and who it helps. Facts only."></textarea></label>
+                <div class="studio-inline-actions">
+                  <button type="submit" class="cc-secondary-btn">Save strategy</button>
+                  <button id="salesDiscoverBtn" type="button" class="cc-primary-btn">✦ Find opportunities</button>
+                  <button id="salesRunBtn" type="button" class="cc-primary-btn">▶ Research & prepare</button>
+                </div>
+                <small id="salesAgentProviderNote" class="agent-provider-note">Checking enrichment and email connectors…</small>
+              </form>
+              <div class="studio-divider"></div>
+              <div class="studio-panel-head compact"><h3>Add a lead</h3><span>Useful when you already know the account or domain.</span></div>
+              <form id="salesLeadForm" class="studio-form">
+                <div class="studio-grid two"><label>Company<input id="salesLeadCompany" required type="text" placeholder="Acme Inc."></label><label>Website / domain<input id="salesLeadWebsite" type="text" placeholder="acme.com"></label></div>
+                <div class="studio-grid two"><label>Contact name<input id="salesLeadContact" type="text" placeholder="Jane Smith"></label><label>Email<input id="salesLeadEmail" type="email" placeholder="jane@acme.com"></label></div>
+                <div class="studio-grid two"><label>Location<input id="salesLeadLocation" type="text" placeholder="Toronto, ON"></label><label>Why now / signal<input id="salesLeadSignal" type="text" placeholder="Expansion, new project, hiring..."></label></div>
+                <button type="submit" class="cc-secondary-btn">Add lead</button>
+              </form>
+            </section>
+            <section class="studio-panel result-panel">
+              <div class="studio-panel-head"><h2>Sales pipeline</h2><span id="salesAgentMeta">0 leads</span></div>
+              <div class="agent-metric-grid">
+                <div><strong id="salesMetricTotal">0</strong><span>tracked</span></div><div><strong id="salesMetricReady">0</strong><span>ready</span></div><div><strong id="salesMetricOutreach">0</strong><span>in outreach</span></div><div><strong id="salesMetricWon">0</strong><span>won</span></div>
+              </div>
+              <div id="salesLeadList" class="agent-card-list"><div class="studio-result empty">Add an account or discover public demand signals.</div></div>
+            </section>
+          </div>
+
+          <div id="studioMarketingAgentTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel agent-control-panel">
+              <div class="studio-panel-head"><h2>AI Marketing Agent</h2><span>Plan → write → review → create → schedule → learn.</span></div>
+              <div class="agent-principle"><strong>Quality loop:</strong> Kairoq drafts, then runs a second editorial pass before anything reaches the content queue.</div>
+              <form id="marketingAgentSettingsForm" class="studio-form">
+                <label>Business / brand<input id="marketingBusiness" type="text" placeholder="Kairoq"></label>
+                <label>Audience<textarea id="marketingAudience" rows="3" placeholder="Who exactly should care about this content?"></textarea></label>
+                <label>Offer / product<textarea id="marketingOffer" rows="3" placeholder="What we sell and the factual value proposition."></textarea></label>
+                <div class="studio-grid two"><label>Marketing goal<input id="marketingGoal" type="text" placeholder="Generate qualified demand"></label><label>Voice<input id="marketingVoice" type="text" placeholder="Clear, credible, useful, human"></label></div>
+                <label>Content pillars<input id="marketingPillars" type="text" placeholder="education, proof, point of view, product"></label>
+                <label>Channels<div class="agent-check-row"><label><input class="marketing-channel" type="checkbox" value="LinkedIn" checked> LinkedIn</label><label><input class="marketing-channel" type="checkbox" value="Instagram" checked> Instagram</label><label><input class="marketing-channel" type="checkbox" value="X" checked> X</label></div></label>
+                <div class="studio-inline-actions"><button type="submit" class="cc-secondary-btn">Save strategy</button><button id="marketingGenerateBtn" type="button" class="cc-primary-btn">✦ Generate 7-day plan</button></div>
+                <small id="marketingPostizNote" class="agent-provider-note">Checking publishing channels…</small>
+              </form>
+            </section>
+            <section class="studio-panel result-panel">
+              <div class="studio-panel-head"><h2>Content queue</h2><span id="marketingAgentMeta">0 pieces</span></div>
+              <div id="marketingIntegrationChips" class="agent-integration-chips"></div>
+              <div id="marketingContentList" class="agent-card-list"><div class="studio-result empty">Set the strategy and generate the first content plan.</div></div>
+            </section>
+          </div>
+
+          <div id="studioCreateTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel">
+              <div class="studio-panel-head"><h2>Create</h2><span>Text → image, image → video, text → video</span></div>
+              <form id="studioCreateForm" class="studio-form">
+                <label>What do you want to create?
+                  <textarea id="studioPrompt" rows="6" placeholder="Create a premium 10-second vertical sneaker ad with cinematic lighting."></textarea>
+                </label>
+                <div class="studio-grid two">
+                  <label>Output type
+                    <select id="studioKind"><option value="image">Image</option><option value="video">Video</option></select>
+                  </label>
+                  <label>Mode
+                    <select id="studioMode"><option value="create">Create</option><option value="image_to_video">Image → Video</option><option value="text_to_video">Text → Video</option></select>
+                  </label>
+                </div>
+                <div class="studio-grid three">
+                  <label>Project
+                    <select id="studioProjectSelect"></select>
+                  </label>
+                  <label>Avatar (optional)
+                    <select id="studioAvatarSelect"><option value="">None</option></select>
+                  </label>
+                  <label>Ratio / size
+                    <select id="studioImageSize"><option value="square_hd">1:1</option><option value="portrait_4_3">4:3 portrait</option><option value="portrait_16_9">9:16 portrait</option><option value="landscape_4_3">4:3 landscape</option><option value="landscape_16_9">16:9 landscape</option></select>
+                  </label>
+                </div>
+                <div class="studio-grid three">
+                  <label>Duration
+                    <select id="studioDuration"><option value="4">4 sec</option><option value="6">6 sec</option><option value="8">8 sec</option><option value="10">10 sec</option></select>
+                  </label>
+                  <label>Budget mode
+                    <select id="studioBudgetMode"><option value="free">Free first</option><option value="cheap">Cheap first</option><option value="balanced" selected>Balanced</option><option value="best">Best quality</option></select>
+                  </label>
+                  <label>Title
+                    <input id="studioTitle" type="text" placeholder="Campaign concept 01">
+                  </label>
+                </div>
+                <label>Reference image (optional)
+                  <input id="studioReferenceFile" type="file" accept="image/*">
+                </label>
+                <div class="studio-estimate-row">
+                  <div><strong>Estimated cost</strong><div id="studioEstimatedCost">$0.00</div></div>
+                  <button type="submit" class="cc-primary-btn">Generate</button>
+                </div>
+              </form>
+            </section>
+            <section class="studio-panel result-panel">
+              <div class="studio-panel-head"><h2>Latest result</h2><span id="studioResultMeta">No generation yet</span></div>
+              <div id="studioResult" class="studio-result empty">Generate something to see it here.</div>
+            </section>
+          </div>
+
+
+          <div id="studioListingsTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel">
+              <div class="studio-panel-head"><h2>Listing → Sales Engine</h2><span>Add a property once. Turn it into reusable sales content.</span></div>
+              <div class="listing-brand-strip">
+                <img src="https://planurstay.com/images/logo.png" alt="PlanURstay logo">
+                <div><strong>PlanURstay sales workflow</strong><span>Move-in ready homes · One rate · Nothing to arrange</span></div>
+              </div>
+              <form id="listingForm" class="studio-form">
+                <div class="listing-import-row">
+                  <label style="flex:1">Listing URL
+                    <input id="listingSourceUrl" type="url" placeholder="https://supplier-or-property-listing.com/unit">
+                  </label>
+                  <button id="listingImportBtn" type="button" class="cc-secondary-btn">Import URL</button>
+                </div>
+                <div class="studio-grid two">
+                  <label>Property title<input id="listingTitle" type="text" placeholder="2BR Downtown Toronto"></label>
+                  <label>Address<input id="listingAddress" type="text" placeholder="123 Example Street"></label>
+                </div>
+                <div class="studio-grid three">
+                  <label>City<input id="listingCity" type="text" placeholder="Toronto"></label>
+                  <label>Bedrooms<input id="listingBedrooms" type="text" placeholder="2"></label>
+                  <label>Bathrooms<input id="listingBathrooms" type="text" placeholder="2"></label>
+                </div>
+                <div class="studio-grid three">
+                  <label>Monthly rate<input id="listingRate" type="text" placeholder="6500"></label>
+                  <label>Currency<select id="listingCurrency"><option>CAD</option><option>USD</option><option>GBP</option><option>EUR</option></select></label>
+                  <label>Minimum stay<input id="listingMinStay" type="text" placeholder="30 nights"></label>
+                </div>
+                <div class="studio-grid three">
+                  <label>Parking<input id="listingParking" type="text" placeholder="1 underground space"></label>
+                  <label>Laundry<input id="listingLaundry" type="text" placeholder="In-suite"></label>
+                  <label>Wi-Fi<input id="listingWifi" type="text" placeholder="Included"></label>
+                </div>
+                <label>Amenities<textarea id="listingAmenities" rows="3" placeholder="Gym, pool, concierge, balcony"></textarea></label>
+                <label>Verified neighbourhood facts<textarea id="listingNeighbourhood" rows="3" placeholder="Only add facts you know are accurate. Example: Financial District; grocery store in building."></textarea></label>
+                <label>Property notes<textarea id="listingNotes" rows="4" placeholder="Corporate-housing details, furnishing notes, supplier terms..."></textarea></label>
+                <label>Property photos
+                  <input id="listingPhotos" type="file" accept="image/*" multiple>
+                </label>
+                <div id="listingPhotoPreview" class="listing-photo-preview"></div>
+                <div class="studio-inline-actions listing-primary-actions">
+                  <button type="submit" class="cc-secondary-btn">Save property</button>
+                  <button id="listingSalesReadyBtn" type="button" class="cc-primary-btn">✦ Make Sales Ready</button>
+                  <button id="listingVideoBtn" type="button" class="cc-secondary-btn">▶ Create Property Video</button>
+                  <button id="listingProposalBtn" type="button" class="cc-secondary-btn">▦ Create Client Proposal</button>
+                </div>
+                <details class="listing-proposal-details">
+                  <summary>Client proposal details</summary>
+                  <div class="studio-grid two">
+                    <label>Company<input id="proposalCompany" type="text" placeholder="ABC Consulting"></label>
+                    <label>Client contact<input id="proposalContact" type="text" placeholder="Jane Smith"></label>
+                  </div>
+                  <div class="studio-grid three">
+                    <label>Guest<input id="proposalGuest" type="text" placeholder="Employee / guest"></label>
+                    <label>Arrival<input id="proposalArrival" type="date"></label>
+                    <label>Departure<input id="proposalDeparture" type="date"></label>
+                  </div>
+                  <label>Quoted rate<input id="proposalRate" type="text" placeholder="CAD 6,500 / month"></label>
+                  <label>Proposal notes<textarea id="proposalNotes" rows="3" placeholder="Optional client-specific notes or requirements"></textarea></label>
+                </details>
+                <div class="listing-trust-note">Kairoq uses supplied facts only. Property video prompts explicitly preserve the real unit and prohibit invented rooms, furniture, views, or amenities.</div>
+              </form>
+            </section>
+            <section class="studio-panel list-panel">
+              <div class="studio-panel-head"><h2>Property Library</h2><span id="listingLibraryMeta">0 saved properties</span></div>
+              <div id="listingList" class="listing-list"></div>
+              <div id="listingOutput" class="listing-output hidden"></div>
+            </section>
+          </div>
+
+          <div id="studioPursuitTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel pursuit-control-panel">
+              <div class="studio-panel-head"><h2>Pursuit Agent</h2><span>Find events that create beds — then keep the pursuit moving.</span></div>
+              <div class="pursuit-hero-note"><strong>Demand signals, not random leads.</strong><span>Kairoq looks for expansion, projects, hiring, relocation, group travel and displacement signals. Every lead keeps its evidence; assumptions must be verified.</span></div>
+              <form id="pursuitDiscoverForm" class="studio-form">
+                <div class="studio-grid two">
+                  <label>Target geography<input id="pursuitGeography" value="Toronto OR Mississauga OR Ontario" placeholder="Toronto OR Mississauga OR Ontario"></label>
+                  <label>Market<input id="pursuitMarket" value="corporate housing" placeholder="corporate housing"></label>
+                </div>
+                <label>Signals to watch<textarea id="pursuitSignals" rows="4">contract awarded OR new office OR expansion OR hiring OR relocation OR construction project OR interns OR displaced</textarea></label>
+                <div class="studio-inline-actions">
+                  <button type="submit" class="cc-primary-btn">✦ Discover opportunities</button>
+                  <button id="pursuitRefreshBtn" type="button" class="cc-secondary-btn">Refresh pipeline</button>
+                </div>
+                <p class="listing-trust-note">Discovery uses public news signals. A signal is not proof of housing demand; Kairoq keeps the source and creates verification questions before outreach.</p>
+              </form>
+              <div class="pursuit-kpis">
+                <div><strong id="pursuitTotal">0</strong><span>pursuits</span></div>
+                <div><strong id="pursuitHot">0</strong><span>high signal</span></div>
+                <div><strong id="pursuitFollowups">0</strong><span>follow-ups</span></div>
+              </div>
+            </section>
+            <section class="studio-panel result-panel">
+              <div class="studio-panel-head"><h2>Opportunity pipeline</h2><span id="pursuitMeta">No pursuits yet</span></div>
+              <div id="pursuitList" class="pursuit-list"><div class="studio-result empty">Run discovery to find demand signals.</div></div>
+            </section>
+          </div>
+
+          <div id="studioArrivalTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel arrival-control-panel">
+              <div class="studio-panel-head"><h2>ArrivalBrief</h2><span>Booking details → one visual, mobile arrival guide.</span></div>
+              <div class="arrival-hero-note"><strong>Show the stay. Don't make the guest decode a long email.</strong><span>Use real property/access photos and verified instructions. The optional Higgsfield welcome clip never receives guest names, addresses, unit numbers, codes, or Wi-Fi credentials.</span></div>
+              <form id="arrivalForm" class="studio-form">
+                <div class="studio-grid two"><label>Guest name<input id="arrivalGuest" placeholder="Jennifer Smith"></label><label>Guest email<input id="arrivalGuestEmail" type="email" placeholder="jennifer@example.com"></label></div>
+                <div class="studio-grid two"><label>Property / building<input id="arrivalProperty" placeholder="300 Front Street West"></label><label>Address<input id="arrivalAddress" placeholder="Toronto, ON"></label></div>
+                <div class="studio-grid three"><label>Arrival<input id="arrivalDate" type="date"></label><label>Departure<input id="arrivalDeparture" type="date"></label><label>Guide language<select id="arrivalLanguage"><option>English</option><option>French</option><option>Spanish</option><option>Hindi</option><option>Mandarin Chinese</option><option>Arabic</option></select></label></div>
+                <label>Entrance / where to go<textarea id="arrivalEntrance" rows="2" placeholder="Use the south lobby entrance on Front Street."></textarea></label>
+                <label>Parking<textarea id="arrivalParking" rows="2" placeholder="Enter P2 and use assigned space P2-184."></textarea></label>
+                <label>Keys / access instructions<textarea id="arrivalAccess" rows="3" placeholder="Verified key pickup, lockbox, concierge or smart-lock instructions."></textarea></label>
+                <div class="studio-grid two"><label>Wi-Fi<textarea id="arrivalWifi" rows="2" placeholder="Network and password, if you want them included in the private guide."></textarea></label><label>Thermostat<textarea id="arrivalThermostat" rows="2" placeholder="Verified thermostat instructions."></textarea></label></div>
+                <div class="studio-grid two"><label>Laundry<textarea id="arrivalLaundry" rows="2" placeholder="Washer/dryer location and verified instructions."></textarea></label><label>Garbage / recycling<textarea id="arrivalGarbage" rows="2" placeholder="Verified disposal location/instructions."></textarea></label></div>
+                <label>Amenities / useful notes<textarea id="arrivalAmenities" rows="3" placeholder="Only verified details the guest should know."></textarea></label>
+                <div class="studio-grid two"><label>Support phone<input id="arrivalSupportPhone" value="1-866-343-0689"></label><label>Support email<input id="arrivalSupportEmail" value="info@planurstay.com"></label></div>
+                <label>Real arrival photos<input id="arrivalPhotos" type="file" accept="image/*" multiple></label>
+                <div id="arrivalPhotoPreview" class="listing-photo-preview"></div>
+                <div class="studio-inline-actions"><button type="submit" class="cc-secondary-btn">Save draft</button><button id="arrivalGenerateBtn" type="button" class="cc-primary-btn">✦ Create ArrivalBrief</button><button id="arrivalVideoBtn" type="button" class="cc-secondary-btn">▶ Add AI welcome clip</button></div>
+                <p class="listing-trust-note"><strong>Create ArrivalBrief is free-first and does not call Higgsfield.</strong> “Add AI welcome clip” is a separate billable Seedance 2.5 request when Higgsfield is configured. The share link may contain access/Wi-Fi information, so treat it as private.</p>
+              </form>
+            </section>
+            <section class="studio-panel result-panel">
+              <div class="studio-panel-head"><h2>Arrival queue</h2><span id="arrivalMeta">No arrival briefs yet</span></div>
+              <div id="arrivalList" class="arrival-list"><div class="studio-result empty">Create an ArrivalBrief to see the guest experience.</div></div>
+              <div id="arrivalOutput" class="listing-output hidden"></div>
+            </section>
+          </div>
+
+
+          <div id="studioToursTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel tour-control-panel">
+              <div class="studio-panel-head"><h2>Interactive Tour Builder</h2><span>Real photos → room-by-room guided tour. No invented geometry.</span></div>
+              <div class="tour-hero-note"><strong>Photos in. Immersive tour out.</strong><span>Use the four outputs independently: Interactive Tour, Walkthrough Video, Vertical Reel, or Enhanced Gallery.</span></div>
+              <form id="tourForm" class="studio-form">
+                <div class="studio-grid two"><label>Property title<input id="tourTitle" placeholder="Furnished 1BR Downtown"></label><label>City / area<input id="tourCity" placeholder="Toronto, ON"></label></div>
+                <div class="studio-grid three"><label>Bedrooms<input id="tourBeds" placeholder="1"></label><label>Bathrooms<input id="tourBaths" placeholder="1"></label><label>CTA label<input id="tourCtaLabel" value="Request Quote"></label></div>
+                <label>CTA link<input id="tourCtaUrl" type="url" placeholder="https://planurstay.com/contact"></label>
+                <label>Property photos<input id="tourPhotos" type="file" accept="image/*" multiple></label>
+                <div class="listing-trust-note"><strong>Truth-preserving mode:</strong> Kairoq does not create rooms, change layouts, add furniture, widen spaces, or invent views. The tour is an immersive presentation of the supplied photos.</div>
+                <div id="tourPhotoEditor" class="tour-photo-editor"><div class="studio-result empty">Upload photos or open the included sample tour.</div></div>
+                <div class="studio-inline-actions"><button type="submit" class="cc-secondary-btn">Save tour</button><button id="tourInteractiveBtn" type="button" class="cc-primary-btn">✦ Create Interactive Tour</button><button id="tourWalkthroughBtn" type="button" class="cc-secondary-btn">▶ Walkthrough Video</button><button id="tourReelBtn" type="button" class="cc-secondary-btn">▯ Vertical Reel</button><button id="tourGalleryBtn" type="button" class="cc-secondary-btn">▦ Enhanced Gallery</button></div>
+                <div class="listing-trust-note" id="tourPremiumPanel">
+                  <strong>AI Motion Engine</strong>
+                  <span id="tourPremiumStatus">Checking providers…</span>
+                  <label style="margin-top:10px">Motion engine<select id="tourMotionEngine"><option value="wan2gp">Local Wan · free / draft</option><option value="higgsfield">Higgsfield · premium</option></select></label>
+                  <div class="studio-grid two" style="margin-top:10px">
+                    <label>Room motion clips<select id="tourPremiumClips"><option value="4">Up to 4 rooms</option><option value="6" selected>Up to 6 rooms</option></select></label>
+                    <label>Clip length<select id="tourPremiumDuration"><option value="4">4 sec</option><option value="5" selected>5 sec</option><option value="6">6 sec</option></select></label>
+                  </div>
+                  <label class="form-check"><input id="tourPremiumIntro" type="checkbox" checked> <span>Add deterministic branded intro</span></label>
+                  <label class="form-check"><input id="tourPremiumOutro" type="checkbox" checked> <span>Add deterministic branded outro / CTA</span></label>
+                  <div class="studio-inline-actions" style="margin-top:10px"><button id="tourPremiumBtn" type="button" class="cc-primary-btn">✦ Generate Premium AI Tour</button><button id="tourPremiumRebuildBtn" type="button" class="cc-secondary-btn">Rebuild premium exports</button></div>
+                  <small>Local Wan runs on your Mac when Wan2GP is available. Higgsfield remains the premium cloud option. One room clip is generated once and reused for the 16:9 walkthrough, 9:16 Reel, and interactive tour.</small>
+                </div>
+              </form>
+            </section>
+            <section class="studio-panel result-panel">
+              <div class="studio-panel-head"><h2>Tour library</h2><span id="tourMeta">Sample tour included</span></div>
+              <div id="tourList" class="tour-list"><div class="studio-result empty">Loading tours…</div></div>
+              <div id="tourOutput" class="listing-output hidden"></div>
+            </section>
+          </div>
+
+          <div id="studioAvatarsTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel">
+              <div class="studio-panel-head"><h2>Create avatar</h2><span>Create once and reuse across images, videos, UGC, and talking avatar clips.</span></div>
+              <form id="studioAvatarForm" class="studio-form">
+                <div class="studio-grid two">
+                  <label>Name<input id="avatarName" type="text" placeholder="Nia"></label>
+                  <label>Voice / style<input id="avatarVoice" type="text" placeholder="Confident, warm, premium"></label>
+                </div>
+                <label>Look / prompt<textarea id="avatarLook" rows="5" placeholder="25-year-old stylish woman, warm olive skin, dark brown shoulder-length hair, fashion creator vibe."></textarea></label>
+                <label>Personality<textarea id="avatarPersonality" rows="3" placeholder="Friendly, aspirational, trustworthy."></textarea></label>
+                <label>Reference image (optional)<input id="avatarReferenceFile" type="file" accept="image/*"></label>
+                <div class="studio-inline-actions">
+                  <button type="button" id="generateAvatarBtn" class="cc-secondary-btn">Generate avatar image</button>
+                  <button type="submit" class="cc-primary-btn">Save avatar</button>
+                </div>
+              </form>
+              <div class="studio-divider"></div>
+              <form id="talkingAvatarForm" class="studio-form">
+                <div class="studio-panel-head compact"><h3>Talking avatar</h3><span>Generate a short talking video from a saved avatar.</span></div>
+                <div class="studio-grid two">
+                  <label>Avatar<select id="talkingAvatarSelect"></select></label>
+                  <label>Duration<select id="talkingAvatarDuration"><option value="4">4 sec</option><option value="6">6 sec</option><option value="8">8 sec</option><option value="10">10 sec</option></select></label>
+                </div>
+                <label>Script<textarea id="talkingAvatarScript" rows="4" placeholder="Hi guys, these are our newest sneakers and they are perfect for everyday wear."></textarea></label>
+                <button type="submit" class="cc-primary-btn">Generate talking avatar</button>
+              </form>
+            </section>
+            <section class="studio-panel list-panel">
+              <div class="studio-panel-head"><h2>Saved avatars</h2><span>Pick one to reuse anywhere in Studio.</span></div>
+              <div id="avatarList" class="avatar-list"></div>
+            </section>
+          </div>
+
+          <div id="studioUgcTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel">
+              <div class="studio-panel-head"><h2>UGC Creator</h2><span>Product/image + actor + script → UGC video</span></div>
+              <form id="ugcForm" class="studio-form">
+                <div class="studio-grid two">
+                  <label>Avatar<select id="ugcAvatarSelect"></select></label>
+                  <label>Duration<select id="ugcDuration"><option value="6">6 sec</option><option value="8">8 sec</option><option value="10">10 sec</option></select></label>
+                </div>
+                <label>Product image<input id="ugcProductFile" type="file" accept="image/*"></label>
+                <label>Hook / script<textarea id="ugcScript" rows="5" placeholder="I’ve been wearing these sneakers all week and they are surprisingly comfortable."></textarea></label>
+                <label>Style notes<textarea id="ugcStyle" rows="3" placeholder="9:16 vertical, authentic creator vibe, clean captions, soft daylight."></textarea></label>
+                <button type="submit" class="cc-primary-btn">Generate UGC video</button>
+              </form>
+            </section>
+            <section class="studio-panel result-panel">
+              <div class="studio-panel-head"><h2>UGC output</h2><span id="ugcResultMeta">Ready when you are</span></div>
+              <div id="ugcResult" class="studio-result empty">Your generated UGC video will appear here.</div>
+            </section>
+          </div>
+
+          <div id="studioProjectsTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel">
+              <div class="studio-panel-head"><h2>Projects</h2><span>Keep related generations together.</span></div>
+              <form id="projectForm" class="studio-form">
+                <div class="studio-grid two">
+                  <label>Project name<input id="projectName" type="text" placeholder="Sneaker Launch"></label>
+                  <label>Description<input id="projectDescription" type="text" placeholder="Fall campaign assets"></label>
+                </div>
+                <button type="submit" class="cc-primary-btn">Save project</button>
+              </form>
+              <div id="projectList" class="project-list"></div>
+            </section>
+            <section class="studio-panel list-panel">
+              <div class="studio-panel-head"><h2>History</h2><span>Every generation saved in one place.</span></div>
+              <div id="studioHistoryList" class="history-card-list"></div>
+            </section>
+          </div>
+
+          <div id="studioLibraryTab" class="studio-panel-grid hidden">
+            <section class="studio-panel form-panel">
+              <div class="studio-panel-head"><h2>Prompt library</h2><span>Save reusable prompts and presets.</span></div>
+              <form id="libraryForm" class="studio-form">
+                <div class="studio-grid two">
+                  <label>Title<input id="libraryTitle" type="text" placeholder="Luxury product ad"></label>
+                  <label>Category<input id="libraryCategory" type="text" placeholder="Ads"></label>
+                </div>
+                <label>Prompt<textarea id="libraryPrompt" rows="6" placeholder="Create a premium product ad with dramatic studio lighting and clean luxury composition."></textarea></label>
+                <button type="submit" class="cc-primary-btn">Save prompt</button>
+              </form>
+            </section>
+            <section class="studio-panel list-panel">
+              <div class="studio-panel-head"><h2>Saved prompts</h2><span>Click any prompt to load it into Create.</span></div>
+              <div id="libraryList" class="library-list"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="messages" class="messages hidden"></section>
+      <button id="jumpLatestBtn" class="jump-latest hidden" type="button">↓ Latest</button>
+
+      <div class="composer-shell">
+        <div id="attachmentTray" class="attachment-tray"></div>
+        <div id="statusBar" class="status-bar"></div>
+
+        <div class="composer">
+          <textarea id="prompt" rows="1" placeholder="What needs to happen?"></textarea>
+          <div class="composer-bottom">
+            <div class="composer-tools inline-controls">
+              <input id="fileInput" type="file" multiple hidden accept="image/*,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.py,.html,.css,.xml,.yaml,.yml,.log">
+              <button id="attachBtn" class="tool-btn" title="Attach image or text/code file">＋</button>
+              <button id="imageModeBtn" class="tool-btn image-mode-btn" title="Generate or edit image">🎨</button>
+              <button id="videoModeBtn" class="tool-btn video-mode-btn" title="Generate or animate video">🎬</button>
+
+              <div class="inline-select model-inline">
+                <select id="modelSelect" aria-label="Model"></select>
+                <button id="favoriteBtn" class="star-btn" title="Favorite model">☆</button>
+              </div>
+
+              <div class="inline-select compact-inline">
+                <select id="effortSelect" aria-label="Thinking effort">
+                  <option value="low">Light</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">Ultra</option>
+                </select>
+              </div>
+
+              <div class="inline-select compact-inline">
+                <select id="purposeSelect" aria-label="Purpose">
+                  <option value="general">General</option>
+                  <option value="coding">Coding</option>
+                  <option value="research">Research</option>
+                  <option value="writing">Writing</option>
+                  <option value="business">Business</option>
+                  <option value="vision">Vision</option>
+                </select>
+              </div>
+
+              <button id="composerMascot" class="composer-mascot" data-agent="atlas" data-state="idle" title="Kairoq">
+                <img src="/assets/mascot-ghost.png" alt="Atlas mascot">
+              </button>
+              <button id="agentQuickBtn" class="agent-quick-btn" title="Choose an AI agent"><span id="agentQuickGlyph">◆</span><span id="agentQuickName">Kairoq</span></button>
+              <button id="modelSearchBtn" class="tool-btn" title="Search models">⌕</button>
+              <div id="modelBadge" class="model-badge hidden">⚡ Free Auto</div>
+            </div>
+            <div class="send-actions">
+              <button id="stopBtn" class="stop-btn hidden" title="Stop">■</button>
+              <button id="sendBtn" class="send-btn" title="Send">↑</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="fineprint">
+          Kairoq prefers free or cheaper routes when possible. Some connected services and generation providers can still charge usage fees.
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="settings-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">SETTINGS</div>
+          <h2>Workspace settings</h2>
+        </div>
+        <button class="icon-btn" value="cancel">✕</button>
+      </div>
+
+      <label>
+        System prompt
+        <textarea id="systemPrompt" rows="5" placeholder="Optional instructions applied to every chat."></textarea>
+      </label>
+
+      <label>
+        Temperature
+        <div class="range-row">
+          <input id="temperature" type="range" min="0" max="2" step="0.1" value="0.7">
+          <span id="temperatureValue">0.7</span>
+        </div>
+      </label>
+
+      <label>
+        Response pace
+        <select id="responsePace">
+          <option value="relaxed">Relaxed</option>
+          <option value="natural" selected>Natural</option>
+          <option value="fast">Fast</option>
+          <option value="instant">Instant</option>
+        </select>
+        <small class="settings-help">Controls how quickly text appears on screen. The AI still generates at full speed underneath.</small>
+      </label>
+
+      <div class="settings-note">
+        Your OpenRouter key is read only from the server environment. It is never stored in the browser.
+      </div>
+
+      <button id="saveSettings" class="primary-btn" value="default">Save settings</button>
+    </form>
+  </dialog>
+
+  <dialog id="modelDialog">
+    <div class="model-dialog-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">MODEL CATALOG</div>
+          <h2>Choose a model</h2>
+        </div>
+        <button id="closeModelDialog" class="icon-btn">✕</button>
+      </div>
+      <input id="modelSearch" class="model-search" placeholder="Search Claude, Gemini, Qwen, DeepSeek…">
+      <div class="model-filter-row">
+        <button data-filter="all" class="filter-chip active">All</button>
+        <button data-filter="free" class="filter-chip">Free</button>
+        <button data-filter="vision" class="filter-chip">Vision</button>
+        <button data-filter="reasoning" class="filter-chip">Reasoning</button>
+        <button data-filter="favorites" class="filter-chip">Favorites</button>
+      </div>
+      <div id="modelResults" class="model-results"></div>
+    </div>
+  </dialog>
+
+
+  <dialog id="workspaceDialog">
+    <div class="settings-card memory-center">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">MEMORY CENTER</div>
+          <h2>Persistent memory</h2>
+        </div>
+        <button id="closeWorkspace" class="icon-btn">✕</button>
+      </div>
+
+      <div class="memory-tabs">
+        <button data-memory-tab="global" class="memory-tab active">Global</button>
+        <button data-memory-tab="project" class="memory-tab">Project</button>
+        <button data-memory-tab="summary" class="memory-tab">Chat summary</button>
+      </div>
+
+      <div id="memoryGlobalPane" class="memory-pane">
+        <p class="dialog-copy">Stable facts and preferences injected into every model.</p>
+        <textarea id="workspaceMemory" rows="12" placeholder="One item per line..."></textarea>
+      </div>
+
+      <div id="memoryProjectPane" class="memory-pane hidden">
+        <p class="dialog-copy">Memory for the currently selected project.</p>
+        <textarea id="projectMemory" rows="12" placeholder="Project decisions, constraints, goals..."></textarea>
+      </div>
+
+      <div id="memorySummaryPane" class="memory-pane hidden">
+        <p class="dialog-copy">Automatic summary of older context in the current chat.</p>
+        <textarea id="chatSummaryBox" rows="12" placeholder="Conversation summary..."></textarea>
+      </div>
+
+      <div class="memory-options">
+        <label><input id="autoMemory" type="checkbox" checked> Automatically update memory after useful conversations</label>
+        <label><input id="autoSummarize" type="checkbox" checked> Automatically summarize longer chats</label>
+      </div>
+
+      <div class="cloud-memory-row">
+        <div>
+          <strong>Cloud sync</strong>
+          <small id="cloudMemoryStatus">Checking…</small>
+        </div>
+        <button id="syncMemoryNow" class="secondary-btn">Sync now</button>
+      </div>
+
+      <div class="memory-actions">
+        <button id="refreshMemoryNow" class="secondary-btn">Update from current chat now</button>
+        <button id="saveWorkspace" class="primary-btn">Save memory</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="compareDialog">
+    <div class="model-dialog-card compare-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">COMPARE</div>
+          <h2>Compare models side by side</h2>
+        </div>
+        <button id="closeCompare" class="icon-btn">✕</button>
+      </div>
+      <textarea id="comparePrompt" rows="4" placeholder="Ask one question to multiple models..."></textarea>
+      <div class="compare-selects">
+        <select id="compareModelA"></select>
+        <select id="compareModelB"></select>
+        <select id="compareModelC"></select>
+      </div>
+      <button id="runCompare" class="primary-btn">Run comparison</button>
+      <div id="compareResults" class="compare-results"></div>
+    </div>
+  </dialog>
+
+  <dialog id="presetDialog">
+    <div class="settings-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">CUSTOM PRESET</div>
+          <h2>Create a reusable preset</h2>
+        </div>
+        <button id="closePresetDialog" class="icon-btn">✕</button>
+      </div>
+      <input id="presetName" class="model-search" placeholder="Preset name">
+      <textarea id="presetPrompt" rows="6" placeholder="Extra instructions for this preset..."></textarea>
+      <div class="compare-selects">
+        <select id="presetEffort">
+          <option value="low">Light</option>
+          <option value="medium">Medium</option>
+          <option value="high">Ultra</option>
+        </select>
+        <select id="presetPurpose">
+          <option value="general">General</option>
+          <option value="coding">Coding</option>
+          <option value="research">Research</option>
+          <option value="writing">Writing</option>
+          <option value="business">Business</option>
+          <option value="vision">Vision</option>
+        </select>
+      </div>
+      <button id="saveCustomPreset" class="primary-btn">Save preset</button>
+    </div>
+  </dialog>
+
+
+  <dialog id="agentDialog">
+    <div class="model-dialog-card agent-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">AGENTS</div>
+          <h2>Give an agent a goal</h2>
+        </div>
+        <button id="closeAgent" class="icon-btn">✕</button>
+      </div>
+
+      <div id="agentMascotHero" class="mascot-hero" data-agent="atlas" data-state="idle">
+        <div class="mascot-glow"></div>
+        <img src="/assets/mascot-ghost.png" alt="Atlas AI mascot">
+        <div class="mascot-orbit-dot dot-a"></div>
+        <div class="mascot-orbit-dot dot-b"></div>
+      </div>
+
+      <div class="atlas-intro">
+        <div class="atlas-mark">◆</div>
+        <div>
+          <strong>Atlas</strong>
+          <span>AI Operations Lead</span>
+          <small>Start here for complex work. Atlas can delegate bounded subtasks to the specialist team and combine the results.</small>
+        </div>
+      </div>
+
+      <div class="agent-grid">
+        <button data-agent="atlas" class="agent-type active">
+          <span class="agent-glyph">◆</span>
+          <span class="agent-copy"><strong>Atlas</strong><em>AI Operations Lead</em><small>Orchestrates work and delegates to the right specialist.</small></span>
+        </button>
+        <button data-agent="scout" class="agent-type">
+          <span class="agent-glyph">◉</span>
+          <span class="agent-copy"><strong>Scout</strong><em>Research & Intelligence</em><small>Researches the web, competitors, markets, and evidence.</small></span>
+        </button>
+        <button data-agent="forge" class="agent-type">
+          <span class="agent-glyph">⬢</span>
+          <span class="agent-copy"><strong>Forge</strong><em>Engineering</em><small>Codes, debugs, reviews GitHub, and designs implementations.</small></span>
+        </button>
+        <button data-agent="relay" class="agent-type">
+          <span class="agent-glyph">⇄</span>
+          <span class="agent-copy"><strong>Relay</strong><em>Communications</em><small>Handles Gmail, Slack, replies, follow-ups, and messaging.</small></span>
+        </button>
+        <button data-agent="orbit" class="agent-type">
+          <span class="agent-glyph">◎</span>
+          <span class="agent-copy"><strong>Orbit</strong><em>Calendar & Scheduling</em><small>Checks calendars, plans meetings, and coordinates time.</small></span>
+        </button>
+        <button data-agent="compass" class="agent-type">
+          <span class="agent-glyph">◇</span>
+          <span class="agent-copy"><strong>Compass</strong><em>Travel Operations</em><small>Handles travel research, Nuitee, itineraries, and trip logic.</small></span>
+        </button>
+        <button data-agent="ledger" class="agent-type">
+          <span class="agent-glyph">▣</span>
+          <span class="agent-copy"><strong>Ledger</strong><em>Finance & Spend</em><small>Analyzes costs, budgets, invoices, margins, and spend.</small></span>
+        </button>
+        <button data-agent="beacon" class="agent-type">
+          <span class="agent-glyph">✦</span>
+          <span class="agent-copy"><strong>Beacon</strong><em>Monitoring & Bots</em><small>Monitors recurring work, alerts, scheduled jobs, and changes.</small></span>
+        </button>
+        <button data-agent="vault" class="agent-type">
+          <span class="agent-glyph">⬡</span>
+          <span class="agent-copy"><strong>Vault</strong><em>Memory & Knowledge</em><small>Maintains project context, company playbooks, and knowledge.</small></span>
+        </button>
+        <button data-agent="rover" class="agent-type">
+          <span class="agent-glyph">△</span>
+          <span class="agent-copy"><strong>Rover</strong><em>Browser Operator</em><small>Uses browser tools to inspect and operate web workflows.</small></span>
+        </button>
+        <button data-agent="writer" class="agent-type">
+          <span class="agent-glyph">✎</span>
+          <span class="agent-copy"><strong>Writer</strong><em>Writing & Documents</em><small>Drafts, rewrites, structures, and polishes content.</small></span>
+        </button>
+        <button data-agent="closer" class="agent-type">
+          <span class="agent-glyph">➤</span>
+          <span class="agent-copy"><strong>Closer</strong><em>Sales & Follow-up</em><small>Works leads, outreach, follow-ups, and conversion tasks.</small></span>
+        </button>
+        <button data-agent="guardian" class="agent-type">
+          <span class="agent-glyph">◈</span>
+          <span class="agent-copy"><strong>Guardian</strong><em>Security & Governance</em><small>Reviews permissions, approvals, risk, and audit activity.</small></span>
+        </button>
+      </div>
+
+      <textarea id="agentGoal" rows="5" placeholder="Example: Research 5 competitors to Travellez, compare pricing and positioning, then recommend gaps we can exploit."></textarea>
+
+      <div class="agent-options">
+        <label>Model <select id="agentModel"></select></label>
+        <label>Max tool loops
+          <select id="agentSteps">
+            <option value="4">4</option>
+            <option value="6" selected>6</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+          </select>
+        </label>
+        <label class="agent-check"><input id="agentWeb" type="checkbox" checked> Web search</label>
+      </div>
+
+      <div class="tool-safety-note">Read-only tools run automatically. File writes, GitHub issue creation, and webhook actions require your approval.</div>
+
+      <button id="runAgent" class="primary-btn">Run ◆ Atlas</button>
+
+      <div id="agentRun" class="agent-run hidden">
+        <div id="agentStatus" class="agent-status"></div>
+        <div id="approvalCard" class="approval-card hidden">
+          <div id="approvalMascot" class="approval-mascot" data-agent="atlas" data-state="waiting">
+            <img src="/assets/mascot-ghost.png" alt="Approval mascot">
+          </div>
+          <div id="approvalTitle" class="approval-title">◆ Atlas wants approval</div>
+          <div id="approvalTool" class="approval-tool"></div>
+          <pre id="approvalArgs" class="approval-args"></pre>
+          <div class="approval-actions">
+            <button id="denyApproval" class="secondary-btn">Deny</button>
+            <button id="approveAction" class="primary-btn">Approve action</button>
+          </div>
+        </div>
+        <div id="agentPlan" class="agent-plan hidden"></div>
+        <div id="agentStepsOut" class="agent-steps-out"></div>
+        <div id="agentFinal" class="agent-final"></div>
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="connectorsDialog">
+    <div class="model-dialog-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">CONNECTORS</div>
+          <h2>Apps your agents can use</h2>
+        </div>
+        <button id="closeConnectors" class="icon-btn">✕</button>
+      </div>
+
+      <div class="connector-list">
+        <div class="connector-row">
+          <div>
+            <strong>Google Gmail + Calendar</strong>
+            <small id="googleConnectorStatus">Checking…</small>
+          </div>
+          <button id="connectGoogle" class="secondary-btn">Connect Google</button>
+        </div>
+        <div class="connector-row microsoft-row">
+          <div>
+            <strong>Microsoft 365</strong>
+            <small id="microsoftConnectorStatus">Checking…</small>
+          </div>
+          <button id="connectMicrosoft" class="secondary-btn">Connect Microsoft</button>
+        </div>
+        <div class="connector-row local-ai-row">
+          <div>
+            <strong>Local AI</strong>
+            <small id="localAiConnectorStatus">Checking Ollama / local endpoint…</small>
+          </div>
+          <span class="connector-env">$0 API cost</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>GitHub</strong>
+            <small id="githubConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via .env</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Travellez / Nuitee</strong>
+            <small id="nuiteeConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via .env</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Slack</strong>
+            <small id="slackConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via .env</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Shopify</strong>
+            <small id="shopifyConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via .env</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Meta Ads</strong>
+            <small id="metaAdsConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">read-only reporting</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Google Ads</strong>
+            <small id="googleAdsConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">Google OAuth</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Web Operator</strong>
+            <small id="browserlessConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via .env</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Notifications</strong>
+            <small id="notificationsConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via .env</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Telegram — message Atlas</strong>
+            <small id="telegramConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">free Bot API</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>WhatsApp + SMS — message Atlas</strong>
+            <small id="twilioConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via Twilio</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Higgsfield media</strong>
+            <small id="higgsfieldConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">pay as you go</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Credential encryption</strong>
+            <small id="encryptionConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">AES-256-GCM</span>
+        </div>
+        <div class="connector-row">
+          <div>
+            <strong>Approved webhook</strong>
+            <small id="webhookConnectorStatus">Checking…</small>
+          </div>
+          <span class="connector-env">via .env</span>
+        </div>
+      </div>
+
+      <div class="settings-note connector-note">
+        Read actions can run automatically. Sending email, calendar events, browser actions, and outbound Telegram/WhatsApp/SMS messages pause for approval.
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="botsDialog">
+    <div class="model-dialog-card bots-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">SCHEDULED BOTS</div>
+          <h2>Recurring agent jobs</h2>
+        </div>
+        <button id="closeBots" class="icon-btn">✕</button>
+      </div>
+
+      <div class="bot-create-grid">
+        <input id="botName" class="model-search" placeholder="Bot name">
+        <select id="botAgentType">
+          <option value="atlas">◆ Atlas — AI Operations Lead</option>
+          <option value="scout">◉ Scout — Research & Intelligence</option>
+          <option value="forge">⬢ Forge — Engineering</option>
+          <option value="relay">⇄ Relay — Communications</option>
+          <option value="orbit">◎ Orbit — Calendar & Scheduling</option>
+          <option value="compass">◇ Compass — Travel Operations</option>
+          <option value="ledger">▣ Ledger — Finance & Spend</option>
+          <option value="beacon">✦ Beacon — Monitoring & Bots</option>
+          <option value="vault">⬡ Vault — Memory & Knowledge</option>
+          <option value="rover">△ Rover — Browser Operator</option>
+          <option value="writer">✎ Writer — Writing & Documents</option>
+          <option value="closer">➤ Closer — Sales & Follow-up</option>
+          <option value="guardian">◈ Guardian — Security & Governance</option>
+        </select>
+        <select id="botModel"></select>
+      </div>
+
+      <textarea id="botGoal" rows="4" placeholder="Example: Every morning, review recent Travellez-related emails and summarize anything that needs my attention."></textarea>
+
+      <div class="bot-schedule-row">
+        <select id="botFrequency">
+          <option value="hourly">Hourly</option>
+          <option value="daily" selected>Daily</option>
+          <option value="weekly">Weekly</option>
+        </select>
+        <select id="botDay">
+          <option value="0">Sunday</option>
+          <option value="1" selected>Monday</option>
+          <option value="2">Tuesday</option>
+          <option value="3">Wednesday</option>
+          <option value="4">Thursday</option>
+          <option value="5">Friday</option>
+          <option value="6">Saturday</option>
+        </select>
+        <input id="botTime" type="time" value="08:00">
+        <label class="agent-check"><input id="botWeb" type="checkbox" checked> Web</label>
+      </div>
+
+      <div class="tool-safety-note">
+        Watchers are read-only. They can research and read connected services, but cannot send email, create events, write files, create issues, or make bookings in the background.
+      </div>
+
+      <button id="createBot" class="primary-btn">Create scheduled bot</button>
+
+      <div class="bots-layout">
+        <div>
+          <div class="eyebrow bots-section-title">ACTIVE BOTS</div>
+          <div id="botsList" class="bots-list"></div>
+        </div>
+        <div>
+          <div class="eyebrow bots-section-title">RECENT RUNS</div>
+          <div id="botsRuns" class="bots-runs"></div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="opsDialog">
+    <div class="model-dialog-card ops-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">SECURITY & OPS</div>
+          <h2>Production controls</h2>
+        </div>
+        <button id="closeOps" class="icon-btn">✕</button>
+      </div>
+
+      <div class="ops-grid">
+        <div class="ops-panel">
+          <div class="eyebrow">COST & RATE LIMITS</div>
+          <div id="budgetSummary" class="budget-summary">Loading…</div>
+        </div>
+        <div class="ops-panel">
+          <div class="eyebrow">FAILED JOBS</div>
+          <div id="deadLetterSummary" class="dead-letter-summary">Loading…</div>
+        </div>
+      </div>
+
+      <div class="ops-panel">
+        <div class="ops-panel-head">
+          <div>
+            <div class="eyebrow">TOOL PERMISSIONS</div>
+            <small>Auto = run without asking · Ask = require approval · Deny = blocked</small>
+          </div>
+          <button id="savePermissions" class="primary-btn compact-btn">Save permissions</button>
+        </div>
+        <div id="permissionsTable" class="permissions-table"></div>
+      </div>
+
+      <div class="ops-panel">
+        <div class="ops-panel-head">
+          <div>
+            <div class="eyebrow">AUDIT LOG</div>
+            <small>Secrets are redacted before events are stored.</small>
+          </div>
+          <button id="refreshAudit" class="secondary-btn compact-btn">Refresh</button>
+        </div>
+        <div id="auditList" class="audit-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="onboardingDialog">
+    <div class="model-dialog-card onboarding-card">
+      <div class="mascot-hero onboarding-mascot" data-agent="atlas" data-state="talking">
+        <div class="mascot-glow"></div>
+        <img src="/assets/mascot-ghost.png" alt="Mascot">
+        <div class="mascot-orbit-dot dot-a"></div>
+        <div class="mascot-orbit-dot dot-b"></div>
+      </div>
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">WELCOME</div>
+          <h2>Set up your AI operating system</h2>
+        </div>
+        <button id="skipOnboarding" class="icon-btn">✕</button>
+      </div>
+
+      <div class="onboarding-steps">
+        <div class="onboarding-step active" data-step="1"><strong>1</strong><span>Model key</span><small>Confirm OpenRouter is working.</small></div>
+        <div class="onboarding-step" data-step="2"><strong>2</strong><span>Choose mode</span><small>Pick your main workflow.</small></div>
+        <div class="onboarding-step" data-step="3"><strong>3</strong><span>Memory</span><small>Save your company rules.</small></div>
+        <div class="onboarding-step" data-step="4"><strong>4</strong><span>Connect apps</span><small>Gmail, Calendar and more.</small></div>
+        <div class="onboarding-step" data-step="5"><strong>5</strong><span>Create bot</span><small>Start with a template.</small></div>
+      </div>
+
+      <div id="onboardingBody" class="onboarding-body"></div>
+
+      <div class="onboarding-actions">
+        <button id="onboardingBack" class="secondary-btn">Back</button>
+        <button id="onboardingNext" class="primary-btn">Next</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="templatesDialog">
+    <div class="model-dialog-card templates-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">TEMPLATES</div>
+          <h2>Ready-made agents and bots</h2>
+        </div>
+        <button id="closeTemplates" class="icon-btn">✕</button>
+      </div>
+      <div id="templateModeTabs" class="mode-tabs"></div>
+      <div id="templateGrid" class="template-grid"></div>
+    </div>
+  </dialog>
+
+  <dialog id="playbookDialog">
+    <div class="model-dialog-card playbook-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">COMPANY PLAYBOOK</div>
+          <h2>How your company works</h2>
+        </div>
+        <button id="closePlaybook" class="icon-btn">✕</button>
+      </div>
+
+      <div class="playbook-grid">
+        <label>Company overview<textarea id="pb_company_overview" rows="4"></textarea></label>
+        <label>Tone of voice<textarea id="pb_tone_of_voice" rows="4"></textarea></label>
+        <label>Approval rules<textarea id="pb_approval_rules" rows="4"></textarea></label>
+        <label>Travel policy<textarea id="pb_travel_policy" rows="4"></textarea></label>
+        <label>Housing policy<textarea id="pb_housing_policy" rows="4"></textarea></label>
+        <label>Preferred suppliers<textarea id="pb_suppliers" rows="4"></textarea></label>
+        <label>Pricing rules<textarea id="pb_pricing_rules" rows="4"></textarea></label>
+        <label>Escalation rules<textarea id="pb_escalation_rules" rows="4"></textarea></label>
+        <label class="wide">Things never to do<textarea id="pb_never_do" rows="4"></textarea></label>
+      </div>
+      <div class="tool-safety-note">Atlas and scheduled bots include this playbook as company context.</div>
+      <button id="savePlaybook" class="primary-btn">Save playbook</button>
+    </div>
+  </dialog>
+
+  <dialog id="workflowsDialog">
+    <div class="model-dialog-card workflows-card">
+      <div class="settings-head">
+        <div>
+          <div class="eyebrow">WORKFLOWS</div>
+          <h2>Agent work queue</h2>
+        </div>
+        <button id="closeWorkflows" class="icon-btn">✕</button>
+      </div>
+      <div class="workflow-actions">
+        <button id="seedDemoWorkflows" class="secondary-btn">Load demo cards</button>
+        <button id="clearWorkflows" class="secondary-btn">Clear</button>
+      </div>
+      <div id="workflowCards" class="workflow-cards"></div>
+    </div>
+  </dialog>
+
+  <script src="/app.js?v=153"></script>
+</body>
+</html>

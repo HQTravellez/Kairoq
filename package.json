@@ -1,0 +1,25 @@
+{
+  "name": "kairoq-outcome-agents",
+  "version": "16.0.0",
+  "private": true,
+  "description": "Kairoq v16: AI Sales Agent and AI Marketing Agent with evidence-grounded lead research, optional OpenEnrich enrichment, content generation/review, media creation, and approval-gated Postiz publishing.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "check": "node --check server.js && node --check public/app.js",
+    "higgsfield:seedance": "tsx index.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@higgsfield/client": "^0.2.6",
+    "dotenv": "^18.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

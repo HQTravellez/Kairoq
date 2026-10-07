@@ -1,0 +1,15 @@
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/living-2.jpeg'
+duration 2.4
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/living-1.jpeg'
+duration 2.4
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/kitchen.jpeg'
+duration 2.4
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/bedroom-2.jpeg'
+duration 2.4
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/bedroom-1.jpeg'
+duration 2.4
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/bathroom.jpeg'
+duration 2.4
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/laundry.jpeg'
+duration 2.4
+file '/mnt/data/kairoq-v15.6-tour-builder/kairoq-v15.6-tour-builder/public/sample-tour/laundry.jpeg'
