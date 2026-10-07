@@ -5770,6 +5770,18 @@ async function handleSalesRun(req,res){try{const body=await getBody(req,500_000)
 async function handleSalesSend(req,res){try{const body=await getBody(req,500_000),lead=loadSalesState().leads.find(x=>x.id===String(body.id||""));if(!lead)return json(res,404,{error:"Lead not found."});return json(res,200,{lead:await sendSalesEmail(lead,{approved:body.approved===true})})}catch(err){return json(res,400,{error:err.message})}}
 async function handleSalesStatus(req,res){try{const body=await getBody(req,500_000),lead=loadSalesState().leads.find(x=>x.id===String(body.id||""));if(!lead)return json(res,404,{error:"Lead not found."});return json(res,200,{lead:upsertSalesLead({...lead,status:body.status||lead.status,follow_up_at:body.follow_up_at||lead.follow_up_at,next_action:body.next_action||lead.next_action})})}catch(err){return json(res,400,{error:err.message})}}
 async function handleMarketingSettings(req,res){try{const body=await getBody(req,500_000),state=loadMarketingState();if(Object.entries(body).some(([k,v])=>JSON.stringify(state.settings[k])!==JSON.stringify(v)))state.strategy=null;state.settings={...state.settings,...body,channels:Array.isArray(body.channels)?body.channels:state.settings.channels};saveMarketingState(state);return json(res,200,{settings:loadMarketingState().settings})}catch(err){return json(res,400,{error:err.message})}}
+async function handleCarouselCopy(req,res){try{
+  const body=await getBody(req,20000);
+  const topic=compactText(body.topic,180),benefit=compactText(body.benefit,200),brand=compactText(body.brand,80);
+  const count=[5,6,8].includes(Number(body.count))?Number(body.count):5;
+  if(!topic)return json(res,400,{error:"Topic is required."});
+  const instruction="You are a senior editorial carousel copywriter. Respond ONLY with a valid JSON object of shape {\"slides\":[{\"kicker\":\"...\",\"title\":\"...\",\"body\":\"...\"}],\"caption\":\"...\"}. Exactly "+count+" slides. Short punchy original headlines (under 65 characters), distinct useful supporting text (under 150 characters), 2-5 word kicker. First slide is a striking hook and last slide is a truthful call to action. No invented statistics, testimonials or performance claims. Brand: "+brand+". Benefit: "+benefit+". Topic: "+topic+".";
+  const result=await callFreeLlmText({messages:[{role:"user",content:instruction}],temperature:0.5});
+  const clean=String(result).replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"");
+  const data=JSON.parse(clean.slice(clean.indexOf("{"),clean.lastIndexOf("}")+1));
+  if(!Array.isArray(data.slides)||data.slides.length!==count)throw new Error("AI did not return the requested slides.");
+  return json(res,200,{slides:data.slides.map(x=>({title:compactText(x.title,160),body:compactText(x.body,330),kicker:compactText(x.kicker,60)})),caption:compactText(data.caption,1800)});
+}catch(err){return json(res,503,{error:"AI copy unavailable: "+(err.message||"retry later")})}}
 async function handleMarketingGenerate(req,res){try{const body=await getBody(req,500_000),items=await generateMarketingPlan(body);return json(res,200,{items})}catch(err){return json(res,500,{error:err.message||"Marketing content generation failed."})}}
 async function handleMarketingSave(req,res){try{const body=await getBody(req,1_000_000);return json(res,200,{item:upsertMarketingItem(body)})}catch(err){return json(res,400,{error:err.message})}}
 async function handleMarketingAsset(req,res){try{const body=await getBody(req,500_000),item=loadMarketingState().items.find(x=>x.id===String(body.id||""));if(!item)return json(res,404,{error:"Content item not found."});return json(res,200,{item:await generateMarketingAsset(item,{kind:body.kind,budget_mode:body.budget_mode||"free"})})}catch(err){return json(res,500,{error:err.message||"Could not generate media."})}}
@@ -6458,6 +6470,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/agents/sales/send") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleSalesSend(req,res); }
   if (req.method === "POST" && url === "/api/agents/sales/status") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleSalesStatus(req,res); }
   if (req.method === "POST" && url === "/api/agents/marketing/settings") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMarketingSettings(req,res); }
+  if (req.method === "POST" && url === "/api/carousel/copy") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleCarouselCopy(req,res); }
   if (req.method === "POST" && url === "/api/agents/marketing/generate") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMarketingGenerate(req,res); }
   if (req.method === "POST" && url === "/api/agents/marketing/save") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMarketingSave(req,res); }
   if (req.method === "POST" && url === "/api/agents/marketing/asset") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMarketingAsset(req,res); }
