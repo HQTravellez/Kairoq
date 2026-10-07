@@ -5623,6 +5623,7 @@ function normalizeSalesLead(input={}){
     score:Math.max(0,Math.min(100,Number(input.score||0))),score_reasons:Array.isArray(input.score_reasons)?input.score_reasons.map(x=>compactText(x,160)).slice(0,10):[],
     confidence:compactText(input.confidence||"unrated",30),evidence:Array.isArray(input.evidence)?input.evidence.slice(0,30):[],enrichment:input.enrichment&&typeof input.enrichment==="object"?input.enrichment:{},
     outreach:input.outreach&&typeof input.outreach==="object"?input.outreach:{},next_action:compactText(input.next_action,1000),follow_up_at:compactText(input.follow_up_at,120),last_touched_at:input.last_touched_at||null,
+    email_opt_out:Boolean(input.email_opt_out),send_history:Array.isArray(input.send_history)?input.send_history.slice(-50):[],
     created_at:input.created_at||now,updated_at:now
   };
 }
@@ -5667,9 +5668,11 @@ async function draftSalesOutreach(lead){
 async function sendSalesEmail(lead,{approved=false}={}){
   if(lead.enrichment?.qualification?.decision!=="qualified"||lead.outreach?.profile_business!==loadSalesState().settings.business)throw new Error("Re-research and draft this lead against the current business profile before sending.");
   if(!approved)throw new Error("Explicit approval is required before sending outreach."); if(!lead.email)throw new Error("This lead has no verified/published email selected."); if(!lead.outreach?.email)throw new Error("Create an outreach draft first.");
+  if(lead.email_opt_out)throw new Error("This recipient has opted out; sending is blocked.");
+  if((lead.send_history||[]).some(x=>x.kind==="initial"&&x.to===lead.email))throw new Error("Initial outreach was already sent to this recipient; a duplicate send is blocked.");
   const perm=await toolPermission("sales_email_send"); if(perm==="deny")throw new Error("Sales email sending is disabled in Security & Ops.");
   let provider=""; if(googleConfigured()){await gmailSend({to:lead.email,subject:lead.outreach.subject||`Hello from Kairoq`,body:lead.outreach.email});provider="Gmail"}else if(microsoftConfigured()){await microsoftOutlookSend({to:lead.email,subject:lead.outreach.subject||`Hello from Kairoq`,body:lead.outreach.email});provider="Outlook"}else throw new Error("Connect Gmail or Microsoft Outlook before sending outreach.");
-  await audit("sales_agent.email_sent",{lead_id:lead.id,company:lead.company,to:lead.email,provider});return upsertSalesLead({...lead,status:"outreach",last_touched_at:new Date().toISOString(),next_action:"Watch for a reply; follow up only if there is no response."});
+  await audit("sales_agent.email_sent",{lead_id:lead.id,company:lead.company,to:lead.email,provider});return upsertSalesLead({...lead,status:"outreach",last_touched_at:new Date().toISOString(),send_history:[...(lead.send_history||[]),{kind:"initial",to:lead.email,at:new Date().toISOString(),provider}].slice(-50),next_action:"Watch for a reply; follow up only if there is no response."});
 }
 async function salesAgentDiscover(settings={}){
   const state=loadSalesState();state.settings={...state.settings,...settings};if(!state.strategy)state.strategy=await agentBrain.planCampaign(state.settings,"sales",callFreeLlmJSON);saveSalesState(state);const rows=await discoverPursuits({geography:state.settings.geography||"Canada",market:state.settings.icp||"B2B",signals:settings.signals||state.strategy.search_queries?.[0]||"business travel corporate travel policy approvals",limit:Math.max(5,Math.min(20,Number(settings.limit||10)))});
