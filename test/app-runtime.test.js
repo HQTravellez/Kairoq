@@ -30,3 +30,28 @@ test('custom apps persist records, isolate users, handle CRUD and preserve data 
  await call('/collections/products/'+id,'DELETE',{},login.cookie);assert.equal((await call('/dashboard','GET',null,login.cookie)).data.total,0);
  }finally{await new Promise(r=>server.close(r));runtime.recordsDb(root,'test-custom').close();fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('reference fields and workflow actions validate and execute on the real managed backend',async()=>{
+ const flow=runtime.validateSchema({collections:[
+  {name:'trips',fields:[{name:'traveler',type:'text',required:true},{name:'status',type:'select',options:['requested','approved','booked'],required:true,default:'requested'}]},
+  {name:'expenses',fields:[{name:'trip_id',type:'reference',collection:'trips',required:true},{name:'description',type:'text',required:true}]}
+ ],actions:[
+  {name:'approve_trip',label:'Approve trip',collection:'trips',field:'status',from:['requested'],to:'approved'},
+  {name:'book_trip',label:'Book trip',collection:'trips',field:'status',from:['approved'],to:'booked'}
+ ]});
+ assert.throws(()=>runtime.validateSchema({collections:[{name:'x',fields:[{name:'bad',type:'reference',collection:'missing'}]}]}),/unknown collection/);
+ assert.throws(()=>runtime.validateSchema({collections:[{name:'x',fields:[{name:'status',type:'select',options:['a','b']}]}],actions:[{name:'go',collection:'x',field:'status',from:['a'],to:'c'}]}),/invalid option/);
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-flow-'));
+ const server=http.createServer((req,res)=>runtime.api(req,res,{root,id:'travel-flow',route:req.url,schema:flow}));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+ const call=async(url,method='GET',data,cookie)=>{const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(cookie?{cookie}:{})},body:data?JSON.stringify(data):undefined});return{status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]}};
+ try{
+  const a=await call('/auth/register','POST',{email:'flow@example.com',password:'long-test-password'});
+  const trip=await call('/collections/trips','POST',{traveler:'Alex',status:'requested'},a.cookie);assert.equal(trip.status,201);const rid=trip.data.record.id;
+  assert.equal((await call('/actions/book_trip/'+rid,'POST',{},a.cookie)).status,409);
+  const approved=await call('/actions/approve_trip/'+rid,'POST',{},a.cookie);assert.equal(approved.status,200);assert.equal(approved.data.record.data.status,'approved');
+  const booked=await call('/actions/book_trip/'+rid,'POST',{},a.cookie);assert.equal(booked.status,200);assert.equal(booked.data.record.data.status,'booked');
+  const expense=await call('/collections/expenses','POST',{trip_id:rid,description:'Taxi'},a.cookie);assert.equal(expense.status,201);assert.equal(expense.data.record.data.trip_id,rid);
+  const after=(await call('/collections/trips','GET',null,a.cookie)).data.records[0];assert.equal(after.data.status,'booked');
+ }finally{await new Promise(r=>server.close(r));runtime.recordsDb(root,'travel-flow').close();fs.rmSync(root,{recursive:true,force:true});}
+});
