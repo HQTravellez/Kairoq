@@ -259,7 +259,7 @@ async function saveToolPermissions(p){const m={...DEFAULT_TOOL_PERMISSIONS,...p}
 async function toolPermission(name){return(await loadToolPermissions())[name]||"approve"}
 function requestRateKey(req){return String(req.headers["x-forwarded-for"]||"").split(",")[0].trim()||req.socket?.remoteAddress||"local"}
 function enforceRateLimit(req){if(!(REQUESTS_PER_MINUTE>0))return;const k=requestRateKey(req),now=Date.now(),a=(rateBuckets.get(k)||[]).filter(t=>now-t<60000);if(a.length>=REQUESTS_PER_MINUTE){const e=new Error("Rate limit exceeded. Try again shortly.");e.statusCode=429;throw e}a.push(now);rateBuckets.set(k,a)}
-async function recordUsage(usage={},context={}){const cost=Number(usage.cost??usage.total_cost??0),r={id:crypto.randomUUID(),at:new Date().toISOString(),cost:Number.isFinite(cost)?cost:0,prompt_tokens:Number(usage.prompt_tokens||usage.input_tokens||0),completion_tokens:Number(usage.completion_tokens||usage.output_tokens||0),total_tokens:Number(usage.total_tokens||0),context:sanitizeAuditData(context)};try{fs.appendFileSync(USAGE_FILE,JSON.stringify(r)+"\\n","utf8")}catch{};if(cloudConfigured()){try{await fetchWithRetry(`${SUPABASE_URL}/rest/v1/ai_usage_ledger`,{method:"POST",headers:supabaseHeaders(),body:JSON.stringify({id:r.id,owner_id:MEMORY_OWNER_ID,usage:r,created_at:r.at})},{retries:2})}catch{}}return r}
+async function recordUsage(usage={},context={}){const cost=Number(usage.cost??usage.total_cost??0),r={id:crypto.randomUUID(),at:new Date().toISOString(),cost:Number.isFinite(cost)?cost:0,prompt_tokens:Number(usage.prompt_tokens||usage.input_tokens||0),completion_tokens:Number(usage.completion_tokens||usage.output_tokens||0),total_tokens:Number(usage.total_tokens||0),context:sanitizeAuditData(context)};try{fs.appendFileSync(USAGE_FILE,JSON.stringify(r)+"\n","utf8")}catch{};if(cloudConfigured()){try{await fetchWithRetry(`${SUPABASE_URL}/rest/v1/ai_usage_ledger`,{method:"POST",headers:supabaseHeaders(),body:JSON.stringify({id:r.id,owner_id:MEMORY_OWNER_ID,usage:r,created_at:r.at})},{retries:2})}catch{}}return r}
 async function usageTotals(){let rs=[];if(cloudConfigured()){try{const d=new Date();d.setUTCDate(1);d.setUTCHours(0,0,0,0);const u=`${SUPABASE_URL}/rest/v1/ai_usage_ledger?owner_id=eq.${encodeURIComponent(MEMORY_OWNER_ID)}&created_at=gte.${encodeURIComponent(d.toISOString())}&select=usage`;const r=await fetchWithRetry(u,{headers:supabaseHeaders()},{retries:2});const x=await r.json().catch(()=>[]);if(r.ok)rs=(x||[]).map(y=>y.usage).filter(Boolean)}catch{}}if(!rs.length)rs=readLocalJsonLines(USAGE_FILE,5000);const n=new Date(),day=n.toISOString().slice(0,10),mon=n.toISOString().slice(0,7);let daily=0,monthly=0;for(const x of rs){const at=String(x.at||""),c=Number(x.cost||0);if(at.startsWith(day))daily+=c;if(at.startsWith(mon))monthly+=c}return{daily,monthly}}
 async function enforceBudget(){const t=await usageTotals();if(DAILY_COST_LIMIT_USD>0&&t.daily>=DAILY_COST_LIMIT_USD)throw new Error(`Daily AI cost limit reached ($${DAILY_COST_LIMIT_USD.toFixed(2)}).`);if(MONTHLY_COST_LIMIT_USD>0&&t.monthly>=MONTHLY_COST_LIMIT_USD)throw new Error(`Monthly AI cost limit reached ($${MONTHLY_COST_LIMIT_USD.toFixed(2)}).`);return t}
 async function notify(title,message,data={}){await audit("notification.created",{title,message,data});if(!NOTIFY_WEBHOOK_URL)return{delivered:false};try{const r=await fetchWithRetry(NOTIFY_WEBHOOK_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,message,data,at:new Date().toISOString()})},{retries:3});return{delivered:r.ok,status:r.status}}catch(e){return{delivered:false,error:e.message}}}
@@ -6488,7 +6488,35 @@ function serveStatic(req, res) {
 
 
 const developerAgent=require("./developer-agent");
+const experiential=require("./experiential");
+const housingBuilder=require("./housing-builder");
+function parseDeveloperResponse(content,model="coding model"){
+  const clean=content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+  try{return JSON.parse(clean)}catch{}
+  const start=clean.indexOf("{"),end=clean.lastIndexOf("}");
+  if(start>=0&&end>start){try{return JSON.parse(clean.slice(start,end+1))}catch{}}
+  const html=(content.match(/```(?:html|HTML)\s*([\s\S]*?)```/i)||[])[1];
+  const css=(content.match(/```css\s*([\s\S]*?)```/i)||[])[1];
+  const js=(content.match(/```(?:javascript|js)\s*([\s\S]*?)```/i)||[])[1];
+  if(html&&css)return {project_name:"Generated Project",summary:"AI-generated website",files:{"index.html":html,"styles.css":css,"app.js":js||""}};
+  // Free coding models often emit one complete HTML document instead of multi-file JSON.
+  const docStart=clean.search(/<!doctype html\b|<html[\s>]/i);
+  if(docStart>=0){
+    const tail=clean.slice(docStart);
+    const endMatch=/<\/html\s*>/i.exec(tail);
+    if(!endMatch)throw Error("Generated HTML document was truncated; missing closing html tag");
+    const documentHtml=tail.slice(0,endMatch.index+endMatch[0].length);
+    const embeddedStyles=[...documentHtml.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(m=>m[1]).join("\n");
+    const embeddedScripts=[...documentHtml.matchAll(/<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).join("\n");
+    const bareHtml=documentHtml.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,"").replace(/<script\b(?![^>]*\bsrc\s*=)[^>]*>[\s\S]*?<\/script>/gi,"");
+    if(embeddedStyles.length>=500 && bareHtml.length>=350){
+      return {project_name:"Custom AI Project",summary:"Custom site generated by "+model,files:{"index.html":bareHtml,"styles.css":embeddedStyles,"app.js":embeddedScripts}};
+    }
+  }
+  throw Error("Response did not contain complete project files; "+clean.length+" characters");
+}
 async function callDeveloperCodingModel(opts={}){
+  if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse:parseDeveloperResponse});
   if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
@@ -6518,29 +6546,7 @@ async function callDeveloperCodingModel(opts={}){
       if(free&&cost>0)throw Error("Free request unexpectedly billed");
       if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model});
       if(!content.trim())throw Error("Empty response; finish="+data.choices?.[0]?.finish_reason+" reasoning="+String(message.reasoning||"").length);
-      const clean=content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
-      try{return JSON.parse(clean)}catch{}
-      const start=clean.indexOf("{"),end=clean.lastIndexOf("}");
-      if(start>=0&&end>start){try{return JSON.parse(clean.slice(start,end+1))}catch{}}
-      const html=(content.match(/```(?:html|HTML)\s*([\s\S]*?)```/i)||[])[1];
-      const css=(content.match(/```css\s*([\s\S]*?)```/i)||[])[1];
-      const js=(content.match(/```(?:javascript|js)\s*([\s\S]*?)```/i)||[])[1];
-      if(html&&css)return {project_name:"Generated Project",summary:"AI-generated website",files:{"index.html":html,"styles.css":css,"app.js":js||""}};
-      // Free coding models often emit one complete HTML document instead of multi-file JSON.
-      const docStart=clean.search(/<!doctype html\b|<html[\s>]/i);
-      if(docStart>=0){
-        const tail=clean.slice(docStart);
-        const endMatch=/<\/html\s*>/i.exec(tail);
-        if(!endMatch)throw Error("Generated HTML document was truncated; missing closing html tag");
-        const documentHtml=tail.slice(0,endMatch.index+endMatch[0].length);
-        const embeddedStyles=[...documentHtml.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(m=>m[1]).join("\n");
-        const embeddedScripts=[...documentHtml.matchAll(/<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).join("\n");
-        const bareHtml=documentHtml.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,"").replace(/<script\b(?![^>]*\bsrc\s*=)[^>]*>[\s\S]*?<\/script>/gi,"");
-        if(embeddedStyles.length>=500 && bareHtml.length>=350){
-          return {project_name:"Custom AI Project",summary:"Custom site generated by "+model,files:{"index.html":bareHtml,"styles.css":embeddedStyles,"app.js":embeddedScripts}};
-        }
-      }
-      throw Error("Response did not contain complete project files; "+clean.length+" characters");
+      return parseDeveloperResponse(content,model);
     }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}
   }
   throw Error("No coding model returned usable project files. "+errors.join(" | "));
@@ -6567,12 +6573,13 @@ async function handleDeveloperPublish(req,res){
 }
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
+  if(url.startsWith("/apps/") && await housingBuilder.handle(req,res))return;
 
   if(req.method==="GET"&&url==="/api/developer/status"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     let local=false;try{local=(await getLocalLlmModels()).length>0}catch{}
-    const ai=local||Boolean(process.env.OPENROUTER_API_KEY);
-    return json(res,200,{ai_generation:ai,local_model:local,openrouter:!!process.env.OPENROUTER_API_KEY,github_publishing:!!(process.env.GITHUB_TOKEN&&process.env.GITHUB_REPO),repository:process.env.GITHUB_REPO||null,chromium:!!process.env.CHROMIUM_PATH,starter_template:true});
+    const ai=local||Boolean(process.env.OPENROUTER_API_KEY)||experiential.configured();
+    return json(res,200,{experiential:experiential.configured(),builder_provider:experiential.configured()?"experiential":"openrouter",ai_generation:ai,local_model:local,openrouter:!!process.env.OPENROUTER_API_KEY,github_publishing:!!(process.env.GITHUB_TOKEN&&process.env.GITHUB_REPO),repository:process.env.GITHUB_REPO||null,chromium:!!process.env.CHROMIUM_PATH,starter_template:true});
   }
   if (req.method === "POST" && url === "/api/developer/build"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperBuild(req,res);}
   if (req.method === "POST" && url === "/api/developer/revise"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperRevise(req,res);}
@@ -6790,8 +6797,11 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
+    if(process.env.HOUSING_APP_BUILD==="true" && experiential.configured()){
+      housingBuilder.build(callDeveloperCodingModel,parseDeveloperResponse).then(r=>console.log("[housing-app] RESULT "+JSON.stringify(r))).catch(e=>console.error("[housing-app] ERROR "+e.message));
+    }
     if(process.env.DEVELOPER_SMOKE_TEST==="true"){
-      const marker=path.join(WORKSPACE_DIR,".developer-smoke-test-v6-freefirst-20261008.json");
+      const marker=path.join(WORKSPACE_DIR,".developer-smoke-test-v7-experiential-20261008.json");
       if(!fs.existsSync(marker)){
         console.log("[developer-smoke] Beginning real model + generated website + Chromium QA test");
         developerAgent.build({brief:"Build a premium, responsive modern corporate travel website for executive teams with a strong hero, three features, pricing call to action, and a functional mobile menu.",projectName:"Kairoq Smoke Test",kind:"website",style:"editorial"},callDeveloperCodingModel)
@@ -6806,6 +6816,6 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
-  callDeveloperCodingModel, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
+  callDeveloperCodingModel, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };
