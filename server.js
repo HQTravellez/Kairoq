@@ -6486,9 +6486,39 @@ function serveStatic(req, res) {
   });
 }
 
+
+const developerAgent=require("./developer-agent");
+async function handleDeveloperBuild(req,res){
+  try{
+    const body=await getBody(req,100000);
+    const generated=await developerAgent.build(body,callFreeLlmJSON);
+    const {preview,files,...info}=generated;
+    return json(res,200,{...info,preview_url:"/api/developer/preview/"+generated.id,files:Object.keys(files)});
+  }catch(err){return json(res,422,{error:String(err.message||err)})}
+}
+async function handleDeveloperPublish(req,res){
+  try{
+    const body=await getBody(req,30000);
+    if(body.confirm!=="PUBLISH_PULL_REQUEST")return json(res,400,{error:"Explicit confirmation required: PUBLISH_PULL_REQUEST"});
+    const result=await developerAgent.publish(String(body.id||""));
+    return json(res,200,result);
+  }catch(err){return json(res,422,{error:String(err.message||err)})}
+}
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
 
+  if (req.method === "POST" && url === "/api/developer/build"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperBuild(req,res);}
+  if (req.method === "POST" && url === "/api/developer/publish"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperPublish(req,res);}
+  if (req.method === "GET" && url.startsWith("/api/developer/preview/")){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{
+      const id=url.slice("/api/developer/preview/".length).split("?")[0];
+      const project=developerAgent.getProject(id);
+      const html=developerAgent.assemble(project.files);
+      res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
+      return res.end(html);
+    }catch(e){return json(res,404,{error:e.message})}
+  }
   if (req.method === "GET" && url === "/health") {
     return json(res, 200, { ok: true, service: SITE_NAME });
   }
