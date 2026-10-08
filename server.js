@@ -6753,6 +6753,18 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
+    if(process.env.DEVELOPER_SMOKE_TEST==="true"){
+      const marker=path.join(WORKSPACE_DIR,".developer-smoke-test-20261007.json");
+      if(!fs.existsSync(marker)){
+        console.log("[developer-smoke] Beginning real model + generated website + Chromium QA test");
+        developerAgent.build({brief:"Build a premium, responsive modern corporate travel website for executive teams with a strong hero, three features, pricing call to action, and a functional mobile menu.",projectName:"Kairoq Smoke Test",kind:"website",style:"editorial"},callDeveloperCodingModel)
+          .then(result=>{
+            const record={at:new Date().toISOString(),passed:result.generation_mode==="ai_generated" && result.qa.passed,mode:result.generation_mode,qa:result.qa,id:result.id,fileSizes:Object.fromEntries(Object.entries(result.files).map(([k,v])=>[k,v.length]))};
+            fs.writeFileSync(marker,JSON.stringify(record));
+            console.log("[developer-smoke] RESULT "+JSON.stringify(record));
+          }).catch(err=>{console.error("[developer-smoke] ERROR "+String(err.message||err).slice(0,500))});
+      }else console.log("[developer-smoke] Already executed, skipping");
+    }
   });
 }
 
