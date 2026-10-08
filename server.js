@@ -6511,6 +6511,12 @@ async function handleDeveloperPublish(req,res){
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
 
+  if(req.method==="GET"&&url==="/api/developer/status"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    let local=false;try{local=(await getLocalLlmModels()).length>0}catch{}
+    const ai=local||Boolean(process.env.OPENROUTER_API_KEY);
+    return json(res,200,{ai_generation:ai,local_model:local,openrouter:!!process.env.OPENROUTER_API_KEY,github_publishing:!!(process.env.GITHUB_TOKEN&&process.env.GITHUB_REPO),repository:process.env.GITHUB_REPO||null,chromium:!!process.env.CHROMIUM_PATH,starter_template:true});
+  }
   if (req.method === "POST" && url === "/api/developer/build"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperBuild(req,res);}
   if (req.method === "POST" && url === "/api/developer/revise"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperRevise(req,res);}
   if (req.method === "POST" && url === "/api/developer/publish"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperPublish(req,res);}
