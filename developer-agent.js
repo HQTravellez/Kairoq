@@ -109,6 +109,7 @@ async function revise(id,instruction,callModel){
 }
 async function publish(id,{branchPrefix="kairoq-build"}={}){
   const project=getProject(id),token=process.env.GITHUB_TOKEN,repo=process.env.GITHUB_REPO;
+  if(!project.qa?.passed)throw Error("Publishing requires passing browser QA. Revise the project and resolve its findings first.");
   if(!token||!/^[\w.-]+\/[\w.-]+$/.test(repo||""))throw Error("GitHub publishing requires GITHUB_TOKEN and GITHUB_REPO variables.");
   const base="https://api.github.com/repos/"+repo;
   const api=async(method,p,body)=>{

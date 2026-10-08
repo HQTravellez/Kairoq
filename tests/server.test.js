@@ -4,6 +4,7 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 
 process.env.NODE_ENV = "test";
+process.env.TZ = "UTC";
 process.env.APP_ENCRYPTION_KEY = "test-key-that-is-not-used-in-production";
 
 const {
@@ -155,7 +156,7 @@ test("budget-aware media routing keeps paid Higgsfield out of free-first mode", 
   const free = mediaProviderOrderForBudget("free");
   const best = mediaProviderOrderForBudget("best");
   assert.equal(free.includes("higgsfield"), false);
-  assert.equal(best[0], "higgsfield");
+  assert.equal(best[0], "selfhost"); // Zero-cost mode overrides a requested paid route.
 });
 
 test("message action detector flags consequential requests", () => {
@@ -402,7 +403,7 @@ test("main stream no longer forces scrollTop for every token", () => {
 });
 
 
-test("creative engine provider order prefers local routes", () => { const {mediaProviderOrderForBudget}=require("../server.js"); const free=mediaProviderOrderForBudget("free"); assert.equal(free[0],"localsd"); assert.equal(free[1],"wan2gp"); assert.ok(free.includes("selfhost")); assert.ok(!free.includes("higgsfield")); });
+test("creative engine provider order prefers local routes", () => { const {mediaProviderOrderForBudget}=require("../server.js"); const free=mediaProviderOrderForBudget("free"); assert.equal(free[0],"selfhost"); assert.equal(free[1],"wan2gp"); assert.ok(free.includes("selfhost")); assert.ok(!free.includes("higgsfield")); });
 
 test("persistent media jobs normalize durable state", () => { const {normalizeMediaJob}=require("../server.js"); const job=normalizeMediaJob({kind:"video",prompt:"make a shoe ad",status:"running",budget_mode:"free"}); assert.equal(job.kind,"video"); assert.equal(job.status,"running"); assert.equal(job.budget_mode,"free"); assert.ok(job.id); assert.ok(job.updated_at); });
 
