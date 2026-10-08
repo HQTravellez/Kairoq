@@ -37,7 +37,7 @@
 #kq-form-actions button{width:auto!important;flex:0 1 auto!important;margin:0!important}
 #record-fields label:before,#record-fields label:after{content:none!important}
 #app-message[role=alert]{color:#842c28!important;background:#fff4f2!important;border-left:3px solid #b64036!important;padding:12px 16px!important;border-radius:8px!important}
-#app-message[data-state=saving]{color:#274b72!important;background:#edf5fe!important;border-left:3px solid #3c638c!important;padding:12px 16px!important;border-radius:8px!important}
+#app-message[data-state=saving]{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 #auth-view :is(p,small,label,input,select,textarea,button,a,span),#app-view :is(p,small,label,input,select,textarea,button,a,span,dt,dd,td,th){font-family:"Liberation Sans",Arial,Helvetica,sans-serif!important}
 @media(max-width:600px){
 #dashboard-metrics{--kq-metric-span:var(--kq-metric-mobile-span,2);display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:auto!important;gap:8px!important;padding:0!important}
