@@ -3,16 +3,20 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const auth=require('./housing-runtime');
 const supabase=require('./supabase-builder');
 const ROOT=path.join(__dirname,'workspace','developer-projects');
-const TYPES=['text','textarea','email','number','date','boolean','select'];
+const TYPES=['text','textarea','email','number','date','boolean','select','reference'];
 const NAME=/^[a-z][a-z0-9_]{0,39}$/;
 function safeName(name){if(!NAME.test(name)||['constructor','prototype','__proto__','id','user_id','created_at','updated_at'].includes(name))throw Error('Invalid collection/field name: '+name);return name;}
 function validateSchema(raw){
  if(!Array.isArray(raw?.collections)||!raw.collections.length||raw.collections.length>12)throw Error('Schema needs 1–12 collections');
- const used=new Set();return{collections:raw.collections.map(c=>{
+ const used=new Set(),collections=raw.collections.map(c=>{
   const name=safeName(String(c.name||''));if(used.has(name))throw Error('Duplicate collection');used.add(name);
   if(!Array.isArray(c.fields)||!c.fields.length||c.fields.length>25)throw Error('Each collection needs 1–25 fields');const fieldsUsed=new Set();
-  const fields=c.fields.map(f=>{const field=safeName(String(f.name||''));if(fieldsUsed.has(field))throw Error('Duplicate field');fieldsUsed.add(field);const type=String(f.type||'text');if(!TYPES.includes(type))throw Error('Unsupported field type: '+type);const out={name:field,label:String(f.label||field).slice(0,80),type,required:!!f.required};if(type==='select'){if(!Array.isArray(f.options)||!f.options.length||f.options.length>30)throw Error('Select needs options');out.options=[...new Set(f.options.map(v=>String(v).slice(0,80)))];}if(Object.hasOwn(f,'default'))out.default=fieldValue(out,f.default);return out;});return{name,label:String(c.label||name).slice(0,80),fields};
- })};
+  const fields=c.fields.map(f=>{const field=safeName(String(f.name||''));if(fieldsUsed.has(field))throw Error('Duplicate field');fieldsUsed.add(field);const type=String(f.type||'text');if(!TYPES.includes(type))throw Error('Unsupported field type: '+type);const out={name:field,label:String(f.label||field).slice(0,80),type,required:!!f.required};if(type==='select'){if(!Array.isArray(f.options)||!f.options.length||f.options.length>30)throw Error('Select needs options');out.options=[...new Set(f.options.map(v=>String(v).slice(0,80)))];}if(type==='reference'){out.collection=safeName(String(f.collection||''));}if(Object.hasOwn(f,'default'))out.default=fieldValue(out,f.default);return out;});return{name,label:String(c.label||name).slice(0,80),fields};
+ });
+ for(const c of collections)for(const f of c.fields)if(f.type==='reference'&&!collections.some(x=>x.name===f.collection))throw Error('Reference field targets unknown collection: '+f.collection);
+ const actions=(raw.actions||[]).map(a=>{const name=safeName(String(a.name||'')),collection=safeName(String(a.collection||'')),field=safeName(String(a.field||''));const c=collections.find(x=>x.name===collection),f=c?.fields.find(x=>x.name===field);if(!c||!f||f.type!=='select')throw Error('Action must target a select field');const from=[...new Set((a.from||[]).map(String))],to=String(a.to||'');if(!to||!f.options.includes(to)||from.some(v=>!f.options.includes(v)))throw Error('Action transition uses invalid option');return{name,label:String(a.label||name).slice(0,80),collection,field,from,to};});
+ if(actions.length>30||new Set(actions.map(a=>a.name)).size!==actions.length)throw Error('Actions must be unique and limited to 30');
+ return{collections,actions};
 }
 function fieldValue(field,value){
  if(value==null||value===''){if(field.required)throw Error(field.label+' is required');return field.type==='boolean'?false:null;}
@@ -21,7 +25,7 @@ function fieldValue(field,value){
  if(typeof value!=='string')throw Error(field.label+' must be text');const s=value.trim();if(!s&&field.required)throw Error(field.label+' is required');if(s.length>(field.type==='textarea'?5000:500))throw Error(field.label+' is too long');
  if(field.type==='email'&&!/^\S+@\S+\.\S+$/.test(s))throw Error('Invalid email');
  if(field.type==='date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(s)||new Date(s).toISOString().slice(0,10)!==s))throw Error('Invalid date');
- if(field.type==='select'&&!field.options.includes(s))throw Error('Invalid option for '+field.label);return s;
+ if(field.type==='select'&&!field.options.includes(s))throw Error('Invalid option for '+field.label);if(field.type==='reference'&&!/^[a-f0-9-]{36}$/.test(s))throw Error(field.label+' must reference a valid record');return s;
 }
 function recordValues(collection,raw){if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Record must be an object');const keys=new Set(collection.fields.map(f=>f.name));for(const k of Object.keys(raw))if(!keys.has(k))throw Error('Unknown field: '+k);return Object.fromEntries(collection.fields.map(f=>[f.name,fieldValue(f,Object.hasOwn(raw,f.name)?raw[f.name]:f.default)]));}
 function validateMigration(before,after){
