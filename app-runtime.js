@@ -16,7 +16,7 @@ function validateSchema(raw){
  for(const c of collections)for(const f of c.fields)if(f.type==='reference'&&!collections.some(x=>x.name===f.collection))throw Error('Reference field targets unknown collection: '+f.collection);
  const actions=(raw.actions||[]).map(a=>{const name=safeName(String(a.name||'')),collection=safeName(String(a.collection||'')),field=safeName(String(a.field||''));const c=collections.find(x=>x.name===collection),f=c?.fields.find(x=>x.name===field);if(!c||!f||f.type!=='select')throw Error('Action must target a select field');const from=[...new Set((a.from||[]).map(String))],to=String(a.to||'');if(!to||!f.options.includes(to)||from.some(v=>!f.options.includes(v)))throw Error('Action transition uses invalid option');return{name,label:String(a.label||name).slice(0,80),collection,field,from,to};});
  if(actions.length>30||new Set(actions.map(a=>a.name)).size!==actions.length)throw Error('Actions must be unique and limited to 30');
- return{collections,actions};
+ return raw.actions===undefined?{collections}:{collections,actions};
 }
 function fieldValue(field,value){
  if(value==null||value===''){if(field.required)throw Error(field.label+' is required');return field.type==='boolean'?false:null;}
