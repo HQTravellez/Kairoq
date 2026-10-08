@@ -7,6 +7,8 @@ async function inspect(page,screen){
   for(const el of [...document.querySelectorAll('h1,h2,h3,p,label,button,a,td,th,small,span')].slice(0,250)){
    const rect=el.getBoundingClientRect(),s=getComputedStyle(el),text=(el.innerText||'').trim();if(!text||text.length<3||!rect.width||!rect.height||el.closest('[aria-hidden="true"],button:disabled')||s.visibility==='hidden'||s.display==='none')continue;
    if(![...el.childNodes].some(n=>n.nodeType===3&&n.textContent.trim().length>=3))continue;
+   // Screen-reader labels are intentionally clipped to 1px, not visual defects.
+   const visuallyHidden=['absolute','fixed'].includes(s.position)&&rect.width<=1&&rect.height<=1&&['hidden','clip'].includes(s.overflow)&&(s.clip!=='auto'||s.clipPath!=='none');if(visuallyHidden)continue;
    const snippet=text.slice(0,45);if(parseFloat(s.fontSize)<12)add('Text below 12px: '+snippet,'Increase compact text to at least 12px and reading text to 16px.');
    if(el.scrollWidth>el.clientWidth+3&&['hidden','clip'].includes(s.overflowX)&&!(s.textOverflow==='ellipsis'&&(el.title||el.getAttribute('aria-label'))))add('Clipped text: '+snippet,'Wrap the text or provide a readable responsive layout.');
    const chain=[];for(let parent=el;parent;parent=parent.parentElement)chain.push(getComputedStyle(parent));if(chain.some(c=>parseFloat(c.opacity)<1||c.backgroundImage!=='none'||c.filter!=='none'))continue;
