@@ -36,6 +36,7 @@
 @media(max-width:600px){
 #dashboard-metrics{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
 #dashboard-metrics .kq-metric{min-width:0!important;padding:14px!important}
+#record-list .kq-table-wrap,#record-list .kq-table,#record-list .kq-table tbody,#record-list .kq-table tr,#record-list .kq-table td{min-width:0!important;max-width:100%!important}
 #record-list .kq-table-wrap{overflow:visible!important}
 #record-list .kq-table,#record-list .kq-table tbody,#record-list .kq-table tr{display:block!important;width:100%!important;box-sizing:border-box!important}
 #record-list .kq-table thead{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important}
