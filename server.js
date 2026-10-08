@@ -6812,6 +6812,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
+    if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./studio-qa").run().catch(e=>console.error("[studio-qa] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true" && experiential.configured())require("./app-smoke").run(appBuilder,callDeveloperCodingModel).catch(e=>console.error("[fullstack-smoke] ERROR "+e.message));
     if(process.env.HOUSING_APP_BUILD==="true" && experiential.configured()){
       housingBuilder.build(callDeveloperCodingModel,parseDeveloperResponse).then(r=>console.log("[housing-app] RESULT "+JSON.stringify(r))).catch(e=>console.error("[housing-app] ERROR "+e.message));

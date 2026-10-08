@@ -14,9 +14,10 @@ function database(root,id){
 }
 function send(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));}
 async function body(req){let s='';for await(const part of req){s+=part;if(s.length>18000)throw Error('Request too large');}try{return JSON.parse(s||'{}')}catch{throw Error('Invalid JSON')}}
-const token=req=>String(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('housing_session='))?.slice(16);
-function user(req,id){const s=sessions.get(token(req));return s&&s.id===id&&s.expires>Date.now()?s.user:null;}
-function cookie(req,res,value){res.setHeader('Set-Cookie','housing_session='+value+'; HttpOnly; SameSite=Strict; Path=/apps/; Max-Age='+(value?86400:0)+(req.headers['x-forwarded-proto']==='https'||req.socket.encrypted?'; Secure':''));}
+const sessionName=id=>id==='housing-enquiries'?'housing_session':'kairoq_session_'+id;
+const token=(req,id)=>{const prefix=sessionName(id)+'=';return String(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(prefix))?.slice(prefix.length)};
+function user(req,id){const s=sessions.get(token(req,id));return s&&s.id===id&&s.expires>Date.now()?s.user:null;}
+function cookie(req,res,value,id){res.setHeader('Set-Cookie',sessionName(id)+'='+value+'; HttpOnly; SameSite=Strict; Path=/apps/'+id+'/; Max-Age='+(value?86400:0)+(req.headers['x-forwarded-proto']==='https'||req.socket.encrypted?'; Secure':''));}
 function clean(raw){
  const str=(key,max=500)=>String(raw[key]??'').trim().slice(0,max);
  const out={name:str('name',120),email:str('email',160).toLowerCase(),city:str('city',100),arrival:str('arrival',10),departure:str('departure',10),budget:Number(raw.budget||0),status:str('status',20)||'new',notes:str('notes',3000),priority:str('priority',20)||'normal'};
@@ -41,9 +42,9 @@ async function handle(req,res,{root,id,route}){
     const salt=crypto.randomBytes(16).toString('hex'),hash=crypto.scryptSync(password,salt,64).toString('hex');account={id:crypto.randomUUID(),email,salt,hash};
     db.prepare('INSERT INTO users VALUES(?,?,?,?)').run(account.id,email,salt,hash);
    }else if(!account||!crypto.timingSafeEqual(Buffer.from(account.hash,'hex'),crypto.scryptSync(password,account.salt,64)))return send(res,401,{error:'Invalid email or password'});
-   const session=crypto.randomBytes(32).toString('hex');sessions.set(session,{id,user:{id:account.id,email},expires:now+86400000});cookie(req,res,session);return send(res,200,{user:{id:account.id,email}});
+   const session=crypto.randomBytes(32).toString('hex');sessions.set(session,{id,user:{id:account.id,email},expires:now+86400000});cookie(req,res,session,id);return send(res,200,{user:{id:account.id,email}});
   }
-  if(route==='/auth/logout'&&method==='POST'){sessions.delete(token(req));cookie(req,res,'');return send(res,200,{ok:true})}
+  if(route==='/auth/logout'&&method==='POST'){sessions.delete(token(req,id));cookie(req,res,'',id);return send(res,200,{ok:true})}
   const account=user(req,id);if(!account)return send(res,401,{error:'Sign in required'});
   if(route==='/auth/me'&&method==='GET')return send(res,200,{user:account});
   if(route==='/enquiries'&&method==='GET')return send(res,200,{enquiries:db.prepare('SELECT * FROM enquiries WHERE user_id=? ORDER BY created_at DESC').all(account.id).map(({user_id,...e})=>e)});

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f2eb">
+  <title>Stockroom Inventory</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Stockroom Inventory home"><span class="brand-mark" aria-hidden="true">S</span><span>stockroom<span class="brand-period">.</span></span></a>
+      <div class="topbar-note">Independent retail · Inventory desk</div>
+      <button id="logout" class="button button-quiet logout-button" type="button" hidden>Sign out</button>
+    </header>
+    <main id="top">
+      <section id="auth-view" class="auth-layout" aria-labelledby="auth-heading">
+        <div class="auth-copy">
+          <p class="eyebrow">A clearer view of what’s on your shelves</p>
+          <h1 id="auth-heading">Good stock<br>starts here.</h1>
+          <p class="lead">Keep your products, quantities, and reorder points in one calm, reliable place.</p>
+          <div class="auth-stamp"><span class="stamp-dot" aria-hidden="true"></span>Your shop’s inventory, at a glance</div>
+        </div>
+        <div class="auth-card">
+          <p class="eyebrow">Your workspace</p>
+          <h2>Sign in or create an account</h2>
+          <p class="muted">Use an account to access your private inventory.</p>
+          <form id="auth-form">
+            <label for="auth-email">Email address</label>
+            <input id="auth-email" name="email" type="email" autocomplete="email" required>
+            <label for="auth-password">Password</label>
+            <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="10" required aria-describedby="password-hint">
+            <span id="password-hint" class="field-hint">Use at least 10 characters.</span>
+            <div class="auth-actions">
+              <button id="login" class="button button-primary" type="submit">Sign in</button>
+              <button id="register" class="button button-outline" type="submit">Create account</button>
+            </div>
+          </form>
+          <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+      <section id="app-view" hidden aria-label="Inventory workspace">
+        <div class="workspace-heading">
+          <div><p class="eyebrow">Your shop, in good order</p><h1>Inventory <span class="heading-light">desk</span></h1></div>
+          <nav class="section-nav" aria-label="Workspace sections"><a href="#dashboard-section">Overview</a><a href="#inventory-section">Products</a></nav>
+        </div>
+        <div id="app-message" class="message app-message" role="status" aria-live="polite"></div>
+        <section id="dashboard-section" class="dashboard-section" aria-labelledby="dashboard-title">
+          <div class="section-heading"><div><p class="eyebrow">The daily picture</p><h2 id="dashboard-title">Overview</h2></div><span class="section-index">01 / 02</span></div>
+          <div id="dashboard-loading" class="loading-line" role="status">Loading your inventory overview…</div>
+          <div id="dashboard-error" class="inline-error" role="alert" hidden></div>
+          <div id="dashboard-cards" class="stats-grid" hidden>
+            <article class="stat-card stat-card-dark"><span class="stat-label">Products tracked</span><strong id="stat-products" class="stat-value">—</strong><span class="stat-caption">Unique items in your catalog</span></article>
+            <article class="stat-card"><span class="stat-label">Units on hand</span><strong id="stat-units" class="stat-value">—</strong><span class="stat-caption">Across all products</span></article>
+            <article class="stat-card stat-card-alert"><span class="stat-label">Need a closer look</span><strong id="stat-low" class="stat-value">—</strong><span class="stat-caption">At or below reorder level</span></article>
+          </div>
+        </section>
+        <section id="inventory-section" class="inventory-section" aria-labelledby="inventory-title">
+          <div class="section-heading inventory-heading">
+            <div><p class="eyebrow">Keep every shelf accounted for</p><h2 id="inventory-title">Product list</h2></div>
+            <div class="collection-control"><label for="collection-select">Collection</label><select id="collection-select" aria-label="Choose a collection"></select></div>
+          </div>
+          <div class="inventory-layout">
+            <section class="product-panel" aria-labelledby="products-panel-title">
+              <div class="panel-heading"><div><h3 id="products-panel-title">Your products</h3><p><span id="record-count">0</span> items in this collection</p></div><span class="panel-rule" aria-hidden="true"></span></div>
+              <div class="filter-row" id="category-filter-wrap" hidden><label for="category-filter">Filter by category</label><select id="category-filter"><option value="">All categories</option></select></div>
+              <div id="records-loading" class="loading-line" role="status" hidden>Loading products…</div>
+              <div id="records-error" class="inline-error" role="alert" hidden></div>
+              <div id="records-empty" class="empty-state" hidden><span class="empty-mark" aria-hidden="true">＋</span><h4>A fresh shelf</h4><p>No products yet. Add your first item using the form.</p></div>
+              <div id="records-filtered-empty" class="empty-state" hidden><span class="empty-mark" aria-hidden="true">⌕</span><h4>No matching products</h4><p>Try another category or show all categories.</p></div>
+              <div id="record-list" class="record-list" aria-live="polite"></div>
+            </section>
+            <section class="form-panel" aria-labelledby="form-title">
+              <div class="form-panel-top"><p class="eyebrow" id="form-eyebrow">Add to the catalog</p><h3 id="form-title">New product</h3><p class="muted">Fields marked <span class="required-mark">*</span> are required.</p></div>
+              <form id="record-form"><div id="record-fields" class="form-fields"></div><div class="form-actions"><button id="save-record" class="button button-primary" type="submit">Save product</button><button id="cancel-edit" class="button button-quiet" type="button" hidden>Cancel edit</button></div></form>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+    <footer class="footer"><span>Stockroom Inventory</span><span>Thoughtful tools for independent shops</span></footer>
+  </div>
+</body>
+</html>
