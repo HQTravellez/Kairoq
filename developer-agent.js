@@ -22,12 +22,13 @@ function normalizeFiles(raw){
   };
   if(files["index.html"].length<350||files["styles.css"].length<500)throw Error("The AI produced incomplete website files.");
   if(Object.values(files).some(x=>x.length>130000))throw Error("Generated file exceeds size limit.");
-  if(/<script\b[^>]*\bsrc\s*=/i.test(files["index.html"]))throw Error("External scripts are not permitted in generated previews.");
+  const scripts=[...files["index.html"].matchAll(/<script\b[^>]*\bsrc\s*=\s*["\x27]([^"\x27]+)["\x27]/gi)];
+  if(scripts.some(x=>!/^\.?\/?app\.js(?:\?.*)?$/.test(x[1])))throw Error("Only the local app.js script is allowed in generated previews.");
   try{new vm.Script(files["app.js"],{filename:"app.js",timeout:1000})}catch(e){throw Error("Generated JavaScript syntax error: "+e.message)}
   return files;
 }
 function assemble(files){
-  let html=files["index.html"];
+  let html=files["index.html"].replace(/<script\b[^>]*\bsrc\s*=\s*["\x27]\.?\/?app\.js(?:\?[^"\x27]*)?["\x27][^>]*>\s*<\/script>/gi,"").replace(/<link\b[^>]*href\s*=\s*["\x27]\.?\/?styles\.css["\x27][^>]*>/gi,"");
   const css="<style>\n"+files["styles.css"].replace(/<\/style/gi,"<\\/style")+"\n</style>";
   const js="<script>\n"+files["app.js"].replace(/<\/script/gi,"<\\/script")+"\n<\/script>";
   html=/<\/head>/i.test(html)?html.replace(/<\/head>/i,css+"\n</head>"):css+"\n"+html;
