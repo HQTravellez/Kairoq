@@ -6490,50 +6490,46 @@ function serveStatic(req, res) {
 const developerAgent=require("./developer-agent");
 async function callDeveloperCodingModel(opts={}){
   if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
-  const primary=(process.env.KAIROQ_BUILDER_MODEL||"anthropic/claude-sonnet-4.6").trim();
-  const freeOnly=String(process.env.KAIROQ_BUILDER_FREE_ONLY||"false")==="true";
-  const requested=freeOnly?"openrouter/free":primary;
-  const fallback=freeOnly?["nvidia/nemotron-3-super-120b-a12b:free"]:["deepseek/deepseek-v3.2"];
-  const models=[requested,...fallback].filter((x,i,a)=>a.indexOf(x)===i);
-  const estimates={"anthropic/claude-sonnet-4.6":[3,15],"deepseek/deepseek-v3.2":[0.25,0.5]};
-  const failures=[];
+  const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
+  const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
+  const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),"deepseek/deepseek-v3.2"];
+  const allowPaid=mode==="premium" && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+  const models=[...freeCandidates,...(allowPaid?paidCandidates:[])].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  const errors=[];
   for(const model of models){
+    const free=model.endsWith(":free")||model==="openrouter/free";
+    if(!free&&!allowPaid)continue;
     try{
-      if(freeOnly && !(model.endsWith(":free")||model==="openrouter/free"))continue;
-      const rates=estimates[model]||[4,20];
-      // Reserve a conservative upper estimate before sending each request.
-      const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3), maxOutput=12000;
-      const maxEstimate=(input*rates[0]+maxOutput*rates[1])/1e6;
-      const totals=await usageTotals();
-      if((DAILY_COST_LIMIT_USD>0 && totals.daily+maxEstimate>=DAILY_COST_LIMIT_USD)||
-         (MONTHLY_COST_LIMIT_USD>0 && totals.monthly+maxEstimate>=MONTHLY_COST_LIMIT_USD))
-        throw Error("Kairoq app budget insufficient for another build; no paid model request sent.");
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(180000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.25,max_tokens:maxOutput})});
+      const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
+      const maxOutput=10000;
+      const rates=free?[0,0]:model.includes("deepseek")?[0.5,1]:[5,25];
+      if(!free){
+        const totals=await enforceBudget();
+        const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
+        if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
+      }
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"}})});
       const data=await response.json().catch(()=>({}));
-      if(!response.ok)throw Error(String(data?.error?.message||"HTTP "+response.status).slice(0,260));
+      if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
       const message=data.choices?.[0]?.message||{};
       const raw=message.content;
-      const content=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(p=>p.text||"").join(""):"";
-      const usage=data.usage||{};
-      // Log the provider-reported charge where available, otherwise conservatively estimate.
-      const bill=Number.isFinite(Number(usage.cost))&&usage.cost!=null?Number(usage.cost):
-        ((Number(usage.prompt_tokens)||input)*rates[0]+(Number(usage.completion_tokens)||maxOutput)*rates[1])/1e6;
-      await recordUsage({...usage,cost:bill},{purpose:"developer-build",model});
-      if(freeOnly&&bill>0)throw Error("Unexpected charge on free-only model");
-      const clean=content.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,"").trim();
-      if(!clean)throw Error("Model produced no answer (finish="+String(data.choices?.[0]?.finish_reason)+")");
-      try{return JSON.parse(clean)}catch{
-        const first=clean.indexOf("{"),last=clean.lastIndexOf("}");
-        if(first>=0&&last>first)return JSON.parse(clean.slice(first,last+1));
-        throw Error("Model returned non-JSON code; build requires structured project files");
-      }
-    }catch(err){
-      failures.push(model+": "+String(err.message||err).slice(0,200));
-      console.warn("[developer-model]",model,String(err.message||err).slice(0,200));
-      if(/budget insufficient|insufficient credits|never purchased credits/i.test(String(err.message)))break;
-    }
+      const content=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
+      const cost=Number(data.usage?.cost||0);
+      if(free&&cost>0)throw Error("Free request unexpectedly billed");
+      if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model});
+      if(!content.trim())throw Error("Empty response; finish="+data.choices?.[0]?.finish_reason+" reasoning="+String(message.reasoning||"").length);
+      const clean=content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+      try{return JSON.parse(clean)}catch{}
+      const start=clean.indexOf("{"),end=clean.lastIndexOf("}");
+      if(start>=0&&end>start){try{return JSON.parse(clean.slice(start,end+1))}catch{}}
+      const html=(clean.match(/```(?:html|HTML)\s*([\s\S]*?)```/i)||[])[1];
+      const css=(clean.match(/```css\s*([\s\S]*?)```/i)||[])[1];
+      const js=(clean.match(/```(?:javascript|js)\s*([\s\S]*?)```/i)||[])[1];
+      if(html&&css)return {project_name:"Generated Project",summary:"AI-generated website",files:{"index.html":html,"styles.css":css,"app.js":js||""}};
+      throw Error("Response did not contain valid JSON or separate HTML/CSS code; "+clean.length+" characters");
+    }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}
   }
-  throw Error("AI coding unavailable: "+failures.join(" | "));
+  throw Error("No coding model returned usable project files. "+errors.join(" | "));
 }
 async function handleDeveloperBuild(req,res){
   try{
