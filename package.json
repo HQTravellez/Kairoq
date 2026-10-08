@@ -11,7 +11,7 @@
     "higgsfield:seedance": "tsx index.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "dependencies": {
     "@higgsfield/client": "^0.2.6",

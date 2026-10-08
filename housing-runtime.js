@@ -61,4 +61,4 @@ async function handle(req,res,{root,id,route}){
   return send(res,404,{error:'Endpoint not found'});
  }catch(e){return send(res,400,{error:String(e.message||e).slice(0,180)})}
 }
-module.exports={handle,database,clean};
+module.exports={handle,database,clean,user,body,send};

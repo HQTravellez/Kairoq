@@ -6490,6 +6490,8 @@ function serveStatic(req, res) {
 const developerAgent=require("./developer-agent");
 const experiential=require("./experiential");
 const housingBuilder=require("./housing-builder");
+const appBuilder=require("./app-builder");
+const appRuntime=require("./app-runtime");
 function parseDeveloperResponse(content,model="coding model"){
   const clean=content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
   try{return JSON.parse(clean)}catch{}
@@ -6554,13 +6556,14 @@ async function callDeveloperCodingModel(opts={}){
 async function handleDeveloperBuild(req,res){
   try{
     const body=await getBody(req,100000);
+    if(body.kind==="fullstack")return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));
     const generated=await developerAgent.build(body,callDeveloperCodingModel);
     const {preview,files,...info}=generated;
     return json(res,200,{...info,preview_url:"/api/developer/preview/"+generated.id,files:Object.keys(files)});
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperRevise(req,res){
-  try{const body=await getBody(req,100000);const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id,files:Object.keys(files)})}
+  try{const body=await getBody(req,100000);if(appBuilder.listProjects().some(p=>p.id===body.id))return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id,files:Object.keys(files)})}
   catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperPublish(req,res){
@@ -6573,7 +6576,19 @@ async function handleDeveloperPublish(req,res){
 }
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
-  if(url.startsWith("/apps/") && await housingBuilder.handle(req,res))return;
+  if(url.startsWith("/apps/") && (await appRuntime.handle(req,res)||await housingBuilder.handle(req,res)))return;
+  if(url.startsWith("/api/developer/jobs/")&&req.method==="GET"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{return json(res,200,appBuilder.getJob(url.slice("/api/developer/jobs/".length)))}catch(e){return json(res,404,{error:"Build job not found"})}
+  }
+  if(url==="/api/developer/projects"&&req.method==="GET"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    return json(res,200,{projects:appBuilder.listProjects()});
+  }
+  if(url==="/api/developer/launch"&&req.method==="POST"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const body=await getBody(req,30000);if(body.confirm!=="LAUNCH_APP")return json(res,400,{error:"Confirm launch"});return json(res,200,appBuilder.publish(String(body.id||"")))}catch(e){return json(res,422,{error:e.message})}
+  }
 
   if(req.method==="GET"&&url==="/api/developer/status"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
@@ -6797,6 +6812,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
+    if(process.env.FULLSTACK_APP_SMOKE_TEST==="true" && experiential.configured())require("./app-smoke").run(appBuilder,callDeveloperCodingModel).catch(e=>console.error("[fullstack-smoke] ERROR "+e.message));
     if(process.env.HOUSING_APP_BUILD==="true" && experiential.configured()){
       housingBuilder.build(callDeveloperCodingModel,parseDeveloperResponse).then(r=>console.log("[housing-app] RESULT "+JSON.stringify(r))).catch(e=>console.error("[housing-app] ERROR "+e.message));
     }

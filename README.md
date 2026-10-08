@@ -1545,3 +1545,12 @@ Browserless, external APIs, image/video providers, SMS and other third-party ser
 If Ollama is running, `OPENROUTER_API_KEY` can be omitted entirely. Kairoq's model catalog and normal chat continue to work from the local endpoint.
 
 If you want OpenRouter's free router as backup, keep an API key configured. The free router has its own rate limits, so local inference should remain the main engine.
+
+
+### Full-stack Build Studio beta
+
+At `/build-studio.html`, choose **Full-stack business app** to generate custom collections, a responsive frontend, login, a dashboard, and persistent per-account records. Build jobs run asynchronously and resume their progress display after a page refresh. Saved projects can be reopened, revised and launched at `/apps/<project-id>/`. Launch hosting uses the existing Kairoq Railway service and volume; GitHub credentials are only needed for static project pull requests.
+
+The trusted SQLite backend supports text, textarea, email, number, date, boolean and select fields. Generated JavaScript runs in the browser; generated server code is never executed. Revisions must preserve collections, field types and existing enum options. Added required fields need defaults. Browser QA checks registration, login, create/edit/delete, saved records, dashboard counts and desktop/mobile layouts before atomically switching the active version. A failed revision leaves the last working version in place. App accounts and saved data persist across deploys; sessions require a fresh login after a server restart.
+
+Supported scope is business CRUD apps such as inventories, enquiry trackers and CRMs. Arbitrary backend code, payments and external integrations are outside this beta. Experiential Labs credentials remain server-side. `FULLSTACK_APP_SMOKE_TEST=true` runs a cached inventory build and feature revision, verifies a real SQLite record survives, and launches the example app. Daily/monthly AI budget checks apply to builds and repair calls.
