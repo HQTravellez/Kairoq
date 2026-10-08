@@ -7,7 +7,7 @@
  function signed(user){$('kq-navigation-close')?.remove();visible($('auth-view')||$('auth-form'),!user);visible($('app-view'),!!user);if($('user-email'))$('user-email').textContent=user?.email||'';queueMicrotask(syncNavigation);}
  async function api(route,body,method){const r=await fetch('api/'+route,{method:method||(body===undefined?'GET':'POST'),credentials:'same-origin',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Object.assign(Error(data.error||'Request failed'),{status:r.status});return data;}
  function emit(){document.dispatchEvent(new CustomEvent('kairoq:data',{detail:{schema,dashboard,collection:current,records:records.slice()}}));}
- function form(record){visible($('record-form'),true);editing=record?.id||null;let host=$('record-fields');if(!host){host=node('div','kq-fields');host.id='record-fields';$('record-form').prepend(host);}host.replaceChildren();
+ function form(record){message('app-message','');visible($('record-form'),true);editing=record?.id||null;let host=$('record-fields');if(!host){host=node('div','kq-fields');host.id='record-fields';$('record-form').prepend(host);}host.replaceChildren();
   for(const f of current.fields){const wrap=node('div','kq-field'),label=node('label','kq-label',f.label.replace(/[\s*]+$/,'')+(f.required?' *':''));label.htmlFor='kq-field-'+f.name;let input;
    if(f.type==='select'){input=node('select','kq-input');if(!f.required)input.add(new Option('Choose '+f.label,''));for(const value of f.options)input.add(new Option(value,value));}
    else if(f.type==='textarea')input=node('textarea','kq-input');else{input=node('input','kq-input');input.type=f.type==='boolean'?'checkbox':['email','number','date'].includes(f.type)?f.type:'text';if(f.type==='number')input.step='any';}
@@ -39,7 +39,8 @@
 #auth-view :is(p,small,label,input,select,textarea,button,a,span),#app-view :is(p,small,label,input,select,textarea,button,a,span,dt,dd,td,th){font-family:"Liberation Sans",Arial,Helvetica,sans-serif!important}
 @media(max-width:600px){
 #dashboard-metrics{--kq-metric-span:var(--kq-metric-mobile-span,2);display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
-#dashboard-metrics .kq-metric{min-width:0!important;padding:14px!important}
+#dashboard-metrics .kq-metric{min-width:0!important;min-height:0!important;padding:10px 12px!important}
+#dashboard-metrics .kq-metric-value{font-size:28px!important;line-height:1.15!important;margin-top:4px!important}
 #record-list .kq-table-wrap,#record-list .kq-table,#record-list .kq-table tbody,#record-list .kq-table tr,#record-list .kq-table td{min-width:0!important;max-width:100%!important}
 #record-list .kq-table-wrap{overflow:visible!important}
 #record-list .kq-table,#record-list .kq-table tbody,#record-list .kq-table tr{display:block!important;width:100%!important;box-sizing:border-box!important}
