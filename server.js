@@ -6490,23 +6490,24 @@ function serveStatic(req, res) {
 const developerAgent=require("./developer-agent");
 async function callDeveloperCodingModel(opts={}){
   if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
-  await enforceBudget();
-  const model=process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2";
-  const promptTokens=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
-  // Pessimistic reservation protects against a concurrent request overspending the app budget.
-  const estimatedMaxCost=(promptTokens*0.000002)+(16000*0.000003);
-  const totals=await usageTotals();
-  if((MONTHLY_COST_LIMIT_USD>0&&totals.monthly+estimatedMaxCost>MONTHLY_COST_LIMIT_USD)||(DAILY_COST_LIMIT_USD>0&&totals.daily+estimatedMaxCost>DAILY_COST_LIMIT_USD))throw Error("Builder budget exhausted; no paid request sent.");
-  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(180000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.2,max_tokens:16000,provider:{max_price:{prompt:2,completion:3}}})});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(data?.error?.message||"Coding model HTTP "+response.status);
-  const content=String(data?.choices?.[0]?.message?.content||"");
-  // Model cost is estimated conservatively; set a separate spend cap at OpenRouter.
-  const u=data.usage||{};
-  const cost=Number(u.cost)||((Number(u.prompt_tokens)||promptTokens)*0.000002+(Number(u.completion_tokens)||16000)*0.000003);
-  await recordUsage({...u,cost},{purpose:"developer-build",model});
-  const clean=content.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,"").trim();
-  try{return JSON.parse(clean)}catch{const first=clean.indexOf("{"),last=clean.lastIndexOf("}");if(first>=0&&last>first)return JSON.parse(clean.slice(first,last+1));throw Error("Coding model returned invalid project JSON.")}
+  const preferred=(process.env.KAIROQ_BUILDER_MODEL||"poolside/laguna-s-2.1:free").trim();
+  // Free-only endpoints. Never allow a paid fallback without separate explicit configuration.
+  const list=[preferred,"poolside/laguna-s-2.1:free","openrouter/free"].filter((m,i,a)=>m.endsWith(":free")||m==="openrouter/free").filter((m,i,a)=>a.indexOf(m)===i);
+  const errors=[];
+  for(const model of list){
+    try{
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(210000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.2,max_tokens:12000})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(data?.error?.message||"HTTP "+response.status);
+      const u=data.usage||{};
+      if(Number(u.cost||0)>0)throw Error("Provider returned nonzero cost on a free-only model");
+      const raw=data?.choices?.[0]?.message?.content;
+      const content=typeof raw==="string"?raw:Array.isArray(raw)?raw.filter(x=>x.type==="text").map(x=>x.text||"").join(""):"";
+      const clean=content.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,"").trim();
+      try{return JSON.parse(clean)}catch{const first=clean.indexOf("{"),last=clean.lastIndexOf("}");if(first>=0&&last>first)return JSON.parse(clean.slice(first,last+1));throw Error("Model returned invalid project JSON ("+clean.length+" chars)")}
+    }catch(err){console.warn("[developer-free-model]",model,String(err.message||err).slice(0,230));errors.push(model+": "+String(err.message||err).slice(0,150))}
+  }
+  throw Error("Free coding models unavailable: "+errors.join("; "));
 }
 async function handleDeveloperBuild(req,res){
   try{
