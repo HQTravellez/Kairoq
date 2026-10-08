@@ -52,3 +52,13 @@ test('desktop states do not invent mobile scores, while real mobile failures rem
  const report=await pipeline.review(async opts=>{const screen=opts.messages[0].content[1].text;return{visual_review:{scores:{...scores,mobile:null},findings:[],screen_reviews:[{screen,scores:{...scores,mobile:null},findings:[]}]}};},{},[{label:'Desktop editing · 1440px',bytes:Buffer.from('image')}]);assert.equal(report.passed,true);assert.equal(report.scores.mobile,null);assert.equal(report.screen_reviews[0].scores.mobile,null);
  assert.equal(pipeline.normalizeReview({scores:{...scores,mobile:2},findings:[]}).passed,false);
 });
+
+test('visual repair evidence records a failing screenshot then an improved screenshot without weakening thresholds',async()=>{
+ const broken=Buffer.from('before-repair'),fixed=Buffer.from('after-repair');
+ let calls=0;const model=async opts=>{calls++;const label=opts.messages[0].content[1].text;const good=calls===2;return{visual_review:{scores:good?scores:{...scores,spacing:2},findings:good?[]:[{severity:'major',issue:'Dashboard panels overlap',fix:'Use responsive columns'}],screen_reviews:[{screen:label,scores:good?scores:{...scores,spacing:2},findings:good?[]:[{severity:'major',issue:'Dashboard panels overlap',fix:'Use responsive columns'}]}]}};};
+ const before=await pipeline.review(model,{},[{label:'Desktop dashboard · 1440px',bytes:broken}]);
+ const after=await pipeline.review(model,{},[{label:'Desktop dashboard · 1440px',bytes:fixed}]);
+ assert.equal(before.passed,false);assert.equal(after.passed,true);assert.notEqual(before.evidence[0].sha256,after.evidence[0].sha256);
+ assert.match(pipeline.repairInstructions(before),/Dashboard panels overlap/);
+ assert.equal(before.coverage.complete,true);assert.equal(after.coverage.complete,true);
+});
