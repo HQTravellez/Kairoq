@@ -4071,19 +4071,16 @@ async function readPublicWebsiteForChat(rawUrl){
   const title=(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||host;
   const meta=(html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)/i)||html.match(/<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description/i)||[])[1]||"";
   const headings=[...html.matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/gi)].slice(0,12).map(m=>m[1].replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
-  // Use the existing real Chromium renderer when explicitly configured.
-  // It is never invoked without a token, preventing accidental paid API calls.
-  if((content.length<500 || (headings.length===0&&content.length<1400)) && BROWSERLESS_TOKEN){
-    try {
-      const renderedPage=await browserlessRender({url:u.toString(),waitForTimeout:1800});
-      if(renderedPage.html && renderedPage.html.length>html.length)html=renderedPage.html;
-    }catch(err){console.warn("Browserless HTML fallback failed:",err.message)}
-  }
   const content=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/\s+/g," ").trim();
+  let browserContent="",browserHeadings=[];
+  if(content.length<800 || (headings.length===0&&content.length<1800)){
+    try{const result=await require("./browser-reader").renderPage(u.toString());browserContent=String(result.body||"").slice(0,12000);browserHeadings=Array.isArray(result.headings)?result.headings:[]}
+    catch(e){console.warn("Chromium renderer unavailable:",e.message)}
+  }
   // JavaScript-heavy sites render an empty HTML shell. Use Jina's browser-rendered
   // public Reader endpoint as a free, rate-limited fallback; no API key is sent.
-  let readable=content,rendered=false,readerError="";
-  if(content.length<500 || (headings.length===0&&content.length<1400)){
+  let readable=browserContent.length>content.length+80?browserContent:content,rendered=browserContent.length>content.length+80,readerError="";
+  if(!rendered&&(content.length<500 || (headings.length===0&&content.length<1400))){
     try{
       const renderUrl="https://r.jina.ai/"+u.toString();
       const renderedResponse=await fetch(renderUrl,{redirect:"error",signal:AbortSignal.timeout(25000),headers:{"Accept":"text/plain","X-Return-Format":"markdown","X-No-Cache":"true"}});
@@ -4093,7 +4090,7 @@ async function readPublicWebsiteForChat(rawUrl){
       else readerError="The rendered reader returned no additional page content.";
     }catch(e){readerError=e.message}
   }
-  return {url:u.toString(),title:title.replace(/<[^>]*>/g," ").trim().slice(0,250),description:meta.trim().slice(0,750),headings,excerpt:readable.slice(0,12000),rendered,readerError};
+  return {url:u.toString(),title:title.replace(/<[^>]*>/g," ").trim().slice(0,250),description:meta.trim().slice(0,750),headings:browserHeadings.length?browserHeadings:headings,excerpt:readable.slice(0,12000),rendered,readerError};
 }
 
 
