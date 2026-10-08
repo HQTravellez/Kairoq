@@ -6496,6 +6496,10 @@ async function handleDeveloperBuild(req,res){
     return json(res,200,{...info,preview_url:"/api/developer/preview/"+generated.id,files:Object.keys(files)});
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
+async function handleDeveloperRevise(req,res){
+  try{const body=await getBody(req,100000);const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callFreeLlmJSON);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id,files:Object.keys(files)})}
+  catch(err){return json(res,422,{error:String(err.message||err)})}
+}
 async function handleDeveloperPublish(req,res){
   try{
     const body=await getBody(req,30000);
@@ -6508,6 +6512,7 @@ const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
 
   if (req.method === "POST" && url === "/api/developer/build"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperBuild(req,res);}
+  if (req.method === "POST" && url === "/api/developer/revise"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperRevise(req,res);}
   if (req.method === "POST" && url === "/api/developer/publish"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperPublish(req,res);}
   if (req.method === "GET" && url.startsWith("/api/developer/preview/")){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
