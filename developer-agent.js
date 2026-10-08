@@ -59,7 +59,7 @@ async function audit(files,{capture=false}={}){
         const check=await page.evaluate(()=>({title:document.title,text:document.body.innerText.trim().length,overflow:document.documentElement.scrollWidth>innerWidth+8,buttons:[...document.querySelectorAll("button")].length}));
         if(check.text<150)notes.push(width+"px: insufficient meaningful page content");
         if(check.overflow)notes.push(width+"px: horizontal overflow");
-        if(errors.length)notes.push(width+"px: JS errors: "+errors.slice(0,2).join(" | "));if(capture){const label=width+"px website";designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:"jpeg",quality:65})});}
+        if(errors.length)notes.push(width+"px: JS errors: "+errors.slice(0,2).join(" | "));if(capture){const label=width+"px website";designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:"jpeg",quality:65,fullPage:true})});}
         await ctx.close();
       }
     }finally{await browser.close()}

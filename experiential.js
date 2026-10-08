@@ -10,7 +10,7 @@ function callProject(opts,services){
 }
 async function run(opts,{enforceBudget,recordUsage,parse}){
  const model='gpt-6-luna'; // Published $0.10/M input, $0.50/M output; no sampling overrides.
- const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(12000,opts.maxOutputTokens)):12000;
+ const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(20000,opts.maxOutputTokens)):20000;
  let images=0;const inputText=JSON.stringify(opts.messages||[],(k,v)=>{if(k==='image_url'&&v&&typeof v==='object'){images++;return '[rendered screenshot]';}return v;});const input=Math.ceil(inputText.length/2)+images*16384;
  const reserve=(input*0.10+maxOutput*0.50)/1e6;
  const totals=await enforceBudget();
