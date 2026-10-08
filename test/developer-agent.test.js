@@ -21,3 +21,9 @@ test("assembled preview includes CSS and runnable inline JavaScript",()=>{
 test("project loader rejects invalid or traversal project identifiers",()=>{
   for(const id of ["../secrets","../../.env","x/../../x","bad"])assert.throws(()=>getProject(id),/Invalid project ID/);
 });
+
+test("multi-page assembly renders requested route with shared CSS and JS",()=>{
+ const files={"index.html":'<!doctype html><html><head><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="styles.css"></head><body><h1>Home</h1><a href="platform.html">Platform</a><script src="app.js"></script></body></html>',"platform.html":'<!doctype html><html><head><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="styles.css"></head><body><h1>Platform</h1><a href="index.html">Home</a><script src="app.js"></script></body></html>',"styles.css":"body{font:16px Arial} ".repeat(40),"app.js":"window.__kairoqMultiPage=true;"};
+ const home=assemble(files,"index.html"),platform=assemble(files,"platform.html");
+ assert.match(home,/<h1>Home<\/h1>/);assert.match(platform,/<h1>Platform<\/h1>/);assert.match(platform,/<style>/);assert.match(platform,/__kairoqMultiPage/);
+});
