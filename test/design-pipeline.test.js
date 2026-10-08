@@ -45,3 +45,6 @@ test('every screenshot is reviewed and a weak final screen blocks the build',asy
 test('missing screen verdicts cannot be published as a visual pass',async()=>{
  await assert.rejects(pipeline.review(async()=>({visual_review:{scores,findings:[]}}),{},[{label:'Editing',bytes:Buffer.from('image')}]),/omitted screen-level/);
 });
+test('incomplete model reports get one bounded retry without lowering the gate',async()=>{
+ let calls=0;const result=await pipeline.review(async()=>{calls++;return{visual_review:{scores,findings:[],...(calls===2?{screen_reviews:[{screen:'Saving',scores,findings:[]}]}:{})}};},{},[{label:'Saving',bytes:Buffer.from('image')}]);assert.equal(calls,2);assert.equal(result.passed,true);assert.equal(result.coverage.complete,true);
+});
