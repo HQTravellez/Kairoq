@@ -6754,7 +6754,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
     if(process.env.DEVELOPER_SMOKE_TEST==="true"){
-      const marker=path.join(WORKSPACE_DIR,".developer-smoke-test-20261007.json");
+      const marker=path.join(WORKSPACE_DIR,".developer-smoke-test-v2-20261007.json");
       if(!fs.existsSync(marker)){
         console.log("[developer-smoke] Beginning real model + generated website + Chromium QA test");
         developerAgent.build({brief:"Build a premium, responsive modern corporate travel website for executive teams with a strong hero, three features, pricing call to action, and a functional mobile menu.",projectName:"Kairoq Smoke Test",kind:"website",style:"editorial"},callDeveloperCodingModel)
