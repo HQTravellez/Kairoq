@@ -6488,16 +6488,36 @@ function serveStatic(req, res) {
 
 
 const developerAgent=require("./developer-agent");
+async function callDeveloperCodingModel(opts={}){
+  if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
+  await enforceBudget();
+  const model=process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2";
+  const promptTokens=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
+  // Pessimistic reservation protects against a concurrent request overspending the app budget.
+  const estimatedMaxCost=(promptTokens*0.000002)+(16000*0.000003);
+  const totals=await usageTotals();
+  if((MONTHLY_COST_LIMIT_USD>0&&totals.monthly+estimatedMaxCost>MONTHLY_COST_LIMIT_USD)||(DAILY_COST_LIMIT_USD>0&&totals.daily+estimatedMaxCost>DAILY_COST_LIMIT_USD))throw Error("Builder budget exhausted; no paid request sent.");
+  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(180000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.2,max_tokens:16000,provider:{max_price:{prompt:2,completion:3}}})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data?.error?.message||"Coding model HTTP "+response.status);
+  const content=String(data?.choices?.[0]?.message?.content||"");
+  // Model cost is estimated conservatively; set a separate spend cap at OpenRouter.
+  const u=data.usage||{};
+  const cost=Number(u.cost)||((Number(u.prompt_tokens)||promptTokens)*0.000002+(Number(u.completion_tokens)||16000)*0.000003);
+  await recordUsage({...u,cost},{purpose:"developer-build",model});
+  const clean=content.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,"").trim();
+  try{return JSON.parse(clean)}catch{const first=clean.indexOf("{"),last=clean.lastIndexOf("}");if(first>=0&&last>first)return JSON.parse(clean.slice(first,last+1));throw Error("Coding model returned invalid project JSON.")}
+}
 async function handleDeveloperBuild(req,res){
   try{
     const body=await getBody(req,100000);
-    const generated=await developerAgent.build(body,callFreeLlmJSON);
+    const generated=await developerAgent.build(body,callDeveloperCodingModel);
     const {preview,files,...info}=generated;
     return json(res,200,{...info,preview_url:"/api/developer/preview/"+generated.id,files:Object.keys(files)});
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperRevise(req,res){
-  try{const body=await getBody(req,100000);const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callFreeLlmJSON);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id,files:Object.keys(files)})}
+  try{const body=await getBody(req,100000);const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id,files:Object.keys(files)})}
   catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperPublish(req,res){
