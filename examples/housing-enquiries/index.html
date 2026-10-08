@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f3ec">
+  <title>PlanURstay Enquiries</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="PlanURstay Enquiries home">
+      <span class="brand-mark" aria-hidden="true">P</span>
+      <span>PlanURstay <span class="brand-light">Enquiries</span></span>
+    </a>
+    <div class="account-area" id="account-area" hidden>
+      <span class="account-email" id="account-email"></span>
+      <button class="button button-quiet button-small" id="logout" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <div class="global-message" id="global-message" role="alert" aria-live="polite" hidden></div>
+
+    <section class="auth-layout" id="auth-view" aria-labelledby="auth-heading" hidden>
+      <div class="auth-intro">
+        <p class="eyebrow">A calmer way to stay on top</p>
+        <h1>Every enquiry,<br><em>in the right place.</em></h1>
+        <p class="intro-copy">Keep your housing conversations organised, follow up with confidence, and see your pipeline at a glance.</p>
+        <div class="intro-note"><span aria-hidden="true">✳</span> Your enquiries are private to your account.</div>
+      </div>
+      <div class="auth-card">
+        <p class="eyebrow">Welcome</p>
+        <h2 id="auth-heading">Sign in or create an account</h2>
+        <p class="muted">Use your email and a password of at least 10 characters.</p>
+        <div class="form-message" id="auth-message" role="alert" aria-live="polite" hidden></div>
+        <form id="auth-form">
+          <label for="auth-email">Email address</label>
+          <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+          <label for="auth-password">Password</label>
+          <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="10" required>
+          <div class="auth-actions">
+            <button class="button button-primary" id="login" type="submit">Sign in</button>
+            <button class="button button-outline" id="register" type="submit">Create account</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="app-view" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Your workspace</p>
+          <h1>Enquiry overview</h1>
+          <p class="muted heading-subtitle">A clear view of every conversation and what needs your attention.</p>
+        </div>
+        <div class="heading-accent" aria-hidden="true">✳</div>
+      </div>
+
+      <section class="stats-grid" aria-label="Enquiry dashboard">
+        <article class="stat-card stat-featured"><span class="stat-label">Total enquiries</span><strong id="total-count">—</strong><span class="stat-caption">All your enquiries</span></article>
+        <article class="stat-card"><span class="stat-label">Active</span><strong id="active-count">—</strong><span class="stat-caption">In progress</span></article>
+        <article class="stat-card"><span class="stat-label">Booked</span><strong id="booked-count">—</strong><span class="stat-caption">Confirmed stays</span></article>
+        <article class="stat-card"><span class="stat-label">Pipeline budget</span><strong id="pipeline-budget">—</strong><span class="stat-caption">Across your pipeline</span></article>
+        <article class="stat-card"><span class="stat-label">Urgent</span><strong id="urgent-count">—</strong><span class="stat-caption">Needs attention</span></article>
+      </section>
+
+      <div class="workspace-grid">
+        <section class="panel form-panel" aria-labelledby="form-title">
+          <div class="panel-heading">
+            <div><p class="eyebrow" id="form-eyebrow">New record</p><h2 id="form-title">Add an enquiry</h2></div>
+            <span class="panel-icon" aria-hidden="true">＋</span>
+          </div>
+          <p class="muted form-intro">Capture the details now; you can update them as the conversation progresses.</p>
+          <div class="form-message" id="enquiry-message" role="alert" aria-live="polite" hidden></div>
+          <form id="enquiry-form">
+            <div class="field"><label for="enquiry-name">Full name</label><input id="enquiry-name" name="name" type="text" autocomplete="name" required></div>
+            <div class="field"><label for="enquiry-email">Email address</label><input id="enquiry-email" name="email" type="email" autocomplete="email" required></div>
+            <div class="field"><label for="enquiry-city">Preferred city</label><input id="enquiry-city" name="city" type="text" required></div>
+            <div class="field-row">
+              <div class="field"><label for="enquiry-arrival">Arrival</label><input id="enquiry-arrival" name="arrival" type="date" required></div>
+              <div class="field"><label for="enquiry-departure">Departure</label><input id="enquiry-departure" name="departure" type="date" required></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="enquiry-budget">Budget</label><div class="input-prefix"><span aria-hidden="true">$</span><input id="enquiry-budget" name="budget" type="number" min="0" step="0.01" inputmode="decimal" required></div></div>
+              <div class="field"><label for="enquiry-status">Status</label><select id="enquiry-status" name="status"><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="booked">Booked</option><option value="closed">Closed</option></select></div>
+            </div>
+            <div class="field"><label for="enquiry-priority">Priority</label><select id="enquiry-priority" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+            <div class="field"><label for="enquiry-notes">Notes <span class="optional">Optional</span></label><textarea id="enquiry-notes" name="notes" rows="4" placeholder="Anything useful to remember…"></textarea></div>
+            <div class="form-actions"><button class="button button-primary button-full" id="save-enquiry" type="submit">Save enquiry</button><button class="button button-quiet button-full" id="cancel-edit" type="button" hidden>Cancel edit</button></div>
+          </form>
+        </section>
+
+        <section class="panel enquiries-panel" aria-labelledby="enquiries-title">
+          <div class="panel-heading list-heading">
+            <div><p class="eyebrow">Your pipeline</p><h2 id="enquiries-title">Recent enquiries</h2></div>
+            <div class="list-tools">
+              <label class="filter-label" for="priority-filter">Priority</label>
+              <select id="priority-filter" aria-label="Filter enquiries by priority">
+                <option value="all">All priorities</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+              <button class="button button-quiet button-small" id="refresh-enquiries" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="list-loading" id="list-loading" role="status" hidden><span class="spinner" aria-hidden="true"></span> Loading enquiries…</div>
+          <div class="empty-state" id="empty-state" hidden><span class="empty-mark" aria-hidden="true">✳</span><h3>No enquiries yet</h3><p>Your next conversation can start here. Add an enquiry using the form.</p></div>
+          <div class="enquiry-list" id="enquiry-list" aria-live="polite"></div>
+        </section>
+      </div>
+      <p class="privacy-note"><span aria-hidden="true">◈</span> Your workspace is private and synced securely to your account.</p>
+    </section>
+  </main>
+  <footer class="site-footer">PlanURstay Enquiries <span aria-hidden="true">·</span> Make room for better stays.</footer>
+</body>
+</html>
