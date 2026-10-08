@@ -73,7 +73,7 @@ async function finishDesign(files,qa,designPlan,brief,callModel){
  for(let polish=0;polish<3;polish++){
   evidence=designPipeline.stripShots(qa);const visual=await designPipeline.review(callModel,designPlan,evidence,qa.design_checks);qa.visual_review=visual;if(visual.passed)break;
   if(polish===2){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
-  files=designSystem.apply(normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{"index.html":complete HTML,"styles.css":complete CSS,"app.js":complete JS}}. Polish this working website while preserving all interactions, content and valid navigation. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(designSystem.source(files))}]})),designPlan.style);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
+  files=designSystem.apply(normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing complete shared styles.css/app.js AND every existing HTML page. Polish this working website while preserving all routes, interactions, content and valid navigation. Never remove an existing page. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(designSystem.source(files))}]})),designPlan.style);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
  }
  return{files,qa,evidence};
 }
@@ -91,7 +91,7 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
   let files=designSystem.apply(normalizeFiles(generated),designPlan.style),qa=await audit(files,{capture:true}),revisions=0;
   if(!usedStarter && qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
-      const fix="Return only JSON with files: index.html, styles.css, app.js. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(designSystem.source(files)).slice(0,34000)+". Preserve and enhance premium design.";
+      const fix="Return only JSON with files containing complete styles.css, app.js, index.html and every current HTML page. Do not remove routes. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(designSystem.source(files)).slice(0,34000)+". Preserve and enhance premium design.";
       const repaired=designSystem.apply(normalizeFiles(await callModel({messages:[{role:"user",content:fix}],temperature:0.2})),designPlan.style);
       const repairedQa=await audit(repaired,{capture:true});
       if(repairedQa.findings.length<=qa.findings.length){files=repaired;qa=repairedQa;revisions=1}
@@ -110,12 +110,12 @@ async function revise(id,instruction,callModel){
   if(revision.length<5)throw Error("Describe the design or functionality change.");
   if(p.status==="pull_request")throw Error("This project has a pending GitHub PR. Create a new project before revising.");
   const designPlan=await designPipeline.plan(callModel,{brief:p.brief,kind:p.kind,style:p.style,previous:p.design_plan,existing:p.files});
-  const prompt=designPipeline.instructions(designPlan)+designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing files object with index.html, styles.css, and app.js strings. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(designSystem.source(p.files)).slice(0,37000);
+  const prompt=designPipeline.instructions(designPlan)+designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing a files object with complete shared styles.css/app.js and EVERY existing HTML page. Never remove or rename an existing route. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(designSystem.source(p.files)).slice(0,37000);
   const modelResult=await callModel({messages:[{role:"user",content:prompt}],temperature:0.25});
   let files=designSystem.apply(normalizeFiles(modelResult),designPlan.style),qa=await audit(files,{capture:true});
   if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
-      const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files of index.html, styles.css and app.js:\n"+JSON.stringify(designSystem.source(files)).slice(0,30000)}],temperature:0.15});
+      const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files containing shared styles.css/app.js and every existing HTML route:\n"+JSON.stringify(designSystem.source(files)).slice(0,30000)}],temperature:0.15});
       const fixed=designSystem.apply(normalizeFiles(patch),designPlan.style),test=await audit(fixed,{capture:true});
       if(test.findings.length<=qa.findings.length){files=fixed;qa=test}
     }catch{}
