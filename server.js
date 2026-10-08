@@ -6490,9 +6490,9 @@ function serveStatic(req, res) {
 const developerAgent=require("./developer-agent");
 async function callDeveloperCodingModel(opts={}){
   if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
-  const preferred=(process.env.KAIROQ_BUILDER_MODEL||"poolside/laguna-s-2.1:free").trim();
+  const preferred=(process.env.KAIROQ_BUILDER_MODEL||"nvidia/nemotron-3-super-120b-a12b:free").trim();
   // Free-only endpoints. Never allow a paid fallback without separate explicit configuration.
-  const list=[preferred,"poolside/laguna-s-2.1:free","openrouter/free"].filter((m,i,a)=>m.endsWith(":free")||m==="openrouter/free").filter((m,i,a)=>a.indexOf(m)===i);
+  const list=[preferred,"nvidia/nemotron-3-super-120b-a12b:free","poolside/laguna-xs-2.1:free","openrouter/free"].filter((m,i,a)=>m.endsWith(":free")||m==="openrouter/free").filter((m,i,a)=>a.indexOf(m)===i);
   const errors=[];
   for(const model of list){
     try{
@@ -6755,7 +6755,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
     if(process.env.DEVELOPER_SMOKE_TEST==="true"){
-      const marker=path.join(WORKSPACE_DIR,".developer-smoke-test-v3-free-20261007.json");
+      const marker=path.join(WORKSPACE_DIR,".developer-smoke-test-v4-free-20261007.json");
       if(!fs.existsSync(marker)){
         console.log("[developer-smoke] Beginning real model + generated website + Chromium QA test");
         developerAgent.build({brief:"Build a premium, responsive modern corporate travel website for executive teams with a strong hero, three features, pricing call to action, and a functional mobile menu.",projectName:"Kairoq Smoke Test",kind:"website",style:"editorial"},callDeveloperCodingModel)
