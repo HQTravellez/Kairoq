@@ -33,7 +33,7 @@
   if(!document.getElementById('kq-record-controls-style')){
    const style=node('style');style.id='kq-record-controls-style';style.textContent=`
 #dashboard-metrics{display:grid!important;grid-template-columns:repeat(var(--kq-metric-columns,4),minmax(0,1fr))!important;--kq-metric-span:var(--kq-metric-desktop-span,1);gap:14px!important}
-#kq-form-actions{display:flex!important;flex-wrap:wrap!important;gap:12px!important;align-items:center!important}
+#save-record:disabled{opacity:1!important;color:#fff!important;background:#244c3d!important;cursor:wait!important}\n#kq-form-actions{display:flex!important;flex-wrap:wrap!important;gap:12px!important;align-items:center!important}
 #kq-form-actions button{width:auto!important;flex:0 1 auto!important;margin:0!important}
 #record-fields label:before,#record-fields label:after{content:none!important}
 #app-message[role=alert]{color:#842c28!important;background:#fff4f2!important;border-left:3px solid #b64036!important;padding:12px 16px!important;border-radius:8px!important}
