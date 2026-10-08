@@ -6,6 +6,6 @@ RUN npm install --omit=dev
 COPY . .
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV NODE_ENV=production TZ=UTC
-RUN node --test test/journey-qa.test.js test/design-pipeline.test.js test/app-release.test.js test/real-visual-repair.test.js test/app-runtime.test.js
+RUN node --test test/journey-qa.test.js test/design-pipeline.test.js test/app-release.test.js test/real-visual-repair.test.js test/app-runtime.test.js test/developer-agent.test.js
 EXPOSE 3002
 CMD ["node","deployment-start.js"]
