@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@higgsfield/client": "^0.2.6",
-    "dotenv": "^18.0.4"
+    "dotenv": "^18.0.4",
+    "playwright-core": "^1.56.0"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
