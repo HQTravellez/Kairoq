@@ -28,6 +28,15 @@ async function appStates(page,collections,{sample,selectCollection,shot,fixtures
   if(await page.locator('#record-search').count()){await page.locator('#record-search').fill('kairoq-no-match-qa-847236');await page.waitForFunction(()=>!document.querySelector('[data-record-id]'));await shot(page,'Desktop '+collection.label+' · no matches');await page.locator('#record-search').fill('');await page.locator('[data-record-id]').waitFor();tested.push(collection.name+': search empty state');}
   const filters=page.locator('#app-view select[data-field]');for(const filter of await filters.all()){const name=await filter.getAttribute('data-field'),field=collection.fields.find(f=>f.name===name);if(field?.type!=='select')continue;for(const value of field.options){await filter.selectOption(value);const expected=(await read()).filter(r=>r.data[name]===value).length;await page.waitForFunction(count=>document.querySelectorAll('[data-record-id]').length===count,expected,{timeout:5000});}await filter.selectOption('');tested.push(collection.name+': '+name+' filter');}
   const dashboard=await page.evaluate(async()=>(await(await fetch('api/dashboard')).json()));if(dashboard.collections[collection.name]!==1)throw Error('Dashboard collection count is incorrect');
+  // Verify intermediate tablet widths as well as mobile before modifying records.
+  for(const width of [768,1024]){
+   await page.setViewportSize({width,height:900});
+   await page.reload();await page.locator('#record-form').waitFor({state:'visible'});
+   await selectCollection(page,collection.name);await page.locator('[data-record-id]').waitFor();
+   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+8))throw Error('Responsive overflow at '+width+'px in '+collection.name);
+   await shot(page,'Responsive '+width+'px '+collection.label+' · saved');
+   tested.push(collection.name+': responsive '+width+'px');
+  }
   await page.setViewportSize({width:390,height:844});await page.reload();await page.locator('#record-form').waitFor({state:'visible'});await selectCollection(page,collection.name);await page.locator('[data-record-id]').waitFor();if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+8))throw Error('Mobile overflow in '+collection.name);await shot(page,'Mobile '+collection.label+' · saved');
   await page.locator('[data-record-id] button[data-action=edit]').click();await shot(page,'Mobile '+collection.label+' · editing');await page.locator('#cancel-edit').click();
   await page.locator('[data-record-id] button[data-action=delete]').click();await page.waitForFunction(async name=>(await(await fetch('api/collections/'+name)).json()).records.length===0,collection.name,{timeout:10000});tested.push(collection.name+': UI create/edit/reload/delete, dashboard, desktop and mobile');
