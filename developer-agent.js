@@ -11,26 +11,28 @@ function dirFor(id){if(!validId(id))throw Error("Invalid project ID");return pat
 function getProject(id){
   const dir=dirFor(id);
   const meta=JSON.parse(fs.readFileSync(path.join(dir,"project.json"),"utf8"));
-  const files={};
-  for(const name of ["index.html","styles.css","app.js"])files[name]=fs.readFileSync(path.join(dir,name),"utf8");
+  const files={};const names=Array.isArray(meta.file_names)&&meta.file_names.length?meta.file_names:["index.html","styles.css","app.js"];
+  for(const name of names)files[name]=fs.readFileSync(path.join(dir,name),"utf8");
   return {...meta,files};
 }
 function normalizeFiles(raw){
-  const obj=raw?.files||raw||{};
-  const files={
-    "index.html":String(obj["index.html"]||obj.html||""),
-    "styles.css":String(obj["styles.css"]||obj.css||""),
-    "app.js":String(obj["app.js"]||obj.js||"")
-  };
-  if(files["index.html"].length<350||files["styles.css"].length<500)throw Error("The AI produced incomplete website files.");
-  if(Object.values(files).some(x=>x.length>130000))throw Error("Generated file exceeds size limit.");
-  const scripts=[...files["index.html"].matchAll(/<script\b[^>]*\bsrc\s*=\s*["\x27]([^"\x27]+)["\x27]/gi)];
-  if(scripts.some(x=>!/^\.?\/?app\.js(?:\?.*)?$/.test(x[1])))throw Error("Only the local app.js script is allowed in generated previews.");
+  const obj=raw?.files||raw||{},files={"index.html":String(obj["index.html"]||obj.html||""),"styles.css":String(obj["styles.css"]||obj.css||""),"app.js":String(obj["app.js"]||obj.js||"")};
+  for(const [name,value] of Object.entries(obj)){
+    if(name==="index.html"||name==="styles.css"||name==="app.js"||name==="html"||name==="css"||name==="js")continue;
+    if(/^[a-z0-9][a-z0-9-]{0,48}\.html$/.test(name))files[name]=String(value||"");
+  }
+  const pages=Object.keys(files).filter(n=>n.endsWith(".html"));if(!files["index.html"]||pages.length>10)throw Error("Website needs index.html and at most 10 HTML pages.");
+  if(pages.some(n=>files[n].length<350)||files["styles.css"].length<500)throw Error("The AI produced incomplete website files.");
+  if(Object.values(files).some(x=>x.length>160000))throw Error("Generated file exceeds size limit.");
+  for(const page of pages){
+    const scripts=[...files[page].matchAll(/<script\b[^>]*\bsrc\s*=\s*["\x27]([^"\x27]+)["\x27]/gi)];
+    if(scripts.some(x=>!/^\.?\/?app\.js(?:\?.*)?$/.test(x[1])))throw Error("Only the shared local app.js script is allowed.");
+  }
   try{new vm.Script(files["app.js"],{filename:"app.js",timeout:1000})}catch(e){throw Error("Generated JavaScript syntax error: "+e.message)}
   return files;
 }
-function assemble(files){
-  let html=files["index.html"].replace(/<script\b[^>]*\bsrc\s*=\s*["\x27]\.?\/?app\.js(?:\?[^"\x27]*)?["\x27][^>]*>\s*<\/script>/gi,"").replace(/<link\b[^>]*href\s*=\s*["\x27]\.?\/?styles\.css["\x27][^>]*>/gi,"");
+function assemble(files,pageName="index.html"){
+  let html=files[pageName].replace(/<script\b[^>]*\bsrc\s*=\s*["\x27]\.?\/?app\.js(?:\?[^"\x27]*)?["\x27][^>]*>\s*<\/script>/gi,"").replace(/<link\b[^>]*href\s*=\s*["\x27]\.?\/?styles\.css["\x27][^>]*>/gi,"");
   const css="<style>\n"+files["styles.css"].replace(/<\/style/gi,"<\\/style")+"\n</style>";
   const js="<script>\n"+files["app.js"].replace(/<\/script/gi,"<\\/script")+"\n<\/script>";
   html=/<\/head>/i.test(html)?html.replace(/<\/head>/i,css+"\n</head>"):css+"\n"+html;
@@ -38,34 +40,33 @@ function assemble(files){
   return html;
 }
 async function audit(files,{capture=false}={}){
-  const notes=[],screenshots=[],designChecks=[];
-  const html=assemble(files);
-  if(!/<meta[^>]+name=["']viewport["']/i.test(files["index.html"]))notes.push("Missing viewport meta tag");
-  if(!/<h1[\s>]/i.test(files["index.html"]))notes.push("Missing primary heading");
+  const notes=[],screenshots=[],designChecks=[],pages=Object.keys(files).filter(n=>n.endsWith(".html")).sort((a,b)=>a==="index.html"?-1:b==="index.html"?1:a.localeCompare(b));
+  for(const pageName of pages){if(!/<meta[^>]+name=["']viewport["']/i.test(files[pageName]))notes.push(pageName+": missing viewport meta tag");if(!/<h1[\s>]/i.test(files[pageName]))notes.push(pageName+": missing primary heading");
+   const links=[...files[pageName].matchAll(/href=["']([^"'#?]+\.html)(?:[?#][^"']*)?["']/gi)].map(m=>m[1].replace(/^\.\//,""));for(const href of links)if(!files[href])notes.push(pageName+": missing linked page "+href);}
   try{
     const {chromium}=require("playwright-core");
     const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||"/usr/bin/chromium",headless:true,args:["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"]});
     try{
-      for(const width of [1440,390]){
-        const ctx=await browser.newContext({viewport:{width,height:900},javaScriptEnabled:true,serviceWorkers:"block"});
+      for(const pageName of pages)for(const width of [1440,390]){
+        const html=assemble(files,pageName);const ctx=await browser.newContext({viewport:{width,height:900},javaScriptEnabled:true,serviceWorkers:"block"});
         const page=await ctx.newPage(),errors=[];
         page.on("pageerror",err=>errors.push(err.message));
         await page.route("**/*",route=>route.request().url().startsWith("data:")?route.continue():route.abort());
         await page.setContent(html,{waitUntil:"domcontentloaded",timeout:18000});
         await page.waitForTimeout(250);
         const broken=await page.evaluate(()=>[...document.querySelectorAll('a[href^="#"]')].map(a=>a.getAttribute('href')).filter(h=>h.length>1&&!document.getElementById(h.slice(1))));if(broken.length)notes.push(width+"px: navigation targets missing: "+broken.slice(0,4).join(', '));
-        let controlIndex=0;for(const toggle of await page.locator('button[aria-expanded][aria-controls],details > summary').all()){if(!await toggle.isVisible())continue;const before=await toggle.evaluate(n=>n.tagName==='SUMMARY'?n.parentElement.open:n.getAttribute('aria-expanded'));await toggle.click();const after=await toggle.evaluate(n=>n.tagName==='SUMMARY'?n.parentElement.open:n.getAttribute('aria-expanded'));if(after===before)notes.push(width+"px: expandable control did not change state");if(capture){const label=width+'px website · expanded control '+(++controlIndex);designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:'jpeg',quality:65,fullPage:false})});}await toggle.click();}
+        let controlIndex=0;for(const toggle of await page.locator('button[aria-expanded][aria-controls],details > summary').all()){if(!await toggle.isVisible())continue;const before=await toggle.evaluate(n=>n.tagName==='SUMMARY'?n.parentElement.open:n.getAttribute('aria-expanded'));await toggle.click();const after=await toggle.evaluate(n=>n.tagName==='SUMMARY'?n.parentElement.open:n.getAttribute('aria-expanded'));if(after===before)notes.push(width+"px: expandable control did not change state");if(capture){const label=width+'px '+pageName+' · expanded control '+(++controlIndex);designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:'jpeg',quality:65,fullPage:false})});}await toggle.click();}
         await page.evaluate(()=>window.scrollTo(0,0));
         const check=await page.evaluate(()=>({title:document.title,text:document.body.innerText.trim().length,overflow:document.documentElement.scrollWidth>innerWidth+8,buttons:[...document.querySelectorAll("button")].length}));
         if(check.text<150)notes.push(width+"px: insufficient meaningful page content");
         if(check.overflow)notes.push(width+"px: horizontal overflow");
-        if(errors.length)notes.push(width+"px: JS errors: "+errors.slice(0,2).join(" | "));if(capture){const label=width+"px website";designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:"jpeg",quality:65,fullPage:true})});}
-        if(capture){let sectionIndex=0;for(const section of await page.locator('main > section,main > article,[role=main] > section').all()){if(!await section.isVisible())continue;const heading=(await section.locator('h1,h2').count()?(await section.locator('h1,h2').first().textContent())?.trim().replace(/\s+/g,' ').slice(0,45):'Section')||'Section';const label=width+'px · '+(++sectionIndex)+' '+heading;screenshots.push({label,bytes:await section.screenshot({type:'jpeg',quality:65})});}}
+        if(errors.length)notes.push(width+"px: JS errors: "+errors.slice(0,2).join(" | "));if(capture){const label=width+"px "+pageName;designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:"jpeg",quality:65,fullPage:true})});}
+        if(capture){let sectionIndex=0;for(const section of await page.locator('main > section,main > article,[role=main] > section').all()){if(!await section.isVisible())continue;const heading=(await section.locator('h1,h2').count()?(await section.locator('h1,h2').first().textContent())?.trim().replace(/\s+/g,' ').slice(0,45):'Section')||'Section';const label=width+'px '+pageName+' · '+(++sectionIndex)+' '+heading;screenshots.push({label,bytes:await section.screenshot({type:'jpeg',quality:65})});}}
         await ctx.close();
       }
     }finally{await browser.close()}
   }catch(e){notes.push("Browser QA unavailable: "+e.message)}
-  return {passed:notes.length===0,findings:notes,...(capture?{_screenshots:screenshots,design_checks:designChecks}:{}),tested:["desktop 1440px","mobile 390px","JavaScript execution","horizontal overflow","semantic structure","internal navigation targets","expandable controls"]};
+  return {passed:notes.length===0,findings:notes,pages,...(capture?{_screenshots:screenshots,design_checks:designChecks}:{}),tested:["all HTML routes","desktop 1440px","mobile 390px","JavaScript execution","horizontal overflow","semantic structure","internal and cross-page navigation","expandable controls"]};
 }
 async function finishDesign(files,qa,designPlan,brief,callModel){
  let evidence=[];if(!qa.passed){designPipeline.stripShots(qa);return{files,qa,evidence};}
@@ -82,7 +83,7 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
   kind=kind==="webapp"?"webapp":"website";
   const id=slug(projectName||brief.slice(0,35))+"-"+crypto.randomBytes(3).toString("hex");
   const designPlan=await designPipeline.plan(callModel,{brief,kind,style});
-  const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain EXACTLY index.html, styles.css, app.js string properties. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. index.html links styles.css and app.js using relative paths (the preview system injects their contents). Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Keep total output under 7000 tokens, and output complete files without truncation.";
+  const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain shared styles.css and app.js plus index.html and, when the product needs multiple routes, additional safe lowercase-kebab HTML pages such as platform.html, about.html, pricing.html or industries-travel.html. Generate 2–8 coherent pages for a multi-page website request; every page shares the same design system, header/footer and working navigation. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. Every HTML page links the shared styles.css and app.js using relative paths. Cross-page links must target the generated .html files. Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Keep total output under 7000 tokens, and output complete files without truncation.";
   const prompt=system+designPipeline.instructions(designPlan)+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
   let generated,usedStarter=false;
   try{generated=await callModel({messages:[{role:"user",content:prompt}],temperature:0.45})}
@@ -97,7 +98,7 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
     }catch(e){qa.findings.push("Repair attempt unsuccessful: "+e.message)}
   }
   const finished=await finishDesign(files,qa,designPlan,brief,callModel);files=finished.files;qa=finished.qa;
-  const metadata={id,design_plan:designPlan,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft",generation_mode:usedStarter?"starter_template":"ai_generated"};
+  const metadata={id,file_names:Object.keys(files),pages:Object.keys(files).filter(n=>n.endsWith(".html")),design_plan:designPlan,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft",generation_mode:usedStarter?"starter_template":"ai_generated"};
   const folder=dirFor(id);
   fs.mkdirSync(folder,{recursive:true});designPipeline.saveEvidence(folder,finished.evidence);
   for(const [name,contents] of Object.entries(files))fs.writeFileSync(path.join(folder,name),contents);
