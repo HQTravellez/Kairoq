@@ -7,7 +7,7 @@ test('trusted component runtime is injected once and presentation code survives 
  const once=components.inject(original),twice=components.inject(once);
  assert.equal(once['app.js'],twice['app.js']);
  assert.equal((twice['app.js'].match(/BEGIN KAIROQ COMPONENT RUNTIME/g)||[]).length,1);
- assert.ok(twice['app.js'].endsWith(original['app.js']));
+ assert.ok(twice['app.js'].endsWith(original['app.js']));assert.deepEqual(components.source(twice),original);
  assert.doesNotThrow(()=>new vm.Script(twice['app.js']));
  assert.ok(!twice['app.js'].includes('innerHTML'));
 });
@@ -23,5 +23,5 @@ test('visual reviewer receives actual image payloads and DOM issues cannot be ov
  assert.equal(request.purpose,'design-review');assert.equal(request.messages[0].content[2].image_url.url,'data:image/jpeg;base64,'+bytes.toString('base64'));assert.equal(review.passed,false);assert.equal(review.evidence[0].sha256.length,64);assert.ok(!JSON.stringify(review).includes(bytes.toString('base64')));
 });
 test('foundation is idempotent and previous design plans avoid another model call',async()=>{
- const files={'styles.css':'.custom{color:green}'};const once=system.apply(files,'luxury'),twice=system.apply(once,'luxury');assert.equal(once['styles.css'],twice['styles.css']);assert.match(once['styles.css'],/\.kq-button/);const previous={purpose:'Preserved identity'};assert.equal(await pipeline.plan(()=>{throw Error('unexpected model call');},{previous}),previous);
+ const files={'styles.css':'.custom{color:green}'};const once=system.apply(files,'luxury'),twice=system.apply(once,'luxury');assert.equal(once['styles.css'],twice['styles.css']);assert.deepEqual(system.source(twice),files);assert.match(once['styles.css'],/\.kq-button/);const previous={purpose:'Preserved identity'};assert.equal(await pipeline.plan(()=>{throw Error('unexpected model call');},{previous}),previous);
 });

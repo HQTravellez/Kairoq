@@ -22,5 +22,6 @@ function foundation(style='editorial'){
 @media(max-width:600px){.kq-shell{width:calc(100% - 32px)}.kq-panel{padding:18px}.kq-table th,.kq-table td{padding:12px}.kq-heading{overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){.kq-page *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}`;
 }
+function source(files){return {...files,'styles.css':String(files['styles.css']).replace(/\/\* Kairoq reusable UI foundation v1[\s\S]*?\/\* END KAIROQ FOUNDATION \*\/\n?/g,'')};}
 function apply(files,style){return {...files,'styles.css':foundation(style)+'\n/* END KAIROQ FOUNDATION */\n'+String(files['styles.css']).replace(/\/\* Kairoq reusable UI foundation v1[\s\S]*?\/\* END KAIROQ FOUNDATION \*\/\n?/g,'')};}
-module.exports={palettes,foundation,apply};
+module.exports={palettes,foundation,apply,source};

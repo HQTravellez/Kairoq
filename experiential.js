@@ -18,7 +18,7 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
  if((daily>0&&totals.daily+reserve>daily)||(monthly>0&&totals.monthly+reserve>monthly))throw Error('Experiential builder budget insufficient');
  const response=await fetch('https://api.experientiallabs.ai/v1/chat/completions',{
   method:'POST',headers:{Authorization:'Bearer '+key(),'Content-Type':'application/json'},
-  signal:AbortSignal.timeout(120000),body:JSON.stringify({model,messages:opts.messages,max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'})
+  signal:AbortSignal.timeout(240000),body:JSON.stringify({model,messages:opts.messages,response_format:{type:'json_object'},max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'})
  });
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw Error('Experiential '+response.status+': '+String(data.error?.message||data.error||'Request rejected').slice(0,220));
