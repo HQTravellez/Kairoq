@@ -84,6 +84,26 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
   fs.writeFileSync(path.join(folder,"project.json"),JSON.stringify(metadata,null,2));
   return {...metadata,files,preview:assemble(files)};
 }
+async function revise(id,instruction,callModel){
+  const p=getProject(id),revision=String(instruction||"").trim().slice(0,1600);
+  if(revision.length<5)throw Error("Describe the design or functionality change.");
+  if(p.status==="pull_request")throw Error("This project has a pending GitHub PR. Create a new project before revising.");
+  const prompt="You are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing files object with index.html, styles.css, and app.js strings. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(p.files).slice(0,37000);
+  const modelResult=await callModel({messages:[{role:"user",content:prompt}],temperature:0.25});
+  let files=normalizeFiles(modelResult),qa=await audit(files);
+  if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
+    try{
+      const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files of index.html, styles.css and app.js:\n"+JSON.stringify(files).slice(0,30000)}],temperature:0.15});
+      const fixed=normalizeFiles(patch),test=await audit(fixed);
+      if(test.findings.length<=qa.findings.length){files=fixed;qa=test}
+    }catch{}
+  }
+  for(const [name,code] of Object.entries(files))fs.writeFileSync(path.join(dirFor(id),name),code);
+  const meta={...p};delete meta.files;
+  meta.revisions=Number(meta.revisions||0)+1;meta.qa=qa;meta.updated_at=new Date().toISOString();
+  fs.writeFileSync(path.join(dirFor(id),"project.json"),JSON.stringify(meta,null,2));
+  return {...meta,files,preview:assemble(files)}
+}
 async function publish(id,{branchPrefix="kairoq-build"}={}){
   const project=getProject(id),token=process.env.GITHUB_TOKEN,repo=process.env.GITHUB_REPO;
   if(!token||!/^[\w.-]+\/[\w.-]+$/.test(repo||""))throw Error("GitHub publishing requires GITHUB_TOKEN and GITHUB_REPO variables.");
@@ -108,4 +128,4 @@ async function publish(id,{branchPrefix="kairoq-build"}={}){
   fs.writeFileSync(path.join(dir,"project.json"),JSON.stringify(meta,null,2));
   return {url:pr.html_url,number:pr.number,branch,repository:repo,status:"awaiting_review"};
 }
-module.exports={build,getProject,publish,assemble};
+module.exports={build,revise,getProject,publish,assemble};
