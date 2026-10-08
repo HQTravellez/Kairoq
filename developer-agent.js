@@ -1,4 +1,5 @@
 "use strict";
+const designGuidance=require("./design-guidance");
 // Isolated website/web-app generation. Generated code is only previewed in sandboxed iframes.
 const fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
 const ROOT=path.join(__dirname,"workspace","developer-projects");
@@ -67,7 +68,7 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
   kind=kind==="webapp"?"webapp":"website";
   const id=slug(projectName||brief.slice(0,35))+"-"+crypto.randomBytes(3).toString("hex");
   const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain EXACTLY index.html, styles.css, app.js string properties. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. index.html links styles.css and app.js using relative paths (the preview system injects their contents). Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Keep total output under 7000 tokens, and output complete files without truncation.";
-  const prompt=system+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
+  const prompt=system+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
   let generated,usedStarter=false;
   try{generated=await callModel({messages:[{role:"user",content:prompt}],temperature:0.45})}
   catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(process.env.OPENROUTER_API_KEY || kind==="webapp")throw Error("Custom AI generation failed: "+e.message+". This is not an AI-generated project; check model access or credits.");generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
@@ -91,7 +92,7 @@ async function revise(id,instruction,callModel){
   const p=getProject(id),revision=String(instruction||"").trim().slice(0,1600);
   if(revision.length<5)throw Error("Describe the design or functionality change.");
   if(p.status==="pull_request")throw Error("This project has a pending GitHub PR. Create a new project before revising.");
-  const prompt="You are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing files object with index.html, styles.css, and app.js strings. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(p.files).slice(0,37000);
+  const prompt=designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing files object with index.html, styles.css, and app.js strings. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(p.files).slice(0,37000);
   const modelResult=await callModel({messages:[{role:"user",content:prompt}],temperature:0.25});
   let files=normalizeFiles(modelResult),qa=await audit(files);
   if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){

@@ -18,7 +18,7 @@ async function run(builder,model){
  const after=(await request('collections/'+collection.name)).records.find(r=>r.id===saved.id);
  if(!after||Object.entries(saved.data).some(([k,v])=>after.data[k]!==v))throw Error('Live schema revision lost or changed stored inventory');
  const revised=runtime.getProject(progress.id);if(!revised.schema.collections[0].fields.some(f=>f.name==='category'&&f.type==='select'))throw Error('Requested category field missing');
- await request('collections/'+collection.name+'/'+saved.id,'DELETE');builder.publish(progress.id);
+ await request('collections/'+collection.name+'/'+saved.id,'DELETE');await builder.publish(progress.id);
  const result={passed:true,id:progress.id,url:'/apps/'+progress.id+'/',version:revised.version,qa:revised.qa,checks:['real AI build','real AI feature revision','SQLite records survive revision','launch'],at:new Date().toISOString()};fs.writeFileSync(marker,JSON.stringify(result));console.log('[fullstack-smoke] RESULT '+JSON.stringify(result));
  }finally{await new Promise(r=>server.close(r));}
 }

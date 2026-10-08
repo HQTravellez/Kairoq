@@ -1554,3 +1554,33 @@ At `/build-studio.html`, choose **Full-stack business app** to generate custom c
 The trusted SQLite backend supports text, textarea, email, number, date, boolean and select fields. Generated JavaScript runs in the browser; generated server code is never executed. Revisions must preserve collections, field types and existing enum options. Added required fields need defaults. Browser QA checks registration, login, create/edit/delete, saved records, dashboard counts and desktop/mobile layouts before atomically switching the active version. A failed revision leaves the last working version in place. App accounts and saved data persist across deploys; sessions require a fresh login after a server restart.
 
 Supported scope is business CRUD apps such as inventories, enquiry trackers and CRMs. Arbitrary backend code, payments and external integrations are outside this beta. Experiential Labs credentials remain server-side. `FULLSTACK_APP_SMOKE_TEST=true` runs a cached inventory build and feature revision, verifies a real SQLite record survives, and launches the example app. Daily/monthly AI budget checks apply to builds and repair calls.
+
+### Managed app releases and design
+
+Build Studio creates a versioned preview after browser QA. **Deploy version**
+changes the public app route; revisions and repairs leave that route on its
+previous version until explicitly deployed. Release history supports restoring
+any version that passed QA. Failed deployment health checks restore the previous
+route. Rollback keeps saved records, including fields added by a later version.
+**Diagnose & repair** checks an app and generates a repair only when needed or
+when a specific issue is supplied. Generated repairs still require review and
+explicit deployment.
+
+`design-guidance.js` contains Kairoq-authored design instructions inspired by
+[Impeccable](https://github.com/pbakaus/impeccable). Both website and business-app
+generation use them; revisions preserve the existing identity. This is prompt
+guidance, not installation of Impeccable's CLI/detector engine. Functional browser
+QA checks are separate from subjective visual quality.
+
+### Optional Supabase backend
+
+Existing apps continue using their existing database. New apps can choose
+Supabase once the server connection is ready. The adapter verifies users with
+Supabase Auth, refreshes expiring tokens, stores sessions in encrypted HttpOnly
+cookies scoped to the app, and accesses records with each user's JWT and RLS.
+`migrations/20261008_builder_supabase.sql` defines the isolated Kairoq tables.
+The scoped administrative RPC SQL is a separate, **approval-required** setup
+proposal; it is not activated by setting the publishable key alone. Its token
+must remain server-side and never appear in generated code. Public email
+registration also needs the Supabase project's email delivery and confirmation
+redirect configuration. It has not been verified through a real email inbox.

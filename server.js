@@ -6492,6 +6492,8 @@ const experiential=require("./experiential");
 const housingBuilder=require("./housing-builder");
 const appBuilder=require("./app-builder");
 const appRuntime=require("./app-runtime");
+const appRelease=require("./app-release");
+const builderSupabase=require("./supabase-builder");
 function parseDeveloperResponse(content,model="coding model"){
   const clean=content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
   try{return JSON.parse(clean)}catch{}
@@ -6581,13 +6583,18 @@ const server = http.createServer(async (req, res) => {
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     try{return json(res,200,appBuilder.getJob(url.slice("/api/developer/jobs/".length)))}catch(e){return json(res,404,{error:"Build job not found"})}
   }
+  if(url==="/api/developer/setup"&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return json(res,200,{supabase:await builderSupabase.status(),hosting:{ready:true,provider:"Railway",versions:true,rollback:true},migration_url:"/api/developer/supabase-migration"});}
+  if(url==="/api/developer/supabase-migration"&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});res.writeHead(200,{"Content-Type":"text/plain","Cache-Control":"no-store"});return res.end(fs.readFileSync(path.join(__dirname,"migrations","20261008_builder_supabase.sql"),"utf8"));}
+  if(url.startsWith("/api/developer/releases/")&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const id=url.slice("/api/developer/releases/".length);return json(res,200,{versions:appRelease.versions(id),deployments:appRelease.history(id)})}catch(e){return json(res,404,{error:e.message})}}
+  if(url==="/api/developer/rollback"&&req.method==="POST"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,30000);if(body.confirm!=="ROLLBACK_APP")return json(res,400,{error:"Confirm rollback"});return json(res,200,await appRelease.deploy(String(body.id||""),{version:Number(body.version),rollback:true}))}catch(e){return json(res,422,{error:e.message})}}
+  if(url==="/api/developer/repair"&&req.method==="POST"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,30000);appRuntime.getProject(String(body.id||""));return json(res,202,appBuilder.submit({id:body.id,repair:true,reported_issue:!!String(body.issue||"").trim(),instruction:String(body.issue||"Diagnose this app in Chromium and repair any broken auth, CRUD, dashboard or mobile behavior.")},callDeveloperCodingModel))}catch(e){return json(res,422,{error:e.message})}}
   if(url==="/api/developer/projects"&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     return json(res,200,{projects:appBuilder.listProjects()});
   }
   if(url==="/api/developer/launch"&&req.method==="POST"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
-    try{const body=await getBody(req,30000);if(body.confirm!=="LAUNCH_APP")return json(res,400,{error:"Confirm launch"});return json(res,200,appBuilder.publish(String(body.id||"")))}catch(e){return json(res,422,{error:e.message})}
+    try{const body=await getBody(req,30000);if(body.confirm!=="LAUNCH_APP")return json(res,400,{error:"Confirm launch"});return json(res,200,await appBuilder.publish(String(body.id||"")))}catch(e){return json(res,422,{error:e.message})}
   }
 
   if(req.method==="GET"&&url==="/api/developer/status"){
@@ -6812,6 +6819,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
+    if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./release-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[release-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./studio-qa").run().catch(e=>console.error("[studio-qa] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true" && experiential.configured())require("./app-smoke").run(appBuilder,callDeveloperCodingModel).catch(e=>console.error("[fullstack-smoke] ERROR "+e.message));
     if(process.env.HOUSING_APP_BUILD==="true" && experiential.configured()){
