@@ -48,3 +48,7 @@ test('missing screen verdicts cannot be published as a visual pass',async()=>{
 test('incomplete model reports get one bounded retry without lowering the gate',async()=>{
  let calls=0;const result=await pipeline.review(async()=>{calls++;return{visual_review:{scores,findings:[],...(calls===2?{screen_reviews:[{screen:'Saving',scores,findings:[]}]}:{})}};},{},[{label:'Saving',bytes:Buffer.from('image')}]);assert.equal(calls,2);assert.equal(result.passed,true);assert.equal(result.coverage.complete,true);
 });
+test('desktop states do not invent mobile scores, while real mobile failures remain blocking',async()=>{
+ const report=await pipeline.review(async opts=>{const screen=opts.messages[0].content[1].text;return{visual_review:{scores:{...scores,mobile:null},findings:[],screen_reviews:[{screen,scores:{...scores,mobile:null},findings:[]}]}};},{},[{label:'Desktop editing · 1440px',bytes:Buffer.from('image')}]);assert.equal(report.passed,true);assert.equal(report.scores.mobile,null);assert.equal(report.screen_reviews[0].scores.mobile,null);
+ assert.equal(pipeline.normalizeReview({scores:{...scores,mobile:2},findings:[]}).passed,false);
+});
