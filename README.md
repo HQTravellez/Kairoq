@@ -1602,10 +1602,11 @@ capture login, empty and populated desktop dashboards and a mobile dashboard;
 websites capture desktop and mobile. `design-dom.js` checks small text, clipping
 and text contrast where the rendered background can be determined reliably.
 A vision model receives the actual JPEGs and scores seven design dimensions.
-One automatic polish attempt addresses findings, followed by fresh browser
+Up to two automatic polish attempts address findings, followed by fresh browser
 checks and screenshots. Deployment requires a mean score of at least 4/5,
 no dimension below 3.5, and no major/critical findings. This is an AI assessment,
 not an objective guarantee of design quality or accessibility certification.
+Visual polishing cannot change an app schema; data modelling remains separate.
 Unsupported vision, malformed reviews or unmet quality gates do not produce a
 false visual pass. Calls remain subject to existing daily/monthly budgets.
 

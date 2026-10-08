@@ -25,3 +25,10 @@ test('visual reviewer receives actual image payloads and DOM issues cannot be ov
 test('foundation is idempotent and previous design plans avoid another model call',async()=>{
  const files={'styles.css':'.custom{color:green}'};const once=system.apply(files,'luxury'),twice=system.apply(once,'luxury');assert.equal(once['styles.css'],twice['styles.css']);assert.deepEqual(system.source(twice),files);assert.match(once['styles.css'],/\.kq-button/);const previous={purpose:'Preserved identity'};assert.equal(await pipeline.plan(()=>{throw Error('unexpected model call');},{previous}),previous);
 });
+
+test('visual polish cannot replace the stored schema or project identity',()=>{
+ const builder=require('../app-builder');
+ const candidate={project_name:'Housing',summary:'Saved enquiries',schema:{collections:[{name:'enquiries',label:'Enquiries',fields:[{name:'contact',label:'Contact',type:'text',required:true}]}]},files:{'index.html':'<html>'+ 'a'.repeat(500)+'</html>','styles.css':'.page{color:black}'+ ' '.repeat(500),'app.js':''}};
+ const result=builder.normalizePolish(candidate,{project_name:'Wrong',schema:{collections:[]},files:{...candidate.files,'app.js':'/* visual change */'}});
+ assert.deepEqual(result.schema,candidate.schema);assert.equal(result.project_name,'Housing');assert.equal(result.files['app.js'],'/* visual change */');
+});

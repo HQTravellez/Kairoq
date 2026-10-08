@@ -68,9 +68,9 @@ async function audit(files,{capture=false}={}){
 }
 async function finishDesign(files,qa,designPlan,brief,callModel){
  let evidence=[];if(!qa.passed){designPipeline.stripShots(qa);return{files,qa,evidence};}
- for(let polish=0;polish<2;polish++){
+ for(let polish=0;polish<3;polish++){
   evidence=designPipeline.stripShots(qa);const visual=await designPipeline.review(callModel,designPlan,evidence,qa.design_checks);qa.visual_review=visual;if(visual.passed)break;
-  if(polish===1){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
+  if(polish===2){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
   files=designSystem.apply(normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{"index.html":complete HTML,"styles.css":complete CSS,"app.js":complete JS}}. Polish this working website while preserving all interactions, content and valid navigation. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(designSystem.source(files))}]})),designPlan.style);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
  }
  return{files,qa,evidence};
