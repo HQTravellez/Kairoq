@@ -1592,6 +1592,10 @@ visual direction, layout, typography, palette and interaction states. The
 `design-system.js` foundation provides reusable, customizable components and
 five visual directions; these are concrete CSS classes and tokens, not a fixed
 page template. Feature revisions reuse the saved identity.
+New business apps also use `app-components.js` and the trusted browser runtime
+for authentication, schema-driven forms, records, search, pagination and
+dashboard counts. Generated JavaScript focuses on presentation and navigation;
+existing apps keep their current UI runtime.
 
 Functional browser QA renders the build with synthetic data. Business apps
 capture login, empty and populated desktop dashboards and a mobile dashboard;

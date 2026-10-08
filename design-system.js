@@ -10,7 +10,7 @@ function foundation(style='editorial'){
  const p=palettes[style]||palettes.editorial;
  return `/* Kairoq reusable UI foundation v1; project styles may customize these tokens. */
 :root{--kq-paper:${p.paper};--kq-surface:${p.surface};--kq-ink:${p.ink};--kq-muted:${p.muted};--kq-accent:${p.accent};--kq-on-accent:${p.onAccent};--kq-border:${p.border};--kq-heading:${p.heading};--kq-body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--kq-radius:10px;--kq-space:8px}
-.kq-page{margin:0;background:var(--kq-paper);color:var(--kq-ink);font:16px/1.55 var(--kq-body)}
+.kq-page,.kq-page *,.kq-page *::before,.kq-page *::after{box-sizing:border-box}.kq-panel,.kq-stack,.kq-table-wrap{min-width:0}\n.kq-page{margin:0;background:var(--kq-paper);color:var(--kq-ink);font:16px/1.55 var(--kq-body)}
 .kq-shell{width:min(1200px,100% - 48px);margin-inline:auto}.kq-heading{font-family:var(--kq-heading);line-height:1.12;letter-spacing:-.035em}.kq-muted{color:var(--kq-muted)}
 .kq-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:11px 18px;border:1px solid transparent;border-radius:var(--kq-radius);background:var(--kq-accent);color:var(--kq-on-accent);font:600 15px/1.3 var(--kq-body);cursor:pointer;text-decoration:none}.kq-button--secondary{background:var(--kq-surface);color:var(--kq-ink);border-color:var(--kq-border)}.kq-button:disabled{opacity:.6;cursor:default}
 .kq-input{width:100%;min-height:44px;padding:11px 13px;border:1px solid var(--kq-border);border-radius:var(--kq-radius);background:var(--kq-surface);color:var(--kq-ink);font:16px/1.4 var(--kq-body)}.kq-label{display:block;margin-bottom:8px;font:600 13px/1.4 var(--kq-body)}
