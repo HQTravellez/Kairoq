@@ -6614,9 +6614,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url.startsWith("/api/developer/preview/")){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     try{
-      const id=url.slice("/api/developer/preview/".length).split("?")[0];
-      const project=developerAgent.getProject(id);
-      const html=developerAgent.assemble(project.files);
+      const raw=url.slice("/api/developer/preview/".length),id=raw.split("?")[0],query=new URL("http://local/?"+(raw.split("?")[1]||"")).searchParams;
+      const project=developerAgent.getProject(id),page=String(query.get("page")||"index.html");
+      if(!/^[a-z0-9][a-z0-9-]{0,48}\.html$/.test(page)||!project.files[page])throw Error("Page not found");
+      const html=developerAgent.assemble(project.files,page);
       res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
       return res.end(html);
     }catch(e){return json(res,404,{error:e.message})}
