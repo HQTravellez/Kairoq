@@ -1639,3 +1639,7 @@ not represented by the managed schema require dedicated journey adapters.
 two-collection operations app and section-reviewed website, followed by public
 checks. Its credential-free result is `/generated/journey-proof/report.json`.
 The Docker build executes Chromium regression tests before releasing the server.
+
+Build Studio lists each screen verdict and links its captured screenshot. Screenshot
+evidence is available only to the signed-in Kairoq owner. Shared components supply
+visible validation summaries, explicit saving/edit modes and mobile record cards.

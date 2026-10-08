@@ -6583,6 +6583,11 @@ const server = http.createServer(async (req, res) => {
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     try{return json(res,200,appBuilder.getJob(url.slice("/api/developer/jobs/".length)))}catch(e){return json(res,404,{error:"Build job not found"})}
   }
+  if(url.startsWith("/api/developer/evidence/")&&req.method==="GET"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    const match=/^\/api\/developer\/evidence\/([a-z0-9-]{5,85})\/(0|[1-9]\d{0,5})\/([1-9]\d{0,2})$/.exec(url);if(!match)return json(res,404,{error:"Screenshot not found"});
+    try{const[,id,version,index]=match;if(version==='0')developerAgent.getProject(id);else appRuntime.readVersion(id,Number(version));const folder=version==='0'?path.join(appRuntime.ROOT,id):path.join(appRuntime.ROOT,id,'versions',version);const bytes=fs.readFileSync(path.join(folder,'design-evidence',index+'.jpg'));res.writeHead(200,{"Content-Type":"image/jpeg","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});return res.end(bytes);}catch{return json(res,404,{error:"Screenshot not found"});}
+  }
   if(url==="/api/developer/setup"&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return json(res,200,{supabase:await builderSupabase.status(),hosting:{ready:true,provider:"Railway",versions:true,rollback:true},migration_url:"/api/developer/supabase-migration"});}
   if(url==="/api/developer/supabase-migration"&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});res.writeHead(200,{"Content-Type":"text/plain","Cache-Control":"no-store"});return res.end(fs.readFileSync(path.join(__dirname,"migrations","20261008_builder_supabase.sql"),"utf8"));}
   if(url.startsWith("/api/developer/releases/")&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const id=url.slice("/api/developer/releases/".length);return json(res,200,{versions:appRelease.versions(id),deployments:appRelease.history(id)})}catch(e){return json(res,404,{error:e.message})}}
