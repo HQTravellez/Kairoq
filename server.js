@@ -4090,21 +4090,49 @@ async function readPublicWebsiteForChat(rawUrl){
 
 
 async function searchPublicWeb(query){
-  // Free public search via DuckDuckGo HTML. Results may be rate limited or blocked.
   const phrase=String(query||"").trim().slice(0,240);
   if(!phrase)throw new Error("Search query is empty.");
-  const url="https://www.google.com/search?q="+encodeURIComponent(phrase)+"&num=8";
-  const response=await fetch(url,{signal:AbortSignal.timeout(12000),redirect:"error",headers:{"User-Agent":"Mozilla/5.0 (compatible; KairoqResearch/1.0)","Accept":"text/html"}});
-  if(!response.ok)throw new Error("Search provider returned HTTP "+response.status);
-  let html=(await response.text()).slice(0,250000);
-  const links=[];
-  for(const m of html.matchAll(/href="\/url\?q=(https?[^&"]+)/gi)){
-    let raw;try{raw=decodeURIComponent(m[1])}catch{continue}
-    try{const u=new URL(raw);if(u.protocol!=="https:"||u.hostname.endsWith("google.com")||u.hostname.endsWith("googleusercontent.com"))continue;if(!links.includes(u.href))links.push(u.href)}catch{}
-    if(links.length>=7)break;
+  const results=[],errors=[];
+  const add=(raw)=>{
+    try{
+      const u=new URL(raw.replace(/&amp;/g,"&"));
+      if(u.protocol!=="https:")return;
+      const host=u.hostname.toLowerCase();
+      if(/(^|\.)google\.(com|ca)$|(^|\.)bing\.com$|(^|\.)duckduckgo\.com$/.test(host))return;
+      if(!results.includes(u.href))results.push(u.href);
+    }catch{}
+  };
+  // Optional official search API, with a free public fallback.
+  if(process.env.BRAVE_SEARCH_API_KEY){
+    try{
+      const response=await fetch("https://api.search.brave.com/res/v1/web/search?q="+encodeURIComponent(phrase)+"&count=8",{signal:AbortSignal.timeout(12000),headers:{"X-Subscription-Token":process.env.BRAVE_SEARCH_API_KEY,"Accept":"application/json"}});
+      if(!response.ok)throw new Error("Brave HTTP "+response.status);
+      const data=await response.json();
+      for(const item of data.web?.results||[])add(item.url);
+      if(results.length)return results.slice(0,8);
+    }catch(e){errors.push(e.message)}
   }
-  if(!links.length)throw new Error("No usable results returned by the free search source.");
-  return links;
+  // Bing RSS publishes stable source URLs without depending on Google redirect markup.
+  try{
+    const response=await fetch("https://www.bing.com/search?format=rss&q="+encodeURIComponent(phrase),{signal:AbortSignal.timeout(12000),redirect:"error",headers:{"User-Agent":"Mozilla/5.0","Accept":"application/rss+xml,application/xml,text/xml"}});
+    if(!response.ok)throw new Error("Bing RSS HTTP "+response.status);
+    const xml=(await response.text()).slice(0,150000);
+    for(const m of xml.matchAll(/<item>[\s\S]*?<link>(https:\/\/[^<]+)<\/link>[\s\S]*?<\/item>/gi))add(m[1].replace(/&amp;/g,"&"));
+    if(results.length)return results.slice(0,8);
+  }catch(e){errors.push(e.message)}
+  // DuckDuckGo HTML fallback; resolve its encoded external result URLs.
+  try{
+    const response=await fetch("https://html.duckduckgo.com/html/?q="+encodeURIComponent(phrase),{signal:AbortSignal.timeout(12000),redirect:"error",headers:{"User-Agent":"Mozilla/5.0","Accept":"text/html"}});
+    if(!response.ok)throw new Error("DuckDuckGo HTTP "+response.status);
+    const html=(await response.text()).slice(0,180000);
+    for(const m of html.matchAll(/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"/gi)){
+      const raw=m[1].replace(/&amp;/g,"&");
+      const wrapped=new URL(raw,"https://duckduckgo.com");
+      add(wrapped.searchParams.get("uddg")||wrapped.href);
+    }
+  }catch(e){errors.push(e.message)}
+  if(!results.length)throw new Error("No search results available. "+errors.join("; "));
+  return results.slice(0,8);
 }
 
 async function handleChat(req, res) {
