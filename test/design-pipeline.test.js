@@ -62,3 +62,11 @@ test('visual repair evidence records a failing screenshot then an improved scree
  assert.match(pipeline.repairInstructions(before),/Dashboard panels overlap/);
  assert.equal(before.coverage.complete,true);assert.equal(after.coverage.complete,true);
 });
+
+test('mixed viewport review derives missing aggregate mobile score from actual mobile screenshot and refuses missing evidence',async()=>{
+ const screens=[{label:'Desktop view · 1440px',bytes:Buffer.from('a')},{label:'Mobile view · 390px',bytes:Buffer.from('b')}];
+ const result=await pipeline.review(async opts=>({visual_review:{scores:{...scores,mobile:null},findings:[],screen_reviews:opts.messages[0].content.filter(x=>x.type==='text').slice(1).map(x=>({screen:x.text,scores:{...scores,mobile:x.text.startsWith('Mobile')?4.2:null},findings:[]}))}}),{},screens);
+ assert.equal(result.passed,true);assert.equal(result.scores.mobile,4.2);
+ const fail=await pipeline.review(async opts=>({visual_review:{scores:{...scores,mobile:null},findings:[],screen_reviews:opts.messages[0].content.filter(x=>x.type==='text').slice(1).map(x=>({screen:x.text,scores:{...scores,mobile:x.text.startsWith('Mobile')?2:null},findings:[]}))}}),{},screens);
+ assert.equal(fail.passed,false);
+});
