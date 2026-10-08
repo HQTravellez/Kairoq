@@ -54,12 +54,13 @@ async function audit(files,{capture=false}={}){
         await page.setContent(html,{waitUntil:"domcontentloaded",timeout:18000});
         await page.waitForTimeout(250);
         const broken=await page.evaluate(()=>[...document.querySelectorAll('a[href^="#"]')].map(a=>a.getAttribute('href')).filter(h=>h.length>1&&!document.getElementById(h.slice(1))));if(broken.length)notes.push(width+"px: navigation targets missing: "+broken.slice(0,4).join(', '));
-        for(const toggle of (await page.locator('button[aria-expanded][aria-controls]').all()).slice(0,5)){if(!await toggle.isVisible())continue;const before=await toggle.getAttribute('aria-expanded');await toggle.click();if(await toggle.getAttribute('aria-expanded')===before)notes.push(width+"px: expandable control did not change state");await toggle.click();}
+        let controlIndex=0;for(const toggle of await page.locator('button[aria-expanded][aria-controls],details > summary').all()){if(!await toggle.isVisible())continue;const before=await toggle.evaluate(n=>n.tagName==='SUMMARY'?n.parentElement.open:n.getAttribute('aria-expanded'));await toggle.click();const after=await toggle.evaluate(n=>n.tagName==='SUMMARY'?n.parentElement.open:n.getAttribute('aria-expanded'));if(after===before)notes.push(width+"px: expandable control did not change state");if(capture){const label=width+'px website · expanded control '+(++controlIndex);designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:'jpeg',quality:65,fullPage:false})});}await toggle.click();}
         await page.evaluate(()=>window.scrollTo(0,0));
         const check=await page.evaluate(()=>({title:document.title,text:document.body.innerText.trim().length,overflow:document.documentElement.scrollWidth>innerWidth+8,buttons:[...document.querySelectorAll("button")].length}));
         if(check.text<150)notes.push(width+"px: insufficient meaningful page content");
         if(check.overflow)notes.push(width+"px: horizontal overflow");
         if(errors.length)notes.push(width+"px: JS errors: "+errors.slice(0,2).join(" | "));if(capture){const label=width+"px website";designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:"jpeg",quality:65,fullPage:true})});}
+        if(capture){let sectionIndex=0;for(const section of await page.locator('main > section,main > article,[role=main] > section').all()){if(!await section.isVisible())continue;const heading=(await section.locator('h1,h2').count()?(await section.locator('h1,h2').first().textContent())?.trim().replace(/\s+/g,' ').slice(0,45):'Section')||'Section';const label=width+'px · '+(++sectionIndex)+' '+heading;screenshots.push({label,bytes:await section.screenshot({type:'jpeg',quality:65})});}}
         await ctx.close();
       }
     }finally{await browser.close()}
@@ -151,4 +152,4 @@ async function publish(id,{branchPrefix="kairoq-build"}={}){
   return {url:pr.html_url,number:pr.number,branch,repository:repo,status:"awaiting_review"};
 }
 function listProjects(){if(!fs.existsSync(ROOT))return[];return fs.readdirSync(ROOT).flatMap(id=>{try{const {files,...p}=getProject(id);return[p];}catch{return[];}});}
-module.exports={build,revise,getProject,listProjects,publish,assemble};
+module.exports={build,revise,getProject,listProjects,publish,assemble,audit};

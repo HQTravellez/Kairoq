@@ -17,6 +17,12 @@ async function body(req){let s='';for await(const part of req){s+=part;if(s.leng
 const sessionName=id=>id==='housing-enquiries'?'housing_session':'kairoq_session_'+id;
 const token=(req,id)=>{const prefix=sessionName(id)+'=';return String(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(prefix))?.slice(prefix.length)};
 function user(req,id){const s=sessions.get(token(req,id));return s&&s.id===id&&s.expires>Date.now()?s.user:null;}
+function removeTestAccount(root,id,account){
+ if(!account||!/^kairoq-qa-[a-f0-9]{24}@example\.com$/.test(account.email)||!account.id)throw Error('Only an identified synthetic QA account may be cleaned up');
+ const db=database(root,id),stored=db.prepare('SELECT id FROM users WHERE id=? AND email=?').get(account.id,account.email);if(!stored)return;
+ db.exec('BEGIN');try{if(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='app_records'").get())db.prepare('DELETE FROM app_records WHERE user_id=?').run(account.id);db.prepare('DELETE FROM enquiries WHERE user_id=?').run(account.id);db.prepare('DELETE FROM users WHERE id=? AND email=?').run(account.id,account.email);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
+ for(const[key,session]of sessions)if(session.id===id&&session.user.id===account.id)sessions.delete(key);
+}
 function cookie(req,res,value,id){res.setHeader('Set-Cookie',sessionName(id)+'='+value+'; HttpOnly; SameSite=Strict; Path=/apps/'+id+'/; Max-Age='+(value?86400:0)+(req.headers['x-forwarded-proto']==='https'||req.socket.encrypted?'; Secure':''));}
 function clean(raw){
  const str=(key,max=500)=>String(raw[key]??'').trim().slice(0,max);
@@ -62,4 +68,4 @@ async function handle(req,res,{root,id,route}){
   return send(res,404,{error:'Endpoint not found'});
  }catch(e){return send(res,400,{error:String(e.message||e).slice(0,180)})}
 }
-module.exports={handle,database,clean,user,body,send};
+module.exports={handle,database,clean,user,body,send,removeTestAccount};

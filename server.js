@@ -6819,6 +6819,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
+    if(process.env.FULLSTACK_APP_SMOKE_TEST==="true"&&experiential.configured())require("./journey-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[journey-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true"&&experiential.configured())require("./design-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[design-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./release-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[release-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./studio-qa").run().catch(e=>console.error("[studio-qa] ERROR "+e.message));

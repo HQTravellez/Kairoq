@@ -1614,3 +1614,28 @@ Evidence and reports stay with the project/version. The one-time design smoke
 build produces a housing desk and corporate housing website through this same
 pipeline; its public proof images contain only synthetic test records. Existing
 published versions are preserved when a new build/revision fails its checks.
+
+
+### Screen and public deployment verification
+
+New builds review every captured state, in batches of five screenshots. Each
+state receives its own seven-axis verdict; a weak or omitted state blocks the
+visual gate. Managed-app journeys cover every schema collection on desktop
+and mobile, new/edit forms, required validation, pending saves, recoverable
+service errors, search no-match states, select filters and logout/API protection.
+Website checks capture each section and visible expanded navigation/FAQ state.
+
+Launching a SQLite app now checks the public Railway URL in Chromium, including
+registration, login, CRUD, dashboard, reload, mobile and logout. Configure
+`KAIROQ_PUBLIC_URL` as an HTTPS origin; Railway's `RAILWAY_PUBLIC_DOMAIN` is used
+automatically. A failed public check restores the previous deployed version.
+Checks create a unique synthetic account, remove only that account's records
+and identity, and save credential-free release evidence. Supabase authenticated
+release testing still requires a disposable identity and is reported as blocked
+rather than being claimed as verified. External integrations and business rules
+not represented by the managed schema require dedicated journey adapters.
+
+`FULLSTACK_APP_SMOKE_TEST=true` also runs the cached journey pilot: a fresh
+two-collection operations app and section-reviewed website, followed by public
+checks. Its credential-free result is `/generated/journey-proof/report.json`.
+The Docker build executes Chromium regression tests before releasing the server.
