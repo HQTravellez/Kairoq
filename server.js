@@ -6491,23 +6491,28 @@ const developerAgent=require("./developer-agent");
 async function callDeveloperCodingModel(opts={}){
   if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
   const preferred=(process.env.KAIROQ_BUILDER_MODEL||"nvidia/nemotron-3-super-120b-a12b:free").trim();
-  // Free-only endpoints. Never allow a paid fallback without separate explicit configuration.
-  const list=[preferred,"nvidia/nemotron-3-super-120b-a12b:free","poolside/laguna-xs-2.1:free","openrouter/free"].filter((m,i,a)=>m.endsWith(":free")||m==="openrouter/free").filter((m,i,a)=>a.indexOf(m)===i);
+  const list=[preferred,"nvidia/nemotron-3-super-120b-a12b:free","openrouter/free"].filter((m,i,a)=>(m.endsWith(":free")||m==="openrouter/free")&&a.indexOf(m)===i);
   const errors=[];
   for(const model of list){
     try{
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(210000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.2,max_tokens:12000})});
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(140000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.2,max_tokens:16000,reasoning:{effort:"low"},response_format:{type:"json_object"}})});
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw Error(data?.error?.message||"HTTP "+response.status);
-      const u=data.usage||{};
-      if(Number(u.cost||0)>0)throw Error("Provider returned nonzero cost on a free-only model");
-      const raw=data?.choices?.[0]?.message?.content;
-      const content=typeof raw==="string"?raw:Array.isArray(raw)?raw.filter(x=>x.type==="text").map(x=>x.text||"").join(""):"";
-      const clean=content.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,"").trim();
-      try{return JSON.parse(clean)}catch{const first=clean.indexOf("{"),last=clean.lastIndexOf("}");if(first>=0&&last>first)return JSON.parse(clean.slice(first,last+1));throw Error("Model returned invalid project JSON ("+clean.length+" chars)")}
-    }catch(err){console.warn("[developer-free-model]",model,String(err.message||err).slice(0,230));errors.push(model+": "+String(err.message||err).slice(0,150))}
+      if(Number(data.usage?.cost||0)>0)throw Error("Nonzero model cost detected");
+      const msg=data.choices?.[0]?.message||{};
+      const raw=msg.content;
+      const content=typeof raw==="string"?raw:Array.isArray(raw)?raw.filter(x=>x.type==="text"||x.text).map(x=>x.text||"").join(""):"";
+      const finish=data.choices?.[0]?.finish_reason||"unknown";
+      if(!content.trim())throw Error("Empty answer (finish="+finish+", reasoning_length="+String(msg.reasoning||"").length+", completion_tokens="+(data.usage?.completion_tokens||0)+")");
+      const clean=content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+      try{return JSON.parse(clean)}catch{
+        const first=clean.indexOf("{"),last=clean.lastIndexOf("}");
+        if(first>=0&&last>first)return JSON.parse(clean.slice(first,last+1));
+        throw Error("Invalid JSON (length="+clean.length+", finish="+finish+")");
+      }
+    }catch(err){console.warn("[developer-free-model]",model,String(err.message||err).slice(0,240));errors.push(model+": "+String(err.message||err).slice(0,160))}
   }
-  throw Error("Free coding models unavailable: "+errors.join("; "));
+  throw Error("Free models could not generate usable project JSON: "+errors.join("; "));
 }
 async function handleDeveloperBuild(req,res){
   try{
