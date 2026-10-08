@@ -67,9 +67,11 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
   const id=slug(projectName||brief.slice(0,35))+"-"+crypto.randomBytes(3).toString("hex");
   const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain EXACTLY index.html, styles.css, app.js string properties. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. index.html links styles.css and app.js using relative paths (the preview system injects their contents). Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Provide at least 1000 words of useful page structure/copy where appropriate and robust content.";
   const prompt=system+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
-  let generated=await callModel({messages:[{role:"user",content:prompt}],temperature:0.45});
+  let generated,usedStarter=false;
+  try{generated=await callModel({messages:[{role:"user",content:prompt}],temperature:0.45})}
+  catch(e){if(kind==="webapp")throw Error("Custom interactive app generation requires a working free AI text model. "+e.message);generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
   let files=normalizeFiles(generated),qa=await audit(files),revisions=0;
-  if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
+  if(!usedStarter && qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
       const fix="Return only JSON with files: index.html, styles.css, app.js. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(files).slice(0,34000)+". Preserve and enhance premium design.";
       const repaired=normalizeFiles(await callModel({messages:[{role:"user",content:fix}],temperature:0.2}));
@@ -77,7 +79,7 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
       if(repairedQa.findings.length<=qa.findings.length){files=repaired;qa=repairedQa;revisions=1}
     }catch(e){qa.findings.push("Repair attempt unsuccessful: "+e.message)}
   }
-  const metadata={id,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft"};
+  const metadata={id,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft",generation_mode:usedStarter?"starter_template":"ai_generated"};
   const folder=dirFor(id);
   fs.mkdirSync(folder,{recursive:true});
   for(const [name,contents] of Object.entries(files))fs.writeFileSync(path.join(folder,name),contents);
