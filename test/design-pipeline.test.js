@@ -31,4 +31,5 @@ test('visual polish cannot replace the stored schema or project identity',()=>{
  const candidate={project_name:'Housing',summary:'Saved enquiries',schema:{collections:[{name:'enquiries',label:'Enquiries',fields:[{name:'contact',label:'Contact',type:'text',required:true}]}]},files:{'index.html':'<html>'+ 'a'.repeat(500)+'</html>','styles.css':'.page{color:black}'+ ' '.repeat(500),'app.js':''}};
  const result=builder.normalizePolish(candidate,{project_name:'Wrong',schema:{collections:[]},files:{...candidate.files,'app.js':'/* visual change */'}});
  assert.deepEqual(result.schema,candidate.schema);assert.equal(result.project_name,'Housing');assert.equal(result.files['app.js'],'/* visual change */');
+ const partial=builder.normalizePolish(result,{files:{'styles.css':candidate.files['styles.css']+'\n/* polished */'}});assert.equal(partial.files['app.js'],result.files['app.js']);assert.equal(partial.files['index.html'],candidate.files['index.html']);
 });
