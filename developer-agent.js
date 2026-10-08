@@ -70,7 +70,7 @@ async function build({brief,kind="website",style="editorial",projectName},callMo
   const prompt=system+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
   let generated,usedStarter=false;
   try{generated=await callModel({messages:[{role:"user",content:prompt}],temperature:0.45})}
-  catch(e){if(kind==="webapp")throw Error("Custom interactive app generation requires a working free AI text model. "+e.message);generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
+  catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(kind==="webapp")throw Error("Custom interactive app generation requires a working free AI text model. "+e.message);generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
   let files=normalizeFiles(generated),qa=await audit(files),revisions=0;
   if(!usedStarter && qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
