@@ -43,6 +43,13 @@ async function cloudApi(req,res,{id,route,schema,provider}){
  if(route==='/schema'&&req.method==='GET')return auth.send(res,200,{schema});
  const pad=(record,collection)=>{for(const f of collection.fields)if(!Object.hasOwn(record.data,f.name))record.data[f.name]=f.default??null;return record;};
  if(route==='/dashboard'&&req.method==='GET'){const rows=await provider.records(id,session);const counts=Object.fromEntries(schema.collections.map(c=>[c.name,rows.filter(r=>r.collection===c.name).length]));return auth.send(res,200,{total:rows.length,collections:counts});}
+ const actionMatch=/^\/actions\/([a-z][a-z0-9_]{0,39})\/([a-f0-9-]{36})$/.exec(route);
+ if(actionMatch&&req.method==='POST'){
+  const action=(schema.actions||[]).find(a=>a.name===actionMatch[1]);if(!action)return auth.send(res,404,{error:'Action not found'});
+  const collection=schema.collections.find(c=>c.name===action.collection),old=(await provider.records(id,session,collection.name)).find(r=>r.id===actionMatch[2]);if(!old)return auth.send(res,404,{error:'Record not found'});
+  const value=old.data[action.field];if(action.from.length&&!action.from.includes(value))return auth.send(res,409,{error:'Action not allowed from current state'});
+  const record=await provider.save(id,session,collection.name,patchValues(collection,old.data,{[action.field]:action.to}),old.id);return auth.send(res,200,{record,action:{name:action.name,from:value,to:action.to}});
+ }
  const match=/^\/collections\/([a-z][a-z0-9_]{0,39})(?:\/([a-f0-9-]{36}))?$/.exec(route);const collection=match&&schema.collections.find(c=>c.name===match[1]);if(!collection)return auth.send(res,404,{error:'Collection not found'});
  if(!match[2]&&req.method==='GET')return auth.send(res,200,{records:(await provider.records(id,session,collection.name)).map(r=>pad(r,collection))});
  if(!match[2]&&req.method==='POST')return auth.send(res,201,{record:await provider.save(id,session,collection.name,recordValues(collection,await auth.body(req)))});
@@ -60,6 +67,14 @@ async function api(req,res,{root=ROOT,id,route,schema,backend="sqlite",provider}
   const u=auth.user(req,id);if(!u)return auth.send(res,401,{error:'Sign in required'});const db=recordsDb(root,id);
   if(route==='/schema'&&req.method==='GET')return auth.send(res,200,{schema});
   if(route==='/dashboard'&&req.method==='GET'){const counts=Object.fromEntries(schema.collections.map(c=>[c.name,db.prepare('SELECT count(*) n FROM app_records WHERE user_id=? AND collection=?').get(u.id,c.name).n]));return auth.send(res,200,{total:Object.values(counts).reduce((a,b)=>a+b,0),collections:counts});}
+  const actionMatch=/^\/actions\/([a-z][a-z0-9_]{0,39})\/([a-f0-9-]{36})$/.exec(route);
+  if(actionMatch&&req.method==='POST'){
+   const action=(schema.actions||[]).find(a=>a.name===actionMatch[1]);if(!action)return auth.send(res,404,{error:'Action not found'});
+   const collection=schema.collections.find(c=>c.name===action.collection),old=db.prepare('SELECT * FROM app_records WHERE id=? AND user_id=? AND collection=?').get(actionMatch[2],u.id,collection.name);if(!old)return auth.send(res,404,{error:'Record not found'});
+   const current=JSON.parse(old.payload),value=current[action.field];if(action.from.length&&!action.from.includes(value))return auth.send(res,409,{error:'Action not allowed from current state'});
+   const data=patchValues(collection,current,{[action.field]:action.to}),at=new Date().toISOString();db.prepare('UPDATE app_records SET payload=?,updated_at=? WHERE id=? AND user_id=?').run(JSON.stringify(data),at,old.id,u.id);
+   return auth.send(res,200,{record:{id:old.id,data,created_at:old.created_at,updated_at:at},action:{name:action.name,from:value,to:action.to}});
+  }
   const match=/^\/collections\/([a-z][a-z0-9_]{0,39})(?:\/([a-f0-9-]{36}))?$/.exec(route);if(!match)return auth.send(res,404,{error:'Endpoint not found'});const collection=schema.collections.find(c=>c.name===match[1]);if(!collection)return auth.send(res,404,{error:'Collection not found'});
   if(!match[2]&&req.method==='GET')return auth.send(res,200,{records:db.prepare('SELECT * FROM app_records WHERE user_id=? AND collection=? ORDER BY created_at DESC').all(u.id,collection.name).map(r=>rowRecord(r,collection))});
   if(!match[2]&&req.method==='POST'){const data=recordValues(collection,await auth.body(req)),rid=crypto.randomUUID(),at=new Date().toISOString();db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?,?)').run(rid,u.id,collection.name,JSON.stringify(data),at,at);return auth.send(res,201,{record:{id:rid,data,created_at:at,updated_at:at}});}
