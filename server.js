@@ -6561,11 +6561,11 @@ async function handleDeveloperBuild(req,res){
     if(body.kind==="fullstack")return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));
     const generated=await developerAgent.build(body,callDeveloperCodingModel);
     const {preview,files,...info}=generated;
-    return json(res,200,{...info,preview_url:"/api/developer/preview/"+generated.id,files:Object.keys(files)});
+    return json(res,200,{...info,preview_url:"/api/developer/preview/"+generated.id+"/index.html",files:Object.keys(files)});
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperRevise(req,res){
-  try{const body=await getBody(req,100000);if(appBuilder.listProjects().some(p=>p.id===body.id))return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id,files:Object.keys(files)})}
+  try{const body=await getBody(req,100000);if(appBuilder.listProjects().some(p=>p.id===body.id))return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id+"/index.html",files:Object.keys(files)})}
   catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperPublish(req,res){
@@ -6614,8 +6614,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url.startsWith("/api/developer/preview/")){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     try{
-      const raw=url.slice("/api/developer/preview/".length),id=raw.split("?")[0],query=new URL("http://local/?"+(raw.split("?")[1]||"")).searchParams;
-      const project=developerAgent.getProject(id),page=String(query.get("page")||"index.html");
+      const raw=url.slice("/api/developer/preview/".length).split("?")[0],parts=raw.split("/").filter(Boolean),id=parts.shift(),legacyQuery=new URL("http://local/"+url).searchParams;
+      const project=developerAgent.getProject(id),page=String(parts[0]||legacyQuery.get("page")||"index.html");
       if(!/^[a-z0-9][a-z0-9-]{0,48}\.html$/.test(page)||!project.files[page])throw Error("Page not found");
       const html=developerAgent.assemble(project.files,page);
       res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
