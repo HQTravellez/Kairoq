@@ -33,3 +33,7 @@ test('visual polish cannot replace the stored schema or project identity',()=>{
  assert.deepEqual(result.schema,candidate.schema);assert.equal(result.project_name,'Housing');assert.equal(result.files['app.js'],'/* visual change */');
  const partial=builder.normalizePolish(result,{files:{'styles.css':candidate.files['styles.css']+'\n/* polished */'}});assert.equal(partial.files['app.js'],result.files['app.js']);assert.equal(partial.files['index.html'],candidate.files['index.html']);
 });
+
+test('component compilation enforces readable explicit text sizes without flattening hierarchy',()=>{
+ assert.equal(system.readableCss('.a{font-size:10px}.b{font-size:32px}.c{font:600 .6rem/1.3 system-ui}.d{font-size:1em}'),'.a{font-size:12px}.b{font-size:32px}.c{font:600 0.75rem/1.3 system-ui}.d{font-size:1em}');
+});

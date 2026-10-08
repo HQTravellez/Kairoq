@@ -22,6 +22,12 @@ function foundation(style='editorial'){
 @media(max-width:600px){.kq-shell{width:calc(100% - 32px)}.kq-panel{padding:18px}.kq-table th,.kq-table td{padding:12px}.kq-heading{overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){.kq-page *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}`;
 }
+function readableCss(css){
+ // Bound explicit absolute text sizes; relative em sizes remain context-dependent.
+ const floor=(prefix,n,unit)=>prefix+Math.max(Number(n),unit.toLowerCase()==='px'?12:.75)+unit;
+ return css.replace(/(font-size\s*:\s*)(\d*\.?\d+)(px|rem)\b/gi,(_,p,n,u)=>floor(p,n,u))
+ .replace(/(font\s*:\s*(?:(?:normal|italic|oblique|small-caps|bold|bolder|lighter|[1-9]00)\s+)*)(\d*\.?\d+)(px|rem)\b/gi,(_,p,n,u)=>floor(p,n,u));
+}
 function source(files){return {...files,'styles.css':String(files['styles.css']).replace(/\/\* Kairoq reusable UI foundation v1[\s\S]*?\/\* END KAIROQ FOUNDATION \*\/\n?/g,'')};}
-function apply(files,style){return {...files,'styles.css':foundation(style)+'\n/* END KAIROQ FOUNDATION */\n'+String(files['styles.css']).replace(/\/\* Kairoq reusable UI foundation v1[\s\S]*?\/\* END KAIROQ FOUNDATION \*\/\n?/g,'')};}
-module.exports={palettes,foundation,apply,source};
+function apply(files,style){return {...files,'styles.css':foundation(style)+'\n/* END KAIROQ FOUNDATION */\n'+readableCss(String(files['styles.css']).replace(/\/\* Kairoq reusable UI foundation v1[\s\S]*?\/\* END KAIROQ FOUNDATION \*\/\n?/g,''))};}
+module.exports={palettes,foundation,apply,source,readableCss};
