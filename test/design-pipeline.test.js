@@ -1,6 +1,16 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const pipeline=require('../design-pipeline'),system=require('../design-system');
+const components=require('../app-components'),vm=require('node:vm');
+test('trusted component runtime is injected once and presentation code survives revisions',()=>{
+ const original={'app.js':'document.documentElement.dataset.presentation="custom";'};
+ const once=components.inject(original),twice=components.inject(once);
+ assert.equal(once['app.js'],twice['app.js']);
+ assert.equal((twice['app.js'].match(/BEGIN KAIROQ COMPONENT RUNTIME/g)||[]).length,1);
+ assert.ok(twice['app.js'].endsWith(original['app.js']));
+ assert.doesNotThrow(()=>new vm.Script(twice['app.js']));
+ assert.ok(!twice['app.js'].includes('innerHTML'));
+});
 const scores=Object.fromEntries(pipeline.axes.map(n=>[n,4.2]));
 test('visual gate rejects weak dimensions, major findings and malformed scores',()=>{
  assert.equal(pipeline.normalizeReview({scores,findings:[]}).passed,true);
