@@ -1584,3 +1584,28 @@ proposal; it is not activated by setting the publishable key alone. Its token
 must remain server-side and never appear in generated code. Public email
 registration also needs the Supabase project's email delivery and confirmation
 redirect configuration. It has not been verified through a real email inbox.
+
+### Design pipeline (new AI-generated apps and websites)
+
+Every new build first creates a durable design brief for its audience, purpose,
+visual direction, layout, typography, palette and interaction states. The
+`design-system.js` foundation provides reusable, customizable components and
+five visual directions; these are concrete CSS classes and tokens, not a fixed
+page template. Feature revisions reuse the saved identity.
+
+Functional browser QA renders the build with synthetic data. Business apps
+capture login, empty and populated desktop dashboards and a mobile dashboard;
+websites capture desktop and mobile. `design-dom.js` checks small text, clipping
+and text contrast where the rendered background can be determined reliably.
+A vision model receives the actual JPEGs and scores seven design dimensions.
+One automatic polish attempt addresses findings, followed by fresh browser
+checks and screenshots. Deployment requires a mean score of at least 4/5,
+no dimension below 3.5, and no major/critical findings. This is an AI assessment,
+not an objective guarantee of design quality or accessibility certification.
+Unsupported vision, malformed reviews or unmet quality gates do not produce a
+false visual pass. Calls remain subject to existing daily/monthly budgets.
+
+Evidence and reports stay with the project/version. The one-time design smoke
+build produces a housing desk and corporate housing website through this same
+pipeline; its public proof images contain only synthetic test records. Existing
+published versions are preserved when a new build/revision fails its checks.

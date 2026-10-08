@@ -1,0 +1,31 @@
+'use strict';
+const crypto=require('crypto');
+const system=require('./design-system');
+const axes=['hierarchy','typography','spacing','consistency','mobile','usability','identity'];
+function normalizePlan(raw,{kind,style}){
+ const p=raw?.design_plan||raw;if(!p||typeof p!=='object')throw Error('Design planner returned no brief');
+ const clean={};for(const name of ['audience','purpose','visual_direction','layout','typography','color_strategy','interaction_states']){if(typeof p[name]!=='string'||p[name].trim().length<8)throw Error('Incomplete design brief: '+name);clean[name]=p[name].trim().slice(0,1200);}
+ return{...clean,kind,style,version:1};
+}
+async function plan(callModel,{brief,kind='app',style='editorial',previous,existing}){
+ if(previous)return previous;
+ return normalizePlan(await callModel({purpose:'design-plan',maxOutputTokens:1800,messages:[{role:'user',content:'Plan the product design before any implementation. Return ONLY JSON {design_plan:{audience,purpose,visual_direction,layout,typography,color_strategy,interaction_states}} with concrete concise strings. Tailor it to this brief: '+brief+'\nSurface: '+kind+'\nChosen direction: '+style+'\nChoose an appropriate distinctive identity, realistic tasks and content, clear mobile navigation, and useful empty/loading/error/success states. Use system fonts and inline SVG/CSS artwork, no external assets. Do not invent product capabilities or testimonials. This is a design brief, not code.'+(existing?'\nExisting identity to preserve: '+JSON.stringify({'index.html':existing['index.html']?.slice(0,4000),'styles.css':existing['styles.css']?.slice(0,6000)}):'')}]}),{kind,style});
+}
+function instructions(p){return '\nAPPROVED DESIGN BRIEF (preserve this identity during fixes):\n'+JSON.stringify(p)+'\nUse the reusable kq-page, kq-shell, kq-heading, kq-button, kq-input, kq-label, kq-panel, kq-stack, kq-grid, kq-nav and kq-table classes where appropriate. Customize their --kq-* tokens coherently. This foundation is prepended to styles.css. Build a tailored composition, not a repetitive template. Do not duplicate the foundation in your output.\nFOUNDATION CSS:\n'+system.foundation(p.style);}
+function normalizeReview(raw){
+ const p=raw?.visual_review||raw;if(!p||!p.scores||!Array.isArray(p.findings))throw Error('Visual reviewer returned an invalid report');
+ const scores={};for(const axis of axes){const value=p.scores[axis];if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>5)throw Error('Invalid visual score: '+axis);scores[axis]=value;}
+ const findings=p.findings.slice(0,16).map(f=>{if(!f||!['minor','major','critical'].includes(f.severity)||typeof f.issue!=='string'||typeof f.fix!=='string')throw Error('Invalid visual finding');return{severity:f.severity,screen:String(f.screen||'').slice(0,80),issue:f.issue.slice(0,350),fix:f.fix.slice(0,500)};});
+ const score=Number((Object.values(scores).reduce((a,b)=>a+b,0)/axes.length).toFixed(2));
+ return{passed:score>=4&&Object.values(scores).every(v=>v>=3.5)&&!findings.some(f=>f.severity!=='minor'),score,scores,findings,summary:String(p.summary||'').slice(0,600),method:'AI screenshot review',at:new Date().toISOString()};
+}
+async function review(callModel,p,screenshots,checks=[]){
+ if(!screenshots?.length)throw Error('Visual review requires rendered screenshots');
+ const evidence=screenshots.slice(0,5);const content=[{type:'text',text:'Act as a demanding product design reviewer. Review these rendered screenshots against the design brief, not the source code. Return ONLY JSON {visual_review:{scores:{hierarchy,typography,spacing,consistency,mobile,usability,identity},findings:[{severity:"minor|major|critical",screen,issue,fix}],summary}}. Scores 0-5, where 4 means polished and usable, 5 exceptional; do not award 4 for generic or unfinished work. Assess legibility, visual hierarchy, intentional layout, alignment, useful states, mobile controls, and a distinctive identity appropriate to the product. Report actionable observed problems; do not invent unseen behavior or demand fabricated assets. Any clipped content, illegible important text, overlapping controls or unusable mobile layout is major. Respect the screenshot state (empty screens legitimately have no records). This is subjective AI review, not accessibility certification.\nDESIGN BRIEF: '+JSON.stringify(p)+'\nObserved DOM checks: '+JSON.stringify(checks)}];
+ for(const shot of evidence){content.push({type:'text',text:shot.label});content.push({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot.bytes.toString('base64'),detail:'high'}});}
+ const result=normalizeReview(await callModel({purpose:'design-review',maxOutputTokens:2400,messages:[{role:'user',content}]}));if(checks.length){result.findings.push(...checks);result.passed=false;}result.evidence=evidence.map(s=>({screen:s.label,sha256:crypto.createHash('sha256').update(s.bytes).digest('hex')}));return result;
+}
+function repairInstructions(report){return '\nVISUAL REVIEW REQUIRES POLISH. Keep the design brief, all data/API behavior and testing selectors. Correct these observed issues with complete files:\n'+JSON.stringify({scores:report.scores,findings:report.findings});}
+function stripShots(qa){const shots=qa._screenshots||[];delete qa._screenshots;return shots;}
+function saveEvidence(folder,screenshots){const fs=require('fs'),path=require('path');fs.mkdirSync(path.join(folder,'design-evidence'),{recursive:true});screenshots.forEach((s,i)=>fs.writeFileSync(path.join(folder,'design-evidence',String(i+1)+'.jpg'),s.bytes));}
+module.exports={plan,normalizePlan,instructions,review,normalizeReview,repairInstructions,stripShots,saveEvidence,axes};

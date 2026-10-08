@@ -1,5 +1,6 @@
 "use strict";
 const designGuidance=require("./design-guidance");
+const designPipeline=require("./design-pipeline"),designSystem=require("./design-system"),designDom=require("./design-dom");
 // Isolated website/web-app generation. Generated code is only previewed in sandboxed iframes.
 const fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
 const ROOT=path.join(__dirname,"workspace","developer-projects");
@@ -36,8 +37,8 @@ function assemble(files){
   html=/<\/body>/i.test(html)?html.replace(/<\/body>/i,js+"\n</body>"):html+"\n"+js;
   return html;
 }
-async function audit(files){
-  const notes=[];
+async function audit(files,{capture=false}={}){
+  const notes=[],screenshots=[],designChecks=[];
   const html=assemble(files);
   if(!/<meta[^>]+name=["']viewport["']/i.test(files["index.html"]))notes.push("Missing viewport meta tag");
   if(!/<h1[\s>]/i.test(files["index.html"]))notes.push("Missing primary heading");
@@ -52,38 +53,52 @@ async function audit(files){
         await page.route("**/*",route=>route.request().url().startsWith("data:")?route.continue():route.abort());
         await page.setContent(html,{waitUntil:"domcontentloaded",timeout:18000});
         await page.waitForTimeout(250);
+        const broken=await page.evaluate(()=>[...document.querySelectorAll('a[href^="#"]')].map(a=>a.getAttribute('href')).filter(h=>h.length>1&&!document.getElementById(h.slice(1))));if(broken.length)notes.push(width+"px: navigation targets missing: "+broken.slice(0,4).join(', '));
+        for(const toggle of (await page.locator('button[aria-expanded][aria-controls]').all()).slice(0,5)){if(!await toggle.isVisible())continue;const before=await toggle.getAttribute('aria-expanded');await toggle.click();if(await toggle.getAttribute('aria-expanded')===before)notes.push(width+"px: expandable control did not change state");await toggle.click();}
+        await page.evaluate(()=>window.scrollTo(0,0));
         const check=await page.evaluate(()=>({title:document.title,text:document.body.innerText.trim().length,overflow:document.documentElement.scrollWidth>innerWidth+8,buttons:[...document.querySelectorAll("button")].length}));
         if(check.text<150)notes.push(width+"px: insufficient meaningful page content");
         if(check.overflow)notes.push(width+"px: horizontal overflow");
-        if(errors.length)notes.push(width+"px: JS errors: "+errors.slice(0,2).join(" | "));
+        if(errors.length)notes.push(width+"px: JS errors: "+errors.slice(0,2).join(" | "));if(capture){const label=width+"px website";designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:"jpeg",quality:65})});}
         await ctx.close();
       }
     }finally{await browser.close()}
   }catch(e){notes.push("Browser QA unavailable: "+e.message)}
-  return {passed:notes.length===0,findings:notes,tested:["desktop 1440px","mobile 390px","JavaScript execution","horizontal overflow","semantic structure"]};
+  return {passed:notes.length===0,findings:notes,...(capture?{_screenshots:screenshots,design_checks:designChecks}:{}),tested:["desktop 1440px","mobile 390px","JavaScript execution","horizontal overflow","semantic structure","internal navigation targets","expandable controls"]};
+}
+async function finishDesign(files,qa,designPlan,brief,callModel){
+ let evidence=[];if(!qa.passed){designPipeline.stripShots(qa);return{files,qa,evidence};}
+ for(let polish=0;polish<2;polish++){
+  evidence=designPipeline.stripShots(qa);const visual=await designPipeline.review(callModel,designPlan,evidence,qa.design_checks);qa.visual_review=visual;if(visual.passed)break;
+  if(polish===1){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
+  files=designSystem.apply(normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{"index.html":complete HTML,"styles.css":complete CSS,"app.js":complete JS}}. Polish this working website while preserving all interactions, content and valid navigation. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(files)}]})),designPlan.style);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
+ }
+ return{files,qa,evidence};
 }
 async function build({brief,kind="website",style="editorial",projectName},callModel){
   brief=String(brief||"").trim().slice(0,3000);
   if(brief.length<12)throw Error("Describe the website or app in at least 12 characters.");
   kind=kind==="webapp"?"webapp":"website";
   const id=slug(projectName||brief.slice(0,35))+"-"+crypto.randomBytes(3).toString("hex");
+  const designPlan=await designPipeline.plan(callModel,{brief,kind,style});
   const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain EXACTLY index.html, styles.css, app.js string properties. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. index.html links styles.css and app.js using relative paths (the preview system injects their contents). Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Keep total output under 7000 tokens, and output complete files without truncation.";
-  const prompt=system+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
+  const prompt=system+designPipeline.instructions(designPlan)+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
   let generated,usedStarter=false;
   try{generated=await callModel({messages:[{role:"user",content:prompt}],temperature:0.45})}
   catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(process.env.OPENROUTER_API_KEY || kind==="webapp")throw Error("Custom AI generation failed: "+e.message+". This is not an AI-generated project; check model access or credits.");generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
-  let files=normalizeFiles(generated),qa=await audit(files),revisions=0;
+  let files=designSystem.apply(normalizeFiles(generated),designPlan.style),qa=await audit(files,{capture:true}),revisions=0;
   if(!usedStarter && qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
       const fix="Return only JSON with files: index.html, styles.css, app.js. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(files).slice(0,34000)+". Preserve and enhance premium design.";
-      const repaired=normalizeFiles(await callModel({messages:[{role:"user",content:fix}],temperature:0.2}));
-      const repairedQa=await audit(repaired);
+      const repaired=designSystem.apply(normalizeFiles(await callModel({messages:[{role:"user",content:fix}],temperature:0.2})),designPlan.style);
+      const repairedQa=await audit(repaired,{capture:true});
       if(repairedQa.findings.length<=qa.findings.length){files=repaired;qa=repairedQa;revisions=1}
     }catch(e){qa.findings.push("Repair attempt unsuccessful: "+e.message)}
   }
-  const metadata={id,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft",generation_mode:usedStarter?"starter_template":"ai_generated"};
+  const finished=await finishDesign(files,qa,designPlan,brief,callModel);files=finished.files;qa=finished.qa;
+  const metadata={id,design_plan:designPlan,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft",generation_mode:usedStarter?"starter_template":"ai_generated"};
   const folder=dirFor(id);
-  fs.mkdirSync(folder,{recursive:true});
+  fs.mkdirSync(folder,{recursive:true});designPipeline.saveEvidence(folder,finished.evidence);
   for(const [name,contents] of Object.entries(files))fs.writeFileSync(path.join(folder,name),contents);
   fs.writeFileSync(path.join(folder,"project.json"),JSON.stringify(metadata,null,2));
   return {...metadata,files,preview:assemble(files)};
@@ -92,25 +107,27 @@ async function revise(id,instruction,callModel){
   const p=getProject(id),revision=String(instruction||"").trim().slice(0,1600);
   if(revision.length<5)throw Error("Describe the design or functionality change.");
   if(p.status==="pull_request")throw Error("This project has a pending GitHub PR. Create a new project before revising.");
-  const prompt=designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing files object with index.html, styles.css, and app.js strings. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(p.files).slice(0,37000);
+  const designPlan=await designPipeline.plan(callModel,{brief:p.brief,kind:p.kind,style:p.style,previous:p.design_plan,existing:p.files});
+  const prompt=designPipeline.instructions(designPlan)+designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing files object with index.html, styles.css, and app.js strings. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(p.files).slice(0,37000);
   const modelResult=await callModel({messages:[{role:"user",content:prompt}],temperature:0.25});
-  let files=normalizeFiles(modelResult),qa=await audit(files);
+  let files=designSystem.apply(normalizeFiles(modelResult),designPlan.style),qa=await audit(files,{capture:true});
   if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
       const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files of index.html, styles.css and app.js:\n"+JSON.stringify(files).slice(0,30000)}],temperature:0.15});
-      const fixed=normalizeFiles(patch),test=await audit(fixed);
+      const fixed=designSystem.apply(normalizeFiles(patch),designPlan.style),test=await audit(fixed,{capture:true});
       if(test.findings.length<=qa.findings.length){files=fixed;qa=test}
     }catch{}
   }
+  const finished=await finishDesign(files,qa,designPlan,p.brief,callModel);files=finished.files;qa=finished.qa;if(!qa.passed)throw Error("Revision did not pass functional and visual review; previous project preserved");designPipeline.saveEvidence(dirFor(id),finished.evidence);
   for(const [name,code] of Object.entries(files))fs.writeFileSync(path.join(dirFor(id),name),code);
   const meta={...p};delete meta.files;
-  meta.revisions=Number(meta.revisions||0)+1;meta.qa=qa;meta.updated_at=new Date().toISOString();
+  meta.design_plan=designPlan;meta.revisions=Number(meta.revisions||0)+1;meta.qa=qa;meta.updated_at=new Date().toISOString();
   fs.writeFileSync(path.join(dirFor(id),"project.json"),JSON.stringify(meta,null,2));
   return {...meta,files,preview:assemble(files)}
 }
 async function publish(id,{branchPrefix="kairoq-build"}={}){
   const project=getProject(id),token=process.env.GITHUB_TOKEN,repo=process.env.GITHUB_REPO;
-  if(!project.qa?.passed)throw Error("Publishing requires passing browser QA. Revise the project and resolve its findings first.");
+  if(!project.qa?.passed||project.qa.visual_review&&!project.qa.visual_review.passed)throw Error("Publishing requires passing functional QA and any visual review. Revise the project and resolve its findings first.");
   if(!token||!/^[\w.-]+\/[\w.-]+$/.test(repo||""))throw Error("GitHub publishing requires GITHUB_TOKEN and GITHUB_REPO variables.");
   const base="https://api.github.com/repos/"+repo;
   const api=async(method,p,body)=>{
@@ -133,4 +150,5 @@ async function publish(id,{branchPrefix="kairoq-build"}={}){
   fs.writeFileSync(path.join(dir,"project.json"),JSON.stringify(meta,null,2));
   return {url:pr.html_url,number:pr.number,branch,repository:repo,status:"awaiting_review"};
 }
-module.exports={build,revise,getProject,publish,assemble};
+function listProjects(){if(!fs.existsSync(ROOT))return[];return fs.readdirSync(ROOT).flatMap(id=>{try{const {files,...p}=getProject(id);return[p];}catch{return[];}});}
+module.exports={build,revise,getProject,listProjects,publish,assemble};

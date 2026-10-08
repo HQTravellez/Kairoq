@@ -10,7 +10,8 @@ function callProject(opts,services){
 }
 async function run(opts,{enforceBudget,recordUsage,parse}){
  const model='gpt-6-luna'; // Published $0.10/M input, $0.50/M output; no sampling overrides.
- const maxOutput=12000,input=Math.ceil(JSON.stringify(opts.messages||[]).length/2);
+ const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(12000,opts.maxOutputTokens)):12000;
+ let images=0;const inputText=JSON.stringify(opts.messages||[],(k,v)=>{if(k==='image_url'&&v&&typeof v==='object'){images++;return '[rendered screenshot]';}return v;});const input=Math.ceil(inputText.length/2)+images*16384;
  const reserve=(input*0.10+maxOutput*0.50)/1e6;
  const totals=await enforceBudget();
  const daily=Number(process.env.DAILY_COST_LIMIT_USD||2),monthly=Number(process.env.MONTHLY_COST_LIMIT_USD||30);
@@ -24,7 +25,7 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
  // Record usage before parsing: invalid model output can still incur cost.
  const reported=Number(data.usage?.cost);
  const cost=Number.isFinite(reported)?reported:reserve;
- await recordUsage({...data.usage,cost},{purpose:'developer-build',provider:'experiential',model,cost_estimated:!Number.isFinite(reported)});
+ await recordUsage({...data.usage,cost},{purpose:opts.purpose||'developer-build',provider:'experiential',model,cost_estimated:!Number.isFinite(reported)});
  const raw=data.choices?.[0]?.message?.content;
  const text=typeof raw==='string'?raw:Array.isArray(raw)?raw.map(x=>x.text||'').join(''):'';
  if(!text.trim())throw Error('Experiential returned no code; finish='+data.choices?.[0]?.finish_reason);

@@ -6590,7 +6590,7 @@ const server = http.createServer(async (req, res) => {
   if(url==="/api/developer/repair"&&req.method==="POST"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,30000);appRuntime.getProject(String(body.id||""));return json(res,202,appBuilder.submit({id:body.id,repair:true,reported_issue:!!String(body.issue||"").trim(),instruction:String(body.issue||"Diagnose this app in Chromium and repair any broken auth, CRUD, dashboard or mobile behavior.")},callDeveloperCodingModel))}catch(e){return json(res,422,{error:e.message})}}
   if(url==="/api/developer/projects"&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
-    return json(res,200,{projects:appBuilder.listProjects()});
+    return json(res,200,{projects:[...appBuilder.listProjects(),...developerAgent.listProjects()].sort((a,b)=>(b.updated_at||b.created_at).localeCompare(a.updated_at||a.created_at))});
   }
   if(url==="/api/developer/launch"&&req.method==="POST"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
@@ -6819,6 +6819,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
+    if(process.env.FULLSTACK_APP_SMOKE_TEST==="true"&&experiential.configured())require("./design-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[design-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./release-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[release-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./studio-qa").run().catch(e=>console.error("[studio-qa] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true" && experiential.configured())require("./app-smoke").run(appBuilder,callDeveloperCodingModel).catch(e=>console.error("[fullstack-smoke] ERROR "+e.message));
