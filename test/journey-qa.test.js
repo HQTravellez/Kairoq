@@ -11,3 +11,21 @@ test('public website checks accept working controls and reject nested preview na
  let warmingAttempts=0;const server=require('http').createServer((req,res)=>{res.setHeader('Content-Type','text/html');if(req.url.startsWith('/warming')&&warmingAttempts++===0){res.writeHead(503);return res.end('Starting');}res.end(req.url.startsWith('/broken')?nested:req.url.startsWith('/sandbox')?require('../design-showcase').render(html):html);});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  try{const verify=require('../deployed-website-qa').verify;const result=await verify(base+'/good');assert.equal(result.passed,true);assert.equal(result._screenshots.length,2);assert.equal((await verify(base+'/warming')).passed,true);assert.equal((await verify(base+'/sandbox')).passed,true);assert.ok(warmingAttempts>=2);await assert.rejects(verify(base+'/broken'),/navigation|nested|missing|Timeout/);}finally{await new Promise(r=>server.close(r));}
 });
+
+test('Travellez four-panel business dashboard survives real browser CRUD and every breakpoint',{skip:!fs.existsSync(process.env.CHROMIUM_PATH||'/usr/bin/chromium'),timeout:180000},async()=>{
+ const project=candidate();
+ project.schema.collections=[
+  {name:'trips',label:'Trips',fields:[{name:'traveler',label:'Traveler',type:'text',required:true},{name:'status',label:'Status',type:'select',options:['planned','approved','booked'],required:true},{name:'destination',label:'Destination',type:'text',required:true}]},
+  {name:'approvals',label:'Approvals',fields:[{name:'request',label:'Request',type:'text',required:true},{name:'status',label:'Status',type:'select',options:['pending','approved','rejected'],required:true}]},
+  {name:'expenses',label:'Expenses',fields:[{name:'description',label:'Description',type:'text',required:true},{name:'status',label:'Status',type:'select',options:['draft','submitted','paid'],required:true},{name:'amount',label:'Amount',type:'number',required:true}]},
+  {name:'travelers',label:'Travelers',fields:[{name:'full_name',label:'Full name',type:'text',required:true},{name:'status',label:'Status',type:'select',options:['active','inactive'],required:true},{name:'email',label:'Email',type:'email',required:true}]}
+ ];
+ const qa=await builder.browserQA('travellez-four-panels-qa',project,null,{capture:true});
+ assert.equal(qa.passed,true,JSON.stringify(qa.errors||qa.findings));
+ for(const group of project.schema.collections){
+  assert.ok(qa.tested.some(t=>t.includes(group.name+': UI create/edit/reload/delete')),group.name+' CRUD');
+  for(const width of [768,1024])assert.ok(qa.tested.some(t=>t.includes(group.name+': responsive '+width+'px')),group.name+' '+width);
+  assert.ok(qa._screenshots.some(s=>s.label==='Mobile '+group.label+' · saved'),group.name+' mobile screenshot');
+ }
+ assert.ok(qa._screenshots.length>=24,'real screenshots must be captured');
+});
