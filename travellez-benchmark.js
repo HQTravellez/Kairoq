@@ -16,13 +16,17 @@ async function run(model){
   await builder.run(job,model);
   if(job.status!=='complete'||!job.result?.qa?.passed||!job.result?.qa?.visual_review?.passed)throw Error('App generation/QA failed: '+(job.error||JSON.stringify(job.result?.qa)));
   }else console.log('[travellez-benchmark] Rechecking published app checkpoint '+checkpoint.id);
-  stage('app_publish');const released=await builder.publish(checkpoint?.id||job.result.id);
+  stage('app_publish');let released;
+  try{released=await builder.publish(checkpoint?.id||job.result.id);}catch(error){
+   if(!checkpoint)throw error;stage('app_repair');const repair={...job,id:crypto.randomUUID(),operation:'repair',projectId:checkpoint.id,reported_issue:true,resume_job:resumeRepair(checkpoint.id),brief:job.brief+'\nPublic deployment check failed: '+error.message+(previous.app?.qa?.visual_review?require('./design-pipeline').repairInstructions(previous.app.qa.visual_review):'')};report.app.repair_job_id=repair.id;save();
+   await builder.run(repair,model);if(repair.status!=='complete'||!repair.result?.qa?.passed)throw Error('App deployment repair failed: '+repair.error);released=await builder.publish(checkpoint.id);
+  }
   if(!released?.deployed_qa?.passed)throw Error('Deployed app QA failed');
   report.app={id:released.id,live_url:released.live_url,qa:released.qa,deployed_qa:released.deployed_qa};
   stage('app_visual_review');
   const runtime=require('./app-runtime'),pipeline=require('./design-pipeline'),candidate=runtime.getProject(released.id);
   const shots=released.deployed_qa.evidence.map((entry,index)=>({label:entry.screen,bytes:fs.readFileSync(path.join(runtime.ROOT,released.id,'release-evidence',String(released.deployed_version),'design-evidence',String(index+1)+'.jpg'))}));
-  const cached=previous.app?.qa?.visual_review;let visual=cached?.coverage?.complete&&cached.coverage.mode==='ai-screenshot-review'&&previous.app.deployed_qa?.version===released.deployed_version?cached:await pipeline.review(model,candidate.design_plan,shots,[]);
+  const approved=released.qa?.visual_review,cached=previous.app?.qa?.visual_review;let visual=approved?.passed&&approved.coverage?.complete&&approved.coverage.mode==='ai-screenshot-review'?approved:cached?.coverage?.complete&&cached.coverage.mode==='ai-screenshot-review'&&previous.app.deployed_qa?.version===released.deployed_version?cached:await pipeline.review(model,candidate.design_plan,shots,[]);
   report.app.qa={...report.app.qa,visual_review:visual};save();
   if(!visual.passed){
    stage('app_visual_repair');const repair={...job,id:crypto.randomUUID(),operation:'repair',projectId:released.id,reported_issue:true,brief:job.brief+pipeline.repairInstructions(visual),resume_job:resumeRepair(released.id)};report.app.repair_job_id=repair.id;save();
