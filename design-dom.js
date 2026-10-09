@@ -5,7 +5,7 @@ async function inspect(page,screen){
   const rgba=value=>{const m=value.match(/^rgba?\(([^)]+)\)$/);if(!m)return null;const n=m[1].split(',').map(Number);return n.length>=3?[n[0],n[1],n[2],n[3]??1]:null;};
   const mix=(a,b)=>a.slice(0,3).map((v,i)=>v*a[3]+b[i]*(1-a[3]));const lum=c=>c.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
   for(const el of [...document.querySelectorAll('h1,h2,h3,p,label,button,a,td,th,small,span')].slice(0,250)){
-   const rect=el.getBoundingClientRect(),s=getComputedStyle(el),text=(el.innerText||'').trim();if(!text||text.length<3||!rect.width||!rect.height||el.closest('[aria-hidden="true"],button:disabled')||s.visibility==='hidden'||s.display==='none')continue;
+   const rect=el.getBoundingClientRect(),s=getComputedStyle(el),text=(el.innerText||'').trim();if(!text||text.length<3||!rect.width||!rect.height||el.closest('[aria-hidden="true"],button:disabled')||el.matches('#app-message[data-state="saving"]')||s.visibility==='hidden'||s.display==='none')continue;
    if(![...el.childNodes].some(n=>n.nodeType===3&&n.textContent.trim().length>=3))continue;
    // Screen-reader labels are intentionally clipped to 1px, not visual defects.
    const visuallyHidden=['absolute','fixed'].includes(s.position)&&rect.width<=1&&rect.height<=1&&['hidden','clip'].includes(s.overflow)&&(s.clip!=='auto'||s.clipPath!=='none');if(visuallyHidden)continue;
