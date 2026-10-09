@@ -162,7 +162,7 @@ async function reviewProject(id,callModel){
  const project=getProject(id);if(project.status==='pull_request')throw Error('Review the pending pull request before changing this project');
  const effectConfig=effects.normalize(project.effects||{}),designPlan=project.design_plan||await designPipeline.plan(callModel,{brief:project.brief,kind:project.kind,style:project.style});
  const finished=await finishDesign(project.files,await audit(project.files,{capture:true}),designPlan,project.brief,callModel,effectConfig);
- const meta={...project,qa:finished.qa,design_plan:designPlan,file_names:Object.keys(finished.files),pages:Object.keys(finished.files).filter(name=>name.endsWith('.html')),updated_at:new Date().toISOString()};delete meta.files;
+ const meta={...project,status:'draft',qa:finished.qa,design_plan:designPlan,file_names:Object.keys(finished.files),pages:Object.keys(finished.files).filter(name=>name.endsWith('.html')),updated_at:new Date().toISOString()};delete meta.files;
  designPipeline.saveEvidence(dirFor(id),finished.evidence);
  for(const [name,code]of Object.entries(finished.files))fs.writeFileSync(path.join(dirFor(id),name),code);
  fs.writeFileSync(path.join(dirFor(id),'project.json'),JSON.stringify(meta,null,2));
