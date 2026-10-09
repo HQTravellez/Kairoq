@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM public.ecr.aws/docker/library/node:22-bookworm-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-liberation ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
@@ -6,6 +6,6 @@ RUN npm install --omit=dev
 COPY . .
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV NODE_ENV=production TZ=UTC
-RUN node --test test/journey-qa.test.js test/design-pipeline.test.js test/app-release.test.js test/real-visual-repair.test.js test/app-runtime.test.js test/developer-agent.test.js test/visual-effects.test.js
+RUN node --test test/journey-qa.test.js test/design-pipeline.test.js test/app-release.test.js test/real-visual-repair.test.js test/app-runtime.test.js test/developer-agent.test.js test/website-benchmark.test.js test/visual-effects.test.js
 EXPOSE 3002
 CMD ["node","deployment-start.js"]
