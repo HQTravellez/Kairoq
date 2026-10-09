@@ -113,8 +113,10 @@ function ensureRuntimeNavigationToggle(){
   document.body.append(button);
 }
 function ensureWorkspaceNav(){
-  const workspace=document.querySelector('[data-kq-screen="workspace"]');if(!workspace||document.querySelector('[data-kq-screen-target="workspace"]'))return;
-  const existing=document.querySelector('[data-kq-screen-target]'),host=existing?.parentElement||document.querySelector('nav,[role="navigation"],aside');if(!host)return;
+  const workspace=document.querySelector('[data-kq-screen="workspace"]');if(!workspace)return;
+  const trustedHost=$('collection-select')?.closest('nav,aside,[role="navigation"]')||$('logout')?.closest('nav,aside,[role="navigation"]');
+  const existing=document.querySelector('[data-kq-screen-target]'),host=trustedHost||existing?.parentElement||document.querySelector('nav,[role="navigation"],aside');if(!host)return;
+  if(host.querySelector('[data-kq-screen-target="workspace"]'))return;
   const tag=existing?.tagName==='A'?'a':'button',control=node(tag,existing?.className||'','CRUD workspace');if(tag==='button')control.type='button';else control.href='#workspace';
   for(const cls of ['active','is-active','selected','current'])control.classList.remove(cls);control.dataset.kqScreenTarget='workspace';control.setAttribute('aria-label','Open CRUD workspace');host.append(control);
  }
