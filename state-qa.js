@@ -3,6 +3,7 @@
 async function appStates(page,collections,{sample,selectCollection,shot,fixtures=true}){
  const tested=[];
  for(const collection of collections){
+  await page.evaluate(async names=>{for(const name of names){const records=(await(await fetch('api/collections/'+name)).json()).records;for(const record of records){const r=await fetch('api/collections/'+name+'/'+record.id,{method:'DELETE'});if(!r.ok)throw Error('QA isolation cleanup failed');}}},collections.map(c=>c.name));
   await page.setViewportSize({width:1440,height:1000});await selectCollection(page,collection.name);
   const read=()=>page.evaluate(async name=>{const r=await fetch('api/collections/'+name);if(!r.ok)throw Error('Collection fetch failed');return(await r.json()).records;},collection.name);
   const before=await read();if(before.length)throw Error('QA collection must be empty at the start of its journey');
