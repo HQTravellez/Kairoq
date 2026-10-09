@@ -106,7 +106,7 @@ function stabilizeMobileWorkspace(){
 function ensureRuntimeNavigationToggle(){
   const logout=$('logout'),collection=$('collection-select'),target=logout?.closest('nav,aside,[role="navigation"]')||collection?.closest('nav,aside,[role="navigation"]');
   if(!target)return; if(!target.id)target.id='kq-runtime-navigation';
-  const selector='button[aria-controls~="'+target.id+'"]';if(document.querySelector(selector))return;
+  if($('kq-runtime-navigation-toggle'))return;
   const button=node('button','kq-button kq-button--secondary','Menu');button.id='kq-runtime-navigation-toggle';button.type='button';button.setAttribute('aria-controls',target.id);button.setAttribute('aria-expanded','false');button.setAttribute('aria-label','Open workspace menu');button.title='Open menu';
   Object.assign(button.style,{position:'fixed',top:'12px',left:'12px',zIndex:'2147483646',minWidth:'72px',minHeight:'44px',display:innerWidth<=600?'inline-flex':'none',alignItems:'center',justifyContent:'center'});
   button.onclick=()=>{const open=button.getAttribute('aria-expanded')==='true';button.setAttribute('aria-expanded',String(!open));button.textContent=!open?'Close':'Menu';button.setAttribute('aria-label',!open?'Close workspace menu':'Open workspace menu');syncNavigation();};
