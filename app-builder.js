@@ -20,7 +20,7 @@ function normalize(result){const schema=runtime.validateSchema(result.schema),ra
 function normalizePolish(candidate,polished){return normalize({...candidate,files:{...candidate.files,...(polished.files||polished)}});}
 function versionFolder(id,version){return path.join(runtime.ROOT,id,'versions',String(version));}
 function writeVersion(id,version,p){const dir=versionFolder(id,version);fs.mkdirSync(dir,{recursive:true});for(const [n,v] of Object.entries(p.files))fs.writeFileSync(path.join(dir,n),v);fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify({schema:p.schema,qa:p.qa,design_plan:p.design_plan},null,2));}
-function sample(collection){return Object.fromEntries(collection.fields.map(f=>[f.name,f.default??(f.type==='boolean'?true:f.type==='number'?125:f.type==='date'?'2030-11-01':f.type==='email'?'qa@example.com':f.type==='select'?f.options[0]:'QA '+f.label)]));}
+function sample(collection){return Object.fromEntries(collection.fields.map(f=>[f.name,f.default??(f.type==='boolean'?true:f.type==='number'?125:f.type==='date'?'2030-11-01':f.type==='email'?'qa@example.com':f.type==='select'?f.options[0]:f.type==='reference'?'00000000-0000-4000-8000-000000000001':'QA '+f.label)]));}
 async function revealNavigationControl(page,id){
  const control=page.locator('#'+id);const box=await control.boundingBox(),width=page.viewportSize().width;
  if(await control.isVisible()&&box&&box.x+box.width>0&&box.x<width)return;
