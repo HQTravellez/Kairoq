@@ -6450,6 +6450,7 @@ function serveStatic(req, res) {
   try { decoded = decodeURIComponent(urlPath); }
   catch { res.writeHead(400); return res.end("Bad request"); }
 
+  if(decoded.startsWith("/generated/developer-sites/"))res.setHeader("Content-Security-Policy",require("./website-release").CSP);
   const relative = path.normalize(decoded).replace(/^([/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, relative);
 
@@ -6529,6 +6530,7 @@ async function callDeveloperCodingModel(opts={}){
   const models=[...freeCandidates,...(allowPaid?paidCandidates:[])].filter((m,i,a)=>m&&a.indexOf(m)===i);
   const errors=[];
   for(const model of models){
+    opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
     if(!free&&!allowPaid)continue;
     try{
@@ -6540,7 +6542,7 @@ async function callDeveloperCodingModel(opts={}){
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
         if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
       }
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"}})});
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(110000)]):AbortSignal.timeout(110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"}})});
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
       const message=data.choices?.[0]?.message||{};
@@ -6599,7 +6601,7 @@ const server = http.createServer(async (req, res) => {
   }
   if(url==="/api/developer/launch"&&req.method==="POST"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
-    try{const body=await getBody(req,30000);if(body.confirm!=="LAUNCH_APP")return json(res,400,{error:"Confirm launch"});return json(res,200,await appBuilder.publish(String(body.id||"")))}catch(e){return json(res,422,{error:e.message})}
+    try{const body=await getBody(req,30000);if(body.confirm!=="LAUNCH_APP")return json(res,400,{error:"Confirm launch"});const id=String(body.id||"");return json(res,200,appBuilder.listProjects().some(project=>project.id===id)?await appBuilder.publish(id):await require("./website-release").deploy(id))}catch(e){return json(res,422,{error:e.message})}
   }
 
   if(req.method==="GET"&&url==="/api/developer/travellez-benchmark-status"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{return json(res,200,require("./travellez-benchmark").status())}catch(e){return json(res,500,{error:e.message})}}
