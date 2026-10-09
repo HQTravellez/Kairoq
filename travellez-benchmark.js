@@ -5,13 +5,12 @@ const root=path.join(__dirname,'workspace'),marker=path.join(root,'.travellez-be
 async function run(model){
  if(fs.existsSync(marker)){console.log('[travellez-benchmark] Previously completed; no new build');return;}
  fs.mkdirSync(proof,{recursive:true});
- const previous=status();
- const report={started_at:new Date().toISOString(),status:'running',stage:'starting',app:null,website:null};
+ const previous=status(),checkpoint=resumeApp(previous,builder.listProjects());
+ const report={started_at:new Date().toISOString(),status:'running',stage:'starting',app:checkpoint,website:null};
  const save=()=>fs.writeFileSync(reportFile,JSON.stringify(report,null,2));const stage=value=>{report.stage=value;report.updated_at=new Date().toISOString();save();console.log('[travellez-benchmark] STAGE '+value);};
  save();
  try{
   const job={id:crypto.randomUUID(),operation:'build',projectName:'Travellez Travel Operations Benchmark',style:'tech',effects:{motion:'cinematic',threeD:'interactive',models:true},brief:'Build an exceptional premium full-stack corporate travel operations application named Travellez. Use multiple distinct responsive screens: dashboard, trips, approvals, spend, travelers, and controls, plus the required workspace screen for CRUD. Include real collections for trips (traveler, destination, departure_date, status requested/approved/booked), approvals (trip reference, requester, status pending/approved/rejected), expenses (trip reference, description, amount, category, status draft/submitted/paid), and travelers (name, email, department, status active/inactive). Declare real server workflow actions so a trip can be approved only from requested and booked only from approved, and an expense can be submitted only from draft and paid only from submitted. Use record references between approvals/expenses and trips. Give users a visually distinctive premium sidebar, clear KPI dashboard, excellent search/filter, polished empty/saving/error/populated states, and responsive mobile/tablet/desktop layouts. Use cinematic but restrained motion, product-card tilt, and one tasteful interactive WebGL travel scene such as routes/globe that never contains essential controls. Use the managed authenticated backend and real persistence. Do not add unsupported payments, GDS integrations, fabricated results, or fake actions.',status:'queued',created_at:new Date().toISOString()};
-  const checkpoint=resumeApp(previous,builder.listProjects());
   if(!checkpoint){
   console.log('[travellez-benchmark] Fresh app generation started '+job.id);stage('app_generation');
   await builder.run(job,model);
@@ -30,8 +29,12 @@ async function run(model){
 }
 function status(){try{return JSON.parse(fs.readFileSync(reportFile,'utf8'));}catch{return{status:fs.existsSync(marker)?'passed':'idle',stage:fs.existsSync(marker)?'complete':'idle'};}}
 function resumeApp(report,projects){
- const app=report?.app;if(!app?.qa?.passed||!app.qa.visual_review?.passed||!app.deployed_qa?.passed)return null;
- const project=projects.find(p=>p.id===app.id&&p.status==='live'&&p.deployed_version);
- return project?app:null;
+ const verified=app=>app?.qa?.passed&&app.qa.visual_review?.passed&&app.deployed_qa?.passed;
+ const live=project=>project.status==='live'&&project.deployed_version;
+ if(verified(report?.app)&&projects.some(project=>project.id===report.app.id&&live(project)))return report.app;
+ // Recover a verified durable release if an older runner lost its report checkpoint.
+ const project=projects.find(project=>project.id.startsWith('travellez-travel-operations-benchmark-')&&live(project)&&verified(project));
+ return project?{id:project.id,live_url:project.live_url,qa:project.qa,deployed_qa:project.deployed_qa}:null;
 }
+
 module.exports={run,status,resumeApp};
