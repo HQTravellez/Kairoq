@@ -6533,7 +6533,7 @@ async function callDeveloperCodingModel(opts={}){
     if(!free&&!allowPaid)continue;
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
-      const maxOutput=10000;
+      const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(20000,opts.maxOutputTokens)):10000;
       const rates=free?[0,0]:model.includes("deepseek")?[0.5,1]:[5,25];
       if(!free){
         const totals=await enforceBudget();

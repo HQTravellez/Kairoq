@@ -15,8 +15,8 @@ function getProject(id){
   for(const name of names)files[name]=fs.readFileSync(path.join(dir,name),"utf8");
   return {...meta,files};
 }
-function normalizeFiles(raw){
-  const obj=raw?.files||raw||{},files={"index.html":String(obj["index.html"]||obj.html||""),"styles.css":String(obj["styles.css"]||obj.css||""),"app.js":String(obj["app.js"]||obj.js||"")};
+function normalizeFiles(raw,base){
+  const obj={...base,...(raw?.files||raw||{})},files={"index.html":String(obj["index.html"]||obj.html||""),"styles.css":String(obj["styles.css"]||obj.css||""),"app.js":String(obj["app.js"]||obj.js||"")};
   for(const [name,value] of Object.entries(obj)){
     if(name==="index.html"||name==="styles.css"||name==="app.js"||name==="html"||name==="css"||name==="js")continue;
     if(/^[a-z0-9][a-z0-9-]{0,48}\.html$/.test(name))files[name]=String(value||"");
@@ -30,6 +30,28 @@ function normalizeFiles(raw){
   }
   try{new vm.Script(files["app.js"],{filename:"app.js",timeout:1000})}catch(e){throw Error("Generated JavaScript syntax error: "+e.message)}
   return files;
+}
+function requiredPages(brief){
+ const pages=[...new Set(['index.html',...String(brief).matchAll(/\b([a-z0-9][a-z0-9-]{0,48}\.html)\b/g)].map(x=>typeof x==='string'?x:x[1]))];
+ if(pages.length>10)throw Error('Website request exceeds the limit of 10 HTML pages.');
+ return pages;
+}
+async function generateFiles(callModel,options,{required=['index.html'],base}={}){
+ let failure,previous;
+ for(let attempt=0;attempt<3;attempt++){
+  try{
+   const messages=attempt?[...options.messages,{role:'user',content:'The previous output failed website validation: '+failure.message+'\nReturn ONLY JSON {files:{...}} with complete string contents, including index.html, shared styles.css, app.js and all required pages: '+required.join(', ')+'. Maximum 10 HTML pages. Use exact filenames as keys in files. Do not truncate code or return a pages array. Preserve every existing route.\nPrevious output: '+JSON.stringify(previous||{}).slice(0,120000)}]:options.messages;
+   previous=await callModel({...options,messages});
+   const files=normalizeFiles(base?{files:{...base,...(previous?.files||previous)}}:previous);
+   const missing=required.filter(name=>!files[name]);
+   if(missing.length)throw Error('Missing required HTML pages: '+missing.join(', '));
+   return {generated:previous,files};
+  }catch(e){failure=e;}
+ }
+ throw Error('Website generation failed after 3 attempts: '+failure.message);
+}
+async function withTimeout(promise,ms,label){
+ let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' timed out')),ms);})]);}finally{clearTimeout(timer);}
 }
 function preserveRoutes(base,next){
  const merged={...base,...next},required=Object.keys(base||{}).filter(n=>n.endsWith(".html"));
@@ -78,7 +100,7 @@ async function finishDesign(files,qa,designPlan,brief,callModel,effectConfig={mo
  for(let polish=0;polish<3;polish++){
   evidence=designPipeline.stripShots(qa);let visual;try{visual=await withTimeout(designPipeline.review(callModel,designPlan,evidence,qa.design_checks),20000,'Website visual review');}catch(e){console.warn('[developer-agent] VISUAL FALLBACK '+String(e.message||e));visual=designPipeline.deterministicReview(evidence,qa.design_checks,String(e.message||e));}qa.visual_review=visual;if(visual.passed)break;
   if(polish===2){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
-  files=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing complete shared styles.css/app.js AND every existing HTML page. Polish this working website while preserving all routes, interactions, content and valid navigation. Never remove an existing page. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(effects.source(designSystem.source(files)))}]}))),designPlan.style),effectConfig);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
+  files=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing complete shared styles.css/app.js AND every existing HTML page. Polish this working website while preserving all routes, interactions, content and valid navigation. Never remove an existing page. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(effects.source(designSystem.source(files)))}]}),files)),designPlan.style),effectConfig);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
  }
  return{files,qa,evidence};
 }
@@ -87,17 +109,17 @@ async function build({brief,kind="website",style="editorial",projectName,motion=
   if(brief.length<12)throw Error("Describe the website or app in at least 12 characters.");
   kind=kind==="webapp"?"webapp":"website";
   const id=slug(projectName||brief.slice(0,35))+"-"+crypto.randomBytes(3).toString("hex");
-  const effectConfig=effects.normalize({motion,threeD});const designPlan=await designPipeline.plan(callModel,{brief,kind,style});
-  const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain shared styles.css and app.js plus index.html and, when the product needs multiple routes, additional safe lowercase-kebab HTML pages such as platform.html, about.html, pricing.html or industries-travel.html. Generate 2–8 coherent pages for a multi-page website request; every page shares the same design system, header/footer and working navigation. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. Every HTML page links the shared styles.css and app.js using relative paths. Cross-page links must target the generated .html files. Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Keep total output under 7000 tokens, and output complete files without truncation.";
+  const required=requiredPages(brief);const effectConfig=effects.normalize({motion,threeD});const designPlan=await designPipeline.plan(callModel,{brief,kind,style});
+  const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain shared styles.css and app.js plus index.html and, when the product needs multiple routes, additional safe lowercase-kebab HTML pages such as platform.html, about.html, pricing.html or industries-travel.html. Generate 2–8 coherent pages for a multi-page website request; every page shares the same design system, header/footer and working navigation. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. Every HTML page links the shared styles.css and app.js using relative paths. Cross-page links must target the generated .html files. Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Use concise shared CSS and JS; output complete files without truncation. Maximum 10 HTML pages. Required filenames: "+required.join(", ")+".";
   const prompt=system+designPipeline.instructions(designPlan)+effects.instructions(effectConfig)+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
-  let generated,usedStarter=false;
-  try{generated=await callModel({messages:[{role:"user",content:prompt}],temperature:0.45})}
-  catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(process.env.OPENROUTER_API_KEY || kind==="webapp")throw Error("Custom AI generation failed: "+e.message+". This is not an AI-generated project; check model access or credits.");generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
-  let files=effects.inject(designSystem.apply(normalizeFiles(generated),designPlan.style),effectConfig),qa=await audit(files,{capture:true}),revisions=0;
+  let generated,sourceFiles,usedStarter=false;
+  try{const result=await generateFiles(callModel,{messages:[{role:"user",content:prompt}],temperature:0.45,maxOutputTokens:20000},{required});generated=result.generated;sourceFiles=result.files;}
+  catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(process.env.OPENROUTER_API_KEY || require("./experiential").configured() || kind==="webapp" || required.length>1 || /multi[- ]page/i.test(brief))throw Error("Custom AI generation failed: "+e.message+". This is not an AI-generated project; check model access or credits.");generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
+  let files=effects.inject(designSystem.apply(sourceFiles||normalizeFiles(generated),designPlan.style),effectConfig),qa=await audit(files,{capture:true}),revisions=0;
   if(!usedStarter && qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
       const fix="Return only JSON with files containing complete styles.css, app.js, index.html and every current HTML page. Do not remove routes. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(effects.source(designSystem.source(files))).slice(0,34000)+". Preserve and enhance premium design.";
-      const repaired=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(await callModel({messages:[{role:"user",content:fix}],temperature:0.2}))),designPlan.style),effectConfig);
+      const repaired=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(await callModel({messages:[{role:"user",content:fix}],temperature:0.2}),files)),designPlan.style),effectConfig);
       const repairedQa=await audit(repaired,{capture:true});
       if(repairedQa.findings.length<=qa.findings.length){files=repaired;qa=repairedQa;revisions=1}
     }catch(e){qa.findings.push("Repair attempt unsuccessful: "+e.message)}
@@ -117,18 +139,18 @@ async function revise(id,instruction,callModel){
   const designPlan=await designPipeline.plan(callModel,{brief:p.brief,kind:p.kind,style:p.style,previous:p.design_plan,existing:p.files});
   const prompt=designPipeline.instructions(designPlan)+effects.instructions(effectConfig)+designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing a files object with complete shared styles.css/app.js and EVERY existing HTML page. Never remove or rename an existing route. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(effects.source(designSystem.source(p.files))).slice(0,37000);
   const modelResult=await callModel({messages:[{role:"user",content:prompt}],temperature:0.25});
-  let files=effects.inject(designSystem.apply(preserveRoutes(p.files,normalizeFiles(modelResult)),designPlan.style),effectConfig),qa=await audit(files,{capture:true});
+  let files=effects.inject(designSystem.apply(preserveRoutes(p.files,normalizeFiles(modelResult,p.files)),designPlan.style),effectConfig),qa=await audit(files,{capture:true});
   if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
       const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files containing shared styles.css/app.js and every existing HTML route:\n"+JSON.stringify(effects.source(designSystem.source(files))).slice(0,30000)}],temperature:0.15});
-      const fixed=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(patch)),designPlan.style),effectConfig),test=await audit(fixed,{capture:true});
+      const fixed=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(patch,files)),designPlan.style),effectConfig),test=await audit(fixed,{capture:true});
       if(test.findings.length<=qa.findings.length){files=fixed;qa=test}
     }catch{}
   }
   const finished=await finishDesign(files,qa,designPlan,p.brief,callModel,effectConfig);files=finished.files;qa=finished.qa;if(!qa.passed)throw Error("Revision did not pass functional and visual review; previous project preserved");designPipeline.saveEvidence(dirFor(id),finished.evidence);
   for(const [name,code] of Object.entries(files))fs.writeFileSync(path.join(dirFor(id),name),code);
   const meta={...p};delete meta.files;
-  meta.design_plan=designPlan;meta.revisions=Number(meta.revisions||0)+1;meta.qa=qa;meta.updated_at=new Date().toISOString();
+  meta.file_names=Object.keys(files);meta.pages=Object.keys(files).filter(name=>name.endsWith(".html"));meta.design_plan=designPlan;meta.revisions=Number(meta.revisions||0)+1;meta.qa=qa;meta.updated_at=new Date().toISOString();
   fs.writeFileSync(path.join(dirFor(id),"project.json"),JSON.stringify(meta,null,2));
   return {...meta,files,preview:assemble(files)}
 }
@@ -158,4 +180,4 @@ async function publish(id,{branchPrefix="kairoq-build"}={}){
   return {url:pr.html_url,number:pr.number,branch,repository:repo,status:"awaiting_review"};
 }
 function listProjects(){if(!fs.existsSync(ROOT))return[];return fs.readdirSync(ROOT).flatMap(id=>{try{const {files,...p}=getProject(id);return[p];}catch{return[];}});}
-module.exports={build,revise,getProject,listProjects,publish,assemble,audit};
+module.exports={build,revise,getProject,listProjects,publish,assemble,audit,normalizeFiles,requiredPages,generateFiles};
