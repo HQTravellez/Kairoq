@@ -29,3 +29,11 @@ test('Travellez four-panel business dashboard survives real browser CRUD and eve
  }
  assert.ok(qa._screenshots.length>=24,'real screenshots must be captured');
 });
+
+test('empty linked-record fields guide users to the collection that supplies them',{skip:!fs.existsSync(process.env.CHROMIUM_PATH||'/usr/bin/chromium')},async()=>{
+ const id='reference-help-'+crypto.randomBytes(5).toString('hex'),p=candidate(),folder=path.join(runtime.ROOT,id,'versions','1');
+ p.schema.collections[0].fields.push({name:'task',label:'Linked task',type:'reference',collection:'tasks',required:true});
+ fs.mkdirSync(folder,{recursive:true});for(const[n,c]of Object.entries(p.files))fs.writeFileSync(path.join(folder,n),c);fs.writeFileSync(path.join(folder,'manifest.json'),JSON.stringify({schema:p.schema,qa:{passed:true}}));runtime.saveMetadata({id,version:1,deployed_version:1,status:'live',data_backend:'sqlite'});
+ const server=require('http').createServer(async(req,res)=>{if(!await runtime.handle(req,res)){res.writeHead(404);res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await require('playwright-core').chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{const page=await browser.newPage();await page.goto('http://127.0.0.1:'+server.address().port+'/apps/'+id+'/');await page.locator('#auth-email').fill('help@example.com');await page.locator('#auth-password').fill('reference-password-123');await page.locator('#register').click();const action=page.getByRole('button',{name:'Open Tasks',exact:true});await action.waitFor({state:'visible'});assert.match(await page.locator('#kq-field-task-reference-hint').textContent(),/Create a task first/);assert.equal(await page.locator('#kq-field-task').getAttribute('aria-describedby'),'kq-field-task-reference-hint');await action.click();await page.locator('#record-fields [name=title]').waitFor({state:'visible'});assert.equal(await page.locator('#collection-select').inputValue(),'tasks');}finally{await browser.close();await new Promise(r=>server.close(r));fs.rmSync(path.join(runtime.ROOT,id),{recursive:true,force:true});}
+});
