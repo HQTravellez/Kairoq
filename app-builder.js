@@ -61,6 +61,9 @@ async function ensureWorkspace(page){
 }
 async function selectCollection(page,name){
  await ensureWorkspace(page);await revealNavigationControl(page,'collection-select');await page.locator('#collection-select').selectOption(name);
+ // choose() hydrates linked records before replacing form fields. Wait until its
+ // API requests finish so QA does not type into fields that are about to reset.
+ await page.waitForLoadState('networkidle');
  if(page.viewportSize().width>600)return;
  if(await page.locator('#kq-navigation-close').isVisible()){await page.locator('#kq-navigation-close').click();return;}
  for(const toggle of await page.locator('button[aria-controls][aria-expanded="true"]').all()){
