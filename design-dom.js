@@ -27,7 +27,7 @@ async function inspect(page,screen){
     // Exempt inline prose links; text links can use surrounding line-height and spacing.
     if(el.tagName==='A'&&s.display==='inline')continue;
     if(r.width<36||r.height<36)add('Small mobile tap target: '+label,'Provide at least a 40px by 40px clickable target, with comfortable spacing.');
-    if(r.left < -3||r.right>innerWidth+3)add('Mobile control outside viewport: '+label,'Constrain control width to the viewport and allow the parent layout to wrap.');
+    if(r.left < -3||r.right>innerWidth+3){const nav=el.closest('nav,aside,[role="navigation"]');if(nav){const ns=getComputedStyle(nav),nr=nav.getBoundingClientRect(),collapsed=nav.getAttribute('aria-hidden')==='true'||ns.display==='none'||ns.visibility==='hidden'||(ns.transform!=='none'&&(nr.right<=3||nr.left>=innerWidth-3));if(collapsed)continue;}add('Mobile control outside viewport: '+label,'Constrain control width to the viewport and allow the parent layout to wrap.');}
    }
   }
   // Catch overlays that physically cover high-value controls in the captured viewport.
