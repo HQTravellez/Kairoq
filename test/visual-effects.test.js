@@ -16,7 +16,7 @@ test("trusted runtime is injected once, strips cleanly, and remains valid JavaSc
  assert.match(twice["app.js"],/prefers-reduced-motion/);
  assert.match(twice["app.js"],/MAX_SCENES/);
  assert.match(twice["app.js"],/hardwareConcurrency/);
- assert.match(twice["app.js"],/data-kq-model/);
+ assert.match(twice["app.js"],/dataset\.kqModel/);
  assert.doesNotThrow(()=>new vm.Script(twice["app.js"]));
  assert.equal(effects.source(twice)["app.js"],"window.presentation=true;");
 });
