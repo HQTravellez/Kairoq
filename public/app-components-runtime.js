@@ -4,7 +4,7 @@
  function node(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;}
  function message(id,text,error=false){let n=$(id);if(!n){n=node('p','kq-status');n.id=id;($(id==='auth-message'?'auth-form':'record-form')||$('app-view')||document.body).append(n);}n.textContent=text||'';n.hidden=!text;n.setAttribute('role',error?'alert':'status');n.dataset.state=error?'error':text==='Saving…'?'saving':'status';}
  function visible(n,yes){if(!n)return;n.hidden=!yes;n.style.display=yes?'':'none';if(yes){for(let target=n;target&&target!==document.documentElement;target=target.parentElement){target.hidden=false;target.classList.remove('hidden','is-hidden');if(target.getAttribute('aria-hidden')==='true')target.setAttribute('aria-hidden','false');if(getComputedStyle(target).display==='none')target.style.display='block';if(getComputedStyle(target).visibility==='hidden')target.style.visibility='visible';}}}
- function signed(user){$('kq-navigation-close')?.remove();visible($('auth-view')||$('auth-form'),!user);visible($('app-view'),!!user);visible($('logout'),!!user);if($('user-email'))$('user-email').textContent=user?.email||'';queueMicrotask(syncNavigation);}
+ function signed(user){$('kq-navigation-close')?.remove();visible($('auth-view')||$('auth-form'),!user);visible($('app-view'),!!user);visible($('logout'),!!user);if($('user-email'))$('user-email').textContent=user?.email||'';queueMicrotask(()=>{syncNavigation();enforceVisualQuality();});}
  async function api(route,body,method){const r=await fetch('api/'+route,{method:method||(body===undefined?'GET':'POST'),credentials:'same-origin',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Object.assign(Error(data.error||'Request failed'),{status:r.status});return data;}
  function emit(){document.dispatchEvent(new CustomEvent('kairoq:data',{detail:{schema,dashboard,collection:current,records:records.slice()}}));}
  function form(record){message('app-message','');visible($('record-form'),true);editing=record?.id||null;let host=$('record-fields');if(!host){host=node('div','kq-fields');host.id='record-fields';$('record-form').prepend(host);}host.replaceChildren();
@@ -91,7 +91,7 @@
 #app-view :is(.kq-heading,h1,h2,h3,h4){text-wrap:balance}
 #app-view .kq-button:not(.kq-button--secondary),#app-view #save-record,#auth-view :is(#login,#register){background:#155f50!important;color:#fff!important;border-color:#155f50!important}
 #app-view .kq-button--secondary{background:#fff!important;color:#173129!important;border-color:#9eb1aa!important}
-#app-view #save-record{min-width:132px!important;width:auto!important;white-space:nowrap!important;overflow:visible!important;padding-inline:18px!important}
+#app-view #save-record{min-width:132px!important;width:auto!important;max-width:none!important;white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;padding-inline:18px!important}
 #app-view #record-form,#app-view #record-list{min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
 #app-view .kq-workspace-split{min-width:0!important;max-width:100%!important}
 @media(max-width:1100px){
@@ -137,7 +137,7 @@ function luminance(c){const f=v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.0
 function contrast(a,b){const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);}
 function effectiveBackground(el){for(let n=el;n&&n!==document.documentElement;n=n.parentElement){const c=rgb(getComputedStyle(n).backgroundColor);if(c&&c[3]>.92)return c;}return[255,255,255,1];}
 function enforceVisualQuality(){
- const roots=[$('auth-view'),...document.querySelectorAll('#app-view [data-kq-screen]:not([hidden])')].filter(Boolean);
+ const roots=[$('auth-view')||$('auth-form'),$('app-view'),primaryNavigation(),...document.querySelectorAll('#app-view [data-kq-screen]:not([hidden])')].filter((v,i,a)=>v&&a.indexOf(v)===i);
  for(const root of roots)for(const el of root.querySelectorAll('h1,h2,h3,h4,p,small,label,span,a,button,dt,dd,th,td,caption')){
   if(!el.textContent?.trim()||getComputedStyle(el).display==='none'||getComputedStyle(el).visibility==='hidden')continue;
   const fg=rgb(getComputedStyle(el).color),bg=effectiveBackground(el);if(!fg||fg[3]<.7)continue;
