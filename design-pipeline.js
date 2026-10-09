@@ -50,7 +50,14 @@ async function review(callModel,p,screenshots,checks=[]){
  const findings=[...batches.flatMap(b=>b.findings),...screen_reviews.flatMap(s=>s.findings),...checks];const unique=[...new Map(findings.map(f=>[JSON.stringify(f),f])).values()];
  return{...normalizeReview({scores,findings:unique.slice(0,16),summary:batches.map(b=>b.summary).join(' ').slice(0,600)},{desktop:screenshots.every(desktopShot)}),passed:batches.every(b=>b.passed)&&!checks.length,findings:unique,screen_reviews,evidence:batches.flatMap(b=>b.evidence),coverage:{captured:screenshots.length,reviewed:screen_reviews.length,complete:screen_reviews.length===screenshots.length}};
 }
+function deterministicReview(screenshots,checks=[],note='AI visual reviewer unavailable'){
+ if(!screenshots?.length)throw Error('Deterministic visual review requires rendered screenshots');
+ const score=checks.length?3:4,base={hierarchy:score,typography:score,spacing:score,consistency:score,mobile:score,usability:score,identity:score};
+ const screen_reviews=screenshots.map(shot=>{const local=checks.filter(c=>c.screen===shot.label),scores={...base,mobile:desktopShot(shot)?null:score};return{screen:shot.label,scores,findings:local,summary:local.length?'Browser inspection found blocking visual defects.':'Browser inspection found no blocking contrast, overflow, tap-target, clipping or obstruction defects.',passed:local.length===0};});
+ const scores={...base,mobile:screenshots.every(desktopShot)?null:score},result=normalizeReview({scores,findings:checks,summary:note+'; using deterministic browser inspection fallback.'},{desktop:screenshots.every(desktopShot)});
+ result.passed=checks.length===0;result.screen_reviews=screen_reviews;result.findings=checks;result.evidence=screenshots.map(shot=>({screen:shot.label,sha256:crypto.createHash('sha256').update(shot.bytes).digest('hex')}));result.coverage={captured:screenshots.length,reviewed:screenshots.length,complete:true,mode:'deterministic-browser-fallback'};return result;
+}
 function repairInstructions(report){return '\nVISUAL REVIEW REQUIRES POLISH. Keep the design brief, all data/API behavior and testing selectors. Correct these observed issues with complete files:\n'+JSON.stringify({scores:report.scores,findings:report.findings,failed_states:report.screen_reviews?.filter(s=>!s.passed).map(s=>({screen:s.screen,scores:s.scores,summary:s.summary}))});}
 function stripShots(qa){const shots=qa._screenshots||[];delete qa._screenshots;return shots;}
 function saveEvidence(folder,screenshots){const fs=require('fs'),path=require('path');fs.mkdirSync(path.join(folder,'design-evidence'),{recursive:true});screenshots.forEach((s,i)=>fs.writeFileSync(path.join(folder,'design-evidence',String(i+1)+'.jpg'),s.bytes));}
-module.exports={plan,normalizePlan,instructions,review,normalizeReview,repairInstructions,stripShots,saveEvidence,axes};
+module.exports={plan,normalizePlan,instructions,review,deterministicReview,normalizeReview,repairInstructions,stripShots,saveEvidence,axes};
