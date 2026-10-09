@@ -43,7 +43,7 @@ async function revealNavigationControl(page,id){
  for(const toggle of await page.locator('button[aria-controls][aria-expanded="false"]').all())if(await toggle.isVisible()){
   const targets=await toggle.getAttribute('aria-controls');const contains=await page.evaluate(({targets,id})=>targets.split(/\s+/).some(target=>document.getElementById(target)?.contains(document.getElementById(id))),{targets,id});toggles.push({toggle,contains});
  }
- toggles.sort((a,b)=>Number(b.contains)-Number(a.contains));
+ toggles.sort((a,b)=>Number(b.toggle.id==='kq-runtime-navigation-toggle')-Number(a.toggle.id==='kq-runtime-navigation-toggle')||Number(b.contains)-Number(a.contains));
  for(const {toggle}of toggles){await toggle.click();const rect=await control.boundingBox();if(await control.isVisible()&&rect&&rect.x+rect.width>0&&rect.x<width)return;}
 }
 async function ensureWorkspace(page){
