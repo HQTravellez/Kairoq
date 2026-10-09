@@ -6602,6 +6602,7 @@ const server = http.createServer(async (req, res) => {
     try{const body=await getBody(req,30000);if(body.confirm!=="LAUNCH_APP")return json(res,400,{error:"Confirm launch"});return json(res,200,await appBuilder.publish(String(body.id||"")))}catch(e){return json(res,422,{error:e.message})}
   }
 
+  if(req.method==="GET"&&url==="/api/developer/travellez-benchmark-status"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{return json(res,200,require("./travellez-benchmark").status())}catch(e){return json(res,500,{error:e.message})}}
   if(req.method==="GET"&&url==="/api/developer/status"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     let local=false;try{local=(await getLocalLlmModels()).length>0}catch{}
