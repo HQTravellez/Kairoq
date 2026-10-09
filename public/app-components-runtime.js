@@ -116,13 +116,21 @@ function stabilizeDesktopNavigation(){
  if(innerWidth<=600){for(const screen of screens){for(const prop of ['margin-left','margin-right','width','padding-left','padding-right'])screen.style.removeProperty(prop);}return;}
  const nr=nav.getBoundingClientRect(),leftNav=nr.left<=32&&nr.right<innerWidth*.62,rightNav=nr.right>=innerWidth-32&&nr.left>innerWidth*.38;
  for(const screen of screens){
-  const rect=screen.getBoundingClientRect(),cs=getComputedStyle(screen),currentLeft=parseFloat(cs.paddingLeft)||0,currentRight=parseFloat(cs.paddingRight)||0;
-  let safeLeft=Math.max(24,currentLeft),safeRight=Math.max(24,currentRight);
-  if(leftNav)safeLeft=Math.max(safeLeft,Math.ceil(nr.right+24-rect.left+currentLeft));
-  if(rightNav)safeRight=Math.max(safeRight,Math.ceil(rect.right-(nr.left-24)+currentRight));
-  screen.style.setProperty('padding-left',Math.min(safeLeft,400)+'px','important');
-  screen.style.setProperty('padding-right',Math.min(safeRight,400)+'px','important');
-  screen.style.setProperty('box-sizing','border-box','important');
+  const sr=screen.getBoundingClientRect(),controls=[...screen.querySelectorAll('button,input,select,textarea,a[href]')].filter(el=>{const r=el.getBoundingClientRect(),cs=getComputedStyle(el);return r.width&&r.height&&cs.display!=='none'&&cs.visibility!=='hidden';});
+  const overlaps=controls.some(el=>{const r=el.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return x>=nr.left&&x<=nr.right&&y>=nr.top&&y<=nr.bottom;});
+  const screenOverlap=leftNav?nr.right>sr.left+8:rightNav?nr.left<sr.right-8:false;
+  if((leftNav||rightNav)&&(overlaps||screenOverlap)){
+   const offset=Math.min(Math.ceil(nr.width+24),380);
+   screen.style.setProperty('box-sizing','border-box','important');
+   if(leftNav){screen.style.setProperty('margin-left',offset+'px','important');screen.style.setProperty('margin-right','0','important');}
+   else{screen.style.setProperty('margin-right',offset+'px','important');screen.style.setProperty('margin-left','0','important');}
+   screen.style.setProperty('width','calc(100% - '+offset+'px)','important');
+   screen.style.setProperty('padding-left','24px','important');screen.style.setProperty('padding-right','24px','important');
+  }else{
+   for(const prop of ['margin-left','margin-right','width'])screen.style.removeProperty(prop);
+   screen.style.setProperty('padding-left',Math.max(24,parseFloat(getComputedStyle(screen).paddingLeft)||0)+'px','important');
+   screen.style.setProperty('padding-right',Math.max(24,parseFloat(getComputedStyle(screen).paddingRight)||0)+'px','important');
+  }
  }
 }
 function commonAncestor(a,b){if(!a||!b)return null;for(let n=a;n;n=n.parentElement)if(n.contains(b))return n;return null;}
