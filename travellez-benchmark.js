@@ -22,10 +22,10 @@ async function run(model){
   stage('app_visual_review');
   const runtime=require('./app-runtime'),pipeline=require('./design-pipeline'),candidate=runtime.getProject(released.id);
   const shots=released.deployed_qa.evidence.map((entry,index)=>({label:entry.screen,bytes:fs.readFileSync(path.join(runtime.ROOT,released.id,'release-evidence',String(released.deployed_version),'design-evidence',String(index+1)+'.jpg'))}));
-  let visual=await pipeline.review(model,candidate.design_plan,shots,[]);
+  const cached=previous.app?.qa?.visual_review;let visual=cached?.coverage?.complete&&cached.coverage.mode==='ai-screenshot-review'&&previous.app.deployed_qa?.version===released.deployed_version?cached:await pipeline.review(model,candidate.design_plan,shots,[]);
   report.app.qa={...report.app.qa,visual_review:visual};save();
   if(!visual.passed){
-   stage('app_visual_repair');const repair={...job,id:crypto.randomUUID(),operation:'repair',projectId:released.id,reported_issue:true,brief:job.brief+pipeline.repairInstructions(visual)};
+   stage('app_visual_repair');const repair={...job,id:crypto.randomUUID(),operation:'repair',projectId:released.id,reported_issue:true,brief:job.brief+pipeline.repairInstructions(visual),resume_job:resumeRepair(released.id)};report.app.repair_job_id=repair.id;save();
    await builder.run(repair,model);if(repair.status!=='complete'||!repair.result?.qa?.passed)throw Error('App visual repair failed: '+repair.error);
    const fixed=await builder.publish(released.id);report.app={id:fixed.id,live_url:fixed.live_url,qa:fixed.qa,deployed_qa:fixed.deployed_qa};visual=fixed.qa.visual_review;
   }
@@ -55,4 +55,8 @@ function resumeWebsite(report,projects){
  const found=projects.find(project=>project.id===report?.website?.id)||projects.find(project=>project.id.startsWith('travellez-corporate-travel-website-benchmark-'));
  return found||null;
 }
-module.exports={run,status,resumeApp,resumeWebsite};
+function resumeRepair(projectId,jobsRoot=path.join(root,'build-jobs')){
+ if(!fs.existsSync(jobsRoot))return null;
+ return fs.readdirSync(jobsRoot).filter(name=>/^[a-f0-9-]{36}\.json$/.test(name)).flatMap(name=>{try{const job=JSON.parse(fs.readFileSync(path.join(jobsRoot,name),'utf8'));return job.projectId===projectId&&job.operation==='repair'&&job.status!=='complete'&&fs.existsSync(path.join(jobsRoot,job.id+'.candidate.json'))?[job]:[];}catch{return[];}}).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]?.id||null;
+}
+module.exports={run,status,resumeApp,resumeWebsite,resumeRepair};
