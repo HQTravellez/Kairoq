@@ -76,7 +76,7 @@ async function audit(files,{capture=false}={}){
 async function finishDesign(files,qa,designPlan,brief,callModel,effectConfig={motion:"subtle",threeD:"off"}){
  let evidence=[];if(!qa.passed){designPipeline.stripShots(qa);return{files,qa,evidence};}
  for(let polish=0;polish<3;polish++){
-  evidence=designPipeline.stripShots(qa);const visual=await designPipeline.review(callModel,designPlan,evidence,qa.design_checks);qa.visual_review=visual;if(visual.passed)break;
+  evidence=designPipeline.stripShots(qa);let visual;try{visual=await withTimeout(designPipeline.review(callModel,designPlan,evidence,qa.design_checks),90000,'Website visual review');}catch(e){console.warn('[developer-agent] VISUAL FALLBACK '+String(e.message||e));visual=designPipeline.deterministicReview(evidence,qa.design_checks,String(e.message||e));}qa.visual_review=visual;if(visual.passed)break;
   if(polish===2){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
   files=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing complete shared styles.css/app.js AND every existing HTML page. Polish this working website while preserving all routes, interactions, content and valid navigation. Never remove an existing page. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(effects.source(designSystem.source(files)))}]}))),designPlan.style),effectConfig);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
  }
