@@ -31,19 +31,20 @@ async function reviewBatch(callModel,p,screenshots,checks=[],inventory=[]){
  content[0].text+='\nFull captured-state inventory (other batches are reviewed separately; judge ONLY the supplied images): '+JSON.stringify(inventory);
  for(const shot of evidence){content.push({type:'text',text:shot.label});content.push({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot.bytes.toString('base64'),detail:'high'}});}
  content[0].text+='\nAlso include screen_reviews:[{screen,scores:{hierarchy,typography,spacing,consistency,mobile,usability,identity},findings:[{severity,screen,issue,fix}],summary}] inside visual_review. Return exactly one entry for EVERY supplied screenshot, using its exact label. Evaluate each state individually; strong screens cannot compensate for a weak screen. The overall scores must reflect the weakest screen. Evaluate shared identity and consistency in the context of this one product; loading, validation, error and cropped section screenshots do not each need a different identity or extra decorative artwork. For every score below 4, include a specific observed finding with an actionable fix so the polish step can address it. Keep the quality threshold strict. Each screenshot is one state from a larger desktop/mobile test suite. For DESKTOP screenshots, set the per-screen mobile score to null (not applicable); never penalize a desktop state because this batch contains no mobile screenshot. Judge mobile only from narrow viewport screenshots. For the batch overall mobile score use null if all screenshots are desktop, otherwise judge the mobile screenshots supplied. Populated screenshots use deliberately synthetic QA records (including QA Name, QA Destination and example.com emails), created and saved through the real tested backend in an isolated disposable account. They prove persisted-record states and are not fabricated customer claims. Do not penalize test data wording, duplicate seeded values or demand real customer data; judge the rendering and usable controls. Loading and error fixtures are intentional states: judge their clarity and recovery controls, not the deliberately simulated network failure.';
- let raw,entries;for(let attempt=0;attempt<2;attempt++){raw=await callVisualModel(callModel,{purpose:'design-review',maxOutputTokens:6000,messages:[{role:'user',content}]});entries=(raw.visual_review||raw).screen_reviews||raw.screen_reviews;if(Array.isArray(entries)&&entries.length===evidence.length&&evidence.every(s=>entries.filter(e=>e.screen===s.label).length===1))break;console.warn('[design-review] Incomplete screen coverage; retry '+(attempt+1));content[0].text+='\nFORMAT CORRECTION: the last response omitted or renamed screen verdicts. visual_review.screen_reviews MUST be an array with EXACTLY these labels: '+JSON.stringify(evidence.map(s=>s.label))+'. Include every entry, even if it passes. Do not abbreviate the labels.';}const report=raw.visual_review||raw;
- // Some reviewers correctly mark desktop mobile scores N/A but omit the aggregate
- // mobile score for a mixed desktop/mobile batch. Derive it only from actual narrow
- // screenshot verdicts; never fabricate a passing mobile score.
- const aggregateMobile=report.scores?.mobile;
- if(!evidence.every(desktopShot)&&!(typeof aggregateMobile==='number'&&Number.isFinite(aggregateMobile)&&aggregateMobile>=0&&aggregateMobile<=5)){
-  const mobileEvidence=evidence.filter(s=>!desktopShot(s));
-  const values=mobileEvidence.map(s=>entries?.find(e=>e.screen===s.label)?.scores?.mobile);
-  report.scores.mobile=values.length&&values.every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=5)?Math.min(...values):0;
+ function validatedBatch(raw){
+  const report=raw?.visual_review||raw,entries=report?.screen_reviews||raw?.screen_reviews;
+  if(!Array.isArray(entries)||entries.length!==evidence.length||!evidence.every(shot=>entries.filter(entry=>entry.screen===shot.label).length===1))throw Error('Visual reviewer omitted screen-level evidence or renamed labels');
+  const screen_reviews=evidence.map(shot=>({screen:shot.label,...normalizeReview(entries.find(entry=>entry.screen===shot.label),{desktop:desktopShot(shot)})}));
+  const mobile=screen_reviews.filter((entry,index)=>!desktopShot(evidence[index])).map(entry=>entry.scores.mobile);
+  if(mobile.length&&!(typeof report.scores?.mobile==='number'&&Number.isFinite(report.scores.mobile)&&report.scores.mobile>=0&&report.scores.mobile<=5)){
+   if(!report.scores)throw Error('Visual reviewer omitted aggregate scores');report.scores.mobile=Math.min(...mobile);
+  }
+  return{...normalizeReview(raw,{desktop:evidence.every(desktopShot)}),screen_reviews};
  }
- const result=normalizeReview(raw,{desktop:evidence.every(desktopShot)});
- if(!Array.isArray(entries)||entries.length!==evidence.length)throw Error('Visual reviewer omitted screen-level evidence');
- result.screen_reviews=evidence.map(s=>{const matches=entries.filter(e=>e.screen===s.label);if(matches.length!==1)throw Error('Visual reviewer omitted or duplicated screen: '+s.label);return{screen:s.label,...normalizeReview(matches[0],{desktop:desktopShot(s)})};});
+ let result;for(let attempt=0;attempt<3;attempt++){
+  try{result=validatedBatch(await callVisualModel(callModel,{purpose:'design-review',maxOutputTokens:6000,messages:[{role:'user',content}]}));break;}
+  catch(error){if(attempt===2)throw Error('Visual review batch invalid after 3 attempts: '+error.message);console.warn('[design-review] Invalid batch; retry '+(attempt+1)+': '+error.message);content[0].text+='\nFORMAT CORRECTION: '+error.message+'. Return valid aggregate scores and exactly one complete screen verdict for EACH of these exact labels: '+JSON.stringify(evidence.map(shot=>shot.label))+'. Each verdict needs all seven scores and a findings array. Desktop mobile scores may be null; MOBILE screenshot verdicts MUST contain a numeric mobile score from 0 to 5 based on the actual image, never null or a string. Correct the format without weakening the quality rubric.';}
+ }
  if(result.screen_reviews.some(s=>!s.passed))result.passed=false;
  if(checks.length){result.findings.push(...checks);result.passed=false;}result.evidence=evidence.map(s=>({screen:s.label,sha256:crypto.createHash('sha256').update(s.bytes).digest('hex')}));return result;
 }

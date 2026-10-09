@@ -80,3 +80,10 @@ test('visual request finishing inside its deadline remains usable and clears its
  let signal;const result=await pipeline.callVisualModel(async opts=>{signal=opts.signal;return{review:'complete'};},{purpose:'design-review'},{timeoutMs:15});
  assert.deepEqual(result,{review:'complete'});assert.equal(signal.aborted,false);
 });
+
+test('malformed mobile verdict retries only its batch and retains earlier screenshot coverage',async()=>{
+ const shots=[...Array.from({length:5},(_,i)=>({label:'Desktop '+i+' · 1440px',bytes:Buffer.from('desktop '+i)})),{label:'Mobile pricing · 390px',bytes:Buffer.from('mobile')}];let calls=0;
+ const report=await pipeline.review(async opts=>{calls++;const labels=opts.messages[0].content.filter(item=>item.type==='text').slice(1).map(item=>item.text);return{visual_review:{scores:{...scores,mobile:null},findings:[],screen_reviews:labels.map(screen=>({screen,scores:{...scores,mobile:screen.startsWith('Mobile')?(calls===2?null:4):null},findings:[]}))}};},{},shots);
+ assert.equal(calls,3);assert.equal(report.passed,true);assert.equal(report.coverage.reviewed,6);assert.equal(report.coverage.mode,'ai-screenshot-review');assert.equal(report.scores.mobile,4);
+});
+test('persistent malformed mobile scores exhaust bounded retries without becoming passing evidence',async()=>{let calls=0;await assert.rejects(pipeline.review(async()=>{calls++;return{visual_review:{scores,findings:[],screen_reviews:[{screen:'Mobile · 390px',scores:{...scores,mobile:null},findings:[]}]}};},{},[{label:'Mobile · 390px',bytes:Buffer.from('image')}]),/invalid after 3 attempts: Invalid visual score: mobile/);assert.equal(calls,3);});
