@@ -5,7 +5,7 @@ function fixture(){const id='website-release-'+crypto.randomBytes(5).toString('h
 test('website publication checks every route and preserves immutable live snapshots',async()=>{
  const f=fixture(),seen=[];try{
   const published=await release.deploy(f.id,{outputRoot:f.outputRoot,origin:'https://example.test',verify:async url=>{seen.push(url);return{passed:true,tested:['public route'],_screenshots:[]};}});
-  assert.equal(published.status,'live');assert.deepEqual(published.deployed_qa.pages,['index.html','platform.html']);assert.equal(seen.length,2);assert.ok(seen.some(url=>url.endsWith('/platform.html')));
+  assert.equal(published.status,'live');assert.deepEqual(published.deployed_qa.pages,['index.html','platform.html']);assert.equal(seen.length,2);assert.equal(published.url,published.live_url);assert.ok(published.url.endsWith('/index.html'));assert.ok(seen.includes('https://example.test'+published.url),'the returned live homepage must be an actually verified file route');assert.ok(seen.some(url=>url.endsWith('/platform.html')));
   const live=path.join(f.outputRoot,f.id,published.published_version,'index.html'),before=fs.readFileSync(live,'utf8');assert.match(before,/<style>/);assert.match(before,/<script>/);
   fs.writeFileSync(path.join(f.folder,'styles.css'),fs.readFileSync(path.join(f.folder,'styles.css'),'utf8')+'\n/* new draft */');
   await assert.rejects(release.deploy(f.id,{outputRoot:f.outputRoot,origin:'https://example.test',verify:async()=>{throw Error('Public navigation failed');}}),/navigation failed/);
