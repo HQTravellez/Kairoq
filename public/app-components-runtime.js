@@ -61,6 +61,8 @@
 #record-list .kq-actions{display:flex!important;flex-wrap:wrap!important;gap:10px!important}
 }
 @media(max-width:600px){
+#app-view [data-kq-screen]:not([hidden]),#app-view #record-form,#app-view #record-list,#app-view #record-list .kq-record{transform:none!important;translate:none!important;left:auto!important;right:auto!important;margin-left:0!important;margin-right:0!important;max-width:100%!important;width:100%!important;box-sizing:border-box!important}
+#app-view #record-list .kq-actions,#app-view #record-list .kq-actions button{max-width:100%!important}
 #dashboard-metrics{--kq-metric-span:var(--kq-metric-mobile-span,2);display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:auto!important;gap:8px!important;padding:0!important}
 #dashboard-metrics .kq-metric{min-width:0!important;min-height:0!important;height:auto!important;max-height:none!important;display:flex!important;flex-direction:column!important;gap:0!important;margin:0!important;padding:10px 12px!important}
 #dashboard-metrics .kq-muted{font-size:14px!important;line-height:1.3!important;margin:0!important}
