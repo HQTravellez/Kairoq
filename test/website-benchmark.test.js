@@ -28,3 +28,5 @@ test('live route rejects real failures immediately and bounds startup retries',a
  calls=0;page.goto=async()=>{calls++;return{ok:()=>false,status:()=>502};};
  await assert.rejects(loadAppRoute(page,'https://example.test',{attempts:3,wait:async()=>{}}),/502/);assert.equal(calls,3);
 });
+
+test('website retry recovers saved drafts and excludes unrelated sites',()=>{const {resumeWebsite}=require('../travellez-benchmark');const site={id:'travellez-corporate-travel-website-benchmark-123',status:'needs_repair'};assert.equal(resumeWebsite({},[site]),site);assert.equal(resumeWebsite({website:{id:'saved'}},[{id:'saved'},site]).id,'saved');assert.equal(resumeWebsite({},[{id:'unrelated'}]),null);});

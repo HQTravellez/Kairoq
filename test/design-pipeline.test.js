@@ -70,3 +70,13 @@ test('mixed viewport review derives missing aggregate mobile score from actual m
  const fail=await pipeline.review(async opts=>({visual_review:{scores:{...scores,mobile:null},findings:[],screen_reviews:opts.messages[0].content.filter(x=>x.type==='text').slice(1).map(x=>({screen:x.text,scores:{...scores,mobile:x.text.startsWith('Mobile')?2:null},findings:[]}))}}),{},screens);
  assert.equal(fail.passed,false);
 });
+
+test('visual batch timeout aborts the provider request rather than leaving work queued',async()=>{
+ let signal;
+ await assert.rejects(pipeline.callVisualModel(async opts=>{signal=opts.signal;return new Promise((_,reject)=>opts.signal.addEventListener('abort',()=>reject(opts.signal.reason),{once:true}));},{purpose:'design-review'},{timeoutMs:15}),/batch timed out/);
+ assert.equal(signal.aborted,true);
+});
+test('visual request finishing inside its deadline remains usable and clears its timer',async()=>{
+ let signal;const result=await pipeline.callVisualModel(async opts=>{signal=opts.signal;return{review:'complete'};},{purpose:'design-review'},{timeoutMs:15});
+ assert.deepEqual(result,{review:'complete'});assert.equal(signal.aborted,false);
+});

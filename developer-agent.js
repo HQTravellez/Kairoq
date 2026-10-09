@@ -13,7 +13,7 @@ function getProject(id){
   const meta=JSON.parse(fs.readFileSync(path.join(dir,"project.json"),"utf8"));
   const files={};const names=Array.isArray(meta.file_names)&&meta.file_names.length?meta.file_names:["index.html","styles.css","app.js"];
   for(const name of names)files[name]=fs.readFileSync(path.join(dir,name),"utf8");
-  return {...meta,files};
+  return {...meta,preview_url:meta.preview_url||"/api/developer/preview/"+id+"/index.html",files};
 }
 function normalizeFiles(raw,base){
   const obj={...base,...(raw?.files||raw||{})},files={"index.html":String(obj["index.html"]||obj.html||""),"styles.css":String(obj["styles.css"]||obj.css||""),"app.js":String(obj["app.js"]||obj.js||"")};
@@ -98,9 +98,11 @@ async function audit(files,{capture=false}={}){
 async function finishDesign(files,qa,designPlan,brief,callModel,effectConfig={motion:"subtle",threeD:"off"}){
  let evidence=[];if(!qa.passed){designPipeline.stripShots(qa);return{files,qa,evidence};}
  for(let polish=0;polish<3;polish++){
-  evidence=designPipeline.stripShots(qa);let visual;try{visual=await withTimeout(designPipeline.review(callModel,designPlan,evidence,qa.design_checks),20000,'Website visual review');}catch(e){console.warn('[developer-agent] VISUAL FALLBACK '+String(e.message||e));visual=designPipeline.deterministicReview(evidence,qa.design_checks,String(e.message||e));}qa.visual_review=visual;if(visual.passed)break;
+  evidence=designPipeline.stripShots(qa);let visual;try{visual=await designPipeline.review(callModel,designPlan,evidence,qa.design_checks);}catch(e){console.warn('[developer-agent] VISUAL FALLBACK '+String(e.message||e));visual=designPipeline.deterministicReview(evidence,qa.design_checks,String(e.message||e));}qa.visual_review=visual;if(visual.coverage?.mode==='deterministic-browser-fallback'){qa.passed=false;qa.findings.push('AI screenshot review unavailable; browser inspection alone does not pass the visual quality gate');break;}if(visual.passed)break;
   if(polish===2){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
-  files=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(await callModel({messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing complete shared styles.css/app.js AND every existing HTML page. Polish this working website while preserving all routes, interactions, content and valid navigation. Never remove an existing page. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(effects.source(designSystem.source(files)))}]}),files)),designPlan.style),effectConfig);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
+  const patch=await generateFiles(callModel,{maxOutputTokens:20000,messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing ONLY changed files. Include the complete string contents of each changed file; unchanged pages and assets are preserved by Kairoq. Prefer a shared CSS correction when it fixes multiple pages. Never remove or rename an existing page. Polish this working website while preserving routes, interactions and content. No external scripts, images, fonts, credentials or fake backend actions.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(effects.source(designSystem.source(files)))}]},{base:effects.source(designSystem.source(files)),required:Object.keys(files).filter(name=>name.endsWith('.html'))});
+  files=effects.inject(designSystem.apply(patch.files,designPlan.style),effectConfig);qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
+
  }
  return{files,qa,evidence};
 }
@@ -118,15 +120,17 @@ async function build({brief,kind="website",style="editorial",projectName,motion=
   let files=effects.inject(designSystem.apply(sourceFiles||normalizeFiles(generated),designPlan.style),effectConfig),qa=await audit(files,{capture:true}),revisions=0;
   if(!usedStarter && qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
-      const fix="Return only JSON with files containing complete styles.css, app.js, index.html and every current HTML page. Do not remove routes. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(effects.source(designSystem.source(files))).slice(0,34000)+". Preserve and enhance premium design.";
-      const repaired=effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(await callModel({messages:[{role:"user",content:fix}],temperature:0.2}),files)),designPlan.style),effectConfig);
+      const fix="Return only JSON {files:{...}} containing ONLY changed files with complete string contents. Unchanged pages/assets are preserved. Do not remove routes. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(effects.source(designSystem.source(files))).slice(0,34000)+". Preserve and enhance premium design.";
+      const patch=await generateFiles(callModel,{messages:[{role:"user",content:fix}],temperature:0.2,maxOutputTokens:20000},{base:effects.source(designSystem.source(files)),required});const repaired=effects.inject(designSystem.apply(patch.files,designPlan.style),effectConfig);
       const repairedQa=await audit(repaired,{capture:true});
       if(repairedQa.findings.length<=qa.findings.length){files=repaired;qa=repairedQa;revisions=1}
     }catch(e){qa.findings.push("Repair attempt unsuccessful: "+e.message)}
   }
-  const finished=await finishDesign(files,qa,designPlan,brief,callModel,effectConfig);files=finished.files;qa=finished.qa;
+  const folder=dirFor(id),snapshotQa={...qa},snapshotEvidence=designPipeline.stripShots(snapshotQa);
+  const checkpoint={id,file_names:Object.keys(files),pages:Object.keys(files).filter(name=>name.endsWith('.html')),effects:effectConfig,design_plan:designPlan,project_name:String(generated.project_name||projectName||'New Project').slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa:snapshotQa,revisions,status:'reviewing',generation_mode:usedStarter?'starter_template':'ai_generated'};
+  fs.mkdirSync(folder,{recursive:true});designPipeline.saveEvidence(folder,snapshotEvidence);for(const[name,code]of Object.entries(files))fs.writeFileSync(path.join(folder,name),code);fs.writeFileSync(path.join(folder,'project.json'),JSON.stringify(checkpoint,null,2));
+  let finished;try{finished=await finishDesign(files,qa,designPlan,brief,callModel,effectConfig);}catch(error){fs.writeFileSync(path.join(folder,'project.json'),JSON.stringify({...checkpoint,status:'needs_repair',error:String(error.message)},null,2));error.projectId=id;throw error;}files=finished.files;qa=finished.qa;
   const metadata={id,file_names:Object.keys(files),pages:Object.keys(files).filter(n=>n.endsWith(".html")),effects:effectConfig,design_plan:designPlan,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft",generation_mode:usedStarter?"starter_template":"ai_generated"};
-  const folder=dirFor(id);
   fs.mkdirSync(folder,{recursive:true});designPipeline.saveEvidence(folder,finished.evidence);
   for(const [name,contents] of Object.entries(files))fs.writeFileSync(path.join(folder,name),contents);
   fs.writeFileSync(path.join(folder,"project.json"),JSON.stringify(metadata,null,2));
@@ -138,8 +142,8 @@ async function revise(id,instruction,callModel){
   if(p.status==="pull_request")throw Error("This project has a pending GitHub PR. Create a new project before revising.");
   const designPlan=await designPipeline.plan(callModel,{brief:p.brief,kind:p.kind,style:p.style,previous:p.design_plan,existing:p.files});
   const prompt=designPipeline.instructions(designPlan)+effects.instructions(effectConfig)+designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing a files object with complete shared styles.css/app.js and EVERY existing HTML page. Never remove or rename an existing route. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(effects.source(designSystem.source(p.files))).slice(0,37000);
-  const modelResult=await callModel({messages:[{role:"user",content:prompt}],temperature:0.25});
-  let files=effects.inject(designSystem.apply(preserveRoutes(p.files,normalizeFiles(modelResult,p.files)),designPlan.style),effectConfig),qa=await audit(files,{capture:true});
+  const modelResult=await generateFiles(callModel,{messages:[{role:"user",content:prompt}],temperature:0.25,maxOutputTokens:20000},{base:effects.source(designSystem.source(p.files)),required:p.pages||Object.keys(p.files).filter(name=>name.endsWith(".html"))});
+  let files=effects.inject(designSystem.apply(modelResult.files,designPlan.style),effectConfig),qa=await audit(files,{capture:true});
   if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
       const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files containing shared styles.css/app.js and every existing HTML route:\n"+JSON.stringify(effects.source(designSystem.source(files))).slice(0,30000)}],temperature:0.15});
@@ -153,6 +157,16 @@ async function revise(id,instruction,callModel){
   meta.file_names=Object.keys(files);meta.pages=Object.keys(files).filter(name=>name.endsWith(".html"));meta.design_plan=designPlan;meta.revisions=Number(meta.revisions||0)+1;meta.qa=qa;meta.updated_at=new Date().toISOString();
   fs.writeFileSync(path.join(dirFor(id),"project.json"),JSON.stringify(meta,null,2));
   return {...meta,files,preview:assemble(files)}
+}
+async function reviewProject(id,callModel){
+ const project=getProject(id);if(project.status==='pull_request')throw Error('Review the pending pull request before changing this project');
+ const effectConfig=effects.normalize(project.effects||{}),designPlan=project.design_plan||await designPipeline.plan(callModel,{brief:project.brief,kind:project.kind,style:project.style});
+ const finished=await finishDesign(project.files,await audit(project.files,{capture:true}),designPlan,project.brief,callModel,effectConfig);
+ const meta={...project,qa:finished.qa,design_plan:designPlan,file_names:Object.keys(finished.files),pages:Object.keys(finished.files).filter(name=>name.endsWith('.html')),updated_at:new Date().toISOString()};delete meta.files;
+ designPipeline.saveEvidence(dirFor(id),finished.evidence);
+ for(const [name,code]of Object.entries(finished.files))fs.writeFileSync(path.join(dirFor(id),name),code);
+ fs.writeFileSync(path.join(dirFor(id),'project.json'),JSON.stringify(meta,null,2));
+ return{...meta,files:finished.files,preview:assemble(finished.files)};
 }
 async function publish(id,{branchPrefix="kairoq-build"}={}){
   const project=getProject(id),token=process.env.GITHUB_TOKEN,repo=process.env.GITHUB_REPO;
@@ -180,4 +194,4 @@ async function publish(id,{branchPrefix="kairoq-build"}={}){
   return {url:pr.html_url,number:pr.number,branch,repository:repo,status:"awaiting_review"};
 }
 function listProjects(){if(!fs.existsSync(ROOT))return[];return fs.readdirSync(ROOT).flatMap(id=>{try{const {files,...p}=getProject(id);return[p];}catch{return[];}});}
-module.exports={build,revise,getProject,listProjects,publish,assemble,audit,normalizeFiles,requiredPages,generateFiles};
+module.exports={build,revise,reviewProject,getProject,listProjects,publish,assemble,audit,normalizeFiles,requiredPages,generateFiles};

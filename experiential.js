@@ -9,6 +9,7 @@ function callProject(opts,services){
  return task;
 }
 async function run(opts,{enforceBudget,recordUsage,parse}){
+ opts.signal?.throwIfAborted();
  const model='gpt-6-luna'; // Published $0.10/M input, $0.50/M output; no sampling overrides.
  const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(20000,opts.maxOutputTokens)):20000;
  let images=0;const inputText=JSON.stringify(opts.messages||[],(k,v)=>{if(k==='image_url'&&v&&typeof v==='object'){images++;return '[rendered screenshot]';}return v;});const input=Math.ceil(inputText.length/2)+images*16384;
@@ -18,7 +19,7 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
  if((daily>0&&totals.daily+reserve>daily)||(monthly>0&&totals.monthly+reserve>monthly))throw Error('Experiential builder budget insufficient');
  const response=await fetch('https://api.experientiallabs.ai/v1/chat/completions',{
   method:'POST',headers:{Authorization:'Bearer '+key(),'Content-Type':'application/json'},
-  signal:AbortSignal.timeout(240000),body:JSON.stringify({model,messages:opts.messages,response_format:{type:'json_object'},max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'})
+  signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(240000)]):AbortSignal.timeout(240000),body:JSON.stringify({model,messages:opts.messages,response_format:{type:'json_object'},max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'})
  });
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw Error('Experiential '+response.status+': '+String(data.error?.message||data.error||'Request rejected').slice(0,220));
