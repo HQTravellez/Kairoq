@@ -49,9 +49,20 @@ test('reference fields and workflow actions validate and execute on the real man
   const a=await call('/auth/register','POST',{email:'flow@example.com',password:'long-test-password'});
   const trip=await call('/collections/trips','POST',{traveler:'Alex',status:'requested'},a.cookie);assert.equal(trip.status,201);const rid=trip.data.record.id;
   assert.equal((await call('/actions/book_trip/'+rid,'POST',{},a.cookie)).status,409);
+  assert.equal((await call('/collections/trips','POST',{traveler:'Bypass',status:'booked'},a.cookie)).status,409);
+  assert.equal((await call('/collections/trips/'+rid,'PATCH',{status:'booked'},a.cookie)).status,409);
+  assert.equal((await call('/collections/trips/'+rid,'PATCH',{traveler:'Edited',status:'requested'},a.cookie)).status,200);
+  assert.throws(()=>runtime.validateMigration(flow,{...flow,actions:[]}),/workflow actions/);
   const approved=await call('/actions/approve_trip/'+rid,'POST',{},a.cookie);assert.equal(approved.status,200);assert.equal(approved.data.record.data.status,'approved');
   const booked=await call('/actions/book_trip/'+rid,'POST',{},a.cookie);assert.equal(booked.status,200);assert.equal(booked.data.record.data.status,'booked');
   const expense=await call('/collections/expenses','POST',{trip_id:rid,description:'Taxi'},a.cookie);assert.equal(expense.status,201);assert.equal(expense.data.record.data.trip_id,rid);
   const after=(await call('/collections/trips','GET',null,a.cookie)).data.records[0];assert.equal(after.data.status,'booked');
  }finally{await new Promise(r=>server.close(r));runtime.recordsDb(root,'travel-flow').close();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('connected backend rejects workflow bypass before saving and permits guarded actions',async()=>{
+ const flow=runtime.validateSchema({collections:[{name:'trips',fields:[{name:'status',type:'select',options:['booked','requested'],required:true}]}],actions:[{name:'book',label:'Book',collection:'trips',field:'status',from:['requested'],to:'booked'}]}),rid=require('crypto').randomUUID();let record={id:rid,data:{status:'requested'}},saves=0;
+ const provider={session:async()=>({user:{id:'owner'}}),records:async()=>[record],save:async(id,session,collection,data)=>{saves++;record={...record,data};return record;}};
+ const server=http.createServer((req,res)=>runtime.api(req,res,{id:'cloud-flow',route:req.url,schema:flow,backend:'supabase',provider}));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+ try{assert.equal(runtime.workflowInitial(flow,flow.collections[0],flow.collections[0].fields[0]),'requested');assert.equal((await fetch(base+'/collections/trips',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'booked'})})).status,409);assert.equal((await fetch(base+'/collections/trips/'+rid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'booked'})})).status,409);assert.equal(saves,0);assert.equal((await fetch(base+'/actions/book/'+rid,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,200);assert.equal(saves,1);assert.equal(record.data.status,'booked');}finally{await new Promise(r=>server.close(r));}
 });
