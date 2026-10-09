@@ -93,7 +93,7 @@
   root.style.setProperty('overflow-x','hidden','important');
 }
 function ensureRuntimeNavigationToggle(){
-  const logout=$('logout'),collection=$('collection-select'),target=logout?.closest('nav,aside,[role="navigation"]')||collection?.closest('nav,aside,[role="navigation"]')||logout?.parentElement||collection?.parentElement;
+  const logout=$('logout'),collection=$('collection-select'),target=logout?.closest('nav,aside,[role="navigation"]')||collection?.closest('nav,aside,[role="navigation"]');
   if(!target)return; if(!target.id)target.id='kq-runtime-navigation';
   const selector='button[aria-controls~="'+target.id+'"]';if(document.querySelector(selector))return;
   const button=node('button','kq-button kq-button--secondary','Menu');button.id='kq-runtime-navigation-toggle';button.type='button';button.setAttribute('aria-controls',target.id);button.setAttribute('aria-expanded','false');button.setAttribute('aria-label','Open workspace menu');button.title='Open menu';
