@@ -30,7 +30,7 @@ async function run(model){
   async function reviewReleased(release,cached){
    const candidate=runtime.readVersion(release.id,release.deployed_version);
    const shots=release.deployed_qa.evidence.map((entry,index)=>({label:entry.screen,bytes:fs.readFileSync(path.join(runtime.ROOT,release.id,'release-evidence',String(release.deployed_version),'design-evidence',String(index+1)+'.jpg'))}));
-   return gates.reviewEvidence(model,candidate.design_plan,shots,cached,release.deployed_qa.design_checks||[]);
+   return gates.reviewEvidence(model,pipeline.restoreScope(candidate.design_plan,job.brief),shots,cached,release.deployed_qa.design_checks||[]);
   }
   let visual;
   try{visual=await reviewReleased(released,previous.app?.deployed_qa?.visual_review);}catch(error){
