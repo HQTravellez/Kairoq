@@ -1,5 +1,5 @@
 "use strict";
-const designGuidance=require("./design-guidance");
+const designGuidance=require("./design-guidance");const apiLearning=require("./api-learning");
 const designPipeline=require("./design-pipeline"),designSystem=require("./design-system"),designDom=require("./design-dom"),effects=require("./visual-effects");
 // Isolated website/web-app generation. Generated code is only previewed in sandboxed iframes.
 const fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
@@ -106,14 +106,14 @@ async function finishDesign(files,qa,designPlan,brief,callModel,effectConfig={mo
  }
  return{files,qa,evidence};
 }
-async function build({brief,kind="website",style="editorial",projectName,motion="subtle",threeD="off"},callModel){
+async function build({brief,kind="website",style="editorial",projectName,motion="subtle",threeD="off",apiSpec},callModel){
   brief=String(brief||"").trim().slice(0,3000);
   if(brief.length<12)throw Error("Describe the website or app in at least 12 characters.");
   kind=kind==="webapp"?"webapp":"website";
   const id=slug(projectName||brief.slice(0,35))+"-"+crypto.randomBytes(3).toString("hex");
   const required=requiredPages(brief);const effectConfig=effects.normalize({motion,threeD});const designPlan=await designPipeline.plan(callModel,{brief,kind,style});
   const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain shared styles.css and app.js plus index.html and, when the product needs multiple routes, additional safe lowercase-kebab HTML pages such as platform.html, about.html, pricing.html or industries-travel.html. Generate 2–8 coherent pages for a multi-page website request; every page shares the same design system, header/footer and working navigation. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. Every HTML page links the shared styles.css and app.js using relative paths. Cross-page links must target the generated .html files. Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Use concise shared CSS and JS; output complete files without truncation. Maximum 10 HTML pages. Required filenames: "+required.join(", ")+".";
-  const prompt=system+designPipeline.instructions(designPlan)+effects.instructions(effectConfig)+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
+  const prompt=system+designPipeline.instructions(designPlan)+(apiSpec?apiLearning.instructions(apiSpec):'')+effects.instructions(effectConfig)+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
   let generated,sourceFiles,usedStarter=false;
   try{const result=await generateFiles(callModel,{messages:[{role:"user",content:prompt}],temperature:0.45,maxOutputTokens:20000},{required});generated=result.generated;sourceFiles=result.files;}
   catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(process.env.OPENROUTER_API_KEY || require("./experiential").configured() || kind==="webapp" || required.length>1 || /multi[- ]page/i.test(brief))throw Error("Custom AI generation failed: "+e.message+". This is not an AI-generated project; check model access or credits.");generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
