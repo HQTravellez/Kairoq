@@ -33,7 +33,7 @@ function learn(input){
  const spec=parse(input),servers=(spec.servers||[]).map(s=>s.url).filter(s=>typeof s==="string"&&/^https:\/\//i.test(s)).slice(0,3);
  const base=spec.swagger==="2.0"?(spec.schemes?.includes("https")&&spec.host?"https://"+spec.host+(spec.basePath||""):""):servers[0]||"";
  const securitySchemes=spec.components?.securitySchemes||spec.securityDefinitions||{};
- const auth=Object.entries(securitySchemes).slice(0,20).map(([name,value])=>({name:safeText(name,70),type:safeText(value.type,35),scheme:safeText(value.scheme,35),in:safeText(value.in,20),tokenUrl:safeText(value.flows?.clientCredentials?.tokenUrl||value.tokenUrl,200)}));
+ const auth=Object.entries(securitySchemes).slice(0,20).map(([name,value])=>({name:safeText(name,70),type:safeText(value.type,35),scheme:safeText(value.scheme,35),in:safeText(value.in,20),headerName:safeText(value.name,80),tokenUrl:safeText(value.flows?.clientCredentials?.tokenUrl||value.tokenUrl,200)}));
  const operations=[];
  for(const [route,item] of Object.entries(spec.paths)){
   if(!route.startsWith("/")||typeof item!=="object"||!item)continue;
