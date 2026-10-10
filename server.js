@@ -6450,7 +6450,7 @@ function serveStatic(req, res) {
   try { decoded = decodeURIComponent(urlPath); }
   catch { res.writeHead(400); return res.end("Bad request"); }
 
-  if(decoded.startsWith("/generated/developer-sites/"))res.setHeader("Content-Security-Policy",require("./website-release").CSP);
+  if(decoded.startsWith("/generated/developer-sites/"))res.setHeader("Content-Security-Policy",require("./website-release").contentPolicy(decoded));
   const relative = path.normalize(decoded).replace(/^([/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, relative);
 
@@ -6559,17 +6559,15 @@ async function callDeveloperCodingModel(opts={}){
 }
 async function handleDeveloperBuild(req,res){
   try{
-    const body=await getBody(req,100000);
+    const body=await getBody(req,6500000);
     if(body.documentationUrl)body.apiPlan=await require("./api-docs").discover(body.documentationUrl);
     else if(body.documentationText)body.apiPlan=require("./api-docs").infer(body.documentationText);
     if(body.kind==="fullstack")return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));
-    const generated=await developerAgent.build(body,callDeveloperCodingModel);
-    const {preview,files,...info}=generated;
-    return json(res,200,{...info,preview_url:"/api/developer/preview/"+generated.id+"/index.html",files:Object.keys(files)});
+    return json(res,202,require("./website-jobs").submit(body,callDeveloperCodingModel));
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperRevise(req,res){
-  try{const body=await getBody(req,100000);if(appBuilder.listProjects().some(p=>p.id===body.id))return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel,body);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id+"/index.html",files:Object.keys(files)})}
+  try{const body=await getBody(req,100000);if(appBuilder.listProjects().some(p=>p.id===body.id))return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));developerAgent.getProject(String(body.id||""));return json(res,202,require("./website-jobs").submit(body,callDeveloperCodingModel))}
   catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperPublish(req,res){
@@ -6583,6 +6581,7 @@ async function handleDeveloperPublish(req,res){
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
+  if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
   if(url.startsWith("/apps/") && (await appRuntime.handle(req,res)||await housingBuilder.handle(req,res)))return;
   if(url.startsWith('/api/developer/assets')||url.startsWith('/api/developer/github')||url.startsWith('/api/developer/export/')){
     if(!isAuthenticated(req))return json(res,401,{error:'Authentication required.'});
@@ -6600,7 +6599,7 @@ const server = http.createServer(async (req, res) => {
   }
   if(url.startsWith("/api/developer/jobs/")&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
-    try{return json(res,200,appBuilder.getJob(url.slice("/api/developer/jobs/".length)))}catch(e){return json(res,404,{error:"Build job not found"})}
+    try{const id=url.slice("/api/developer/jobs/".length);return json(res,200,id.startsWith("site-")?require("./website-jobs").getJob(id):appBuilder.getJob(id))}catch(e){return json(res,404,{error:"Build job not found"})}
   }
   if(url.startsWith("/api/developer/evidence/")&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});

@@ -24,6 +24,12 @@ test("OAuth rejects unconfigured providers and invalid callback URLs",()=>{
  assert.throws(()=>oauth.config("not-configured"),/not configured/);
  assert.throws(()=>oauth.config("../escape"),/Invalid/);
 });
+test('OAuth state filenames accept generated base64url states beginning with an underscore',async()=>{
+ const originalRandom=crypto.randomBytes;let flow;
+ try{crypto.randomBytes=size=>size===32?Buffer.alloc(32,255):originalRandom(size);flow=oauth.start('example');}finally{crypto.randomBytes=originalRandom;}
+ const state=new URL(flow.url).searchParams.get('state');assert.ok(state.startsWith('_'));
+ const result=await oauth.complete({state,code:'test-code',cookie:state,exchange:async()=>({access_token:'test-token',expires_in:3600})});assert.equal(result.connected,true);oauth.disconnect('example');
+});
 test("SDK generation emits executable JavaScript with encoded parameters",async()=>{
  const plan={title:"Trips",operations:[{id:"getTrip",method:"GET",path:"/trips/{id}"},{id:"createTrip",method:"POST",path:"/trips"}]};
  const result=sdk.generate(plan);
