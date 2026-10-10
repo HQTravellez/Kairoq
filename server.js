@@ -6567,7 +6567,7 @@ async function handleDeveloperBuild(req,res){
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperRevise(req,res){
-  try{const body=await getBody(req,100000);if(appBuilder.listProjects().some(p=>p.id===body.id))return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id+"/index.html",files:Object.keys(files)})}
+  try{const body=await getBody(req,100000);if(appBuilder.listProjects().some(p=>p.id===body.id))return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));const result=await developerAgent.revise(String(body.id||""),String(body.instruction||""),callDeveloperCodingModel,body);const {files,preview,...info}=result;return json(res,200,{...info,preview_url:"/api/developer/preview/"+result.id+"/index.html",files:Object.keys(files)})}
   catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 async function handleDeveloperPublish(req,res){
@@ -6580,7 +6580,22 @@ async function handleDeveloperPublish(req,res){
 }
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
+  if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(url.startsWith("/apps/") && (await appRuntime.handle(req,res)||await housingBuilder.handle(req,res)))return;
+  if(url.startsWith('/api/developer/assets')||url.startsWith('/api/developer/github')||url.startsWith('/api/developer/export/')){
+    if(!isAuthenticated(req))return json(res,401,{error:'Authentication required.'});
+    try{
+      const library=require('./builder-assets'),git=require('./project-github'),portable=require('./project-portability');
+      if(url==='/api/developer/assets'&&req.method==='GET')return json(res,200,{assets:library.list()});
+      if(url==='/api/developer/assets/search'&&req.method==='POST')return json(res,200,{results:await library.search(await getBody(req,10000))});
+      if(url==='/api/developer/assets/download'&&req.method==='POST'){const body=await getBody(req,10000);return json(res,200,{asset:await library.download(String(body.id||''))});}
+      if(url.startsWith('/api/developer/github/status/')&&req.method==='GET')return json(res,200,git.status(url.slice('/api/developer/github/status/'.length)));
+      if(url==='/api/developer/github/push'&&req.method==='POST'){const body=await getBody(req,10000);return json(res,200,await git.push(String(body.id||''),{repository:body.repository,create_name:body.create_name}));}
+      if(url==='/api/developer/github/pull'&&req.method==='POST'){const body=await getBody(req,10000);return json(res,200,await git.pull(String(body.id||''),{callModel:callDeveloperCodingModel}));}
+      if(url.startsWith('/api/developer/export/')&&req.method==='GET'){const id=url.slice('/api/developer/export/'.length),project=portable.load(id),bytes=portable.zip(portable.bundle(project));res.writeHead(200,{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="'+id+'.zip"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});return res.end(bytes);}
+      return json(res,404,{error:'Route not found'});
+    }catch(e){return json(res,422,{error:e.message});}
+  }
   if(url.startsWith("/api/developer/jobs/")&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     try{return json(res,200,appBuilder.getJob(url.slice("/api/developer/jobs/".length)))}catch(e){return json(res,404,{error:"Build job not found"})}
@@ -6628,7 +6643,7 @@ const server = http.createServer(async (req, res) => {
       const project=developerAgent.getProject(id),page=String(parts[0]||legacyQuery.get("page")||"index.html");
       if(!/^[a-z0-9][a-z0-9-]{0,48}\.html$/.test(page)||!project.files[page])throw Error("Page not found");
       const html=developerAgent.assemble(project.files,page);
-      res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
+      res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; font-src data:; connect-src 'self'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
       return res.end(html);
     }catch(e){return json(res,404,{error:e.message})}
   }
@@ -6830,6 +6845,7 @@ if (process.env.NODE_ENV !== "test") {
   recoverMediaJobs();
   setTimeout(() => schedulerTick().catch(()=>{}), 5_000);
   setInterval(() => schedulerTick().catch(()=>{}), 60_000);
+  require("./scripts/verify-builder-assets").startup().catch(e=>console.warn("[builder-assets] PROVIDER SMOKE ERROR "+e.message));
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);
     console.log(`Free Only defaults to ON.`);

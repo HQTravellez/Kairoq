@@ -1,0 +1,7 @@
+'use strict';
+// Bounded provider smoke test. No generation, no continuous polling, no app/user data writes.
+const fs=require('fs'),path=require('path'),assets=require('../builder-assets');
+async function verify(){const results=[];for(const request of [{query:'Toronto skyline',kind:'image'},{query:'notification',kind:'audio'},{query:'rock',kind:'model'}]){try{const candidates=await assets.search({...request,limit:4});let a,error;for(const c of candidates.slice(0,3))try{a=await assets.download(c.id);break;}catch(e){error=e;}if(!a)throw error||Error('No compatible results');results.push({kind:request.kind,passed:true,url:a.url,license:a.license,source:a.source_url,bytes:a.size,dependencies:a.dependencies?.length||0});}catch(e){results.push({kind:request.kind,passed:false,error:e.message});}}return{source_sha:process.env.RAILWAY_GIT_COMMIT_SHA||null,passed:results.every(r=>r.passed),results};}
+async function startup(){if(process.env.KAIROQ_ASSET_SMOKE_TEST!=='true')return;const marker=path.join(assets.ROOT,'provider-smoke.json'),sha=process.env.RAILWAY_GIT_COMMIT_SHA;try{const prior=JSON.parse(fs.readFileSync(marker,'utf8'));if(sha&&prior.source_sha===sha)return;}catch{}const result=await verify();fs.mkdirSync(assets.ROOT,{recursive:true});fs.writeFileSync(marker,JSON.stringify(result,null,2));console.log('[builder-assets] PROVIDER SMOKE '+JSON.stringify(result));}
+if(require.main===module)verify().then(r=>{console.log(JSON.stringify(r,null,2));process.exitCode=r.passed?0:1;});
+module.exports={verify,startup};

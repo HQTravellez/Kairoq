@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const web=require('./developer-agent'),pipeline=require('./design-pipeline');
 const gates=require('./benchmark-gates');
 const ROOT=path.join(__dirname,'workspace','generated','developer-sites');
-const CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts";
+const CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; font-src data:; connect-src 'self'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts";
 async function deploy(id,{outputRoot=ROOT,origin=require('./app-release').publicOrigin(),verify=require('./deployed-website-qa').verify,callModel}={}){
  const project=web.getProject(id),visual=project.qa?.visual_review;
  if(project.kind!=='website')throw Error('Use the application runtime to deploy interactive apps');
