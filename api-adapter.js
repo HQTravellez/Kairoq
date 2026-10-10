@@ -29,7 +29,10 @@ function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentia
  return{url,method:op.method,headers:{"Accept":"application/json",...(payload?{"Content-Type":"application/json"}:{}),...(secret?{"Authorization":"Bearer "+secret}:{})},payload,operation:op};
 }
 async function execute(args,{lookup=dns.lookup,timeout=10000}={}){
- const request=prepare(args),ip=await lookup(request.url.hostname,{all:true});
+ if(process.env.KAIROQ_API_LIVE_ENABLED!=="true")throw Error("Live API execution is disabled; set KAIROQ_API_LIVE_ENABLED=true after reviewing the provider and host allowlist");
+ const request=prepare(args);
+ if(!["GET","HEAD"].includes(request.method)&&process.env.KAIROQ_API_WRITE_ENABLED!=="true")throw Error("Live API writes are disabled by server policy");
+ const ip=await lookup(request.url.hostname,{all:true});
  if(!ip?.length||ip.some(x=>!docs.publicIp(x.address)))throw Error("API target resolves to a non-public address");
  const pinned=ip[0];
  return new Promise((resolve,reject)=>{
