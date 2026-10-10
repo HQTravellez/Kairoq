@@ -20,6 +20,18 @@ function foundation(style='editorial'){
 @media(max-width:600px){.kq-table-wrap{overflow:visible}.kq-table thead{display:none}.kq-table,.kq-table tbody{display:block}.kq-table tr{display:block;margin-bottom:16px;padding:14px;background:var(--kq-surface);border:1px solid var(--kq-border);border-radius:var(--kq-radius)}.kq-table td{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:12px;padding:10px 0;border:0}.kq-table td::before{content:attr(data-label);font-size:12px;font-weight:600;color:var(--kq-muted)}}
 .kq-page :focus-visible{outline:3px solid var(--kq-accent);outline-offset:3px}.kq-page img,.kq-page svg{max-width:100%}.kq-page input,.kq-page textarea,.kq-page select{font-size:16px}
 @media(max-width:600px){.kq-shell{width:calc(100% - 32px)}.kq-panel{padding:18px}.kq-table th,.kq-table td{padding:12px}.kq-heading{overflow-wrap:anywhere}}
+/* Cross-product visual quality floor: responsive rhythm, safe geometry, readable controls. */
+.kq-page{overflow-wrap:break-word}.kq-page :is(main,section,article,aside,header,footer,nav){min-width:0}
+.kq-page :is(h1,h2,h3){max-width:28ch;overflow-wrap:break-word}
+.kq-page :is(h1,.kq-hero-title){font-size:clamp(2rem,4.5vw,4.75rem);line-height:1.08;letter-spacing:-.035em}
+.kq-page :is(h2,.kq-section-title){font-size:clamp(1.5rem,2.7vw,2.75rem);line-height:1.16}
+.kq-page :is(button,a,input,select,textarea){touch-action:manipulation}
+.kq-page :is(button,a).kq-button{min-height:44px}
+.kq-page :is(input,textarea,select){max-width:100%}
+.kq-page :is(img,video,canvas,svg){max-width:100%;height:auto}
+.kq-page .kq-panel,.kq-page .kq-metric{overflow-wrap:anywhere}
+@media(min-width:601px) and (max-width:1100px){.kq-shell{width:calc(100% - 48px)}.kq-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:18px}.kq-stack{gap:18px}.kq-panel{padding:20px}.kq-record-details{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.kq-page .kq-grid,.kq-page .kq-fields{grid-template-columns:minmax(0,1fr)}.kq-page .kq-actions{flex-wrap:wrap}.kq-page .kq-actions .kq-button{max-width:100%}.kq-page .kq-record-details{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.kq-page *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}`;
 }
 function readableCss(css){
