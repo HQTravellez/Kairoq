@@ -38,3 +38,18 @@ test("credential names are restricted to dedicated environment variables",()=>{
 test("API documentation fetch refuses unknown hosts before network access",async()=>{
  await assert.rejects(docs.fetchDocs("https://api.example.com/openapi.json",{allowedHosts:"other.example.com"}),/not allowlisted/);
 });
+
+test("header API keys are sent server-side without leaking into the URL",()=>{
+ const previous=process.env.KAIROQ_API_TOKEN_TEST_KEY;process.env.KAIROQ_API_TOKEN_TEST_KEY="test-secret";
+ try{
+  const keySpec=structuredClone(spec);keySpec.components={securitySchemes:{key:{type:"apiKey",in:"header",name:"X-API-Key"}}};keySpec.security=[{key:[]}];
+  const prepared=adapter.prepare({apiSpec:keySpec,operationId:"getTrip",pathParams:{id:"123"},allowedHosts:"api.example.com",approved:true,credentialName:"KAIROQ_API_TOKEN_TEST_KEY"});
+  assert.equal(prepared.headers["X-API-Key"],"test-secret");assert.equal(prepared.headers.Authorization,undefined);
+  assert.ok(!prepared.url.href.includes("test-secret"));
+ }finally{if(previous===undefined)delete process.env.KAIROQ_API_TOKEN_TEST_KEY;else process.env.KAIROQ_API_TOKEN_TEST_KEY=previous;}
+});
+test("live requests remain disabled without explicit server policy",async()=>{
+ const previous=process.env.KAIROQ_API_LIVE_ENABLED;delete process.env.KAIROQ_API_LIVE_ENABLED;
+ try{await assert.rejects(adapter.execute({apiSpec:spec,operationId:"getTrip",pathParams:{id:"1"},approved:true,allowedHosts:"api.example.com"}),/disabled/);}
+ finally{if(previous===undefined)delete process.env.KAIROQ_API_LIVE_ENABLED;else process.env.KAIROQ_API_LIVE_ENABLED=previous;}
+});
