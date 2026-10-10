@@ -9,21 +9,66 @@
 <section class="panel"><h2>1. Discover an API</h2><div class="field"><label for="docsUrl">Public documentation URL (HTTPS)</label><input id="docsUrl" type="url" placeholder="https://docs.example.com/openapi.json"></div><div class="field"><label for="docsText">Or paste OpenAPI JSON, Postman JSON, or documentation text</label><textarea id="docsText" placeholder="Paste API documentation here"></textarea></div><div class="actions"><button id="discover">Analyze documentation</button></div><p class="small">URL imports require a server-side host allowlist. Ordinary documentation produces a draft that must be verified before live integration.</p></section>
 <section class="panel"><h2>2. Build a product</h2><div class="field"><label for="project">Product name</label><input id="project" value="API-powered workspace"></div><div class="field"><label for="brief">What should Kairoq build?</label><textarea id="brief">Build a premium full-stack dashboard using the imported API operations, with authenticated users, clear integration status, empty states and graceful errors.</textarea></div><div class="actions"><button id="build" disabled>Build with API context</button></div><p class="small">Generated apps can plan integrations from the API contract. Actual live API execution is a separate permissioned step.</p></section>
 </div>
-<section class="panel"><h2>3. Inspect the API contract</h2><p id="status" class="status" role="status" aria-live="polite">No API documentation imported yet.</p><pre id="output" aria-label="Imported API contract">Waiting for API documentation.</pre></section>
-<section class="panel" style="margin-top:18px"><h2>4. Test a server-side operation</h2><p class="small danger">Live calls are disabled by default and require server-side enablement, allowlisted hosts, dedicated credentials and explicit approval. Mutating calls require separate write approval.</p><div class="grid"><div class="field"><label for="operation">Operation</label><select id="operation"><option value="">Import an API first</option></select></div><div class="field"><label for="credential">Server credential variable name (optional)</label><input id="credential" placeholder="KAIROQ_API_TOKEN_PROVIDER"></div></div><div class="field"><label for="params">Path parameters JSON</label><textarea id="params" rows="2">{}</textarea></div><div class="field"><label for="payload">Request body JSON (optional)</label><textarea id="payload" rows="2"></textarea></div><div class="actions"><button id="test" class="secondary" disabled>Review and test selected operation</button></div></section>
+<section class="panel" style="margin-bottom:18px"><h2>3. OAuth connections</h2><p class="small">Connect an administrator-approved OAuth provider. OAuth credentials and access tokens remain on the server. If no providers appear, configure KAIROQ_OAUTH_PROVIDERS, KAIROQ_OAUTH_ENCRYPTION_KEY, KAIROQ_OAUTH_REDIRECT_URI and APP_PASSWORD in Railway.</p><div class="field"><label for="oauthProvider">Configured OAuth provider</label><select id="oauthProvider"><option value="">Loading provider configuration…</option></select></div><p id="oauthStatus" class="small" role="status" aria-live="polite">Checking available providers…</p><div class="actions"><button id="oauthConnect" disabled>Connect OAuth</button><button id="oauthDisconnect" class="secondary" disabled>Disconnect</button><button id="oauthRefresh" class="secondary">Refresh connections</button></div></section>
+<section class="panel" style="margin-bottom:18px"><h2>4. Generate a reusable API SDK</h2><p class="small">Create a server-side JavaScript client from the imported contract. Generated code is reviewed before use and does not automatically install packages or bypass API permissions.</p><div class="actions"><button id="sdkGenerate" disabled>Generate SDK</button><button id="sdkDownload" class="secondary" disabled>Download JavaScript SDK</button></div><p id="sdkStatus" class="small" role="status" aria-live="polite">Import an API to enable SDK generation.</p></section>
+<section class="panel"><h2>5. Inspect the API contract</h2><p id="status" class="status" role="status" aria-live="polite">No API documentation imported yet.</p><pre id="output" aria-label="Imported API contract">Waiting for API documentation.</pre></section>
+<section class="panel" style="margin-top:18px"><h2>6. Test a server-side operation</h2><p class="small danger">Live calls are disabled by default and require server-side enablement, allowlisted hosts, dedicated credentials and explicit approval. Mutating calls require separate write approval.</p><div class="grid"><div class="field"><label for="operation">Operation</label><select id="operation"><option value="">Import an API first</option></select></div><div class="field"><label for="credential">Server credential variable name (optional)</label><input id="credential" placeholder="KAIROQ_API_TOKEN_PROVIDER"></div><div class="field"><label for="oauthForTest">OAuth connection for API testing (optional)</label><select id="oauthForTest"><option value="">No OAuth (use API key if required)</option></select></div></div><div class="field"><label for="params">Path parameters JSON</label><textarea id="params" rows="2">{}</textarea></div><div class="field"><label for="payload">Request body JSON (optional)</label><textarea id="payload" rows="2"></textarea></div><div class="actions"><button id="test" class="secondary" disabled>Review and test selected operation</button></div></section>
 </main><script>
 "use strict";
-const $=id=>document.getElementById(id);let plan=null;
+const $=id=>document.getElementById(id);let plan=null,generatedSdk=null;
+async function refreshProviders(){
+ const oauth=$("oauthProvider"),forTest=$("oauthForTest");
+ try{
+  const response=await fetch("/api/developer/oauth/providers",{credentials:"same-origin",cache:"no-store"});
+  const data=await response.json();if(!response.ok)throw Error(data.error||"Unable to read OAuth providers");
+  const providers=data.providers||[],old=oauth.value;oauth.replaceChildren();forTest.replaceChildren();
+  const blank=document.createElement("option");blank.value="";blank.textContent=providers.length?"Choose an OAuth provider":"No OAuth providers configured";oauth.append(blank);
+  const none=document.createElement("option");none.value="";none.textContent="No OAuth (use API key if required)";forTest.append(none);
+  for(const provider of providers){const option=document.createElement("option");option.value=provider.name;option.textContent=provider.name+" — "+(provider.connected?"Connected":provider.ready===false?"Configuration required":"Not connected");oauth.append(option);
+   if(provider.connected){const use=document.createElement("option");use.value=provider.name;use.textContent=provider.name+" (connected)";forTest.append(use);}
+  }
+  if(providers.some(p=>p.name===old))oauth.value=old;
+  const selected=providers.find(p=>p.name===oauth.value),connectable=selected&&selected.ready!==false&&selected.grantType==="authorization_code";
+  $("oauthConnect").disabled=!connectable||!!selected.connected;
+  $("oauthDisconnect").disabled=!selected?.connected;
+  $("oauthStatus").textContent=!providers.length?"No providers configured on the server. Set OAuth variables in Railway, then refresh.":selected?.error||selected?(selected?.connected?"OAuth provider connected.":"Select Connect OAuth to authorize this provider."):"Choose a provider to connect.";
+ }catch(error){oauth.replaceChildren();const option=document.createElement("option");option.textContent="OAuth unavailable";oauth.append(option);$("oauthConnect").disabled=true;$("oauthDisconnect").disabled=true;$("oauthStatus").textContent=error.message;}
+}
+
 function status(message){$("status").textContent=message;}
 async function request(url,body){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(data.error||"Request failed ("+r.status+")");return data;}
 async function action(button,fn){button.disabled=true;try{await fn();}catch(e){status(e.message);$("output").textContent=String(e.message);}finally{button.disabled=false;}}
+$("oauthProvider").addEventListener("change",refreshProviders);
+$("oauthRefresh").addEventListener("click",refreshProviders);
+$("oauthConnect").addEventListener("click",()=>action($("oauthConnect"),async()=>{
+ const provider=$("oauthProvider").value;if(!provider)throw Error("Select a configured OAuth provider");
+ const data=await request("/api/developer/oauth/start",{provider});
+ if(!data.authorizationUrl||!data.authorizationUrl.startsWith("https://"))throw Error("OAuth provider returned an invalid authorization URL");
+ window.location.assign(data.authorizationUrl);
+}));
+$("oauthDisconnect").addEventListener("click",()=>action($("oauthDisconnect"),async()=>{
+ const provider=$("oauthProvider").value;if(!provider||!window.confirm("Disconnect OAuth provider "+provider+"?"))return;
+ await request("/api/developer/oauth/disconnect",{provider});await refreshProviders();
+}));
+$("sdkGenerate").addEventListener("click",()=>action($("sdkGenerate"),async()=>{
+ if(!plan)throw Error("Import API documentation first");
+ generatedSdk=await request("/api/developer/api/sdk",{apiPlan:plan,options:{language:"javascript"}});
+ $("sdkDownload").disabled=false;$("sdkStatus").textContent="Generated "+generatedSdk.operations+" operations. Review the source before use.";
+ $("output").textContent=generatedSdk.source;
+}));
+$("sdkDownload").addEventListener("click",()=>{
+ if(!generatedSdk?.source)return;
+ const blob=new Blob([generatedSdk.source],{type:"application/javascript"}),url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download="kairoq-api-client.js";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
+});
+refreshProviders();
 $("discover").addEventListener("click",()=>action($("discover"),async()=>{
  const documentationUrl=$("docsUrl").value.trim(),documentationText=$("docsText").value.trim();
  if(!documentationUrl&&!documentationText)throw Error("Enter a URL or paste documentation.");
  plan=await request("/api/developer/api/discover",documentationUrl?{documentationUrl}:{documentationText});
  $("output").textContent=JSON.stringify(plan,null,2);status(plan.title+": "+plan.operations.length+" documented operations. "+(plan.format==="unstructured"?"Draft only: verify against a formal specification.":"Ready for product planning."));
  $("operation").replaceChildren();for(const op of plan.operations){const opt=document.createElement("option");opt.value=op.id;opt.textContent=op.method+" "+op.path;$("operation").append(opt);}
- $("build").disabled=!plan.operations.length;$("test").disabled=!plan.operations.length;
+ $("build").disabled=!plan.operations.length;$("test").disabled=!plan.operations.length;$("sdkGenerate").disabled=!plan.operations.length;generatedSdk=null;$("sdkDownload").disabled=true;
 }));
 $("build").addEventListener("click",()=>action($("build"),async()=>{
  if(!plan)throw Error("Import documentation first");
@@ -40,7 +85,7 @@ $("test").addEventListener("click",()=>action($("test"),async()=>{
  if(!window.confirm(message))return;
  if(write&&!window.confirm("Confirm again: this is a mutating API operation."))return;
  const params=JSON.parse($("params").value||"{}"),body=$("payload").value.trim()?JSON.parse($("payload").value):undefined;
- const result=await request("/api/developer/api/execute",{plan,operationId:operation.id,pathParams:params,body,credentialName:$("credential").value.trim()||undefined,approved:true,approvedWrites:write});
+ const result=await request("/api/developer/api/execute",{plan,operationId:operation.id,pathParams:params,body,credentialName:$("credential").value.trim()||undefined,oauthProvider:$("oauthForTest").value||undefined,approved:true,approvedWrites:write});
  status("API returned HTTP "+result.status);$("output").textContent=JSON.stringify(result,null,2);
 }));
 </script></body></html>
