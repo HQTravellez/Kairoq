@@ -33,7 +33,7 @@ function plain(input){
 }
 function infer(input){
  const source=String(input||"");if(Buffer.byteLength(source)>MAX)throw Error("Documentation exceeds 400 KB");
- try{const obj=JSON.parse(source);if(obj.openapi||obj.swagger)return require("./api-learning").learn(obj);}catch(e){if(!e.message.includes("JSON")&&/Only OpenAPI|Specification/.test(e.message))throw e;}
+ try{const obj=JSON.parse(source);if(obj.openapi||obj.swagger)return require("./api-learning").learn(obj);if(obj.info?.schema?.includes("schema.getpostman.com/json/collection/v2."))return require("./api-learning").fromPostman(obj);}catch(e){if(!e.message.includes("JSON")&&/Only OpenAPI|Specification|Postman/.test(e.message))throw e;}
  const text=plain(source);
  const regex=/\b(GET|POST|PUT|PATCH|DELETE)\s+(\/[\w.{}\-\/?:=&%]+)(?=\s|$|[.,;])/gi;
  const found=new Map();let m;
