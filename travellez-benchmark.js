@@ -54,8 +54,11 @@ async function run(model){
    published=await require('./website-release').deploy(site.id,{callModel:model});
   }
   report.website={...report.website,live_url:published.live_url,published_version:published.published_version,deployed_qa:published.deployed_qa};
-  report.status='passed';report.stage='complete';report.completed_at=new Date().toISOString();save();fs.writeFileSync(marker,JSON.stringify({...current,passed:true,at:report.completed_at,app_id:report.app.id,website_id:site.id}));
-  console.log('[travellez-benchmark] PASS '+JSON.stringify({app_id:report.app.id,website_id:site.id}));
+  report.status='passed';report.stage='complete';report.completed_at=new Date().toISOString();
+  if(!gates.currentPass(report,current))throw Error('Benchmark completion is missing current commit or matching public visual evidence');
+  save();fs.writeFileSync(marker,JSON.stringify({...current,passed:true,at:report.completed_at,app_id:report.app.id,website_id:site.id}));
+  const summary=surface=>{const qa=surface.deployed_qa,visual=qa.visual_review;return{id:surface.id,url:surface.live_url,version:qa.version||surface.published_version,passed:qa.passed,pages:qa.pages,tested:qa.tested||qa.routes?.map(route=>({page:route.page,tested:route.tested})),score:visual.score,scores:visual.scores,coverage:visual.coverage,evidence_count:qa.evidence.length};};
+  console.log('[travellez-benchmark] PASS '+JSON.stringify({...current,completed_at:report.completed_at,app:summary(report.app),website:summary(report.website)}));
  }catch(e){if(e.projectId)report.website={id:e.projectId};report.status='failed';report.stage='failed';report.error=String(e.message||e).slice(0,1500);report.completed_at=new Date().toISOString();save();console.error('[travellez-benchmark] FAIL '+report.error);}
  return report;
 }

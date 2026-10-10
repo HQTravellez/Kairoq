@@ -89,9 +89,17 @@ async function loadAppRoute(page,base,{attempts=12,delayMs=5000,wait=ms=>new Pro
 async function checkScreens(page,{requiredScreens=[],shot=async()=>{}}={}){
  const names=await page.locator('[data-kq-screen-target]').evaluateAll(nodes=>[...new Set(nodes.map(n=>n.dataset.kqScreenTarget).filter(Boolean))]);
  for(const name of requiredScreens)if(!names.includes(name)||!await page.locator('[data-kq-screen="'+name+'"]').count())throw Error('Required screen missing: '+name);
+ async function settleNavigation(){
+  await page.waitForFunction(()=>[...document.querySelectorAll('[data-kq-screen-target]')].every(button=>{
+   for(let node=button;node;node=node.parentElement)if(node.getAnimations().some(animation=>animation instanceof CSSTransition&&animation.playState==='running'))return false;
+   return true;
+  }),null,{timeout:3000});
+ }
  for(const width of (requiredScreens.length?[1440,390]:[1440])){
   await page.setViewportSize({width,height:900});
+  await settleNavigation();
   for(const name of names){
+   await settleNavigation();
    const buttons=page.locator('[data-kq-screen-target="'+name+'"]');
    async function reachable(){for(const button of await buttons.all()){const box=await button.boundingBox();if(await button.isVisible()&&box&&box.x>=0&&box.x+box.width<=width+8)return button;}return null;}
    let button=await reachable();
@@ -99,7 +107,7 @@ async function checkScreens(page,{requiredScreens=[],shot=async()=>{}}={}){
     for(const toggle of await page.locator('button[aria-controls][aria-expanded="false"]').all()){
      if(!await toggle.isVisible())continue;
      const contains=await toggle.evaluate((node,name)=>node.getAttribute('aria-controls').split(/\s+/).some(id=>document.getElementById(id)?.querySelector('[data-kq-screen-target="'+name+'"]')),name);
-     if(contains){await toggle.click();button=await reachable();if(button)break;}
+     if(contains){await toggle.click();await settleNavigation();button=await reachable();if(button)break;}
     }
    }
    if(!button){if(requiredScreens.includes(name))throw Error('Required navigation unreachable: '+name+' at '+width+'px');continue;}
