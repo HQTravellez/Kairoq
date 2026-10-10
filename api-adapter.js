@@ -44,7 +44,7 @@ async function execute(args,{lookup=dns.lookup,timeout=10000}={}){
  if(!ip?.length||ip.some(x=>!docs.publicIp(x.address)))throw Error("API target resolves to a non-public address");
  const pinned=ip[0];
  return new Promise((resolve,reject)=>{
-  const req=https.request(request.url,{method:request.method,headers:request.headers,timeout,maxHeaderSize:16384,lookup:(host,opts,cb)=>cb(null,pinned.address,pinned.family)},res=>{
+  const req=https.request(request.url,{method:request.method,headers:request.headers,timeout,maxHeaderSize:16384,lookup:(host,opts,cb)=>opts.all?cb(null,[pinned]):cb(null,pinned.address,pinned.family)},res=>{
    let size=0,chunks=[];res.on("data",part=>{size+=part.length;if(size>300000){req.destroy(Error("API response exceeds 300 KB"));return;}chunks.push(part);});
    res.on("end",()=>{const raw=Buffer.concat(chunks).toString("utf8");let data;try{data=JSON.parse(raw);}catch{data=raw.slice(0,300000);}resolve({status:res.statusCode,ok:res.statusCode>=200&&res.statusCode<300,data,operationId:request.operation.id});});
   });req.on("timeout",()=>req.destroy(Error("API request timed out")));req.on("error",reject);req.end(request.payload);
