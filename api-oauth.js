@@ -23,7 +23,7 @@ function config(name){
 }
 function seal(value){const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv("aes-256-gcm",key(),iv);const data=Buffer.concat([cipher.update(JSON.stringify(value),"utf8"),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),data]).toString("base64");}
 function unseal(value){const bytes=Buffer.from(value,"base64");if(bytes.length<29)throw Error("Invalid encrypted OAuth state");const decipher=crypto.createDecipheriv("aes-256-gcm",key(),bytes.subarray(0,12));decipher.setAuthTag(bytes.subarray(12,28));return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)),decipher.final()]).toString("utf8"));}
-function file(name,type){if(type==='state'){if(!/^[A-Za-z0-9_-]{43}$/.test(String(name)))throw Error('Invalid OAuth state');}else safeName(name);return path.join(STORE,type+"-"+name+".json.enc");}
+function file(name,type){if(type==="state"){if(!/^[A-Za-z0-9_-]{40,100}$/.test(String(name||"")))throw Error("Invalid OAuth state");}else safeName(name);return path.join(STORE,type+"-"+name+".json.enc");}
 function write(filename,value){fs.mkdirSync(STORE,{recursive:true,mode:0o700});const temp=filename+"."+crypto.randomBytes(6).toString("hex")+".tmp";fs.writeFileSync(temp,seal(value),{mode:0o600,flag:"wx"});fs.renameSync(temp,filename);}
 function read(filename){return unseal(fs.readFileSync(filename,"utf8"));}
 function providers(){return Object.keys(configs()).filter(n=>/^[a-z][a-z0-9_-]{0,49}$/i.test(n)).map(n=>{try{const c=config(n);return{name:n,grantType:c.grant,scopes:c.scopes,connected:fs.existsSync(file(n,"token"))};}catch(e){return{name:n,ready:false,error:e.message};}});}
