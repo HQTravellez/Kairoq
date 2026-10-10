@@ -153,6 +153,7 @@ async function browserQA(id,candidate,previous,{capture=false,liveBase,requiredS
   if(errors.length)throw Error(errors.join('; '));return{passed:true,findings:[],...(capture?{_screenshots:screenshots,design_checks:designChecks}:{}),tested:[...tested,...states,'logout API protection and reload','registration','login','collection navigation','UI create, edit and delete',...(sortedTable?['table sorting ascending/descending']:[]),'dashboard counts','persistent records after reload',...(previous?['saved records survive schema revision']:[]),'desktop1440px','mobile390px','logout'],at:new Date().toISOString()};
  }finally{if(browser)await browser.close();try{if(liveBase&&qaAccount)require('./housing-runtime').removeTestAccount(runtime.ROOT,id,qaAccount);}finally{await new Promise(r=>server.close(r));fs.rmSync(temp,{recursive:true,force:true});}}
 }
+function featureBrief(job,previous){return previous?(previous.brief+(job.operation==='revise'?'\nRequested change: '+job.brief:'')):job.brief;}
 function promptProject(p){return {schema:p.schema,files:effects.source(components.source(designSystem.source(p.files)))};}
 const running=new Set();
 async function run(job,callModel){
@@ -163,7 +164,7 @@ async function run(job,callModel){
   const qaOptions={capture:true,...(projectId.startsWith('travellez-travel-operations-benchmark-')?{requiredScreens:require('./benchmark-gates').REQUIRED_SCREENS}:{})};
   const dataBackend=previous?.data_backend||job.data_backend||'sqlite';if(dataBackend==='supabase'){const setup=await cloud.status();if(!setup.ready)throw Error(setup.error||'Supabase is not connected. Complete Build Studio setup first.');}
   if(job.operation==='repair'&&!job.reported_issue){try{await browserQA(projectId,previous,previous);job.status='complete';job.result={...previous,files:undefined,schema:undefined};job.result.summary='Diagnostics passed; no repair was needed.';return job;}catch(e){job.brief+='\nBrowser diagnostic: '+String(e.message).slice(0,1200);}}
-  job.status='designing';writeJob(job);const designPlan=checkpoint?.designPlan||await designPipeline.plan(callModel,{brief:previous?(previous.brief+'\nRequested change: '+job.brief):job.brief,kind:'business app',style:job.style,previous:previous?.design_plan,existing:previous?.files});
+  job.status='designing';writeJob(job);const brief=featureBrief(job,previous);const designPlan=designPipeline.restoreScope(checkpoint?.designPlan||await designPipeline.plan(callModel,{brief,kind:'business app',style:job.style,previous:previous?.design_plan,existing:previous?.files}),brief);
   const version=previous?Math.max(...fs.readdirSync(path.join(runtime.ROOT,projectId,'versions')).map(Number).filter(Number.isFinite))+1:1;let prompt=buildContract+designPipeline.instructions(designPlan)+'\n'+design.guidance('business app',job.style,!!previous)+'\nAPP BRIEF: '+job.brief+'\nPROJECT NAME: '+job.projectName+'\nSTYLE: '+job.style;
   if(previous)prompt+='\nRevise this existing app following the requested change. Preserve existing collections/fields/types/options and all working auth/CRUD. New required fields need defaults. Existing project:'+JSON.stringify(promptProject(previous));
   let candidate,lastError;
@@ -185,4 +186,4 @@ async function run(job,callModel){
 function submit(input,callModel){const brief=String(input.brief||input.instruction||'').trim();if(brief.length<12||brief.length>6000)throw Error('Describe the app or change in 12–6000 characters');const job={id:crypto.randomUUID(),operation:input.repair?'repair':input.id?'revise':'build',reported_issue:!!input.reported_issue,data_backend:input.data_backend==='supabase'?'supabase':'sqlite',effects:effects.normalize({motion:input.motion,threeD:input.threeD||input.three_d}),projectId:input.id||null,projectName:String(input.projectName||'Custom App').slice(0,100),brief,style:String(input.style||'editorial').slice(0,100),status:'queued',created_at:new Date().toISOString()};writeJob(job);run(job,callModel).catch(()=>{});return job;}
 function listProjects(){if(!fs.existsSync(runtime.ROOT))return[];return fs.readdirSync(runtime.ROOT).flatMap(id=>{try{const p=runtime.getProject(id);delete p.files;return[p]}catch{return[]}}).sort((a,b)=>b.updated_at.localeCompare(a.updated_at));}
 async function publish(id){return require('./app-release').deploy(id);}
-module.exports={submit,getJob,run,normalize,normalizePolish,checkScreens,browserQA,loadAppRoute,listProjects,publish};
+module.exports={submit,getJob,run,normalize,normalizePolish,featureBrief,checkScreens,browserQA,loadAppRoute,listProjects,publish};

@@ -17,7 +17,7 @@ async function deploy(id,{outputRoot=ROOT,origin=require('./app-release').public
   for(const name of pages){const html=web.assemble(files,name),file=path.join(folder,name);if(created)fs.writeFileSync(file,html);else if(fs.readFileSync(file,'utf8')!==html)throw Error('Published website snapshot does not match its content version');}
   for(const name of pages){const result=await verify(origin+baseURL+name);if(!result?.passed)throw Error('Published website failed QA: '+name);const evidence=pipeline.stripShots(result);shots.push(...evidence.map(shot=>({...shot,label:name+' · '+shot.label})));routes.push({page:name,...result});}
   const deployed_qa={passed:true,scope:'all public HTML routes',pages,routes,evidence:gates.evidenceManifest(shots),at:new Date().toISOString()};
-  if(callModel)deployed_qa.visual_review=await gates.reviewEvidence(callModel,project.design_plan,shots,project.deployed_qa?.visual_review);
+  if(callModel)deployed_qa.visual_review=await gates.reviewEvidence(callModel,pipeline.restoreScope(project.design_plan,project.design_plan?.user_brief||project.brief),shots,project.deployed_qa?.visual_review);
   else if(id.startsWith('travellez-corporate-travel-website-benchmark-'))throw Error('Travellez publication requires a public screenshot reviewer');
   pipeline.saveEvidence(folder,shots);fs.writeFileSync(path.join(folder,'release.json'),JSON.stringify({id,version,deployed_qa},null,2));
   const meta={...project,status:'live',published_version:version,live_url:url,published_at:new Date().toISOString(),deployed_qa};delete meta.files;

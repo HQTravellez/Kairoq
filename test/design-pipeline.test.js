@@ -25,6 +25,18 @@ test('visual reviewer receives actual image payloads and DOM issues cannot be ov
 test('foundation is idempotent and previous design plans avoid another model call',async()=>{
  const files={'styles.css':'.custom{color:green}'};const once=system.apply(files,'luxury'),twice=system.apply(once,'luxury');assert.equal(once['styles.css'],twice['styles.css']);assert.deepEqual(system.source(twice),files);assert.match(once['styles.css'],/\.kq-button/);const previous={purpose:'Preserved identity'};assert.equal(await pipeline.plan(()=>{throw Error('unexpected model call');},{previous}),previous);
 });
+test('legacy and checkpoint plans regain authoritative scope without treating repair feedback as feature requirements',async()=>{
+ const legacy={purpose:'Preserved identity',layout:'Suggested policy settings'};
+ const brief='Provide trips, expenses and a workflow Controls screen';
+ const restored=await pipeline.plan(()=>{throw Error('must reuse identity');},{previous:legacy,brief});
+ assert.equal(restored.user_brief,brief);assert.equal(restored.layout,legacy.layout);assert.equal(legacy.user_brief,undefined);
+ const builder=require('../app-builder'),previous={brief};
+ assert.equal(builder.featureBrief({operation:'repair',brief:'Reviewer demands editable policy settings'},previous),brief);
+ assert.match(builder.featureBrief({operation:'revise',brief:'Add editable travel policies'},previous),/Requested change: Add editable travel policies/);
+ let request;await pipeline.review(async options=>{request=options;return{visual_review:{scores,findings:[],screen_reviews:[{screen:'Desktop Controls',scores,findings:[]}]}};},pipeline.restoreScope(legacy,brief),[{label:'Desktop Controls',bytes:Buffer.from('fixture')}]);
+ assert.match(request.messages[0].content[0].text,/ORIGINAL USER BRIEF .*Provide trips, expenses and a workflow Controls screen/);
+ assert.match(request.messages[0].content[0].text,/do not infer those editors from a navigation label/);
+});
 
 test('visual polish cannot replace the stored schema or project identity',()=>{
  const builder=require('../app-builder');
