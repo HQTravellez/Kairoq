@@ -1,6 +1,8 @@
 "use strict";
 const test=require("node:test"),assert=require("node:assert/strict");
 const docs=require("../api-docs"),adapter=require("../api-adapter");
+process.env.KAIROQ_API_APPROVED_OPERATIONS="api.example.com:GET:/trips/{id},api.example.com:POST:/trips";
+process.env.KAIROQ_API_APPROVED_WRITES="api.example.com:POST:/trips";
 const spec={openapi:"3.0.0",info:{title:"Trips",version:"1"},servers:[{url:"https://api.example.com/v1"}],paths:{
  "/trips/{id}":{get:{operationId:"getTrip",responses:{"200":{}}},delete:{operationId:"deleteTrip",responses:{"204":{}}}},
  "/trips":{post:{operationId:"createTrip",responses:{"201":{}}}}
