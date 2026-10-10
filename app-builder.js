@@ -86,13 +86,40 @@ async function loadAppRoute(page,base,{attempts=12,delayMs=5000,wait=ms=>new Pro
   await wait(delayMs);
  }
 }
-async function browserQA(id,candidate,previous,{capture=false,liveBase}={}){
+async function checkScreens(page,{requiredScreens=[],shot=async()=>{}}={}){
+ const names=await page.locator('[data-kq-screen-target]').evaluateAll(nodes=>[...new Set(nodes.map(n=>n.dataset.kqScreenTarget).filter(Boolean))]);
+ for(const name of requiredScreens)if(!names.includes(name)||!await page.locator('[data-kq-screen="'+name+'"]').count())throw Error('Required screen missing: '+name);
+ for(const width of (requiredScreens.length?[1440,390]:[1440])){
+  await page.setViewportSize({width,height:900});
+  for(const name of names){
+   const buttons=page.locator('[data-kq-screen-target="'+name+'"]');
+   async function reachable(){for(const button of await buttons.all()){const box=await button.boundingBox();if(await button.isVisible()&&box&&box.x>=0&&box.x+box.width<=width+8)return button;}return null;}
+   let button=await reachable();
+   if(!button&&requiredScreens.includes(name)){
+    for(const toggle of await page.locator('button[aria-controls][aria-expanded="false"]').all()){
+     if(!await toggle.isVisible())continue;
+     const contains=await toggle.evaluate((node,name)=>node.getAttribute('aria-controls').split(/\s+/).some(id=>document.getElementById(id)?.querySelector('[data-kq-screen-target="'+name+'"]')),name);
+     if(contains){await toggle.click();button=await reachable();if(button)break;}
+    }
+   }
+   if(!button){if(requiredScreens.includes(name))throw Error('Required navigation unreachable: '+name+' at '+width+'px');continue;}
+   await button.click({noWaitAfter:true});const target=page.locator('[data-kq-screen="'+name+'"]').first();await target.waitFor({state:'visible',timeout:3000});
+   if(await target.getAttribute('hidden')!==null)throw Error('Screen navigation failed: '+name);
+   await page.waitForFunction(name=>[...document.querySelectorAll('[data-kq-screen-target]')].some(n=>n.dataset.kqScreenTarget===name&&(n.getAttribute('aria-current')==='page'||n.classList.contains('active')||n.classList.contains('is-active')||n.dataset.active==='true')),name,{timeout:2000});
+   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+8))throw Error('Screen overflow: '+name+' at '+width+'px');
+   await shot(page,(width===390?'Mobile':'Desktop')+' screen · '+name);
+  }
+ }
+ return names;
+}
+async function browserQA(id,candidate,previous,{capture=false,liveBase,requiredScreens=[]}={}){
  const screenshots=[],designChecks=[],tested=[];async function shot(page,label){if(capture){await page.evaluate(()=>window.scrollTo(0,0));designChecks.push(...await designDom.inspect(page,label));screenshots.push({label,bytes:await page.screenshot({type:"jpeg",quality:65,fullPage:true})});}}
  const temp=fs.mkdtempSync(path.join(require('os').tmpdir(),'kairoq-app-qa-')),prefix='/apps/'+id+'/';let schema=candidate.schema;
  const server=http.createServer(async(req,res)=>{const route=req.url.split('?')[0].slice(prefix.length);if(route.startsWith('api/'))return runtime.api(req,res,{root:temp,id,route:'/'+route.slice(4),schema});const file=route||'index.html';if(!candidate.files[file]){res.writeHead(404);return res.end()}res.setHeader('Content-Type',file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':'application/javascript');res.end(candidate.files[file]);});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=liveBase||'http://127.0.0.1:'+server.address().port+prefix;let browser,qaAccount;
  try{
   const {chromium}=require('playwright-core');browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--disable-dev-shm-usage']});const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];await page.addInitScript(trusted=>{window.__kairoqQATrustedComponents=trusted;window.__kairoqQACollectionReady=null;document.addEventListener('kairoq:data',event=>{window.__kairoqQACollectionReady=event.detail?.collection?.name||null;});},candidate.files['app.js'].includes('/* BEGIN KAIROQ COMPONENT RUNTIME */'));page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());const email='kairoq-qa-'+crypto.randomBytes(12).toString('hex')+'@example.com',password=crypto.randomBytes(18).toString('hex');await page.route('**/*',route=>route.request().url().startsWith(base)?route.continue():route.abort());const served=await loadAppRoute(page,base,{attempts:liveBase?12:1});if(liveBase&&served.headers()['x-kairoq-version']!==String(candidate.version))throw Error('Public route served the wrong version');await shot(page,'Desktop login · 1440px');await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill(password);const registered=page.waitForResponse(r=>r.url()===base+'api/auth/register');await page.locator('#register').click();const registration=await registered;qaAccount=(await registration.json()).user;await waitForWorkspace(page);
-  const screenTargets=page.locator('[data-kq-screen-target]');if(await screenTargets.count()){const names=await screenTargets.evaluateAll(nodes=>[...new Set(nodes.map(n=>n.dataset.kqScreenTarget).filter(Boolean))]);for(const name of names){const button=page.locator('[data-kq-screen-target="'+name+'"]').first();if(!await button.isVisible())continue;await button.click({noWaitAfter:true});const target=page.locator('[data-kq-screen="'+name+'"]').first();await target.waitFor({state:'visible',timeout:3000});if(await target.getAttribute('hidden')!==null)throw Error('Screen navigation failed: '+name);await page.waitForFunction(n=>{const b=document.querySelector('[data-kq-screen-target="'+CSS.escape(n)+'"]');return b&&(b.getAttribute('aria-current')==='page'||b.classList.contains('active')||b.classList.contains('is-active')||b.dataset.active==='true');},name,{timeout:2000});await shot(page,'Desktop screen · '+name);}const workspace=page.locator('[data-kq-screen-target="workspace"]').first();if(await workspace.count()&&await workspace.isVisible())await workspace.click();await ensureWorkspace(page);tested.push('multi-screen navigation: '+names.join(', '));}
+  const checkedScreens=await checkScreens(page,{requiredScreens,shot});if(checkedScreens.length)tested.push('multi-screen navigation: '+checkedScreens.join(', '));
+  await page.setViewportSize({width:1440,height:1000});await ensureWorkspace(page);
   await shot(page,'Desktop empty workspace · 1440px');let saved,sortedTable=false;
   if(previous){const collection=previous.schema.collections[0],payload=await sampleWithReferences(page,previous.schema,collection);saved=await page.evaluate(async({name,payload})=>{const r=await fetch('api/collections/'+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!r.ok)throw Error('Could not seed revision regression record');return(await r.json()).record},{name:collection.name,payload});await page.reload();await waitForWorkspace(page);}
   const collection=candidate.schema.collections[0];await selectCollection(page,collection.name);const payload=await sampleWithReferences(page,candidate.schema,collection);await selectCollection(page,collection.name);for(const f of collection.fields){const field=page.locator('#record-fields [name="'+f.name+'"]');if(await field.isDisabled()){if(!(candidate.schema.actions||[]).some(action=>action.collection===collection.name&&action.field===f.name)||await field.inputValue()!==String(payload[f.name]))throw Error('Unexpected disabled field '+f.name);continue;}if(f.type==='boolean')await field.setChecked(payload[f.name]);else if(f.type==='select'||f.type==='reference')await field.selectOption(payload[f.name]);else await field.fill(String(payload[f.name]));}await page.locator('#save-record').click();await page.locator('[data-record-id]').first().waitFor({timeout:12000});await page.waitForFunction(async({name,payload})=>(await(await fetch('api/collections/'+name)).json()).records.some(r=>Object.entries(payload).every(([k,v])=>r.data[k]===v)),{name:collection.name,payload},{timeout:10000});
@@ -148,4 +175,4 @@ async function run(job,callModel){
 function submit(input,callModel){const brief=String(input.brief||input.instruction||'').trim();if(brief.length<12||brief.length>6000)throw Error('Describe the app or change in 12–6000 characters');const job={id:crypto.randomUUID(),operation:input.repair?'repair':input.id?'revise':'build',reported_issue:!!input.reported_issue,data_backend:input.data_backend==='supabase'?'supabase':'sqlite',effects:effects.normalize({motion:input.motion,threeD:input.threeD||input.three_d}),projectId:input.id||null,projectName:String(input.projectName||'Custom App').slice(0,100),brief,style:String(input.style||'editorial').slice(0,100),status:'queued',created_at:new Date().toISOString()};writeJob(job);run(job,callModel).catch(()=>{});return job;}
 function listProjects(){if(!fs.existsSync(runtime.ROOT))return[];return fs.readdirSync(runtime.ROOT).flatMap(id=>{try{const p=runtime.getProject(id);delete p.files;return[p]}catch{return[]}}).sort((a,b)=>b.updated_at.localeCompare(a.updated_at));}
 async function publish(id){return require('./app-release').deploy(id);}
-module.exports={submit,getJob,run,normalize,normalizePolish,browserQA,loadAppRoute,listProjects,publish};
+module.exports={submit,getJob,run,normalize,normalizePolish,checkScreens,browserQA,loadAppRoute,listProjects,publish};

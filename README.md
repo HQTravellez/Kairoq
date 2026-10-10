@@ -1643,3 +1643,12 @@ The Docker build executes Chromium regression tests before releasing the server.
 Build Studio lists each screen verdict and links its captured screenshot. Screenshot
 evidence is available only to the signed-in Kairoq owner. Shared components supply
 visible validation summaries, explicit saving/edit modes and mobile record cards.
+
+
+### Commit-linked Travellez benchmark evidence
+
+Travellez benchmark reports now identify the source commit and contract version. Old reports become `stale`; revalidation reuses existing projects and repairs only observed failures. Public AI verdicts must match the captured screenshot hashes. Required app screens are exercised at desktop and mobile widths, and the required collections, trip references and guarded transitions are checked explicitly.
+
+The **Benchmark evidence** Actions workflow runs regression tests on pushes and pull requests. Its manual deployed check reads an existing report once, rejects failed/incomplete/stale evidence, and uploads the report plus hash-verified public screenshots. It does not start another generation or poll the deployment. Supply the public HTTPS origin and deployed commit SHA; password-protected instances use the `KAIROQ_BENCHMARK_PASSWORD` Actions secret. Screenshot downloads require the same owner session as the report.
+
+For a local saved report: `KAIROQ_BENCHMARK_REPORT=/path/to/report.json KAIROQ_EXPECTED_SHA=<commit> npm run benchmark:verify`. For a deployed report, replace `KAIROQ_BENCHMARK_REPORT` with `KAIROQ_PUBLIC_URL=https://your-kairoq-host`. Verification exits nonzero unless both public outputs passed for the expected commit. Railway `/health` success remains separate from benchmark success.
