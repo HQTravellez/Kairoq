@@ -6,6 +6,7 @@ function generate(input,{language="typescript",className="KairoqApiClient"}={}){
  const plan=input?.operations?input:api.learn(input);
  if(!["typescript","javascript"].includes(language))throw Error("SDK language must be javascript or typescript");
  if(!/^[A-Z][A-Za-z0-9]{1,70}$/.test(className))throw Error("Invalid SDK class name");
+ const scheme=plan.auth?.find(a=>a.type==="http")?.scheme?.toLowerCase();const prefix=scheme==="token"?"Token ":scheme==="basic"?"Basic ":"Bearer ";
  const used=new Set(),methods=[];
  for(const op of plan.operations){let name=safeIdentifier(op.id);if(used.has(name))name=name+"_"+op.method.toLowerCase();if(used.has(name))throw Error("Duplicate SDK method");used.add(name);
   const pathname=JSON.stringify(op.path),verb=JSON.stringify(op.method);
@@ -30,7 +31,7 @@ class ${className} {
     const url=new URL(base.href.replace(/\\/$/,"")+"/"+path.replace(/^\\/+/,""));
     if(url.origin!==base.origin)throw Error("Cross-origin API target rejected");
     for(const [k,v] of Object.entries(query))url.searchParams.set(k,String(v));
-    const headers={Accept:"application/json",...(this.token?{Authorization:"Bearer "+this.token}:{})};
+    const headers={Accept:"application/json",...(this.token?{Authorization:${JSON.stringify(prefix)}+this.token}:{})};
     if(body!==undefined)headers["Content-Type"]="application/json";
     const res=await this.fetchImpl(url.href,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal,redirect:"error"});
     const raw=await res.text();let data;try{data=JSON.parse(raw);}catch{data=raw;}

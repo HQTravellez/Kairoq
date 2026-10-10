@@ -33,7 +33,7 @@ function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentia
  const headers={"Accept":"application/json",...(payload?{"Content-Type":"application/json"}:{})};
  if(secret){const key=contract.auth?.find(a=>a.type==="apiKey"&&a.in==="header"&&/^[a-z0-9-]{1,80}$/i.test(a.headerName||""));
   if(key){if(["host","content-length","authorization","cookie","connection"].includes(key.headerName.toLowerCase()))throw Error("Unsafe API key header");headers[key.headerName]=secret;}
-  else headers.Authorization="Bearer "+secret;
+  else {const scheme=contract.auth?.find(a=>a.type==="http")?.scheme?.toLowerCase();headers.Authorization=(scheme==="token"?"Token ":scheme==="basic"?"Basic ":"Bearer ")+secret;}
  }
  return{url,method:op.method,headers,payload,operation:op};
 }

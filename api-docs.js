@@ -15,15 +15,15 @@ function allowed(u,hosts){
  const set=new Set(String(hosts||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean));
  if(!set.has(u.hostname.toLowerCase()))throw Error("Documentation host is not allowlisted");
 }
-async function fetchDocs(url,{allowedHosts=process.env.KAIROQ_API_DOC_HOSTS,lookup=dns.lookup,timeout=8000}={}){
+async function fetchDocs(url,{allowedHosts=process.env.KAIROQ_API_DOC_HOSTS,lookup=dns.lookup,timeout=8000,maxBytes=MAX,bundle=false}={}){
  const u=validUrl(url);allowed(u,allowedHosts);
  const resolved=await lookup(u.hostname,{all:true});if(!resolved?.length||resolved.some(x=>!publicIp(x.address)))throw Error("Documentation host resolves to a non-public address");
  const ip=resolved[0];
  return new Promise((resolve,reject)=>{
   const req=https.get(u,{timeout,maxHeaderSize:16384,headers:{Accept:"application/json, text/html, text/markdown, text/plain", "User-Agent":"Kairoq-API-Docs/1.0"},lookup:(host,opts,cb)=>opts.all?cb(null,[ip]):cb(null,ip.address,ip.family)},res=>{
    if(res.statusCode!==200){res.resume();return reject(Error("Documentation fetch returned HTTP "+res.statusCode));}
-   const mime=String(res.headers["content-type"]||"").toLowerCase();if(mime&&!/json|html|text\/plain|markdown/.test(mime)){res.resume();return reject(Error("Unsupported documentation content type"));}
-   let total=0,chunks=[];res.on("data",part=>{total+=part.length;if(total>MAX){req.destroy(Error("Documentation exceeds 400 KB"));return;}chunks.push(part);});
+   const mime=String(res.headers["content-type"]||"").toLowerCase();if(mime&&!(bundle?/javascript|json|text\/plain/:/json|html|text\/plain|markdown/).test(mime)){res.resume();return reject(Error("Unsupported documentation content type"));}
+   let total=0,chunks=[];res.on("data",part=>{total+=part.length;if(total>maxBytes){req.destroy(Error("Documentation exceeds permitted size"));return;}chunks.push(part);});
    res.on("end",()=>resolve({url:u.href,content:Buffer.concat(chunks).toString("utf8"),contentType:mime}));
   });req.on("timeout",()=>req.destroy(Error("Documentation request timed out")));req.on("error",reject);
  });
@@ -51,6 +51,10 @@ async function discover(url,options){
   for(const match of refs){
    try{const linked=new URL(match[1],page.url);if(linked.hostname!==new URL(page.url).hostname)continue;const spec=await fetchDocs(linked.href,options);const parsed=infer(spec.content);if(parsed.format!=="unstructured"){result={...parsed,documentationUrl:page.url,specificationUrl:spec.url};break;}}catch{}
   }
+ }
+ if(result.format==="unstructured"&&!result.operations.length){
+  const scripts=[...page.content.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)].map(m=>new URL(m[1],page.url)).filter(u=>u.origin===new URL(page.url).origin&&/\.js(?:$|\?)/.test(u.href)).slice(0,2);
+  for(const script of scripts){try{const fetched=await fetchDocs(script.href,{...options,bundle:true,maxBytes:6000000});const specs=require("./api-bundle-docs").extract(fetched.content);if(specs.length){result=require("./api-bundle-docs").combine(specs,page.url);break;}}catch(error){result.limitations.push("Bundle extraction: "+error.message);}}
  }
  return{...result,documentationUrl:page.url};
 }
