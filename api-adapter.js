@@ -3,7 +3,7 @@
 const https=require("node:https"),dns=require("node:dns").promises;
 const docs=require("./api-docs"),api=require("./api-learning");
 function baseApprovalKey(contract,op){const u=docs.validUrl(contract.baseUrl);return u.hostname.toLowerCase()+":"+op.method+":"+op.path;}
-function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentialName,approved=false,approvedWrites=false,allowedHosts=process.env.KAIROQ_API_HOSTS}={}){
+function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentialName,oauthProvider,approved=false,approvedWrites=false,allowedHosts=process.env.KAIROQ_API_HOSTS}={}){
  const contract=plan?.operations?plan:api.learn(apiSpec);
  const op=contract.operations.find(x=>x.id===operationId);if(!op)throw Error("Unknown API operation");
  const approvalKey=baseApprovalKey(contract,op);const allowedOps=new Set(String(process.env.KAIROQ_API_APPROVED_OPERATIONS||"").split(",").map(x=>x.trim()).filter(Boolean));
@@ -26,7 +26,8 @@ function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentia
   if(!/^KAIROQ_API_TOKEN_[A-Z0-9_]{1,64}$/.test(credentialName))throw Error("Credential must be a dedicated KAIROQ_API_TOKEN_ environment variable");
   secret=process.env[credentialName]||"";if(!secret)throw Error("API credential not configured");
  }
- if(op.authenticationRequired&&!secret)throw Error("Operation requires an API credential");
+ if(oauthProvider){if(credentialName)throw Error("Choose either OAuth or a static API credential");const provider=require("./api-oauth").config(oauthProvider);if(!provider)throw Error("OAuth provider not configured");}
+ if(op.authenticationRequired&&!secret&&!oauthProvider)throw Error("Operation requires an API credential");
  if(body!==undefined&&JSON.stringify(body).length>50000)throw Error("API body too large");
  const payload=body===undefined?undefined:JSON.stringify(body);
  const headers={"Accept":"application/json",...(payload?{"Content-Type":"application/json"}:{})};
@@ -39,6 +40,7 @@ function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentia
 async function execute(args,{lookup=dns.lookup,timeout=10000}={}){
  if(process.env.KAIROQ_API_LIVE_ENABLED!=="true")throw Error("Live API execution is disabled; set KAIROQ_API_LIVE_ENABLED=true after reviewing the provider and host allowlist");
  const request=prepare(args);
+ if(args.oauthProvider){const token=await require("./api-oauth").accessToken(args.oauthProvider);request.headers.Authorization="Bearer "+token;}
  if(!["GET","HEAD"].includes(request.method)&&process.env.KAIROQ_API_WRITE_ENABLED!=="true")throw Error("Live API writes are disabled by server policy");
  const ip=await lookup(request.url.hostname,{all:true});
  if(!ip?.length||ip.some(x=>!docs.publicIp(x.address)))throw Error("API target resolves to a non-public address");
