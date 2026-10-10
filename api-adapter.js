@@ -2,11 +2,14 @@
 // Server-side API adapter: explicit host + operation permission, no client secrets.
 const https=require("node:https"),dns=require("node:dns").promises;
 const docs=require("./api-docs"),api=require("./api-learning");
+function baseApprovalKey(contract,op){const u=docs.validUrl(contract.baseUrl);return u.hostname.toLowerCase()+":"+op.method+":"+op.path;}
 function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentialName,approved=false,approvedWrites=false,allowedHosts=process.env.KAIROQ_API_HOSTS}={}){
  const contract=plan?.operations?plan:api.learn(apiSpec);
  const op=contract.operations.find(x=>x.id===operationId);if(!op)throw Error("Unknown API operation");
+ const approvalKey=baseApprovalKey(contract,op);const allowedOps=new Set(String(process.env.KAIROQ_API_APPROVED_OPERATIONS||"").split(",").map(x=>x.trim()).filter(Boolean));
+ if(!allowedOps.has(approvalKey))throw Error("Operation is not approved in the server policy");
  if(!approved)throw Error("API execution requires explicit approval");
- if(!["GET","HEAD"].includes(op.method)&&!approvedWrites)throw Error("Mutating API operations require separate write approval");
+ if(!["GET","HEAD"].includes(op.method)&&(!approvedWrites||!new Set(String(process.env.KAIROQ_API_APPROVED_WRITES||"").split(",").map(x=>x.trim())).has(approvalKey)))throw Error("Mutating API operations require separate write approval");
  const base=docs.validUrl(contract.baseUrl);const hosts=String(allowedHosts||"").split(",").map(x=>x.trim().toLowerCase());if(!hosts.includes(base.hostname.toLowerCase()))throw Error("API host is not allowlisted");
  let pathname=op.path;
  for(const token of pathname.match(/\{([^{}]+)\}/g)||[]){
