@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API Intelligence · Kairoq</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#141f31;--ink:#eaf0f7;--muted:#aebbc9;--border:#30435b;--accent:#8cbbff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,sans-serif}main{width:min(1100px,calc(100% - 32px));margin:40px auto 80px}header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}h1{font-size:clamp(2rem,4vw,3.5rem);letter-spacing:-.045em;line-height:1.1;margin:22px 0 10px}h2{font-size:1.25rem;margin:0 0 12px}.lead{max-width:65ch;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:18px;margin:24px 0}.panel{padding:24px;background:var(--panel);border:1px solid var(--border);border-radius:18px;min-width:0}.field{display:grid;gap:7px;margin:14px 0}label{font-size:.9rem;font-weight:650}input,textarea,select{width:100%;min-width:0;background:#0d1827;border:1px solid #42546a;border-radius:9px;color:var(--ink);font:inherit;padding:11px 12px}textarea{min-height:145px;resize:vertical}button{background:var(--accent);color:#08101b;border:0;border-radius:9px;font:650 15px system-ui;padding:12px 18px;min-height:44px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}button.secondary{background:#283a50;color:var(--ink)}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.small{font-size:.85rem;color:var(--muted)}.status{margin:20px 0;padding:14px 18px;border:1px solid var(--border);border-radius:12px;background:#172539}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.55 ui-monospace,monospace;background:#0d1827;border:1px solid var(--border);border-radius:12px;padding:16px;max-height:480px;overflow:auto}a{color:#bed8ff}strong{color:#fff}.danger{color:#ffb1a7}@media(max-width:600px){main{margin-top:22px}.panel{padding:18px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+</style></head><body><main>
+<header><div><strong>KAIROQ</strong> / API Intelligence</div><a href="/">Back to workspace</a></header>
+<h1>Build with real APIs.</h1><p class="lead">Import documentation, understand endpoints and authentication, review API changes, and generate an API-aware product. No credentials are sent to the browser by Kairoq.</p>
+<div class="grid">
+<section class="panel"><h2>1. Discover an API</h2><div class="field"><label for="docsUrl">Public documentation URL (HTTPS)</label><input id="docsUrl" type="url" placeholder="https://docs.example.com/openapi.json"></div><div class="field"><label for="docsText">Or paste OpenAPI JSON, Postman JSON, or documentation text</label><textarea id="docsText" placeholder="Paste API documentation here"></textarea></div><div class="actions"><button id="discover">Analyze documentation</button></div><p class="small">URL imports require a server-side host allowlist. Ordinary documentation produces a draft that must be verified before live integration.</p></section>
+<section class="panel"><h2>2. Build a product</h2><div class="field"><label for="project">Product name</label><input id="project" value="API-powered workspace"></div><div class="field"><label for="brief">What should Kairoq build?</label><textarea id="brief">Build a premium full-stack dashboard using the imported API operations, with authenticated users, clear integration status, empty states and graceful errors.</textarea></div><div class="actions"><button id="build" disabled>Build with API context</button></div><p class="small">Generated apps can plan integrations from the API contract. Actual live API execution is a separate permissioned step.</p></section>
+</div>
+<section class="panel"><h2>3. Inspect the API contract</h2><p id="status" class="status" role="status" aria-live="polite">No API documentation imported yet.</p><pre id="output" aria-label="Imported API contract">Waiting for API documentation.</pre></section>
+<section class="panel" style="margin-top:18px"><h2>4. Test a server-side operation</h2><p class="small danger">Live calls are disabled by default and require server-side enablement, allowlisted hosts, dedicated credentials and explicit approval. Mutating calls require separate write approval.</p><div class="grid"><div class="field"><label for="operation">Operation</label><select id="operation"><option value="">Import an API first</option></select></div><div class="field"><label for="credential">Server credential variable name (optional)</label><input id="credential" placeholder="KAIROQ_API_TOKEN_PROVIDER"></div></div><div class="field"><label for="params">Path parameters JSON</label><textarea id="params" rows="2">{}</textarea></div><div class="field"><label for="payload">Request body JSON (optional)</label><textarea id="payload" rows="2"></textarea></div><div class="actions"><button id="test" class="secondary" disabled>Review and test selected operation</button></div></section>
+</main><script>
+"use strict";
+const $=id=>document.getElementById(id);let plan=null;
+function status(message){$("status").textContent=message;}
+async function request(url,body){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(data.error||"Request failed ("+r.status+")");return data;}
+async function action(button,fn){button.disabled=true;try{await fn();}catch(e){status(e.message);$("output").textContent=String(e.message);}finally{button.disabled=false;}}
+$("discover").addEventListener("click",()=>action($("discover"),async()=>{
+ const documentationUrl=$("docsUrl").value.trim(),documentationText=$("docsText").value.trim();
+ if(!documentationUrl&&!documentationText)throw Error("Enter a URL or paste documentation.");
+ plan=await request("/api/developer/api/discover",documentationUrl?{documentationUrl}:{documentationText});
+ $("output").textContent=JSON.stringify(plan,null,2);status(plan.title+": "+plan.operations.length+" documented operations. "+(plan.format==="unstructured"?"Draft only: verify against a formal specification.":"Ready for product planning."));
+ $("operation").replaceChildren();for(const op of plan.operations){const opt=document.createElement("option");opt.value=op.id;opt.textContent=op.method+" "+op.path;$("operation").append(opt);}
+ $("build").disabled=!plan.operations.length;$("test").disabled=!plan.operations.length;
+}));
+$("build").addEventListener("click",()=>action($("build"),async()=>{
+ if(!plan)throw Error("Import documentation first");
+ const brief=$("brief").value.trim();if(brief.length<12)throw Error("Describe the product in more detail.");
+ const result=await request("/api/developer/build",{kind:"fullstack",projectName:$("project").value,brief,apiPlan:plan});
+ status("Build submitted. Job: "+result.id+". Track progress in Kairoq Build Studio.");
+ $("output").textContent=JSON.stringify(result,null,2);
+}));
+$("test").addEventListener("click",()=>action($("test"),async()=>{
+ if(!plan)throw Error("Import documentation first");
+ const operation=plan.operations.find(x=>x.id===$("operation").value);if(!operation)throw Error("Select an operation");
+ const write=!["GET","HEAD"].includes(operation.method);
+ const message="Execute "+operation.method+" "+operation.path+" against the approved provider?"+(write?" This may change live provider data.":"");
+ if(!window.confirm(message))return;
+ if(write&&!window.confirm("Confirm again: this is a mutating API operation."))return;
+ const params=JSON.parse($("params").value||"{}"),body=$("payload").value.trim()?JSON.parse($("payload").value):undefined;
+ const result=await request("/api/developer/api/execute",{plan,operationId:operation.id,pathParams:params,body,credentialName:$("credential").value.trim()||undefined,approved:true,approvedWrites:write});
+ status("API returned HTTP "+result.status);$("output").textContent=JSON.stringify(result,null,2);
+}));
+</script></body></html>
