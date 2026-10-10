@@ -41,12 +41,12 @@ test('website contract retries missing home and required routes before browser Q
  assert.equal(calls,3);assert.ok(result.files['platform.html']);
 });
 test('website contract bounds repairs and rejects excess pages',async()=>{
- const files=websiteFixture();for(let i=0;i<10;i++)files[`page-${i}.html`]=files['index.html'];
- let calls=0;await assert.rejects(generateFiles(async()=>{calls++;return{files};},{messages:[]}),/after 3 attempts.*at most 10/);assert.equal(calls,3);
+ const files=websiteFixture();for(let i=0;i<40;i++)files[`page-${i}.html`]=files['index.html'];
+ let calls=0;await assert.rejects(generateFiles(async()=>{calls++;return{files};},{messages:[]}),/after 3 attempts.*at most 40/);assert.equal(calls,3);
 });
 test('required route extraction enforces exact filenames and page limit',()=>{
  assert.deepEqual(requiredPages('Generate index.html, platform.html, smart-itinerary.html and pricing.html'),['index.html','platform.html','smart-itinerary.html','pricing.html']);
- assert.throws(()=>requiredPages(Array.from({length:10},(_,i)=>`page-${i}.html`).join(' ')),/exceeds/);
+ assert.throws(()=>requiredPages(Array.from({length:40},(_,i)=>`page-${i}.html`).join(' ')),/exceeds/);
 });
 test('partial website repairs retain existing routes and shared assets',()=>{
  const base={...websiteFixture(),'about.html':websiteFixture()['index.html']};

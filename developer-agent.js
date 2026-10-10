@@ -1,6 +1,7 @@
 "use strict";
-const assetLibrary=require("./builder-assets");
-const designGuidance=require("./design-guidance");const apiLearning=require("./api-learning");
+const assetLibrary=require("./builder-assets"),apiLearning=require("./api-learning");
+const designGuidance=require("./design-guidance");
+const websiteSource=require("./website-source"),websiteForms=require("./website-forms");
 const designPipeline=require("./design-pipeline"),designSystem=require("./design-system"),designDom=require("./design-dom"),effects=require("./visual-effects");
 // Isolated website/web-app generation. Generated code is only previewed in sandboxed iframes.
 const fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
@@ -22,28 +23,33 @@ function normalizeFiles(raw,base){
     if(name==="index.html"||name==="styles.css"||name==="app.js"||name==="html"||name==="css"||name==="js")continue;
     if(/^[a-z0-9][a-z0-9-]{0,48}\.html$/.test(name))files[name]=String(value||"");
   }
-  const pages=Object.keys(files).filter(n=>n.endsWith(".html"));if(!files["index.html"]||pages.length>10)throw Error("Website needs index.html and at most 10 HTML pages.");
-  if(pages.some(n=>files[n].length<350)||files["styles.css"].length<500)throw Error("The AI produced incomplete website files.");
-  if(Object.values(files).some(x=>x.length>160000))throw Error("Generated file exceeds size limit.");
+  for(const name of ["components.json","assets.json"])if(obj[name])files[name]=typeof obj[name]==="string"?obj[name]:JSON.stringify(obj[name]);
+  websiteSource.components(files);if(files["assets.json"])websiteSource.assets(JSON.parse(files["assets.json"]));
+  const pages=Object.keys(files).filter(n=>n.endsWith(".html"));if(!files["index.html"]||pages.length>websiteSource.MAX_PAGES)throw Error("Website needs index.html and at most 40 HTML pages.");
+  if(pages.some(n=>websiteSource.expand(files[n],files).length<350)||files["styles.css"].length<500)throw Error("The AI produced incomplete website files.");
+  if(Object.entries(files).some(([name,x])=>x.length>(name==="assets.json"?6000000:160000)))throw Error("Generated file exceeds size limit.");
   for(const page of pages){
-    const scripts=[...files[page].matchAll(/<script\b[^>]*\bsrc\s*=\s*["\x27]([^"\x27]+)["\x27]/gi)];
+    const expanded=websiteSource.resolveAssets(websiteSource.expand(files[page],files),files);
+    const scripts=[...expanded.matchAll(/<script\b[^>]*\bsrc\s*=\s*["\x27]([^"\x27]+)["\x27]/gi)];
     if(scripts.some(x=>!/^\.?\/?app\.js(?:\?.*)?$/.test(x[1])))throw Error("Only the shared local app.js script is allowed.");
   }
+  websiteForms.schemas(files);
   try{new vm.Script(files["app.js"],{filename:"app.js",timeout:1000})}catch(e){throw Error("Generated JavaScript syntax error: "+e.message)}
   return files;
 }
 function requiredPages(brief){
  const pages=[...new Set(['index.html',...String(brief).matchAll(/\b([a-z0-9][a-z0-9-]{0,48}\.html)\b/g)].map(x=>typeof x==='string'?x:x[1]))];
- if(pages.length>10)throw Error('Website request exceeds the limit of 10 HTML pages.');
+ if(pages.length>websiteSource.MAX_PAGES)throw Error('Website request exceeds the limit of 40 HTML pages.');
  return pages;
 }
-async function generateFiles(callModel,options,{required=['index.html'],base}={}){
+async function generateFiles(callModel,options,{required=['index.html'],base,allowedPages}={}){
  let failure,previous;
  for(let attempt=0;attempt<3;attempt++){
   try{
-   const messages=attempt?[...options.messages,{role:'user',content:'The previous output failed website validation: '+failure.message+'\nReturn ONLY JSON {files:{...}} with complete string contents, including index.html, shared styles.css, app.js and all required pages: '+required.join(', ')+'. Maximum 10 HTML pages. Use exact filenames as keys in files. Do not truncate code or return a pages array. Preserve every existing route.\nPrevious output: '+JSON.stringify(previous||{}).slice(0,120000)}]:options.messages;
+   const messages=attempt?[...options.messages,{role:'user',content:'The previous output failed website validation: '+failure.message+'\nReturn ONLY JSON {files:{...}} with complete string contents, including index.html, shared styles.css, app.js and all required pages: '+required.join(', ')+'. Maximum 40 HTML pages. Use exact filenames as keys in files. Do not truncate code or return a pages array. Preserve every existing route.\nPrevious output: '+JSON.stringify(websiteSource.modelSource(previous?.files||previous||{})).slice(0,120000)}]:options.messages;
    previous=await callModel({...options,messages});
-   const files=normalizeFiles(base?{files:{...base,...(previous?.files||previous)}}:previous);
+   const files=normalizeFiles(base?{files:{...base,...(previous?.files||previous),...(base["assets.json"]?{"assets.json":base["assets.json"]}:{})}}:previous);
+   if(allowedPages&&Object.keys(files).filter(name=>name.endsWith('.html')).some(name=>!allowedPages.includes(name)))throw Error('Generate only these allowed routes in this batch: '+allowedPages.join(', '));
    const missing=required.filter(name=>!files[name]);
    if(missing.length)throw Error('Missing required HTML pages: '+missing.join(', '));
    return {generated:previous,files};
@@ -54,15 +60,39 @@ async function generateFiles(callModel,options,{required=['index.html'],base}={}
 async function withTimeout(promise,ms,label){
  let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' timed out')),ms);})]);}finally{clearTimeout(timer);}
 }
+async function generateSite(callModel,{prompt,brief,required,base={},kind='website'}){
+ // Plan route names first, then generate complete bounded batches, preserving the
+ // shared component/style contract. A large site cannot fit one model response.
+ let pages=required;
+ if(kind==='website'){
+  let failure;
+  for(let attempt=0;attempt<3;attempt++){
+   try{
+    const plan=await callModel({purpose:'website-sitemap',maxOutputTokens:2500,messages:[{role:'user',content:'Plan a sitemap for this website. Return ONLY JSON {pages:["index.html",...]} using safe lowercase-kebab .html filenames. Include all required filenames: '+required.join(', ')+'. Choose the page count appropriate to the brief, maximum 40; do not inflate a simple homepage. Brief: '+brief+(failure?'\nPrevious plan error: '+failure:'')}]});
+    if(!Array.isArray(plan.pages)||plan.pages.some(name=>typeof name!=='string'||! /^[a-z0-9][a-z0-9-]{0,48}\.html$/.test(name)))throw Error('Invalid sitemap filenames');
+    pages=[...new Set([...required,...plan.pages])];if(pages.length>websiteSource.MAX_PAGES)throw Error('Sitemap exceeds 40 pages');break;
+   }catch(error){failure=error.message;if(attempt===2)throw Error('Website sitemap failed: '+failure);}
+  }
+ }
+ let files=base,generated={};
+ for(let offset=0;offset<pages.length;offset+=4){
+  const batch=pages.slice(offset,offset+4),existing=Object.keys(files).filter(name=>name.endsWith('.html'));
+  const context=offset?'\nExisting shared design and homepage (preserve unchanged files): '+JSON.stringify(websiteSource.modelSource(Object.fromEntries(Object.entries(files).filter(([name])=>!name.endsWith('.html')||name==='index.html')))):' ';
+  const result=await generateFiles(callModel,{temperature:0.4,maxOutputTokens:20000,messages:[{role:'user',content:prompt+'\nCOMPLETE SITEMAP: '+pages.join(', ')+'. Generate ONLY these page files in this batch: '+batch.join(', ')+'. '+(offset?'Reuse existing components, styles and JavaScript. Return only changed/new files.':'Also generate shared components.json, styles.css and app.js. Do not generate other pages yet.')+context}]},{base:files,required:[...existing,...batch],allowedPages:[...existing,...batch]});
+  if(Object.keys(result.files).filter(name=>name.endsWith('.html')).some(name=>!pages.includes(name)))throw Error('Generated route is outside the planned sitemap');
+  files=result.files;generated={...generated,...result.generated};
+ }
+ return{files,generated};
+}
 function preserveRoutes(base,next){
  const merged={...base,...next},required=Object.keys(base||{}).filter(n=>n.endsWith(".html"));
  for(const name of required)if(!merged[name])throw Error("Revision removed route: "+name);
  return merged;
 }
-function assemble(files,pageName="index.html"){
-  let html=files[pageName].replace(/<script\b[^>]*\bsrc\s*=\s*["\x27]\.?\/?app\.js(?:\?[^"\x27]*)?["\x27][^>]*>\s*<\/script>/gi,"").replace(/<link\b[^>]*href\s*=\s*["\x27]\.?\/?styles\.css["\x27][^>]*>/gi,"");
-  const css="<style>\n"+files["styles.css"].replace(/<\/style/gi,"<\\/style")+"\n</style>";
-  const js="<script>\n"+files["app.js"].replace(/<\/script/gi,"<\\/script")+"\n<\/script>";
+function assemble(files,pageName="index.html",{formConfig}={}){
+  let html=websiteSource.resolveAssets(websiteSource.expand(files[pageName],files),files).replace(/<script\b[^>]*\bsrc\s*=\s*["\x27]\.?\/?app\.js(?:\?[^"\x27]*)?["\x27][^>]*>\s*<\/script>/gi,"").replace(/<link\b[^>]*href\s*=\s*["\x27]\.?\/?styles\.css["\x27][^>]*>/gi,"");
+  const css="<style>\n"+websiteSource.resolveAssets(files["styles.css"],files).replace(/<\/style/gi,"<\\/style")+"\n</style>";
+  const js="<script>\n"+(websiteForms.runtime(formConfig)+files["app.js"]).replace(/<\/script/gi,"<\\/script")+"\n<\/script>";
   html=/<\/head>/i.test(html)?html.replace(/<\/head>/i,css+"\n</head>"):css+"\n"+html;
   html=/<\/body>/i.test(html)?html.replace(/<\/body>/i,js+"\n</body>"):html+"\n"+js;
   return html;
@@ -70,8 +100,8 @@ function assemble(files,pageName="index.html"){
 async function audit(files,{capture=false}={}){
   assetLibrary.assertReferences(files);
   const notes=[],screenshots=[],designChecks=[],pages=Object.keys(files).filter(n=>n.endsWith(".html")).sort((a,b)=>a==="index.html"?-1:b==="index.html"?1:a.localeCompare(b));
-  for(const pageName of pages){if(!/<meta[^>]+name=["']viewport["']/i.test(files[pageName]))notes.push(pageName+": missing viewport meta tag");if(!/<h1[\s>]/i.test(files[pageName]))notes.push(pageName+": missing primary heading");
-   const links=[...files[pageName].matchAll(/href=["']([^"'#?]+\.html)(?:[?#][^"']*)?["']/gi)].map(m=>m[1].replace(/^\.\//,""));for(const href of links)if(!files[href])notes.push(pageName+": missing linked page "+href);}
+  for(const pageName of pages){const rendered=websiteSource.expand(files[pageName],files);if(!/<meta[^>]+name=["']viewport["']/i.test(rendered))notes.push(pageName+": missing viewport meta tag");if(!/<h1[\s>]/i.test(rendered))notes.push(pageName+": missing primary heading");
+   const links=[...rendered.matchAll(/href=["']([^"'#?]+\.html)(?:[?#][^"']*)?["']/gi)].map(m=>m[1].replace(/^\.\//,""));for(const href of links)if(!files[href])notes.push(pageName+": missing linked page "+href);}
   try{
     const {chromium}=require("playwright-core");
     const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||"/usr/bin/chromium",headless:true,args:["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"]});
@@ -103,28 +133,32 @@ async function finishDesign(files,qa,designPlan,brief,callModel,effectConfig={mo
  for(let polish=0;polish<3;polish++){
   evidence=designPipeline.stripShots(qa);let visual;try{visual=await designPipeline.review(callModel,designPlan,evidence,qa.design_checks);}catch(e){console.warn('[developer-agent] VISUAL FALLBACK '+String(e.message||e));visual=designPipeline.deterministicReview(evidence,qa.design_checks,String(e.message||e));}qa.visual_review=visual;if(visual.coverage?.mode==='deterministic-browser-fallback'){qa.passed=false;qa.findings.push('AI screenshot review unavailable; browser inspection alone does not pass the visual quality gate');break;}if(visual.passed)break;
   if(polish===2){qa.passed=false;qa.findings.push('Design review needs further refinement');break;}
-  const patch=await generateFiles(callModel,{maxOutputTokens:20000,messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing ONLY changed files. Include the complete string contents of each changed file; unchanged pages and assets are preserved by Kairoq. Prefer a shared CSS correction when it fixes multiple pages. Never remove or rename an existing page. Polish this working website while preserving routes, interactions and content. No external scripts, fonts, credentials or fake backend actions. Preserve all approved local asset URLs and credits.'+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(effects.source(designSystem.source(files)))}]},{base:effects.source(designSystem.source(files)),required:Object.keys(files).filter(name=>name.endsWith('.html'))});
+  const patch=await generateFiles(callModel,{maxOutputTokens:20000,messages:[{role:'user',content:'Return ONLY JSON {files:{...}} containing ONLY changed files. Include the complete string contents of each changed file; unchanged pages and assets are preserved by Kairoq. Prefer a shared CSS correction when it fixes multiple pages. Never remove or rename an existing page. Polish this working website while preserving routes, interactions and content. No external scripts, fonts, credentials or fake backend actions. Preserve uploaded images and shared components.'+websiteSource.instructions(files)+designPipeline.instructions(designPlan)+designPipeline.repairInstructions(visual)+'\nOriginal brief: '+brief+'\nCurrent files: '+JSON.stringify(websiteSource.modelSource(effects.source(designSystem.source(files))))}]},{base:effects.source(designSystem.source(files)),required:Object.keys(files).filter(name=>name.endsWith('.html'))});
   files=assetLibrary.credits(effects.inject(designSystem.apply(patch.files,designPlan.style),effectConfig),assetLibrary.list());qa=await audit(files,{capture:true});if(!qa.passed){designPipeline.stripShots(qa);break;}
 
  }
  return{files,qa,evidence};
 }
-async function build({brief,kind="website",style="editorial",projectName,motion="subtle",threeD="off",apiSpec,apiPlan,asset_ids=[],auto_assets=true},callModel){
+async function build({brief,kind="website",style="editorial",projectName,motion="subtle",threeD="off",assets:uploadedAssets=[],onProgress=()=>{},apiSpec,apiPlan,asset_ids=[],auto_assets=true},callModel){
   brief=String(brief||"").trim().slice(0,3000);
   if(brief.length<12)throw Error("Describe the website or app in at least 12 characters.");
   kind=kind==="webapp"?"webapp":"website";
   const id=slug(projectName||brief.slice(0,35))+"-"+crypto.randomBytes(3).toString("hex");
+  const brandAssets=websiteSource.assetFiles(uploadedAssets);
+  onProgress("sourcing");
   const assets=await assetLibrary.prepare(brief,callModel,{ids:asset_ids,auto:auto_assets});
   const required=requiredPages(brief);const effectConfig=effects.normalize({motion,threeD:assets.some(a=>a.kind==='model')&&threeD==='off'?'hero':threeD});const designPlan=await designPipeline.plan(callModel,{brief,kind,style});
-  const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain shared styles.css and app.js plus index.html and, when the product needs multiple routes, additional safe lowercase-kebab HTML pages such as platform.html, about.html, pricing.html or industries-travel.html. Generate 2–8 coherent pages for a multi-page website request; every page shares the same design system, header/footer and working navigation. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Use approved downloaded assets when provided, otherwise inline SVG icons or CSS illustrations. Never use external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. Every HTML page links the shared styles.css and app.js using relative paths. Cross-page links must target the generated .html files. Do not embed CSS or JS inside HTML. Webapps must have functional client-side interactions using in-memory/localStorage only, not fake backend actions. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Use concise shared CSS and JS; output complete files without truncation. Maximum 10 HTML pages. Required filenames: "+required.join(", ")+".";
-  const prompt=system+assetLibrary.instructions(assets)+designPipeline.instructions(designPlan)+(apiPlan?apiLearning.instructions(apiPlan):apiSpec?apiLearning.instructions(apiSpec):'')+effects.instructions(effectConfig)+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
+  const system="You are a senior product designer, creative director, and principal frontend engineer. Return ONLY a JSON object with keys project_name,summary,files. files must contain shared styles.css and app.js plus index.html and, when the product needs multiple routes, additional safe lowercase-kebab HTML pages such as platform.html, about.html, pricing.html or industries-travel.html. Follow the planned sitemap for a multi-page website request; every page shares the same design system, header/footer and working navigation. Build a premium, real, fully usable responsive "+kind+" based on the user's brief. Original creative direction, impeccable typography, restrained palette, layout hierarchy, deliberate whitespace, subtle interactions, premium mobile UX, accessibility and working navigation/CTAs. Choose a high-end design appropriate to industry, not generic AI gradients, neon blobs, or bland templates. Strong designed hero and multiple coherent sections with realistic domain-specific copy, meaningful content, responsive 390px and 1440px layouts. CSS animations respect prefers-reduced-motion. Include inline SVG icons or CSS illustrations instead of external image dependencies. Pure HTML CSS browser JS, no framework, no external scripts, no API credentials, no fake payment or authentication claims. Every HTML page links the shared styles.css and app.js using relative paths. Cross-page links must target the generated .html files. Do not embed CSS or JS inside HTML. Webapps use client-side interactions; the only website backend action supported here is Kairoq enquiry capture. Do not fake authentication, bookings, payments or AI responses. Quality bar: visually finished and polished, not a wireframe. Prioritize complete working code over lengthy prose. Use concise shared CSS and JS; output complete files without truncation. Maximum 40 HTML pages. Required filenames: "+required.join(", ")+".";
+  const prompt=system+websiteSource.instructions(brandAssets)+assetLibrary.instructions(assets)+(apiPlan?apiLearning.instructions(apiPlan):apiSpec?apiLearning.instructions(apiSpec):'')+designPipeline.instructions(designPlan)+effects.instructions(effectConfig)+"\n"+designGuidance.guidance(kind,style)+"\n\nDESIGN DIRECTION: "+style+"\nPROJECT NAME: "+String(projectName||"").slice(0,100)+"\nUSER BRIEF:\n"+brief;
+  onProgress("generating");
   let generated,sourceFiles,usedStarter=false;
-  try{const result=await generateFiles(callModel,{messages:[{role:"user",content:prompt}],temperature:0.45,maxOutputTokens:20000},{required});generated=result.generated;sourceFiles=result.files;}
-  catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(process.env.OPENROUTER_API_KEY || require("./experiential").configured() || kind==="webapp" || required.length>1 || /multi[- ]page/i.test(brief))throw Error("Custom AI generation failed: "+e.message+". This is not an AI-generated project; check model access or credits.");generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
+  try{const result=await generateSite(callModel,{prompt,brief,required,base:brandAssets,kind});generated=result.generated;sourceFiles=result.files;}
+  catch(e){console.warn("[developer-model] Generation unavailable:",String(e.message||e).slice(0,400));if(process.env.OPENROUTER_API_KEY || require("./experiential").configured() || uploadedAssets.length || kind==="webapp" || required.length>1 || /multi[- ]page/i.test(brief))throw Error("Custom AI generation failed: "+e.message+". This is not an AI-generated project; check model access or credits.");generated=require("./developer-starter").starter(brief,projectName,style);usedStarter=true;}
+  onProgress("testing");
   let files=assetLibrary.credits(effects.inject(designSystem.apply(sourceFiles||normalizeFiles(generated),designPlan.style),effectConfig),assets),qa=await audit(files,{capture:true}),revisions=0;
   if(!usedStarter && qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
-      const fix="Return only JSON {files:{...}} containing ONLY changed files with complete string contents. Unchanged pages/assets are preserved. Do not remove routes. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(effects.source(designSystem.source(files))).slice(0,34000)+". Preserve and enhance premium design.";
+      const fix="Return only JSON {files:{...}} containing ONLY changed files with complete string contents. Unchanged pages/assets are preserved. Do not remove routes. Repair these browser QA issues: "+qa.findings.join("; ")+"\nOriginal brief:"+brief+"\nCurrent files JSON:\n"+JSON.stringify(websiteSource.modelSource(effects.source(designSystem.source(files)))).slice(0,34000)+". Preserve and enhance premium design.";
       const patch=await generateFiles(callModel,{messages:[{role:"user",content:fix}],temperature:0.2,maxOutputTokens:20000},{base:effects.source(designSystem.source(files)),required});const repaired=assetLibrary.credits(effects.inject(designSystem.apply(patch.files,designPlan.style),effectConfig),assets);
       const repairedQa=await audit(repaired,{capture:true});
       if(repairedQa.findings.length<=qa.findings.length){files=repaired;qa=repairedQa;revisions=1}
@@ -133,6 +167,7 @@ async function build({brief,kind="website",style="editorial",projectName,motion=
   const folder=dirFor(id),snapshotQa={...qa},snapshotEvidence=designPipeline.stripShots(snapshotQa);
   const checkpoint={id,assets,file_names:Object.keys(files),pages:Object.keys(files).filter(name=>name.endsWith('.html')),effects:effectConfig,design_plan:designPlan,project_name:String(generated.project_name||projectName||'New Project').slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa:snapshotQa,revisions,status:'reviewing',generation_mode:usedStarter?'starter_template':'ai_generated'};
   fs.mkdirSync(folder,{recursive:true});designPipeline.saveEvidence(folder,snapshotEvidence);for(const[name,code]of Object.entries(files))fs.writeFileSync(path.join(folder,name),code);fs.writeFileSync(path.join(folder,'project.json'),JSON.stringify(checkpoint,null,2));
+  onProgress("reviewing");
   let finished;try{finished=await finishDesign(files,qa,designPlan,brief,callModel,effectConfig);}catch(error){fs.writeFileSync(path.join(folder,'project.json'),JSON.stringify({...checkpoint,status:'needs_repair',error:String(error.message)},null,2));error.projectId=id;throw error;}files=finished.files;qa=finished.qa;
   const metadata={id,assets,file_names:Object.keys(files),pages:Object.keys(files).filter(n=>n.endsWith(".html")),effects:effectConfig,design_plan:designPlan,project_name:String(generated.project_name||projectName||"New Project").slice(0,100),summary:String(generated.summary||brief).slice(0,500),brief,kind,style,created_at:new Date().toISOString(),qa,revisions,status:"draft",generation_mode:usedStarter?"starter_template":"ai_generated"};
   fs.mkdirSync(folder,{recursive:true});designPipeline.saveEvidence(folder,finished.evidence);
@@ -146,12 +181,17 @@ async function revise(id,instruction,callModel,{asset_ids=[],auto_assets=true}={
   if(p.status==="pull_request")throw Error("This project has a pending GitHub PR. Create a new project before revising.");
   const assets=await assetLibrary.prepare(revision,callModel,{ids:asset_ids,auto:auto_assets,existing:p.assets||[]});
   const designPlan=await designPipeline.plan(callModel,{brief:p.brief,kind:p.kind,style:p.style,previous:p.design_plan,existing:p.files});
-  const prompt=assetLibrary.instructions(assets)+designPipeline.instructions(designPlan)+effects.instructions(effectConfig)+designGuidance.guidance(p.kind,p.style,true)+"\nYou are a world-class frontend product designer and engineer. Revise this working website/webapp. Return ONLY JSON containing a files object with complete shared styles.css/app.js and EVERY existing HTML page. Never remove or rename an existing route. Preserve its working features, improve the visual polish and fix any issues. Do not inject external scripts. Maintain responsive and accessible layouts. No fake backend functionality. User changes: "+revision+"\nOriginal brief: "+p.brief+"\nExisting full project JSON:\n"+JSON.stringify(effects.source(designSystem.source(p.files))).slice(0,37000);
-  const modelResult=await generateFiles(callModel,{messages:[{role:"user",content:prompt}],temperature:0.25,maxOutputTokens:20000},{base:effects.source(designSystem.source(p.files)),required:p.pages||Object.keys(p.files).filter(name=>name.endsWith(".html"))});
+  const routes=p.pages||Object.keys(p.files).filter(name=>name.endsWith(".html"));
+  let revised=effects.source(designSystem.source(p.files));
+  for(let offset=0;offset<routes.length;offset+=4){
+   const batch=routes.slice(offset,offset+4),context=websiteSource.modelSource(Object.fromEntries(Object.entries(revised).filter(([name])=>!name.endsWith('.html')||batch.includes(name)||name==='index.html')));
+   const result=await generateFiles(callModel,{messages:[{role:'user',content:websiteSource.instructions(revised)+assetLibrary.instructions(assets)+designPipeline.instructions(designPlan)+effects.instructions(effectConfig)+designGuidance.guidance(p.kind,p.style,true)+'\nRevise this website while preserving every route. Return ONLY JSON {files:{...}} with ONLY changed files, including complete contents. Apply the requested change to these pages in this batch: '+batch.join(', ')+'. Shared component/CSS/JS edits may affect all pages. Do not rewrite unchanged pages. Sitemap: '+routes.join(', ')+'. User change: '+revision+'\nOriginal brief: '+p.brief+'\nExisting source: '+JSON.stringify(context)}],temperature:0.25,maxOutputTokens:20000},{base:revised,required:routes});revised=result.files;
+  }
+  const modelResult={files:revised};
   let files=assetLibrary.credits(effects.inject(designSystem.apply(modelResult.files,designPlan.style),effectConfig),assets),qa=await audit(files,{capture:true});
   if(qa.findings.length && qa.findings.every(x=>!x.startsWith("Browser QA unavailable"))){
     try{
-      const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files containing shared styles.css/app.js and every existing HTML route:\n"+JSON.stringify(effects.source(designSystem.source(files))).slice(0,30000)}],temperature:0.15});
+      const patch=await callModel({messages:[{role:"user",content:"Fix these code problems: "+qa.findings.join("; ")+"\nReturn full JSON files containing shared styles.css/app.js and every existing HTML route:\n"+JSON.stringify(websiteSource.modelSource(effects.source(designSystem.source(files)))).slice(0,30000)}],temperature:0.15});
       const fixed=assetLibrary.credits(effects.inject(designSystem.apply(preserveRoutes(files,normalizeFiles(patch,files)),designPlan.style),effectConfig),assets),test=await audit(fixed,{capture:true});
       if(test.findings.length<=qa.findings.length){files=fixed;qa=test}
     }catch{}
@@ -190,7 +230,7 @@ async function publish(id,{branchPrefix="kairoq-build"}={}){
   const branch=branchPrefix+"/"+id;
   await api("POST","/git/refs",{ref:"refs/heads/"+branch,sha:baseRef.object.sha});
   const parent=await api("GET","/git/commits/"+baseRef.object.sha);
-  const tree=await api("POST","/git/trees",{base_tree:parent.tree.sha,tree:Object.entries(project.files).map(([name,content])=>({path:"generated-sites/"+id+"/"+name,mode:"100644",type:"blob",content}))});
+  const tree=await api("POST","/git/trees",{base_tree:parent.tree.sha,tree:Object.entries(project.files).map(([name,content])=>({path:"generated-sites/"+id+"/"+name,mode:"100644",type:"blob",content:name.endsWith(".html")?assemble(project.files,name):content}))});
   const commit=await api("POST","/git/commits",{message:"Generate "+project.project_name+" via Kairoq Developer",tree:tree.sha,parents:[baseRef.object.sha]});
   await api("PATCH","/git/refs/heads/"+branch,{sha:commit.sha});
   const pr=await api("POST","/pulls",{title:"[Kairoq Build] "+project.project_name,head:branch,base:baseBranch,body:"Generated website/webapp preview. Review source and QA results before merging.\n\nQA:\n"+JSON.stringify(project.qa,null,2)});
@@ -200,4 +240,4 @@ async function publish(id,{branchPrefix="kairoq-build"}={}){
   return {url:pr.html_url,number:pr.number,branch,repository:repo,status:"awaiting_review"};
 }
 function listProjects(){if(!fs.existsSync(ROOT))return[];return fs.readdirSync(ROOT).flatMap(id=>{try{const {files,...p}=getProject(id);return[p];}catch{return[];}});}
-module.exports={finishDesign,build,revise,reviewProject,getProject,listProjects,publish,assemble,audit,normalizeFiles,requiredPages,generateFiles};
+module.exports={generateSite,build,revise,reviewProject,getProject,listProjects,publish,assemble,audit,normalizeFiles,requiredPages,generateFiles};

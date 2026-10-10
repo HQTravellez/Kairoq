@@ -10,16 +10,21 @@ function assetFiles(project){
  const out={};for(const name of names){if(!/^[a-f0-9]{64}\.[a-z0-9]+$/.test(name))throw Error('Invalid project asset');out[name]=fs.readFileSync(path.join(assets.ROOT,name));}return out;
 }
 function bundle(project){
- const full=project.kind==='fullstack',files={};for(const [name,code]of Object.entries(project.files))files[(full?'public/':'')+name]=Buffer.from(full?code:code.replaceAll('/builder-assets/','assets/'));
+ const full=project.kind==='fullstack',componentSource=!full&&!!(project.files['components.json']||project.files['assets.json']),files={};
+ for(const [name,code]of Object.entries(project.files)){
+  if(componentSource)files['source/'+name]=Buffer.from(code);
+  const rendered=componentSource&&name.endsWith('.html')?web.assemble(project.files,name):code;
+  files[(full?'public/':'')+name]=Buffer.from(full?rendered:rendered.replaceAll('/builder-assets/','assets/'));
+ }
  for(const [name,bytes]of Object.entries(assetFiles(project)))files[(full?'workspace/builder-assets/':'assets/')+name]=!full&&name.endsWith('.gltf')?Buffer.from(bytes.toString().replaceAll('/builder-assets/','')):bytes;
- files['kairoq-project.json']=Buffer.from(JSON.stringify({format:1,id:project.id,kind:project.kind,project_name:project.project_name,brief:project.brief,schema:project.schema,assets:project.assets||[]},null,2));
+ files['kairoq-project.json']=Buffer.from(JSON.stringify({format:1,...(componentSource?{source_format:2}:{}),id:project.id,kind:project.kind,project_name:project.project_name,brief:project.brief,schema:project.schema,assets:project.assets||[]},null,2));
  const credits=(project.assets||[]).map(a=>`${a.title} — ${a.creator}\n${a.source_url}\n${a.license}: ${a.license_url}${a.provider_credit?'\n'+a.provider_credit:''}`).join('\n\n');files['ASSET-CREDITS.txt']=Buffer.from(credits||'No downloaded assets.');
  if(full){
   for(const name of ['app-runtime.js','housing-runtime.js','supabase-builder.js','builder-assets.js'])files[name]=fs.readFileSync(path.join(__dirname,name));
   files['package.json']=Buffer.from(JSON.stringify({name:project.id,private:true,scripts:{start:'node server.js'},engines:{node:'>=22.13'}},null,2));
   files['server.js']=Buffer.from(`'use strict';\nconst fs=require('fs'),path=require('path'),http=require('http'),runtime=require('./app-runtime'),assets=require('./builder-assets'),p=require('./kairoq-project.json');\nconst dir=path.join(runtime.ROOT,p.id),v=path.join(dir,'versions','1');fs.mkdirSync(v,{recursive:true});for(const n of ['index.html','styles.css','app.js'])fs.copyFileSync(path.join(__dirname,'public',n),path.join(v,n));fs.writeFileSync(path.join(v,'manifest.json'),JSON.stringify({schema:p.schema}));runtime.saveMetadata({id:p.id,kind:'fullstack',version:1,deployed_version:1,status:'live',data_backend:'sqlite'});\nconst server=http.createServer(async(req,res)=>{if(req.url==='/'){res.writeHead(302,{Location:'/apps/'+p.id+'/'});return res.end();}if(req.url.startsWith('/builder-assets/'))return assets.handle(req,res);if(await runtime.handle(req,res))return;res.writeHead(404);res.end();});server.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Kairoq listening on '+server.address().port));\n`);
   files['README.md']=Buffer.from(`# ${project.project_name}\n\nRequires Node 22.13 or newer. Run npm start, then open http://localhost:3000. Deploy with npm start and persist workspace/ on a volume.\n\nThis export starts with a fresh built-in SQLite database. It does not contain users, sessions, production records or credentials. A Supabase-backed original is exported with the same schema and a fresh SQLite backend; its remote data is not migrated.\n\nDownloaded assets and their credits are included.\n`);
- }else files['README.md']=Buffer.from(`# ${project.project_name}\n\nServe this folder with a static HTTPS host. The entry point is index.html. Assets and ASSET-CREDITS.txt are included. No production credentials or user data are included.\n`);
+ }else files['README.md']=Buffer.from(`# ${project.project_name}\n\nServe this folder with a static HTTPS host. The entry point is index.html. Assets and ASSET-CREDITS.txt are included. No production credentials or user data are included.\n${componentSource?'Shared component source is in source/. Edit those files for GitHub sync; the root HTML files are compiled for hosting. Uploaded images are embedded. Enquiry submission requires the Kairoq-hosted release and is disabled in this static export.\n':''}`);
  return files;
 }
 // Portable ZIP archive without shelling out or installing project-controlled packages.
