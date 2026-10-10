@@ -7,12 +7,12 @@ function privateIP(ip){
  if(net.isIP(ip)===4){const [a,b]=ip.split('.').map(Number);return a===0||a===10||a===127||a>=224||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&[0,168].includes(b)||a===100&&b>=64&&b<=127||a===198&&[18,19].includes(b);}
  return !net.isIP(ip)||!/^2[0-9a-f]{3}:/i.test(ip); // accept only globally routable IPv6, never mapped IPv4
 }
-async function remote(url,{limit=MAX,redirects=3}={}){
+async function remote(url,{limit=MAX,redirects=3,lookup=dns.lookup,request=https.get}={}){
  const u=new URL(url);if(u.protocol!=='https:'||u.username||u.password||u.port&&u.port!=='443'||net.isIP(u.hostname))throw Error('Asset downloads require public HTTPS hosts');
- const addresses=await dns.lookup(u.hostname,{all:true});if(!addresses.length||addresses.some(a=>privateIP(a.address)))throw Error('Private network asset URL blocked');
- const chosen=addresses[0];return new Promise((resolve,reject)=>{
-  const deadline=setTimeout(()=>req.destroy(Error('Asset request deadline exceeded')),30000);const req=https.get(u,{headers:{'User-Agent':'Kairoq-Asset-Builder/1.0','Accept-Encoding':'identity'},lookup:(_h,_o,cb)=>cb(null,chosen.address,chosen.family)},res=>{
-   if([301,302,303,307,308].includes(res.statusCode)){res.resume();if(!redirects)return reject(Error('Too many asset redirects'));return resolve(remote(new URL(res.headers.location,u).href,{limit,redirects:redirects-1}));}
+ const addresses=await lookup(u.hostname,{all:true});if(!addresses.length||addresses.some(a=>privateIP(a.address)))throw Error('Private network asset URL blocked');
+ const chosen=addresses.find(a=>a.family===4)||addresses[0];return new Promise((resolve,reject)=>{
+  const deadline=setTimeout(()=>req.destroy(Error('Asset request deadline exceeded')),30000);const req=request(u,{headers:{'User-Agent':'Kairoq-Asset-Builder/1.0','Accept-Encoding':'identity'},lookup:(_h,opts,cb)=>opts.all?cb(null,[chosen]):cb(null,chosen.address,chosen.family)},res=>{
+   if([301,302,303,307,308].includes(res.statusCode)){res.resume();if(!redirects)return reject(Error('Too many asset redirects'));return resolve(remote(new URL(res.headers.location,u).href,{limit,redirects:redirects-1,lookup,request}));}
    if(res.statusCode!==200){res.resume();return reject(Error('Asset provider returned HTTP '+res.statusCode));}
    if(Number(res.headers['content-length'])>limit){res.destroy();return reject(Error('Asset exceeds download size limit'));}
    let size=0;const parts=[];res.on('data',chunk=>{size+=chunk.length;if(size>limit){res.destroy(Error('Asset exceeds download size limit'));return;}parts.push(chunk);});res.on('error',reject);res.on('end',()=>resolve({bytes:Buffer.concat(parts),type:String(res.headers['content-type']||'').split(';')[0]}));

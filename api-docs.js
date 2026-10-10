@@ -20,7 +20,7 @@ async function fetchDocs(url,{allowedHosts=process.env.KAIROQ_API_DOC_HOSTS,look
  const resolved=await lookup(u.hostname,{all:true});if(!resolved?.length||resolved.some(x=>!publicIp(x.address)))throw Error("Documentation host resolves to a non-public address");
  const ip=resolved[0];
  return new Promise((resolve,reject)=>{
-  const req=https.get(u,{timeout,maxHeaderSize:16384,headers:{Accept:"application/json, text/html, text/markdown, text/plain", "User-Agent":"Kairoq-API-Docs/1.0"},lookup:(host,opts,cb)=>cb(null,ip.address,ip.family)},res=>{
+  const req=https.get(u,{timeout,maxHeaderSize:16384,headers:{Accept:"application/json, text/html, text/markdown, text/plain", "User-Agent":"Kairoq-API-Docs/1.0"},lookup:(host,opts,cb)=>opts.all?cb(null,[ip]):cb(null,ip.address,ip.family)},res=>{
    if(res.statusCode!==200){res.resume();return reject(Error("Documentation fetch returned HTTP "+res.statusCode));}
    const mime=String(res.headers["content-type"]||"").toLowerCase();if(mime&&!/json|html|text\/plain|markdown/.test(mime)){res.resume();return reject(Error("Unsupported documentation content type"));}
    let total=0,chunks=[];res.on("data",part=>{total+=part.length;if(total>MAX){req.destroy(Error("Documentation exceeds 400 KB"));return;}chunks.push(part);});
