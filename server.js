@@ -6560,6 +6560,8 @@ async function callDeveloperCodingModel(opts={}){
 async function handleDeveloperBuild(req,res){
   try{
     const body=await getBody(req,100000);
+    if(body.documentationUrl)body.apiPlan=await require("./api-docs").discover(body.documentationUrl);
+    else if(body.documentationText)body.apiPlan=require("./api-docs").infer(body.documentationText);
     if(body.kind==="fullstack")return json(res,202,appBuilder.submit(body,callDeveloperCodingModel));
     const generated=await developerAgent.build(body,callDeveloperCodingModel);
     const {preview,files,...info}=generated;
@@ -6632,6 +6634,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === "POST" && url === "/api/developer/api/discover"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,10000);return json(res,200,body.documentationUrl?await require("./api-docs").discover(body.documentationUrl):require("./api-docs").infer(body.documentationText));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/execute"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,await require("./api-adapter").execute(body));}catch(e){return json(res,422,{error:String(e.message||e)});}}
+  if (req.method === "POST" && url === "/api/developer/api/diff"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,require("./api-evolution").diff(body.before,body.after));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/inspect"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,require("./api-learning").learn(body.apiSpec));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/build"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperBuild(req,res);}
   if (req.method === "POST" && url === "/api/developer/revise"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});return handleDeveloperRevise(req,res);}
