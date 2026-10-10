@@ -19,6 +19,7 @@ async function run(model){
   }else console.log('[travellez-benchmark] Rechecking published app checkpoint '+checkpoint.id);
   stage('app_publish');let released;
   try{released=await builder.publish(checkpoint?.id||job.result.id);}catch(error){
+   console.warn('[travellez-benchmark] APP PUBLISH CHECK FAILED '+String(error.message).slice(0,1500));
    if(!checkpoint)throw error;stage('app_repair');const repair={...job,id:crypto.randomUUID(),operation:'repair',projectId:checkpoint.id,reported_issue:true,resume_job:resumeRepair(checkpoint.id),brief:job.brief+'\nPublic deployment check failed: '+error.message+(previous.app?.qa?.visual_review?require('./design-pipeline').repairInstructions(previous.app.qa.visual_review):'')};report.app.repair_job_id=repair.id;save();
    await builder.run(repair,model);if(repair.status!=='complete'||!repair.result?.qa?.passed)throw Error('App deployment repair failed: '+repair.error);released=await builder.publish(checkpoint.id);
   }
