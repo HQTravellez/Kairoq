@@ -29,7 +29,12 @@ function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentia
  if(op.authenticationRequired&&!secret)throw Error("Operation requires an API credential");
  if(body!==undefined&&JSON.stringify(body).length>50000)throw Error("API body too large");
  const payload=body===undefined?undefined:JSON.stringify(body);
- return{url,method:op.method,headers:{"Accept":"application/json",...(payload?{"Content-Type":"application/json"}:{}),...(secret?{"Authorization":"Bearer "+secret}:{})},payload,operation:op};
+ const headers={"Accept":"application/json",...(payload?{"Content-Type":"application/json"}:{})};
+ if(secret){const key=contract.auth?.find(a=>a.type==="apiKey"&&a.in==="header"&&/^[a-z0-9-]{1,80}$/i.test(a.headerName||""));
+  if(key){if(["host","content-length","authorization","cookie","connection"].includes(key.headerName.toLowerCase()))throw Error("Unsafe API key header");headers[key.headerName]=secret;}
+  else headers.Authorization="Bearer "+secret;
+ }
+ return{url,method:op.method,headers,payload,operation:op};
 }
 async function execute(args,{lookup=dns.lookup,timeout=10000}={}){
  if(process.env.KAIROQ_API_LIVE_ENABLED!=="true")throw Error("Live API execution is disabled; set KAIROQ_API_LIVE_ENABLED=true after reviewing the provider and host allowlist");
