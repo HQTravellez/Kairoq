@@ -43,3 +43,26 @@ test("design foundation maintains consistent accessible responsive controls acro
   assert.equal(design.source(out)["styles.css"],"h1{font-size:12px}");
  }
 });
+
+const fs=require("node:fs"),os=require("node:os"),path=require("node:path"),http=require("node:http");
+for(const scenario of scenarios)test("real multi-collection CRUD and guarded workflow: "+scenario.name,async()=>{
+ const schema=runtime.validateSchema(scenario.schema),root=fs.mkdtempSync(path.join(os.tmpdir(),"kairoq-complex-")),id="complex-"+scenario.name.replace(/[^a-z]+/g,"-");
+ const server=http.createServer((req,res)=>runtime.api(req,res,{root,id,route:req.url,schema}));
+ await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));const base="http://127.0.0.1:"+server.address().port;
+ const call=async(route,method="GET",body,cookie)=>{const response=await fetch(base+route,{method,headers:{"Content-Type":"application/json",...(cookie?{cookie}:{})},body:body?JSON.stringify(body):undefined});return{status:response.status,data:await response.json(),cookie:response.headers.get("set-cookie")?.split(";")[0]};};
+ try{
+  const a=await call("/auth/register","POST",{email:"a@qa.example",password:"complex-password-123"});assert.equal(a.status,200);const cookie=a.cookie,created={};
+  for(const collection of schema.collections){
+   const body={};for(const field of collection.fields){body[field.name]=field.type==="reference"?created[field.collection]:field.type==="number"?25:field.type==="date"?"2030-10-10":field.type==="email"?"traveler@qa.example":field.type==="select"?runtime.workflowInitial(schema,collection,field):field.type==="boolean"?true:"QA "+field.name;}
+   const response=await call("/collections/"+collection.name,"POST",body,cookie);assert.equal(response.status,201,JSON.stringify(response.data));created[collection.name]=response.data.record.id;
+  }
+  const counts=await call("/dashboard","GET",null,cookie);assert.equal(counts.data.total,3);
+  const action=schema.actions[0],rid=created[action.collection];
+  const bypass=await call("/collections/"+action.collection+"/"+rid,"PATCH",{[action.field]:action.to},cookie);assert.equal(bypass.status,409);
+  const changed=await call("/actions/"+action.name+"/"+rid,"POST",{},cookie);assert.equal(changed.status,200);assert.equal(changed.data.record.data[action.field],action.to);
+  const other=await call("/auth/register","POST",{email:"b@qa.example",password:"complex-password-456"});assert.equal(other.status,200);
+  assert.equal((await call("/dashboard","GET",null,other.cookie)).data.total,0);
+  assert.equal((await call("/collections/"+action.collection+"/"+rid,"DELETE",{},other.cookie)).status,404);
+  assert.equal((await call("/collections/"+action.collection,"GET",null,cookie)).data.records[0].data[action.field],action.to);
+ }finally{await new Promise(resolve=>server.close(resolve));runtime.recordsDb(root,id).close();fs.rmSync(root,{recursive:true,force:true});}
+});
