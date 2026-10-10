@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const web=require('./developer-agent'),pipeline=require('./design-pipeline');
 const gates=require('./benchmark-gates'),forms=require('./website-forms');
 const ROOT=path.join(__dirname,'workspace','generated','developer-sites');
-const CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; font-src data:; connect-src 'self'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts";
+const CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; font-src data:; connect-src 'self'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms";
 function contentPolicy(route,origin=require('./app-release').publicOrigin()){
  const match=/^\/generated\/developer-sites\/([a-z0-9-]{5,85})\/([a-f0-9]{16})\/[a-z0-9-]+\.html$/.exec(route);
  if(!match||!origin)return CSP;
