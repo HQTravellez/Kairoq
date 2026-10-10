@@ -23,7 +23,7 @@ function config(name){
 }
 function seal(value){const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv("aes-256-gcm",key(),iv);const data=Buffer.concat([cipher.update(JSON.stringify(value),"utf8"),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),data]).toString("base64");}
 function unseal(value){const bytes=Buffer.from(value,"base64");if(bytes.length<29)throw Error("Invalid encrypted OAuth state");const decipher=crypto.createDecipheriv("aes-256-gcm",key(),bytes.subarray(0,12));decipher.setAuthTag(bytes.subarray(12,28));return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)),decipher.final()]).toString("utf8"));}
-function file(name,type){safeName(name);return path.join(STORE,type+"-"+name+".json.enc");}
+function file(name,type){if(type==="state"){if(!/^[A-Za-z0-9_-]{40,100}$/.test(String(name||"")))throw Error("Invalid OAuth state");}else safeName(name);return path.join(STORE,type+"-"+name+".json.enc");}
 function write(filename,value){fs.mkdirSync(STORE,{recursive:true,mode:0o700});const temp=filename+"."+crypto.randomBytes(6).toString("hex")+".tmp";fs.writeFileSync(temp,seal(value),{mode:0o600,flag:"wx"});fs.renameSync(temp,filename);}
 function read(filename){return unseal(fs.readFileSync(filename,"utf8"));}
 function providers(){return Object.keys(configs()).filter(n=>/^[a-z][a-z0-9_-]{0,49}$/i.test(n)).map(n=>{try{const c=config(n);return{name:n,grantType:c.grant,scopes:c.scopes,connected:fs.existsSync(file(n,"token"))};}catch(e){return{name:n,ready:false,error:e.message};}});}
@@ -41,7 +41,7 @@ async function postToken(c,params,{lookup=dns.lookup,timeout=12000}={}){
  return new Promise((resolve,reject)=>{
   const req=https.request(c.tokenUrl,{method:"POST",timeout,maxHeaderSize:16000,headers:{"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded","Content-Length":Buffer.byteLength(body)},lookup:(host,opts,cb)=>cb(null,ip[0].address,ip[0].family)},res=>{
    let size=0,chunks=[];res.on("data",part=>{size+=part.length;if(size>200000){req.destroy(Error("OAuth token response too large"));return;}chunks.push(part);});
-   res.on("end",()=>{if(res.statusCode<200||res.statusCode>=300)return reject(Error("OAuth provider returned HTTP "+res.statusCode));let data;try{data=JSON.parse(Buffer.concat(chunks).toString("utf8"));}catch{return reject(Error("Invalid OAuth token response");}if(typeof data.access_token!=="string"||!data.access_token||data.access_token.length>20000)return reject(Error("OAuth provider returned no usable access token"));resolve(data);});
+   res.on("end",()=>{if(res.statusCode<200||res.statusCode>=300)return reject(Error("OAuth provider returned HTTP "+res.statusCode));let data;try{data=JSON.parse(Buffer.concat(chunks).toString("utf8"));}catch{return reject(Error("Invalid OAuth token response"));}if(typeof data.access_token!=="string"||!data.access_token||data.access_token.length>20000)return reject(Error("OAuth provider returned no usable access token"));resolve(data);});
   });req.on("timeout",()=>req.destroy(Error("OAuth token request timed out")));req.on("error",reject);req.end(body);
  });
 }
