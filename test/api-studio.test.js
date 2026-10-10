@@ -29,3 +29,18 @@ test("API Studio inline script parses as valid JavaScript",()=>{
  assert.ok(match,"Missing inline script");
  assert.doesNotThrow(()=>new vm.Script(match[1],{filename:"api-studio.html"}));
 });
+test("expired Studio sessions reveal sign-in and successful login preserves the imported plan",async()=>{
+ const elements=new Map();const element=id=>{if(!elements.has(id))elements.set(id,{hidden:true,value:"",disabled:false,textContent:"",listeners:{},addEventListener(event,fn){this.listeners[event]=fn;},replaceChildren(){},append(){}});return elements.get(id);};
+ let signedIn=false;const requests=[];
+ const context=vm.createContext({URLSearchParams,window:{location:{hash:"",pathname:"/api-studio.html",search:""},history:{replaceState(){}}},document:{getElementById:element,createElement:()=>({})},fetch:async(url,options)=>{
+  requests.push({url,options});if(url==="/api/login"){signedIn=true;return{ok:true,status:200,json:async()=>({ok:true})};}
+  return{ok:signedIn,status:signedIn?200:401,json:async()=>signedIn?{providers:[]}:{error:"Authentication required"}};
+ }});
+ vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
+ await vm.runInContext("refreshProviders()",context);assert.equal(element("signInPanel").hidden,false);
+ vm.runInContext('plan={title:"Preserved",operations:[{id:"getTrips"}]};',context);
+ element("studioPassword").value="test-password";
+ await element("studioLogin").listeners.submit({preventDefault(){}});
+ assert.equal(element("signInPanel").hidden,true);assert.equal(element("studioPassword").value,"");
+ assert.equal(vm.runInContext("plan.title",context),"Preserved");assert.ok(requests.some(r=>r.url==="/api/login"));
+});

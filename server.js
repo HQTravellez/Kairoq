@@ -6718,6 +6718,20 @@ const server = http.createServer(async (req, res) => {
   }
 
 
+  if (req.method === "POST" && url === "/api/login/magic") {
+    if (!authEnabled()) return json(res,403,{error:"Workspace protection must be configured before magic-link login."});
+    try {
+      const body=await getBody(req,2000);require("./magic-login").consume(body.token);
+      const secure=(process.env.SITE_URL||"").startsWith("https://");
+      return json(res,200,{ok:true},{"Cache-Control":"no-store","Set-Cookie":`${SESSION_COOKIE}=${sessionToken()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800${secure ? "; Secure" : ""}`});
+    } catch(error) { return json(res,401,{error:error.message}); }
+  }
+  if (req.method === "POST" && url === "/api/auth/magic-link") {
+    if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:"Sign in to create a workspace sign-in link."});
+    const link=require("./magic-login").issue();
+    return json(res,200,{path:"/api-studio.html#magic="+link.token,expires:link.expires},{"Cache-Control":"no-store"});
+  }
+
   if (req.method === "POST" && url === "/api/login") {
     try { return await handleLogin(req, res); }
     catch (err) { return json(res, 500, { error: err.message }); }

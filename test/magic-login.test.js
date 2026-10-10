@@ -1,0 +1,8 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-magic-'));process.env.KAIROQ_MAGIC_STORE_DIR=dir;
+const magic=require('../magic-login');
+test.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+test('magic links store only digests and cannot be replayed',()=>{const link=magic.issue();assert.equal(link.token.length,43);assert.ok(!fs.readdirSync(dir).join().includes(link.token));assert.equal(magic.consume(link.token).ok,true);assert.throws(()=>magic.consume(link.token),/already been used/);assert.throws(()=>magic.consume('invalid'),/Invalid/);});
+test('expired links cannot sign in',()=>{const link=magic.issue(),digest=crypto.createHash('sha256').update(link.token).digest('hex');fs.writeFileSync(path.join(dir,digest+'.json'),JSON.stringify({expires:Date.now()-1000}));assert.throws(()=>magic.consume(link.token),/expired/);});
+test('bootstrap links are expiring and single-use across module reloads',()=>{const token=crypto.randomBytes(32).toString('base64url');process.env.KAIROQ_MAGIC_LOGIN_HASH=crypto.createHash('sha256').update(token).digest('hex');process.env.KAIROQ_MAGIC_LOGIN_EXPIRES=String(Date.now()+60000);assert.equal(magic.configured(),true);magic.consume(token);delete require.cache[require.resolve('../magic-login')];assert.throws(()=>require('../magic-login').consume(token),/already been used/);process.env.KAIROQ_MAGIC_LOGIN_EXPIRES=String(Date.now()-1);assert.equal(magic.configured(),false);});
