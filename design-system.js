@@ -28,7 +28,7 @@ function foundation(style='editorial'){
 .kq-page :is(button,a,input,select,textarea){touch-action:manipulation}
 .kq-page :is(button,a).kq-button{min-height:44px}
 .kq-page :is(input,textarea,select){max-width:100%}
-.kq-page :is(img,video,canvas,svg){max-width:100%;height:auto}
+.kq-page :is(img,video,svg){max-width:100%;height:auto}.kq-page canvas{max-width:100%}
 .kq-page .kq-panel,.kq-page .kq-metric{overflow-wrap:anywhere}
 @media(min-width:601px) and (max-width:1100px){.kq-shell{width:calc(100% - 48px)}.kq-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:18px}.kq-stack{gap:18px}.kq-panel{padding:20px}.kq-record-details{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){.kq-page .kq-grid,.kq-page .kq-fields{grid-template-columns:minmax(0,1fr)}.kq-page .kq-actions{flex-wrap:wrap}.kq-page .kq-actions .kq-button{max-width:100%}.kq-page .kq-record-details{grid-template-columns:minmax(0,1fr)}}
