@@ -31,7 +31,7 @@ async function refreshProviders(){
   const selected=providers.find(p=>p.name===oauth.value),connectable=selected&&selected.ready!==false&&selected.grantType==="authorization_code";
   $("oauthConnect").disabled=!connectable||!!selected.connected;
   $("oauthDisconnect").disabled=!selected?.connected;
-  $("oauthStatus").textContent=!providers.length?"No providers configured on the server. Set OAuth variables in Railway, then refresh.":selected?.error||selected?(selected?.connected?"OAuth provider connected.":"Select Connect OAuth to authorize this provider."):"Choose a provider to connect.";
+  $("oauthStatus").textContent=!providers.length?"No providers configured on the server. Set OAuth variables in Railway, then refresh.":selected?.error?selected.error:selected?(selected.connected?"OAuth provider connected.":"Select Connect OAuth to authorize this provider."):"Choose a provider to connect.";
  }catch(error){oauth.replaceChildren();const option=document.createElement("option");option.textContent="OAuth unavailable";oauth.append(option);$("oauthConnect").disabled=true;$("oauthDisconnect").disabled=true;$("oauthStatus").textContent=error.message;}
 }
 
