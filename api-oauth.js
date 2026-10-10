@@ -3,7 +3,7 @@
 // Provider endpoints are configured by the operator, never by browser-supplied URLs.
 const crypto=require("node:crypto"),fs=require("node:fs"),path=require("node:path"),https=require("node:https"),dns=require("node:dns").promises;
 const docs=require("./api-docs");
-const STORE=path.join(__dirname,"workspace","api-oauth");
+const STORE=process.env.KAIROQ_OAUTH_STORE_DIR?path.resolve(process.env.KAIROQ_OAUTH_STORE_DIR):path.join(__dirname,"workspace","api-oauth");
 const safeName=n=>{if(!/^[a-z][a-z0-9_-]{0,49}$/i.test(String(n||"")))throw Error("Invalid OAuth provider");return n;};
 function key(){const value=process.env.KAIROQ_OAUTH_ENCRYPTION_KEY||"";const buf=/^[0-9a-f]{64}$/i.test(value)?Buffer.from(value,"hex"):Buffer.from(value,"base64");if(buf.length!==32)throw Error("Configure KAIROQ_OAUTH_ENCRYPTION_KEY as a persistent 32-byte hex or base64 secret");return buf;}
 function configs(){let parsed;try{parsed=JSON.parse(process.env.KAIROQ_OAUTH_PROVIDERS||"{}");}catch{throw Error("Invalid KAIROQ_OAUTH_PROVIDERS JSON");}if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Error("Invalid OAuth provider configuration");return parsed;}
@@ -26,7 +26,7 @@ function unseal(value){const bytes=Buffer.from(value,"base64");if(bytes.length<2
 function file(name,type){if(type==="state"){if(!/^[A-Za-z0-9_-]{40,100}$/.test(String(name||"")))throw Error("Invalid OAuth state");}else safeName(name);return path.join(STORE,type+"-"+name+".json.enc");}
 function write(filename,value){fs.mkdirSync(STORE,{recursive:true,mode:0o700});const temp=filename+"."+crypto.randomBytes(6).toString("hex")+".tmp";fs.writeFileSync(temp,seal(value),{mode:0o600,flag:"wx"});fs.renameSync(temp,filename);}
 function read(filename){return unseal(fs.readFileSync(filename,"utf8"));}
-function providers(){return Object.keys(configs()).filter(n=>/^[a-z][a-z0-9_-]{0,49}$/i.test(n)).map(n=>{try{const c=config(n);return{name:n,grantType:c.grant,scopes:c.scopes,connected:fs.existsSync(file(n,"token"))};}catch(e){return{name:n,ready:false,error:e.message};}});}
+function providers(){return Object.keys(configs()).filter(n=>/^[a-z][a-z0-9_-]{0,49}$/i.test(n)).map(n=>{try{const c=config(n);return{name:n,grantType:c.grant,scopes:c.scopes,connected:fs.existsSync(file(n,"token"))&&!!read(file(n,"token")).access_token};}catch(e){return{name:n,ready:false,error:e.message};}});}
 function start(name){
  const c=config(name);if(c.grant!=="authorization_code")throw Error("Provider uses client credentials, not browser authorization");
  const state=crypto.randomBytes(32).toString("base64url"),verifier=crypto.randomBytes(32).toString("base64url"),challenge=crypto.createHash("sha256").update(verifier).digest("base64url");
@@ -39,7 +39,7 @@ async function postToken(c,params,{lookup=dns.lookup,timeout=12000}={}){
  const data=new URLSearchParams(params);data.set("client_id",c.clientId);if(c.secret)data.set("client_secret",c.secret);
  const body=data.toString();
  return new Promise((resolve,reject)=>{
-  const req=https.request(c.tokenUrl,{method:"POST",timeout,maxHeaderSize:16000,headers:{"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded","Content-Length":Buffer.byteLength(body)},lookup:(host,opts,cb)=>cb(null,ip[0].address,ip[0].family)},res=>{
+  const req=https.request(c.tokenUrl,{method:"POST",timeout,maxHeaderSize:16000,headers:{"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded","Content-Length":Buffer.byteLength(body)},lookup:(host,opts,cb)=>opts.all?cb(null,[ip[0]]):cb(null,ip[0].address,ip[0].family)},res=>{
    let size=0,chunks=[];res.on("data",part=>{size+=part.length;if(size>200000){req.destroy(Error("OAuth token response too large"));return;}chunks.push(part);});
    res.on("end",()=>{if(res.statusCode<200||res.statusCode>=300)return reject(Error("OAuth provider returned HTTP "+res.statusCode));let data;try{data=JSON.parse(Buffer.concat(chunks).toString("utf8"));}catch{return reject(Error("Invalid OAuth token response"));}if(typeof data.access_token!=="string"||!data.access_token||data.access_token.length>20000)return reject(Error("OAuth provider returned no usable access token"));resolve(data);});
   });req.on("timeout",()=>req.destroy(Error("OAuth token request timed out")));req.on("error",reject);req.end(body);
