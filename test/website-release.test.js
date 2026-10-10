@@ -18,3 +18,12 @@ test('publication rejects fallback visual scores and incomplete review before ex
 test('legacy saved websites recover their preview URL when reopened',()=>{
  const f=fixture();try{assert.equal(web.getProject(f.id).preview_url,'/api/developer/preview/'+f.id+'/index.html');}finally{f.clean();}
 });
+test('public screenshot AI failure preserves the existing published website',async()=>{
+ const f=fixture();try{
+ const published=await release.deploy(f.id,{outputRoot:f.outputRoot,origin:'https://example.test',verify:async()=>({passed:true,_screenshots:[]})});
+ fs.writeFileSync(path.join(f.folder,'styles.css'),fs.readFileSync(path.join(f.folder,'styles.css'),'utf8')+'\n/* new draft */');
+ const scores=Object.fromEntries(require('../design-pipeline').axes.map(axis=>[axis,4]));
+ await assert.rejects(release.deploy(f.id,{outputRoot:f.outputRoot,origin:'https://example.test',verify:async()=>({passed:true,_screenshots:[{label:'390px',bytes:Buffer.from('public rendering')}]}),callModel:async opts=>({visual_review:{scores:{...scores,mobile:2},findings:[],screen_reviews:opts.messages[0].content.filter(x=>x.type==='text').slice(1).map(x=>({screen:x.text,scores:{...scores,mobile:2},findings:[]}))}})}),/Public screenshots require/);
+ assert.equal(web.getProject(f.id).published_version,published.published_version);assert.deepEqual(fs.readdirSync(path.join(f.outputRoot,f.id)),[published.published_version]);
+ }finally{f.clean();}
+});

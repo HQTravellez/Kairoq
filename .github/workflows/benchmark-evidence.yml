@@ -1,0 +1,51 @@
+name: Benchmark evidence
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      public_url:
+        description: Public Kairoq HTTPS origin to verify
+        required: true
+      expected_sha:
+        description: Deployed commit SHA (defaults to this workflow commit)
+        required: false
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: apt-get update && apt-get install -y chromium fonts-liberation
+      - run: test -x /usr/bin/chromium
+      - run: npm run check
+      - run: node --test test/benchmark-gates.test.js test/evidence-route.test.js test/app-release.test.js test/design-pipeline.test.js test/website-benchmark.test.js test/website-release.test.js test/journey-qa.test.js test/real-visual-repair.test.js test/app-runtime.test.js test/developer-agent.test.js
+        env:
+          CHROMIUM_PATH: /usr/bin/chromium
+  deployed-benchmark:
+    if: github.event_name == 'workflow_dispatch'
+    needs: regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node scripts/verify-benchmark.js
+        env:
+          KAIROQ_PUBLIC_URL: ${{ inputs.public_url }}
+          KAIROQ_EXPECTED_SHA: ${{ inputs.expected_sha || github.sha }}
+          KAIROQ_BENCHMARK_PASSWORD: ${{ secrets.KAIROQ_BENCHMARK_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployed-benchmark-evidence
+          path: benchmark-artifacts/
+          if-no-files-found: ignore
