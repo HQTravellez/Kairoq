@@ -19,7 +19,18 @@ function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentia
  if(/[{}]/.test(pathname))throw Error("Unresolved path parameter");
  const url=new URL(base.href.replace(/\/$/,"")+"/"+pathname.replace(/^\//,""));
  if(url.hostname!==base.hostname||url.protocol!=="https:")throw Error("Unsafe API target");
- for(const [k,v] of Object.entries(query)){if(!/^[\w.-]{1,80}$/.test(k)||v===null||typeof v==="object"||String(v).length>500)throw Error("Invalid query parameter");url.searchParams.set(k,String(v));}
+ for(const [k,v] of Object.entries(query)){
+  if(!/^[\w.-]{1,80}$/.test(k)||v===null)throw Error("Invalid query parameter");
+  if(Array.isArray(v)){
+   const parameter=op.parameters?.find(p=>p.in==='query'&&p.name===k);
+   if(parameter?.schema?.type!=='array'||v.length>100||v.some(x=>x===null||typeof x==='object'||String(x).length>500))throw Error('Invalid documented query array');
+   require('./api-validation').validate(parameter.schema,v,'query.'+k);
+   const style=parameter.style||'form',explode=parameter.explode??true;
+   if(style==='form'&&explode){for(const item of v)url.searchParams.append(k,String(item));}
+   else if(['form','spaceDelimited','pipeDelimited'].includes(style))url.searchParams.set(k,v.join(style==='spaceDelimited'?' ':style==='pipeDelimited'?'|':','));
+   else throw Error('Unsupported query serialization: '+style);
+  }else{if(typeof v==='object'||String(v).length>500)throw Error('Invalid query parameter');url.searchParams.set(k,String(v));}
+ }
  if(url.href.length>4000)throw Error("API URL too long");
  let secret="";
  if(credentialName){

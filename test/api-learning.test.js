@@ -12,6 +12,11 @@ const spec={
   "/expenses":{post:{operationId:"submitExpense",requestBody:{content:{"application/json":{schema:{type:"object",required:["amount"],properties:{amount:{type:"number"},currency:{type:"string"}}}}}},responses:{"201":{description:"Created"}}}}
  }
 };
+test('path-level API servers and query serialization are preserved',()=>{
+ const data={openapi:'3.1.0',paths:{'/forecast':{servers:[{url:'https://weather.example.com'}],get:{parameters:[{name:'current',in:'query',explode:false,schema:{type:'array',items:{type:'string'}}}],responses:{200:{}}}}}};
+ const learned=api.learn(data);assert.equal(learned.baseUrl,'https://weather.example.com');assert.equal(learned.operations[0].parameters[0].explode,false);
+ data.paths['/other']={servers:[{url:'https://other.example.com'}],get:{responses:{200:{}}}};assert.equal(api.learn(data).baseUrl,'','Different hosts must not be silently combined');
+});
 test("learns documented operations, schemas, auth and required parameters",()=>{
  const p=api.learn(spec);assert.equal(p.title,"Complex Travel API");assert.equal(p.operations.length,3);
  assert.equal(p.operations[0].authenticationRequired,true);

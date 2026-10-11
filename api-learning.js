@@ -42,7 +42,8 @@ function schemaSnapshot(node,spec,seen=new Set(),depth=0){
 }
 function learn(input){
  const spec=parse(input),servers=(spec.servers||[]).map(s=>s.url).filter(s=>typeof s==="string"&&/^https:\/\//i.test(s)).slice(0,3);
- const base=spec.swagger==="2.0"?(spec.schemes?.includes("https")&&spec.host?"https://"+spec.host+(spec.basePath||""):""):servers[0]||"";
+ const operationServers=[...new Set(Object.values(spec.paths).flatMap(item=>Object.entries(item||{}).filter(([key])=>HTTP.has(key)).map(([,op])=>op?.servers?.[0]?.url||item?.servers?.[0]?.url||servers[0]).filter(url=>typeof url==='string'&&/^https:\/\//i.test(url))))];
+ const base=spec.swagger==="2.0"?(spec.schemes?.includes("https")&&spec.host?"https://"+spec.host+(spec.basePath||""):""):operationServers.length===1?operationServers[0]:operationServers.length?"":servers[0]||"";
  const securitySchemes=spec.components?.securitySchemes||spec.securityDefinitions||{};
  const auth=Object.entries(securitySchemes).slice(0,20).map(([name,value])=>({name:safeText(name,70),type:safeText(value.type,35),scheme:safeText(value.scheme,35),in:safeText(value.in,20),headerName:safeText(value.name,80),tokenUrl:safeText(value.flows?.clientCredentials?.tokenUrl||value.tokenUrl,200)}));
  const operations=[];
@@ -60,7 +61,7 @@ function learn(input){
    const responses=Object.keys(op.responses||{}).filter(k=>/^2\d\d$/.test(k)).slice(0,6);
    const declaredSecurity=op.security??spec.security??[];
    const responseSchemas=Object.fromEntries(responses.map(code=>{const r=resolve(op.responses[code],spec),json=r.content&&Object.entries(r.content).find(([k])=>/json/i.test(k))?.[1];return[code,schemaSnapshot(json?.schema||r.schema||{},spec)];}));
-   operations.push({id:safeText(op.operationId||method+"_"+route.replace(/[^a-z0-9]+/gi,"_"),100),method:method.toUpperCase(),path:safeText(route,250),summary:safeText(op.summary||op.description,160),tags:Array.isArray(op.tags)?op.tags.slice(0,5).map(x=>safeText(x,50)):[],requiredParameters:required,parameters:parameters.filter(p=>['path','query'].includes(p.in)).map(p=>({name:p.name,in:p.in,schema:schemaSnapshot(p.schema||{type:p.type},spec)})),bodyFields:fields,bodyRequired:!!(body?.required||legacy?.required),requestSchema:schemaSnapshot(media?.schema||legacy?.schema||{},spec),responseSchemas,successCodes:responses,authenticationRequired:Array.isArray(declaredSecurity)&&declaredSecurity.some(s=>Object.keys(s).length>0)});
+   operations.push({id:safeText(op.operationId||method+"_"+route.replace(/[^a-z0-9]+/gi,"_"),100),method:method.toUpperCase(),path:safeText(route,250),summary:safeText(op.summary||op.description,160),tags:Array.isArray(op.tags)?op.tags.slice(0,5).map(x=>safeText(x,50)):[],requiredParameters:required,parameters:parameters.filter(p=>['path','query'].includes(p.in)).map(p=>({name:p.name,in:p.in,style:p.style||"form",explode:p.explode??(p.collectionFormat? p.collectionFormat==="multi":true),schema:schemaSnapshot(p.schema||{type:p.type,items:p.items},spec)})),bodyFields:fields,bodyRequired:!!(body?.required||legacy?.required),requestSchema:schemaSnapshot(media?.schema||legacy?.schema||{},spec),responseSchemas,successCodes:responses,authenticationRequired:Array.isArray(declaredSecurity)&&declaredSecurity.some(s=>Object.keys(s).length>0)});
   }
  }
  if(!operations.length)throw Error("Specification has no supported HTTP operations");
