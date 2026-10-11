@@ -32,7 +32,7 @@ API execution retains host/operation allowlists and separate provider-write cont
 
 ## Verification boundaries
 
-The final complete local suite passed 247 tests with zero failures and zero skips, including business repair and payment reconciliation hardening. The browser journey exercises team creation, real record persistence, transactional stock reservation, rejection of overselling, acceptance scenarios, scheduled-job setup/cancellation, workspace isolation, selection persistence and logout. Billing tests use a controlled transport and signed event logic; no real Stripe charge or Sabre booking is claimed.
+The final complete local suite passed 247 tests with zero failures and zero skips, including business repair and payment reconciliation hardening. After the final empty-workflow visibility change, 18 targeted tests passed without failures or skips. The browser journey exercises team creation, real record persistence, transactional stock reservation, rejection of overselling, acceptance scenarios, scheduled-job setup/cancellation, workspace isolation, selection persistence and logout. Billing tests use a controlled transport and signed event logic; no real Stripe charge or Sabre booking is claimed.
 
 The local generation/visual-review fixtures test orchestration mechanics. They do not establish real AI design quality by themselves. Real generated-app evidence is recorded separately after the release is deployed.
 
