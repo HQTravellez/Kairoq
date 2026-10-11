@@ -6600,7 +6600,7 @@ const server = http.createServer(async (req, res) => {
   }
   if(url.startsWith("/api/developer/jobs/")&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
-    try{const id=url.slice("/api/developer/jobs/".length);return json(res,200,id.startsWith("site-")?require("./website-jobs").getJob(id):appBuilder.getJob(id))}catch(e){return json(res,404,{error:"Build job not found"})}
+    try{const id=url.slice("/api/developer/jobs/".length);if(id.endsWith("/candidate"))return json(res,200,appBuilder.recoverCandidate(id.slice(0,-"/candidate".length)));return json(res,200,id.startsWith("site-")?require("./website-jobs").getJob(id):appBuilder.getJob(id))}catch(e){return json(res,404,{error:"Build job not found"})}
   }
   if(url.startsWith("/api/developer/evidence/")&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
