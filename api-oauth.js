@@ -19,7 +19,7 @@ function config(name){
  const scopes=Array.isArray(c.scopes)?c.scopes.map(x=>String(x).slice(0,120)).slice(0,30):[];
  const redirect=grant==="authorization_code"?docs.validUrl(process.env.KAIROQ_OAUTH_REDIRECT_URI||""):null;
  if(redirect&&redirect.pathname!=="/api/developer/oauth/callback")throw Error("OAuth callback URL must end in /api/developer/oauth/callback");
- return{name,clientId,secret,scopes,grant,authUrl,tokenUrl,redirect};
+ const tokenAuth=c.tokenEndpointAuthMethod||'client_secret_post';if(!['client_secret_post','client_secret_basic','client_secret_basic_base64'].includes(tokenAuth))throw Error('Unsupported OAuth token authentication method');return{name,clientId,secret,scopes,grant,authUrl,tokenUrl,redirect,tokenAuth};
 }
 function seal(value){const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv("aes-256-gcm",key(),iv);const data=Buffer.concat([cipher.update(JSON.stringify(value),"utf8"),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),data]).toString("base64");}
 function unseal(value){const bytes=Buffer.from(value,"base64");if(bytes.length<29)throw Error("Invalid encrypted OAuth state");const decipher=crypto.createDecipheriv("aes-256-gcm",key(),bytes.subarray(0,12));decipher.setAuthTag(bytes.subarray(12,28));return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)),decipher.final()]).toString("utf8"));}
@@ -34,12 +34,12 @@ function start(name){
  const u=new URL(c.authUrl.href);u.searchParams.set("response_type","code");u.searchParams.set("client_id",c.clientId);u.searchParams.set("redirect_uri",c.redirect.href);u.searchParams.set("state",state);u.searchParams.set("code_challenge",challenge);u.searchParams.set("code_challenge_method","S256");if(c.scopes.length)u.searchParams.set("scope",c.scopes.join(" "));
  return{url:u.href,state,cookie:"kq_oauth_state="+state+"; HttpOnly; Secure; SameSite=Lax; Path=/api/developer/oauth; Max-Age=600"};
 }
+function tokenRequest(c,params){const data=new URLSearchParams(params),headers={Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'};if(c.tokenAuth==='client_secret_basic'||c.tokenAuth==='client_secret_basic_base64'){if(!c.secret)throw Error('Basic OAuth authentication needs a secret');const encode=v=>c.tokenAuth==='client_secret_basic_base64'?Buffer.from(v).toString('base64'):encodeURIComponent(v);headers.Authorization='Basic '+Buffer.from(encode(c.clientId)+':'+encode(c.secret)).toString('base64');}else{data.set('client_id',c.clientId);if(c.secret)data.set('client_secret',c.secret);}return{headers,body:data.toString()};}
 async function postToken(c,params,{lookup=dns.lookup,timeout=12000}={}){
  const ip=await lookup(c.tokenUrl.hostname,{all:true});if(!ip?.length||ip.some(x=>!docs.publicIp(x.address)))throw Error("OAuth token host resolves to a private or unsafe address");
- const data=new URLSearchParams(params);data.set("client_id",c.clientId);if(c.secret)data.set("client_secret",c.secret);
- const body=data.toString();
+ const prepared=tokenRequest(c,params),body=prepared.body;
  return new Promise((resolve,reject)=>{
-  const req=https.request(c.tokenUrl,{method:"POST",timeout,maxHeaderSize:16000,headers:{"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded","Content-Length":Buffer.byteLength(body)},lookup:(host,opts,cb)=>opts.all?cb(null,[ip[0]]):cb(null,ip[0].address,ip[0].family)},res=>{
+  const req=https.request(c.tokenUrl,{method:"POST",timeout,maxHeaderSize:16000,headers:{...prepared.headers,"Content-Length":Buffer.byteLength(body)},lookup:(host,opts,cb)=>opts.all?cb(null,[ip[0]]):cb(null,ip[0].address,ip[0].family)},res=>{
    let size=0,chunks=[];res.on("data",part=>{size+=part.length;if(size>200000){req.destroy(Error("OAuth token response too large"));return;}chunks.push(part);});
    res.on("end",()=>{if(res.statusCode<200||res.statusCode>=300)return reject(Error("OAuth provider returned HTTP "+res.statusCode));let data;try{data=JSON.parse(Buffer.concat(chunks).toString("utf8"));}catch{return reject(Error("Invalid OAuth token response"));}if(typeof data.access_token!=="string"||!data.access_token||data.access_token.length>20000)return reject(Error("OAuth provider returned no usable access token"));resolve(data);});
   });req.on("timeout",()=>req.destroy(Error("OAuth token request timed out")));req.on("error",reject);req.end(body);
@@ -76,4 +76,4 @@ async function accessToken(name,{exchange=postToken}={}){
  inflight.set(name,refresh);try{return await refresh;}finally{inflight.delete(name);}
 }
 function disconnect(name){config(name);try{fs.unlinkSync(file(name,"token"));}catch(e){if(e.code!=="ENOENT")throw e;}return{provider:name,connected:false};}
-module.exports={config,providers,start,complete,accessToken,disconnect,postToken};
+module.exports={tokenRequest,config,providers,start,complete,accessToken,disconnect,postToken};

@@ -34,13 +34,13 @@ test("API contract is read-only and never fetches remote references",()=>{
 test("rejects invalid, oversized, missing and unsupported specifications",()=>{
  assert.throws(()=>api.learn("{}"),/Only OpenAPI/);
  assert.throws(()=>api.learn({openapi:"3.1.0",paths:{}}),/no supported HTTP operations/);
- assert.throws(()=>api.learn("x".repeat(400001)),/400 KB/);
+ assert.throws(()=>api.learn("x".repeat(2000001)),/2 MB/);
  assert.throws(()=>api.learn({swagger:"1.2",paths:{"/x":{get:{}}}}),/Only OpenAPI/);
 });
 test("rejects API specifications with excessive operations",()=>{
  const large={openapi:"3.0.0",paths:{}};
- for(let i=0;i<151;i++)large.paths["/endpoint"+i]={get:{responses:{"200":{}}}};
- assert.throws(()=>api.learn(large),/150 operations/);
+ for(let i=0;i<1001;i++)large.paths["/endpoint"+i]={get:{responses:{"200":{}}}};
+ assert.throws(()=>api.learn(large),/1000 operations/);
 });
 test("supports Swagger 2.0 input without executing operations",()=>{
  const p=api.learn({swagger:"2.0",info:{title:"Legacy",version:"1"},host:"api.example.com",schemes:["https"],basePath:"/v2",securityDefinitions:{key:{type:"apiKey",in:"header",name:"X-Key"}},paths:{"/items":{get:{responses:{"200":{}}}}}});

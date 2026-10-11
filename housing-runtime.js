@@ -10,17 +10,18 @@ function database(root,id){
  const db=new DatabaseSync(file);db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
  CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,salt TEXT NOT NULL,hash TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS enquiries(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),name TEXT NOT NULL,email TEXT NOT NULL,city TEXT NOT NULL,arrival TEXT,departure TEXT,budget REAL NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'new',notes TEXT NOT NULL DEFAULT '',priority TEXT NOT NULL DEFAULT 'normal',created_at TEXT NOT NULL,updated_at TEXT NOT NULL);`);
- dbs.set(file,db);return db;
+ db.exec('CREATE TABLE IF NOT EXISTS app_sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires INTEGER NOT NULL);');dbs.set(file,db);return db;
 }
 function send(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));}
 async function body(req){let s='';for await(const part of req){s+=part;if(s.length>18000)throw Error('Request too large');}try{return JSON.parse(s||'{}')}catch{throw Error('Invalid JSON')}}
 const sessionName=id=>id==='housing-enquiries'?'housing_session':'kairoq_session_'+id;
 const token=(req,id)=>{const prefix=sessionName(id)+'=';return String(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(prefix))?.slice(prefix.length)};
-function user(req,id){const s=sessions.get(token(req,id));return s&&s.id===id&&s.expires>Date.now()?s.user:null;}
+function user(req,id,root){const value=token(req,id);if(!value)return null;if(root){const db=database(root,id),hash=crypto.createHash('sha256').update(value).digest('hex'),account=db.prepare('SELECT u.id,u.email FROM app_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?').get(hash,Date.now());return account||null;}const s=sessions.get(value);return s&&s.id===id&&s.expires>Date.now()?s.user:null;}
 function removeTestAccount(root,id,account){
  if(!account||!/^kairoq-qa-[a-f0-9]{24}@example\.com$/.test(account.email)||!account.id)throw Error('Only an identified synthetic QA account may be cleaned up');
  const db=database(root,id),stored=db.prepare('SELECT id FROM users WHERE id=? AND email=?').get(account.id,account.email);if(!stored)return;
- db.exec('BEGIN');try{if(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='app_records'").get())db.prepare('DELETE FROM app_records WHERE user_id=?').run(account.id);db.prepare('DELETE FROM enquiries WHERE user_id=?').run(account.id);db.prepare('DELETE FROM users WHERE id=? AND email=?').run(account.id,account.email);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
+ db.exec('BEGIN');try{if(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='app_records'").get())db.prepare('DELETE FROM app_records WHERE user_id=?').run(account.id);if(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='app_members'").get()){const teams=db.prepare("SELECT team_id FROM app_members WHERE user_id=? AND role='owner'").all(account.id);for(const t of teams){if(db.prepare('SELECT count(*) n FROM app_members WHERE team_id=? AND user_id<>?').get(t.team_id,account.id).n)throw Error('QA cleanup cannot remove a team with other members');db.prepare('DELETE FROM app_records WHERE id IN (SELECT record_id FROM app_record_scopes WHERE team_id=?)').run(t.team_id);db.prepare('DELETE FROM app_teams WHERE id=?').run(t.team_id);}db.prepare('DELETE FROM app_audit WHERE user_id=?').run(account.id);}
+ for(const table of ['app_function_runs','app_automation_events'])if(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table))db.prepare('DELETE FROM '+table+' WHERE user_id=?').run(account.id);db.prepare('DELETE FROM enquiries WHERE user_id=?').run(account.id);db.prepare('DELETE FROM users WHERE id=? AND email=?').run(account.id,account.email);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
  for(const[key,session]of sessions)if(session.id===id&&session.user.id===account.id)sessions.delete(key);
 }
 function cookie(req,res,value,id){res.setHeader('Set-Cookie',sessionName(id)+'='+value+'; HttpOnly; SameSite=Strict; Path=/apps/'+id+'/; Max-Age='+(value?86400:0)+(req.headers['x-forwarded-proto']==='https'||req.socket.encrypted?'; Secure':''));}
@@ -48,10 +49,10 @@ async function handle(req,res,{root,id,route}){
     const salt=crypto.randomBytes(16).toString('hex'),hash=crypto.scryptSync(password,salt,64).toString('hex');account={id:crypto.randomUUID(),email,salt,hash};
     db.prepare('INSERT INTO users VALUES(?,?,?,?)').run(account.id,email,salt,hash);
    }else if(!account||!crypto.timingSafeEqual(Buffer.from(account.hash,'hex'),crypto.scryptSync(password,account.salt,64)))return send(res,401,{error:'Invalid email or password'});
-   const session=crypto.randomBytes(32).toString('hex');sessions.set(session,{id,user:{id:account.id,email},expires:now+86400000});cookie(req,res,session,id);return send(res,200,{user:{id:account.id,email}});
+   const session=crypto.randomBytes(32).toString('hex');sessions.set(session,{id,user:{id:account.id,email},expires:now+86400000});db.prepare('DELETE FROM app_sessions WHERE expires<=?').run(now);db.prepare('INSERT INTO app_sessions VALUES(?,?,?)').run(crypto.createHash('sha256').update(session).digest('hex'),account.id,now+86400000);cookie(req,res,session,id);return send(res,200,{user:{id:account.id,email}});
   }
-  if(route==='/auth/logout'&&method==='POST'){sessions.delete(token(req,id));cookie(req,res,'',id);return send(res,200,{ok:true})}
-  const account=user(req,id);if(!account)return send(res,401,{error:'Sign in required'});
+  if(route==='/auth/logout'&&method==='POST'){db.prepare('DELETE FROM app_sessions WHERE token_hash=?').run(crypto.createHash('sha256').update(token(req,id)||'').digest('hex'));sessions.delete(token(req,id));cookie(req,res,'',id);return send(res,200,{ok:true})}
+  const account=user(req,id,root);if(!account)return send(res,401,{error:'Sign in required'});
   if(route==='/auth/me'&&method==='GET')return send(res,200,{user:account});
   if(route==='/enquiries'&&method==='GET')return send(res,200,{enquiries:db.prepare('SELECT * FROM enquiries WHERE user_id=? ORDER BY created_at DESC').all(account.id).map(({user_id,...e})=>e)});
   if(route==='/dashboard'&&method==='GET'){

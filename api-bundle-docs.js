@@ -26,7 +26,7 @@ function combine(specs,url){
  if(!specs.length)throw Error('No embedded OpenAPI specifications found');
  const learn=require('./api-learning').learn,plans=specs.map(learn),base=plans[0].baseUrl;if(plans.some(p=>p.baseUrl!==base))throw Error('Documentation includes incompatible API servers; import specifications separately');
  const operations=new Map();for(const p of plans)for(const o of p.operations)operations.set(o.method+' '+o.path,o);
- if(operations.size>150)throw Error('Documentation exceeds 150 operations');
+ if(operations.size>1000)throw Error('Documentation exceeds 1000 operations');
  const auth=plans.flatMap(p=>p.auth);if(new URL(url).hostname==='devhub.tripninja.io'){auth.push({name:'tripninjaToken',type:'http',scheme:'token'});for(const o of operations.values())o.authenticationRequired=true;}
  return{title:plans[0].title,version:plans[0].version,format:'openapi-bundle',baseUrl:base,auth,operations:[...operations.values()],documentationUrl:url,limitations:['Specifications extracted without executing website code','Descriptions and examples omitted; operation schemas retained for import','Generated validation covers documented top-level fields; provider integration still requires verification','No live provider requests made']};
 }

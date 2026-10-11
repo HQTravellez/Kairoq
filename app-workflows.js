@@ -24,13 +24,13 @@ async function run({root,id,userId,envelope,workflowId,inputs={},requestId,mode=
  inputsFor(workflow,inputs);if(!['simulate','live'].includes(mode))throw Error('Unknown workflow execution mode');
  if(mode==='simulate')return{id:null,workflowId,mode,status:'simulation',externalCalls:0,steps:workflow.steps.map(s=>({id:s.id,operationId:s.operationId,status:'planned',arguments:s.arguments,...(s.when?{when:s.when}:{})})),message:'This is an execution plan; no provider results or saved records were created.'};
  if(!/^[A-Za-z0-9_-]{16,100}$/.test(requestId||''))throw Error('Use a unique requestId of 16–100 characters');
- const credentialName=orchestrator.readiness(plan,apiContract,id).connections[0].credentialName;
+ const connection=orchestrator.readiness(plan,apiContract,id).connections[0],credentialName=connection.credentialName,oauthProvider=connection.oauthProvider;
  const operations=workflow.steps.map(s=>apiContract.operations.find(o=>o.id===s.operationId));
  if(process.env.KAIROQ_API_LIVE_ENABLED!=='true')throw Object.assign(Error('Live provider execution is disabled'),{status:409});
  if(operations.some(o=>!['GET','HEAD'].includes(o.method))&&!confirmWrites)throw Object.assign(Error('Confirm provider writes before running this workflow'),{status:409});
- if(operations.some(o=>o.authenticationRequired)&&!process.env[credentialName])throw Object.assign(Error('Configure server credential '+credentialName),{status:409});
+ if(operations.some(o=>o.authenticationRequired)&&!process.env[credentialName]&&!oauthProvider)throw Object.assign(Error('Configure server credential '+credentialName),{status:409});
  // Preflight ALL operations so a later missing permission cannot follow an earlier write.
- for(const op of operations){if(!['GET','HEAD'].includes(op.method)&&process.env.KAIROQ_API_WRITE_ENABLED!=='true')throw Object.assign(Error('Provider writes are disabled'),{status:409});const pathParams=Object.fromEntries((op.path.match(/\{([^{}]+)\}/g)||[]).map(k=>[k.slice(1,-1),'preflight']));adapter.prepare({plan:apiContract,operationId:op.id,pathParams,credentialName:operations.some(o=>o.authenticationRequired)?credentialName:undefined,approved:true,approvedWrites:confirmWrites});}
+ for(const op of operations){if(!['GET','HEAD'].includes(op.method)&&process.env.KAIROQ_API_WRITE_ENABLED!=='true')throw Object.assign(Error('Provider writes are disabled'),{status:409});const pathParams=Object.fromEntries((op.path.match(/\{([^{}]+)\}/g)||[]).map(k=>[k.slice(1,-1),'preflight']));adapter.prepare({plan:apiContract,operationId:op.id,pathParams,credentialName:operations.some(o=>o.authenticationRequired)&&!oauthProvider?credentialName:undefined,oauthProvider:operations.some(o=>o.authenticationRequired)?oauthProvider:undefined,approved:true,approvedWrites:confirmWrites});}
  const db=open(root,id),scope=fingerprint(envelope),key=fingerprint({scope,inputs,confirmWrites}),at=new Date().toISOString();
  const result={id:crypto.randomUUID(),workflowId,mode,status:'running',steps:[],externalCalls:0,createdAt:at,contractFingerprint:scope,verifiedProvider:false};
  const sanitize=value=>validation.sanitize(value,[process.env[credentialName]]);
@@ -44,7 +44,7 @@ async function run({root,id,userId,envelope,workflowId,inputs={},requestId,mode=
     if(step.when&&JSON.stringify(resolve(step.when.source,inputs,outputs))!==JSON.stringify(step.when.equals)){result.steps.push({id:step.id,status:'skipped'});save();continue;}
     const op=apiContract.operations.find(o=>o.id===step.operationId),args=resolve(step.arguments,inputs,outputs);validation.operation(op,args);
     result.steps.push({id:step.id,operationId:op.id,status:'running'});save();dispatched=true;result.externalCalls++;let response;
-    try{response=await execute({plan:apiContract,operationId:op.id,...args,credentialName:op.authenticationRequired?credentialName:undefined,approved:true,approvedWrites:confirmWrites});}catch{result.steps.at(-1).status='unknown';throw Error('Provider request failed; reconcile its outcome before starting a new run');}
+    try{response=await execute({plan:apiContract,operationId:op.id,...args,credentialName:op.authenticationRequired&&!oauthProvider?credentialName:undefined,oauthProvider:op.authenticationRequired?oauthProvider:undefined,approved:true,approvedWrites:confirmWrites});}catch{result.steps.at(-1).status='unknown';throw Error('Provider request failed; reconcile its outcome before starting a new run');}
     if(!response?.ok){result.steps.at(-1).status='failed';result.steps.at(-1).providerStatus=response?.status;throw Error('Provider rejected step '+step.id+' (HTTP '+response?.status+')');}
     if(op.responseSchemas?.[String(response.status)])validation.validate(op.responseSchemas[String(response.status)],response.data,'response.'+step.id);
     outputs[step.id]=response.data;for(const assertion of step.assertions||[])if(JSON.stringify(resolve(assertion.source,inputs,outputs))!==JSON.stringify(assertion.equals)){result.steps.at(-1).status='failed';throw Error('Provider business outcome did not satisfy step '+step.id);}
