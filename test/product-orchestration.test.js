@@ -123,7 +123,17 @@ test('business repair preserves acceptance outcomes while correcting server step
  const result=await planner.plan(async opts=>{calls++;const out=structuredClone(base);out.schema.functions[0].steps[0].values.value=25;if(calls===1)out.schema.scenarios[0].expect.args[1]=20;else assert.match(opts.messages[0].content,/must preserve acceptance scenario/);assert.match(opts.messages[0].content,/REPAIR SERVER LOGIC/);return out;},{brief:'Calculate the requested total correctly',previous,repairError:'Acceptance outcome did not match the requested business result'});
  assert.equal(calls,2);assert.deepEqual(result.schema.scenarios,previous.schema.scenarios);assert.equal(result.schema.functions[0].steps[0].values.value,25);
 });
+test('scenario planning checks custom result shapes before generating a frontend',()=>{
+ const schema={collections:[{name:'totals',fields:[{name:'total',type:'number'}]}],functions:[{name:'calculate',inputs:[],steps:[{id:'row',type:'create',collection:'totals',values:{total:125}}],result:{total:{$result:'row.data.total'}}}],scenarios:[{name:'calculated_total',function:'calculate',fixtures:[],inputs:{},expect:{$op:'eq',args:[{$result:'run.result.data.total'},125]}}]};
+ assert.throws(()=>runtime.validateSchema(schema),/Scenario response path run.result.data.total does not match function calculate result/);
+ schema.scenarios[0].expect.args[0].$result='run.result.total';assert.doesNotThrow(()=>runtime.validateSchema(schema));
+ schema.functions[0].result={$result:'row'};schema.scenarios[0].expect.args[0].$result='run.result.data.total';assert.doesNotThrow(()=>runtime.validateSchema(schema));
+});
 test('disabled external integrations leave no empty panel and can be enabled on revision',()=>{
  const components=require('../app-workflow-components'),files={'app.js':'','styles.css':'body{color:black}'};
  const disabled=components.inject(files,false);assert.match(disabled['styles.css'],/#workflow-panel\{display:none!important\}/);const enabled=components.inject(disabled,true);assert.doesNotMatch(enabled['styles.css'],/DISABLED WORKFLOWS/);assert.match(enabled['app.js'],/BEGIN KAIROQ WORKFLOW RUNTIME/);
+});
+test('long internal scenario names stay bounded and failed planning exposes actionable structural diagnostics',async()=>{
+ const model={collections:[{name:'items',fields:[{name:'value',type:'number'}]}],functions:[{name:'create_item',inputs:[],steps:[{id:'row',type:'create',collection:'items',values:{value:3}}]}],scenarios:[{name:'creates_a_record_with_the_expected_business_value_for_the_owner',function:'create_item',fixtures:[],inputs:{},expect:{$op:'eq',args:[{$result:'run.result.data.value'},3]}}]};assert.doesNotThrow(()=>runtime.validateSchema(model));const tooLong=structuredClone(model);tooLong.scenarios[0].name='a'.repeat(101);assert.throws(()=>runtime.validateSchema(tooLong),/1–100/);
+ const diagnostics=[];let calls=0;const planned=await planner.plan(async opts=>{const out={schema:structuredClone(model),requirements:[{id:'create',implementation:'function',target:'create_item'}],workflows:[]};if(++calls===1)out.schema.scenarios[0].function='unknown';else assert.match(opts.messages[0].content,/declared functions: create_item/);return out;},{brief:'Create actual items with the requested business value',onInvalid:d=>diagnostics.push(d)});assert.equal(calls,2);assert.equal(diagnostics[0].scenarios[0].function,'unknown');assert.equal(diagnostics[0].requirementsKind,'array');assert.equal(planned.schema.scenarios[0].function,'create_item');
 });
