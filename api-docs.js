@@ -1,7 +1,7 @@
 "use strict";
 // Documentation ingestion is bounded, HTTPS-only, and treats all external text as data.
 const https=require("node:https"),dns=require("node:dns").promises,net=require("node:net");
-const MAX=400000;
+const MAX=2000000;
 function publicIp(ip){
  if(net.isIP(ip)===4){const p=ip.split(".").map(Number);return !(p[0]===0||p[0]===10||p[0]===127||p[0]>=224||p[0]===169&&p[1]===254||p[0]===172&&p[1]>=16&&p[1]<=31||p[0]===192&&p[1]===168||p[0]===100&&p[1]>=64&&p[1]<=127||p[0]===192&&p[1]===0||p[0]===198&&p[1]>=18&&p[1]<=19||p[0]===192&&p[1]===0&&p[2]===2||p[0]===198&&p[1]===51&&p[2]===100||p[0]===203&&p[1]===0&&p[2]===113);}
  if(net.isIP(ip)===6){const s=ip.toLowerCase();if(s.startsWith("::ffff:"))return publicIp(s.slice(7));return !(s==="::1"||s==="::"||s.startsWith("fe80:")||s.startsWith("fc")||s.startsWith("fd")||s.startsWith("2001:db8:")||s.startsWith("ff"));}
@@ -32,7 +32,7 @@ function plain(input){
  return String(input||"").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&(?:nbsp|amp|lt|gt|quot);/gi,x=>({"&nbsp;":" ","&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"'}[x.toLowerCase()]||" ")).replace(/\s+/g," ").trim();
 }
 function infer(input){
- const source=String(input||"");if(Buffer.byteLength(source)>MAX)throw Error("Documentation exceeds 400 KB");
+ const source=String(input||"");if(Buffer.byteLength(source)>MAX)throw Error("Documentation exceeds 2 MB");
  try{const obj=JSON.parse(source);if(obj.openapi||obj.swagger)return require("./api-learning").learn(obj);if(obj.info?.schema?.includes("schema.getpostman.com/json/collection/v2."))return require("./api-learning").fromPostman(obj);}catch(e){if(!e.message.includes("JSON")&&/Only OpenAPI|Specification|Postman/.test(e.message))throw e;}
  const text=plain(source);
  const regex=/\b(GET|POST|PUT|PATCH|DELETE)\s+(\/[\w.{}\-\/?:=&%]+)(?=\s|$|[.,;])/gi;

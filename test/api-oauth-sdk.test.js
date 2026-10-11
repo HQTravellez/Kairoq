@@ -42,3 +42,7 @@ test("SDK generation emits executable JavaScript with encoded parameters",async(
  assert.equal(response.url,"https://api.example.com/v1/trips/a%2Fb");assert.equal(response.auth,"Bearer test");
 });
 test.after(()=>{for(const [k,v] of Object.entries({KAIROQ_OAUTH_ENCRYPTION_KEY:original.key,KAIROQ_OAUTH_PROVIDERS:original.providers,KAIROQ_OAUTH_REDIRECT_URI:original.redirect})){if(v===undefined)delete process.env[k];else process.env[k]=v;}});
+test('client credentials can authenticate in a Basic header without sending the client secret in the body',()=>{
+ const request=oauth.tokenRequest({clientId:'client',secret:'private-secret',tokenAuth:'client_secret_basic'},{grant_type:'client_credentials'});assert.equal(request.headers.Authorization,'Basic '+Buffer.from('client:private-secret').toString('base64'));assert.equal(request.body,'grant_type=client_credentials');assert.ok(!request.body.includes('private-secret'));
+ const legacy=oauth.tokenRequest({clientId:'client',secret:'private-secret',tokenAuth:'client_secret_basic_base64'},{grant_type:'client_credentials'});assert.equal(legacy.headers.Authorization,'Basic '+Buffer.from(Buffer.from('client').toString('base64')+':'+Buffer.from('private-secret').toString('base64')).toString('base64'));
+});

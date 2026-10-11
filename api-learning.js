@@ -1,11 +1,11 @@
 "use strict";
 // Kairoq API intelligence: a read-only, bounded OpenAPI 3 / Swagger 2 importer.
 // API documentation is untrusted data, never instructions or executable code.
-const MAX_BYTES=400000,MAX_OPERATIONS=150;
+const MAX_BYTES=2000000,MAX_OPERATIONS=1000;
 const HTTP=new Set(["get","post","put","patch","delete","head","options"]);
 function parse(input){
  const raw=typeof input==="string"?input:JSON.stringify(input);
- if(!raw||Buffer.byteLength(raw,"utf8")>MAX_BYTES)throw Error("API specification is empty or exceeds 400 KB");
+ if(!raw||Buffer.byteLength(raw,"utf8")>MAX_BYTES)throw Error("API specification is empty or exceeds 2 MB");
  let spec;try{spec=typeof input==="string"?JSON.parse(input):JSON.parse(raw);}catch{throw Error("Provide an OpenAPI or Swagger specification as JSON");}
  if(!spec||typeof spec!=="object"||Array.isArray(spec)||(!/^3\./.test(String(spec.openapi||""))&&!/^2\./.test(String(spec.swagger||""))))throw Error("Only OpenAPI 3.x or Swagger 2.0 JSON is supported");
  if(!spec.paths||typeof spec.paths!=="object"||Array.isArray(spec.paths))throw Error("Specification has no valid paths");
@@ -41,17 +41,18 @@ function schemaSnapshot(node,spec,seen=new Set(),depth=0){
  return out;
 }
 function learn(input){
+ const candidate=typeof input==='string'?(()=>{try{return JSON.parse(input);}catch{return null;}})():input;if(candidate?.info?.schema?.includes('schema.getpostman.com/json/collection/v2.'))return fromPostman(candidate);
  const spec=parse(input),servers=(spec.servers||[]).map(s=>s.url).filter(s=>typeof s==="string"&&/^https:\/\//i.test(s)).slice(0,3);
  const operationServers=[...new Set(Object.values(spec.paths).flatMap(item=>Object.entries(item||{}).filter(([key])=>HTTP.has(key)).map(([,op])=>op?.servers?.[0]?.url||item?.servers?.[0]?.url||servers[0]).filter(url=>typeof url==='string'&&/^https:\/\//i.test(url))))];
  const base=spec.swagger==="2.0"?(spec.schemes?.includes("https")&&spec.host?"https://"+spec.host+(spec.basePath||""):""):operationServers.length===1?operationServers[0]:operationServers.length?"":servers[0]||"";
  const securitySchemes=spec.components?.securitySchemes||spec.securityDefinitions||{};
- const auth=Object.entries(securitySchemes).slice(0,20).map(([name,value])=>({name:safeText(name,70),type:safeText(value.type,35),scheme:safeText(value.scheme,35),in:safeText(value.in,20),headerName:safeText(value.name,80),tokenUrl:safeText(value.flows?.clientCredentials?.tokenUrl||value.tokenUrl,200)}));
+ const auth=Object.entries(securitySchemes).slice(0,20).map(([name,value])=>({name:safeText(name,70),type:safeText(value.type,35),scheme:safeText(value.scheme,35),in:safeText(value.in,20),headerName:safeText(value.name,80),tokenUrl:safeText(value.flows?.clientCredentials?.tokenUrl||value.flows?.authorizationCode?.tokenUrl||value.tokenUrl,200),flows:value.flows?Object.fromEntries(Object.entries(value.flows).map(([name,f])=>[name,{tokenUrl:safeText(f.tokenUrl,220),authorizationUrl:safeText(f.authorizationUrl,220),scopes:Object.keys(f.scopes||{}).slice(0,30)}])):undefined}));
  const operations=[];
  for(const [route,item] of Object.entries(spec.paths)){
   if(!route.startsWith("/")||typeof item!=="object"||!item)continue;
   for(const [method,raw] of Object.entries(item)){
    if(!HTTP.has(method.toLowerCase())||!raw||typeof raw!=="object")continue;
-   if(operations.length>=MAX_OPERATIONS)throw Error("API specification exceeds 150 operations");
+   if(operations.length>=MAX_OPERATIONS)throw Error("API specification exceeds 1000 operations");
    const op=resolve(raw,spec),parameters=[...(Array.isArray(item.parameters)?item.parameters:[]),...(Array.isArray(op.parameters)?op.parameters:[])].map(p=>resolve(p,spec));
    const body=op.requestBody?resolve(op.requestBody,spec):null;
    const media=body?.content&&Object.entries(body.content).find(([k])=>/json/i.test(k))?.[1];
@@ -61,26 +62,13 @@ function learn(input){
    const responses=Object.keys(op.responses||{}).filter(k=>/^2\d\d$/.test(k)).slice(0,6);
    const declaredSecurity=op.security??spec.security??[];
    const responseSchemas=Object.fromEntries(responses.map(code=>{const r=resolve(op.responses[code],spec),json=r.content&&Object.entries(r.content).find(([k])=>/json/i.test(k))?.[1];return[code,schemaSnapshot(json?.schema||r.schema||{},spec)];}));
-   operations.push({id:safeText(op.operationId||method+"_"+route.replace(/[^a-z0-9]+/gi,"_"),100),method:method.toUpperCase(),path:safeText(route,250),summary:safeText(op.summary||op.description,160),tags:Array.isArray(op.tags)?op.tags.slice(0,5).map(x=>safeText(x,50)):[],requiredParameters:required,parameters:parameters.filter(p=>['path','query'].includes(p.in)).map(p=>({name:p.name,in:p.in,style:p.style||"form",explode:p.explode??(p.collectionFormat? p.collectionFormat==="multi":true),schema:schemaSnapshot(p.schema||{type:p.type,items:p.items},spec)})),bodyFields:fields,bodyRequired:!!(body?.required||legacy?.required),requestSchema:schemaSnapshot(media?.schema||legacy?.schema||{},spec),responseSchemas,successCodes:responses,authenticationRequired:Array.isArray(declaredSecurity)&&declaredSecurity.some(s=>Object.keys(s).length>0)});
+   operations.push({id:safeText(op.operationId||method+"_"+route.replace(/[^a-z0-9]+/gi,"_"),100),method:method.toUpperCase(),path:safeText(route,250),summary:safeText(op.summary||op.description,160),tags:Array.isArray(op.tags)?op.tags.slice(0,5).map(x=>safeText(x,50)):[],requiredParameters:required,parameters:parameters.filter(p=>['path','query'].includes(p.in)).map(p=>({name:p.name,in:p.in,style:p.style||"form",explode:p.explode??(p.collectionFormat? p.collectionFormat==="multi":true),schema:schemaSnapshot(p.schema||{type:p.type,items:p.items},spec)})),bodyFields:fields,bodyRequired:!!(body?.required||legacy?.required),requestSchema:schemaSnapshot(media?.schema||legacy?.schema||{},spec),responseSchemas,successCodes:responses,security:declaredSecurity,authenticationRequired:Array.isArray(declaredSecurity)&&declaredSecurity.some(s=>Object.keys(s).length>0)});
   }
  }
  if(!operations.length)throw Error("Specification has no supported HTTP operations");
  return{title:safeText(spec.info?.title||"Imported API",120),version:safeText(spec.info?.version,50),format:spec.openapi?"openapi3":"swagger2",baseUrl:safeText(base,220),auth,operations,limitations:["Read-only API understanding; no external requests executed","Credentials must be supplied through server-side secret storage","API calls require explicit approval, scoped permissions and tested adapters","External $ref URLs are not fetched"]};
 }
-function fromPostman(collection){
- if(!collection?.info?.schema?.includes("schema.getpostman.com/json/collection/v2.")||!Array.isArray(collection.item))throw Error("Unsupported Postman collection");
- const operations=[];
- const walk=(items)=>{for(const item of items){if(Array.isArray(item.item)){walk(item.item);continue;}const req=item.request;if(!req)continue;
-  const method=String(req.method||"GET").toUpperCase();if(!HTTP.has(method.toLowerCase()))continue;
-  const raw=req.url?.raw||req.url||"",url=String(raw),pathname=req.url?.path?(Array.isArray(req.url.path)?"/"+req.url.path.join("/"):String(req.url.path)):url.replace(/^https?:\/\/[^/]+/,"").split("?")[0];
-  if(!pathname.startsWith("/"))continue;
-  if(operations.length>=MAX_OPERATIONS)throw Error("Postman collection exceeds 150 operations; split it into smaller collections before importing");
-  operations.push({id:safeText(item.name||method+"_"+pathname,100).replace(/[^a-z0-9_]/gi,"_"),method,path:safeText(pathname.replace(/:([a-zA-Z0-9_]+)/g,"{$1}"),250),summary:safeText(req.description?.content||req.description,160),tags:[],requiredParameters:[],bodyFields:[],successCodes:[],authenticationRequired:null});
- }};
- walk(collection.item);
- if(!operations.length)throw Error("Postman collection has no supported operations");
- return{title:safeText(collection.info.name||"Postman Collection"),format:"postman-v2",version:"",baseUrl:"",auth:[],operations,limitations:["Postman imports require an explicit approved base URL and authentication setup","Imported operations are not verified against a live service","No API calls were made"]};
-}
+function fromPostman(collection,options){return require('./api-postman').importCollection(collection,options);}
 function instructions(input){
  const plan=input?.operations?input:learn(input);
  const compact={title:plan.title,baseUrl:plan.baseUrl,auth:plan.auth,operations:plan.operations.map(o=>({id:o.id,method:o.method,path:o.path,summary:o.summary,requiredParameters:o.requiredParameters,bodyFields:o.bodyFields,authenticationRequired:o.authenticationRequired}))};

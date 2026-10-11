@@ -5,7 +5,7 @@ const docs=require("./api-docs"),api=require("./api-learning");
 function baseApprovalKey(contract,op){const u=docs.validUrl(contract.baseUrl);return u.hostname.toLowerCase()+":"+op.method+":"+op.path;}
 function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentialName,oauthProvider,approved=false,approvedWrites=false,allowedHosts=process.env.KAIROQ_API_HOSTS}={}){
  const contract=plan?.operations?plan:api.learn(apiSpec);
- const op=contract.operations.find(x=>x.id===operationId);if(!op)throw Error("Unknown API operation");
+ const op=contract.operations.find(x=>x.id===operationId);if(!op)throw Error("Unknown API operation");if(op.unsupportedBody)throw Error('This documented request body encoding needs a specialized server adapter');if(op.requiresScripts)throw Error('Postman pre-request scripts require an explicit server adapter');
  const approvalKey=baseApprovalKey(contract,op);const allowedOps=new Set(String(process.env.KAIROQ_API_APPROVED_OPERATIONS||"").split(",").map(x=>x.trim()).filter(Boolean));
  if(!allowedOps.has(approvalKey))throw Error("Operation is not approved in the server policy");
  if(!approved)throw Error("API execution requires explicit approval");
@@ -40,12 +40,16 @@ function prepare({apiSpec,plan,operationId,pathParams={},query={},body,credentia
  if(oauthProvider){if(credentialName)throw Error("Choose either OAuth or a static API credential");const provider=require("./api-oauth").config(oauthProvider);if(!provider)throw Error("OAuth provider not configured");}
  if(op.authenticationRequired&&!secret&&!oauthProvider)throw Error("Operation requires an API credential");
  if(body!==undefined&&JSON.stringify(body).length>50000)throw Error("API body too large");
- const payload=body===undefined?undefined:JSON.stringify(body);
- const headers={"Accept":"application/json",...(payload?{"Content-Type":"application/json"}:{})};
- if(secret){const key=contract.auth?.find(a=>a.type==="apiKey"&&a.in==="header"&&/^[a-z0-9-]{1,80}$/i.test(a.headerName||""));
-  if(key){if(["host","content-length","authorization","cookie","connection"].includes(key.headerName.toLowerCase()))throw Error("Unsafe API key header");headers[key.headerName]=secret;}
-  else {const scheme=contract.auth?.find(a=>a.type==="http")?.scheme?.toLowerCase();headers.Authorization=(scheme==="token"?"Token ":scheme==="basic"?"Basic ":"Bearer ")+secret;}
+ if(op.requestEncoding==='form'&&body!==undefined&&(!body||Array.isArray(body)||typeof body!=='object'||Object.values(body).some(v=>v===null||typeof v==='object')))throw Error('Form request body needs scalar fields');
+ const payload=body===undefined?undefined:op.requestEncoding==='form'?new URLSearchParams(body).toString():JSON.stringify(body);
+ const headers={"Accept":"application/json",...(payload?{"Content-Type":op.requestEncoding==='form'?'application/x-www-form-urlencoded':'application/json'}:{})};
+ const requirements=op.security?.filter(r=>Object.keys(r).length)||[];let auth=contract.auth||[];
+ if(requirements.length){const choice=requirements.find(r=>Object.keys(r).length===1&&auth.some(a=>Object.hasOwn(r,a.name)&&(oauthProvider?a.type==='oauth2'||a.type==='http'&&a.scheme==='bearer':a.type==='http'||a.type==='apiKey')));if(!choice&&op.authenticationRequired)throw Error('No supported authentication binding for this operation');if(choice)auth=auth.filter(a=>Object.hasOwn(choice,a.name));}
+ if(secret){const key=auth.find(a=>a.type==='apiKey');
+  if(key){if(!/^[a-z0-9_.-]{1,80}$/i.test(key.headerName||''))throw Error('Unsafe API key name');if(key.in==='query'){if(query[key.headerName]!==undefined)throw Error('Client cannot override the server API key');url.searchParams.set(key.headerName,secret);}else if(key.in==='header'){if(['host','content-length','authorization','cookie','connection'].includes(key.headerName.toLowerCase()))throw Error('Unsafe API key header');headers[key.headerName]=secret;}else throw Error('Unsupported API key placement');}
+  else {const scheme=auth.find(a=>a.type==='http')?.scheme?.toLowerCase();headers.Authorization=(scheme==='token'?'Token ':scheme==='basic'?'Basic ':'Bearer ')+secret;}
  }
+
  return{url,method:op.method,headers,payload,operation:op};
 }
 async function execute(args,{lookup=dns.lookup,timeout=10000}={}){
