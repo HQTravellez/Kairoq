@@ -3,8 +3,8 @@ const functions=require('./app-functions');
 const NAME=/^[a-z][a-z0-9_]{0,99}$/;
 // Verify response paths against the declared result before spending a UI build.
 function validateResultPaths(value,fn,schema){
- const unknown=Symbol('unknown'),steps={};const shape=value=>{if(!value||typeof value!=='object')return null;if(Array.isArray(value))return value.map(shape);if(value.$input||value.$op)return null;if(value.$result){let out=steps;for(const key of value.$result.split('.'))out=out?.[key]??unknown;return out;}return Object.fromEntries(Object.entries(value).map(([key,v])=>[key,shape(v)]));};
- for(const step of fn.steps){const c=schema.collections.find(c=>c.name===step.collection),record={id:null,data:Object.fromEntries((c?.fields||[]).map(f=>[f.name,null]))};steps[step.id]=['read','create','update','action'].includes(step.type)?record:step.type==='list'?[record]:unknown;}
+ const unknown=Symbol('unknown'),steps={};const shape=value=>{if(!value||typeof value!=='object')return null;if(Array.isArray(value))return value.map(shape);if(value.$op==='coalesce')return unknown;if(value.$input||value.$op)return null;if(value.$result){let out=steps;for(const key of value.$result.split('.'))out=out?.[key]??unknown;return out;}return Object.fromEntries(Object.entries(value).map(([key,v])=>[key,shape(v)]));};
+ for(const step of fn.steps){const c=schema.collections.find(c=>c.name===step.collection),record={id:null,data:Object.fromEntries((c?.fields||[]).map(f=>[f.name,null]))};steps[step.id]=['read','create','update','action'].includes(step.type)?record:unknown;}
  const response={run:{id:null,function:null,status:null,created_at:null,result:shape(fn.result)}};
  const visit=v=>{if(!v||typeof v!=='object')return;if(v.$result?.startsWith('run.')){let out=response;for(const key of v.$result.split('.')){if(out===unknown)break;if(!out||typeof out!=='object'||!Object.hasOwn(out,key))throw Error('Scenario response path '+v.$result+' does not match function '+fn.name+' result; align the declared result shape with the expected business outcome');out=out[key];}}else for(const child of Object.values(v))visit(child);};visit(value);
 }
