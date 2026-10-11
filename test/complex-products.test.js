@@ -45,6 +45,24 @@ test("design foundation maintains consistent accessible responsive controls acro
 });
 
 const fs=require("node:fs"),os=require("node:os"),path=require("node:path"),http=require("node:http");
+for(const scenario of [
+ {name:'trip date ordering',type:'date',first:'2030-10-10',last:'2030-10-12',invalid:'2030-10-09'},
+ {name:'procurement received quantity',type:'number',first:10,last:5,invalid:11,operator:'lte'},
+ {name:'event registration capacity',type:'number',first:50,last:20,invalid:51,operator:'lte'}
+])test('server rejects invalid creates and partial updates: '+scenario.name,async()=>{
+ const schema=runtime.validateSchema({collections:[{name:'items',fields:[{name:'limit',type:scenario.type,required:true,...(scenario.type==='number'?{minimum:0}:{})},{name:'value',type:scenario.type,required:true,...(scenario.type==='number'?{minimum:0}:{})}],rules:[{field:'value',operator:scenario.operator||'gte',other:'limit',message:'Business rule failed'}]}]});
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-rules-')),id='rules-'+scenario.type;
+ const server=http.createServer((req,res)=>runtime.api(req,res,{root,id,route:req.url,schema}));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+ const call=async(route,method,body,cookie)=>{const response=await fetch(base+route,{method,headers:{'Content-Type':'application/json',...(cookie?{cookie}:{})},body:body?JSON.stringify(body):undefined});return{status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};};
+ try{const user=await call('/auth/register','POST',{email:'rules@qa.example',password:'rules-password-123'});const cookie=user.cookie;
+  assert.equal((await call('/collections/items','POST',{limit:scenario.first,value:scenario.invalid},cookie)).status,400);
+  const saved=await call('/collections/items','POST',{limit:scenario.first,value:scenario.last},cookie);assert.equal(saved.status,201);
+  assert.equal((await call('/collections/items/'+saved.data.record.id,'PATCH',{value:scenario.invalid},cookie)).status,400);
+  if(scenario.type==='number')assert.equal((await call('/collections/items/'+saved.data.record.id,'PATCH',{value:-1},cookie)).status,400);
+  const list=await call('/collections/items','GET',null,cookie);assert.equal(list.data.records.length,1);assert.equal(list.data.records[0].data.value,scenario.last);
+  const revised=structuredClone(schema);delete revised.collections[0].rules;assert.throws(()=>runtime.validateMigration(schema,revised),/collection rules/);
+ }finally{await new Promise(r=>server.close(r));runtime.recordsDb(root,id).close();fs.rmSync(root,{recursive:true,force:true});}
+});
 for(const scenario of scenarios)test("real multi-collection CRUD and guarded workflow: "+scenario.name,async()=>{
  const schema=runtime.validateSchema(scenario.schema),root=fs.mkdtempSync(path.join(os.tmpdir(),"kairoq-complex-")),id="complex-"+scenario.name.replace(/[^a-z]+/g,"-");
  const server=http.createServer((req,res)=>runtime.api(req,res,{root,id,route:req.url,schema}));

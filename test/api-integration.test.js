@@ -53,3 +53,12 @@ test("live requests remain disabled without explicit server policy",async()=>{
  try{await assert.rejects(adapter.execute({apiSpec:spec,operationId:"getTrip",pathParams:{id:"1"},approved:true,allowedHosts:"api.example.com"}),/disabled/);}
  finally{if(previous===undefined)delete process.env.KAIROQ_API_LIVE_ENABLED;else process.env.KAIROQ_API_LIVE_ENABLED=previous;}
 });
+test('documented query arrays use their declared serialization and reject malformed values',()=>{
+ const plan=require('../api-learning').learn(spec);const op=plan.operations[0];op.parameters=[{name:'current',in:'query',style:'form',explode:false,schema:{type:'array',items:{type:'string'}}}];
+ const args={plan,operationId:op.id,pathParams:{id:'123'},allowedHosts:'api.example.com',approved:true,query:{current:['temperature_2m','weather_code']}};
+ assert.equal(adapter.prepare(args).url.searchParams.get('current'),'temperature_2m,weather_code');
+ op.parameters[0].explode=true;assert.deepEqual(adapter.prepare(args).url.searchParams.getAll('current'),['temperature_2m','weather_code']);
+ assert.throws(()=>adapter.prepare({...args,query:{current:[{}]}}),/query array/);
+ assert.throws(()=>adapter.prepare({...args,query:{undocumented:['a']}}),/query array/);
+ op.parameters[0].style='deepObject';assert.throws(()=>adapter.prepare(args),/Unsupported query/);
+});
