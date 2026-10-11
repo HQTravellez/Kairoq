@@ -15,7 +15,7 @@ This release expands the shared app runtime and the AI planning contract. These 
 - OAuth client credentials support body authentication, Basic header authentication and the explicitly configured legacy base64 credential variant. Generated workflows can bind an operator-configured OAuth provider.
 - Large API contracts retain the complete import while bounding the model's planning context to relevant operations. No omitted operation is invented.
 - Generated server functions require acceptance scenarios. Fixture records, function calls and expected business outcomes execute against actual HTTP backend routes during build/repair QA, before publication.
-- Additive revisions preserve stored field types, collection scope, permissions, function input/role contracts and configured automation/billing definitions. Server function steps may be repaired; new capabilities may be added. Acceptance failures trigger bounded server-logic replanning while preserving the existing fixtures, inputs and expected results.
+- Additive revisions preserve stored field types, collection scope, permissions, function input/role contracts and configured automation/billing definitions. Named maps and JSON Schema input properties normalize into the same validated field contract. Planning retries include the rejected output and exact error. Server function steps may be repaired; new capabilities may be added. Acceptance failures trigger bounded server-logic replanning while preserving the existing fixtures, inputs and expected results.
 - Standalone exports include the new backend modules and automation worker, without users, production data or secrets.
 
 ## Configuration
@@ -32,7 +32,7 @@ API execution retains host/operation allowlists and separate provider-write cont
 
 ## Verification boundaries
 
-The final complete local suite passed 246 tests with zero failures and zero skips, including business repair and payment reconciliation hardening. The browser journey exercises team creation, real record persistence, transactional stock reservation, rejection of overselling, acceptance scenarios, scheduled-job setup/cancellation, workspace isolation, selection persistence and logout. Billing tests use a controlled transport and signed event logic; no real Stripe charge or Sabre booking is claimed.
+The final complete local suite passed 247 tests with zero failures and zero skips, including business repair and payment reconciliation hardening. The browser journey exercises team creation, real record persistence, transactional stock reservation, rejection of overselling, acceptance scenarios, scheduled-job setup/cancellation, workspace isolation, selection persistence and logout. Billing tests use a controlled transport and signed event logic; no real Stripe charge or Sabre booking is claimed.
 
 The local generation/visual-review fixtures test orchestration mechanics. They do not establish real AI design quality by themselves. Real generated-app evidence is recorded separately after the release is deployed.
 
