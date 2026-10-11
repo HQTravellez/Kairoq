@@ -8,6 +8,17 @@ const spec={openapi:'3.0.3',info:{title:'Documented Travel API'},servers:[{url:'
 const contract=api.learn(spec),schema={collections:[{name:'bookings',label:'Bookings',fields:[{name:'destination',label:'Destination',type:'text',required:true},{name:'reference',label:'Reference',type:'text',required:true}]}]};
 function raw(){return{schema,summary:'Search then book using documented operations',requirements:[{id:'login',description:'Sign in securely',implementation:'auth',target:''},{id:'booking',description:'Search and book travel',implementation:'workflow',target:'book_trip'},{id:'history',description:'Save bookings',implementation:'collection',target:'bookings'}],workflows:[{id:'book_trip',label:'Book trip',inputs:[{name:'destination',label:'Destination',type:'string',required:true}],steps:[{id:'search',operationId:'search',arguments:{body:{destination:{$input:'destination'}}}},{id:'book',operationId:'book',arguments:{body:{quote_id:{$step:'search.quote.id'}}}}],persist:{collection:'bookings',fields:{destination:{$input:'destination'},reference:{$step:'book.reference'}}}}]};}
 function envelope(){return{plan:planner.normalize(raw(),contract),apiContract:contract};}
+test('planner repairs malformed transition states with actionable schema errors',async()=>{
+ let calls=0;
+ const result=await planner.plan(async opts=>{
+  const p=raw();p.schema=structuredClone(schema);p.schema.collections[0].fields.push({name:'state',type:'select',options:['draft','approved'],default:'draft'});
+  p.schema.actions=[{name:'approve',collection:'bookings',field:'state',from:['draft'],to:'approved'}];
+  calls++;if(calls===1)p.schema.actions[0].from='draft';else assert.match(opts.messages[0].content,/from must be an array of source states/);
+  return p;
+ },{brief:'Build a private travel desk with an internal approval transition',apiContract:contract});
+ assert.equal(calls,2);assert.deepEqual(result.schema.actions[0].from,['draft']);
+ const p=raw();p.requirements[2].target='unknown';assert.throws(()=>planner.normalize(p,contract),/unknown collection unknown; use one of: bookings/);
+});
 test('planner refuses to persist arbitrary provider timestamps into date-only fields',()=>{
  const p=raw();p.schema=structuredClone(schema);p.schema.collections[0].fields[1].type='date';
  assert.throws(()=>planner.normalize(p,contract),/date-only response/);
