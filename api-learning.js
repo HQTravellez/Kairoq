@@ -42,8 +42,8 @@ function schemaSnapshot(node,spec,seen=new Set(),depth=0){
 }
 function learn(input){
  const spec=parse(input),servers=(spec.servers||[]).map(s=>s.url).filter(s=>typeof s==="string"&&/^https:\/\//i.test(s)).slice(0,3);
- const pathServers=[...new Set(Object.values(spec.paths).flatMap(item=>[...(item?.servers||[]),...Object.entries(item||{}).filter(([key])=>HTTP.has(key)).flatMap(([,op])=>op?.servers||[])].map(server=>server.url).filter(url=>typeof url==="string"&&/^https:\/\//i.test(url))))];
- const base=spec.swagger==="2.0"?(spec.schemes?.includes("https")&&spec.host?"https://"+spec.host+(spec.basePath||""):""):servers[0]||(pathServers.length===1?pathServers[0]:"");
+ const operationServers=[...new Set(Object.values(spec.paths).flatMap(item=>Object.entries(item||{}).filter(([key])=>HTTP.has(key)).map(([,op])=>op?.servers?.[0]?.url||item?.servers?.[0]?.url||servers[0]).filter(url=>typeof url==='string'&&/^https:\/\//i.test(url))))];
+ const base=spec.swagger==="2.0"?(spec.schemes?.includes("https")&&spec.host?"https://"+spec.host+(spec.basePath||""):""):operationServers.length===1?operationServers[0]:operationServers.length?"":servers[0]||"";
  const securitySchemes=spec.components?.securitySchemes||spec.securityDefinitions||{};
  const auth=Object.entries(securitySchemes).slice(0,20).map(([name,value])=>({name:safeText(name,70),type:safeText(value.type,35),scheme:safeText(value.scheme,35),in:safeText(value.in,20),headerName:safeText(value.name,80),tokenUrl:safeText(value.flows?.clientCredentials?.tokenUrl||value.tokenUrl,200)}));
  const operations=[];
