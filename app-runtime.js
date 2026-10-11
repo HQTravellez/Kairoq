@@ -120,7 +120,7 @@ async function api(req,res,{root=ROOT,id,route,schema,backend="sqlite",provider,
   }
   const match=/^\/collections\/([a-z][a-z0-9_]{0,39})(?:\/([a-f0-9-]{36}))?$/.exec(route);if(!match)return auth.send(res,404,{error:'Endpoint not found'});const collection=schema.collections.find(c=>c.name===match[1]);if(!collection)return auth.send(res,404,{error:'Collection not found'});
   if(!match[2]&&req.method==='GET')return auth.send(res,200,{records:access.rows(db,collection,ctx).map(r=>rowRecord(r,collection))});
-  if(!match[2]&&req.method==='POST'){const data=workflowValues(schema,collection,recordValues(collection,await auth.body(req)));return auth.send(res,201,{record:access.save(db,schema,collection,ctx,data)});}
+  if(!match[2]&&req.method==='POST'){access.allow(collection,ctx,'create');const data=workflowValues(schema,collection,recordValues(collection,await auth.body(req)));return auth.send(res,201,{record:access.save(db,schema,collection,ctx,data)});}
   const old=access.get(db,collection,ctx,match[2],req.method==='DELETE'?'delete':'update');
   if(req.method==='PATCH'){const current=JSON.parse(old.payload),data=workflowValues(schema,collection,patchValues(collection,current,await auth.body(req)),current);return auth.send(res,200,{record:access.save(db,schema,collection,ctx,data,old.id)});}
   if(req.method==='DELETE')return auth.send(res,200,access.remove(db,collection,ctx,old.id));
