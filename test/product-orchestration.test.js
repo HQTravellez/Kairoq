@@ -123,3 +123,7 @@ test('business repair preserves acceptance outcomes while correcting server step
  const result=await planner.plan(async opts=>{calls++;const out=structuredClone(base);out.schema.functions[0].steps[0].values.value=25;if(calls===1)out.schema.scenarios[0].expect.args[1]=20;else assert.match(opts.messages[0].content,/must preserve acceptance scenario/);assert.match(opts.messages[0].content,/REPAIR SERVER LOGIC/);return out;},{brief:'Calculate the requested total correctly',previous,repairError:'Acceptance outcome did not match the requested business result'});
  assert.equal(calls,2);assert.deepEqual(result.schema.scenarios,previous.schema.scenarios);assert.equal(result.schema.functions[0].steps[0].values.value,25);
 });
+test('disabled external integrations leave no empty panel and can be enabled on revision',()=>{
+ const components=require('../app-workflow-components'),files={'app.js':'','styles.css':'body{color:black}'};
+ const disabled=components.inject(files,false);assert.match(disabled['styles.css'],/#workflow-panel\{display:none!important\}/);const enabled=components.inject(disabled,true);assert.doesNotMatch(enabled['styles.css'],/DISABLED WORKFLOWS/);assert.match(enabled['app.js'],/BEGIN KAIROQ WORKFLOW RUNTIME/);
+});

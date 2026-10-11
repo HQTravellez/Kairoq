@@ -149,8 +149,8 @@ function enforceVisualQuality(){
  const roots=[$('auth-view')||$('auth-form'),$('app-view'),primaryNavigation(),...document.querySelectorAll('#app-view [data-kq-screen]:not([hidden])')].filter((v,i,a)=>v&&a.indexOf(v)===i);
  for(const root of roots)for(const el of root.querySelectorAll('h1,h2,h3,h4,p,small,label,span,a,button,dt,dd,th,td,caption')){
   if(!el.textContent?.trim()||getComputedStyle(el).display==='none'||getComputedStyle(el).visibility==='hidden')continue;
-  const fg=rgb(getComputedStyle(el).color),bg=effectiveBackground(el);if(!fg)continue;const displayed=fg.slice(0,3).map((v,i)=>v*fg[3]+bg[i]*(1-fg[3]));
-  if(contrast(displayed,bg)<4.6){const dark=[35,35,35,1],light=[255,255,255,1],best=contrast(dark,bg)>=contrast(light,bg)?dark:light;el.style.setProperty('color',best===dark?'#232323':'#fff','important');}
+  if(!el.getBoundingClientRect().width||!el.getBoundingClientRect().height||el.closest('button:disabled,[aria-hidden="true"]'))continue;for(let ancestor=el;ancestor;ancestor=ancestor.parentElement){if(Number(getComputedStyle(ancestor).opacity)<.95)ancestor.style.setProperty('opacity','1','important');if(ancestor===root)break;}const css=getComputedStyle(el),fg=rgb(css.webkitTextFillColor)||rgb(css.color),bg=effectiveBackground(el);if(!fg)continue;const displayed=fg.slice(0,3).map((v,i)=>v*fg[3]+bg[i]*(1-fg[3]));
+  if(contrast(displayed,bg)<4.6){const dark=[35,35,35,1],light=[255,255,255,1],best=contrast(dark,bg)>=contrast(light,bg)?dark:light;el.style.setProperty('color',best===dark?'#232323':'#fff','important');el.style.setProperty('-webkit-text-fill-color',best===dark?'#232323':'#fff','important');}
  }
  stabilizeDesktopNavigation();stabilizeMobileWorkspace();markWorkspaceLayout();
 }
