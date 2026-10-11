@@ -201,7 +201,7 @@ async function revise(id,instruction,callModel,{asset_ids=[],auto_assets=true}={
   const meta={...p};delete meta.files;
   meta.assets=assets;meta.file_names=Object.keys(files);meta.pages=Object.keys(files).filter(name=>name.endsWith(".html"));meta.design_plan=designPlan;meta.revisions=Number(meta.revisions||0)+1;meta.qa=qa;meta.status='draft';meta.updated_at=new Date().toISOString();
   fs.writeFileSync(path.join(dirFor(id),"project.json"),JSON.stringify(meta,null,2));
-  await require('./project-github').autoPush(id);
+  // Website revisions remain drafts until an explicit GitHub or launch action.
   return {...meta,files,preview:assemble(files)}
 }
 async function reviewProject(id,callModel){

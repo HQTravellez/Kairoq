@@ -37,7 +37,7 @@ function validateMigration(before,after){
 }
 function readVersion(id,version,root=ROOT){if(!/^[a-z0-9-]{5,85}$/.test(id)||!Number.isInteger(Number(version))||Number(version)<1)throw Error('Invalid app version');const folder=path.join(root,id,'versions',String(version));const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));return{...manifest,version:Number(version),files:Object.fromEntries(['index.html','styles.css','app.js'].map(n=>[n,fs.readFileSync(path.join(folder,n),'utf8')]))};}
 function getProject(id,root=ROOT){if(!/^[a-z0-9-]{5,85}$/.test(id))throw Error('Invalid app ID');const meta=JSON.parse(fs.readFileSync(path.join(root,id,'app.json'),'utf8'));return{...meta,...readVersion(id,meta.version,root)};}
-function metadata(id,root=ROOT){const {files,schema,qa,...meta}=getProject(id,root);return{...meta,qa};}
+function metadata(id,root=ROOT){const {files,schema,qa,...meta}=getProject(id,root);if(meta.orchestration)meta.build_report=require('./product-orchestrator').report(meta.orchestration.plan,meta.orchestration.apiContract,id,qa,process.env,require('./app-workflows').verified(root,id,meta.orchestration));return{...meta,qa};}
 function saveMetadata(meta,root=ROOT){const folder=path.join(root,meta.id);fs.mkdirSync(folder,{recursive:true});const temp=path.join(folder,'app.json.'+crypto.randomUUID()+'.tmp');fs.writeFileSync(temp,JSON.stringify(meta,null,2));fs.renameSync(temp,path.join(folder,'app.json'));}
 function patchValues(collection,old,changes){const names=new Set(collection.fields.map(f=>f.name));for(const key of Object.keys(changes))if(!names.has(key))throw Error('Unknown field: '+key);const known=Object.fromEntries(Object.entries(old).filter(([k])=>names.has(k)));return{...old,...recordValues(collection,{...known,...changes})};}
 async function cloudApi(req,res,{id,route,schema,provider}){
@@ -61,9 +61,30 @@ async function cloudApi(req,res,{id,route,schema,provider}){
  if(match[2]&&req.method==='DELETE')return auth.send(res,200,await provider.remove(id,session,collection.name,match[2]));return auth.send(res,405,{error:'Unsupported method'});
  }catch(e){return auth.send(res,e.status||400,{error:e.message, ...(e.confirmationRequired?{confirmation_required:true}:{})});}
 }
+async function workflowApi(req,res,{root,id,route,schema,backend,provider,orchestration,workflowExecute}){
+ try{
+  if(req.method!=='GET'&&req.headers.origin&&new URL(req.headers.origin).host!==req.headers.host)return auth.send(res,403,{error:'Cross-origin write blocked'});
+  const cloudProvider=backend==='supabase'?(provider||supabase.get()):null;
+  const session=cloudProvider?await cloudProvider.session(req,res,id):null;
+  const user=cloudProvider?session?.user:auth.user(req,id);if(!user)return auth.send(res,401,{error:'Sign in required'});
+  const workflows=require('./app-workflows');
+  if(route==='/workflows'&&req.method==='GET')return auth.send(res,200,workflows.list(orchestration,id,root));
+  const read=/^\/workflow-runs\/([a-f0-9-]{36})$/.exec(route);
+  if(read&&req.method==='GET')return auth.send(res,200,workflows.inspect(root,id,user.id,read[1]));
+  const match=/^\/workflows\/([a-z][a-z0-9_]{0,39})\/runs$/.exec(route);if(!match||req.method!=='POST')return auth.send(res,404,{error:'Workflow route not found'});
+  const body=await auth.body(req);
+  const persist=async(name,fields)=>{const collection=schema.collections.find(c=>c.name===name);if(!collection)throw Error('Unknown workflow collection');const data=workflowValues(schema,collection,recordValues(collection,fields));
+   if(cloudProvider)return cloudProvider.save(id,session,name,data);
+   const db=recordsDb(root,id),rid=crypto.randomUUID(),at=new Date().toISOString();db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?,?)').run(rid,user.id,name,JSON.stringify(data),at,at);return{id:rid,data,created_at:at,updated_at:at};
+  };
+  const result=await workflows.run({root,id,userId:user.id,envelope:orchestration,workflowId:match[1],inputs:body.inputs||{},requestId:body.requestId,mode:body.mode||'simulate',confirmWrites:body.confirmWrites===true,persist},workflowExecute?{execute:workflowExecute}:undefined);
+  return auth.send(res,result.status==='needs_review'?409:result.status==='failed'?422:200,result);
+ }catch(e){return auth.send(res,e.status||422,{error:e.message});}
+}
 function recordsDb(root,id){const db=auth.database(root,id);db.exec('CREATE TABLE IF NOT EXISTS app_records(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),collection TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS app_record_owner ON app_records(user_id,collection);');return db;}
 function rowRecord(r,collection){const data=JSON.parse(r.payload);for(const f of collection.fields)if(!Object.hasOwn(data,f.name))data[f.name]=f.default??null;return{id:r.id,data,created_at:r.created_at,updated_at:r.updated_at};}
-async function api(req,res,{root=ROOT,id,route,schema,backend="sqlite",provider}){
+async function api(req,res,{root=ROOT,id,route,schema,backend="sqlite",provider,orchestration,workflowExecute}){
+ if(route==='/workflows'||route.startsWith('/workflows/')||route.startsWith('/workflow-runs/'))return workflowApi(req,res,{root,id,route,schema,backend,provider,orchestration,workflowExecute});
  if(backend==="supabase")return cloudApi(req,res,{id,route,schema,provider:provider||supabase.get()});
  if(route.startsWith('/auth/'))return auth.handle(req,res,{root,id,route});
  try{
@@ -88,5 +109,5 @@ async function api(req,res,{root=ROOT,id,route,schema,backend="sqlite",provider}
   return auth.send(res,405,{error:'Unsupported method'});
  }catch(e){return auth.send(res,e.status||400,{error:String(e.message||e).slice(0,200)})}
 }
-async function handle(req,res){const m=/^\/apps\/([a-z0-9-]{5,85})\/(.*)$/.exec(req.url.split('?')[0]);if(!m||!fs.existsSync(path.join(ROOT,m[1],'app.json')))return false;try{const meta=metadata(m[1]);let route=m[2];const preview=/^preview\/(\d+)\/(.*)$/.exec(route);const version=preview?Number(preview[1]):meta.deployed_version||(meta.status==='live'?meta.version:null);if(!version){auth.send(res,404,{error:'This app has not been deployed yet. Open its preview in Build Studio.'});return true;}if(preview)route=preview[2];const p=readVersion(meta.id,version);if(route.startsWith('api/')){await api(req,res,{id:meta.id,route:'/'+route.slice(4),schema:p.schema,backend:meta.data_backend||'sqlite'});return true;}const name=route||'index.html';if(!['index.html','styles.css','app.js'].includes(name)){res.writeHead(404);res.end('Not found');return true;}res.writeHead(200,{'Content-Type':name.endsWith('html')?'text/html':name.endsWith('css')?'text/css':'application/javascript','Cache-Control':'no-store','X-Kairoq-Version':String(version),'X-Robots-Tag':'noindex','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; media-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"});res.end(p.files[name]);return true;}catch(e){auth.send(res,503,{error:'App temporarily unavailable'});return true;}}
+async function handle(req,res){const m=/^\/apps\/([a-z0-9-]{5,85})\/(.*)$/.exec(req.url.split('?')[0]);if(!m||!fs.existsSync(path.join(ROOT,m[1],'app.json')))return false;try{const meta=metadata(m[1]);let route=m[2];const preview=/^preview\/(\d+)\/(.*)$/.exec(route);const version=preview?Number(preview[1]):meta.deployed_version||(meta.status==='live'?meta.version:null);if(!version){auth.send(res,404,{error:'This app has not been deployed yet. Open its preview in Build Studio.'});return true;}if(preview)route=preview[2];const p=readVersion(meta.id,version);if(route.startsWith('api/')){await api(req,res,{id:meta.id,route:'/'+route.slice(4),schema:p.schema,orchestration:p.orchestration,backend:meta.data_backend||'sqlite'});return true;}const name=route||'index.html';if(!['index.html','styles.css','app.js'].includes(name)){res.writeHead(404);res.end('Not found');return true;}res.writeHead(200,{'Content-Type':name.endsWith('html')?'text/html':name.endsWith('css')?'text/css':'application/javascript','Cache-Control':'no-store','X-Kairoq-Version':String(version),'X-Robots-Tag':'noindex','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; media-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"});res.end(p.files[name]);return true;}catch(e){auth.send(res,503,{error:'App temporarily unavailable'});return true;}}
 module.exports={ROOT,validateSchema,validateMigration,recordValues,patchValues,workflowValues,workflowInitial,getProject,readVersion,metadata,saveMetadata,recordsDb,api,handle};

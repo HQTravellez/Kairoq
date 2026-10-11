@@ -2,6 +2,10 @@
 const test=require("node:test"),assert=require("node:assert/strict");
 const docs=require("../api-docs"),api=require("../api-learning"),evolution=require("../api-evolution");
 const before={openapi:"3.0.3",info:{title:"Payments",version:"1"},paths:{"/payments":{get:{operationId:"listPayments",responses:{"200":{}}},post:{operationId:"createPayment",requestBody:{content:{"application/json":{schema:{type:"object",properties:{amount:{type:"number"}}}}}},responses:{"201":{}}}}}};
+test("oversized Postman collections fail instead of silently truncating operations",()=>{
+ const collection={info:{schema:"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},item:Array.from({length:151},(_,i)=>({name:"operation_"+i,request:{method:"GET",url:{path:["items",String(i)]}}}))};
+ assert.throws(()=>api.fromPostman(collection),/exceeds 150 operations/);
+});
 test("Postman v2 documentation imports operations without executing them",()=>{
  const data={info:{name:"Travel Collection",schema:"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},item:[{name:"Travel",item:[{name:"Find hotels",request:{method:"GET",url:{raw:"https://api.example.com/hotels",path:["hotels"]}}},{name:"Book hotel",request:{method:"POST",url:{raw:"https://api.example.com/bookings",path:["bookings"]}}}]}]};
  const result=docs.infer(JSON.stringify(data));assert.equal(result.format,"postman-v2");assert.equal(result.operations.length,2);assert.equal(result.operations[1].method,"POST");
