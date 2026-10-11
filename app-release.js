@@ -11,7 +11,7 @@ async function deployedCheck(id,version,candidate,root=runtime.ROOT){
  const origin=publicOrigin();if(!origin)throw Error('Set KAIROQ_PUBLIC_URL or RAILWAY_PUBLIC_DOMAIN to verify the public deployment');
  if(runtime.metadata(id,root).data_backend==='supabase')throw Error('Authenticated deployed QA for Supabase requires a disposable test identity; this release was not verified');
  const benchmark=id.startsWith('travellez-travel-operations-benchmark-');if(benchmark)gates.assertAppContract(candidate);
- const qa=await require('./app-builder').browserQA(id,candidate,null,{capture:true,liveBase:origin+'/apps/'+id+'/',requiredScreens:benchmark?gates.REQUIRED_SCREENS:[]});
+ const qa=await require('./app-builder').browserQA(id,candidate,null,{capture:true,liveBase:origin+'/apps/'+id+'/',requiredScreens:[...new Set([...(candidate.orchestration?.plan?.requirements||[]).filter(r=>r.implementation==='ui').map(r=>r.target),...(benchmark?gates.REQUIRED_SCREENS:[])])]});
  const pipeline=require('./design-pipeline'),shots=pipeline.stripShots(qa);if(qa.design_checks?.length)throw Error('Public deployment failed rendered checks: '+qa.design_checks.map(f=>f.issue).join('; '));
  const evidencePath=path.join(root,id,'release-evidence',String(version));pipeline.saveEvidence(evidencePath,shots);
  const result={...qa,scope:'public deployed URL',url:origin+'/apps/'+id+'/',version,evidence:shots.map(s=>({screen:s.label,sha256:crypto.createHash('sha256').update(s.bytes).digest('hex')}))};fs.writeFileSync(path.join(evidencePath,'report.json'),JSON.stringify(result,null,2));return result;
