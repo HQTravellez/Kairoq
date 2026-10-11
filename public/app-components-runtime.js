@@ -154,6 +154,7 @@ function enforceVisualQuality(){
  for(const root of roots)for(const el of root.querySelectorAll('h1,h2,h3,h4,p,small,label,span,a,button,strong,em,dt,dd,th,td,caption')){
   if(!el.textContent?.trim()||getComputedStyle(el).display==='none'||getComputedStyle(el).visibility==='hidden')continue;
   if(!el.getBoundingClientRect().width||!el.getBoundingClientRect().height||el.closest('button:disabled,[aria-hidden="true"]'))continue;for(let ancestor=el;ancestor;ancestor=ancestor.parentElement){if(Number(getComputedStyle(ancestor).opacity)<1){ancestor.style.setProperty('transition','none','important');ancestor.style.setProperty('opacity','1','important');}if(ancestor===document.body)break;}const css=getComputedStyle(el),fg=rgb(css.webkitTextFillColor)||rgb(css.color),bg=effectiveBackground(el);if(!fg)continue;const displayed=fg.slice(0,3).map((v,i)=>v*fg[3]+bg[i]*(1-fg[3]));
+  if(parseFloat(css.fontSize)<12&&[...el.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))el.style.setProperty('font-size','12px','important');
   if(contrast(displayed,bg)<4.6){el.style.setProperty('transition','none','important');const dark=[35,35,35,1],light=[255,255,255,1],best=contrast(dark,bg)>=contrast(light,bg)?dark:light,color=contrast(best,bg)<4.5?'#000':best===dark?'#232323':'#fff';el.style.setProperty('color',color,'important');el.style.setProperty('-webkit-text-fill-color',color,'important');}
  }
  stabilizeMobileWorkspace();stabilizeDesktopNavigation();markWorkspaceLayout();
