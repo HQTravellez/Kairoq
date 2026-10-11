@@ -1,0 +1,1499 @@
+{
+  "verifiedAt": "2026-10-11T05:32:05.763Z",
+  "app": {
+    "projectId": "travellez-connected-travel-desk-4013823a",
+    "url": "https://kairoq-production.up.railway.app/apps/travellez-connected-travel-desk-4013823a/",
+    "liveChecks": 24,
+    "exportBytes": 75815,
+    "visualScore": 4,
+    "reviewedScreens": 44
+  },
+  "buildJob": "32818ba0-c89e-4696-9cd9-8b91b4ccde75",
+  "originalBuildJob": "6aa819a3-0cd7-4027-aa02-129c04262f84",
+  "checks": [
+    {
+      "name": "Real recovered build passed browser and AI visual gates",
+      "passed": true
+    },
+    {
+      "name": "Anonymous schema access denied",
+      "passed": true
+    },
+    {
+      "name": "Real account registration",
+      "passed": true
+    },
+    {
+      "name": "Persist trips",
+      "passed": true
+    },
+    {
+      "name": "Reject negative trips.budget",
+      "passed": true
+    },
+    {
+      "name": "Reject invalid partial-update business rule trips",
+      "passed": true
+    },
+    {
+      "name": "Persist expenses",
+      "passed": true
+    },
+    {
+      "name": "Reject negative expenses.amount",
+      "passed": true
+    },
+    {
+      "name": "Persist weather_snapshots",
+      "passed": true
+    },
+    {
+      "name": "Workflow configuration available",
+      "passed": true
+    },
+    {
+      "name": "Real provider workflow completed and saved",
+      "passed": true
+    },
+    {
+      "name": "Exactly one external provider call",
+      "passed": true
+    },
+    {
+      "name": "Duplicate request replays stored run",
+      "passed": true
+    },
+    {
+      "name": "Provider result persists exactly once",
+      "passed": true
+    },
+    {
+      "name": "Independent account registration",
+      "passed": true
+    },
+    {
+      "name": "Cross-user records isolated",
+      "passed": true
+    },
+    {
+      "name": "Cross-user run access denied",
+      "passed": true
+    },
+    {
+      "name": "Logout revokes app session",
+      "passed": true
+    },
+    {
+      "name": "Real login after logout",
+      "passed": true
+    },
+    {
+      "name": "Saved provider record survives new login",
+      "passed": true
+    },
+    {
+      "name": "Public app serves the verified version",
+      "passed": true
+    },
+    {
+      "name": "Public app still requires login for private data",
+      "passed": true
+    },
+    {
+      "name": "Saved private data remains reachable on live route",
+      "passed": true
+    },
+    {
+      "name": "Complete source/backend ZIP available",
+      "passed": true,
+      "bytes": 75815
+    }
+  ],
+  "providerRun": {
+    "id": "58823efe-8ad4-4950-a994-4737906a6021",
+    "status": "complete",
+    "verifiedProvider": true,
+    "externalCalls": 1,
+    "providerHTTPStatusNotRetained": true,
+    "savedFields": {
+      "destination": "Toronto",
+      "observed_time": "2026-10-11T01:30",
+      "temperature": 11.7
+    }
+  },
+  "buildQA": {
+    "passed": true,
+    "findings": [],
+    "design_checks": [],
+    "tested": [
+      "multi-screen navigation: overview, workspace, conditions",
+      "documented workflow forms and no-call simulation at desktop/mobile",
+      "trips: required form validation",
+      "trips: pending save and error recovery",
+      "trips: search empty state",
+      "trips: responsive 768px",
+      "trips: responsive 1024px",
+      "trips: UI create/edit/reload/delete, dashboard, desktop and mobile",
+      "expenses: required form validation",
+      "expenses: pending save and error recovery",
+      "expenses: search empty state",
+      "expenses: responsive 768px",
+      "expenses: responsive 1024px",
+      "expenses: UI create/edit/reload/delete, dashboard, desktop and mobile",
+      "weather_snapshots: required form validation",
+      "weather_snapshots: pending save and error recovery",
+      "weather_snapshots: search empty state",
+      "weather_snapshots: responsive 768px",
+      "weather_snapshots: responsive 1024px",
+      "weather_snapshots: UI create/edit/reload/delete, dashboard, desktop and mobile",
+      "logout API protection and reload",
+      "registration",
+      "login",
+      "collection navigation",
+      "UI create, edit and delete",
+      "dashboard counts",
+      "persistent records after reload",
+      "desktop1440px",
+      "mobile390px",
+      "logout"
+    ],
+    "at": "2026-10-11T05:15:27.805Z",
+    "visual_review": {
+      "passed": true,
+      "score": 4,
+      "scores": {
+        "hierarchy": 4,
+        "typography": 4,
+        "spacing": 4,
+        "consistency": 4,
+        "mobile": 4,
+        "usability": 4,
+        "identity": 4
+      },
+      "findings": [
+        {
+          "severity": "minor",
+          "screen": "Desktop login · 1440px",
+          "issue": "Sign in and Create account are both full-width scarlet buttons, so the two different actions compete equally for attention.",
+          "fix": "Keep the current sign-in action primary and style Create account as a secondary button or text link."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop screen · overview",
+          "issue": "The sidebar ends partway down the tall page, leaving a conspicuous blank strip beside the lower dashboard and workflow content.",
+          "fix": "Extend the sidebar background to the page height or keep the navigation rail fixed while scrolling."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop screen · workspace",
+          "issue": "The empty-state “Go to new-record form” button is redundant because the complete new-trip form is already visible beside it.",
+          "fix": "Remove the jump button when the form is already in view, or make its focus-and-scroll effect clearer."
+        },
+        {
+          "severity": "minor",
+          "screen": "Mobile workflow · Check destination weather",
+          "issue": "The workflow’s explanatory content takes up substantial vertical space before the inputs, so users must scroll through a long panel to reach the controls on mobile.",
+          "fix": "Tighten the workflow introduction and vertical gaps on narrow screens while keeping the coordinate requirement and provider-status message visible."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop Trips · empty",
+          "issue": "The weather area uses a generic “Connected workflows” heading and an unverified-provider notice above the actual weather task. This adds visual weight and slightly competes with the task’s own heading.",
+          "fix": "Make “Check destination weather” the primary heading for this section and present the verification notice as compact secondary guidance."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop Expenses · empty",
+          "issue": "The empty-state “Go to new-record form” button sits beside an already visible New Expense form, so its purpose is slightly redundant.",
+          "fix": "Hide the shortcut while the form is visible, or rename it to make clear that it focuses the form."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop Expenses · empty",
+          "issue": "The weather area repeats “Check destination weather” as both a section heading and a workflow title beneath “Connected workflows,” adding a layer of redundant heading hierarchy.",
+          "fix": "Keep one prominent workflow title and use the remaining space for a concise description or state."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop Expenses · saved",
+          "issue": "The page is labeled “Travel records” and its guidance refers to details that matter to “your trip,” even though the selected collection is Expenses. This makes the page context less precise.",
+          "fix": "Use collection-aware page titles and guidance, such as “Expense records” and copy that describes tracking expenses."
+        },
+        {
+          "severity": "minor",
+          "screen": "Mobile workflow · Check destination weather",
+          "issue": "The workflow introduction and status content occupy a long section before the input fields, increasing the scroll needed to reach the controls.",
+          "fix": "Reduce introductory copy or vertical spacing on mobile while preserving the coordinate guidance and status."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop Trips · empty",
+          "issue": "The generic “Connected workflows” heading and provider-verification notice compete slightly with the weather task heading.",
+          "fix": "Lead with “Check destination weather” and reduce the notice to compact secondary guidance."
+        },
+        {
+          "severity": "minor",
+          "screen": "Mobile Trips · editing",
+          "issue": "The workflow is introduced by “Check destination weather,” then repeats that title inside a card headed “Connected workflows,” making the heading hierarchy slightly redundant.",
+          "fix": "Use one prominent workflow title and a less repetitive label for the card."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop Expenses · validation",
+          "issue": "The validation message appears below the submit button rather than directly alongside the highlighted Category field, requiring a little extra visual scanning.",
+          "fix": "Keep the summary message, but place or associate an inline prompt with the invalid Category field."
+        },
+        {
+          "severity": "minor",
+          "screen": "Desktop Expenses · saved",
+          "issue": "The page is labeled “Travel records” and its guidance refers to details that matter to “your trip,” although Expenses is selected.",
+          "fix": "Use an expenses-specific title and concise guidance for this collection."
+        }
+      ],
+      "summary": "A polished, cohesive desktop travel desk with clear typography, restrained scarlet accents, and legible, usable forms. The supplied screens show good hierarchy and clear workflow attribution. Minor refinements would improve the auth action hierarchy and the long-page sidebar and empty-state details. No mobile screenshots were supplied, so mobile is not scored. The supplied states are polished, legible, and consistently branded with a clear scarlet-and-warm-neutral palette. Forms, record cards, saved state, and workflow controls are visibly organized and usable. The main optional refinement is ",
+      "method": "AI screenshot review",
+      "at": "2026-10-11T05:17:36.000Z",
+      "screen_reviews": [
+        {
+          "screen": "Desktop login · 1440px",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Desktop login · 1440px",
+              "issue": "Sign in and Create account are both full-width scarlet buttons, so the two different actions compete equally for attention.",
+              "fix": "Keep the current sign-in action primary and style Create account as a secondary button or text link."
+            }
+          ],
+          "summary": "The split layout makes the product identity and sign-in form easy to find. Labels, fields, and privacy reassurance are readable, and the warm neutral and scarlet palette feels appropriate. The two equal-weight red actions could be differentiated.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:15:46.893Z"
+        },
+        {
+          "screen": "Desktop screen · overview",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Desktop screen · overview",
+              "issue": "The sidebar ends partway down the tall page, leaving a conspicuous blank strip beside the lower dashboard and workflow content.",
+              "fix": "Extend the sidebar background to the page height or keep the navigation rail fixed while scrolling."
+            }
+          ],
+          "summary": "The page leads with the overview and readable zero-state totals, then offers useful starting guidance and collection links. The weather workflow and its attribution are visible and clearly presented. The sidebar ending before the long page does look unfinished, though it does not obscure content.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:15:46.893Z"
+        },
+        {
+          "screen": "Desktop screen · workspace",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Desktop screen · workspace",
+              "issue": "The empty-state “Go to new-record form” button is redundant because the complete new-trip form is already visible beside it.",
+              "fix": "Remove the jump button when the form is already in view, or make its focus-and-scroll effect clearer."
+            }
+          ],
+          "summary": "The empty records state and persistent trip form are both easy to identify, with readable labels and clear save guidance. Search and the workflow controls are visible. The empty-state jump action competes with the already-visible form and could be simplified.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:15:46.893Z"
+        },
+        {
+          "screen": "Desktop screen · conditions",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The destination-conditions heading and coordinate guidance set expectations clearly. The saved-snapshot entry point and weather workflow are distinct, and the attribution is visible below the workflow. The generous spacing supports scanning without hiding controls.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:15:46.893Z"
+        },
+        {
+          "screen": "Desktop workflow · Check destination weather",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The execution-plan state clearly says that no provider calls or records were created, avoiding confusion with live results. Inputs, preview, and run actions are visible and legible, and the Open-Meteo attribution remains present.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:15:46.893Z"
+        },
+        {
+          "screen": "Mobile workflow · Check destination weather",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Mobile workflow · Check destination weather",
+              "issue": "The workflow introduction and status content occupy a long section before the input fields, increasing the scroll needed to reach the controls.",
+              "fix": "Reduce introductory copy or vertical spacing on mobile while preserving the coordinate guidance and status."
+            }
+          ],
+          "summary": "The compact navigation labels remain on one line, and the form fields and action buttons are stacked clearly. Text and controls are readable; the workflow’s long lead-in is a modest mobile efficiency issue.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:03.151Z"
+        },
+        {
+          "screen": "Desktop empty workspace · 1440px",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The empty state is clear and actionable, with a visible search, a prominent path to the form, and a well-separated trip form. The desktop sidebar and main content do not overlap. The workflow panel and attribution are visible below.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:03.151Z"
+        },
+        {
+          "screen": "Desktop populated workspace · 1440px",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The saved trip displays its fields in a readable card with clear Edit and Delete actions. The form’s saved confirmation is visible, and the workflow area remains distinct from the collection content.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:03.151Z"
+        },
+        {
+          "screen": "Desktop primary collection · editing",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The populated edit form is easy to distinguish from the record card, and the date selections include readable worded dates. Save changes and Cancel edit are clear, adjacent actions; the page remains well structured.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:03.151Z"
+        },
+        {
+          "screen": "Mobile populated workspace · 390px",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The record adapts into a readable card that shows its fields and actions, followed by a single-column trip form. Navigation labels fit without wrapping, and the workflow controls remain visible and operable in the mobile layout.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:03.151Z"
+        },
+        {
+          "screen": "Desktop Trips · empty",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Desktop Trips · empty",
+              "issue": "The generic “Connected workflows” heading and provider-verification notice compete slightly with the weather task heading.",
+              "fix": "Lead with “Check destination weather” and reduce the notice to compact secondary guidance."
+            }
+          ],
+          "summary": "The empty state explains how to begin and keeps the add-trip form visible alongside the record search. Form labels and controls are readable, and the empty-state action is prominent. The workflow section is clear but could use a simpler heading hierarchy.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:16.075Z"
+        },
+        {
+          "screen": "Desktop Trips · validation",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The missing destination is visibly indicated in the form, and the validation message explains what to correct. Entered values remain visible, making this state straightforward to recover from.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:16.075Z"
+        },
+        {
+          "screen": "Desktop Trips · saving",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The populated form remains legible during submission, and the button’s “Saving…” label clearly communicates the current state. Layout and styling remain consistent with the empty state.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:16.075Z"
+        },
+        {
+          "screen": "Desktop Trips · service error",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The error is close to the form and clearly states that the record could not be saved and should be retried. Entered values and the enabled Add Trip action remain available for recovery.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:16.075Z"
+        },
+        {
+          "screen": "Desktop Trips · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The saved record is displayed with its fields and Edit/Delete actions, while a distinct success message confirms the save. The visible form is reset and ready for another trip.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:16.075Z"
+        },
+        {
+          "screen": "Desktop Trips · editing",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The saved trip and populated edit form are easy to distinguish and scan. The two-column desktop layout keeps record actions and all form fields visible, while the weather workflow and attribution remain clear below.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:31.482Z"
+        },
+        {
+          "screen": "Desktop Trips · no matches",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The no-match state clearly reports the result and offers a visible way to clear the search. The empty record area does not obscure the available trip form or weather workflow.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:31.482Z"
+        },
+        {
+          "screen": "Responsive 768px Trips · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The layout adapts to the narrower viewport by stacking the records and form rather than squeezing their contents. Navigation, record actions, form controls, workflow inputs, and attribution remain visible and legible.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:31.482Z"
+        },
+        {
+          "screen": "Responsive 1024px Trips · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The sidebar and main content remain distinct, with comfortable space for the record card and two-column form. The saved trip details and actions are easy to scan, and the lower workflow section remains intact.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:31.482Z"
+        },
+        {
+          "screen": "Mobile Trips · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The compact navigation labels remain on one line, and the record card stacks every trip field and its actions into a readable mobile layout. Form controls and workflow inputs are full-width and comfortably separated; the page is long but its sections remain clear.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:31.482Z"
+        },
+        {
+          "screen": "Mobile Trips · editing",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Mobile Trips · editing",
+              "issue": "The workflow is introduced by “Check destination weather,” then repeats that title inside a card headed “Connected workflows,” making the heading hierarchy slightly redundant.",
+              "fix": "Use one prominent workflow title and a less repetitive label for the card."
+            }
+          ],
+          "summary": "The trip card and populated edit form stack cleanly at this viewport, with readable fields, visible save and cancel actions, and a compact navigation row whose labels remain on one line. The workflow inputs and attribution are also visible and legible further down the page.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:51.431Z"
+        },
+        {
+          "screen": "Desktop Expenses · empty",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Desktop Expenses · empty",
+              "issue": "The empty-state “Go to new-record form” button sits beside an already visible New Expense form, so its purpose is slightly redundant.",
+              "fix": "Hide the shortcut while the form is visible, or rename it to make clear that it focuses the form."
+            },
+            {
+              "severity": "minor",
+              "screen": "Desktop Expenses · empty",
+              "issue": "The weather area repeats “Check destination weather” as both a section heading and a workflow title beneath “Connected workflows,” adding a layer of redundant heading hierarchy.",
+              "fix": "Keep one prominent workflow title and use the remaining space for a concise description or state."
+            }
+          ],
+          "summary": "The empty record state is understandable, and the visible expense form explains that a trip must exist before an expense can be linked. The desktop sidebar, form, and workflow area are well separated. The empty-state shortcut is redundant while the form is already on screen.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:51.431Z"
+        },
+        {
+          "screen": "Desktop Expenses · validation",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Desktop Expenses · validation",
+              "issue": "The validation message appears below the submit button rather than directly alongside the highlighted Category field, requiring a little extra visual scanning.",
+              "fix": "Keep the summary message, but place or associate an inline prompt with the invalid Category field."
+            }
+          ],
+          "summary": "The incomplete Category field is visibly highlighted, and the validation message names it and gives a next step. Other entered values remain visible, while the record list, form, and workflow retain the same clear layout and styling.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:51.431Z"
+        },
+        {
+          "screen": "Desktop Expenses · saving",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "“Saving…” on the primary action clearly communicates the in-progress state without obscuring the form or other page content. The state is visually consistent with the surrounding expense page.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:51.431Z"
+        },
+        {
+          "screen": "Desktop Expenses · service error",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The error is concise and actionable, and the populated form remains available for another attempt. The message is visually distinct from the form without disrupting the page hierarchy.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:16:51.431Z"
+        },
+        {
+          "screen": "Desktop Expenses · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [
+            {
+              "severity": "minor",
+              "screen": "Desktop Expenses · saved",
+              "issue": "The page is labeled “Travel records” and its guidance refers to details that matter to “your trip,” although Expenses is selected.",
+              "fix": "Use an expenses-specific title and concise guidance for this collection."
+            }
+          ],
+          "summary": "The saved expense is easy to scan, and the adjacent form is clearly labeled and complete. The success message is visible. Page-level copy is slightly mismatched to the selected collection; otherwise the layout is balanced and the scarlet actions reinforce the brand.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:01.745Z"
+        },
+        {
+          "screen": "Desktop Expenses · editing",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The populated edit form is distinct from the saved record list, with clear Save changes and Cancel edit actions. The selected trip and expense values are legible, and the workflow section remains visible below. The editing state is easy to understand and operate.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:01.745Z"
+        },
+        {
+          "screen": "Desktop Expenses · no matches",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The zero-result count, “No matching records” message, and Clear filters action clearly explain the search state and how to recover. The empty result area is spacious without obscuring the still-accessible expense form or weather workflow.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:01.745Z"
+        },
+        {
+          "screen": "Responsive 768px Expenses · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "At this width, records and the add form stack into readable panels while the sidebar and controls remain visible. Labels, fields, and buttons are not clipped, and the workflow inputs wrap cleanly. The page is long, but its sections remain clearly separated.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:01.745Z"
+        },
+        {
+          "screen": "Responsive 1024px Expenses · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The 1024px layout uses the available content width well: the record panel and form remain legible, and the workflow is separated below with its controls fully visible. Consistent surfaces, typography, and scarlet actions make this a polished responsive state.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:01.745Z"
+        },
+        {
+          "screen": "Mobile Expenses · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The saved expense card, record search, and add form are clearly separated and comfortably readable at mobile width. The workflow and attribution remain visible farther down the page.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:12.812Z"
+        },
+        {
+          "screen": "Mobile Expenses · editing",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "Edit mode is readily identifiable, populated values are legible, and Save changes and Cancel edit are distinct controls. The long page remains in a single readable column.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:12.812Z"
+        },
+        {
+          "screen": "Desktop Weather snapshots · empty",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The empty state is explicit and provides a clear route to the visible creation form. The desktop sidebar does not obstruct the content, and the workflow is visibly separated below the collection workspace.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:12.812Z"
+        },
+        {
+          "screen": "Desktop Weather snapshots · validation",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The invalid destination is visibly highlighted and the validation message explains the problem and next step. Form fields and the weather workflow remain easy to distinguish.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:12.812Z"
+        },
+        {
+          "screen": "Desktop Weather snapshots · saving",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The saving state is clearly communicated on the form action, while entered values remain visible. The otherwise calm layout makes this state easy to scan.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:12.812Z"
+        },
+        {
+          "screen": "Desktop Weather snapshots · service error",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The failed save is clearly called out beside the still-populated form, and the enabled submit action makes retry straightforward. The records area, form, and weather workflow remain legible and well separated.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:25.024Z"
+        },
+        {
+          "screen": "Desktop Weather snapshots · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The saved record and success message are easy to identify. The form resets to a clean add state, with clear record actions and the weather workflow visible below.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:25.024Z"
+        },
+        {
+          "screen": "Desktop Weather snapshots · editing",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The edit form is visibly distinct from the add state, has populated fields, and offers clear save and cancel actions. The red field outline is noticeable without obscuring its label or value.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:25.024Z"
+        },
+        {
+          "screen": "Desktop Weather snapshots · no matches",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The search query, empty-result message, and clear action make this state understandable and recoverable. The add form remains available alongside the no-results state.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:25.024Z"
+        },
+        {
+          "screen": "Responsive 768px Weather snapshots · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The layout stacks records, form, and workflow into a readable single-column flow while keeping record actions and form controls visible. Navigation and branding remain consistent at this responsive width.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:25.024Z"
+        },
+        {
+          "screen": "Responsive 1024px Weather snapshots · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": null,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The desktop-width records, form, and weather workflow have clear headings and readable controls. The two-column fields fit the available content area, and the sidebar does not obscure the page.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:35.999Z"
+        },
+        {
+          "screen": "Mobile Weather snapshots · saved",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "Navigation labels fit on one line, and the saved record, add form, and workflow stack into a clear single-column layout. Text and actions are readable without visible clipping.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:35.999Z"
+        },
+        {
+          "screen": "Mobile Weather snapshots · editing",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The edit state is clearly distinguished by its heading, populated fields, and Save changes and Cancel edit actions. The form and workflow remain usable in the stacked mobile layout.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:35.999Z"
+        },
+        {
+          "screen": "Mobile signed out · 390px",
+          "passed": true,
+          "score": 4,
+          "scores": {
+            "hierarchy": 4,
+            "typography": 4,
+            "spacing": 4,
+            "consistency": 4,
+            "mobile": 4,
+            "usability": 4,
+            "identity": 4
+          },
+          "findings": [],
+          "summary": "The sign-in and account-creation actions are prominent, the form labels and inputs are legible, and the signed-out status is clearly shown. The compact brand-led layout fits the narrow viewport.",
+          "method": "AI screenshot review",
+          "at": "2026-10-11T05:17:35.999Z"
+        }
+      ],
+      "evidence": [
+        {
+          "screen": "Desktop login · 1440px",
+          "sha256": "846e773ed4ccc4bade2186839c2a831684b984fe960f52e44a9be43643df7371"
+        },
+        {
+          "screen": "Desktop screen · overview",
+          "sha256": "858956cef08a17ba7b1ca8dee3f482bdb72aa9912bd2af8de442d445de70757c"
+        },
+        {
+          "screen": "Desktop screen · workspace",
+          "sha256": "840e0036375046d30f544e1b17a496ad31bf31259048928326cc5d917d4e7df0"
+        },
+        {
+          "screen": "Desktop screen · conditions",
+          "sha256": "0603be0428dc12221e337c7ce1cb665280024262bdbea083f4de4691c41cf0bc"
+        },
+        {
+          "screen": "Desktop workflow · Check destination weather",
+          "sha256": "d1885e2f8ad47ca6e59fec5b4437dc47225c07e029b75adad49948eb69bd458e"
+        },
+        {
+          "screen": "Mobile workflow · Check destination weather",
+          "sha256": "5268ce256200bc478a98a47ef5cde0661447ea547c9c8212fb482c6c39d8d0ba"
+        },
+        {
+          "screen": "Desktop empty workspace · 1440px",
+          "sha256": "2da9d44a8d01fe5fe70c8ac588f4432c7c5823ae44396901d890be7d3c29b397"
+        },
+        {
+          "screen": "Desktop populated workspace · 1440px",
+          "sha256": "26746d45c3f9dff89a4c8cf5154b296efa768a20e874d0a16660376acc128480"
+        },
+        {
+          "screen": "Desktop primary collection · editing",
+          "sha256": "84e4dd90582f31ef5a2fb4390740c9ccb10c51f7bf7f125bb94a8580b0113ae0"
+        },
+        {
+          "screen": "Mobile populated workspace · 390px",
+          "sha256": "216e23625112de3be1f1085d76f548a9c5273e9c5c13bcea8350b7f3cfb6a879"
+        },
+        {
+          "screen": "Desktop Trips · empty",
+          "sha256": "347ef5e08a9aea40f26156ab23313fc603267d9a2037decfce7924f97483e265"
+        },
+        {
+          "screen": "Desktop Trips · validation",
+          "sha256": "9952999c1d73f45e15ce1027dc1bc6f0780d277c384f977f6592c3957a20f3f3"
+        },
+        {
+          "screen": "Desktop Trips · saving",
+          "sha256": "9e6bd6e0562b116221c0d3a51093a600324c42313dbfa5a27e1738d6e4726254"
+        },
+        {
+          "screen": "Desktop Trips · service error",
+          "sha256": "611d4b6944298389140f16a74619ea9440b4147539687dabae247c6e8f329af5"
+        },
+        {
+          "screen": "Desktop Trips · saved",
+          "sha256": "086dd3ca143d1ad3e3b103c69c7ecb7f7e80714f07d2a8592613a679c66f6406"
+        },
+        {
+          "screen": "Desktop Trips · editing",
+          "sha256": "eebe1397ca3a2509dd78b284b0b16d73aaef47a778e159e2098cb63aa22b3e41"
+        },
+        {
+          "screen": "Desktop Trips · no matches",
+          "sha256": "b74a2e0352dcae55c6c5e318d2adc391d7622c2d4d1836566121e4ce390226f7"
+        },
+        {
+          "screen": "Responsive 768px Trips · saved",
+          "sha256": "e9462a37e3d7b28abb30d850680cb27016cce7e6c392b1f434afbdb4c9ec14f5"
+        },
+        {
+          "screen": "Responsive 1024px Trips · saved",
+          "sha256": "6f5996ac4277aaba7feb83bd8543dca1cee77e0618df925a529b5ed32f4a00d3"
+        },
+        {
+          "screen": "Mobile Trips · saved",
+          "sha256": "216e23625112de3be1f1085d76f548a9c5273e9c5c13bcea8350b7f3cfb6a879"
+        },
+        {
+          "screen": "Mobile Trips · editing",
+          "sha256": "555eb489067b7bcc32b83b2ac0bc578a7db17fcc9856c29d7ed201548392ed64"
+        },
+        {
+          "screen": "Desktop Expenses · empty",
+          "sha256": "343747134968de2852c7a5724398a141a80e0e4acbbf73171976d431e3688040"
+        },
+        {
+          "screen": "Desktop Expenses · validation",
+          "sha256": "478e2c6add3d3201802c42f4c38847b336295cbec8e49d112229a4491b454da0"
+        },
+        {
+          "screen": "Desktop Expenses · saving",
+          "sha256": "a11d12e644d83cebdb20b3859cc1606c5495777f3c976b3645ec3f8c1bce0aeb"
+        },
+        {
+          "screen": "Desktop Expenses · service error",
+          "sha256": "9788473a9ced72442d9ebb15a9f35ea0772f7f59329663164be7f2eeb037c29e"
+        },
+        {
+          "screen": "Desktop Expenses · saved",
+          "sha256": "dbcaa9c5d7cd67db727676d5d5ba146a6cea01eb0d138e71f759fd00f71edca4"
+        },
+        {
+          "screen": "Desktop Expenses · editing",
+          "sha256": "10ba42f6625ed0ab380bae2b2c2b102a995724fb29256244f75e97b8bdc021a2"
+        },
+        {
+          "screen": "Desktop Expenses · no matches",
+          "sha256": "77484e8df72fcc2de5ba6d72946c99e6478fcea2f5ad25d09a2a884392cad324"
+        },
+        {
+          "screen": "Responsive 768px Expenses · saved",
+          "sha256": "ad2745c9023badcf7d732bd097f4c3987352cd91c580ded8d5fb308ed848749a"
+        },
+        {
+          "screen": "Responsive 1024px Expenses · saved",
+          "sha256": "cff4a242325465f579203b319a7e1f35dcdc424cc5aea1bde86e3ffa42a3885f"
+        },
+        {
+          "screen": "Mobile Expenses · saved",
+          "sha256": "f4bc0b307b2d2d77581c268e251c6856d429a5de4141f9fb992475a1fa7fe2af"
+        },
+        {
+          "screen": "Mobile Expenses · editing",
+          "sha256": "05d198d4f2a3938382817339f40e97ba0a05e55ab5e2a8147403fc024ccd812d"
+        },
+        {
+          "screen": "Desktop Weather snapshots · empty",
+          "sha256": "8b040fbc742c24f6c61487f9d8c09255114b8b8e1677756acee0addb6d8a8051"
+        },
+        {
+          "screen": "Desktop Weather snapshots · validation",
+          "sha256": "7c3ba0770f1230409ad5a5be1858032f246ed429aa845ba8a72535317321cdd0"
+        },
+        {
+          "screen": "Desktop Weather snapshots · saving",
+          "sha256": "8fe03e08f8d2e1c221242b65227105215d7bb07ce1b5457b72d69c3337dbeb04"
+        },
+        {
+          "screen": "Desktop Weather snapshots · service error",
+          "sha256": "cff96a687e69b5817a02011738291ca7f8ba59e2e9650b3344ae70757a620347"
+        },
+        {
+          "screen": "Desktop Weather snapshots · saved",
+          "sha256": "634bed1c14468327280e2e1e52e4abceb215a0a46d3809077c01ddccb5ea03b2"
+        },
+        {
+          "screen": "Desktop Weather snapshots · editing",
+          "sha256": "b6fbbd6e0922adbacb9211bd0d66d6d8c74dbb2e04e7999ae44c7d914c89f392"
+        },
+        {
+          "screen": "Desktop Weather snapshots · no matches",
+          "sha256": "b1aefcbca7ef423a8192a6a67849aa8f4ea8d74612e58bfd042bd57f0bdb2c55"
+        },
+        {
+          "screen": "Responsive 768px Weather snapshots · saved",
+          "sha256": "7b71ea51c805dc44e42faa401f3935bfbdb496114915daf56e890ac5758cbf11"
+        },
+        {
+          "screen": "Responsive 1024px Weather snapshots · saved",
+          "sha256": "1eb1674f803870388838ad04d20afef9a055e46ca2ce725de029049108912163"
+        },
+        {
+          "screen": "Mobile Weather snapshots · saved",
+          "sha256": "1414b6fa0a770c28cd27950f19cf022f1b7b5752c40f108b08bdca1dbd4d9d27"
+        },
+        {
+          "screen": "Mobile Weather snapshots · editing",
+          "sha256": "88fed54bc8c70dccbb6e8597ebc9498140fec2724457f34a0046aa010431bf0f"
+        },
+        {
+          "screen": "Mobile signed out · 390px",
+          "sha256": "b0a0003911dd942da7dc158252c2e96b85680c81ce7aa1209ac8c216cea04c2e"
+        }
+      ],
+      "coverage": {
+        "captured": 44,
+        "reviewed": 44,
+        "complete": true,
+        "mode": "ai-screenshot-review"
+      }
+    }
+  },
+  "deployedQA": {
+    "passed": true,
+    "findings": [],
+    "design_checks": [],
+    "tested": [
+      "multi-screen navigation: overview, workspace, conditions",
+      "documented workflow forms and no-call simulation at desktop/mobile",
+      "trips: search empty state",
+      "trips: responsive 768px",
+      "trips: responsive 1024px",
+      "trips: UI create/edit/reload/delete, dashboard, desktop and mobile",
+      "expenses: search empty state",
+      "expenses: responsive 768px",
+      "expenses: responsive 1024px",
+      "expenses: UI create/edit/reload/delete, dashboard, desktop and mobile",
+      "weather_snapshots: search empty state",
+      "weather_snapshots: responsive 768px",
+      "weather_snapshots: responsive 1024px",
+      "weather_snapshots: UI create/edit/reload/delete, dashboard, desktop and mobile",
+      "logout API protection and reload",
+      "registration",
+      "login",
+      "collection navigation",
+      "UI create, edit and delete",
+      "dashboard counts",
+      "persistent records after reload",
+      "desktop1440px",
+      "mobile390px",
+      "logout"
+    ],
+    "at": "2026-10-11T05:32:05.522Z",
+    "scope": "public deployed URL",
+    "url": "https://kairoq-production.up.railway.app/apps/travellez-connected-travel-desk-4013823a/",
+    "version": 1,
+    "evidence": [
+      {
+        "screen": "Desktop login · 1440px",
+        "sha256": "846e773ed4ccc4bade2186839c2a831684b984fe960f52e44a9be43643df7371"
+      },
+      {
+        "screen": "Desktop screen · overview",
+        "sha256": "c0f44f7fea94695ec88cd3edf98c1d3282b1b04e4e6f5241c5701911f949dce8"
+      },
+      {
+        "screen": "Desktop screen · workspace",
+        "sha256": "46381d0c417ed02e4b24181d0975fa3a72a18246699d80fa8f26b034663eae2f"
+      },
+      {
+        "screen": "Desktop screen · conditions",
+        "sha256": "e6ee56fe3c9c0b12b5f07da5225a7a6c1094621ae0b566c467c4faec36c86978"
+      },
+      {
+        "screen": "Desktop workflow · Check destination weather",
+        "sha256": "5852401e374d961976b9edf7e8fb8d613be67db6a7582f6e2e3dc1c474dfbcc1"
+      },
+      {
+        "screen": "Mobile workflow · Check destination weather",
+        "sha256": "64182533741891d6d9fa5ad07d5908c618d04046aa50f202f0ed9463ff7552d4"
+      },
+      {
+        "screen": "Desktop empty workspace · 1440px",
+        "sha256": "9e29a05a5f8b9dfcc8a78a39746417fa547bf20cf353e40e02bf1cb421487c99"
+      },
+      {
+        "screen": "Desktop populated workspace · 1440px",
+        "sha256": "9323a800124faf9eda7101da9303cccb748ee2ec47f013c9699bd1a895ff9238"
+      },
+      {
+        "screen": "Desktop primary collection · editing",
+        "sha256": "7a72af9c5ffed2b946fb48534e11e32b918e53dc7772428c0c112ed5ae8ec2f4"
+      },
+      {
+        "screen": "Mobile populated workspace · 390px",
+        "sha256": "62f9bd2df03afdd9f13f41e51a8c4d358d63438999329f90a12afc4f79374d25"
+      },
+      {
+        "screen": "Desktop Trips · empty",
+        "sha256": "45e5c7b344508e3f87d79bb85533b420a3baa86e7b27fed164b59cc1d5c7f4c3"
+      },
+      {
+        "screen": "Desktop Trips · saved",
+        "sha256": "eefaaefbdd8e238e0078781dcbd2fda2ebb0753fe4f8a9b1b0f9f1fe1fb66946"
+      },
+      {
+        "screen": "Desktop Trips · editing",
+        "sha256": "7a72af9c5ffed2b946fb48534e11e32b918e53dc7772428c0c112ed5ae8ec2f4"
+      },
+      {
+        "screen": "Desktop Trips · no matches",
+        "sha256": "03e0d985b403f352dbdfb4c59f7baeb7ab2bb5a0a633d6270fe577e32b1131b2"
+      },
+      {
+        "screen": "Responsive 768px Trips · saved",
+        "sha256": "07ab473dc1bfd72fc6ba13e1333d160e4712a3b0993981f9b76b97dc4da0b8ed"
+      },
+      {
+        "screen": "Responsive 1024px Trips · saved",
+        "sha256": "350d0805cc7aea52b64735cb21eb529eb979a08feabc21a461489a10cdc2ec29"
+      },
+      {
+        "screen": "Mobile Trips · saved",
+        "sha256": "9791bd840d9575664aee5d425b25c832171b46746069d853c7fb2943212d7d99"
+      },
+      {
+        "screen": "Mobile Trips · editing",
+        "sha256": "4a2f0a414919a559ff30b760cadef5b4a3aa62439c28eff1e8d54124c90f111f"
+      },
+      {
+        "screen": "Desktop Expenses · empty",
+        "sha256": "e5829a3e785b09397a5ef1e03f158c7886cff61726c79156cb6c74ac898fe6cd"
+      },
+      {
+        "screen": "Desktop Expenses · saved",
+        "sha256": "8741b81f3996a0f62421d5d7137aa6f159c99b41d0595b19b4665e2c2559b9be"
+      },
+      {
+        "screen": "Desktop Expenses · editing",
+        "sha256": "337745463c090073541bbf23774629048fb246d95118ea45cc8f223e9ad8c66f"
+      },
+      {
+        "screen": "Desktop Expenses · no matches",
+        "sha256": "6f4783c535684d1531925cdc90b8b5f68e8ee9fb451dbffc67ac3bc5aa084f1e"
+      },
+      {
+        "screen": "Responsive 768px Expenses · saved",
+        "sha256": "8215a9ecc4ef9e000e00dfb98e38e26e39cf0aa740ddc298ae80567c9d3d5a5e"
+      },
+      {
+        "screen": "Responsive 1024px Expenses · saved",
+        "sha256": "186c1cdf274b68cd93f993fe9c4de8f80492496537575af11b69eb9553662e0c"
+      },
+      {
+        "screen": "Mobile Expenses · saved",
+        "sha256": "fbb985540fc9b17e0cd977aea28b9ccd60d5caf94971f6585c698751ffaef17e"
+      },
+      {
+        "screen": "Mobile Expenses · editing",
+        "sha256": "30b85b15f932d2183157ebb6f9707985cf8891481a689b6f85863d04d4006c16"
+      },
+      {
+        "screen": "Desktop Weather snapshots · empty",
+        "sha256": "bd69077fddb6b76f988f2b0dc80f33221e09d4d80bd6d9d0e0ea2b8027c0d9bf"
+      },
+      {
+        "screen": "Desktop Weather snapshots · saved",
+        "sha256": "e6648b1d39369a589a8a7e02671382ee9a9f56343cbeae4676825f75eb3c8677"
+      },
+      {
+        "screen": "Desktop Weather snapshots · editing",
+        "sha256": "d6bdff6aadb2fd816756c69b5987feb71d2c80a17fdff3a9993a52d634e5bf1e"
+      },
+      {
+        "screen": "Desktop Weather snapshots · no matches",
+        "sha256": "70a39ec921a056fa6c75a8fc19db48de9dddf669a64f6138c0a4a88a64b0484c"
+      },
+      {
+        "screen": "Responsive 768px Weather snapshots · saved",
+        "sha256": "cf24dcadf487a889a1187a3e35859df2e9bb7077ee2591a9346c60639aa24d28"
+      },
+      {
+        "screen": "Responsive 1024px Weather snapshots · saved",
+        "sha256": "1a9c728ac201ce0daad60bf801e01e13a4a6cdca811229d64825ab25e6bb61f5"
+      },
+      {
+        "screen": "Mobile Weather snapshots · saved",
+        "sha256": "da02ba6261132c96ba26b1929ea212277e40675e4bbabee25b25b54a84cb3dd6"
+      },
+      {
+        "screen": "Mobile Weather snapshots · editing",
+        "sha256": "7659ed53c1c2f2dadb3e0b2499e13a697bdb4130e2b2d3240284292896c088eb"
+      },
+      {
+        "screen": "Mobile signed out · 390px",
+        "sha256": "b0a0003911dd942da7dc158252c2e96b85680c81ce7aa1209ac8c216cea04c2e"
+      }
+    ]
+  },
+  "backendRelease": {
+    "commit": "346b530e378e7e823cea298c195e3f4dc072dae7",
+    "testsPassed": 152,
+    "testsFailed": 0,
+    "testsSkipped": 0
+  },
+  "scope": "Non-commercial personal travel planning evaluation; no supplier booking or fares, billing, manager roles or scheduled jobs",
+  "complexScenarioChecks": {
+    "total": 20,
+    "passed": 20,
+    "scenarios": [
+      "Inventory/procurement",
+      "Event seat allocation"
+    ],
+    "method": "Fresh remote AI plans exercised through actual HTTP handlers and SQLite; not separately deployed apps"
+  },
+  "servingDeploymentId": "602939fc-90f4-45e8-a724-296a57dcca5c"
+}
