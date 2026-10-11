@@ -46,3 +46,20 @@ test('client credentials can authenticate in a Basic header without sending the 
  const request=oauth.tokenRequest({clientId:'client',secret:'private-secret',tokenAuth:'client_secret_basic'},{grant_type:'client_credentials'});assert.equal(request.headers.Authorization,'Basic '+Buffer.from('client:private-secret').toString('base64'));assert.equal(request.body,'grant_type=client_credentials');assert.ok(!request.body.includes('private-secret'));
  const legacy=oauth.tokenRequest({clientId:'client',secret:'private-secret',tokenAuth:'client_secret_basic_base64'},{grant_type:'client_credentials'});assert.equal(legacy.headers.Authorization,'Basic '+Buffer.from(Buffer.from('client').toString('base64')+':'+Buffer.from('private-secret').toString('base64')).toString('base64'));
 });
+function generatedClient(plan,fetchImpl){const context={module:{exports:{}},URL,URLSearchParams,encodeURIComponent};vm.runInNewContext(sdk.generate(plan).source,context,{timeout:1000});return new context.module.exports.KairoqApiClient({baseUrl:'https://api.example.com/v1',token:'server-secret',fetchImpl});}
+test('SDK preserves documented API keys, array serialization and form encoding',async()=>{
+ const plan={auth:[{name:'key',type:'apiKey',in:'header',headerName:'X-Api-Key'}],operations:[{id:'search',method:'POST',path:'/search',authenticationRequired:true,security:[{key:[]}],requestEncoding:'form',parameters:[{name:'tags',in:'query',schema:{type:'array'},style:'form',explode:true}]}]};let seen;
+ const client=generatedClient(plan,async(url,options)=>{seen={url,options};return{ok:true,text:async()=>'{}'};});await client.search({query:{tags:['one','two']},body:{query:'A & B'}});
+ assert.deepEqual(new URL(seen.url).searchParams.getAll('tags'),['one','two']);assert.equal(seen.options.headers['X-Api-Key'],'server-secret');assert.equal(seen.options.headers.Authorization,undefined);assert.equal(seen.options.body,'query=A+%26+B');assert.equal(seen.options.headers['Content-Type'],'application/x-www-form-urlencoded');assert.equal(seen.options.redirect,'error');
+ await assert.rejects(client.search({query:{unknown:['one']}}),/documented query array/);
+});
+test('SDK paginates only bounded documented reads and detects cursor loops without retrying',async()=>{
+ const plan={operations:[{id:'listItems',method:'GET',path:'/items',parameters:[{name:'cursor',in:'query',schema:{type:'string'}}]},{id:'createItem',method:'POST',path:'/items'}]},pagination={itemsPath:'items',cursorPath:'next',cursorParameter:'cursor',maxPages:3};let calls=0;
+ const client=generatedClient(plan,async(url)=>{calls++;const next=new URL(url).searchParams.get('cursor');return{ok:true,text:async()=>JSON.stringify({items:[next?'second':'first'],next:next?null:'page2'})};});
+ assert.deepEqual(Array.from(await client.paginate('listItems',{pagination})),['first','second']);assert.equal(calls,2);
+ await assert.rejects(client.paginate('createItem',{pagination}),/documented GET/);assert.equal(calls,2);
+ await assert.rejects(client.paginate('listItems',{pagination:{...pagination,maxPages:1}}),/page limit/);assert.equal(calls,3);
+ const looping=generatedClient(plan,async()=>({ok:true,text:async()=>JSON.stringify({items:[],next:'same'})}));await assert.rejects(looping.paginate('listItems',{pagination}),/repeated pagination cursor/);
+ await assert.rejects(client.paginate('listItems',{pagination:{...pagination,cursorParameter:'undocumented'}}),/documented string cursor/);
+});
+test('SDK does not attach credentials to explicitly public operations',async()=>{let seen;const client=generatedClient({operations:[{id:'publicInfo',method:'GET',path:'/public',authenticationRequired:false}]},async(url,options)=>{seen=options;return{ok:true,text:async()=>'{}'};});await client.publicInfo();assert.equal(seen.headers.Authorization,undefined);});

@@ -11,7 +11,7 @@ function generate(input,{language="typescript",className="KairoqApiClient"}={}){
  for(const op of plan.operations){let name=safeIdentifier(op.id);if(used.has(name))name=name+"_"+op.method.toLowerCase();if(used.has(name))throw Error("Duplicate SDK method");used.add(name);
   const pathname=JSON.stringify(op.path),verb=JSON.stringify(op.method);
   methods.push(`  async ${name}(options = {}) {
-    return this.request(${verb}, ${pathname}, options);
+    return this.request(${verb}, ${pathname}, options, ${JSON.stringify(op.id)});
   }`);
  }
  const source=`"use strict";
@@ -19,9 +19,14 @@ function generate(input,{language="typescript",className="KairoqApiClient"}={}){
 class ${className} {
   constructor({baseUrl, token, fetchImpl = fetch}) {
     if(typeof baseUrl!=="string" || !baseUrl.startsWith("https://")) throw Error("HTTPS baseUrl required");
+    const base=new URL(baseUrl);if(base.username||base.password||base.search||base.hash)throw Error("Invalid API base URL");
     this.baseUrl=baseUrl;this.token=token;this.fetchImpl=fetchImpl;
+    this.operations=${JSON.stringify(plan.operations)};
+    this.auth=${JSON.stringify(plan.auth||[])};
   }
-  async request(method, path, {pathParams={},query={},body,signal}={}) {
+  async request(method, path, {pathParams={},query={},body,signal}={}, operationId) {
+    const operation=this.operations.find(op=>op.id===operationId);
+    if(operation?.unsupportedBody||operation?.requiresScripts)throw Error("Operation needs a specialized server adapter");
     for(const [key,value] of Object.entries(pathParams)) {
       if(!/^[a-zA-Z0-9_]+$/.test(key))throw Error("Invalid path parameter");
       path=path.replace("{"+key+"}",encodeURIComponent(String(value)));
@@ -30,13 +35,59 @@ class ${className} {
     const base=new URL(this.baseUrl);
     const url=new URL(base.href.replace(/\\/$/,"")+"/"+path.replace(/^\\/+/,""));
     if(url.origin!==base.origin)throw Error("Cross-origin API target rejected");
-    for(const [k,v] of Object.entries(query))url.searchParams.set(k,String(v));
-    const headers={Accept:"application/json",...(this.token?{Authorization:${JSON.stringify(prefix)}+this.token}:{})};
-    if(body!==undefined)headers["Content-Type"]="application/json";
-    const res=await this.fetchImpl(url.href,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal,redirect:"error"});
+    for(const [k,v] of Object.entries(query)){
+      if(v===undefined)continue;
+      if(v===null||typeof v==='object'&&!Array.isArray(v))throw Error("Invalid query value");
+      if(Array.isArray(v)){
+        const p=operation?.parameters?.find(p=>p.in==='query'&&p.name===k);
+        if(p?.schema?.type!=='array'||v.length>100||v.some(x=>x===null||typeof x==='object'))throw Error("Invalid documented query array");
+        const style=p.style||'form';
+        if(style==='form'&&(p.explode??true))for(const item of v)url.searchParams.append(k,String(item));
+        else if(['form','spaceDelimited','pipeDelimited'].includes(style))url.searchParams.set(k,v.join(style==='spaceDelimited'?' ':style==='pipeDelimited'?'|':','));
+        else throw Error("Unsupported query serialization");
+      }else url.searchParams.set(k,String(v));
+    }
+    const headers={Accept:"application/json"};
+    const requirements=operation?.security?.filter(r=>Object.keys(r).length)||[];
+    let auth=this.auth;
+    if(requirements.length){const choice=requirements.find(r=>Object.keys(r).length===1&&auth.some(a=>Object.hasOwn(r,a.name)&&['http','oauth2','apiKey'].includes(a.type)));if(!choice)throw Error("Unsupported authentication combination");auth=auth.filter(a=>Object.hasOwn(choice,a.name));}
+    if(operation?.authenticationRequired&&!this.token)throw Error("API credential required");
+    if(this.token&&operation?.authenticationRequired!==false){const key=auth.find(a=>a.type==='apiKey');
+      if(key){if(!/^[a-z0-9_.-]{1,80}$/i.test(key.headerName||''))throw Error("Invalid API key name");
+        if(key.in==='query'){if(query[key.headerName]!==undefined)throw Error("Cannot override API credential");url.searchParams.set(key.headerName,this.token);}
+        else if(key.in==='header'&&!['host','content-length','authorization','cookie','connection'].includes(key.headerName.toLowerCase()))headers[key.headerName]=this.token;
+        else throw Error("Unsupported API key placement");
+      }else{const scheme=auth.find(a=>a.type==='http')?.scheme?.toLowerCase();headers.Authorization=(scheme==='basic'?'Basic ':scheme==='token'?'Token ':${JSON.stringify(prefix)})+this.token;}
+    }
+    let payload;
+    if(body!==undefined){if(operation?.requestEncoding==='form'){
+      if(!body||Array.isArray(body)||typeof body!=='object'||Object.values(body).some(v=>v===null||typeof v==='object'))throw Error("Form body needs scalar fields");
+      headers['Content-Type']='application/x-www-form-urlencoded';payload=new URLSearchParams(body).toString();
+    }else{headers['Content-Type']='application/json';payload=JSON.stringify(body);}}
+    const res=await this.fetchImpl(url.href,{method,headers,body:payload,signal,redirect:"error"});
     const raw=await res.text();let data;try{data=JSON.parse(raw);}catch{data=raw;}
     if(!res.ok){const error=new Error("API HTTP "+res.status);error.status=res.status;error.response=data;throw error;}
     return data;
+  }
+  async paginate(operationId,{pagination,...options}={}) {
+    const op=this.operations.find(o=>o.id===operationId);
+    if(!op||op.method!=='GET')throw Error("Pagination requires a documented GET operation");
+    const {itemsPath,cursorPath,cursorParameter,maxPages=10,maxItems=1000}=pagination||{};
+    const safePath=p=>typeof p==='string'&&p.split('.').every(k=>/^[a-zA-Z0-9_]+$/.test(k)&&!['__proto__','prototype','constructor'].includes(k));
+    if(!safePath(itemsPath)||!safePath(cursorPath)||!op.parameters?.some(p=>p.in==='query'&&p.name===cursorParameter&&p.schema?.type==='string'))throw Error("Pagination needs explicit response paths and a documented string cursor parameter");
+    if(!Number.isInteger(maxPages)||maxPages<1||maxPages>20||!Number.isInteger(maxItems)||maxItems<1||maxItems>10000)throw Error("Invalid pagination limits");
+    const get=(v,p)=>{for(const key of p.split('.')){if(!v||!Object.hasOwn(v,key))throw Error("Pagination response path missing: "+p);v=v[key];}return v;};
+    const query={...options.query},seen=new Set(),items=[];
+    if(query[cursorParameter]!==undefined)seen.add(String(query[cursorParameter]));
+    for(let page=0;page<maxPages;page++){
+      const data=await this.request(op.method,op.path,{...options,query},op.id),batch=get(data,itemsPath),next=get(data,cursorPath);
+      if(!Array.isArray(batch))throw Error("Pagination items are not an array");
+      if(items.length+batch.length>maxItems)throw Error("Pagination item limit reached; result is incomplete");items.push(...batch);
+      if(next===null||next==='')return items;
+      if(typeof next!=='string'||next.length>500||seen.has(next))throw Error("Invalid or repeated pagination cursor");
+      seen.add(next);query[cursorParameter]=next;
+    }
+    throw Error("Pagination page limit reached; result is incomplete");
   }
 ${methods.join("\n")}
 }
