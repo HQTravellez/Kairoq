@@ -150,6 +150,7 @@ function luminance(c){const f=v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.0
 function contrast(a,b){const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);}
 function effectiveBackground(el){for(let n=el;n&&n!==document.documentElement;n=n.parentElement){const c=rgb(getComputedStyle(n).backgroundColor);if(c&&c[3]>.92)return c;}return[255,255,255,1];}
 function enforceVisualQuality(){
+ ensureMobileScreenNavigation();
  const roots=[$('auth-view')||$('auth-form'),$('app-view'),primaryNavigation(),...document.querySelectorAll('#app-view [data-kq-screen]:not([hidden])')].filter((v,i,a)=>v&&a.indexOf(v)===i);
  for(const root of roots)for(const el of root.querySelectorAll('h1,h2,h3,h4,p,small,label,span,a,button,strong,em,dt,dd,th,td,caption')){
   if(!el.textContent?.trim()||getComputedStyle(el).display==='none'||getComputedStyle(el).visibility==='hidden')continue;
@@ -173,6 +174,18 @@ function ensureRuntimeNavigationToggle(){
   Object.assign(button.style,{position:'fixed',top:'12px',right:'12px',zIndex:'2147483646',minWidth:'72px',minHeight:'44px',display:innerWidth<=600?'inline-flex':'none',alignItems:'center',justifyContent:'center'});
   button.onclick=()=>{const open=button.getAttribute('aria-expanded')==='true';button.setAttribute('aria-expanded',String(!open));button.textContent=!open?'Close':'Menu';button.setAttribute('aria-label',!open?'Close workspace menu':'Open workspace menu');syncNavigation();};
   document.body.append(button);
+}
+function ensureMobileScreenNavigation(){
+ const root=$('app-view');if(!root)return;
+ const screens=[...root.querySelectorAll('[data-kq-screen]')].map(el=>el.dataset.kqScreen).filter(Boolean);
+ if(screens.length<2)return;
+ let nav=$('kq-mobile-screen-nav');
+ if(!nav){nav=node('nav');nav.id='kq-mobile-screen-nav';nav.setAttribute('aria-label','App screens');root.prepend(nav);}
+ const signature=JSON.stringify(screens);
+ if(nav.dataset.screens!==signature){nav.replaceChildren();nav.dataset.screens=signature;for(const name of screens){const control=node('button','kq-button kq-button--secondary',screenLabel(name));control.type='button';control.dataset.kqScreenTarget=name;control.style.cssText='font-size:14px!important;min-height:44px!important;max-width:100%!important;white-space:normal!important;flex:1 1 auto!important';nav.append(control);}}
+ nav.style.cssText='display:'+(innerWidth<=600?'flex':'none')+'!important;position:static!important;flex-wrap:wrap!important;gap:8px!important;padding:16px!important;margin:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;transform:none!important';
+ nav.hidden=innerWidth>600;
+ for(const control of nav.children){const active=control.dataset.kqScreenTarget===activeScreenName;if(active)control.setAttribute('aria-current','page');else control.removeAttribute('aria-current');control.setAttribute('aria-pressed',String(active));}
 }
 function ensureWorkspaceNav(){
   const workspace=document.querySelector('[data-kq-screen="workspace"]');if(!workspace)return;
