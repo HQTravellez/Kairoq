@@ -147,3 +147,15 @@ test('one-prompt build enforces planned UI screens before visual review or publi
  try{const result=await builder.run({id,operation:'build',projectName:prefix,brief:'Build a workspace and an insights screen',style:'tech',data_backend:'sqlite',apiContract:contract,auto_assets:false,asset_ids:[],effects:{motion:'off',threeD:'off'}},model);assert.equal(result.status,'failed');assert.match(result.error,/Required screen missing: insights/);assert.equal(visualCalls,0);}
  finally{for(const folder of fs.readdirSync(runtime.ROOT))if(folder.startsWith(prefix+'-'))fs.rmSync(path.join(runtime.ROOT,folder),{recursive:true,force:true});for(const suffix of ['.json','.candidate.json'])fs.rmSync(path.join(__dirname,'..','workspace','build-jobs',id+suffix),{force:true});}
 });
+test('planner retains prior validation feedback and demands a complete corrected envelope',async()=>{
+ let calls=0;
+ const result=await planner.plan(async opts=>{
+  const out=raw();out.schema=structuredClone(schema);calls++;
+  assert.match(opts.messages[0].content,/non-negative budget use minimum:0/);
+  if(calls===1)out.schema.collections[0].rules=[{field:'destination',operator:'gte',other:0}];
+  if(calls===2){assert.match(opts.messages[0].content,/COMPLETE.*requirements/);delete out.requirements;}
+  if(calls===3){assert.match(opts.messages[0].content,/Invalid collection comparison rule/);assert.match(opts.messages[0].content,/a schema alone is incomplete/);assert.match(opts.messages[0].content,/requirements is a sibling of schema/);}
+  return {product_plan:out};
+ },{brief:'Private records and documented workflows',apiContract:contract});
+ assert.equal(calls,3);assert.equal(result.requirements.length,3);
+});
