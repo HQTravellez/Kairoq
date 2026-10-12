@@ -159,3 +159,10 @@ test('planner retains prior validation feedback and demands a complete corrected
  },{brief:'Private records and documented workflows',apiContract:contract});
  assert.equal(calls,3);assert.equal(result.requirements.length,3);
 });
+test('planning rejects invalid fixture references and guarded states before frontend generation',()=>{
+ const p={collections:[{name:'projects',fields:[{name:'status',type:'select',options:['draft','active'],default:'draft'}]},{name:'tasks',fields:[{name:'project',type:'reference',collection:'projects',required:true}]}],actions:[{name:'activate',collection:'projects',field:'status',from:['draft'],to:'active'}],functions:[{name:'read_task',inputs:[{name:'task',type:'string',required:true,collection:'tasks'}],steps:[{id:'task',type:'read',collection:'tasks',recordId:{$input:'task'}}]}],scenarios:[{name:'linked_task',function:'read_task',fixtures:[{id:'project',collection:'projects',values:{status:'draft'}},{id:'task',collection:'tasks',values:{project:{$result:'project.id'}}}],inputs:{task:{$result:'task.id'}},expect:{$op:'eq',args:[1,1]}}]};
+ assert.doesNotThrow(()=>runtime.validateSchema(p));
+ const badPath=structuredClone(p);badPath.scenarios[0].fixtures[1].values.project={$result:'project.data.id'};assert.throws(()=>runtime.validateSchema(badPath),/Scenario fixture task/);
+ const badState=structuredClone(p);badState.scenarios[0].fixtures[0].values.status='active';assert.throws(()=>runtime.validateSchema(badState),/Use a workflow action/);
+ const missing=structuredClone(p);missing.scenarios[0].fixtures[1].values.project='ffffffff-ffff-4fff-8fff-ffffffffffff';assert.throws(()=>runtime.validateSchema(missing),/earlier projects fixture/);
+});
