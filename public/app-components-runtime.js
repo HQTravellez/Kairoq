@@ -183,7 +183,7 @@ function ensureMobileScreenNavigation(){
  if(!nav){nav=node('nav');nav.id='kq-mobile-screen-nav';nav.setAttribute('aria-label','App screens');root.prepend(nav);}
  const signature=JSON.stringify(screens);
  if(nav.dataset.screens!==signature){nav.replaceChildren();nav.dataset.screens=signature;for(const name of screens){const control=node('button','kq-button kq-button--secondary',screenLabel(name));control.type='button';control.dataset.kqScreenTarget=name;control.style.cssText='font-size:14px!important;min-height:44px!important;max-width:100%!important;white-space:normal!important;flex:1 1 auto!important';nav.append(control);}}
- nav.style.cssText='display:'+(innerWidth<=600?'flex':'none')+'!important;position:static!important;flex-wrap:wrap!important;gap:8px!important;padding:16px!important;margin:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;transform:none!important';
+ nav.style.cssText='display:'+(innerWidth<=600?'flex':'none')+'!important;position:static!important;flex-wrap:wrap!important;gap:8px!important;padding:64px 16px 16px!important;margin:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;transform:none!important';
  nav.hidden=innerWidth>600;
  for(const control of nav.children){const active=control.dataset.kqScreenTarget===activeScreenName;if(active)control.setAttribute('aria-current','page');else control.removeAttribute('aria-current');control.setAttribute('aria-pressed',String(active));}
 }
