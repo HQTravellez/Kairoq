@@ -15,6 +15,7 @@
     "node": ">=22.13"
   },
   "dependencies": {
+    "@babel/parser": "7.29.9",
     "@higgsfield/client": "^0.2.6",
     "@vitejs/plugin-react": "4.5.0",
     "acorn": "8.15.0",

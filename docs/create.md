@@ -10,6 +10,51 @@
 4. **Versions.** Every successful edit is saved as an immutable version (`versions/<n>/files.json` and `versions/<n>/dist`). Any version can be previewed or restored.
 5. **Preview.** `/builder/p/<id>-<key>/v/<n>/` serves a version's build. The key is random per project. Pages served from the Kairoq host use a CSP sandbox, so generated code runs in an isolated origin and cannot use the Kairoq session.
 
+## Editor features
+
+- **Live streaming.** The model's output streams into the chat as it is written: the summary, the file being written, and its latest code. The editor uses Server-Sent Events (`/api/create/jobs/<id>/events`) and falls back to polling.
+- **Runtime checks and Fix it.**
+  - Every build includes a small reporter script (`builder-runtime/kairoq-reporter.js`). It tells the editor about uncaught errors, console errors, failed requests and blank pages.
+  - After each build, the server also opens the app in headless Chromium (`runtime-check.js`). If it finds problems, they go back to the model. These retries count toward the 3 attempts.
+  - If the last attempt still has problems, the version is saved with them, and the editor shows **Fix it**.
+- **Model tiers.**
+  - **Standard** uses the builder model chain.
+  - **Pro** uses `KAIROQ_PRO_MODELS` first, then the standard paid chain.
+  - Messages with images and the Standard tier use `KAIROQ_VISION_MODELS`, because DeepSeek cannot read images.
+  - Pro and image requests need `KAIROQ_BUILDER_PAID_APPROVED=true` and count toward the builder budget.
+- **Discuss mode.** The model answers or plans without changing code or creating a version. An **Implement this plan** button sends the plan as a build request.
+- **Images in chat.** Attach, paste or drop up to 4 images (PNG/JPEG/WebP/GIF, 3 MB each).
+  - Images are shown to the model as reference, for example "build this screenshot".
+  - In build mode, images are also saved as project uploads. Every build copies them to `./uploads/<name>`, so the app can use your logo and photos.
+- **Credits per message:** Standard `KAIROQ_STANDARD_CREDITS` (1), Pro `KAIROQ_PRO_CREDITS` (5), Discuss `KAIROQ_DISCUSS_CREDITS` (1), plus `KAIROQ_IMAGE_CREDITS` (1) when images are attached. Credits are refunded when a message fails.
+
+## Visual edits
+
+**Edit** turns on click-to-select in the preview. Builds tag every JSX element with `data-kq="file:line:col"` (`react-visual.js`).
+
+- Selecting an element shows its text, Tailwind classes and, for images, `src` and `alt`. There are quick text and background colour swatches.
+- **Apply** rewrites that element in the source and builds a new version. There's no AI call and no credit.
+- Text or classes set by code (expressions) can't be edited visually. The panel says so and suggests asking the AI.
+
+## Code download and GitHub
+
+- **Settings → Download code** gives a ZIP of a standard Vite + React + Tailwind project (`npm install && npm run dev`). Its `src/kairoq.js` keeps using the app's backend on Kairoq.
+- **Push to GitHub:**
+  - Commits the current version to `owner/repo`, creating a private repo if needed.
+  - Uses the customer's fine-grained token (stored encrypted), or the server `GITHUB_TOKEN` for the owner.
+  - Files Kairoq doesn't manage, like `.github/`, are kept.
+- **Pull from GitHub:** brings `src/` changes back as a new version, after the same safety checks and build.
+
+## Automatic HTTPS for custom domains
+
+With `RAILWAY_API_TOKEN` (or `RAILWAY_PROJECT_TOKEN`) set:
+
+- Adding a domain also registers it on this Railway service (`customDomainCreate`).
+- Kairoq shows Railway's DNS records alongside the `_kairoq` TXT record. Railway issues the certificate once DNS is correct.
+- Removing the domain, or deleting the project, removes it from Railway.
+
+Without a token, add each verified domain in Railway by hand. If the API call fails, the error is shown on the domain.
+
 ## Backend for generated apps
 
 Every Create project has its own backend: user accounts and saved records in a per-project SQLite database (`workspace/react-projects/<id>/data.sqlite`). Generated code uses it through the built-in `kairoq` module:
@@ -34,12 +79,76 @@ Collections must be declared in `src/backend.json`, which the model writes along
 | `shared` | any signed-in user | signed-in users | creator |
 | `public-read` | anyone | signed-in users | creator |
 | `public` | anyone | anyone | creator (anonymous records: owner only, from the Data tab) |
+| `submit-only` | nobody (owner only, in the Data tab) | anyone | owner, from the Data tab |
 
 - The API is `/api/apps/<project-id>/…`. It uses bearer tokens instead of cookies, so it works from sandboxed previews, `/sites/` pages and custom domains. A custom domain can reach only its own app's API.
 - Passwords are hashed with scrypt. Records are limited to 20 KB, 10,000 per collection and 10,000 users per app. Each IP is limited to 240 requests per minute per app.
 - Preview and published versions share one database. The access rules come from the published version, or from the current draft if the app isn't published.
 - In the editor, the **Data** tab shows collections, records and sign-ups, and lets the owner delete records.
 - In sandboxed pages (preview and `/sites/`), sign-ins last until the page reloads because browser storage is unavailable. On subdomains and custom domains, sign-ins persist.
+
+### Optional backend features
+
+Enable these in `src/backend.json`. The model adds them when the app needs them.
+
+- **File uploads.** Add `"storage":{"access":"signed-in"}` (or `"public"`).
+  - In code: `storage.upload(file)` returns `{id, url}`.
+  - Allowed: images, PDF, text and CSV, up to 5 MB each, with `KAIROQ_APP_STORAGE_MB` per app (default 500).
+  - Files are served with a sandbox CSP. Only the uploader can delete a file.
+- **Email.** Add `"email":true`.
+  - In code: `email.send({to:'owner'|'me', subject, text})`.
+  - Mail goes only to the app owner (the Create account's email, or `KAIROQ_OWNER_EMAIL` for owner-built apps) or to the signed-in user. Apps can't be used to spam other people.
+  - Limits: anonymous senders 5 per hour, signed-in users 20 per hour, 200 per app per day.
+  - Sent through Resend (`KAIROQ_RESEND_API_KEY`, `KAIROQ_EMAIL_FROM`).
+- **Payments.** Add `"payments":{"products":{"pro":{"price":"price_…","mode":"payment"|"subscription"}}}`.
+  - The app owner connects their own Stripe secret key and webhook secret under **Settings**. Both are encrypted with `APP_ENCRYPTION_KEY`.
+  - In code: `payments.checkout('pro')` starts Stripe Checkout for the signed-in user. The return URL must point to the app itself.
+  - Purchases are recorded only from a signed webhook, after re-reading the Checkout Session with the owner's key.
+  - In code: `payments.has('pro')` / `payments.purchases()`. Payments show in the Data tab.
+- **Scheduled jobs.** Add `"schedules":[…]` with `every` set to `hour`, `day` or `week`.
+  - Actions: `delete_older_than` (with `days`) and `email_owner_summary`.
+  - The server checks for due jobs every 5 minutes.
+
+## Growth features
+
+- **Landing page and pricing.**
+  - Signed-out visitors to `/create` see a landing page with features, the templates gallery, live pricing and sign-up.
+  - Pricing is built from the free credits, `KAIROQ_PLANS` and `KAIROQ_CREDIT_PACKS`.
+  - A prompt typed on the landing page is built automatically right after sign-up.
+- **Templates.** Six starter apps (`create-templates.js`): restaurant, hotel guest portal, SaaS landing page, team CRM, appointment booking, portfolio. Each one is a working app using the backend, and you keep building on it through chat.
+- **Monthly plans.**
+  - `KAIROQ_PLANS` lists Stripe subscription Prices. Checkout runs in subscription mode.
+  - Every paid invoice (first and renewals) adds the plan's credits, once per invoice, after re-reading the invoice and subscription from Stripe.
+  - Cancellation ends the plan. Credits already paid for are kept.
+  - **Manage billing** opens Stripe's customer portal.
+  - Add webhook events `invoice.paid`, `customer.subscription.updated` and `customer.subscription.deleted` to the account webhook.
+- **Collaborators.**
+  - The owner invites people by email as **editor** (chat, visual edits, restore, publish) or **viewer** (read-only).
+  - Settings, domains, GitHub, sharing, members and deleting stay with the owner.
+  - Each person spends their own credits.
+- **Share links and remix.**
+  - **Share** creates a public link (`/create/share/<token>`) that shows a live preview.
+  - With remix enabled, anyone signed in can copy the app's code and images into their own account. Data and keys are never copied.
+  - Turning sharing off disables the link.
+- **Analytics.**
+  - Published pages count views and daily unique visitors on the server.
+  - No cookies and no scripts. A visitor is a salted hash of IP and browser that changes daily.
+  - Bots, previews and asset requests are skipped.
+  - Totals, a 30-day chart and top referrers appear in **Publish**.
+- **SEO.**
+  - Published pages get a title, description, canonical URL and Open Graph/Twitter tags, plus `robots.txt` and `sitemap.xml`.
+  - If no share image is set, Kairoq takes a 1200×630 screenshot when you publish.
+
+## Scale and operations
+
+- **Parallel builds.** Vite builds run in worker threads (`KAIROQ_BUILD_WORKERS`, default 2), so several projects build at once without blocking the server. A build that exceeds `KAIROQ_BUILD_TIMEOUT_MS` is stopped by terminating its worker.
+- **Backups.**
+  - Every day, `VACUUM INTO` writes consistent copies of the accounts database and each app's database, plus the hosting registry, to `workspace/backups/<timestamp>/`.
+  - Backups are kept for `KAIROQ_BACKUP_DAYS` (default 7).
+  - The owner can run one on demand (`POST /api/create/admin/backup`) and see build, job and account counts (`GET /api/create/admin/status`).
+  - These backups live on the same volume, so also enable Railway volume backups, or copy the folder off-site.
+- **Rate limits** use the last `X-Forwarded-For` entry (the one Railway's proxy adds), so clients can't spoof their address to get around them.
+- **Postgres.** Everything is SQLite on the Railway volume today, which suits one server. To run several servers, move accounts and app data to Postgres, and builds and projects to shared storage. The data access is isolated in `builder-accounts.js`, `react-backend.js` and `react-analytics.js`, which keeps that move contained.
 
 ## Checking real-model quality
 

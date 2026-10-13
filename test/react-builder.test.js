@@ -245,7 +245,7 @@ test('the app backend enforces sign-in, per-user privacy and declared collection
   assert.equal((await request(s,'GET','/api/create/projects/'+meta.id+'/data')).json.collections[0].count,0);
   // A custom domain reaches only its own app's backend.
   hosting.publish(meta.id,{slug:'tasks-app'});
-  const {domain}=hosting.addDomain(meta.id,'tasks.example.com');
+  const {domain}=await hosting.addDomain(meta.id,'tasks.example.com');
   await hosting.verifyDomain(meta.id,'tasks.example.com',{resolveTxt:async()=>[['kairoq-verify='+domain.token]]});
   assert.equal((await request(s,'GET',base+'/collections/messages',{headers:{host:'tasks.example.com'}})).json.items.length,1);
   const other=builder.create({name:'Other',owner:'owner'});

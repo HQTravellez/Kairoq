@@ -9,7 +9,7 @@ async function api(path,{method='GET',body}={}){
  if(!r.ok)throw Object.assign(new Error(data.error||'Request failed ('+r.status+')'),{status:r.status});
  return data;
 }
-function show(screen){for(const id of ['auth','home','editor'])$(id).classList.toggle('hidden',id!==screen);$('bar-project').classList.toggle('hidden',screen!=='editor')}
+function show(screen){for(const id of ['auth','home','editor','share-screen'])$(id).classList.toggle('hidden',id!==screen);$('bar-project').classList.toggle('hidden',screen!=='editor')}
 function text(el,value){el.textContent=value==null?'':String(value)}
 function when(iso){try{return new Date(iso).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}catch{return''}}
 
@@ -27,8 +27,10 @@ function renderCredits(account){
  const customer=Boolean(account);
  $('credits').classList.toggle('hidden',!customer);
  $('buy').classList.toggle('hidden',!customer||!state.me?.purchases);
- if(customer)text($('credits'),account.credits+' credit'+(account.credits===1?'':'s'));
+ $('plans-open').classList.toggle('hidden',!customer||!state.me?.subscriptions);
+ if(customer)text($('credits'),account.credits+' credit'+(account.credits===1?'':'s')+(account.plan?' · '+planName(account.plan):''));
 }
+function planName(id){return(state.me?.plans||[]).find(p=>p.id===id)?.name||id}
 function setMode(mode){
  state.mode=mode;
  $('tab-signup').setAttribute('aria-selected',String(mode==='signup'));
@@ -51,6 +53,7 @@ $('logout').onclick=async()=>{await api('/logout',{method:'POST'}).catch(()=>{})
 // ---------- home ----------
 async function loadHome(){
  show('home');history.replaceState(null,'','/create');
+ renderTemplates($('home-templates'),id=>startFromTemplate(id));
  const {projects}=await api('/projects');
  const list=$('projects');list.replaceChildren();
  if(!projects.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects yet. Describe one above.';list.append(li);return}
@@ -59,6 +62,7 @@ async function loadHome(){
   open.type='button';open.className='open';open.textContent=p.name;open.onclick=()=>openProject(p.id);
   meta.className='meta';meta.textContent='v'+p.current_version+' · '+when(p.updated_at);
   li.append(open,meta);
+  if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
   if(p.published){const b=document.createElement('span');b.className='badge live';b.textContent='Live';li.append(b)}
   list.append(li);
  }
@@ -81,7 +85,9 @@ async function openProject(id,{pendingText,job}={}){
  state.project=project;
  if(account)renderCredits(account);
  show('editor');history.replaceState(null,'','/create?project='+id);
+ applyRole();
  $('project-name').value=project.name;
+ renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
  renderVersions();
  setPreview(project.preview_url);
@@ -92,14 +98,18 @@ async function openProject(id,{pendingText,job}={}){
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
  const msgs=state.project.messages;
- if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. I will edit the code and refresh the preview.';list.append(li)}
- for(const m of msgs)list.append(messageItem(m.role,m.text,m.changed));
- if(pendingText)list.append(messageItem('user',pendingText));
+ if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. Switch to Discuss to plan without changing code.';list.append(li)}
+ msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1)));
+ if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
  list.scrollTop=list.scrollHeight;
+ renderErrors();
 }
-function messageItem(role,body,changed){
- const li=document.createElement('li');li.className=role;li.textContent=body;
- if(changed&&changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+changed.join(', ');li.append(s)}
+function messageItem(m,last){
+ const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
+ const body=document.createElement('div');body.textContent=m.text;li.append(body);
+ if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
+ if(m.changed&&m.changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+m.changed.join(', ');li.append(s)}
+ if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>send('Implement the plan you just described.','build');li.append(b)}
  return li;
 }
 function renderVersions(){
@@ -107,7 +117,7 @@ function renderVersions(){
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
-function setPreview(url){if(!url)return;$('frame').src=url;$('open').href=url}
+function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url}
 $('versions').onchange=()=>setPreview(previewFor($('versions').value));
 $('restore').onclick=async()=>{
  const n=Number($('versions').value);if(n===state.project.current_version)return;
@@ -133,6 +143,12 @@ async function renderData(){
  if(!d.collections.some(c=>c.name===state.collection))state.collection=d.collections[0]?.name;
  for(const c of d.collections){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.textContent=c.name+' ('+c.count+') · '+c.access;b.setAttribute('aria-current',String(c.name===state.collection));b.onclick=()=>{state.collection=c.name;renderData()};li.append(b);list.append(li)}
  text($('user-count'),'('+d.user_count+')');
+ const feats=[];
+ if(d.features.storage)feats.push('Files: '+d.files.n+' ('+Math.round(d.files.bytes/1024)+' KB)');
+ if(d.features.email)feats.push('Email on');
+ if(d.features.payments.length)feats.push('Payments: '+d.payments.length+' purchase'+(d.payments.length===1?'':'s')+' of '+d.features.payments.join(', '));
+ for(const sc of d.features.schedules)feats.push('Schedule "'+sc.name+'" every '+sc.every+(sc.last_result?' · last: '+sc.last_result:''));
+ text($('data-features'),feats.join(' · '));
  const users=$('users');users.replaceChildren();
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
@@ -155,48 +171,182 @@ async function renderFiles(){
  if(state.file){const {content}=await api('/projects/'+state.project.id+'/file?path='+encodeURIComponent(state.file));text($('file-view').firstChild,content)}
 }
 
+// ---------- chat ----------
+state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
 $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('chat-form').requestSubmit()}});
-$('chat-form').onsubmit=async e=>{
- e.preventDefault();
- const message=$('chat-input').value.trim();if(!message||state.job)return;
+function setChatMode(mode){state.mode=mode;$('mode-build').setAttribute('aria-pressed',String(mode==='build'));$('mode-discuss').setAttribute('aria-pressed',String(mode==='discuss'));$('chat-input').placeholder=mode==='discuss'?'Ask a question or plan a feature. No code changes, no surprises.':'Ask for a change: add a pricing section, make the header sticky…';text($('send'),mode==='discuss'?'Ask':'Send');costHint()}
+$('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');
+function renderTiers(){
+ const sel=$('tier');sel.replaceChildren();
+ for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+' · '+t.credits+' credit'+(t.credits===1?'':'s')+(t.enabled?'':' (not enabled)');if(t.id===state.tier)o.selected=true;sel.append(o)}
+ costHint();
+}
+$('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
+function costHint(){
+ if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');return}
+ const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
+ const n=(state.mode==='discuss'?state.me.discuss_credits:(t?t.credits:1))+(state.attachments.length?state.me.image_credits:0);
+ text($('cost-hint'),n+' credit'+(n===1?'':'s'));
+}
+// Attachments: button, paste or drop.
+$('attach').onclick=()=>$('attach-input').click();
+$('attach-input').onchange=()=>{addFiles($('attach-input').files);$('attach-input').value=''};
+$('chat-input').addEventListener('paste',e=>{const files=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith('image/'));if(files.length){e.preventDefault();addFiles(files)}});
+$('chat-form').addEventListener('dragover',e=>e.preventDefault());
+$('chat-form').addEventListener('drop',e=>{e.preventDefault();addFiles(e.dataTransfer.files)});
+async function addFiles(files){
  text($('chat-error'),'');
- $('messages').append(messageItem('user',message));$('messages').scrollTop=$('messages').scrollHeight;
- $('chat-input').value='';
- try{const {job}=await api('/projects/'+state.project.id+'/chat',{method:'POST',body:{message}});watch(job)}
+ for(const f of [...files]){
+  if(state.attachments.length>=4){text($('chat-error'),'Attach up to 4 images.');break}
+  if(!/^image\/(png|jpeg|webp|gif)$/.test(f.type)){text($('chat-error'),f.name+': use PNG, JPEG, WebP or GIF.');continue}
+  if(f.size>3*1024*1024){text($('chat-error'),f.name+' is larger than 3 MB.');continue}
+  const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
+  state.attachments.push({name:f.name||'pasted.png',dataUrl});
+ }
+ renderAttachments();
+}
+function renderAttachments(){
+ const wrap=$('attachments');wrap.replaceChildren();
+ state.attachments.forEach((a,i)=>{const fig=document.createElement('figure');const img=document.createElement('img');img.src=a.dataUrl;img.alt=a.name;const x=document.createElement('button');x.type='button';x.textContent='×';x.setAttribute('aria-label','Remove '+a.name);x.onclick=()=>{state.attachments.splice(i,1);renderAttachments()};fig.append(img,x);wrap.append(fig)});
+ wrap.classList.toggle('hidden',!state.attachments.length);costHint();
+}
+$('chat-form').onsubmit=e=>{e.preventDefault();const message=$('chat-input').value.trim();if(message)send(message,state.mode)};
+async function send(message,mode,path='/chat',extra={}){
+ if(state.job)return;
+ text($('chat-error'),'');
+ const images=state.attachments.map(a=>({name:a.name,dataUrl:a.dataUrl}));
+ $('messages').append(messageItem({role:'user',text:message,mode,images:images.map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
+ $('chat-input').value='';state.attachments=[];renderAttachments();
+ try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,images:images.length?images:undefined,...extra}});watch(job)}
  catch(err){
-  $('messages').append(messageItem('assistant failed',err.message));
+  $('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));
   if(err.status===402&&state.me.purchases)openBuy();
  }
-};
-const LABELS={queued:'Starting…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…'};
+}
+const LABELS={queued:'Starting…',thinking:'Thinking…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
+function streamItem(){
+ let li=$('stream');
+ if(!li){li=document.createElement('li');li.id='stream';li.className='assistant streaming';li.innerHTML='<div class="stream-msg"></div><div class="stream-files changed"></div><pre class="stream-code hidden"></pre>';$('messages').append(li)}
+ return li;
+}
+function renderStream(job){
+ const st=job.stream;
+ if(!st){$('stream')?.remove();return}
+ const li=streamItem();
+ if(job.mode==='discuss'){text(li.querySelector('.stream-msg'),st.text);}
+ else{
+  text(li.querySelector('.stream-msg'),st.message||'Planning the change…');
+  text(li.querySelector('.stream-files'),st.files&&st.files.length?'Writing '+st.files.join(', '):'');
+  const pre=li.querySelector('.stream-code');pre.classList.toggle('hidden',!st.tail);
+  pre.textContent=String(st.tail||'').replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-14).join('\n');
+ }
+ $('messages').scrollTop=$('messages').scrollHeight;
+}
 async function watch(job){
- state.job=job;busy(true,LABELS[job.status]);
- refreshCredits();
+ state.job=job;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
- while(state.job&&state.job.id===job.id){
-  await new Promise(r=>setTimeout(r,1500));
-  let current;
-  try{current=(await api('/jobs/'+job.id)).job}catch(err){text($('chat-error'),err.message);break}
-  text($('progress-text'),LABELS[current.status]||'Working…');
-  if(current.status==='complete'||current.status==='failed'){
-   if(state.project&&state.project.id===id){
-    const {project,account}=await api('/projects/'+id);
-    state.project=project;if(account)renderCredits(account);
-    renderMessages();renderVersions();setPreview(project.preview_url);
-    if(current.status==='failed')$('messages').append(messageItem('assistant failed',current.error+'\nYour credit was refunded.'));
-    if(state.code)renderFiles();
-    if(state.data)renderData();
+ const done=await new Promise(resolve=>{
+  let finished=false;
+  const finish=j=>{if(!finished){finished=true;resolve(j)}};
+  const apply=j=>{text($('progress-text'),LABELS[j.status]||'Working…');renderStream(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  if(window.EventSource){
+   const es=new EventSource('/api/create/jobs/'+job.id+'/events');
+   es.onmessage=e=>{const j=JSON.parse(e.data);apply(j);if(j.status==='complete'||j.status==='failed')es.close()};
+   es.onerror=()=>{es.close();poll()};
+  }else poll();
+  async function poll(){
+   while(!finished){
+    await new Promise(r=>setTimeout(r,1000));
+    try{apply((await api('/jobs/'+job.id)).job)}catch(err){text($('chat-error'),err.message);finish(null)}
    }
-   break;
   }
+ });
+ $('stream')?.remove();
+ if(done&&state.project&&state.project.id===id){
+  const {project,account}=await api('/projects/'+id);
+  state.project=project;if(account)renderCredits(account);
+  state.runtimeErrors=[];
+  renderMessages();renderVersions();
+  if(done.mode!=='discuss')setPreview(project.preview_url);
+  if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
+  if(state.code)renderFiles();
+  if(state.data)renderData();
  }
  state.job=null;busy(false);
 }
-function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;if(label)text($('progress-text'),label)}
+function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;$('fix').disabled=on;if(label)text($('progress-text'),label)}
 async function refreshCredits(){try{const v=await loadMe();if(v&&v.account)renderCredits(v.account)}catch{}}
 
+// ---------- visual edits ----------
+state.selecting=false;
+function postFrame(msg){try{$('frame').contentWindow.postMessage({source:'kairoq-editor',...msg},'*')}catch{}}
+$('frame').addEventListener('load',()=>{if(state.selecting)setTimeout(()=>postFrame({type:'select-mode',on:true}),300)});
+function previewVersion(){return Number($('versions').value)||state.project.current_version}
+$('visual-toggle').onclick=()=>{
+ state.selecting=!state.selecting;
+ if(state.selecting&&previewVersion()!==state.project.current_version){$('versions').value=state.project.current_version;setPreview(state.project.preview_url)}
+ if(state.selecting)view('preview');
+ $('visual-toggle').setAttribute('aria-pressed',String(state.selecting));
+ postFrame({type:'select-mode',on:state.selecting});
+ state.selected=null;renderVisual();
+};
+$('visual-cancel').onclick=()=>{state.selecting=false;$('visual-toggle').setAttribute('aria-pressed','false');postFrame({type:'select-mode',on:false});state.selected=null;renderVisual()};
+const COLORS=[['slate-900','#0f172a'],['white','#ffffff'],['rose-600','#e11d48'],['amber-500','#f59e0b'],['emerald-600','#059669'],['sky-600','#0284c7'],['indigo-600','#4f46e5'],['violet-600','#7c3aed']];
+function renderVisual(){
+ $('visual-panel').classList.toggle('hidden',!state.selecting);
+ $('chat-form').classList.toggle('hidden',state.selecting);
+ const el=state.selected;
+ $('visual-fields').classList.toggle('hidden',!el);
+ text($('visual-hint'),el?'Editing this element. Click another element to switch.':'Click any element in the preview to edit it. Visual edits are free.');
+ text($('visual-error'),'');
+ if(!el)return;
+ text($('visual-tag'),'<'+el.tag+'>');
+ $('visual-text').value=el.text??'';$('visual-text').disabled=!el.text_editable;
+ text($('visual-text-label').firstChild,el.text_editable?'Text':'Text (set by code: ask the AI to change it)');
+ $('visual-class').value=el.class_name??'';$('visual-class').disabled=el.class_name===null;
+ $('visual-image').classList.toggle('hidden',el.tag!=='img');
+ $('visual-src').value=el.src??'';$('visual-alt').value=el.alt??'';
+ const sw=$('swatches');sw.replaceChildren();
+ for(const kind of ['text','bg']){const lab=document.createElement('span');lab.className='muted small swatch-label';lab.textContent=kind==='bg'?'Background':'Text';sw.append(lab);for(const [name,hex] of COLORS){const b=document.createElement('button');b.type='button';b.style.background=hex;b.title=kind+'-'+name;b.setAttribute('aria-label',(kind==='bg'?'Background ':'Text ')+name);if(kind==='bg')b.style.borderRadius='4px';b.onclick=()=>{const re=kind==='bg'?/\bbg-[a-z]+(-\d+)?\b/g:/\btext-(?:white|black|[a-z]+-\d+)\b/g;$('visual-class').value=($('visual-class').value.replace(re,'').trim()+' '+kind+'-'+name).trim()};sw.append(b)}}
+ if(el.tag==='img')api('/projects/'+state.project.id+'/assets').then(({assets})=>{const sel=$('visual-uploads');sel.replaceChildren(new Option('Use an uploaded image…',''));for(const a of assets)sel.append(new Option(a.name,a.path))}).catch(()=>{});
+}
+$('visual-uploads').onchange=()=>{if($('visual-uploads').value)$('visual-src').value=$('visual-uploads').value};
+$('visual-panel').onsubmit=async e=>{
+ e.preventDefault();const el=state.selected;if(!el)return;
+ const changes={};
+ if(el.text_editable&&$('visual-text').value!==(el.text??''))changes.text=$('visual-text').value;
+ if(el.class_name!==null&&$('visual-class').value!==(el.class_name??''))changes.className=$('visual-class').value;
+ if(el.tag==='img'){if($('visual-src').value!==(el.src??''))changes.src=$('visual-src').value;if($('visual-alt').value!==(el.alt??''))changes.alt=$('visual-alt').value}
+ if(!Object.keys(changes).length){text($('visual-error'),'Nothing changed yet.');return}
+ $('visual-apply').disabled=true;
+ try{
+  const {project}=await api('/projects/'+state.project.id+'/visual',{method:'POST',body:{loc:el.loc,version:state.project.current_version,changes}});
+  state.project=project;state.selected=null;renderMessages();renderVersions();setPreview(project.preview_url);
+ }catch(err){text($('visual-error'),err.message)}
+ finally{$('visual-apply').disabled=false}
+};
+
+// ---------- runtime errors from the preview ----------
+window.addEventListener('message',e=>{
+ if(e.source!==$('frame').contentWindow||!e.data||e.data.source!=='kairoq-app')return;
+ if(e.data.type==='select'&&state.selecting){api('/projects/'+state.project.id+'/inspect',{method:'POST',body:{loc:e.data.loc,version:previewVersion()}}).then(({element})=>{state.selected={...element,loc:e.data.loc};renderVisual()}).catch(err=>{state.selected=null;renderVisual();text($('visual-error'),err.message)});return}
+ if(e.data.type==='runtime-error'){const msg=String(e.data.message||'').slice(0,800);if(msg&&!state.runtimeErrors.includes(msg)&&state.runtimeErrors.length<10){state.runtimeErrors.push(msg);renderErrors()}}
+});
+function currentVersionErrors(){return state.project?.versions.find(v=>v.n===state.project.current_version)?.runtime_errors||[]}
+function renderErrors(){
+ const errors=[...new Set([...state.runtimeErrors,...currentVersionErrors()])];
+ $('errors').classList.toggle('hidden',!errors.length);
+ text($('errors-count'),errors.length+' problem'+(errors.length===1?'':'s')+' found while running the app');
+ const list=$('errors-list');list.replaceChildren();
+ for(const e of errors){const li=document.createElement('li');li.textContent=e;list.append(li)}
+}
+$('fix').onclick=()=>{
+ const errors=[...new Set([...state.runtimeErrors,...currentVersionErrors()])];
+ if(errors.length)send('Fix the problems found while running the app.','build','/fix',{errors});
+};
+
 // ---------- publish & domains ----------
-$('publish-open').onclick=()=>{renderPublish();$('publish-dialog').showModal()};
+$('publish-open').onclick=()=>{renderPublish();renderInsights().catch(()=>{});$('publish-dialog').showModal()};
 function slugFrom(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)}
 function renderPublish(){
  const p=state.project;
@@ -214,11 +364,12 @@ function renderPublish(){
   const li=document.createElement('li'),head=document.createElement('div');
   head.className='row';head.style.marginTop='0';
   const name=document.createElement('strong');name.textContent=d.hostname;name.style.flex='1';
-  const badge=document.createElement('span');badge.className='badge'+(d.verified?' live':'');badge.textContent=d.verified?'Connected':'Waiting for DNS';
+  const badge=document.createElement('span');badge.className='badge'+(d.verified?' live':'');badge.textContent=d.verified?(d.https==='manual'?'Connected · add in Railway for HTTPS':d.https&&/VALID|ISSUED/i.test(d.https)?'Connected · HTTPS':'Connected'):'Waiting for DNS';
   head.append(name,badge);
   if(!d.verified){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent='Verify';b.onclick=()=>domainAction('/verify','POST',d.hostname);head.append(b)}
   const rm=document.createElement('button');rm.type='button';rm.className='ghost';rm.textContent='Remove';rm.onclick=()=>domainAction('/domains','DELETE',d.hostname);head.append(rm);
   li.append(head);
+  if(d.railway_error){const p=document.createElement('p');p.className='error small';p.textContent='Automatic HTTPS setup failed: '+d.railway_error;li.append(p)}
   if(!d.verified){
    const dns=document.createElement('div');dns.className='dns';
    const intro=document.createElement('span');intro.className='muted';intro.textContent='Add these records at your domain provider:';dns.append(intro);
@@ -243,6 +394,53 @@ async function domainAction(path,method,hostname){
  catch(err){text($('publish-error'),err.message)}
 }
 
+// ---------- settings: code, GitHub, Stripe ----------
+$('settings-open').onclick=async()=>{
+ text($('settings-error'),'');text($('gh-status'),'');
+ $('download').href='/api/create/projects/'+state.project.id+'/download';
+ try{
+  const [{settings},gh]=await Promise.all([api('/projects/'+state.project.id+'/settings'),api('/projects/'+state.project.id+'/github')]);
+  const st=settings.secrets;
+  text($('stripe-key-status'),st.stripe_secret_key?'(saved '+st.stripe_secret_key.hint+')':'');
+  text($('stripe-hook-status'),st.stripe_webhook_secret?'(saved '+st.stripe_webhook_secret.hint+')':'');
+  text($('gh-token-status'),gh.token?'(saved '+gh.token.hint+')':gh.owner_fallback?'(using the server GITHUB_TOKEN)':'');
+  text($('stripe-hook-url'),settings.stripe_webhook_url);text($('stripe-events'),settings.stripe_events.join(', '));
+  text($('email-status'),settings.email?'Email is set up. Apps can notify you with email.send({to:"owner", …}).':'Email is not set up on this server yet (KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM).');
+  $('gh-repo').value=gh.github?.repo||'';
+  if(gh.github?.last_push)text($('gh-status'),'Last push: version '+gh.github.last_push.version+' · '+when(gh.github.last_push.at));
+  if(!settings.encryption)text($('settings-error'),'Saving keys needs APP_ENCRYPTION_KEY on the server.');
+ }catch(err){text($('settings-error'),err.message)}
+ $('settings-dialog').showModal();
+};
+async function saveSecrets(fields){
+ const body={};for(const [id,name] of fields){const v=$(id).value.trim();if(v)body[name]=v}
+ if(!Object.keys(body).length)return;
+ await api('/projects/'+state.project.id+'/settings',{method:'POST',body});
+ for(const [id] of fields)$(id).value='';
+}
+$('settings-save').onclick=async()=>{
+ text($('settings-error'),'');
+ try{await saveSecrets([['stripe-key','stripe_secret_key'],['stripe-hook','stripe_webhook_secret']]);$('settings-open').click()}catch(err){text($('settings-error'),err.message)}
+};
+$('gh-push').onclick=async()=>{
+ text($('settings-error'),'');text($('gh-status'),'Pushing…');$('gh-push').disabled=true;
+ try{
+  await saveSecrets([['gh-token','github_token']]);
+  const {result}=await api('/projects/'+state.project.id+'/push',{method:'POST',body:{repo:$('gh-repo').value}});
+  $('gh-status').replaceChildren(document.createTextNode(result.unchanged?'Already up to date. ':'Pushed. '),Object.assign(document.createElement('a'),{href:result.url,target:'_blank',rel:'noopener',textContent:'Open on GitHub ↗'}));
+ }catch(err){text($('gh-status'),'');text($('settings-error'),err.message)}
+ finally{$('gh-push').disabled=false}
+};
+$('gh-pull').onclick=async()=>{
+ text($('settings-error'),'');text($('gh-status'),'Pulling…');$('gh-pull').disabled=true;
+ try{
+  const {result,project}=await api('/projects/'+state.project.id+'/pull',{method:'POST'});
+  if(result.unchanged)text($('gh-status'),'No changes on GitHub.');
+  else{text($('gh-status'),'Pulled '+result.changed.length+' changed file'+(result.changed.length===1?'':'s')+' as version '+result.version+'.');state.project=project;renderMessages();renderVersions();setPreview(project.preview_url)}
+ }catch(err){text($('gh-status'),'');text($('settings-error'),err.message)}
+ finally{$('gh-pull').disabled=false}
+};
+
 // ---------- credits ----------
 $('buy').onclick=()=>openBuy();
 function openBuy(){
@@ -259,9 +457,133 @@ function openBuy(){
 }
 
 // ---------- start ----------
+// ---------- landing, templates, plans ----------
+function setPending(p){try{sessionStorage.setItem('kairoq-pending',JSON.stringify(p))}catch{}state.pending=p}
+function takePending(){let p=state.pending;try{p=p||JSON.parse(sessionStorage.getItem('kairoq-pending')||'null');sessionStorage.removeItem('kairoq-pending')}catch{}state.pending=null;return p}
+async function renderTemplates(wrap,onPick){
+ if(!state.templates)state.templates=(await api('/templates')).templates;
+ wrap.replaceChildren();
+ for(const t of state.templates){
+  const b=document.createElement('button');b.type='button';
+  b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:t.category}),Object.assign(document.createElement('strong'),{textContent:t.name}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description}));
+  b.onclick=()=>onPick(t.id);wrap.append(b);
+ }
+}
+async function startFromTemplate(id){
+ text($('home-error'),'');
+ try{const {project}=await api('/projects',{method:'POST',body:{template:id}});await openProject(project.id)}catch(err){text($('home-error'),err.message)}
+}
+function planCard(title,price,lines,action){
+ const card=document.createElement('div');card.className='plan';
+ card.append(Object.assign(document.createElement('h3'),{textContent:title}),Object.assign(document.createElement('span'),{className:'price',textContent:price}));
+ const ul=document.createElement('ul');for(const l of lines)ul.append(Object.assign(document.createElement('li'),{textContent:l}));card.append(ul);
+ if(action)card.append(action);
+ return card;
+}
+function renderLanding(){
+ renderTemplates($('landing-templates'),id=>{setPending({template:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()}).catch(()=>{});
+ const wrap=$('landing-plans');wrap.replaceChildren();
+ const per=(state.me.tiers||[]).map(t=>t.label+' '+t.credits+' credit'+(t.credits===1?'':'s')).join(', ');
+ wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a free URL','No card needed']));
+ for(const p of state.me.plans||[])wrap.append(planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features]));
+ for(const p of state.me.packs||[])wrap.append(planCard(p.name,p.label||p.credits+' credits',[p.credits+' credits, one-time','Never expire']));
+ text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. Failed changes are refunded.');
+}
+$('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+$('plans-open').onclick=()=>{
+ text($('plans-error'),'');
+ const account=state.me.viewer?.account||{};
+ text($('plan-current'),account.plan?'Current plan: '+planName(account.plan)+' ('+(account.plan_status||'active')+')'+(account.plan_renews_at?' · renews '+when(account.plan_renews_at):''):'You are on the free plan.');
+ const wrap=$('plans-list');wrap.replaceChildren();
+ for(const p of state.me.plans||[]){
+  const btn=Object.assign(document.createElement('button'),{type:'button',className:'primary',textContent:account.plan===p.id?'Current plan':'Choose '+p.name});
+  btn.disabled=account.plan===p.id;
+  btn.onclick=async()=>{btn.disabled=true;try{const {url}=await api('/subscribe',{method:'POST',body:{plan:p.id}});location.href=url}catch(err){text($('plans-error'),err.message);btn.disabled=false}};
+  const card=planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features],btn);if(account.plan===p.id)card.classList.add('current');wrap.append(card);
+ }
+ $('billing').classList.toggle('hidden',!account.billing);
+ $('plans-dialog').showModal();
+};
+$('billing').onclick=async()=>{try{const {url}=await api('/billing',{method:'POST'});location.href=url}catch(err){text($('plans-error'),err.message)}};
+
+// ---------- roles, sharing, team ----------
+function applyRole(){
+ const role=state.project.role||'owner';
+ document.body.classList.toggle('readonly',role==='viewer');
+ for(const id of ['team-open','settings-open'])$(id).classList.toggle('hidden',role!=='owner');
+}
+$('team-open').onclick=()=>{renderTeam();$('team-dialog').showModal()};
+function renderTeam(){
+ text($('team-error'),'');
+ const p=state.project,list=$('members');list.replaceChildren();
+ for(const m of p.members||[]){
+  const li=document.createElement('li'),row=document.createElement('div');row.className='row';row.style.marginTop='0';
+  const who=Object.assign(document.createElement('span'),{textContent:m.email});who.style.flex='1';
+  const role=Object.assign(document.createElement('span'),{className:'role-badge',textContent:m.role});
+  const rm=Object.assign(document.createElement('button'),{type:'button',className:'ghost',textContent:'Remove'});
+  rm.onclick=()=>teamCall('/members','DELETE',{email:m.email});
+  row.append(who,role,rm);li.append(row);list.append(li);
+ }
+ $('share-on').checked=!!p.share;$('share-remix').checked=!!p.share?.remix;$('share-remix').disabled=!p.share;
+ $('share-link-row').classList.toggle('hidden',!p.share);
+ if(p.share)$('share-link').value=location.origin+p.share.url;
+}
+async function teamCall(path,method,body){
+ text($('team-error'),'');
+ try{const r=await api('/projects/'+state.project.id+path,{method,body});if(r.project)state.project=r.project;renderTeam()}catch(err){text($('team-error'),err.message)}
+}
+$('member-add').onclick=async()=>{await teamCall('/members','POST',{email:$('member-email').value,role:$('member-role').value});if(!$('team-error').textContent)$('member-email').value=''};
+$('share-on').onchange=()=>teamCall('/share','POST',{enabled:$('share-on').checked,remix:$('share-remix').checked});
+$('share-remix').onchange=()=>teamCall('/share','POST',{enabled:true,remix:$('share-remix').checked});
+$('share-copy').onclick=()=>{navigator.clipboard?.writeText($('share-link').value).then(()=>text($('share-copy'),'Copied')).catch(()=>{$('share-link').select()})};
+async function openShare(token,v){
+ show('share-screen');
+ try{
+  const {share}=await api('/share/'+token);
+  text($('share-name'),share.name);document.title=share.name+' · Kairoq Create';
+  $('share-frame').src=share.preview_url;
+  $('remix').classList.toggle('hidden',!share.remix);
+  $('remix').onclick=()=>{if(!v){setPending({remix:token});location.href='/create#signup';return}remix(token)};
+ }catch(err){text($('share-error'),err.message);$('remix').classList.add('hidden')}
+}
+async function remix(token){
+ try{const {project}=await api('/remix',{method:'POST',body:{token}});await openProject(project.id)}
+ catch(err){show('share-screen');text($('share-error'),err.message)}
+}
+
+// ---------- analytics & SEO (publish dialog) ----------
+async function renderInsights(){
+ const p=state.project;
+ $('seo-title').value=p.seo?.title||'';$('seo-description').value=p.seo?.description||'';$('seo-image').value=p.seo?.image||'';text($('seo-status'),'');
+ $('analytics').classList.toggle('hidden',!p.published);
+ if(!p.published)return;
+ const {analytics:a}=await api('/projects/'+p.id+'/analytics');
+ text($('an-views'),a.totals.views.toLocaleString());text($('an-visitors'),a.totals.visitors.toLocaleString());
+ const bars=$('an-bars'),max=Math.max(1,...a.series.map(d=>d.views));bars.replaceChildren();
+ bars.setAttribute('aria-label','Daily page views: '+a.series.filter(d=>d.views).map(d=>d.day+' '+d.views).join(', ')||'none yet');
+ for(const d of a.series){const s=document.createElement('span');s.style.height=Math.max(d.views?6:1,Math.round(d.views/max*100))+'%';if(!d.views)s.style.opacity='.25';s.tabIndex=-1;
+  const tip=new Date(d.day+'T00:00:00Z').toLocaleDateString([], {month:'short',day:'numeric',timeZone:'UTC'})+': '+d.views+' view'+(d.views===1?'':'s')+', '+d.visitors+' visitor'+(d.visitors===1?'':'s');
+  s.onmouseenter=()=>{$('an-tip').classList.remove('hidden');text($('an-tip'),tip)};bars.append(s)}
+ bars.onmouseleave=()=>$('an-tip').classList.add('hidden');
+ const refs=$('an-referrers');refs.replaceChildren();
+ for(const r of a.referrers)refs.append(Object.assign(document.createElement('li'),{textContent:r.referrer+' · '+r.views}));
+}
+$('seo-save').onclick=async()=>{
+ try{const {project}=await api('/projects/'+state.project.id+'/seo',{method:'POST',body:{title:$('seo-title').value,description:$('seo-description').value,image:$('seo-image').value}});state.project=project;text($('seo-status'),'Saved. Applies to the live site right away.')}
+ catch(err){text($('seo-status'),err.message)}
+};
+
 async function start(){
  const v=await loadMe();
- if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);return}
+ const share=/^\/create\/share\/([a-f0-9]{24})\/?$/.exec(location.pathname);
+ if(share)return openShare(share[1],v);
+ if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}
+ const pending=takePending();
+ if(pending){
+  if(pending.remix)return remix(pending.remix);
+  try{const {project,job}=await api('/projects',{method:'POST',body:pending.template?{template:pending.template}:{prompt:pending.prompt}});return openProject(project.id,{pendingText:pending.prompt,job})}catch(err){await loadHome();text($('home-error'),err.message);return}
+ }
+ if(new URLSearchParams(location.search).get('purchase')==='success')setTimeout(refreshCredits,3000);
  const params=new URLSearchParams(location.search);
  const id=params.get('project');
  if(id&&/^[a-f0-9]{12}$/.test(id)){try{return await openProject(id)}catch{}}
