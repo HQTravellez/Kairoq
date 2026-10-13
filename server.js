@@ -20,6 +20,7 @@ const PORT = Number(process.env.PORT || 3002);
 const SITE_NAME = process.env.SITE_NAME || "Kairoq";
 const PUBLIC_DIR = path.join(__dirname, "public");
 const OR_CHAT = "https://openrouter.ai/api/v1/chat/completions";
+const reactBuilder=require("./react-builder"),reactBackend=require("./react-backend"),reactHosting=require("./react-hosting"),createApi=require("./create-api");
 const OR_MODELS = "https://openrouter.ai/api/v1/models";
 const OR_KEY = "https://openrouter.ai/api/v1/key";
 const ZERO_COST_MODE = String(process.env.ZERO_COST_MODE || "true").toLowerCase() !== "false";
@@ -238,11 +239,11 @@ function sanitizeAuditData(data){
 }
 async function audit(type,data={}){
   const event={id:crypto.randomUUID(),type,at:new Date().toISOString(),data:sanitizeAuditData(data)};
-  try{fs.appendFileSync(AUDIT_FILE,JSON.stringify(event)+"\\n","utf8")}catch{}
+  try{fs.appendFileSync(AUDIT_FILE,JSON.stringify(event)+"\n","utf8")}catch{}
   if(cloudConfigured()){try{await fetchWithRetry(`${SUPABASE_URL}/rest/v1/ai_audit_log`,{method:"POST",headers:supabaseHeaders(),body:JSON.stringify({id:event.id,owner_id:MEMORY_OWNER_ID,event,created_at:event.at})},{retries:2})}catch{}}
   return event;
 }
-function readLocalJsonLines(file,limit=500){try{if(!fs.existsSync(file))return[];return fs.readFileSync(file,"utf8").trim().split(/\\n+/).filter(Boolean).slice(-limit).reverse().map(JSON.parse)}catch{return[]}}
+function readLocalJsonLines(file,limit=500){try{if(!fs.existsSync(file))return[];const rows=[];for(const line of fs.readFileSync(file,"utf8").split(/\r?\n/)){for(const part of line.split(/(?<=\})\\n(?=\{)/)){if(!part.trim())continue;try{rows.push(JSON.parse(part))}catch{}}}return rows.slice(-limit).reverse()}catch{return[]}}
 async function getAuditEvents(limit=200){
   if(cloudConfigured()){try{const u=`${SUPABASE_URL}/rest/v1/ai_audit_log?owner_id=eq.${encodeURIComponent(MEMORY_OWNER_ID)}&select=event&order=created_at.desc&limit=${Math.min(500,limit)}`;const r=await fetchWithRetry(u,{headers:supabaseHeaders()},{retries:2});const d=await r.json().catch(()=>[]);if(r.ok)return(d||[]).map(x=>x.event).filter(Boolean)}catch{}}
   return readLocalJsonLines(AUDIT_FILE,limit);
@@ -261,7 +262,7 @@ async function toolPermission(name){return(await loadToolPermissions())[name]||"
 function requestRateKey(req){return String(req.headers["x-forwarded-for"]||"").split(",")[0].trim()||req.socket?.remoteAddress||"local"}
 function enforceRateLimit(req){if(!(REQUESTS_PER_MINUTE>0))return;const k=requestRateKey(req),now=Date.now(),a=(rateBuckets.get(k)||[]).filter(t=>now-t<60000);if(a.length>=REQUESTS_PER_MINUTE){const e=new Error("Rate limit exceeded. Try again shortly.");e.statusCode=429;throw e}a.push(now);rateBuckets.set(k,a)}
 async function recordUsage(usage={},context={}){const cost=Number(usage.cost??usage.total_cost??0),r={id:crypto.randomUUID(),at:new Date().toISOString(),cost:Number.isFinite(cost)?cost:0,prompt_tokens:Number(usage.prompt_tokens||usage.input_tokens||0),completion_tokens:Number(usage.completion_tokens||usage.output_tokens||0),total_tokens:Number(usage.total_tokens||0),context:sanitizeAuditData(context)};try{fs.appendFileSync(USAGE_FILE,JSON.stringify(r)+"\n","utf8")}catch{};if(cloudConfigured()){try{await fetchWithRetry(`${SUPABASE_URL}/rest/v1/ai_usage_ledger`,{method:"POST",headers:supabaseHeaders(),body:JSON.stringify({id:r.id,owner_id:MEMORY_OWNER_ID,usage:r,created_at:r.at})},{retries:2})}catch{}}return r}
-async function usageTotals(){let rs=[];if(cloudConfigured()){try{const d=new Date();d.setUTCDate(1);d.setUTCHours(0,0,0,0);const u=`${SUPABASE_URL}/rest/v1/ai_usage_ledger?owner_id=eq.${encodeURIComponent(MEMORY_OWNER_ID)}&created_at=gte.${encodeURIComponent(d.toISOString())}&select=usage`;const r=await fetchWithRetry(u,{headers:supabaseHeaders()},{retries:2});const x=await r.json().catch(()=>[]);if(r.ok)rs=(x||[]).map(y=>y.usage).filter(Boolean)}catch{}}if(!rs.length)rs=readLocalJsonLines(USAGE_FILE,5000);const n=new Date(),day=n.toISOString().slice(0,10),mon=n.toISOString().slice(0,7);let daily=0,monthly=0;for(const x of rs){const at=String(x.at||""),c=Number(x.cost||0);if(at.startsWith(day))daily+=c;if(at.startsWith(mon))monthly+=c}return{daily,monthly}}
+async function usageTotals(filter={}){let rs=[];if(cloudConfigured()){try{const d=new Date();d.setUTCDate(1);d.setUTCHours(0,0,0,0);const u=`${SUPABASE_URL}/rest/v1/ai_usage_ledger?owner_id=eq.${encodeURIComponent(MEMORY_OWNER_ID)}&created_at=gte.${encodeURIComponent(d.toISOString())}&select=usage`;const r=await fetchWithRetry(u,{headers:supabaseHeaders()},{retries:2});const x=await r.json().catch(()=>[]);if(r.ok)rs=(x||[]).map(y=>y.usage).filter(Boolean)}catch{}}if(!rs.length)rs=readLocalJsonLines(USAGE_FILE,20000);const n=new Date(),day=n.toISOString().slice(0,10),mon=n.toISOString().slice(0,7);let daily=0,monthly=0;for(const x of rs){if(filter.purpose&&x.context?.purpose!==filter.purpose)continue;const at=String(x.at||""),c=Number(x.cost||0);if(at.startsWith(day))daily+=c;if(at.startsWith(mon))monthly+=c}return{daily,monthly}}
 async function enforceBudget(){const t=await usageTotals();if(DAILY_COST_LIMIT_USD>0&&t.daily>=DAILY_COST_LIMIT_USD)throw new Error(`Daily AI cost limit reached ($${DAILY_COST_LIMIT_USD.toFixed(2)}).`);if(MONTHLY_COST_LIMIT_USD>0&&t.monthly>=MONTHLY_COST_LIMIT_USD)throw new Error(`Monthly AI cost limit reached ($${MONTHLY_COST_LIMIT_USD.toFixed(2)}).`);return t}
 async function notify(title,message,data={}){await audit("notification.created",{title,message,data});if(!NOTIFY_WEBHOOK_URL)return{delivered:false};try{const r=await fetchWithRetry(NOTIFY_WEBHOOK_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,message,data,at:new Date().toISOString()})},{retries:3});return{delivered:r.ok,status:r.status}}catch(e){return{delivered:false,error:e.message}}}
 
@@ -6521,15 +6522,19 @@ function parseDeveloperResponse(content,model="coding model"){
   }
   throw Error("Response did not contain complete project files; "+clean.length+" characters");
 }
-async function callDeveloperCodingModel(opts={}){
-  if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse:parseDeveloperResponse});
-  if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
+async function callDeveloperCodingModel(opts={}){return callBuilderModel(opts,parseDeveloperResponse)}
+async function callBuilderModel(opts={},parse=parseDeveloperResponse){
+  if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
+  if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
-  const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),"deepseek/deepseek-v3.2"];
-  const allowPaid=mode==="premium" && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
-  const models=[...freeCandidates,...(allowPaid?paidCandidates:[])].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
+  const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
+  let allowPaid=(mode==="premium"||mode==="paid-first") && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
+  if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
+  const ordered=mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
+  const models=ordered.filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
@@ -6542,6 +6547,7 @@ async function callDeveloperCodingModel(opts={}){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
         if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
+        if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
       }
       const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(110000)]):AbortSignal.timeout(110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"}})});
       const data=await response.json().catch(()=>({}));
@@ -6553,7 +6559,7 @@ async function callDeveloperCodingModel(opts={}){
       if(free&&cost>0)throw Error("Free request unexpectedly billed");
       if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model});
       if(!content.trim())throw Error("Empty response; finish="+data.choices?.[0]?.finish_reason+" reasoning="+String(message.reasoning||"").length);
-      return parseDeveloperResponse(content,model);
+      return parse(content,model);
     }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}
   }
   throw Error("No coding model returned usable project files. "+errors.join(" | "));
@@ -6582,6 +6588,14 @@ async function handleDeveloperPublish(req,res){
 }
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
+  const hostRoute=reactHosting.handleHost(req,res);
+  if(typeof hostRoute==="string"){if(!await reactBackend.handle(req,res,{onlyProject:hostRoute.slice(8)})){res.writeHead(404);res.end();}return;}
+  if(hostRoute)return;
+  if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
+  if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
+  if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(req.method==="GET"&&/^\/create\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
   if(url.startsWith("/apps/") && (await appRuntime.handle(req,res)||await housingBuilder.handle(req,res)))return;
@@ -6902,6 +6916,6 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
-  callDeveloperCodingModel, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
+  callDeveloperCodingModel, callBuilderModel, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };

@@ -1,5 +1,11 @@
 # Kairoq v16 — AI Sales Agent + AI Marketing Agent
 
+## Kairoq Create — build apps by chatting
+
+Open `/create`. Describe an app, and Kairoq writes a real React + Vite + Tailwind project, shows it in a live preview, and changes it as you chat. Every change is a saved version you can preview or restore. Publish in one click to `/sites/<name>/`, connect a custom domain, and sell credits to customers through Stripe. Setup and security details: [docs/create.md](docs/create.md).
+
+The app builder uses a paid coding model first when `KAIROQ_BUILDER_MODE=paid-first` and `KAIROQ_BUILDER_PAID_APPROVED=true`, capped by `KAIROQ_BUILDER_MONTHLY_LIMIT_USD` (default $100). The app-wide `DAILY_COST_LIMIT_USD` and `MONTHLY_COST_LIMIT_USD` also apply, so keep them above the builder cap. When the cap is reached it falls back to free models.
+
 Kairoq now surfaces two outcome-focused workers first, while keeping the existing Studio underneath.
 
 ## AI Sales Agent

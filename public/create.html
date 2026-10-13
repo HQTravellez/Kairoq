@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kairoq Create</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/create.css?v=20261013">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="/create">Kairoq <span>Create</span></a>
+  <div class="bar-project hidden" id="bar-project">
+    <button class="ghost" id="back" type="button" aria-label="All projects">←</button>
+    <input id="project-name" aria-label="Project name" maxlength="80">
+  </div>
+  <div class="bar-right">
+    <span class="credits hidden" id="credits"></span>
+    <button class="ghost hidden" id="buy" type="button">Buy credits</button>
+    <span class="who" id="who"></span>
+    <button class="ghost hidden" id="logout" type="button">Sign out</button>
+  </div>
+</header>
+
+<!-- Sign in / sign up -->
+<section class="screen hidden" id="auth">
+  <div class="auth-card">
+    <h1>Build apps by chatting.</h1>
+    <p class="muted">Describe what you want. Kairoq writes a real React app, shows it live, and publishes it in one click.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-signup" aria-selected="true">Create account</button>
+      <button type="button" role="tab" id="tab-login" aria-selected="false">Sign in</button>
+    </div>
+    <form id="auth-form">
+      <label>Email<input id="email" type="email" autocomplete="email" required></label>
+      <label>Password<input id="password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="primary" id="auth-submit" type="submit">Create account</button>
+      <p class="muted small" id="free-note"></p>
+      <p class="error" id="auth-error" role="alert"></p>
+    </form>
+  </div>
+</section>
+
+<!-- Project list / new project -->
+<section class="screen hidden" id="home">
+  <div class="home">
+    <h1>What do you want to build?</h1>
+    <form id="new-form" class="prompt-box">
+      <textarea id="new-prompt" rows="3" placeholder="A booking page for my yoga studio with class times, prices and a sign-up form" required></textarea>
+      <button class="primary" type="submit" id="new-submit">Build it</button>
+    </form>
+    <div class="examples">
+      <button type="button" class="example">A restaurant site with menu, opening hours and reservations</button>
+      <button type="button" class="example">A CRM to track leads, deals and follow-ups</button>
+      <button type="button" class="example">A hotel guest portal with Wi-Fi, check-out time and local tips</button>
+      <button type="button" class="example">A habit tracker with streaks and a weekly chart</button>
+    </div>
+    <p class="error" id="home-error" role="alert"></p>
+    <h2>Your projects</h2>
+    <ul class="projects" id="projects"></ul>
+  </div>
+</section>
+
+<!-- Editor: chat + preview -->
+<section class="screen hidden" id="editor">
+  <aside class="chat">
+    <ol class="messages" id="messages" aria-live="polite"></ol>
+    <div class="progress hidden" id="progress"><span class="dot"></span><span id="progress-text">Working…</span></div>
+    <form id="chat-form" class="composer">
+      <textarea id="chat-input" rows="3" placeholder="Ask for a change: add a pricing section, make the header sticky…" required></textarea>
+      <button class="primary" id="send" type="submit">Send</button>
+    </form>
+    <p class="error" id="chat-error" role="alert"></p>
+  </aside>
+  <main class="stage">
+    <div class="stage-bar">
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" id="view-preview" aria-pressed="true">Preview</button>
+        <button type="button" id="view-code" aria-pressed="false">Code</button>
+        <button type="button" id="view-data" aria-pressed="false">Data</button>
+      </div>
+      <div class="seg" role="group" aria-label="Device">
+        <button type="button" id="desktop" aria-pressed="true">Desktop</button>
+        <button type="button" id="mobile" aria-pressed="false">Mobile</button>
+      </div>
+      <select id="versions" aria-label="Version"></select>
+      <button class="ghost" id="restore" type="button">Restore</button>
+      <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
+      <button class="primary" id="publish-open" type="button">Publish</button>
+    </div>
+    <div class="canvas" id="canvas">
+      <iframe id="frame" title="App preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
+      <div class="data hidden" id="data">
+        <p class="muted small">Saved data and sign-ups from this app. Preview and published versions share one database.</p>
+        <div class="data-grid">
+          <div><h3>Collections</h3><ul class="file-list" id="collections"></ul><h3>Users <span class="muted" id="user-count"></span></h3><ul class="users" id="users"></ul></div>
+          <div><h3 id="records-title">Records</h3><ul class="records" id="records"></ul></div>
+        </div>
+      </div>
+      <div class="code hidden" id="code">
+        <ul class="file-list" id="file-list"></ul>
+        <pre id="file-view"><code></code></pre>
+      </div>
+    </div>
+  </main>
+</section>
+
+<dialog id="publish-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Publish</h2>
+    <label>Site name<input id="slug" pattern="[a-z0-9-]{3,40}" placeholder="my-app"></label>
+    <p class="muted small">Your app will be live at <code id="slug-preview"></code></p>
+    <div class="row"><button class="primary" id="publish" type="button">Publish current version</button><button class="ghost hidden" id="unpublish" type="button">Unpublish</button></div>
+    <div id="live-links"></div>
+    <h3>Custom domain</h3>
+    <div class="row"><input id="domain" placeholder="www.example.com"><button class="ghost" id="add-domain" type="button">Add</button></div>
+    <ul class="domains" id="domains"></ul>
+    <p class="error" id="publish-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="buy-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Buy credits</h2>
+    <p class="muted small">One credit pays for one change. Failed changes are refunded.</p>
+    <div id="packs" class="packs"></div>
+    <p class="error" id="buy-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<script src="/create.js?v=20261013"></script>
+</body>
+</html>
