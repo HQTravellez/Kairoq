@@ -113,6 +113,7 @@ function handleHost(req,res){
  let id=registry.domains[host];
  if(!id&&sites&&host.endsWith('.'+sites)){const slug=host.slice(0,-sites.length-1);if(/^[a-z0-9-]+$/.test(slug))id=registry.slugs[slug]}
  if(!id)return false;
+ if(String(req.url||'').startsWith('/api/apps/'))return'backend:'+id;
  // Separate origin from Kairoq, so no sandbox is needed and storage works normally.
  if(!serveProject(req,res,id,String(req.url||'/').split('?')[0],false)){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Site not found')}
  return true;

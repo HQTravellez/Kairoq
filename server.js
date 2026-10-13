@@ -20,7 +20,7 @@ const PORT = Number(process.env.PORT || 3002);
 const SITE_NAME = process.env.SITE_NAME || "Kairoq";
 const PUBLIC_DIR = path.join(__dirname, "public");
 const OR_CHAT = "https://openrouter.ai/api/v1/chat/completions";
-const reactBuilder=require("./react-builder"),reactHosting=require("./react-hosting"),createApi=require("./create-api");
+const reactBuilder=require("./react-builder"),reactBackend=require("./react-backend"),reactHosting=require("./react-hosting"),createApi=require("./create-api");
 const OR_MODELS = "https://openrouter.ai/api/v1/models";
 const OR_KEY = "https://openrouter.ai/api/v1/key";
 const ZERO_COST_MODE = String(process.env.ZERO_COST_MODE || "true").toLowerCase() !== "false";
@@ -6529,7 +6529,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
   const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
-  const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??20);
+  const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
   let allowPaid=(mode==="premium"||mode==="paid-first") && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
@@ -6588,7 +6588,10 @@ async function handleDeveloperPublish(req,res){
 }
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
-  if(reactHosting.handleHost(req,res))return;
+  const hostRoute=reactHosting.handleHost(req,res);
+  if(typeof hostRoute==="string"){if(!await reactBackend.handle(req,res,{onlyProject:hostRoute.slice(8)})){res.writeHead(404);res.end();}return;}
+  if(hostRoute)return;
+  if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
   if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;

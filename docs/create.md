@@ -10,6 +10,46 @@
 4. **Versions.** Every successful edit is saved as an immutable version (`versions/<n>/files.json` and `versions/<n>/dist`). Any version can be previewed or restored.
 5. **Preview.** `/builder/p/<id>-<key>/v/<n>/` serves a version's build. The key is random per project. Pages served from the Kairoq host use a CSP sandbox, so generated code runs in an isolated origin and cannot use the Kairoq session.
 
+## Backend for generated apps
+
+Every Create project has its own backend: user accounts and saved records in a per-project SQLite database (`workspace/react-projects/<id>/data.sqlite`). Generated code uses it through the built-in `kairoq` module:
+
+```js
+import { auth, collection } from 'kairoq';
+await auth.signUp(email, password);           // also signIn, signOut, user(), onChange(fn)
+const tasks = collection('tasks');
+await tasks.create({ title: 'Book the venue' });
+const mine = await tasks.list({ mine: true }); // also get, update, remove, where, order, limit
+```
+
+Collections must be declared in `src/backend.json`, which the model writes along with the app:
+
+```json
+{ "collections": { "tasks": { "access": "private" }, "messages": { "access": "public" } } }
+```
+
+| Access | Read | Add | Change or delete |
+|---|---|---|---|
+| `private` | the signed-in creator only | signed-in users | creator |
+| `shared` | any signed-in user | signed-in users | creator |
+| `public-read` | anyone | signed-in users | creator |
+| `public` | anyone | anyone | creator (anonymous records: owner only, from the Data tab) |
+
+- The API is `/api/apps/<project-id>/…`. It uses bearer tokens instead of cookies, so it works from sandboxed previews, `/sites/` pages and custom domains. A custom domain can reach only its own app's API.
+- Passwords are hashed with scrypt. Records are limited to 20 KB, 10,000 per collection and 10,000 users per app. Each IP is limited to 240 requests per minute per app.
+- Preview and published versions share one database. The access rules come from the published version, or from the current draft if the app isn't published.
+- In the editor, the **Data** tab shows collections, records and sign-ups, and lets the owner delete records.
+- In sandboxed pages (preview and `/sites/`), sign-ins last until the page reloads because browser storage is unavailable. On subdomains and custom domains, sign-ins persist.
+
+## Checking real-model quality
+
+`scripts/create-quality-check.js` builds six typical apps with the configured model. It applies a follow-up edit to each, opens every result in Chromium, and reports pass/fail, attempts and timing. It spends real model credit (roughly a few cents per app with DeepSeek).
+
+```
+OPENROUTER_API_KEY=... KAIROQ_BUILDER_MODE=paid-first KAIROQ_BUILDER_PAID_APPROVED=true \
+  node scripts/create-quality-check.js --limit 6 --out quality-report.json
+```
+
 ## Publishing and domains
 
 - **Publish** makes a version live at `/sites/<name>/` on the Kairoq host. Publishing again moves it to the current version.
@@ -47,4 +87,4 @@ On Railway, `workspace/` should be on the persistent volume.
 
 - Up to 80 source files, 200 KB per file and 1.5 MB per project.
 - Builds run one at a time and time out after 90 seconds.
-- Generated apps have no backend. They keep data in the browser. Connecting the existing full-stack runtime (login, database, Stripe) to Create projects is the next step.
+- Generated apps can't take payments yet. Stripe checkout inside generated apps is a possible next step.

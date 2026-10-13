@@ -5,7 +5,7 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-react-'));
 process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_FREE_CREDITS='2';
-const builder=require('../react-builder'),hosting=require('../react-hosting'),accounts=require('../builder-accounts'),createApi=require('../create-api');
+const builder=require('../react-builder'),hosting=require('../react-hosting'),accounts=require('../builder-accounts'),createApi=require('../create-api'),backend=require('../react-backend');
 
 const APP=`import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
@@ -69,13 +69,17 @@ test('an edit that never builds fails with the last problem and keeps the curren
 
 function request(server,method,url,{body,headers={}}={}){
  return new Promise((resolve,reject)=>{
-  const req=http.request({host:'127.0.0.1',port:server.address().port,method,path:url,headers:{...(body?{'Content-Type':'application/json'}:{}),...headers}},res=>{let data='';res.on('data',c=>data+=c);res.on('end',()=>{let json;try{json=JSON.parse(data)}catch{}resolve({status:res.statusCode,headers:res.headers,text:data,json})})});
-  req.on('error',reject);if(body)req.write(typeof body==='string'?body:JSON.stringify(body));req.end();
+  const payload=body?(typeof body==='string'?body:JSON.stringify(body)):null;
+  const req=http.request({host:'127.0.0.1',port:server.address().port,method,path:url,headers:{...(payload?{'Content-Type':'application/json','Content-Length':Buffer.byteLength(payload)}:{}),...headers}},res=>{let data='';res.on('data',c=>data+=c);res.on('end',()=>{let json;try{json=JSON.parse(data)}catch{}resolve({status:res.statusCode,headers:res.headers,text:data,json})})});
+  req.on('error',reject);if(payload)req.write(payload);req.end();
  });
 }
 function server(callModel,{owner=false}={}){
  const s=http.createServer(async(req,res)=>{
-  if(hosting.handleHost(req,res))return;
+  const hostRoute=hosting.handleHost(req,res);
+  if(typeof hostRoute==='string'){if(!await backend.handle(req,res,{onlyProject:hostRoute.slice(8)})){res.writeHead(404);res.end()}return}
+  if(hostRoute)return;
+  if(await backend.handle(req,res))return;
   if(builder.handlePreview(req,res))return;
   if(hosting.handlePath(req,res))return;
   if(await createApi.handle(req,res,{isOwner:()=>owner,callModel,secure:false}))return;
@@ -172,6 +176,81 @@ test('Stripe credit purchases are verified, re-read from Stripe and credited onc
   const credits=accounts.history(account.id).reduce((n,r)=>n+r.delta,0);
   assert.equal(credits,102);
  }finally{delete process.env.KAIROQ_STRIPE_SECRET_KEY;delete process.env.KAIROQ_STRIPE_WEBHOOK_SECRET;delete process.env.KAIROQ_CREDIT_PACKS}
+});
+
+const TASKS_APP=`import { useEffect, useState } from 'react';
+import { auth, collection } from 'kairoq';
+const tasks=collection('tasks');
+export default function App(){
+  const [user,setUser]=useState(auth.user());const [items,setItems]=useState([]);
+  useEffect(()=>auth.onChange(setUser),[]);
+  useEffect(()=>{if(user)tasks.list({mine:true}).then(setItems)},[user]);
+  return <main className="p-6">{user?<ul>{items.map(t=><li key={t.id}>{t.title}</li>)}</ul>:<button onClick={()=>auth.signIn('a@b.co','password1')}>Sign in</button>}</main>;
+}
+`;
+const BACKEND=JSON.stringify({collections:{tasks:{access:'private'},messages:{access:'public'},posts:{access:'public-read'}}});
+
+test('apps can use the kairoq backend client; invalid backend.json is sent back for a retry',async()=>{
+ const meta=builder.create({name:'Tasks',owner:'owner'});await builder.initialize(meta);
+ const model=sequence(
+  {message:'x',files:{'src/App.jsx':TASKS_APP,'src/backend.json':'{"collections":{"tasks":{"access":"everyone"}}}'}},
+  {message:'Added tasks with sign-in.',files:{'src/App.jsx':TASKS_APP,'src/backend.json':BACKEND}});
+ const result=await builder.edit(meta.id,'Task list with login',{callModel:model});
+ assert.equal(result.attempts,2);
+ assert.match(JSON.stringify(model.seen[1].at(-1)),/needs \\"access\\": one of private/);
+ const dist=path.join(builder.versionDir(meta.id,result.version),'dist','assets');
+ const js=fs.readFileSync(path.join(dist,fs.readdirSync(dist).find(f=>f.endsWith('.js'))),'utf8');
+ assert.ok(js.includes('/api/apps/'+meta.id),'client is bundled with this project id');
+});
+
+test('the app backend enforces sign-in, per-user privacy and declared collections',async()=>{
+ const meta=builder.create({name:'Data',owner:'owner'});await builder.initialize(meta);
+ await builder.edit(meta.id,'x',{callModel:sequence({message:'ok',files:{'src/App.jsx':TASKS_APP,'src/backend.json':BACKEND}})});
+ const s=await server(sequence(good),{owner:true});
+ const base='/api/apps/'+meta.id;
+ const call=(method,url,body,token)=>request(s,method,base+url,{body,headers:token?{authorization:'Bearer '+token}:{}});
+ try{
+  const pre=await request(s,'OPTIONS',base+'/collections/tasks');
+  assert.equal(pre.status,204);assert.equal(pre.headers['access-control-allow-origin'],'*');
+  assert.equal((await call('GET','/collections/tasks')).status,401,'private collections need sign-in');
+  const ana=(await call('POST','/auth/signup',{email:'ana@x.co',password:'password1'})).json;
+  const bo=(await call('POST','/auth/signup',{email:'bo@x.co',password:'password2'})).json;
+  assert.equal((await call('POST','/auth/signup',{email:'ana@x.co',password:'password1'})).status,409);
+  const task=(await call('POST','/collections/tasks',{data:{title:'Buy mats',_owner:'forged',id:'forged'}},ana.token)).json.item;
+  assert.equal(task.title,'Buy mats');assert.equal(task._owner,ana.user.id);assert.notEqual(task.id,'forged');
+  assert.equal((await call('GET','/collections/tasks',null,bo.token)).json.items.length,0,'other users cannot see private records');
+  assert.equal((await call('GET','/collections/tasks/'+task.id,null,bo.token)).status,404);
+  assert.equal((await call('PATCH','/collections/tasks/'+task.id,{data:{title:'hacked'}},bo.token)).status,403);
+  assert.equal((await call('PATCH','/collections/tasks/'+task.id,{data:{done:true}},ana.token)).json.item.title,'Buy mats');
+  assert.equal((await call('GET','/collections/tasks',null,ana.token)).json.items[0].done,true);
+  // public: anyone can add; public-read: anyone reads, sign-in to add
+  assert.equal((await call('POST','/collections/messages',{data:{text:'hi'}})).status,201);
+  assert.equal((await call('GET','/collections/messages')).json.items.length,1);
+  assert.equal((await call('POST','/collections/posts',{data:{t:1}})).status,401);
+  assert.equal((await call('POST','/collections/posts',{data:{t:1}},bo.token)).status,201);
+  assert.equal((await call('GET','/collections/posts?where='+encodeURIComponent('{"t":1}'))).json.items.length,1);
+  assert.equal((await call('GET','/collections/secrets',null,ana.token)).status,404,'undeclared collections are rejected');
+  assert.equal((await call('POST','/collections/messages',{data:{big:'x'.repeat(30000)}})).status,413);
+  assert.equal((await call('GET','/auth/user',null,ana.token)).json.user.email,'ana@x.co');
+  await call('POST','/auth/signout',null,ana.token);
+  assert.equal((await call('GET','/auth/user',null,ana.token)).json.user,null);
+  assert.equal((await call('POST','/auth/signin',{email:'ana@x.co',password:'wrong-pass'})).status,401);
+  // Owner data view in Create.
+  const data=(await request(s,'GET','/api/create/projects/'+meta.id+'/data')).json;
+  assert.deepEqual(data.collections.map(c=>[c.name,c.count]),[['tasks',1],['messages',1],['posts',1]]);
+  assert.equal(data.user_count,2);
+  const records=(await request(s,'GET','/api/create/projects/'+meta.id+'/records?collection=tasks')).json.items;
+  assert.equal(records[0].title,'Buy mats');
+  const del=await request(s,'DELETE','/api/create/projects/'+meta.id+'/records',{body:{id:records[0].id}});assert.equal(del.status,200);
+  assert.equal((await request(s,'GET','/api/create/projects/'+meta.id+'/data')).json.collections[0].count,0);
+  // A custom domain reaches only its own app's backend.
+  hosting.publish(meta.id,{slug:'tasks-app'});
+  const {domain}=hosting.addDomain(meta.id,'tasks.example.com');
+  await hosting.verifyDomain(meta.id,'tasks.example.com',{resolveTxt:async()=>[['kairoq-verify='+domain.token]]});
+  assert.equal((await request(s,'GET',base+'/collections/messages',{headers:{host:'tasks.example.com'}})).json.items.length,1);
+  const other=builder.create({name:'Other',owner:'owner'});
+  assert.equal((await request(s,'GET','/api/apps/'+other.id+'/auth/user',{headers:{host:'tasks.example.com'}})).status,404);
+ }finally{s.close()}
 });
 
 test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));

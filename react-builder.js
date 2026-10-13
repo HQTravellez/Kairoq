@@ -4,7 +4,7 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 
 const ROOT=()=>process.env.KAIROQ_REACT_PROJECTS_DIR||path.join(__dirname,'workspace','react-projects');
-const ALLOWED_PACKAGES=['react','react-dom','react-dom/client','react/jsx-runtime','lucide-react','react-router-dom'];
+const ALLOWED_PACKAGES=['react','react-dom','react-dom/client','react/jsx-runtime','lucide-react','react-router-dom','kairoq'];
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -48,7 +48,11 @@ Rules:
 - Use JavaScript with JSX (.jsx/.js). Style with Tailwind utility classes. Write clean, responsive, accessible UI with real, specific copy (no lorem ipsum).
 - The only npm packages available are: react, react-dom, lucide-react (icons), react-router-dom (use HashRouter for routing). Do not import anything else and do not use import.meta or query imports like "?raw".
 - Split the UI into components under src/components/ and pages under src/pages/ when the app grows.
-- There is no backend. Keep state in React; if you persist data, use localStorage inside try/catch because it can be unavailable.
+- Backend: import { auth, collection } from 'kairoq' for user accounts and saved data shared by all visitors.
+  auth.signUp(email,password,name?) / auth.signIn(email,password) / auth.signOut() return promises; auth.user() returns the signed-in user or null; auth.onChange(fn) subscribes and returns an unsubscribe function.
+  collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
+  Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (contact forms, guestbooks). Only a record's creator can update or delete it.
+  Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
 - Images: use https URLs (for example https://images.unsplash.com/...) or inline SVG.
 Respond with ONLY a JSON object, no markdown fences:
 {"message":"one or two sentences telling the user what you changed","files":{"src/path.jsx":"full new file content"},"delete":["src/unused.jsx"]}
@@ -102,18 +106,19 @@ function validateFiles(files){
   }
  }
  if(total>MAX_PROJECT_BYTES)errors.push('Project source is larger than 1.5 MB.');
+ errors.push(...require('./react-backend').configErrors(files));
  for(const required of ['src/main.jsx','src/App.jsx'])if(!Object.hasOwn(files,required))errors.push(required+' is required.');
  return errors;
 }
 
 // ---------- build ----------
 let buildQueue=Promise.resolve();
-function build(files,outDir){
- const task=buildQueue.then(()=>runBuild(files,outDir));
+function build(files,outDir,options={}){
+ const task=buildQueue.then(()=>runBuild(files,outDir,options));
  buildQueue=task.catch(()=>{});
  return task;
 }
-async function runBuild(files,outDir){
+async function runBuild(files,outDir,{projectId='000000000000'}={}){
  fs.mkdirSync(ROOT(),{recursive:true});
  const work=fs.mkdtempSync(path.join(ROOT(),'.build-'));
  try{
@@ -125,7 +130,7 @@ async function runBuild(files,outDir){
   const modules=path.join(__dirname,'node_modules');
   const output=[];
   const logger={info(){},warn(m){output.push(String(m))},warnOnce(m){output.push(String(m))},error(m){output.push(String(m))},clearScreen(){},hasErrorLogged(){return false},hasWarned:false};
-  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react()],
+  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react(),kairoqClient(projectId)],
    resolve:{alias:Object.fromEntries(['react','react-dom','lucide-react','react-router-dom'].map(p=>[p,path.join(modules,p)])),dedupe:['react','react-dom']},
    css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:{extend:{}}})]}},
    server:{fs:{strict:true,allow:[work]}},
@@ -137,6 +142,9 @@ async function runBuild(files,outDir){
  }catch(e){
   throw Object.assign(Error(cleanBuildError(e)),{build:true});
  }finally{fs.rmSync(work,{recursive:true,force:true})}
+}
+function kairoqClient(projectId){
+ return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':null},load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId):null}};
 }
 function cleanBuildError(e){
  const root=ROOT();
@@ -176,7 +184,7 @@ function create({name,owner}){
 }
 async function initialize(meta){
  const files=template(meta.name);
- await build(files,path.join(versionDir(meta.id,1),'dist'));
+ await build(files,path.join(versionDir(meta.id,1),'dist'),{projectId:meta.id});
  writeJson(path.join(versionDir(meta.id,1),'files.json'),files);
  meta.versions.push({n:1,at:new Date().toISOString(),summary:'Starter project'});
  meta.current_version=1;
@@ -213,7 +221,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},signal}={}){
   if(errors.length){lastError=errors.slice(0,12).join('\n');messages.push({role:'user',content:'That change was rejected:\n'+lastError+'\nReturn corrected JSON with the full content of every file you need to change.'});continue}
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n))+1,dir=versionDir(id,n);
-  try{await build(next,path.join(dir,'dist'))}
+  try{await build(next,path.join(dir,'dist'),{projectId:id})}
   catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
   writeJson(path.join(dir,'files.json'),next);
   const changed=Object.keys(reply.files).filter(k=>base[k]!==reply.files[k]).concat(reply.delete.filter(k=>Object.hasOwn(base,k)&&!Object.hasOwn(next,k)));
@@ -240,7 +248,7 @@ function remove(id){const dir=projectDir(id);loadMeta(id);fs.rmSync(dir,{recursi
 // ---------- serving built files ----------
 const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8'};
 // sandbox=true runs the page in an opaque origin so generated code cannot use the Kairoq session.
-function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
+function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
 function serveDist(req,res,distDir,rest,{sandbox}){
  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);return res.end()}
  let rel=decodeURIComponent(String(rest||'').split('?')[0]).replace(/^\/+/,'');

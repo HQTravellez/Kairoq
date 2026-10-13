@@ -2,7 +2,7 @@
 // HTTP API for the chat builder (/create). Owners (the Kairoq admin login) build
 // without credits; customer accounts spend one credit per successful edit.
 const crypto=require('crypto');
-const builder=require('./react-builder'),hosting=require('./react-hosting'),accounts=require('./builder-accounts');
+const builder=require('./react-builder'),hosting=require('./react-hosting'),accounts=require('./builder-accounts'),backend=require('./react-backend');
 
 const jobs=new Map();
 const attempts=new Map();
@@ -117,7 +117,10 @@ async function handle(req,res,{isOwner,callModel,secure}){
   ownedProject(v,id);
   if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null}),true;
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
-  if(!action&&method==='DELETE'){hosting.unpublish(id);return send(res,200,builder.remove(id)),true}
+  if(!action&&method==='DELETE'){hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
+  if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
+  if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
+  if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
   if(action==='/chat'&&method==='POST'){const b=await readJson(req,20000);return send(res,202,{job:startEdit(v,id,b.message,callModel)}),true}
   if(action==='/file'&&method==='GET'){const name=new URL(req.url,'http://x').searchParams.get('path')||'';return send(res,200,{path:name,content:builder.readFile(id,name)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}

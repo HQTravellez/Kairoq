@@ -86,6 +86,7 @@ async function openProject(id,{pendingText,job}={}){
  renderVersions();
  setPreview(project.preview_url);
  if(state.code)await renderFiles();
+ if(state.data)await renderData();
  if(job)watch(job);
 }
 function renderMessages(pendingText){
@@ -117,13 +118,35 @@ $('back').onclick=()=>{state.project=null;loadHome()};
 $('project-name').onchange=async()=>{try{const {project}=await api('/projects/'+state.project.id,{method:'PATCH',body:{name:$('project-name').value}});state.project.name=project.name}catch{}};
 function device(mobile){$('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile))}
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
-function view(code){
- state.code=code;
- $('view-preview').setAttribute('aria-pressed',String(!code));$('view-code').setAttribute('aria-pressed',String(code));
- $('frame').classList.toggle('hidden',code);$('code').classList.toggle('hidden',!code);
- if(code)renderFiles();
+function view(mode){
+ state.code=mode==='code';state.data=mode==='data';
+ for(const m of ['preview','code','data'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
+ $('frame').classList.toggle('hidden',mode!=='preview');$('code').classList.toggle('hidden',mode!=='code');$('data').classList.toggle('hidden',mode!=='data');
+ if(mode==='code')renderFiles();
+ if(mode==='data')renderData();
 }
-$('view-preview').onclick=()=>view(false);$('view-code').onclick=()=>view(true);
+$('view-preview').onclick=()=>view('preview');$('view-code').onclick=()=>view('code');$('view-data').onclick=()=>view('data');
+async function renderData(){
+ const d=await api('/projects/'+state.project.id+'/data');
+ const list=$('collections');list.replaceChildren();
+ if(!d.collections.length){const li=document.createElement('li');li.className='muted small';li.textContent='No collections yet. Ask for a feature that saves data, like "let visitors book a class".';list.append(li)}
+ if(!d.collections.some(c=>c.name===state.collection))state.collection=d.collections[0]?.name;
+ for(const c of d.collections){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.textContent=c.name+' ('+c.count+') · '+c.access;b.setAttribute('aria-current',String(c.name===state.collection));b.onclick=()=>{state.collection=c.name;renderData()};li.append(b);list.append(li)}
+ text($('user-count'),'('+d.user_count+')');
+ const users=$('users');users.replaceChildren();
+ for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
+ const records=$('records');records.replaceChildren();
+ text($('records-title'),state.collection?'Records in '+state.collection:'Records');
+ if(!state.collection)return;
+ const {items}=await api('/projects/'+state.project.id+'/records?collection='+encodeURIComponent(state.collection));
+ if(!items.length){const li=document.createElement('li');li.className='muted small';li.textContent='No records yet.';records.append(li)}
+ for(const it of items){
+  const li=document.createElement('li'),pre=document.createElement('pre'),del=document.createElement('button');
+  pre.textContent=JSON.stringify(it,null,2);del.type='button';del.className='ghost';del.textContent='Delete';
+  del.onclick=async()=>{if(!confirm('Delete this record?'))return;await api('/projects/'+state.project.id+'/records',{method:'DELETE',body:{id:it.id}});renderData()};
+  li.append(pre,del);records.append(li);
+ }
+}
 async function renderFiles(){
  const list=$('file-list');list.replaceChildren();
  const files=state.project.files;
@@ -162,6 +185,7 @@ async function watch(job){
     renderMessages();renderVersions();setPreview(project.preview_url);
     if(current.status==='failed')$('messages').append(messageItem('assistant failed',current.error+'\nYour credit was refunded.'));
     if(state.code)renderFiles();
+    if(state.data)renderData();
    }
    break;
   }
