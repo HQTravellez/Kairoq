@@ -35,9 +35,10 @@ function scan(files,cfg){
    if((m=/localStorage\.setItem\(\s*['"`][^'"`]*(token|password|secret)/i.exec(code)))add('medium','Sensitive value saved in browser storage','`'+file+'` stores a token or password in localStorage, where any script on the page can read it.','Let the built-in auth handle sessions; do not store passwords at all.',file,lineOf(code,m.index));
   }
   if(fn){
-   const writes=/\.(create|update|remove)\s*\(/.test(code),checksUser=/\buser\b/.test(code.replace(/\{\s*user\s*[,}]/,''))||/\buser\s*\?|\bif\s*\(\s*!?\s*user\b/.test(code);
+   const writes=/\.(create|update|remove)\s*\(/.test(code)||/db\.(sql|batch)[\s\S]{0,80}\b(INSERT|UPDATE|DELETE)\b/i.test(code),checksUser=/\buser\b/.test(code.replace(/\{\s*user\s*[,}]/,''))||/\buser\s*\?|\bif\s*\(\s*!?\s*user\b/.test(code);
    if(writes&&!checksUser)add('medium','Server function changes data without checking the user','`'+file+'` creates, updates or deletes records but never checks who is signed in. Server functions have full database access, so anyone could call it.','Return 401 unless `user` is set, and check the user may change that record.',file);
    if(/hook|webhook|stripe/i.test(file)&&/rawBody|request\.body/.test(code)&&!/hmacSha256Hex|timingSafeEqual/.test(code))add('medium','Webhook does not verify its signature','`'+file+'` looks like a webhook receiver but never verifies a signature, so anyone can send fake events.','Verify the provider\'s signature with crypto.hmacSha256Hex over request.rawBody and crypto.timingSafeEqual.',file);
+   if(/db\.sql\(\s*`[^`]*\$\{/.test(code)||/db\.sql\(\s*(['"])[^'"]*\1\s*\+/.test(code)||/db\.sql\(\s*[a-zA-Z_$][\w$]*\s*[,)]/.test(code)&&/(['"`])\s*(SELECT|INSERT|UPDATE|DELETE)\b[^'"`]*\1\s*\+/i.test(code))add('high','SQL built from strings','`'+file+'` puts values straight into SQL text. A visitor could change the query (SQL injection) and read or delete data.','Use db.sql`... ${value}` (tagged template) or db.sql(\'... ?\', [value]) so values are sent as parameters.',file);
    if(/fetch\s*\(\s*(request|req)\.(body|query)/.test(code))add('low','Function fetches a URL chosen by the visitor','`'+file+'` passes a visitor-supplied URL to fetch. Private addresses are blocked, but it can still be abused to call other sites.','Only allow known hosts, or build the URL yourself.',file);
   }
  }

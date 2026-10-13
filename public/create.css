@@ -178,3 +178,17 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .findings .sev{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
 .findings .sev.high{color:var(--error)}.findings .sev.medium{color:var(--accent)}.findings .sev.low{color:var(--muted)}
 .findings p{margin:6px 0 0;color:var(--muted);line-height:1.45}
+.sql-section,.logs-section{margin-top:18px}
+.sql-section details{border:1px solid var(--line,#e5e2dc);border-radius:10px;padding:8px 10px;margin:6px 0}
+.sql-section summary{cursor:pointer;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+.sql-scroll{overflow:auto;max-height:280px;margin-top:6px}
+.sql-table{border-collapse:collapse;font-size:12px;font-family:ui-monospace,Menlo,monospace}
+.sql-table th,.sql-table td{border:1px solid var(--line,#e5e2dc);padding:3px 6px;text-align:left;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.sql-table th{background:rgba(0,0,0,.04)}
+.sql-form textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.logs{list-style:none;padding:0;margin:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;max-height:240px;overflow:auto}
+.logs li{padding:3px 0;border-bottom:1px solid var(--line,#e5e2dc);word-break:break-word}
+.logs li.error{color:#b42318}.logs li.warn{color:#9a6700}
+.agent-steps{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--muted,#6b6660)}
+.agent-steps li{margin:2px 0}
+#stop-job{margin-left:auto}

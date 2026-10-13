@@ -75,6 +75,7 @@ Rules:
       export default async function (request, { user, db, secrets, fetch, ai, email, crypto, log }) { ...; return { status: 200, json: {...} }; }
     request = { method, query, headers, body (parsed JSON), rawBody }; user is the signed-in user or null. db.collection('name').list/get/create/update/remove run with full access, so check user and validate input yourself. secrets.get('STRIPE_KEY') reads secrets the owner adds in Settings (never put keys in src/). fetch can only reach public https/http hosts. crypto has hmacSha256Hex(key,msg), sha256Hex, timingSafeEqual, randomId. Return {status, json} or {status, body, headers:{'content-type':...}}.
     Call it from the app with: import { functions } from 'kairoq'; const data = await functions.invoke('name', body). Its public URL (for webhooks from other services) is functions.url('name'); verify webhook signatures with crypto.hmacSha256Hex over request.rawBody.
+  - SQL database (relational data: tables, foreign keys, joins, reports, inventory, bookings with rooms and guests): write migrations sql/001_init.sql, sql/002_add_rooms.sql, ... (SQLite syntax: CREATE TABLE, indexes, REFERENCES, CHECK). Migrations run once, in order; never change one that already ran, add a new numbered file instead. Query only from server functions: const rows = await db.sql\`SELECT * FROM rooms WHERE price <= \${max}\` (tagged template, values become parameters) or db.sql('SELECT ... WHERE id = ?', [id]); writes return {changes,lastInsertRowid}; add RETURNING * to get rows back; db.batch([[sql, params], ...]) runs several statements in one transaction. Never build SQL by joining strings with user input. Check user before reads or writes of personal data. Use collections for simple per-user lists and SQL when the data has relations.
   - Scheduled jobs: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
@@ -93,7 +94,7 @@ function versionDir(id,n){return path.join(projectDir(id),'versions',String(Numb
 function loadFiles(id,n){const files=readJson(path.join(versionDir(id,n),'files.json'),null);if(!files)throw Object.assign(Error('Unknown version'),{status:404});return files}
 
 // ---------- validation ----------
-function validPath(p){return typeof p==='string'&&p.length<=120&&(/^src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.(?:jsx|js|tsx|ts|css|json)$/.test(p)||/^functions\/[a-z][a-z0-9-]{0,39}\.js$/.test(p))&&!p.split('/').some(seg=>seg==='..'||seg.startsWith('.'))}
+function validPath(p){return typeof p==='string'&&p.length<=120&&(/^src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.(?:jsx|js|tsx|ts|css|json)$/.test(p)||/^functions\/[a-z][a-z0-9-]{0,39}\.js$/.test(p)||/^sql\/\d{3}_[a-z0-9_]{1,40}\.sql$/.test(p))&&!p.split('/').some(seg=>seg==='..'||seg.startsWith('.'))}
 function resolveRelative(from,spec,files){
  const base=path.posix.normalize(path.posix.join(path.posix.dirname(from),spec));
  if(!base.startsWith('src/'))return null;
@@ -111,7 +112,7 @@ function validateFiles(files){
  let total=0;
  for(const name of names){
   const code=files[name];
-  if(!validPath(name)){errors.push('Invalid file path: '+name+' (files must be under src/ with a .jsx/.js/.css/.json extension).');continue}
+  if(!validPath(name)){errors.push('Invalid file path: '+name+' (app files go under src/ with a .jsx/.js/.css/.json extension, server functions in functions/<name>.js, SQL migrations in sql/001_name.sql).');continue}
   if(typeof code!=='string'){errors.push(name+' must be a string.');continue}
   total+=Buffer.byteLength(code);
   if(Buffer.byteLength(code)>MAX_FILE_BYTES)errors.push(name+' is larger than 200 KB.');
@@ -132,6 +133,7 @@ function validateFiles(files){
  if(total>MAX_PROJECT_BYTES)errors.push('Project source is larger than 1.5 MB.');
  errors.push(...require('./react-backend').configErrors(files));
  errors.push(...require('./react-functions').validate(files));
+ errors.push(...require('./react-sql').validate(files));
  for(const required of ['src/main.jsx','src/App.jsx'])if(!Object.hasOwn(files,required))errors.push(required+' is required.');
  return errors;
 }
@@ -257,6 +259,7 @@ async function initializeFrom(meta,files,summary){
  const errors=validateFiles(files);
  if(errors.length)throw Object.assign(Error(errors[0]),{status:400});
  await build(files,path.join(versionDir(meta.id,1),'dist'),{projectId:meta.id});
+ await applyMigrations(meta.id,files);
  writeJson(path.join(versionDir(meta.id,1),'files.json'),files);
  const fresh=loadMeta(meta.id);
  fresh.versions.push({n:1,at:new Date().toISOString(),summary});
@@ -316,10 +319,13 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
   catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
+  try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\nMigrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
   runtimeErrors=[];
   if(checkRuntime){
    onProgress('testing');
+   markTesting(id,n,next);
    try{runtimeErrors=(await checkRuntime(previewUrl(meta,n))).errors||[]}catch(e){runtimeErrors=[]}
+   finally{clearTesting(id,n)}
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError=runtimeErrors.join('\n');
@@ -355,12 +361,21 @@ async function discuss(id,question,{callModel,onStream,signal,tier='standard',im
 }
 
 // Validates, builds and saves source files as a new version without the AI.
+// A version being tested before it is saved. The app backend serves its server functions
+// and backend.json while it is tested, so new functions and collections work in the check.
+const testingBuilds=new Map();
+function markTesting(id,n,files){writeJson(path.join(versionDir(id,n),'files.json'),files);testingBuilds.set(id,n)}
+function clearTesting(id,n){if(n===undefined||testingBuilds.get(id)===n)testingBuilds.delete(id)}
+function testingVersion(id){return testingBuilds.get(id)}
+// Applies new SQL migrations to the app database (sql/NNN_name.sql).
+function applyMigrations(id,files){return require('./react-sql').run.migrate(projectDir(id),files)}
 async function saveSource(id,files,{summary,changed=[],extra={},message}={}){
  const errors=validateFiles(files);
  if(errors.length)throw Object.assign(Error(errors.slice(0,5).join('\n')),{status:400});
  const meta=loadMeta(id),n=Math.max(0,...meta.versions.map(v=>v.n))+1,dir=versionDir(id,n);
  try{await build(files,path.join(dir,'dist'),{projectId:id})}
  catch(e){fs.rmSync(dir,{recursive:true,force:true});throw Object.assign(Error('That change does not build: '+String(e.message).slice(0,500)),{status:400})}
+ try{await applyMigrations(id,files)}catch(e){fs.rmSync(dir,{recursive:true,force:true});throw Object.assign(Error(e.message),{status:400})}
  writeJson(path.join(dir,'files.json'),files);
  const fresh=loadMeta(id);
  fresh.versions.push({n,at:new Date().toISOString(),summary:String(summary).slice(0,200),changed,...extra});
@@ -392,7 +407,7 @@ function restore(id,n){
  return detail(id);
 }
 function rename(id,name){const meta=loadMeta(id);meta.name=String(name||meta.name).slice(0,80);saveMeta(meta);return summary(meta)}
-function remove(id){const dir=projectDir(id);loadMeta(id);fs.rmSync(dir,{recursive:true,force:true});return{deleted:id}}
+function remove(id){const dir=projectDir(id);loadMeta(id);require('./react-sql').closeEverywhere(dir);fs.rmSync(dir,{recursive:true,force:true});return{deleted:id}}
 
 // ---------- serving built files ----------
 const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8'};
@@ -428,4 +443,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={contentPolicy,initializeFrom,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

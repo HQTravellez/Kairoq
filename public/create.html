@@ -112,7 +112,7 @@
 <section class="screen hidden" id="editor">
   <aside class="chat">
     <ol class="messages" id="messages" aria-live="polite"></ol>
-    <div class="progress hidden" id="progress"><span class="dot"></span><span id="progress-text">Working…</span></div>
+    <div class="progress hidden" id="progress"><span class="dot"></span><span id="progress-text">Working…</span><button type="button" class="ghost link-btn" id="stop-job">Stop</button></div>
     <form id="visual-panel" class="composer visual hidden" aria-label="Visual edit">
       <p class="muted small" id="visual-hint">Click any element in the preview to edit it. Visual edits are free.</p>
       <div id="visual-fields" class="hidden">
@@ -137,9 +137,11 @@
         <div class="seg" role="group" aria-label="Mode">
           <button type="button" id="mode-build" aria-pressed="true">Build</button>
           <button type="button" id="mode-discuss" aria-pressed="false">Discuss</button>
+          <button type="button" id="mode-agent" aria-pressed="false" title="Works in steps: writes code, tests it in a browser, reads logs and fixes problems until done">Agent</button>
         </div>
         <select id="tier" aria-label="Model"></select>
         <button type="button" class="ghost icon" id="attach" aria-label="Attach images" title="Attach images (or paste a screenshot)">＋ Image</button>
+        <button type="button" class="ghost icon" id="figma-open" title="Build a Figma frame">Figma</button>
         <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
         <span class="muted small" id="cost-hint"></span>
         <button class="primary" id="send" type="submit">Send</button>
@@ -180,6 +182,20 @@
           <div><h3>Collections</h3><ul class="file-list" id="collections"></ul><h3>Users <span class="muted" id="user-count"></span></h3><ul class="users" id="users"></ul></div>
           <div><h3 id="records-title">Records</h3><ul class="records" id="records"></ul></div>
         </div>
+        <section id="sql-section" class="sql-section hidden">
+          <h3>SQL tables</h3>
+          <p class="muted small" id="sql-migrations"></p>
+          <div id="sql-tables"></div>
+          <form id="sql-form" class="sql-form hidden">
+            <label>Run SQL <span class="muted small">(owner only; one statement)</span><textarea id="sql-query" rows="3" spellcheck="false" placeholder="SELECT * FROM bookings ORDER BY id DESC LIMIT 20"></textarea></label>
+            <div class="row"><button class="ghost" type="submit">Run</button><span class="error small" id="sql-error" role="alert"></span></div>
+            <div id="sql-result"></div>
+          </form>
+        </section>
+        <section class="logs-section">
+          <h3>Server logs <button class="ghost link-btn" id="logs-refresh" type="button">Refresh</button></h3>
+          <ol class="logs" id="logs"></ol>
+        </section>
       </div>
       <div class="code hidden" id="code">
         <ul class="file-list" id="file-list"></ul>
@@ -246,6 +262,19 @@
   </form>
 </dialog>
 
+<dialog id="figma-dialog">
+  <form method="dialog" class="dialog" id="figma-form">
+    <h2>Import from Figma</h2>
+    <p class="muted small">In Figma, select a frame, then Share → Copy link to selection. Kairoq reads the frame's layout, colours, fonts, text and images and builds it.</p>
+    <label>Frame link<input id="figma-url" type="url" required placeholder="https://www.figma.com/design/…?node-id=12-34"></label>
+    <label>Personal access token <span class="muted small" id="figma-token-status"></span><input id="figma-token" type="password" autocomplete="off" placeholder="figd_… (File content: read)"></label>
+    <label class="check"><input type="checkbox" id="figma-save" checked> Save the token for this project (encrypted)</label>
+    <label>Notes for the AI <span class="muted small">(optional)</span><textarea id="figma-message" rows="2" placeholder="Make the booking button open a form that saves to the database"></textarea></label>
+    <p class="muted small" id="figma-cost"></p>
+    <p class="error" id="figma-error" role="alert"></p>
+    <div class="row end"><button class="primary" id="figma-import" type="button">Import and build</button><button class="ghost" value="close">Cancel</button></div>
+  </form>
+</dialog>
 <dialog id="security-dialog">
   <form method="dialog" class="dialog">
     <h2>Security check</h2>

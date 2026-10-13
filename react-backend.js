@@ -180,7 +180,7 @@ function liveConfig(meta){const n=meta.published?.version||meta.current_version;
 // rules while the published site runs the published ones. Only those two versions are served.
 function requestVersion(meta,req){
  const v=Number(req.headers['x-kairoq-version']);
- if(Number.isInteger(v)&&(v===meta.current_version||v===meta.published?.version))return v;
+ if(Number.isInteger(v)&&(v===meta.current_version||v===meta.published?.version||v===builder.testingVersion(meta.id)))return v;
  return meta.published?.version||meta.current_version;
 }
 let appAiImpl=null;
@@ -327,9 +327,15 @@ async function handle(req,res,{onlyProject}={}){
     secret:async name=>require('./project-secrets').get(id,'app_'+String(name).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
     db:async(op,a,u)=>functionDb(db,cfg,op,a,u),
     ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');return appAi(meta,db,a)},
+    sql:(q,p)=>require('./react-sql').run.query(builder.projectDir(id),q,p),
+    sqlBatch:steps=>require('./react-sql').run.batch(builder.projectDir(id),steps),
     email:async(a,u)=>extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
    };
-   const out=await require('./react-functions').invoke({source,request:{method:req.method,path:route,query:q0,headers,body,rawBody},user:publicUser(user),host});
+   const applog=require('./react-logs');
+   let out;
+   try{out=await require('./react-functions').invoke({source,request:{method:req.method,path:route,query:q0,headers,body,rawBody},user:publicUser(user),host})}
+   catch(e){applog.add(id,{level:'error',source:'functions/'+fnm[1]+'.js',message:req.method+' '+route+': '+(e.message||e)});throw e}
+   for(const line of out.logs||[])applog.add(id,{level:'log',source:'functions/'+fnm[1]+'.js',message:line});
    require('./react-functions').respond(res,out.result,CORS);
    return true;
   }
@@ -364,7 +370,11 @@ async function handle(req,res,{onlyProject}={}){
   if(rid&&req.method==='PATCH')return send(res,200,{item:update(db,collection,user,rid,(await readJson(req)).data)}),true;
   if(rid&&req.method==='DELETE')return send(res,200,remove(db,collection,user,rid)),true;
   throw fail(405,'Method not allowed');
- }catch(e){return send(res,Number.isInteger(e.status)?e.status:422,{error:String(e.message||e)}),true}
+ }catch(e){
+  const status=Number.isInteger(e.status)?e.status:422;
+  if(!route.startsWith('/functions/'))require('./react-logs').add(id,{level:status>=500?'error':'warn',source:'backend',message:req.method+' '+route+' → '+status+': '+String(e.message||e)});
+  return send(res,status,{error:String(e.message||e)}),true;
+ }
 }
 
 // ---------- owner view (Create "Data" tab) ----------

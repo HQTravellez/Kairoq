@@ -93,7 +93,9 @@ const __log=(...a)=>__sync('log',{args:a.map(v=>typeof v==='string'?v:(()=>{try{
 globalThis.console={log:__log,info:__log,warn:__log,error:__log};
 globalThis.fetch=__fetch;
 globalThis.__ctx=user=>({user,fetch:__fetch,log:__log,
- db:{collection:__col},
+ db:{collection:__col,
+  sql:(q,...p)=>Array.isArray(q)&&q.raw?__call('sql',{query:q.join('?'),params:p}):__call('sql',{query:String(q),params:p.length===1&&Array.isArray(p[0])?p[0]:p}),
+  batch:steps=>__call('sql.batch',{steps})},
  secrets:{get:n=>__call('secret',{name:String(n)})},
  ai:{chat:o=>__call('ai.chat',o)},
  email:{send:o=>__call('email',o)},
@@ -111,6 +113,8 @@ async function run({source,request,user,host}){
   fetch:async a=>{if(++fetches>MAX_FETCHES)throw fail(429,'fetch: at most '+MAX_FETCHES+' requests per call');return guardedFetch(a)},
   secret:async a=>host.secret(a.name),
   'db.list':a=>host.db('list',a,user),'db.get':a=>host.db('get',a,user),'db.create':a=>host.db('create',a,user),'db.update':a=>host.db('update',a,user),'db.remove':a=>host.db('remove',a,user),
+  sql:a=>{if(!host.sql)throw fail(501,'SQL is not available here');return host.sql(a.query,a.params)},
+  'sql.batch':a=>{if(!host.sqlBatch)throw fail(501,'SQL is not available here');return host.sqlBatch(a.steps)},
   'ai.chat':a=>host.ai(a,user),
   email:a=>host.email(a,user)
  };
@@ -184,6 +188,7 @@ module.exports={validate,list,run,respond,guardedFetch,privateAddress,functionNa
 // Functions run in worker threads so a slow or stuck function never blocks the
 // server; one that overruns its time limit is stopped by terminating its worker.
 const pool={workers:[],queue:[],seq:0};
+function need(fn){if(typeof fn!=='function')throw fail(501,'SQL is not available here');return fn}
 function poolSize(){const n=Number(process.env.KAIROQ_FUNCTION_WORKERS??4);return Number.isInteger(n)&&n>=1?Math.min(n,16):4}
 function invoke({source,request,user,host}){
  return new Promise((resolve,reject)=>{
@@ -200,7 +205,7 @@ function spawn(){
   if(msg.type==='host'){
    let reply;
    try{
-    const value=msg.op==='secret'?await job.host.secret(msg.args.name):msg.op==='db'?await job.host.db(msg.args.op,msg.args.args,msg.user):msg.op==='ai'?await job.host.ai(msg.args,msg.user):msg.op==='email'?await job.host.email(msg.args,msg.user):(()=>{throw Error('Unknown host call')})();
+    const value=msg.op==='secret'?await job.host.secret(msg.args.name):msg.op==='db'?await job.host.db(msg.args.op,msg.args.args,msg.user):msg.op==='ai'?await job.host.ai(msg.args,msg.user):msg.op==='email'?await job.host.email(msg.args,msg.user):msg.op==='sql'?await need(job.host.sql)(msg.args.query,msg.args.params):msg.op==='sqlBatch'?await need(job.host.sqlBatch)(msg.args.steps):(()=>{throw Error('Unknown host call')})();
     reply={type:'hostReply',callId:msg.callId,value:value===undefined?null:value};
    }catch(e){reply={type:'hostReply',callId:msg.callId,error:String(e.message||e),status:e.status}}
    if(w.job===job)w.thread.postMessage(reply);
