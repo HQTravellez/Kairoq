@@ -36,7 +36,7 @@ function ownedProject(v,id){
  if(meta.owner!==v.owner)throw Object.assign(Error('Unknown project'),{status:404});
  return meta;
 }
-function projectView(id){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token)}))}}
+function projectView(id){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking']);
 function intEnv(name,fallback){const n=Number(process.env[name]);return Number.isInteger(n)&&n>=0?n:fallback}
@@ -180,7 +180,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
   ownedProject(v,id);
   if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null}),true;
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
-  if(!action&&method==='DELETE'){hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
+  if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
@@ -189,6 +189,39 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}
   if(action==='/asset'&&method==='GET'){const file=require('./react-assets').read(id,new URL(req.url,'http://x').searchParams.get('name'));if(!file)throw Object.assign(Error('Unknown image'),{status:404});res.writeHead(200,{'Content-Type':file.type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'});res.end(file.bytes);return true}
+  if(action==='/settings'&&method==='GET'){
+   const secrets=require('./project-secrets');
+   return send(res,200,{settings:{secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM)}}),true;
+  }
+  if(action==='/settings'&&method==='POST'){
+   const b=await readJson(req,8000),secrets=require('./project-secrets');
+   const rules={stripe_secret_key:/^(sk|rk)_(live|test)_[A-Za-z0-9]{10,}$/,stripe_webhook_secret:/^whsec_[A-Za-z0-9]{10,}$/,github_token:/^(ghp_|github_pat_)[A-Za-z0-9_]{20,}$/};
+   for(const [name,re] of Object.entries(rules)){
+    if(b[name]===undefined)continue;
+    const value=String(b[name]||'').trim();
+    if(value&&!re.test(value))throw Object.assign(Error('That '+name.replace(/_/g,' ')+' does not look right'),{status:400});
+    secrets.set(id,name,value||null);
+   }
+   return send(res,200,{settings:{secrets:secrets.status(id)}}),true;
+  }
+  if(action==='/download'&&method==='GET'){
+   const meta=builder.loadMeta(id),bytes=require('./react-export').zip(id);
+   const name=String(meta.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)||'app';
+   res.writeHead(200,{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="'+name+'-v'+meta.current_version+'.zip"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(bytes);return true;
+  }
+  if(action==='/github'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{github:meta.github||null,token:require('./project-secrets').status(id).github_token||null,owner_fallback:v.kind==='owner'&&Boolean(process.env.GITHUB_TOKEN)}),true}
+  if(action==='/push'&&method==='POST'){const b=await readJson(req,2000);return send(res,200,{result:await require('./react-export').push(id,{repo:b.repo,isOwner:v.kind==='owner'}),project:projectView(id)}),true}
+  if(action==='/pull'&&method==='POST'){
+   for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('Wait for the current change to finish'),{status:409});
+   return send(res,200,{result:await require('./react-export').pull(id,{isOwner:v.kind==='owner'}),project:projectView(id)}),true;
+  }
+  if(action==='/inspect'&&method==='POST'){const b=await readJson(req,4000);return send(res,200,{element:builder.inspectElement(id,b)}),true}
+  if(action==='/visual'&&method==='POST'){
+   for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('Wait for the current change to finish'),{status:409});
+   const b=await readJson(req,20000);
+   const r=await builder.visualEdit(id,{loc:b.loc,version:b.version,changes:b.changes});
+   return send(res,200,{result:r,project:projectView(id)}),true;
+  }
   if(action==='/fix'&&method==='POST'){
    const b=await readJson(req,40000),meta=builder.loadMeta(id);
    const reported=Array.isArray(b.errors)?b.errors.map(e=>String(e).slice(0,800)).slice(0,10):[];
@@ -201,9 +234,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
   if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);hosting.publish(id,{slug:b.slug,version:b.version});return send(res,200,{project:projectView(id)}),true}
   if(action==='/unpublish'&&method==='POST'){hosting.unpublish(id);return send(res,200,{project:projectView(id)}),true}
-  if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);hosting.addDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
+  if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);await hosting.addDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
   if(action==='/verify'&&method==='POST'){const b=await readJson(req,2000);const r=await hosting.verifyDomain(id,b.hostname);return send(res,200,{verified:r.verified,error:r.error,project:projectView(id)}),true}
-  if(action==='/domains'&&method==='DELETE'){const b=await readJson(req,2000);hosting.removeDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
+  if(action==='/domains'&&method==='DELETE'){const b=await readJson(req,2000);await hosting.removeDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
   return send(res,404,{error:'Route not found'}),true;
  }catch(e){
   const status=Number.isInteger(e.status)?e.status:422;

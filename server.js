@@ -6916,6 +6916,7 @@ if (process.env.NODE_ENV !== "test") {
   recoverMediaJobs();
   setTimeout(() => schedulerTick().catch(()=>{}), 5_000);
   setInterval(() => schedulerTick().catch(()=>{}), 60_000);
+  setInterval(() => reactBackend.runAllSchedules().catch(e=>console.warn("[create-schedules]",e.message)), 5*60_000).unref();
   require("./scripts/verify-builder-assets").startup().catch(e=>console.warn("[builder-assets] PROVIDER SMOKE ERROR "+e.message));
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);

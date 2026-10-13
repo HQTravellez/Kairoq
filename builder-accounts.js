@@ -135,4 +135,5 @@ async function stripeWebhook(raw,signature,{fetchSession=id=>stripe('checkout/se
  return{credited:!result.duplicate,credits:pack.credits};
 }
 
-module.exports={signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,COOKIE};
+function email(id){return get(id)?.email||null}
+module.exports={email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,COOKIE};

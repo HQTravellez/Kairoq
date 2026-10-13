@@ -66,6 +66,23 @@
   <aside class="chat">
     <ol class="messages" id="messages" aria-live="polite"></ol>
     <div class="progress hidden" id="progress"><span class="dot"></span><span id="progress-text">Working…</span></div>
+    <form id="visual-panel" class="composer visual hidden" aria-label="Visual edit">
+      <p class="muted small" id="visual-hint">Click any element in the preview to edit it. Visual edits are free.</p>
+      <div id="visual-fields" class="hidden">
+        <strong id="visual-tag"></strong>
+        <label id="visual-text-label">Text<textarea id="visual-text" rows="3"></textarea></label>
+        <label>Style classes (Tailwind)<input id="visual-class" spellcheck="false"></label>
+        <div class="swatches" id="swatches" aria-label="Quick colours"></div>
+        <div id="visual-image" class="hidden">
+          <label>Image<input id="visual-src" spellcheck="false" placeholder="https://… or ./uploads/…"></label>
+          <select id="visual-uploads" aria-label="Uploaded images"></select>
+          <label>Alt text<input id="visual-alt"></label>
+        </div>
+        <div class="row end"><button class="primary" id="visual-apply" type="submit">Apply</button></div>
+      </div>
+      <p class="error" id="visual-error" role="alert"></p>
+      <div class="row end"><button class="ghost" id="visual-cancel" type="button">Done editing</button></div>
+    </form>
     <form id="chat-form" class="composer">
       <div class="attachments hidden" id="attachments"></div>
       <textarea id="chat-input" rows="3" placeholder="Ask for a change: add a pricing section, make the header sticky…" required></textarea>
@@ -96,7 +113,9 @@
       </div>
       <select id="versions" aria-label="Version"></select>
       <button class="ghost" id="restore" type="button">Restore</button>
+      <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits">✎ Edit</button>
       <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
+      <button class="ghost" id="settings-open" type="button">Settings</button>
       <button class="primary" id="publish-open" type="button">Publish</button>
     </div>
     <div class="errors hidden" id="errors" role="status">
@@ -107,6 +126,7 @@
       <iframe id="frame" title="App preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
       <div class="data hidden" id="data">
         <p class="muted small">Saved data and sign-ups from this app. Preview and published versions share one database.</p>
+        <p class="small" id="data-features"></p>
         <div class="data-grid">
           <div><h3>Collections</h3><ul class="file-list" id="collections"></ul><h3>Users <span class="muted" id="user-count"></span></h3><ul class="users" id="users"></ul></div>
           <div><h3 id="records-title">Records</h3><ul class="records" id="records"></ul></div>
@@ -131,6 +151,28 @@
     <div class="row"><input id="domain" placeholder="www.example.com"><button class="ghost" id="add-domain" type="button">Add</button></div>
     <ul class="domains" id="domains"></ul>
     <p class="error" id="publish-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="settings-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Project settings</h2>
+    <h3>Code</h3>
+    <div class="row"><a class="link" id="download" download>Download code (ZIP)</a></div>
+    <label>GitHub repository<input id="gh-repo" placeholder="your-name/my-app" spellcheck="false"></label>
+    <label>GitHub token <span class="muted small" id="gh-token-status"></span><input id="gh-token" type="password" autocomplete="off" placeholder="github_pat_… (Contents: read and write)"></label>
+    <div class="row"><button class="primary" id="gh-push" type="button">Push to GitHub</button><button class="ghost" id="gh-pull" type="button">Pull changes from GitHub</button></div>
+    <p class="muted small" id="gh-status"></p>
+    <h3>Payments (Stripe)</h3>
+    <p class="muted small">Connect your own Stripe account so the app can take payments. Keys are encrypted and never shown again.</p>
+    <label>Secret key <span class="muted small" id="stripe-key-status"></span><input id="stripe-key" type="password" autocomplete="off" placeholder="sk_live_… or rk_live_…"></label>
+    <label>Webhook signing secret <span class="muted small" id="stripe-hook-status"></span><input id="stripe-hook" type="password" autocomplete="off" placeholder="whsec_…"></label>
+    <p class="muted small">In Stripe, add a webhook endpoint <code id="stripe-hook-url"></code> for <span id="stripe-events"></span>.</p>
+    <div class="row"><button class="primary" id="settings-save" type="button">Save keys</button></div>
+    <h3>Email</h3>
+    <p class="muted small" id="email-status"></p>
+    <p class="error" id="settings-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>

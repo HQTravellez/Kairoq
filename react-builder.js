@@ -54,6 +54,11 @@ Rules:
   collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
   Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (contact forms, guestbooks). Only a record's creator can update or delete it.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
+  Optional features (add them to src/backend.json only when the app needs them):
+  - File uploads: "storage":{"access":"signed-in"} (or "public"). import { storage } from 'kairoq'; const f=await storage.upload(fileFromInput) returns {id,url,name}; save f.url in a record to show it later. Images, PDF, text and CSV up to 5 MB.
+  - Email: "email":true. import { email } from 'kairoq'; await email.send({to:'owner',subject,text}) notifies the app owner (for contact and booking forms); to:'me' emails the signed-in user.
+  - Payments: "payments":{"products":{"pro":{"price":"price_REPLACE_ME","mode":"payment"}}} (mode "subscription" for plans). import { payments } from 'kairoq'; await payments.checkout('pro') opens Stripe Checkout for the signed-in user; await payments.has('pro') checks a purchase. Tell the user to replace price ids with their Stripe price ids and connect Stripe in Settings.
+  - Scheduled jobs: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
 Respond with ONLY a JSON object, no markdown fences:
@@ -134,7 +139,7 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
   const modules=path.join(__dirname,'node_modules');
   const output=[];
   const logger={info(){},warn(m){output.push(String(m))},warnOnce(m){output.push(String(m))},error(m){output.push(String(m))},clearScreen(){},hasErrorLogged(){return false},hasWarned:false};
-  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react(),kairoqClient(projectId)],
+  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId)],
    resolve:{alias:Object.fromEntries(['react','react-dom','lucide-react','react-router-dom'].map(p=>[p,path.join(modules,p)])),dedupe:['react','react-dom']},
    css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:{extend:{}}})]}},
    server:{fs:{strict:true,allow:[work]}},
@@ -273,6 +278,35 @@ async function discuss(id,question,{callModel,onStream,signal,tier='standard',im
  return{message:answer};
 }
 
+// Validates, builds and saves source files as a new version without the AI.
+async function saveSource(id,files,{summary,changed=[],extra={},message}={}){
+ const errors=validateFiles(files);
+ if(errors.length)throw Object.assign(Error(errors.slice(0,5).join('\n')),{status:400});
+ const meta=loadMeta(id),n=Math.max(0,...meta.versions.map(v=>v.n))+1,dir=versionDir(id,n);
+ try{await build(files,path.join(dir,'dist'),{projectId:id})}
+ catch(e){fs.rmSync(dir,{recursive:true,force:true});throw Object.assign(Error('That change does not build: '+String(e.message).slice(0,500)),{status:400})}
+ writeJson(path.join(dir,'files.json'),files);
+ const fresh=loadMeta(id);
+ fresh.versions.push({n,at:new Date().toISOString(),summary:String(summary).slice(0,200),changed,...extra});
+ fresh.current_version=n;
+ fresh.messages.push({role:'assistant',text:message||summary+'.',version:n,changed,mode:extra.visual?'visual':'system',at:new Date().toISOString()});
+ saveMeta(fresh);
+ return{version:n,summary,preview_url:previewUrl(fresh)};
+}
+// Applies a visual edit (text, classes, image) without the AI and saves it as a new version.
+async function visualEdit(id,{loc,version,changes}){
+ const meta=loadMeta(id);
+ if(Number(version)!==meta.current_version)throw Object.assign(Error('Switch to the latest version to edit visually'),{status:409});
+ const base=loadFiles(id,meta.current_version);
+ const {files:next,summary}=require('./react-visual').applyEdit(base,loc,changes||{});
+ const file=require('./react-visual').parseLoc(loc).file;
+ return saveSource(id,next,{summary,changed:[file],extra:{visual:true}});
+}
+function inspectElement(id,{loc,version}){
+ const meta=loadMeta(id);
+ const n=Number(version)||meta.current_version;
+ return{...require('./react-visual').inspect(loadFiles(id,n),loc),latest:n===meta.current_version};
+}
 function restore(id,n){
  const meta=loadMeta(id);n=Number(n);
  if(!meta.versions.some(v=>v.n===n))throw Object.assign(Error('Unknown version'),{status:404});
@@ -318,4 +352,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={create,initialize,list,detail,readFile,edit,discuss,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

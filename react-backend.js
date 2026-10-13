@@ -28,7 +28,7 @@ function normalizeConfig(cfg){
   collections[name]={access};
  }
  if(Object.keys(collections).length>30)throw Error('src/backend.json can declare up to 30 collections.');
- return{collections};
+ return{collections,...require('./react-backend-extras').normalizeExtras(cfg,collections)};
 }
 function configErrors(files){try{parseConfig(files);return[]}catch(e){return[e.message]}}
 
@@ -42,6 +42,7 @@ function database(id){
   CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS records(id TEXT PRIMARY KEY,collection TEXT NOT NULL,owner_id TEXT,data TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
   CREATE INDEX IF NOT EXISTS records_collection ON records(collection,created_at);`);
+ require('./react-backend-extras').migrate(db);
  dbs.set(file,db);
  return db;
 }
@@ -162,9 +163,19 @@ async function handle(req,res,{onlyProject}={}){
   if(route==='/auth/signin'&&req.method==='POST')return send(res,200,signIn(db,await readJson(req))),true;
   if(route==='/auth/signout'&&req.method==='POST'){const t=/^Bearer (.+)$/.exec(String(req.headers.authorization||''));if(t)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(t[1]));return send(res,200,{ok:true}),true}
   if(route==='/auth/user'&&req.method==='GET')return send(res,200,{user:publicUser(user)}),true;
+  const extras=require('./react-backend-extras'),q0=Object.fromEntries(u.searchParams);
+  if(route==='/payments/webhook'&&req.method==='POST')return send(res,200,await extras.paymentWebhook(req,{id,meta,db})),true;
+  const cfg=liveConfig(meta);
+  if(route==='/files'&&req.method==='POST')return send(res,201,{file:await extras.upload(req,{id,db,cfg,user,query:q0})}),true;
+  const fm=/^\/files\/([a-f0-9-]{36})$/.exec(route);
+  if(fm&&req.method==='GET'){extras.serveFile(res,{id,db,fid:fm[1]});return true}
+  if(fm&&req.method==='DELETE')return send(res,200,extras.removeFile({id,db,user,fid:fm[1]})),true;
+  if(route==='/email'&&req.method==='POST')return send(res,200,await extras.sendEmail(await readJson(req,20000),{meta,db,cfg,user})),true;
+  if(route==='/payments/checkout'&&req.method==='POST')return send(res,200,await extras.checkout(await readJson(req),{id,meta,cfg,user,req})),true;
+  if(route==='/payments/mine'&&req.method==='GET')return send(res,200,{purchases:extras.myPurchases(db,user)}),true;
   const c=/^\/collections\/([a-z][a-z0-9_]{0,39})(?:\/([a-f0-9-]{36}))?$/.exec(route);
   if(!c)throw fail(404,'Unknown backend route');
-  const collection=c[1],rid=c[2],def=liveConfig(meta).collections[collection];
+  const collection=c[1],rid=c[2],def=cfg.collections[collection];
   if(!def)throw fail(404,'Collection "'+collection+'" is not declared in src/backend.json');
   const q=Object.fromEntries(u.searchParams);
   if(!rid&&req.method==='GET')return send(res,200,{items:list(db,def.access,collection,user,q)}),true;
@@ -181,6 +192,9 @@ function overview(id){
  const meta=builder.loadMeta(id),cfg=liveConfig(meta),db=database(id);
  const counts=Object.fromEntries(db.prepare('SELECT collection,COUNT(*) n FROM records GROUP BY collection').all().map(r=>[r.collection,r.n]));
  return{
+  features:{storage:cfg.storage||null,email:!!cfg.email,payments:cfg.payments?Object.keys(cfg.payments.products):[],schedules:(cfg.schedules||[]).map(s=>({...s,...(db.prepare('SELECT last_run,last_result FROM schedule_runs WHERE name=?').get(s.name)||{})}))},
+  files:db.prepare('SELECT COUNT(*) n,COALESCE(SUM(size),0) bytes FROM files').get(),
+  payments:db.prepare('SELECT p.product,p.mode,p.status,p.amount,p.currency,p.created_at,u.email FROM payments p LEFT JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC LIMIT 50').all(),
   collections:Object.entries(cfg.collections).map(([name,def])=>({name,access:def.access,count:counts[name]||0})),
   users:db.prepare('SELECT id,email,name,created_at FROM users ORDER BY created_at DESC LIMIT 100').all(),
   user_count:db.prepare('SELECT COUNT(*) n FROM users').get().n
@@ -224,8 +238,38 @@ export function collection(name){
     async remove(id){await call(p+'/'+id,{method:'DELETE'})}
   };
 }
-export default{auth,collection};
+export const storage={
+  async upload(file,{name}={}){
+    const r=await fetch(BASE+'/files?name='+encodeURIComponent(name||file.name||'file'),{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream',...(token?{Authorization:'Bearer '+token}:{})},body:file});
+    const d=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(d.error||'Upload failed'),{status:r.status});
+    return{...d.file,url:new URL(d.file.url,BASE.startsWith('http')?BASE:location.href).toString()};
+  },
+  url(id){return BASE+'/files/'+id},
+  async remove(id){await call('/files/'+id,{method:'DELETE'})}
+};
+export const email={
+  async send({to='owner',subject,text}){return call('/email',{method:'POST',body:{to,subject,text}})}
+};
+export const payments={
+  async checkout(product){
+    const {url}=await call('/payments/checkout',{method:'POST',body:{product,return_url:location.href}});
+    try{if(window.top===window){location.href=url;return}}catch{}
+    window.open(url,'_blank','noopener');
+  },
+  async purchases(){return(await call('/payments/mine')).purchases},
+  async has(product){return(await this.purchases()).some(p=>p.product===product&&p.status==='active')}
+};
+export default{auth,collection,storage,email,payments};
 `;
 }
 
-module.exports={handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+// Runs due scheduled jobs for every project (called on a timer by the server).
+async function runAllSchedules(options){
+ const out=[];
+ for(const p of builder.list()){
+  try{const meta=builder.loadMeta(p.id),cfg=liveConfig(meta);if(!cfg.schedules||!cfg.schedules.length)continue;
+   const r=await require('./react-backend-extras').runSchedules(p.id,cfg,database(p.id),meta,options);if(r.length)out.push({project:p.id,results:r})}catch(e){out.push({project:p.id,error:e.message})}
+ }
+ return out;
+}
+module.exports={runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};

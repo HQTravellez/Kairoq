@@ -112,7 +112,7 @@ function renderVersions(){
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
-function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();$('frame').src=url;$('open').href=url}
+function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url}
 $('versions').onchange=()=>setPreview(previewFor($('versions').value));
 $('restore').onclick=async()=>{
  const n=Number($('versions').value);if(n===state.project.current_version)return;
@@ -138,6 +138,12 @@ async function renderData(){
  if(!d.collections.some(c=>c.name===state.collection))state.collection=d.collections[0]?.name;
  for(const c of d.collections){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.textContent=c.name+' ('+c.count+') · '+c.access;b.setAttribute('aria-current',String(c.name===state.collection));b.onclick=()=>{state.collection=c.name;renderData()};li.append(b);list.append(li)}
  text($('user-count'),'('+d.user_count+')');
+ const feats=[];
+ if(d.features.storage)feats.push('Files: '+d.files.n+' ('+Math.round(d.files.bytes/1024)+' KB)');
+ if(d.features.email)feats.push('Email on');
+ if(d.features.payments.length)feats.push('Payments: '+d.payments.length+' purchase'+(d.payments.length===1?'':'s')+' of '+d.features.payments.join(', '));
+ for(const sc of d.features.schedules)feats.push('Schedule "'+sc.name+'" every '+sc.every+(sc.last_result?' · last: '+sc.last_result:''));
+ text($('data-features'),feats.join(' · '));
  const users=$('users');users.replaceChildren();
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
@@ -266,9 +272,59 @@ async function watch(job){
 function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;$('fix').disabled=on;if(label)text($('progress-text'),label)}
 async function refreshCredits(){try{const v=await loadMe();if(v&&v.account)renderCredits(v.account)}catch{}}
 
+// ---------- visual edits ----------
+state.selecting=false;
+function postFrame(msg){try{$('frame').contentWindow.postMessage({source:'kairoq-editor',...msg},'*')}catch{}}
+$('frame').addEventListener('load',()=>{if(state.selecting)setTimeout(()=>postFrame({type:'select-mode',on:true}),300)});
+function previewVersion(){return Number($('versions').value)||state.project.current_version}
+$('visual-toggle').onclick=()=>{
+ state.selecting=!state.selecting;
+ if(state.selecting&&previewVersion()!==state.project.current_version){$('versions').value=state.project.current_version;setPreview(state.project.preview_url)}
+ if(state.selecting)view('preview');
+ $('visual-toggle').setAttribute('aria-pressed',String(state.selecting));
+ postFrame({type:'select-mode',on:state.selecting});
+ state.selected=null;renderVisual();
+};
+$('visual-cancel').onclick=()=>{state.selecting=false;$('visual-toggle').setAttribute('aria-pressed','false');postFrame({type:'select-mode',on:false});state.selected=null;renderVisual()};
+const COLORS=[['slate-900','#0f172a'],['white','#ffffff'],['rose-600','#e11d48'],['amber-500','#f59e0b'],['emerald-600','#059669'],['sky-600','#0284c7'],['indigo-600','#4f46e5'],['violet-600','#7c3aed']];
+function renderVisual(){
+ $('visual-panel').classList.toggle('hidden',!state.selecting);
+ $('chat-form').classList.toggle('hidden',state.selecting);
+ const el=state.selected;
+ $('visual-fields').classList.toggle('hidden',!el);
+ text($('visual-hint'),el?'Editing this element. Click another element to switch.':'Click any element in the preview to edit it. Visual edits are free.');
+ text($('visual-error'),'');
+ if(!el)return;
+ text($('visual-tag'),'<'+el.tag+'>');
+ $('visual-text').value=el.text??'';$('visual-text').disabled=!el.text_editable;
+ text($('visual-text-label').firstChild,el.text_editable?'Text':'Text (set by code: ask the AI to change it)');
+ $('visual-class').value=el.class_name??'';$('visual-class').disabled=el.class_name===null;
+ $('visual-image').classList.toggle('hidden',el.tag!=='img');
+ $('visual-src').value=el.src??'';$('visual-alt').value=el.alt??'';
+ const sw=$('swatches');sw.replaceChildren();
+ for(const kind of ['text','bg']){const lab=document.createElement('span');lab.className='muted small swatch-label';lab.textContent=kind==='bg'?'Background':'Text';sw.append(lab);for(const [name,hex] of COLORS){const b=document.createElement('button');b.type='button';b.style.background=hex;b.title=kind+'-'+name;b.setAttribute('aria-label',(kind==='bg'?'Background ':'Text ')+name);if(kind==='bg')b.style.borderRadius='4px';b.onclick=()=>{const re=kind==='bg'?/\bbg-[a-z]+(-\d+)?\b/g:/\btext-(?:white|black|[a-z]+-\d+)\b/g;$('visual-class').value=($('visual-class').value.replace(re,'').trim()+' '+kind+'-'+name).trim()};sw.append(b)}}
+ if(el.tag==='img')api('/projects/'+state.project.id+'/assets').then(({assets})=>{const sel=$('visual-uploads');sel.replaceChildren(new Option('Use an uploaded image…',''));for(const a of assets)sel.append(new Option(a.name,a.path))}).catch(()=>{});
+}
+$('visual-uploads').onchange=()=>{if($('visual-uploads').value)$('visual-src').value=$('visual-uploads').value};
+$('visual-panel').onsubmit=async e=>{
+ e.preventDefault();const el=state.selected;if(!el)return;
+ const changes={};
+ if(el.text_editable&&$('visual-text').value!==(el.text??''))changes.text=$('visual-text').value;
+ if(el.class_name!==null&&$('visual-class').value!==(el.class_name??''))changes.className=$('visual-class').value;
+ if(el.tag==='img'){if($('visual-src').value!==(el.src??''))changes.src=$('visual-src').value;if($('visual-alt').value!==(el.alt??''))changes.alt=$('visual-alt').value}
+ if(!Object.keys(changes).length){text($('visual-error'),'Nothing changed yet.');return}
+ $('visual-apply').disabled=true;
+ try{
+  const {project}=await api('/projects/'+state.project.id+'/visual',{method:'POST',body:{loc:el.loc,version:state.project.current_version,changes}});
+  state.project=project;state.selected=null;renderMessages();renderVersions();setPreview(project.preview_url);
+ }catch(err){text($('visual-error'),err.message)}
+ finally{$('visual-apply').disabled=false}
+};
+
 // ---------- runtime errors from the preview ----------
 window.addEventListener('message',e=>{
  if(e.source!==$('frame').contentWindow||!e.data||e.data.source!=='kairoq-app')return;
+ if(e.data.type==='select'&&state.selecting){api('/projects/'+state.project.id+'/inspect',{method:'POST',body:{loc:e.data.loc,version:previewVersion()}}).then(({element})=>{state.selected={...element,loc:e.data.loc};renderVisual()}).catch(err=>{state.selected=null;renderVisual();text($('visual-error'),err.message)});return}
  if(e.data.type==='runtime-error'){const msg=String(e.data.message||'').slice(0,800);if(msg&&!state.runtimeErrors.includes(msg)&&state.runtimeErrors.length<10){state.runtimeErrors.push(msg);renderErrors()}}
 });
 function currentVersionErrors(){return state.project?.versions.find(v=>v.n===state.project.current_version)?.runtime_errors||[]}
@@ -303,11 +359,12 @@ function renderPublish(){
   const li=document.createElement('li'),head=document.createElement('div');
   head.className='row';head.style.marginTop='0';
   const name=document.createElement('strong');name.textContent=d.hostname;name.style.flex='1';
-  const badge=document.createElement('span');badge.className='badge'+(d.verified?' live':'');badge.textContent=d.verified?'Connected':'Waiting for DNS';
+  const badge=document.createElement('span');badge.className='badge'+(d.verified?' live':'');badge.textContent=d.verified?(d.https==='manual'?'Connected · add in Railway for HTTPS':d.https&&/VALID|ISSUED/i.test(d.https)?'Connected · HTTPS':'Connected'):'Waiting for DNS';
   head.append(name,badge);
   if(!d.verified){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent='Verify';b.onclick=()=>domainAction('/verify','POST',d.hostname);head.append(b)}
   const rm=document.createElement('button');rm.type='button';rm.className='ghost';rm.textContent='Remove';rm.onclick=()=>domainAction('/domains','DELETE',d.hostname);head.append(rm);
   li.append(head);
+  if(d.railway_error){const p=document.createElement('p');p.className='error small';p.textContent='Automatic HTTPS setup failed: '+d.railway_error;li.append(p)}
   if(!d.verified){
    const dns=document.createElement('div');dns.className='dns';
    const intro=document.createElement('span');intro.className='muted';intro.textContent='Add these records at your domain provider:';dns.append(intro);
@@ -331,6 +388,53 @@ async function domainAction(path,method,hostname){
  try{const r=await api('/projects/'+state.project.id+path,{method,body:{hostname}});state.project=r.project;renderPublish();if(r.error)text($('publish-error'),r.error)}
  catch(err){text($('publish-error'),err.message)}
 }
+
+// ---------- settings: code, GitHub, Stripe ----------
+$('settings-open').onclick=async()=>{
+ text($('settings-error'),'');text($('gh-status'),'');
+ $('download').href='/api/create/projects/'+state.project.id+'/download';
+ try{
+  const [{settings},gh]=await Promise.all([api('/projects/'+state.project.id+'/settings'),api('/projects/'+state.project.id+'/github')]);
+  const st=settings.secrets;
+  text($('stripe-key-status'),st.stripe_secret_key?'(saved '+st.stripe_secret_key.hint+')':'');
+  text($('stripe-hook-status'),st.stripe_webhook_secret?'(saved '+st.stripe_webhook_secret.hint+')':'');
+  text($('gh-token-status'),gh.token?'(saved '+gh.token.hint+')':gh.owner_fallback?'(using the server GITHUB_TOKEN)':'');
+  text($('stripe-hook-url'),settings.stripe_webhook_url);text($('stripe-events'),settings.stripe_events.join(', '));
+  text($('email-status'),settings.email?'Email is set up. Apps can notify you with email.send({to:"owner", …}).':'Email is not set up on this server yet (KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM).');
+  $('gh-repo').value=gh.github?.repo||'';
+  if(gh.github?.last_push)text($('gh-status'),'Last push: version '+gh.github.last_push.version+' · '+when(gh.github.last_push.at));
+  if(!settings.encryption)text($('settings-error'),'Saving keys needs APP_ENCRYPTION_KEY on the server.');
+ }catch(err){text($('settings-error'),err.message)}
+ $('settings-dialog').showModal();
+};
+async function saveSecrets(fields){
+ const body={};for(const [id,name] of fields){const v=$(id).value.trim();if(v)body[name]=v}
+ if(!Object.keys(body).length)return;
+ await api('/projects/'+state.project.id+'/settings',{method:'POST',body});
+ for(const [id] of fields)$(id).value='';
+}
+$('settings-save').onclick=async()=>{
+ text($('settings-error'),'');
+ try{await saveSecrets([['stripe-key','stripe_secret_key'],['stripe-hook','stripe_webhook_secret']]);$('settings-open').click()}catch(err){text($('settings-error'),err.message)}
+};
+$('gh-push').onclick=async()=>{
+ text($('settings-error'),'');text($('gh-status'),'Pushing…');$('gh-push').disabled=true;
+ try{
+  await saveSecrets([['gh-token','github_token']]);
+  const {result}=await api('/projects/'+state.project.id+'/push',{method:'POST',body:{repo:$('gh-repo').value}});
+  $('gh-status').replaceChildren(document.createTextNode(result.unchanged?'Already up to date. ':'Pushed. '),Object.assign(document.createElement('a'),{href:result.url,target:'_blank',rel:'noopener',textContent:'Open on GitHub ↗'}));
+ }catch(err){text($('gh-status'),'');text($('settings-error'),err.message)}
+ finally{$('gh-push').disabled=false}
+};
+$('gh-pull').onclick=async()=>{
+ text($('settings-error'),'');text($('gh-status'),'Pulling…');$('gh-pull').disabled=true;
+ try{
+  const {result,project}=await api('/projects/'+state.project.id+'/pull',{method:'POST'});
+  if(result.unchanged)text($('gh-status'),'No changes on GitHub.');
+  else{text($('gh-status'),'Pulled '+result.changed.length+' changed file'+(result.changed.length===1?'':'s')+' as version '+result.version+'.');state.project=project;renderMessages();renderVersions();setPreview(project.preview_url)}
+ }catch(err){text($('gh-status'),'');text($('settings-error'),err.message)}
+ finally{$('gh-pull').disabled=false}
+};
 
 // ---------- credits ----------
 $('buy').onclick=()=>openBuy();

@@ -28,6 +28,33 @@
   - In build mode, images are also saved as project uploads. Every build copies them to `./uploads/<name>`, so the app can use your logo and photos.
 - **Credits per message:** Standard `KAIROQ_STANDARD_CREDITS` (1), Pro `KAIROQ_PRO_CREDITS` (5), Discuss `KAIROQ_DISCUSS_CREDITS` (1), plus `KAIROQ_IMAGE_CREDITS` (1) when images are attached. Credits are refunded when a message fails.
 
+## Visual edits
+
+**Edit** turns on click-to-select in the preview. Builds tag every JSX element with `data-kq="file:line:col"` (`react-visual.js`).
+
+- Selecting an element shows its text, Tailwind classes and, for images, `src` and `alt`. There are quick text and background colour swatches.
+- **Apply** rewrites that element in the source and builds a new version. There's no AI call and no credit.
+- Text or classes set by code (expressions) can't be edited visually. The panel says so and suggests asking the AI.
+
+## Code download and GitHub
+
+- **Settings → Download code** gives a ZIP of a standard Vite + React + Tailwind project (`npm install && npm run dev`). Its `src/kairoq.js` keeps using the app's backend on Kairoq.
+- **Push to GitHub:**
+  - Commits the current version to `owner/repo`, creating a private repo if needed.
+  - Uses the customer's fine-grained token (stored encrypted), or the server `GITHUB_TOKEN` for the owner.
+  - Files Kairoq doesn't manage, like `.github/`, are kept.
+- **Pull from GitHub:** brings `src/` changes back as a new version, after the same safety checks and build.
+
+## Automatic HTTPS for custom domains
+
+With `RAILWAY_API_TOKEN` (or `RAILWAY_PROJECT_TOKEN`) set:
+
+- Adding a domain also registers it on this Railway service (`customDomainCreate`).
+- Kairoq shows Railway's DNS records alongside the `_kairoq` TXT record. Railway issues the certificate once DNS is correct.
+- Removing the domain, or deleting the project, removes it from Railway.
+
+Without a token, add each verified domain in Railway by hand. If the API call fails, the error is shown on the domain.
+
 ## Backend for generated apps
 
 Every Create project has its own backend: user accounts and saved records in a per-project SQLite database (`workspace/react-projects/<id>/data.sqlite`). Generated code uses it through the built-in `kairoq` module:
@@ -58,6 +85,28 @@ Collections must be declared in `src/backend.json`, which the model writes along
 - Preview and published versions share one database. The access rules come from the published version, or from the current draft if the app isn't published.
 - In the editor, the **Data** tab shows collections, records and sign-ups, and lets the owner delete records.
 - In sandboxed pages (preview and `/sites/`), sign-ins last until the page reloads because browser storage is unavailable. On subdomains and custom domains, sign-ins persist.
+
+### Optional backend features
+
+Enable these in `src/backend.json`. The model adds them when the app needs them.
+
+- **File uploads.** Add `"storage":{"access":"signed-in"}` (or `"public"`).
+  - In code: `storage.upload(file)` returns `{id, url}`.
+  - Allowed: images, PDF, text and CSV, up to 5 MB each, with `KAIROQ_APP_STORAGE_MB` per app (default 500).
+  - Files are served with a sandbox CSP. Only the uploader can delete a file.
+- **Email.** Add `"email":true`.
+  - In code: `email.send({to:'owner'|'me', subject, text})`.
+  - Mail goes only to the app owner (the Create account's email, or `KAIROQ_OWNER_EMAIL` for owner-built apps) or to the signed-in user. Apps can't be used to spam other people.
+  - Limits: anonymous senders 5 per hour, signed-in users 20 per hour, 200 per app per day.
+  - Sent through Resend (`KAIROQ_RESEND_API_KEY`, `KAIROQ_EMAIL_FROM`).
+- **Payments.** Add `"payments":{"products":{"pro":{"price":"price_…","mode":"payment"|"subscription"}}}`.
+  - The app owner connects their own Stripe secret key and webhook secret under **Settings**. Both are encrypted with `APP_ENCRYPTION_KEY`.
+  - In code: `payments.checkout('pro')` starts Stripe Checkout for the signed-in user. The return URL must point to the app itself.
+  - Purchases are recorded only from a signed webhook, after re-reading the Checkout Session with the owner's key.
+  - In code: `payments.has('pro')` / `payments.purchases()`. Payments show in the Data tab.
+- **Scheduled jobs.** Add `"schedules":[…]` with `every` set to `hour`, `day` or `week`.
+  - Actions: `delete_older_than` (with `days`) and `email_owner_summary`.
+  - The server checks for due jobs every 5 minutes.
 
 ## Checking real-model quality
 

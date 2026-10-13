@@ -59,22 +59,29 @@ function unpublish(id){
  return{published:null};
 }
 
-function dnsInstructions(hostname,token){
+function dnsInstructions(hostname,token,entry){
+ const txt={type:'TXT',name:'_kairoq.'+hostname,value:'kairoq-verify='+token,note:'Proves you own the domain.'};
+ // Railway's own records (when the domain was registered through its API) replace the generic CNAME.
+ if(entry&&entry.railway&&entry.railway.dns&&entry.railway.dns.length)return[...entry.railway.dns.map(r=>({type:r.type,name:r.name,value:r.value,note:'Routes your domain to Kairoq and lets Railway issue the HTTPS certificate.'})),txt];
  const target=sitesDomain()?'sites.'+sitesDomain():mainHost()||'your Kairoq domain';
  return[
   {type:'CNAME',name:hostname,value:target,note:'Points your domain at Kairoq. For a root domain (example.com) use your DNS provider\'s ALIAS/ANAME or flattened CNAME.'},
   {type:'TXT',name:'_kairoq.'+hostname,value:'kairoq-verify='+token,note:'Proves you own the domain.'}
  ];
 }
-function addDomain(id,hostname){
+async function addDomain(id,hostname,{railway=require('./react-railway')}={}){
  const meta=builder.loadMeta(id),host=normalizeHost(hostname);
  const registry=readRegistry();
  if(registry.domains[host]&&registry.domains[host]!==id)throw Object.assign(Error('That domain is connected to another project'),{status:409});
  meta.domains=meta.domains||[];
  let entry=meta.domains.find(d=>d.hostname===host);
  if(!entry){if(meta.domains.length>=5)throw Object.assign(Error('A project can have up to 5 domains'),{status:400});entry={hostname:host,token:crypto.randomBytes(12).toString('hex'),verified:false,added_at:new Date().toISOString()};meta.domains.push(entry)}
+ if(railway.configured()&&!entry.railway){
+  try{entry.railway=await railway.addDomain(host);delete entry.railway_error}
+  catch(e){entry.railway_error=String(e.message||e).slice(0,300)}
+ }
  builder.saveMeta(meta);
- return{domain:entry,dns:dnsInstructions(host,entry.token)};
+ return{domain:entry,dns:dnsInstructions(host,entry.token,entry)};
 }
 async function verifyDomain(id,hostname,{resolveTxt=dns.resolveTxt}={}){
  const meta=builder.loadMeta(id),host=normalizeHost(hostname);
@@ -83,7 +90,7 @@ async function verifyDomain(id,hostname,{resolveTxt=dns.resolveTxt}={}){
  if(!meta.published)throw Object.assign(Error('Publish the app before connecting a domain'),{status:409});
  let records=[];
  try{records=(await resolveTxt('_kairoq.'+host)).map(parts=>parts.join(''))}catch{}
- if(!records.includes('kairoq-verify='+entry.token))return{verified:false,domain:entry,dns:dnsInstructions(host,entry.token),error:'The TXT record was not found yet. DNS changes can take a few minutes to an hour.'};
+ if(!records.includes('kairoq-verify='+entry.token))return{verified:false,domain:entry,dns:dnsInstructions(host,entry.token,entry),error:'The TXT record was not found yet. DNS changes can take a few minutes to an hour.'};
  const registry=readRegistry();
  if(registry.domains[host]&&registry.domains[host]!==id)throw Object.assign(Error('That domain is connected to another project'),{status:409});
  registry.domains[host]=id;writeRegistry(registry);
@@ -91,8 +98,10 @@ async function verifyDomain(id,hostname,{resolveTxt=dns.resolveTxt}={}){
  builder.saveMeta(meta);
  return{verified:true,domain:entry,urls:siteUrls(meta)};
 }
-function removeDomain(id,hostname){
+async function removeDomain(id,hostname,{railway=require('./react-railway')}={}){
  const meta=builder.loadMeta(id),host=normalizeHost(hostname),registry=readRegistry();
+ const entry=(meta.domains||[]).find(d=>d.hostname===host);
+ if(entry&&entry.railway&&entry.railway.id&&railway.configured()){try{await railway.removeDomain(entry.railway.id)}catch(e){console.warn('[railway] remove domain',host,e.message)}}
  if(registry.domains[host]===id){delete registry.domains[host];writeRegistry(registry)}
  meta.domains=(meta.domains||[]).filter(d=>d.hostname!==host);
  builder.saveMeta(meta);
