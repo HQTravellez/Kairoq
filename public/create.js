@@ -82,6 +82,7 @@ async function openProject(id,{pendingText,job}={}){
  if(account)renderCredits(account);
  show('editor');history.replaceState(null,'','/create?project='+id);
  $('project-name').value=project.name;
+ renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
  renderVersions();
  setPreview(project.preview_url);
@@ -92,14 +93,18 @@ async function openProject(id,{pendingText,job}={}){
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
  const msgs=state.project.messages;
- if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. I will edit the code and refresh the preview.';list.append(li)}
- for(const m of msgs)list.append(messageItem(m.role,m.text,m.changed));
- if(pendingText)list.append(messageItem('user',pendingText));
+ if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. Switch to Discuss to plan without changing code.';list.append(li)}
+ msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1)));
+ if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
  list.scrollTop=list.scrollHeight;
+ renderErrors();
 }
-function messageItem(role,body,changed){
- const li=document.createElement('li');li.className=role;li.textContent=body;
- if(changed&&changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+changed.join(', ');li.append(s)}
+function messageItem(m,last){
+ const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
+ const body=document.createElement('div');body.textContent=m.text;li.append(body);
+ if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
+ if(m.changed&&m.changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+m.changed.join(', ');li.append(s)}
+ if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>send('Implement the plan you just described.','build');li.append(b)}
  return li;
 }
 function renderVersions(){
@@ -107,7 +112,7 @@ function renderVersions(){
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
-function setPreview(url){if(!url)return;$('frame').src=url;$('open').href=url}
+function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();$('frame').src=url;$('open').href=url}
 $('versions').onchange=()=>setPreview(previewFor($('versions').value));
 $('restore').onclick=async()=>{
  const n=Number($('versions').value);if(n===state.project.current_version)return;
@@ -155,45 +160,129 @@ async function renderFiles(){
  if(state.file){const {content}=await api('/projects/'+state.project.id+'/file?path='+encodeURIComponent(state.file));text($('file-view').firstChild,content)}
 }
 
+// ---------- chat ----------
+state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
 $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('chat-form').requestSubmit()}});
-$('chat-form').onsubmit=async e=>{
- e.preventDefault();
- const message=$('chat-input').value.trim();if(!message||state.job)return;
+function setChatMode(mode){state.mode=mode;$('mode-build').setAttribute('aria-pressed',String(mode==='build'));$('mode-discuss').setAttribute('aria-pressed',String(mode==='discuss'));$('chat-input').placeholder=mode==='discuss'?'Ask a question or plan a feature. No code changes, no surprises.':'Ask for a change: add a pricing section, make the header sticky…';text($('send'),mode==='discuss'?'Ask':'Send');costHint()}
+$('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');
+function renderTiers(){
+ const sel=$('tier');sel.replaceChildren();
+ for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+' · '+t.credits+' credit'+(t.credits===1?'':'s')+(t.enabled?'':' (not enabled)');if(t.id===state.tier)o.selected=true;sel.append(o)}
+ costHint();
+}
+$('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
+function costHint(){
+ if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');return}
+ const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
+ const n=(state.mode==='discuss'?state.me.discuss_credits:(t?t.credits:1))+(state.attachments.length?state.me.image_credits:0);
+ text($('cost-hint'),n+' credit'+(n===1?'':'s'));
+}
+// Attachments: button, paste or drop.
+$('attach').onclick=()=>$('attach-input').click();
+$('attach-input').onchange=()=>{addFiles($('attach-input').files);$('attach-input').value=''};
+$('chat-input').addEventListener('paste',e=>{const files=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith('image/'));if(files.length){e.preventDefault();addFiles(files)}});
+$('chat-form').addEventListener('dragover',e=>e.preventDefault());
+$('chat-form').addEventListener('drop',e=>{e.preventDefault();addFiles(e.dataTransfer.files)});
+async function addFiles(files){
  text($('chat-error'),'');
- $('messages').append(messageItem('user',message));$('messages').scrollTop=$('messages').scrollHeight;
- $('chat-input').value='';
- try{const {job}=await api('/projects/'+state.project.id+'/chat',{method:'POST',body:{message}});watch(job)}
+ for(const f of [...files]){
+  if(state.attachments.length>=4){text($('chat-error'),'Attach up to 4 images.');break}
+  if(!/^image\/(png|jpeg|webp|gif)$/.test(f.type)){text($('chat-error'),f.name+': use PNG, JPEG, WebP or GIF.');continue}
+  if(f.size>3*1024*1024){text($('chat-error'),f.name+' is larger than 3 MB.');continue}
+  const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
+  state.attachments.push({name:f.name||'pasted.png',dataUrl});
+ }
+ renderAttachments();
+}
+function renderAttachments(){
+ const wrap=$('attachments');wrap.replaceChildren();
+ state.attachments.forEach((a,i)=>{const fig=document.createElement('figure');const img=document.createElement('img');img.src=a.dataUrl;img.alt=a.name;const x=document.createElement('button');x.type='button';x.textContent='×';x.setAttribute('aria-label','Remove '+a.name);x.onclick=()=>{state.attachments.splice(i,1);renderAttachments()};fig.append(img,x);wrap.append(fig)});
+ wrap.classList.toggle('hidden',!state.attachments.length);costHint();
+}
+$('chat-form').onsubmit=e=>{e.preventDefault();const message=$('chat-input').value.trim();if(message)send(message,state.mode)};
+async function send(message,mode,path='/chat',extra={}){
+ if(state.job)return;
+ text($('chat-error'),'');
+ const images=state.attachments.map(a=>({name:a.name,dataUrl:a.dataUrl}));
+ $('messages').append(messageItem({role:'user',text:message,mode,images:images.map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
+ $('chat-input').value='';state.attachments=[];renderAttachments();
+ try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,images:images.length?images:undefined,...extra}});watch(job)}
  catch(err){
-  $('messages').append(messageItem('assistant failed',err.message));
+  $('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));
   if(err.status===402&&state.me.purchases)openBuy();
  }
-};
-const LABELS={queued:'Starting…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…'};
+}
+const LABELS={queued:'Starting…',thinking:'Thinking…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
+function streamItem(){
+ let li=$('stream');
+ if(!li){li=document.createElement('li');li.id='stream';li.className='assistant streaming';li.innerHTML='<div class="stream-msg"></div><div class="stream-files changed"></div><pre class="stream-code hidden"></pre>';$('messages').append(li)}
+ return li;
+}
+function renderStream(job){
+ const st=job.stream;
+ if(!st){$('stream')?.remove();return}
+ const li=streamItem();
+ if(job.mode==='discuss'){text(li.querySelector('.stream-msg'),st.text);}
+ else{
+  text(li.querySelector('.stream-msg'),st.message||'Planning the change…');
+  text(li.querySelector('.stream-files'),st.files&&st.files.length?'Writing '+st.files.join(', '):'');
+  const pre=li.querySelector('.stream-code');pre.classList.toggle('hidden',!st.tail);
+  pre.textContent=String(st.tail||'').replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-14).join('\n');
+ }
+ $('messages').scrollTop=$('messages').scrollHeight;
+}
 async function watch(job){
- state.job=job;busy(true,LABELS[job.status]);
- refreshCredits();
+ state.job=job;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
- while(state.job&&state.job.id===job.id){
-  await new Promise(r=>setTimeout(r,1500));
-  let current;
-  try{current=(await api('/jobs/'+job.id)).job}catch(err){text($('chat-error'),err.message);break}
-  text($('progress-text'),LABELS[current.status]||'Working…');
-  if(current.status==='complete'||current.status==='failed'){
-   if(state.project&&state.project.id===id){
-    const {project,account}=await api('/projects/'+id);
-    state.project=project;if(account)renderCredits(account);
-    renderMessages();renderVersions();setPreview(project.preview_url);
-    if(current.status==='failed')$('messages').append(messageItem('assistant failed',current.error+'\nYour credit was refunded.'));
-    if(state.code)renderFiles();
-    if(state.data)renderData();
+ const done=await new Promise(resolve=>{
+  let finished=false;
+  const finish=j=>{if(!finished){finished=true;resolve(j)}};
+  const apply=j=>{text($('progress-text'),LABELS[j.status]||'Working…');renderStream(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  if(window.EventSource){
+   const es=new EventSource('/api/create/jobs/'+job.id+'/events');
+   es.onmessage=e=>{const j=JSON.parse(e.data);apply(j);if(j.status==='complete'||j.status==='failed')es.close()};
+   es.onerror=()=>{es.close();poll()};
+  }else poll();
+  async function poll(){
+   while(!finished){
+    await new Promise(r=>setTimeout(r,1000));
+    try{apply((await api('/jobs/'+job.id)).job)}catch(err){text($('chat-error'),err.message);finish(null)}
    }
-   break;
   }
+ });
+ $('stream')?.remove();
+ if(done&&state.project&&state.project.id===id){
+  const {project,account}=await api('/projects/'+id);
+  state.project=project;if(account)renderCredits(account);
+  state.runtimeErrors=[];
+  renderMessages();renderVersions();
+  if(done.mode!=='discuss')setPreview(project.preview_url);
+  if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
+  if(state.code)renderFiles();
+  if(state.data)renderData();
  }
  state.job=null;busy(false);
 }
-function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;if(label)text($('progress-text'),label)}
+function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;$('fix').disabled=on;if(label)text($('progress-text'),label)}
 async function refreshCredits(){try{const v=await loadMe();if(v&&v.account)renderCredits(v.account)}catch{}}
+
+// ---------- runtime errors from the preview ----------
+window.addEventListener('message',e=>{
+ if(e.source!==$('frame').contentWindow||!e.data||e.data.source!=='kairoq-app')return;
+ if(e.data.type==='runtime-error'){const msg=String(e.data.message||'').slice(0,800);if(msg&&!state.runtimeErrors.includes(msg)&&state.runtimeErrors.length<10){state.runtimeErrors.push(msg);renderErrors()}}
+});
+function currentVersionErrors(){return state.project?.versions.find(v=>v.n===state.project.current_version)?.runtime_errors||[]}
+function renderErrors(){
+ const errors=[...new Set([...state.runtimeErrors,...currentVersionErrors()])];
+ $('errors').classList.toggle('hidden',!errors.length);
+ text($('errors-count'),errors.length+' problem'+(errors.length===1?'':'s')+' found while running the app');
+ const list=$('errors-list');list.replaceChildren();
+ for(const e of errors){const li=document.createElement('li');li.textContent=e;list.append(li)}
+}
+$('fix').onclick=()=>{
+ const errors=[...new Set([...state.runtimeErrors,...currentVersionErrors()])];
+ if(errors.length)send('Fix the problems found while running the app.','build','/fix',{errors});
+};
 
 // ---------- publish & domains ----------
 $('publish-open').onclick=()=>{renderPublish();$('publish-dialog').showModal()};

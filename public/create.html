@@ -67,8 +67,19 @@
     <ol class="messages" id="messages" aria-live="polite"></ol>
     <div class="progress hidden" id="progress"><span class="dot"></span><span id="progress-text">Working…</span></div>
     <form id="chat-form" class="composer">
+      <div class="attachments hidden" id="attachments"></div>
       <textarea id="chat-input" rows="3" placeholder="Ask for a change: add a pricing section, make the header sticky…" required></textarea>
-      <button class="primary" id="send" type="submit">Send</button>
+      <div class="composer-bar">
+        <div class="seg" role="group" aria-label="Mode">
+          <button type="button" id="mode-build" aria-pressed="true">Build</button>
+          <button type="button" id="mode-discuss" aria-pressed="false">Discuss</button>
+        </div>
+        <select id="tier" aria-label="Model"></select>
+        <button type="button" class="ghost icon" id="attach" aria-label="Attach images" title="Attach images (or paste a screenshot)">＋ Image</button>
+        <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+        <span class="muted small" id="cost-hint"></span>
+        <button class="primary" id="send" type="submit">Send</button>
+      </div>
     </form>
     <p class="error" id="chat-error" role="alert"></p>
   </aside>
@@ -87,6 +98,10 @@
       <button class="ghost" id="restore" type="button">Restore</button>
       <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
       <button class="primary" id="publish-open" type="button">Publish</button>
+    </div>
+    <div class="errors hidden" id="errors" role="status">
+      <details><summary id="errors-count"></summary><ul id="errors-list"></ul></details>
+      <button class="primary" id="fix" type="button">Fix it</button>
     </div>
     <div class="canvas" id="canvas">
       <iframe id="frame" title="App preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>

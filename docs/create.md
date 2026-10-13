@@ -10,6 +10,24 @@
 4. **Versions.** Every successful edit is saved as an immutable version (`versions/<n>/files.json` and `versions/<n>/dist`). Any version can be previewed or restored.
 5. **Preview.** `/builder/p/<id>-<key>/v/<n>/` serves a version's build. The key is random per project. Pages served from the Kairoq host use a CSP sandbox, so generated code runs in an isolated origin and cannot use the Kairoq session.
 
+## Editor features
+
+- **Live streaming.** The model's output streams into the chat as it is written: the summary, the file being written, and its latest code. The editor uses Server-Sent Events (`/api/create/jobs/<id>/events`) and falls back to polling.
+- **Runtime checks and Fix it.**
+  - Every build includes a small reporter script (`builder-runtime/kairoq-reporter.js`). It tells the editor about uncaught errors, console errors, failed requests and blank pages.
+  - After each build, the server also opens the app in headless Chromium (`runtime-check.js`). If it finds problems, they go back to the model. These retries count toward the 3 attempts.
+  - If the last attempt still has problems, the version is saved with them, and the editor shows **Fix it**.
+- **Model tiers.**
+  - **Standard** uses the builder model chain.
+  - **Pro** uses `KAIROQ_PRO_MODELS` first, then the standard paid chain.
+  - Messages with images and the Standard tier use `KAIROQ_VISION_MODELS`, because DeepSeek cannot read images.
+  - Pro and image requests need `KAIROQ_BUILDER_PAID_APPROVED=true` and count toward the builder budget.
+- **Discuss mode.** The model answers or plans without changing code or creating a version. An **Implement this plan** button sends the plan as a build request.
+- **Images in chat.** Attach, paste or drop up to 4 images (PNG/JPEG/WebP/GIF, 3 MB each).
+  - Images are shown to the model as reference, for example "build this screenshot".
+  - In build mode, images are also saved as project uploads. Every build copies them to `./uploads/<name>`, so the app can use your logo and photos.
+- **Credits per message:** Standard `KAIROQ_STANDARD_CREDITS` (1), Pro `KAIROQ_PRO_CREDITS` (5), Discuss `KAIROQ_DISCUSS_CREDITS` (1), plus `KAIROQ_IMAGE_CREDITS` (1) when images are attached. Credits are refunded when a message fails.
+
 ## Backend for generated apps
 
 Every Create project has its own backend: user accounts and saved records in a per-project SQLite database (`workspace/react-projects/<id>/data.sqlite`). Generated code uses it through the built-in `kairoq` module:

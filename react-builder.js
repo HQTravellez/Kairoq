@@ -17,6 +17,7 @@ const INDEX_HTML=`<!doctype html>
   </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/kairoq-reporter.js"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
@@ -53,7 +54,8 @@ Rules:
   collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
   Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (contact forms, guestbooks). Only a record's creator can update or delete it.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
-- Images: use https URLs (for example https://images.unsplash.com/...) or inline SVG.
+- Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
+- When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
 Respond with ONLY a JSON object, no markdown fences:
 {"message":"one or two sentences telling the user what you changed","files":{"src/path.jsx":"full new file content"},"delete":["src/unused.jsx"]}
 Include only files you create or change, each with its complete content. "delete" is optional.`;
@@ -123,6 +125,8 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
  const work=fs.mkdtempSync(path.join(ROOT(),'.build-'));
  try{
   fs.writeFileSync(path.join(work,'index.html'),INDEX_HTML);
+  fs.copyFileSync(path.join(__dirname,'builder-runtime','kairoq-reporter.js'),path.join(work,'kairoq-reporter.js'));
+  if(projectId!=='000000000000')require('./react-assets').copyInto(projectId,path.join(work,'public'));
   for(const [name,code] of Object.entries(files)){const file=path.join(work,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,code)}
   const {build:viteBuild}=await import('vite');
   const react=(await import('@vitejs/plugin-react')).default;
@@ -200,19 +204,27 @@ function previewUrl(m,n=m.current_version){return n?'/builder/p/'+m.id+'-'+m.pre
 function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.versions,messages:m.messages.slice(-100),domains:m.domains,files:m.current_version?Object.keys(loadFiles(id,m.current_version)).sort():[]}}
 function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_version);if(!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});return files[name]}
 
-async function edit(id,instruction,{callModel,onProgress=()=>{},signal}={}){
+function userContent(text,images){
+ if(!images||!images.length)return text;
+ return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
+}
+function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10).map(m=>({role:m.role==='user'?'user':'assistant',content:m.text}))}
+function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
+
+// mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote=''}={}){
  const meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
  if(!meta.current_version)await initialize(meta);
  const base=loadFiles(id,meta.current_version);
- const history=meta.messages.slice(-10).map(m=>({role:m.role==='user'?'user':'assistant',content:m.text}));
- const messages=[{role:'system',content:SYSTEM_PROMPT},...history,{role:'user',content:'Current project files:\n\n'+contextFiles(base)+'\n\nRequest: '+text}];
- let lastError='';
+ const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+'\n\nRequest: '+text;
+ const messages=[{role:'system',content:SYSTEM_PROMPT},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
+ let lastError='',runtimeErrors=[];
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:16000,signal},parseEdit);
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:16000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
   const next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;
@@ -220,20 +232,47 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},signal}={}){
   messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,delete:reply.delete})});
   if(errors.length){lastError=errors.slice(0,12).join('\n');messages.push({role:'user',content:'That change was rejected:\n'+lastError+'\nReturn corrected JSON with the full content of every file you need to change.'});continue}
   onProgress('building');
-  const n=Math.max(0,...meta.versions.map(v=>v.n))+1,dir=versionDir(id,n);
+  const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
   catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
+  runtimeErrors=[];
+  if(checkRuntime){
+   onProgress('testing');
+   try{runtimeErrors=(await checkRuntime(previewUrl(meta,n))).errors||[]}catch(e){runtimeErrors=[]}
+   if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
+    fs.rmSync(dir,{recursive:true,force:true});
+    lastError=runtimeErrors.join('\n');
+    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'});
+    continue;
+   }
+  }
   writeJson(path.join(dir,'files.json'),next);
   const changed=Object.keys(reply.files).filter(k=>base[k]!==reply.files[k]).concat(reply.delete.filter(k=>Object.hasOwn(base,k)&&!Object.hasOwn(next,k)));
   const fresh=loadMeta(id);
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed});
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   fresh.current_version=n;
-  fresh.messages.push({role:'user',text,at:new Date().toISOString()},{role:'assistant',text:reply.message,version:n,changed,at:new Date().toISOString()});
+  const now=new Date().toISOString();
+  fresh.messages.push({role:'user',text,at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:reply.message,version:n,changed,at:now,...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   saveMeta(fresh);
-  return{version:n,message:reply.message,changed,attempts:attempt,preview_url:previewUrl(fresh)};
+  return{version:n,message:reply.message,changed,attempts:attempt,runtime_errors:runtimeErrors,preview_url:previewUrl(fresh)};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }
+
+const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.
+Answer questions about the app, suggest improvements, and when the user wants a change, reply with a short numbered plan of what you would change and which files. Keep answers brief and concrete. Plain text, no JSON.`;
+function parseText(content){if(typeof content==='string'){const t=content.trim();if(!t)throw Error('Empty answer');return t}return String(content?.message||content?.answer||JSON.stringify(content))}
+async function discuss(id,question,{callModel,onStream,signal,tier='standard',images=[]}={}){
+ const meta=loadMeta(id);
+ const text=String(question||'').trim().slice(0,8000);
+ if(!text)throw Object.assign(Error('Ask a question or describe an idea'),{status:400});
+ const files=meta.current_version?loadFiles(id,meta.current_version):template(meta.name);
+ const messages=[{role:'system',content:DISCUSS_PROMPT},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+'\n\nMessage: '+text,images)}];
+ const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined},parseText)).slice(0,12000);
+ addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:answer,mode:'discuss'}]);
+ return{message:answer};
+}
+
 function restore(id,n){
  const meta=loadMeta(id);n=Number(n);
  if(!meta.versions.some(v=>v.n===n))throw Object.assign(Error('Unknown version'),{status:404});
@@ -279,4 +318,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={create,initialize,list,detail,readFile,edit,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={create,initialize,list,detail,readFile,edit,discuss,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

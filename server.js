@@ -6533,7 +6533,11 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   let allowPaid=(mode==="premium"||mode==="paid-first") && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
-  const ordered=mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
+  // Pro tier: stronger models first, then the standard paid chain; never free models.
+  const proCandidates=String(process.env.KAIROQ_PRO_MODELS||"anthropic/claude-sonnet-4.5,openai/gpt-5").split(",").map(m=>m.trim()).filter(Boolean);
+  const visionCandidates=String(process.env.KAIROQ_VISION_MODELS||"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean);
+  if((opts.tier==="pro"||opts.tier==="vision")&&!allowPaid)throw Error("Pro and image models need KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left this month."+(errors.length?" "+errors.join(" | "):""));
+  const ordered=opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
   const models=ordered.filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
@@ -6542,15 +6546,16 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
       const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(20000,opts.maxOutputTokens)):10000;
-      const rates=free?[0,0]:model.includes("deepseek")?[0.5,1]:[5,25];
+      const rates=free?[0,0]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:[5,25];
       if(!free){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
         if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
         if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
       }
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(110000)]):AbortSignal.timeout(110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"}})});
-      const data=await response.json().catch(()=>({}));
+      const stream=typeof opts.onToken==="function";
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?240000:110000)]):AbortSignal.timeout(stream?240000:110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},...(stream?{stream:true,usage:{include:true}}:{})})});
+      const data=stream&&response.ok&&response.body?await readChatStream(response.body,opts.onToken):await response.json().catch(()=>({}));
       if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
       const message=data.choices?.[0]?.message||{};
       const raw=message.content;
@@ -6563,6 +6568,33 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
     }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}
   }
   throw Error("No coding model returned usable project files. "+errors.join(" | "));
+}
+// Reads an OpenAI-compatible SSE stream into the same shape as a non-streamed response.
+async function readChatStream(body,onToken){
+  const reader=body.getReader(),decoder=new TextDecoder();
+  let buffer="",content="",reasoning="",usage=null,finish=null,error=null;
+  const handle=line=>{
+    if(!line.startsWith("data:"))return;
+    const payload=line.slice(5).trim();
+    if(!payload||payload==="[DONE]")return;
+    let event;try{event=JSON.parse(payload)}catch{return}
+    if(event.error)error=event.error;
+    if(event.usage)usage=event.usage;
+    const choice=event.choices?.[0];
+    if(choice?.finish_reason)finish=choice.finish_reason;
+    const delta=choice?.delta||{};
+    if(delta.reasoning)reasoning+=delta.reasoning;
+    if(typeof delta.content==="string"&&delta.content){content+=delta.content;try{onToken(delta.content,content)}catch{}}
+  };
+  for(;;){
+    const {done,value}=await reader.read();
+    if(done)break;
+    buffer+=decoder.decode(value,{stream:true});
+    let i;while((i=buffer.indexOf("\n"))>=0){handle(buffer.slice(0,i).trim());buffer=buffer.slice(i+1)}
+  }
+  handle(buffer.trim());
+  if(error)throw Error(error.message||"Provider stream error");
+  return{choices:[{message:{content,reasoning},finish_reason:finish}],usage};
 }
 async function handleDeveloperBuild(req,res){
   try{
@@ -6594,7 +6626,7 @@ const server = http.createServer(async (req, res) => {
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
