@@ -53,6 +53,8 @@ $('logout').onclick=async()=>{await api('/logout',{method:'POST'}).catch(()=>{})
 // ---------- home ----------
 async function loadHome(){
  show('home');history.replaceState(null,'','/create');
+ const acct=state.me.viewer?.account;
+ $('verify-notice').classList.toggle('hidden',!(acct&&!acct.email_verified&&state.me.email_ready));
  renderTemplates($('home-templates'),id=>startFromTemplate(id));
  const {projects}=await api('/projects');
  const list=$('projects');list.replaceChildren();
@@ -396,7 +398,9 @@ async function domainAction(path,method,hostname){
 
 // ---------- settings: code, GitHub, Stripe ----------
 $('settings-open').onclick=async()=>{
- text($('settings-error'),'');text($('gh-status'),'');
+ text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
+ $('knowledge').value=state.project.knowledge||'';
+ renderSecrets().catch(err=>text($('settings-error'),err.message));
  $('download').href='/api/create/projects/'+state.project.id+'/download';
  try{
   const [{settings},gh]=await Promise.all([api('/projects/'+state.project.id+'/settings'),api('/projects/'+state.project.id+'/github')]);
@@ -573,8 +577,68 @@ $('seo-save').onclick=async()=>{
  catch(err){text($('seo-status'),err.message)}
 };
 
+// ---------- password reset, verification, Google ----------
+$('forgot-open').onclick=()=>{$('forgot-form').classList.toggle('hidden');$('forgot-email').value=$('email').value;$('forgot-email').focus()};
+$('forgot-form').onsubmit=async e=>{e.preventDefault();try{await api('/password/forgot',{method:'POST',body:{email:$('forgot-email').value}});text($('forgot-status'),state.me.email_ready?'If that email has an account, a reset link is on its way.':'Email is not set up on this server yet, so reset links cannot be sent.')}catch(err){text($('forgot-status'),err.message)}};
+$('reset-form').onsubmit=async e=>{e.preventDefault();text($('reset-error'),'');try{await api('/password/reset',{method:'POST',body:{token:state.resetToken,password:$('reset-password').value}});state.resetToken=null;history.replaceState(null,'','/create');await start()}catch(err){text($('reset-error'),err.message)}};
+$('verify-resend').onclick=async()=>{try{await api('/verify/resend',{method:'POST'});text($('verify-resend'),'Sent. Check your inbox.')}catch(err){text($('verify-resend'),err.message)}};
+async function handleLinks(){
+ const q=new URLSearchParams(location.search);
+ if(q.get('verify')){try{await api('/verify',{method:'POST',body:{token:q.get('verify')}});state.flash='Your email is confirmed.'}catch(err){state.flash=err.message}history.replaceState(null,'','/create')}
+ if(q.get('reset')){state.resetToken=q.get('reset');history.replaceState(null,'','/create')}
+ if(q.get('auth_error')){state.flash=q.get('auth_error');history.replaceState(null,'','/create')}
+}
+
+// ---------- security check ----------
+$('security-open').onclick=async()=>{
+ const list=$('findings');list.replaceChildren();text($('security-summary'),'Checking…');$('security-fix').classList.add('hidden');
+ $('security-dialog').showModal();
+ try{
+  const {findings,version}=await api('/projects/'+state.project.id+'/security');
+  const counts=['high','medium','low'].map(s=>findings.filter(f=>f.severity===s).length);
+  text($('security-summary'),findings.length?'Version '+version+': '+counts[0]+' high, '+counts[1]+' medium, '+counts[2]+' low.':'Version '+version+': no problems found.');
+  for(const f of findings){
+   const li=document.createElement('li');
+   li.append(Object.assign(document.createElement('span'),{className:'sev '+f.severity,textContent:f.severity}),Object.assign(document.createElement('strong'),{textContent:f.title}));
+   li.append(Object.assign(document.createElement('p'),{textContent:f.detail}),Object.assign(document.createElement('p'),{textContent:'Fix: '+f.fix}));
+   list.append(li);
+  }
+  const serious=findings.filter(f=>f.severity!=='low');
+  const canEdit=(state.project.role||'owner')!=='viewer';
+  $('security-fix').classList.toggle('hidden',!serious.length||!canEdit);
+  $('security-fix').onclick=()=>{$('security-dialog').close();send('Fix these security problems:\n'+serious.map(f=>'- '+f.title+(f.file?' ('+f.file+')':'')+': '+f.detail+' Suggested fix: '+f.fix).join('\n'),'build')};
+ }catch(err){text($('security-summary'),err.message)}
+};
+
+// ---------- knowledge and server secrets (settings) ----------
+async function renderSecrets(){
+ const {secrets}=await api('/projects/'+state.project.id+'/secrets');
+ const list=$('secrets-list');list.replaceChildren();
+ if(!secrets.length)list.append(Object.assign(document.createElement('li'),{className:'muted small',textContent:'No secrets yet.'}));
+ for(const sec of secrets){
+  const li=document.createElement('li'),row=document.createElement('div');row.className='row';row.style.marginTop='0';
+  const name=Object.assign(document.createElement('code'),{textContent:sec.name});name.style.flex='1';
+  const rm=Object.assign(document.createElement('button'),{type:'button',className:'ghost',textContent:'Delete'});
+  rm.onclick=async()=>{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:sec.name,value:null}});renderSecrets()};
+  row.append(name,Object.assign(document.createElement('span'),{className:'muted small',textContent:sec.hint}),rm);li.append(row);list.append(li);
+ }
+}
+$('secret-add').onclick=async()=>{
+ text($('settings-error'),'');
+ try{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:$('secret-name').value,value:$('secret-value').value}});$('secret-name').value='';$('secret-value').value='';renderSecrets()}
+ catch(err){text($('settings-error'),err.message)}
+};
+$('knowledge-save').onclick=async()=>{
+ try{const {project}=await api('/projects/'+state.project.id+'/knowledge',{method:'POST',body:{text:$('knowledge').value}});state.project=project;text($('knowledge-status'),'Saved. The AI will follow this from the next message.')}
+ catch(err){text($('knowledge-status'),err.message)}
+};
+
 async function start(){
+ await handleLinks();
  const v=await loadMe();
+ $('google-login').classList.toggle('hidden',!state.me.google);
+ if(state.resetToken){show('auth');renderLanding();$('auth-form').classList.add('hidden');$('reset-form').classList.remove('hidden');$('signup').scrollIntoView();return}
+ if(state.flash){text($('auth-error'),state.flash);text($('home-error'),state.flash);state.flash=null}
  const share=/^\/create\/share\/([a-f0-9]{24})\/?$/.exec(location.pathname);
  if(share)return openShare(share[1],v);
  if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}

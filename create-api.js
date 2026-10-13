@@ -50,7 +50,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor'};
+ 'GET:/security':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer')return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -60,16 +60,17 @@ function findShare(token){
  for(const p of builder.list()){const meta=builder.loadMeta(p.id);if(meta.share&&meta.share.token===token)return meta}
  return null;
 }
-function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
+function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking']);
 function intEnv(name,fallback){const n=Number(process.env[name]);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
- const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true';
+ const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
  return[
   {id:'standard',label:'Standard',credits:intEnv('KAIROQ_STANDARD_CREDITS',1),enabled:true},
-  {id:'pro',label:'Pro',credits:intEnv('KAIROQ_PRO_CREDITS',5),enabled:paid}
- ];
+  {id:'pro',label:'Pro',credits:intEnv('KAIROQ_PRO_CREDITS',5),enabled:paid},
+  {id:'max',label:'Max',credits:intEnv('KAIROQ_MAX_CREDITS',15),enabled:paid}
+ ].filter(t=>t.id!=='max'||max);
 }
 function cost({mode,tier,images}){
  if(mode==='discuss')return intEnv('KAIROQ_DISCUSS_CREDITS',1)+(images?intEnv('KAIROQ_IMAGE_CREDITS',1):0);
@@ -111,7 +112,7 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[]},{callMod
  if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,mode==='discuss'?'Discuss message':'Chat edit'+(tier==='pro'?' (Pro)':''),'job:'+job.id);
  jobs.set(job.id,job);
  setImmediate(async()=>{
-  const modelTier=images.length&&tier!=='pro'?'vision':tier;
+  const modelTier=images.length&&tier==='standard'?'vision':tier;
   const onStream=text=>update({stream:streamSnapshot(text,mode)});
   try{
    if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,tier:modelTier,images})}
@@ -152,12 +153,33 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot}
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1)}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1)}),true;
   }
+  if(route==='/auth/google'&&method==='GET'){
+   const url=require('./google-oauth').startUrl({kind:'kairoq'},origin(req));
+   res.writeHead(302,{Location:url,'Cache-Control':'no-store'});res.end();return true;
+  }
+  if(route==='/auth/google/callback'&&method==='GET'){
+   const google=require('./google-oauth'),q=Object.fromEntries(new URL(req.url,'http://x').searchParams);
+   try{
+    const {entry,profile}=await google.finish(q,origin(req));
+    if(entry.kind==='app'){
+     const session=require('./react-backend').googleAppSignIn(entry.appId,profile);
+     const back=new URL(entry.returnUrl);back.hash='kairoq_code='+google.issueAppCode(entry.appId,session);
+     res.writeHead(302,{Location:back.toString(),'Cache-Control':'no-store'});res.end();return true;
+    }
+    const s=accounts.googleLogin(profile);
+    res.writeHead(302,{Location:'/create','Set-Cookie':accounts.cookie(s.token,secure),'Cache-Control':'no-store'});res.end();return true;
+   }catch(e){res.writeHead(302,{Location:'/create?auth_error='+encodeURIComponent(String(e.message||e).slice(0,200)),'Cache-Control':'no-store'});res.end();return true}
+  }
+  if(route==='/verify'&&method==='POST'){const b=await readJson(req,2000);return send(res,200,{account:accounts.verifyEmail(b.token)}),true}
+  if(route==='/password/forgot'&&method==='POST'){limited(req,'forgot',5);const b=await readJson(req,2000);return send(res,200,await accounts.requestReset(b.email,origin(req))),true}
+  if(route==='/password/reset'&&method==='POST'){limited(req,'reset',10);const b=await readJson(req,4000),s=accounts.resetPassword(b.token,b.password);return send(res,200,{account:s.account},{'Set-Cookie':accounts.cookie(s.token,secure)}),true}
   if(route==='/signup'&&method==='POST'){
    if(process.env.KAIROQ_BUILDER_SIGNUPS==='closed')throw Object.assign(Error('Sign-ups are closed'),{status:403});
    limited(req,'signup',10);
    const b=await readJson(req,10000),s=accounts.signup(b.email,b.password);
+   accounts.sendVerification(s.account.id,origin(req)).catch(()=>{});
    return send(res,201,{account:s.account},{'Set-Cookie':accounts.cookie(s.token,secure)}),true;
   }
   if(route==='/login'&&method==='POST'){
@@ -196,6 +218,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot}
    }
    if(route==='/admin/backup'&&method==='POST')return send(res,200,{backup:backups.run()}),true;
    return send(res,404,{error:'Route not found'}),true;
+  }
+  if(route==='/verify/resend'&&method==='POST'){
+   if(v.kind!=='customer')throw Object.assign(Error('Owner accounts do not need verification'),{status:400});
+   limited(req,'verify',5);return send(res,200,await accounts.sendVerification(v.account.id,origin(req))),true;
   }
   if(route==='/credits'&&method==='GET'){
    if(v.kind!=='customer')return send(res,200,{unlimited:true,history:[]}),true;
@@ -277,6 +303,29 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot}
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}
   if(action==='/asset'&&method==='GET'){const file=require('./react-assets').read(id,new URL(req.url,'http://x').searchParams.get('name'));if(!file)throw Object.assign(Error('Unknown image'),{status:404});res.writeHead(200,{'Content-Type':file.type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'});res.end(file.bytes);return true}
+  if(action==='/security'&&method==='GET'){
+   const meta=builder.loadMeta(id),files=builder.loadFiles(id,meta.current_version);
+   let cfg={collections:{}};try{cfg=backend.parseConfig(files)}catch{}
+   return send(res,200,{version:meta.current_version,findings:require('./react-security').scan(files,cfg)}),true;
+  }
+  if(action==='/knowledge'&&method==='POST'){
+   const b=await readJson(req,20000),meta=builder.loadMeta(id);
+   meta.knowledge=String(b.text||'').slice(0,8000);builder.saveMeta(meta);
+   return send(res,200,{project:projectView(id)}),true;
+  }
+  if(action==='/secrets'&&method==='GET'){
+   const st=require('./project-secrets').status(id);
+   return send(res,200,{secrets:Object.entries(st).filter(([k])=>k.startsWith('app_')).map(([k,v])=>({name:k.slice(4).toUpperCase(),hint:v.hint,at:v.at}))}),true;
+  }
+  if(action==='/secrets'&&method==='POST'){
+   const b=await readJson(req,20000),name=String(b.name||'').trim().toUpperCase();
+   if(!/^[A-Z][A-Z0-9_]{0,49}$/.test(name))throw Object.assign(Error('Secret names use letters, numbers and _ (for example STRIPE_KEY)'),{status:400});
+   const value=b.value===null||b.value===undefined?null:String(b.value);
+   if(value!==null&&value.length>10000)throw Object.assign(Error('Secret is too long'),{status:400});
+   require('./project-secrets').set(id,'app_'+name.toLowerCase(),value);
+   const st=require('./project-secrets').status(id);
+   return send(res,200,{secrets:Object.entries(st).filter(([k])=>k.startsWith('app_')).map(([k,v])=>({name:k.slice(4).toUpperCase(),hint:v.hint,at:v.at}))}),true;
+  }
   if(action==='/settings'&&method==='GET'){
    const secrets=require('./project-secrets');
    return send(res,200,{settings:{secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM)}}),true;

@@ -4,7 +4,17 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 
 const ROOT=()=>process.env.KAIROQ_REACT_PROJECTS_DIR||path.join(__dirname,'workspace','react-projects');
-const ALLOWED_PACKAGES=['react','react-dom','react-dom/client','react/jsx-runtime','lucide-react','react-router-dom','kairoq'];
+// Packages generated apps may import (and their sub-paths). All are installed with Kairoq.
+const APP_PACKAGES={react:'UI',
+ 'react-dom':'UI','lucide-react':'icons','react-router-dom':'routing (use HashRouter)',
+ recharts:'charts','framer-motion':'animation','date-fns':'dates',clsx:'class names','tailwind-merge':'merging Tailwind classes','class-variance-authority':'component variants',
+ zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
+ '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
+ sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
+ 'embla-carousel-react':'carousels','qrcode.react':'QR codes'};
+const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq'];
+function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
+function allowedImport(spec){if(spec==='kairoq')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -47,10 +57,12 @@ const SYSTEM_PROMPT=`You are the coding engine of an app builder like Lovable. Y
 Rules:
 - Source lives under src/. The entry is src/main.jsx, which renders src/App.jsx and imports src/index.css. index.html is fixed; set the page title with document.title in a useEffect.
 - Use JavaScript with JSX (.jsx/.js). Style with Tailwind utility classes. Write clean, responsive, accessible UI with real, specific copy (no lorem ipsum).
-- The only npm packages available are: react, react-dom, lucide-react (icons), react-router-dom (use HashRouter for routing). Do not import anything else and do not use import.meta or query imports like "?raw".
+- Available npm packages (nothing else can be imported): ${Object.entries(APP_PACKAGES).map(([p,u])=>p+' ('+u+')').join(', ')}. Build polished UI from Tailwind plus Radix primitives (shadcn-style components in src/components/ui/ using clsx + tailwind-merge + class-variance-authority), recharts for charts, framer-motion for tasteful motion and sonner for toasts. Do not use import.meta or query imports like "?raw".
 - Split the UI into components under src/components/ and pages under src/pages/ when the app grows.
 - Backend: import { auth, collection } from 'kairoq' for user accounts and saved data shared by all visitors.
-  auth.signUp(email,password,name?) / auth.signIn(email,password) / auth.signOut() return promises; auth.user() returns the signed-in user or null; auth.onChange(fn) subscribes and returns an unsubscribe function.
+  auth.signUp(email,password,name?) / auth.signIn(email,password) / auth.signOut() return promises; auth.user() returns the signed-in user or null; auth.onChange(fn) subscribes and returns an unsubscribe function; await auth.ready() before deciding the user is signed out (it finishes Google sign-in).
+  auth.signInWithGoogle() offers "Continue with Google" (it works on the published app; in the preview show its error message). Password reset: auth.requestPasswordReset(email) emails a link back to the app; when auth.resetToken() is set, show a "choose a new password" form that calls auth.resetPassword(newPassword).
+  Live updates: const stop = collection('messages').subscribe(({type,item}) => ...) delivers created/updated/deleted events to everyone allowed to read them (chats, live dashboards, presence); call stop() on unmount.
   collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
   Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (guestbooks, public comments); "submit-only" = anyone can add but nobody can read them back, only the owner sees them in Kairoq (use this for contact, booking, reservation, order and waitlist forms; show a thank-you message after create). Only a record's creator can update or delete it.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
@@ -58,6 +70,11 @@ Rules:
   - File uploads: "storage":{"access":"signed-in"} (or "public"). import { storage } from 'kairoq'; const f=await storage.upload(fileFromInput) returns {id,url,name}; save f.url in a record to show it later. Images, PDF, text and CSV up to 5 MB.
   - Email: "email":true. import { email } from 'kairoq'; await email.send({to:'owner',subject,text}) notifies the app owner (for contact and booking forms); to:'me' emails the signed-in user.
   - Payments: "payments":{"products":{"pro":{"price":"price_REPLACE_ME","mode":"payment"}}} (mode "subscription" for plans). import { payments } from 'kairoq'; await payments.checkout('pro') opens Stripe Checkout for the signed-in user; await payments.has('pro') checks a purchase. Tell the user to replace price ids with their Stripe price ids and connect Stripe in Settings.
+  - AI in the app: "ai":true. import { ai } from 'kairoq'; const { text } = await ai.chat({ system, messages:[{role:'user',content}] }) (also ai.chat('prompt')). Use it for chatbots, summaries, suggestions and generators. Show a loading state; errors can include "out of AI credits".
+  - Server functions (for API keys, calling other services, webhooks, logic that must not run in the browser): add functions/<name>.js (lowercase-name) with exactly one default export and no imports:
+      export default async function (request, { user, db, secrets, fetch, ai, email, crypto, log }) { ...; return { status: 200, json: {...} }; }
+    request = { method, query, headers, body (parsed JSON), rawBody }; user is the signed-in user or null. db.collection('name').list/get/create/update/remove run with full access, so check user and validate input yourself. secrets.get('STRIPE_KEY') reads secrets the owner adds in Settings (never put keys in src/). fetch can only reach public https/http hosts. crypto has hmacSha256Hex(key,msg), sha256Hex, timingSafeEqual, randomId. Return {status, json} or {status, body, headers:{'content-type':...}}.
+    Call it from the app with: import { functions } from 'kairoq'; const data = await functions.invoke('name', body). Its public URL (for webhooks from other services) is functions.url('name'); verify webhook signatures with crypto.hmacSha256Hex over request.rawBody.
   - Scheduled jobs: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
@@ -76,7 +93,7 @@ function versionDir(id,n){return path.join(projectDir(id),'versions',String(Numb
 function loadFiles(id,n){const files=readJson(path.join(versionDir(id,n),'files.json'),null);if(!files)throw Object.assign(Error('Unknown version'),{status:404});return files}
 
 // ---------- validation ----------
-function validPath(p){return typeof p==='string'&&p.length<=120&&/^src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.(?:jsx|js|tsx|ts|css|json)$/.test(p)&&!p.split('/').some(seg=>seg==='..'||seg.startsWith('.'))}
+function validPath(p){return typeof p==='string'&&p.length<=120&&(/^src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.(?:jsx|js|tsx|ts|css|json)$/.test(p)||/^functions\/[a-z][a-z0-9-]{0,39}\.js$/.test(p))&&!p.split('/').some(seg=>seg==='..'||seg.startsWith('.'))}
 function resolveRelative(from,spec,files){
  const base=path.posix.normalize(path.posix.join(path.posix.dirname(from),spec));
  if(!base.startsWith('src/'))return null;
@@ -98,13 +115,13 @@ function validateFiles(files){
   if(typeof code!=='string'){errors.push(name+' must be a string.');continue}
   total+=Buffer.byteLength(code);
   if(Buffer.byteLength(code)>MAX_FILE_BYTES)errors.push(name+' is larger than 200 KB.');
-  if(/\.(jsx?|tsx?)$/.test(name)){
+  if(/\.(jsx?|tsx?)$/.test(name)&&!name.startsWith('functions/')){
    if(/\bimport\.meta\b/.test(code))errors.push(name+': import.meta is not allowed.');
    if(/\bimport\s*\(\s*[^'"\s)]/.test(code))errors.push(name+': dynamic import() must use a string literal.');
    for(const spec of specifiers(code)){
     if(spec.includes('?')||spec.includes('\0'))errors.push(name+': import "'+spec+'" uses a query, which is not allowed.');
     else if(spec.startsWith('.')){if(!resolveRelative(name,spec,files))errors.push(name+': import "'+spec+'" does not match a project file.')}
-    else if(!ALLOWED_PACKAGES.includes(spec))errors.push(name+': package "'+spec+'" is not available. Use only react, react-dom, lucide-react and react-router-dom.');
+    else if(!allowedImport(spec))errors.push(name+': package "'+spec+'" is not available. Available packages: '+Object.keys(APP_PACKAGES).join(', ')+'.');
    }
   }
   if(name.endsWith('.css')){
@@ -114,6 +131,7 @@ function validateFiles(files){
  }
  if(total>MAX_PROJECT_BYTES)errors.push('Project source is larger than 1.5 MB.');
  errors.push(...require('./react-backend').configErrors(files));
+ errors.push(...require('./react-functions').validate(files));
  for(const required of ['src/main.jsx','src/App.jsx'])if(!Object.hasOwn(files,required))errors.push(required+' is required.');
  return errors;
 }
@@ -166,6 +184,7 @@ function pump(){
 }
 function buildStats(){return{workers:pool.workers.length,busy:pool.workers.filter(w=>w.task).length,queued:pool.queue.length,max:workerCount()}}
 async function runBuild(files,outDir,{projectId='000000000000'}={}){
+ const version=Number((/[\\/]versions[\\/](\d+)[\\/]dist$/.exec(outDir)||[])[1]||0);
  fs.mkdirSync(ROOT(),{recursive:true});
  const work=fs.mkdtempSync(path.join(ROOT(),'.build-'));
  try{
@@ -173,14 +192,16 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
   fs.copyFileSync(path.join(__dirname,'builder-runtime','kairoq-reporter.js'),path.join(work,'kairoq-reporter.js'));
   if(projectId!=='000000000000')require('./react-assets').copyInto(projectId,path.join(work,'public'));
   for(const [name,code] of Object.entries(files)){const file=path.join(work,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,code)}
+  // Packages resolve from Kairoq's own installed modules (validated imports only).
+  fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(work,'node_modules'),'dir');
   const {build:viteBuild}=await import('vite');
   const react=(await import('@vitejs/plugin-react')).default;
   const tailwind=require('tailwindcss');
   const modules=path.join(__dirname,'node_modules');
   const output=[];
   const logger={info(){},warn(m){output.push(String(m))},warnOnce(m){output.push(String(m))},error(m){output.push(String(m))},clearScreen(){},hasErrorLogged(){return false},hasWarned:false};
-  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId)],
-   resolve:{alias:Object.fromEntries(['react','react-dom','lucide-react','react-router-dom'].map(p=>[p,path.join(modules,p)])),dedupe:['react','react-dom']},
+  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId,version)],
+   resolve:{dedupe:['react','react-dom']},
    css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:{extend:{}}})]}},
    server:{fs:{strict:true,allow:[work]}},
    build:{outDir,emptyOutDir:true,assetsInlineLimit:0,reportCompressedSize:false,sourcemap:false}});
@@ -192,8 +213,8 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
   throw Object.assign(Error(cleanBuildError(e)),{build:true});
  }finally{fs.rmSync(work,{recursive:true,force:true})}
 }
-function kairoqClient(projectId){
- return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':null},load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId):null}};
+function kairoqClient(projectId,version=0){
+ return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':null},load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):null}};
 }
 function cleanBuildError(e){
  const root=ROOT();
@@ -262,6 +283,8 @@ function previewUrl(m,n=m.current_version){return n?'/builder/p/'+m.id+'-'+m.pre
 function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.versions,messages:m.messages.slice(-100),domains:m.domains,files:m.current_version?Object.keys(loadFiles(id,m.current_version)).sort():[]}}
 function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_version);if(!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});return files[name]}
 
+// The owner's standing instructions for this project (brand, audience, rules), sent with every request.
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:''}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
@@ -277,7 +300,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  if(!meta.current_version)await initialize(meta);
  const base=loadFiles(id,meta.current_version);
  const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+'\n\nRequest: '+text;
- const messages=[{role:'system',content:SYSTEM_PROMPT},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
+ const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[];
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
@@ -325,7 +348,7 @@ async function discuss(id,question,{callModel,onStream,signal,tier='standard',im
  const text=String(question||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Ask a question or describe an idea'),{status:400});
  const files=meta.current_version?loadFiles(id,meta.current_version):template(meta.name);
- const messages=[{role:'system',content:DISCUSS_PROMPT},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+'\n\nMessage: '+text,images)}];
+ const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+'\n\nMessage: '+text,images)}];
  const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined},parseText)).slice(0,12000);
  addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:answer,mode:'discuss'}]);
  return{message:answer};

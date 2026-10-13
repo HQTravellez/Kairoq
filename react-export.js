@@ -10,13 +10,23 @@ function fail(status,message){return Object.assign(Error(message),{status})}
 function slug(name){return String(name||'app').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)||'app'}
 function publicOrigin(){return(process.env.KAIROQ_PUBLIC_URL||(process.env.RAILWAY_PUBLIC_DOMAIN?'https://'+process.env.RAILWAY_PUBLIC_DOMAIN:'')).replace(/\/$/,'')}
 
+// react and react-dom plus every allowed package the source imports, at Kairoq's pinned versions.
+function usedDependencies(source,pkg){
+ const deps={react:pkg.react,'react-dom':pkg['react-dom']};
+ for(const code of Object.values(source))for(const m of String(code).matchAll(/(?:from|import)\s*\(?\s*['"]([^'".][^'"]*)['"]/g)){
+  const spec=m[1];if(spec==='kairoq')continue;
+  const name=spec.startsWith('@')?spec.split('/').slice(0,2).join('/'):spec.split('/')[0];
+  if(pkg[name])deps[name]=pkg[name];
+ }
+ return Object.fromEntries(Object.entries(deps).sort());
+}
 function exportFiles(id){
  const meta=builder.loadMeta(id);
  if(!meta.current_version)throw fail(409,'Build the app first');
  const source=builder.loadFiles(id,meta.current_version),pkg=require('./package.json').dependencies;
  const out={
   'package.json':JSON.stringify({name:slug(meta.name),private:true,version:'1.0.0',type:'module',scripts:{dev:'vite',build:'vite build',preview:'vite preview'},
-   dependencies:{react:pkg.react,'react-dom':pkg['react-dom'],'lucide-react':pkg['lucide-react'],'react-router-dom':pkg['react-router-dom']},
+   dependencies:usedDependencies(source,pkg),
    devDependencies:{vite:pkg.vite,'@vitejs/plugin-react':pkg['@vitejs/plugin-react'],tailwindcss:pkg.tailwindcss}},null,2)+'\n',
   'vite.config.js':"import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nimport { fileURLToPath } from 'node:url';\n\nexport default defineConfig({\n  base: './',\n  plugins: [react()],\n  resolve: { alias: { kairoq: fileURLToPath(new URL('./src/kairoq.js', import.meta.url)) } }\n});\n",
   'tailwind.config.js':"export default {\n  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],\n  theme: { extend: {} },\n  plugins: []\n};\n",

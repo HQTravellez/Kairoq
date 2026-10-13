@@ -15,7 +15,8 @@ function database(){
   CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,credits INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,expires_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS ledger(id TEXT PRIMARY KEY,account_id TEXT NOT NULL,delta INTEGER NOT NULL,reason TEXT NOT NULL,ref TEXT UNIQUE,at TEXT NOT NULL);`);
- for(const col of ['plan TEXT','plan_status TEXT','stripe_customer TEXT','subscription_id TEXT','plan_renews_at TEXT']){try{db.exec('ALTER TABLE accounts ADD COLUMN '+col)}catch{}}
+ db.exec('CREATE TABLE IF NOT EXISTS account_tokens(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,kind TEXT NOT NULL,expires_at INTEGER NOT NULL)');
+ for(const col of ['plan TEXT','plan_status TEXT','stripe_customer TEXT','subscription_id TEXT','plan_renews_at TEXT','email_verified INTEGER NOT NULL DEFAULT 0','google_sub TEXT']){try{db.exec('ALTER TABLE accounts ADD COLUMN '+col)}catch{}}
  return db;
 }
 function freeCredits(){const n=Number(process.env.KAIROQ_FREE_CREDITS??30);return Number.isInteger(n)&&n>=0?n:30}
@@ -31,7 +32,7 @@ function normalizeEmail(email){
  if(e.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))throw Object.assign(Error('Enter a valid email address'),{status:400});
  return e;
 }
-function publicAccount(a){return a&&{id:a.id,email:a.email,credits:a.credits,created_at:a.created_at,plan:a.plan||null,plan_status:a.plan_status||null,plan_renews_at:a.plan_renews_at||null,billing:Boolean(a.stripe_customer)}}
+function publicAccount(a){return a&&{id:a.id,email:a.email,email_verified:Boolean(a.email_verified),credits:a.credits,created_at:a.created_at,plan:a.plan||null,plan_status:a.plan_status||null,plan_renews_at:a.plan_renews_at||null,billing:Boolean(a.stripe_customer)}}
 
 function signup(email,password){
  const e=normalizeEmail(email);
@@ -198,4 +199,52 @@ async function stripeWebhook(raw,signature,{fetchSession,stripeGet=p=>stripe(p)}
 }
 
 function email(id){return get(id)?.email||null}
-module.exports={plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,COOKIE};
+// ---------- email verification, password reset, Google ----------
+function issueToken(accountId,kind,ttlMs){
+ const token=crypto.randomBytes(24).toString('base64url'),d=database();
+ d.prepare('DELETE FROM account_tokens WHERE account_id=? AND kind=?').run(accountId,kind);
+ d.prepare('INSERT INTO account_tokens(token_hash,account_id,kind,expires_at) VALUES(?,?,?,?)').run(hashToken(token),accountId,kind,Date.now()+ttlMs);
+ return token;
+}
+function consumeToken(token,kind){
+ const d=database(),row=d.prepare('SELECT * FROM account_tokens WHERE token_hash=? AND kind=?').get(hashToken(String(token||'')),kind);
+ if(!row||row.expires_at<Date.now())throw Object.assign(Error(kind==='reset'?'This reset link has expired. Ask for a new one.':'This link has expired.'),{status:400});
+ d.prepare('DELETE FROM account_tokens WHERE token_hash=?').run(row.token_hash);
+ return row.account_id;
+}
+async function mail(to,subject,text){await require('./react-backend-extras').deliver(to,subject,text)}
+function mailReady(){return Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM)}
+async function sendVerification(accountId,origin){
+ const a=get(accountId);if(!a||a.email_verified||!mailReady())return{sent:false};
+ const token=issueToken(accountId,'verify',3*86400000);
+ await mail(a.email,'Confirm your email for Kairoq Create','Confirm your email address:\n\n'+origin+'/create?verify='+encodeURIComponent(token)+'\n\nThe link works for 3 days.');
+ return{sent:true};
+}
+function verifyEmail(token){const id=consumeToken(token,'verify');database().prepare('UPDATE accounts SET email_verified=1 WHERE id=?').run(id);return publicAccount(get(id))}
+// Always succeeds, so it never reveals whether an email has an account.
+async function requestReset(email,origin){
+ let e;try{e=normalizeEmail(email)}catch{return{sent:true}}
+ const a=database().prepare('SELECT * FROM accounts WHERE email=?').get(e);
+ if(a&&mailReady()){const token=issueToken(a.id,'reset',3600000);await mail(a.email,'Reset your Kairoq Create password','Choose a new password:\n\n'+origin+'/create?reset='+encodeURIComponent(token)+'\n\nThe link works for one hour. If you did not ask for this, ignore this email.').catch(()=>{})}
+ return{sent:true};
+}
+function resetPassword(token,password){
+ if(String(password||'').length<8)throw Object.assign(Error('Use a password with at least 8 characters'),{status:400});
+ const id=consumeToken(token,'reset'),d=database();
+ d.prepare('UPDATE accounts SET password=?,email_verified=1 WHERE id=?').run(hashPassword(password),id);
+ d.prepare('DELETE FROM sessions WHERE account_id=?').run(id);
+ return startSession(id);
+}
+// Google sign-in: links to an existing account with the same verified email, or creates one.
+function googleLogin({sub,email,email_verified}){
+ if(!sub||!email||email_verified===false)throw Object.assign(Error('Google did not confirm this email address'),{status:400});
+ const d=database(),e=normalizeEmail(email);
+ let a=d.prepare('SELECT * FROM accounts WHERE google_sub=?').get(String(sub))||d.prepare('SELECT * FROM accounts WHERE email=?').get(e);
+ if(a){d.prepare('UPDATE accounts SET google_sub=?,email_verified=1 WHERE id=?').run(String(sub),a.id);return startSession(a.id)}
+ if(process.env.KAIROQ_BUILDER_SIGNUPS==='closed')throw Object.assign(Error('Sign-ups are closed'),{status:403});
+ const id=crypto.randomUUID(),at=new Date().toISOString(),credits=freeCredits();
+ d.prepare('INSERT INTO accounts(id,email,password,credits,created_at,email_verified,google_sub) VALUES(?,?,?,?,?,1,?)').run(id,e,'google$'+crypto.randomBytes(16).toString('hex'),credits,at,String(sub));
+ if(credits)d.prepare('INSERT INTO ledger(id,account_id,delta,reason,ref,at) VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),id,credits,'Free credits',null,at);
+ return startSession(id);
+}
+module.exports={sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,COOKIE};

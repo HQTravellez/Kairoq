@@ -21,7 +21,10 @@
   - **Standard** uses the builder model chain.
   - **Pro** uses `KAIROQ_PRO_MODELS` first, then the standard paid chain.
   - Messages with images and the Standard tier use `KAIROQ_VISION_MODELS`, because DeepSeek cannot read images.
-  - Pro and image requests need `KAIROQ_BUILDER_PAID_APPROVED=true` and count toward the builder budget.
+  - **Max** uses `KAIROQ_MAX_MODELS` (for example Fable 5.1). It is hidden until that is set, and costs `KAIROQ_MAX_CREDITS` (15) per message.
+  - Pro, Max and image requests need `KAIROQ_BUILDER_PAID_APPROVED=true` and count toward the builder budget.
+- **Project knowledge.** Under **Settings**, owners write instructions the model follows on every message (brand, tone, rules). Up to 8,000 characters.
+- **Security scan.** The **Security** button checks the code and backend settings: secrets in browser code, collections with personal data open to everyone, unsafe HTML, server functions that change data without checking the user, and unsigned webhooks. **Fix with AI** sends the findings to the model.
 - **Discuss mode.** The model answers or plans without changing code or creating a version. An **Implement this plan** button sends the plan as a build request.
 - **Images in chat.** Attach, paste or drop up to 4 images (PNG/JPEG/WebP/GIF, 3 MB each).
   - Images are shown to the model as reference, for example "build this screenshot".
@@ -108,6 +111,42 @@ Enable these in `src/backend.json`. The model adds them when the app needs them.
 - **Scheduled jobs.** Add `"schedules":[…]` with `every` set to `hour`, `day` or `week`.
   - Actions: `delete_older_than` (with `days`) and `email_owner_summary`.
   - The server checks for due jobs every 5 minutes.
+
+### Server functions, webhooks and secrets
+
+- Files in `functions/<name>.js` run on the server at `/api/apps/<id>/functions/<name>` (any method).
+- Contract: `export default async function (request, { user, db, secrets, fetch, ai, email, crypto, log }) { return { status, json } }`.
+  - `request` has `method`, `query`, `headers`, `body` and `rawBody` (for webhook signatures, with `crypto.hmacSha256Hex` and `crypto.timingSafeEqual`).
+  - `db.collection(name)` has full access, so functions must check `user` themselves.
+  - `secrets.get('NAME')` reads keys the owner adds under **Settings → Server secrets**, encrypted with `APP_ENCRYPTION_KEY`. They never reach the browser.
+- In the app: `functions.invoke(name, body)` or `functions.url(name)`.
+- Functions run in a QuickJS sandbox with no Node APIs, 16 MB of memory and `KAIROQ_FUNCTION_TIMEOUT_MS` (10 s), in `KAIROQ_FUNCTION_WORKERS` (4) worker threads, so a stuck function never blocks the server.
+- `fetch` allows only http/https on ports 80, 443, 8080 and 8443 and blocks private and metadata addresses, including after DNS lookup. Bodies are limited to 5 MB.
+- Each version runs its own functions. The preview runs the draft; the published site runs the published version.
+
+### AI in generated apps
+
+- Add `"ai": true` to `src/backend.json`. In code: `ai.chat({messages, system})`, also available to functions.
+- Calls use `KAIROQ_APP_AI_MODEL` while under `KAIROQ_APP_AI_MONTHLY_LIMIT_USD`, then the free router.
+- Every `KAIROQ_APP_AI_CALLS_PER_CREDIT` (10) calls cost the app owner 1 credit. When the owner has no credits, calls return 402. Each visitor is limited to `KAIROQ_APP_AI_PER_MINUTE` (20).
+
+### Sign-in options
+
+- **Google.** Set `KAIROQ_GOOGLE_CLIENT_ID` and `KAIROQ_GOOGLE_CLIENT_SECRET`, and register `<KAIROQ_PUBLIC_URL>/api/create/auth/google/callback` as the redirect URI. One client serves Kairoq accounts and every generated app.
+  - In apps: `auth.signInWithGoogle()`. The app receives a one-time, 60-second code in the URL fragment, only on its own preview, published or domain URLs. Google sign-in can't run inside the editor preview's frame; it opens in the published app.
+  - Only Google-verified emails are accepted. Existing accounts with the same email are linked.
+- **Password reset.** Kairoq accounts and app users can reset by email (needs Resend). Links last 1 hour and work once; a reset signs out every session.
+- **Email verification.** New Kairoq accounts get a verification link (3 days). Sign-up still works when email isn't configured.
+
+### Real-time updates
+
+- In code: `collection('messages').subscribe(items => …)` keeps a list up to date as records change.
+- Uses Server-Sent Events with single-use, 60-second tickets. Each person only receives records they're allowed to read under the collection's access rule.
+- Up to `KAIROQ_REALTIME_MAX_PER_APP` (500) open connections per app.
+
+### npm packages
+
+Generated apps can import: react, react-dom, react-router-dom, lucide-react, recharts, framer-motion, date-fns, clsx, tailwind-merge, class-variance-authority, zod, react-hook-form, the Radix primitives (dialog, dropdown-menu, tabs, tooltip, popover, select, accordion, switch), sonner, react-markdown, @tanstack/react-query, canvas-confetti, react-day-picker, embla-carousel-react and qrcode.react. Other imports are rejected before the build. Code downloads list only the packages the app uses.
 
 ## Growth features
 

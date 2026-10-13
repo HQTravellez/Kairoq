@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kairoq Create</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/create.css?v=20261013">
+<link rel="stylesheet" href="/create.css?v=20261014">
 </head>
 <body>
 <header class="bar">
@@ -57,6 +57,20 @@
         <button class="primary" id="auth-submit" type="submit">Create account</button>
         <p class="muted small" id="free-note"></p>
         <p class="error" id="auth-error" role="alert"></p>
+        <button class="ghost link-btn" id="forgot-open" type="button">Forgot password?</button>
+      </form>
+      <a class="google hidden" id="google-login" href="/api/create/auth/google">Continue with Google</a>
+      <form id="forgot-form" class="hidden">
+        <p class="muted small">Enter your email and we will send a link to choose a new password.</p>
+        <label>Email<input id="forgot-email" type="email" autocomplete="email" required></label>
+        <button class="primary" type="submit">Send reset link</button>
+        <p class="small" id="forgot-status" role="status"></p>
+      </form>
+      <form id="reset-form" class="hidden">
+        <p class="muted small">Choose a new password.</p>
+        <label>New password<input id="reset-password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <button class="primary" type="submit">Save password and sign in</button>
+        <p class="error" id="reset-error" role="alert"></p>
       </form>
     </section>
   </div>
@@ -90,6 +104,7 @@
     <div class="templates" id="home-templates"></div>
     <h2>Your projects</h2>
     <ul class="projects" id="projects"></ul>
+    <p class="notice hidden" id="verify-notice">Please confirm your email address. <button class="ghost link-btn" id="verify-resend" type="button">Send the link again</button></p>
   </div>
 </section>
 
@@ -147,6 +162,7 @@
       <button class="ghost" id="restore" type="button">Restore</button>
       <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits">✎ Edit</button>
       <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
+      <button class="ghost" id="security-open" type="button">Security</button>
       <button class="ghost" id="team-open" type="button">Share</button>
       <button class="ghost" id="settings-open" type="button">Settings</button>
       <button class="primary" id="publish-open" type="button">Publish</button>
@@ -203,6 +219,14 @@
 <dialog id="settings-dialog">
   <form method="dialog" class="dialog">
     <h2>Project settings</h2>
+    <h3>Project knowledge</h3>
+    <p class="muted small">Standing instructions the AI follows on every change: brand, tone, audience, rules.</p>
+    <textarea id="knowledge" rows="4" maxlength="8000" placeholder="Brand colours are teal and sand. Write in a warm, plain tone. Prices are in EUR. Never use stock photos of people."></textarea>
+    <div class="row"><button class="ghost" id="knowledge-save" type="button">Save knowledge</button><span class="muted small" id="knowledge-status"></span></div>
+    <h3>Server secrets</h3>
+    <p class="muted small">API keys your server functions read with secrets.get("NAME"). Values are encrypted and never shown again.</p>
+    <ul class="domains" id="secrets-list"></ul>
+    <div class="row"><input id="secret-name" placeholder="NAME" spellcheck="false" style="max-width:160px"><input id="secret-value" type="password" autocomplete="off" placeholder="value"><button class="ghost" id="secret-add" type="button">Save</button></div>
     <h3>Code</h3>
     <div class="row"><a class="link" id="download" download>Download code (ZIP)</a></div>
     <label>GitHub repository<input id="gh-repo" placeholder="your-name/my-app" spellcheck="false"></label>
@@ -219,6 +243,15 @@
     <p class="muted small" id="email-status"></p>
     <p class="error" id="settings-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="security-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Security check</h2>
+    <p class="muted small" id="security-summary"></p>
+    <ul class="findings" id="findings"></ul>
+    <div class="row end"><button class="primary hidden" id="security-fix" type="button">Fix with AI</button><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
 
@@ -259,6 +292,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261013"></script>
+<script src="/create.js?v=20261014"></script>
 </body>
 </html>

@@ -21,6 +21,7 @@ function normalizeExtras(cfg,collections){
   if(!['signed-in','public'].includes(access))throw Error('"storage" needs "access": "signed-in" or "public".');
   out.storage={access};
  }
+ if(cfg.ai!==undefined){if(cfg.ai!==true&&cfg.ai!==false)throw Error('"ai" must be true or false.');out.ai=cfg.ai}
  if(cfg.email!==undefined){if(cfg.email!==true&&cfg.email!==false)throw Error('"email" must be true or false.');out.email=cfg.email}
  if(cfg.payments!==undefined){
   const products={};
@@ -201,4 +202,4 @@ async function runSchedules(id,cfg,db,meta,{now=Date.now(),send=deliver}={}){
  return results;
 }
 
-module.exports={normalizeExtras,migrate,upload,serveFile,removeFile,sendEmail,checkout,paymentWebhook,myPurchases,runSchedules,ownerEmail,FILE_TYPES};
+module.exports={deliver,allowedReturn,normalizeExtras,migrate,upload,serveFile,removeFile,sendEmail,checkout,paymentWebhook,myPurchases,runSchedules,ownerEmail,FILE_TYPES};
