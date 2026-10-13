@@ -20,6 +20,7 @@ const PORT = Number(process.env.PORT || 3002);
 const SITE_NAME = process.env.SITE_NAME || "Kairoq";
 const PUBLIC_DIR = path.join(__dirname, "public");
 const OR_CHAT = "https://openrouter.ai/api/v1/chat/completions";
+const reactBuilder=require("./react-builder"),reactHosting=require("./react-hosting"),createApi=require("./create-api");
 const OR_MODELS = "https://openrouter.ai/api/v1/models";
 const OR_KEY = "https://openrouter.ai/api/v1/key";
 const ZERO_COST_MODE = String(process.env.ZERO_COST_MODE || "true").toLowerCase() !== "false";
@@ -6521,9 +6522,10 @@ function parseDeveloperResponse(content,model="coding model"){
   }
   throw Error("Response did not contain complete project files; "+clean.length+" characters");
 }
-async function callDeveloperCodingModel(opts={}){
-  if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse:parseDeveloperResponse});
-  if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
+async function callDeveloperCodingModel(opts={}){return callBuilderModel(opts,parseDeveloperResponse)}
+async function callBuilderModel(opts={},parse=parseDeveloperResponse){
+  if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
+  if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
   const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
@@ -6557,7 +6559,7 @@ async function callDeveloperCodingModel(opts={}){
       if(free&&cost>0)throw Error("Free request unexpectedly billed");
       if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model});
       if(!content.trim())throw Error("Empty response; finish="+data.choices?.[0]?.finish_reason+" reasoning="+String(message.reasoning||"").length);
-      return parseDeveloperResponse(content,model);
+      return parse(content,model);
     }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}
   }
   throw Error("No coding model returned usable project files. "+errors.join(" | "));
@@ -6586,6 +6588,11 @@ async function handleDeveloperPublish(req,res){
 }
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
+  if(reactHosting.handleHost(req,res))return;
+  if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
+  if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(req.method==="GET"&&/^\/create\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
   if(url.startsWith("/apps/") && (await appRuntime.handle(req,res)||await housingBuilder.handle(req,res)))return;
@@ -6906,6 +6913,6 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
-  callDeveloperCodingModel, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
+  callDeveloperCodingModel, callBuilderModel, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };
