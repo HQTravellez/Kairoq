@@ -79,6 +79,7 @@ Collections must be declared in `src/backend.json`, which the model writes along
 | `shared` | any signed-in user | signed-in users | creator |
 | `public-read` | anyone | signed-in users | creator |
 | `public` | anyone | anyone | creator (anonymous records: owner only, from the Data tab) |
+| `submit-only` | nobody (owner only, in the Data tab) | anyone | owner, from the Data tab |
 
 - The API is `/api/apps/<project-id>/…`. It uses bearer tokens instead of cookies, so it works from sandboxed previews, `/sites/` pages and custom domains. A custom domain can reach only its own app's API.
 - Passwords are hashed with scrypt. Records are limited to 20 KB, 10,000 per collection and 10,000 users per app. Each IP is limited to 240 requests per minute per app.
@@ -107,6 +108,47 @@ Enable these in `src/backend.json`. The model adds them when the app needs them.
 - **Scheduled jobs.** Add `"schedules":[…]` with `every` set to `hour`, `day` or `week`.
   - Actions: `delete_older_than` (with `days`) and `email_owner_summary`.
   - The server checks for due jobs every 5 minutes.
+
+## Growth features
+
+- **Landing page and pricing.**
+  - Signed-out visitors to `/create` see a landing page with features, the templates gallery, live pricing and sign-up.
+  - Pricing is built from the free credits, `KAIROQ_PLANS` and `KAIROQ_CREDIT_PACKS`.
+  - A prompt typed on the landing page is built automatically right after sign-up.
+- **Templates.** Six starter apps (`create-templates.js`): restaurant, hotel guest portal, SaaS landing page, team CRM, appointment booking, portfolio. Each one is a working app using the backend, and you keep building on it through chat.
+- **Monthly plans.**
+  - `KAIROQ_PLANS` lists Stripe subscription Prices. Checkout runs in subscription mode.
+  - Every paid invoice (first and renewals) adds the plan's credits, once per invoice, after re-reading the invoice and subscription from Stripe.
+  - Cancellation ends the plan. Credits already paid for are kept.
+  - **Manage billing** opens Stripe's customer portal.
+  - Add webhook events `invoice.paid`, `customer.subscription.updated` and `customer.subscription.deleted` to the account webhook.
+- **Collaborators.**
+  - The owner invites people by email as **editor** (chat, visual edits, restore, publish) or **viewer** (read-only).
+  - Settings, domains, GitHub, sharing, members and deleting stay with the owner.
+  - Each person spends their own credits.
+- **Share links and remix.**
+  - **Share** creates a public link (`/create/share/<token>`) that shows a live preview.
+  - With remix enabled, anyone signed in can copy the app's code and images into their own account. Data and keys are never copied.
+  - Turning sharing off disables the link.
+- **Analytics.**
+  - Published pages count views and daily unique visitors on the server.
+  - No cookies and no scripts. A visitor is a salted hash of IP and browser that changes daily.
+  - Bots, previews and asset requests are skipped.
+  - Totals, a 30-day chart and top referrers appear in **Publish**.
+- **SEO.**
+  - Published pages get a title, description, canonical URL and Open Graph/Twitter tags, plus `robots.txt` and `sitemap.xml`.
+  - If no share image is set, Kairoq takes a 1200×630 screenshot when you publish.
+
+## Scale and operations
+
+- **Parallel builds.** Vite builds run in worker threads (`KAIROQ_BUILD_WORKERS`, default 2), so several projects build at once without blocking the server. A build that exceeds `KAIROQ_BUILD_TIMEOUT_MS` is stopped by terminating its worker.
+- **Backups.**
+  - Every day, `VACUUM INTO` writes consistent copies of the accounts database and each app's database, plus the hosting registry, to `workspace/backups/<timestamp>/`.
+  - Backups are kept for `KAIROQ_BACKUP_DAYS` (default 7).
+  - The owner can run one on demand (`POST /api/create/admin/backup`) and see build, job and account counts (`GET /api/create/admin/status`).
+  - These backups live on the same volume, so also enable Railway volume backups, or copy the folder off-site.
+- **Rate limits** use the last `X-Forwarded-For` entry (the one Railway's proxy adds), so clients can't spoof their address to get around them.
+- **Postgres.** Everything is SQLite on the Railway volume today, which suits one server. To run several servers, move accounts and app data to Postgres, and builds and projects to shared storage. The data access is isolated in `builder-accounts.js`, `react-backend.js` and `react-analytics.js`, which keeps that move contained.
 
 ## Checking real-model quality
 

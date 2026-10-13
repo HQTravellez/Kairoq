@@ -34,5 +34,12 @@ async function check(url,{timeoutMs=15000}={}){
  finally{await context.close().catch(()=>{})}
  return{skipped:false,errors};
 }
+// Saves a 1200x630 PNG of a page (used as the social share image).
+async function screenshot(url,file){
+ if(!available())return false;
+ const context=await (await browser()).newContext({viewport:{width:1200,height:630},deviceScaleFactor:1});
+ try{const page=await context.newPage();await page.goto(url,{waitUntil:'load',timeout:20000});await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});await page.waitForTimeout(400);await page.screenshot({path:file,type:'png'});return true}
+ catch{return false}finally{await context.close().catch(()=>{})}
+}
 async function close(){if(browserPromise){const b=await browserPromise.catch(()=>null);browserPromise=null;await b?.close().catch(()=>{})}}
-module.exports={check,available,close};
+module.exports={check,screenshot,available,close};

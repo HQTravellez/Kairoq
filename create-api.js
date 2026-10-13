@@ -1,7 +1,7 @@
 "use strict";
 // HTTP API for the chat builder (/create). Owners (the Kairoq admin login) build
 // without credits; customer accounts spend one credit per successful edit.
-const crypto=require('crypto');
+const crypto=require('crypto'),fs=require('fs'),path=require('path');
 const builder=require('./react-builder'),hosting=require('./react-hosting'),accounts=require('./builder-accounts'),backend=require('./react-backend');
 
 const jobs=new Map();
@@ -13,7 +13,7 @@ function readJson(req,limit=200000){
 async function readRaw(req,limit=65536){const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>limit)throw Object.assign(Error('Request too large'),{status:413});chunks.push(c)}return Buffer.concat(chunks)}
 function limited(req,bucket,max=20,windowMs=600000){
  if(attempts.size>5000)attempts.clear();
- const key=bucket+':'+(String(req.headers['x-forwarded-for']||'').split(',')[0].trim()||req.socket?.remoteAddress||'local'),now=Date.now();
+ const key=bucket+':'+require('./client-ip').clientIp(req),now=Date.now();
  const list=(attempts.get(key)||[]).filter(t=>now-t<windowMs);list.push(now);attempts.set(key,list);
  if(list.length>max)throw Object.assign(Error('Too many attempts. Try again in a few minutes.'),{status:429});
 }
@@ -31,12 +31,36 @@ function viewer(req,isOwner){
  return null;
 }
 function requireViewer(req,isOwner){const v=viewer(req,isOwner);if(!v)throw Object.assign(Error('Sign in to continue'),{status:401});return v}
-function ownedProject(v,id){
- const meta=builder.loadMeta(id);
- if(meta.owner!==v.owner)throw Object.assign(Error('Unknown project'),{status:404});
- return meta;
+// Roles on a project: the owner, or collaborators invited by email as editor or viewer.
+const RANK={viewer:1,editor:2,owner:3};
+function roleFor(v,meta){
+ if(meta.owner===v.owner)return'owner';
+ if(v.kind==='customer'){const m=(meta.members||[]).find(x=>x.email===v.account.email);if(m)return m.role}
+ return null;
 }
-function projectView(id){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
+function ownedProject(v,id,need='owner'){
+ let meta;try{meta=builder.loadMeta(id)}catch{throw Object.assign(Error('Unknown project'),{status:404})}
+ const role=roleFor(v,meta);
+ if(!role)throw Object.assign(Error('Unknown project'),{status:404});
+ if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
+ return{meta,role};
+}
+const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/records':'viewer','DELETE:/records':'editor',
+ 'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
+ 'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
+ 'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
+ 'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
+ 'GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor'};
+function listFor(v){
+ return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer')return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
+  .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
+}
+function findShare(token){
+ if(!/^[a-f0-9]{24}$/.test(String(token)))return null;
+ for(const p of builder.list()){const meta=builder.loadMeta(p.id);if(meta.share&&meta.share.token===token)return meta}
+ return null;
+}
+function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking']);
 function intEnv(name,fallback){const n=Number(process.env[name]);return Number.isInteger(n)&&n>=0?n:fallback}
@@ -120,7 +144,7 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot}){
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
@@ -128,7 +152,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),free_credits:accounts.freeCredits(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1)}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1)}),true;
   }
   if(route==='/signup'&&method==='POST'){
    if(process.env.KAIROQ_BUILDER_SIGNUPS==='closed')throw Object.assign(Error('Sign-ups are closed'),{status:403});
@@ -146,10 +170,45 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
    const raw=await readRaw(req);
    return send(res,200,await accounts.stripeWebhook(raw,req.headers['stripe-signature'])),true;
   }
+  if(route==='/templates'&&method==='GET')return send(res,200,{templates:require('./create-templates').list()}),true;
+  const sm=/^\/share\/([a-f0-9]{24})$/.exec(route);
+  if(sm&&method==='GET'){
+   const meta=findShare(sm[1]);if(!meta)throw Object.assign(Error('This share link is no longer active'),{status:404});
+   return send(res,200,{share:{name:meta.name,preview_url:builder.previewUrl(meta),remix:!!meta.share.remix,versions:meta.versions.length,updated_at:meta.updated_at}}),true;
+  }
   const v=requireViewer(req,isOwner);
+  if(route==='/remix'&&method==='POST'){
+   const b=await readJson(req,2000),src=findShare(b.token);
+   if(!src||!src.share.remix)throw Object.assign(Error('This app cannot be remixed'),{status:404});
+   if(listFor(v).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached'),{status:400});
+   const meta=builder.create({name:('Remix of '+src.name).slice(0,80),owner:v.owner});
+   const assets=require('./react-assets');
+   for(const a of assets.list(src.id)){const f=assets.read(src.id,a.name);fs.mkdirSync(path.join(builder.projectDir(meta.id),'uploads'),{recursive:true});fs.writeFileSync(path.join(builder.projectDir(meta.id),'uploads',a.name),f.bytes)}
+   await builder.initializeFrom(meta,builder.loadFiles(src.id,src.current_version),'Remixed from '+src.name);
+   return send(res,201,{project:projectViewFor(meta.id)}),true;
+  }
+  if(route.startsWith('/admin/')){
+   if(v.kind!=='owner')throw Object.assign(Error('Owner only'),{status:403});
+   const backups=require('./create-backups');
+   if(route==='/admin/status'&&method==='GET'){
+    const d=accounts.database();
+    return send(res,200,{builds:builder.buildStats(),jobs:[...jobs.values()].filter(j=>ACTIVE.has(j.status)).length,projects:builder.list().length,accounts:d.prepare('SELECT COUNT(*) n FROM accounts').get().n,subscribers:d.prepare("SELECT COUNT(*) n FROM accounts WHERE plan IS NOT NULL AND plan_status='active'").get().n,last_backup:backups.latest()}),true;
+   }
+   if(route==='/admin/backup'&&method==='POST')return send(res,200,{backup:backups.run()}),true;
+   return send(res,404,{error:'Route not found'}),true;
+  }
   if(route==='/credits'&&method==='GET'){
    if(v.kind!=='customer')return send(res,200,{unlimited:true,history:[]}),true;
    return send(res,200,{account:accounts.fromRequest(req),history:accounts.history(v.account.id)}),true;
+  }
+  if(route==='/subscribe'&&method==='POST'){
+   if(v.kind!=='customer')throw Object.assign(Error('The owner account does not use plans'),{status:400});
+   const b=await readJson(req,5000);
+   return send(res,200,await accounts.subscribe(v.account,String(b.plan||''),origin(req))),true;
+  }
+  if(route==='/billing'&&method==='POST'){
+   if(v.kind!=='customer')throw Object.assign(Error('The owner account has no billing'),{status:400});
+   return send(res,200,await accounts.billingPortal(v.account,origin(req))),true;
   }
   if(route==='/checkout'&&method==='POST'){
    if(v.kind!=='customer')throw Object.assign(Error('The owner account does not use credits'),{status:400});
@@ -157,15 +216,18 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
    return send(res,200,await accounts.checkout(v.account,String(b.pack||''),origin(req))),true;
   }
   // ----- projects -----
-  if(route==='/projects'&&method==='GET')return send(res,200,{projects:builder.list(v.owner)}),true;
+  if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
   if(route==='/projects'&&method==='POST'){
    const b=await readJson(req,16000000);
    if(builder.list(v.owner).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
    const prompt=String(b.prompt||'').trim();
-   const meta=builder.create({name:b.name||prompt.split(/[.\n]/)[0].slice(0,60)||'Untitled app',owner:v.owner});
-   await builder.initialize(meta);
+   const tpl=b.template?require('./create-templates').get(String(b.template)):null;
+   if(b.template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
+   const meta=builder.create({name:b.name||(tpl&&!prompt?tpl.name:prompt.split(/[.\n]/)[0].slice(0,60))||'Untitled app',owner:v.owner});
+   if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
+   else await builder.initialize(meta);
    const job=prompt?startJob(v,meta.id,{message:prompt,tier:b.tier||'standard',images:parseImages(b.images)},{callModel,checkRuntime}):null;
-   return send(res,201,{project:projectView(meta.id),job}),true;
+   return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
   if(jm&&method==='GET'){
@@ -177,8 +239,34 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
   const pm=/^\/projects\/([a-f0-9]{12})(\/[a-z]+)?$/.exec(route);
   if(!pm)return send(res,404,{error:'Route not found'}),true;
   const id=pm[1],action=pm[2]||'';
-  ownedProject(v,id);
+  const {role}=ownedProject(v,id,NEED[method+':'+action]||'owner');
+  const projectView=(pid,r=role)=>projectViewFor(pid,r);
   if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null}),true;
+  if(action==='/analytics'&&method==='GET')return send(res,200,{analytics:require('./react-analytics').summary(id,{days:30})}),true;
+  if(action==='/seo'&&method==='POST'){
+   const b=await readJson(req,4000),meta=builder.loadMeta(id);
+   const image=String(b.image||'').trim();
+   if(image&&!/^(https:\/\/|\.\/uploads\/[a-z0-9-]+\.(png|jpg|jpeg|webp|gif)$)/.test(image))throw Object.assign(Error('Share image must be an https URL or an uploaded image'),{status:400});
+   meta.seo={title:String(b.title||'').trim().slice(0,70),description:String(b.description||'').trim().slice(0,200),image};
+   builder.saveMeta(meta);return send(res,200,{project:projectView(id)}),true;
+  }
+  if(action==='/members'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{members:meta.members||[]}),true}
+  if(action==='/members'&&method==='POST'){
+   const b=await readJson(req,2000),meta=builder.loadMeta(id);
+   const email=String(b.email||'').trim().toLowerCase(),r=b.role==='viewer'?'viewer':'editor';
+   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)throw Object.assign(Error('Enter a valid email address'),{status:400});
+   if(v.kind==='customer'&&email===v.account.email)throw Object.assign(Error('You already own this project'),{status:400});
+   meta.members=(meta.members||[]).filter(m=>m.email!==email);
+   if(meta.members.length>=20)throw Object.assign(Error('A project can have up to 20 collaborators'),{status:400});
+   meta.members.push({email,role:r,added_at:new Date().toISOString()});builder.saveMeta(meta);
+   return send(res,200,{members:meta.members,project:projectView(id)}),true;
+  }
+  if(action==='/members'&&method==='DELETE'){const b=await readJson(req,2000),meta=builder.loadMeta(id);meta.members=(meta.members||[]).filter(m=>m.email!==String(b.email||'').toLowerCase());builder.saveMeta(meta);return send(res,200,{members:meta.members,project:projectView(id)}),true}
+  if(action==='/share'&&method==='POST'){
+   const b=await readJson(req,2000),meta=builder.loadMeta(id);
+   meta.share=b.enabled?{token:meta.share?.token||crypto.randomBytes(12).toString('hex'),remix:!!b.remix,at:new Date().toISOString()}:null;
+   builder.saveMeta(meta);return send(res,200,{project:projectView(id)}),true;
+  }
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
   if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
@@ -232,7 +320,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime}){
   }
   if(action==='/file'&&method==='GET'){const name=new URL(req.url,'http://x').searchParams.get('path')||'';return send(res,200,{path:name,content:builder.readFile(id,name)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
-  if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);hosting.publish(id,{slug:b.slug,version:b.version});return send(res,200,{project:projectView(id)}),true}
+  if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);hosting.publish(id,{slug:b.slug,version:b.version});
+   // Social share image: a screenshot of the published version, taken in the background.
+   if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
+  return send(res,200,{project:projectView(id)}),true}
   if(action==='/unpublish'&&method==='POST'){hosting.unpublish(id);return send(res,200,{project:projectView(id)}),true}
   if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);await hosting.addDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
   if(action==='/verify'&&method==='POST'){const b=await readJson(req,2000);const r=await hosting.verifyDomain(id,b.hostname);return send(res,200,{verified:r.verified,error:r.error,project:projectView(id)}),true}

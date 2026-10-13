@@ -7,7 +7,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {DatabaseSync}=require('node:sqlite');
 const builder=require('./react-builder');
 
-const ACCESS=['private','shared','public-read','public'];
+const ACCESS=['private','shared','public-read','public','submit-only'];
 const MAX_RECORD_BYTES=20000,MAX_RECORDS=10000,MAX_USERS=10000,LIST_LIMIT=200,SESSION_DAYS=30;
 const dbs=new Map();
 
@@ -85,8 +85,8 @@ function currentUser(db,req){
 }
 
 // ---------- records ----------
-function canRead(access,user){return access==='public'||access==='public-read'||!!user}
-function canCreate(access,user){return access==='public'||!!user}
+function canRead(access,user){if(access==='submit-only')return false;return access==='public'||access==='public-read'||!!user}
+function canCreate(access,user){return access==='public'||access==='submit-only'||!!user}
 function visibleWhere(access,user){return access==='private'?{sql:' AND owner_id=?',args:[user.id]}:{sql:'',args:[]}}
 function cleanData(data){
  if(!data||typeof data!=='object'||Array.isArray(data))throw fail(400,'Record data must be an object');
@@ -96,6 +96,7 @@ function cleanData(data){
  return text;
 }
 function list(db,access,collection,user,query){
+ if(access==='submit-only')throw fail(403,'Entries in this collection are private to the app owner');
  if(!canRead(access,user))throw fail(401,'Sign in to view these records');
  const v=visibleWhere(access,user);
  if(query.mine==='true'){if(!user)throw fail(401,'Sign in first');v.sql+=' AND owner_id=?';v.args.push(user.id)}
@@ -109,6 +110,7 @@ function list(db,access,collection,user,query){
  return items;
 }
 function getOne(db,access,collection,user,id){
+ if(access==='submit-only')throw fail(403,'Entries in this collection are private to the app owner');
  if(!canRead(access,user))throw fail(401,'Sign in to view this record');
  const r=db.prepare('SELECT * FROM records WHERE id=? AND collection=?').get(id,collection);
  if(!r||(access==='private'&&r.owner_id!==user.id))throw fail(404,'Record not found');
@@ -140,7 +142,7 @@ function remove(db,collection,user,id){ownRecord(db,collection,user,id);db.prepa
 const hits=new Map();
 function limited(req,id){
  if(hits.size>20000)hits.clear();
- const key=id+':'+(String(req.headers['x-forwarded-for']||'').split(',')[0].trim()||req.socket?.remoteAddress||'local'),now=Date.now();
+ const key=id+':'+require('./client-ip').clientIp(req),now=Date.now();
  const list=(hits.get(key)||[]).filter(t=>now-t<60000);list.push(now);hits.set(key,list);
  if(list.length>240)throw fail(429,'Too many requests. Slow down and try again.');
 }

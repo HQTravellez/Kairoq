@@ -15,6 +15,7 @@ function database(){
   CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,credits INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,expires_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS ledger(id TEXT PRIMARY KEY,account_id TEXT NOT NULL,delta INTEGER NOT NULL,reason TEXT NOT NULL,ref TEXT UNIQUE,at TEXT NOT NULL);`);
+ for(const col of ['plan TEXT','plan_status TEXT','stripe_customer TEXT','subscription_id TEXT','plan_renews_at TEXT']){try{db.exec('ALTER TABLE accounts ADD COLUMN '+col)}catch{}}
  return db;
 }
 function freeCredits(){const n=Number(process.env.KAIROQ_FREE_CREDITS??30);return Number.isInteger(n)&&n>=0?n:30}
@@ -30,7 +31,7 @@ function normalizeEmail(email){
  if(e.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))throw Object.assign(Error('Enter a valid email address'),{status:400});
  return e;
 }
-function publicAccount(a){return a&&{id:a.id,email:a.email,credits:a.credits,created_at:a.created_at}}
+function publicAccount(a){return a&&{id:a.id,email:a.email,credits:a.credits,created_at:a.created_at,plan:a.plan||null,plan_status:a.plan_status||null,plan_renews_at:a.plan_renews_at||null,billing:Boolean(a.stripe_customer)}}
 
 function signup(email,password){
  const e=normalizeEmail(email);
@@ -98,6 +99,33 @@ function packs(){
   return Array.isArray(list)?list.filter(p=>p&&/^[a-z0-9_-]{1,40}$/.test(p.id)&&Number.isInteger(p.credits)&&p.credits>0&&/^price_[A-Za-z0-9]+$/.test(p.price)).map(p=>({id:p.id,name:String(p.name||p.id).slice(0,60),credits:p.credits,price:p.price,label:String(p.label||'').slice(0,40)})):[];
  }catch{return[]}
 }
+// KAIROQ_PLANS='[{"id":"starter","name":"Starter","credits":100,"price":"price_...","label":"$20/month"}]'
+function plans(){
+ try{
+  const list=JSON.parse(process.env.KAIROQ_PLANS||'[]');
+  return Array.isArray(list)?list.filter(p=>p&&/^[a-z0-9_-]{1,40}$/.test(p.id)&&Number.isInteger(p.credits)&&p.credits>0&&/^price_[A-Za-z0-9]+$/.test(p.price)).map(p=>({id:p.id,name:String(p.name||p.id).slice(0,60),credits:p.credits,price:p.price,label:String(p.label||'').slice(0,40),features:Array.isArray(p.features)?p.features.slice(0,8).map(f=>String(f).slice(0,80)):[]})):[];
+ }catch{return[]}
+}
+function stripeReady(){return Boolean(process.env.KAIROQ_STRIPE_SECRET_KEY)}
+async function subscribe(account,planId,origin){
+ if(!stripeReady())throw Object.assign(Error('Plans are not set up yet'),{status:409});
+ const plan=plans().find(p=>p.id===planId);
+ if(!plan)throw Object.assign(Error('Unknown plan'),{status:400});
+ const row=get(account.id);
+ if(row.subscription_id&&row.plan_status==='active')throw Object.assign(Error('You already have a plan. Use Manage billing to change it.'),{status:409});
+ const session=await stripe('checkout/sessions',{method:'POST',form:{mode:'subscription','line_items[0][price]':plan.price,'line_items[0][quantity]':'1',client_reference_id:account.id,...(row.stripe_customer?{customer:row.stripe_customer}:{customer_email:account.email}),'metadata[account_id]':account.id,'metadata[plan]':plan.id,'subscription_data[metadata][account_id]':account.id,'subscription_data[metadata][plan]':plan.id,success_url:origin+'/create?purchase=success',cancel_url:origin+'/create?purchase=cancelled'}});
+ return{url:session.url};
+}
+async function billingPortal(account,origin){
+ const row=get(account.id);
+ if(!row.stripe_customer)throw Object.assign(Error('No billing account yet'),{status:404});
+ const session=await stripe('billing_portal/sessions',{method:'POST',form:{customer:row.stripe_customer,return_url:origin+'/create'}});
+ return{url:session.url};
+}
+function setPlan(accountId,fields){
+ const cols=Object.keys(fields);if(!cols.length)return;
+ database().prepare('UPDATE accounts SET '+cols.map(c=>c+'=?').join(',')+' WHERE id=?').run(...cols.map(c=>fields[c]),accountId);
+}
 function stripeConfigured(){return Boolean(process.env.KAIROQ_STRIPE_SECRET_KEY&&packs().length)}
 async function stripe(pathname,{method='GET',form}={}){
  const r=await fetch('https://api.stripe.com/v1/'+pathname,{method,headers:{Authorization:'Bearer '+process.env.KAIROQ_STRIPE_SECRET_KEY,...(form?{'Content-Type':'application/x-www-form-urlencoded'}:{})},body:form?new URLSearchParams(form).toString():undefined,signal:AbortSignal.timeout(20000)});
@@ -120,20 +148,54 @@ function verifyStripeSignature(raw,header,secret,now=Date.now()){
  if(!sigs.some(s=>/^[a-f0-9]{64}$/.test(s)&&crypto.timingSafeEqual(expected,Buffer.from(s,'hex'))))throw Object.assign(Error('Webhook signature invalid'),{status:401});
 }
 // Credits are granted only after re-reading the session from Stripe and confirming payment.
-async function stripeWebhook(raw,signature,{fetchSession=id=>stripe('checkout/sessions/'+encodeURIComponent(id))}={}){
+// Every event is re-read from Stripe before acting on it.
+async function stripeWebhook(raw,signature,{fetchSession,stripeGet=p=>stripe(p)}={}){
  verifyStripeSignature(raw,signature,process.env.KAIROQ_STRIPE_WEBHOOK_SECRET);
- const event=JSON.parse(raw);
- if(event.type!=='checkout.session.completed'&&event.type!=='checkout.session.async_payment_succeeded')return{ignored:event.type};
- const id=event.data?.object?.id;
- if(typeof id!=='string'||!/^cs_[A-Za-z0-9_]+$/.test(id))throw Object.assign(Error('Missing checkout session'),{status:400});
- const session=await fetchSession(id);
- if(session.payment_status!=='paid')return{pending:id};
- const pack=packs().find(p=>p.id===session.metadata?.pack);
- const accountId=session.metadata?.account_id||session.client_reference_id;
- if(!pack||!accountId)throw Object.assign(Error('Checkout session is missing its credit pack'),{status:400});
- const result=grant(accountId,pack.credits,'Bought '+pack.name,'stripe:'+id);
- return{credited:!result.duplicate,credits:pack.credits};
+ const event=JSON.parse(raw),obj=event.data?.object||{};
+ const getSession=fetchSession||(id=>stripeGet('checkout/sessions/'+encodeURIComponent(id)));
+ if(event.type==='checkout.session.completed'||event.type==='checkout.session.async_payment_succeeded'){
+  const id=obj.id;
+  if(typeof id!=='string'||!/^cs_[A-Za-z0-9_]+$/.test(id))throw Object.assign(Error('Missing checkout session'),{status:400});
+  const session=await getSession(id);
+  const accountId=session.metadata?.account_id||session.client_reference_id;
+  if(session.mode==='subscription'){
+   if(!accountId||!get(accountId))throw Object.assign(Error('Subscription is missing its account'),{status:400});
+   setPlan(accountId,{stripe_customer:session.customer||null,subscription_id:session.subscription||null,plan:session.metadata?.plan||null,plan_status:session.status==='complete'?'active':'incomplete'});
+   return{subscribed:accountId};
+  }
+  if(session.payment_status!=='paid')return{pending:id};
+  const pack=packs().find(p=>p.id===session.metadata?.pack);
+  if(!pack||!accountId)throw Object.assign(Error('Checkout session is missing its credit pack'),{status:400});
+  if(session.customer)setPlan(accountId,{stripe_customer:session.customer});
+  const result=grant(accountId,pack.credits,'Bought '+pack.name,'stripe:'+id);
+  return{credited:!result.duplicate,credits:pack.credits};
+ }
+ // Plan credits arrive with each paid invoice (first payment and every renewal).
+ if(event.type==='invoice.paid'||event.type==='invoice.payment_succeeded'){
+  if(!/^in_[A-Za-z0-9_]+$/.test(obj.id||''))throw Object.assign(Error('Missing invoice'),{status:400});
+  const invoice=await stripeGet('invoices/'+encodeURIComponent(obj.id));
+  if(invoice.status!=='paid')return{pending:obj.id};
+  const subId=invoice.subscription||invoice.parent?.subscription_details?.subscription;
+  if(!subId)return{ignored:'invoice without subscription'};
+  const sub=await stripeGet('subscriptions/'+encodeURIComponent(typeof subId==='string'?subId:subId.id));
+  const accountId=sub.metadata?.account_id,plan=plans().find(p=>p.id===sub.metadata?.plan);
+  if(!accountId||!plan||!get(accountId))throw Object.assign(Error('Subscription is missing its plan'),{status:400});
+  const periodEnd=sub.current_period_end||sub.items?.data?.[0]?.current_period_end;
+  setPlan(accountId,{plan:plan.id,plan_status:sub.status,subscription_id:sub.id,stripe_customer:sub.customer||null,plan_renews_at:periodEnd?new Date(periodEnd*1000).toISOString():null});
+  const result=grant(accountId,plan.credits,plan.name+' plan credits','invoice:'+invoice.id);
+  return{credited:!result.duplicate,credits:plan.credits};
+ }
+ if(event.type==='customer.subscription.updated'||event.type==='customer.subscription.deleted'){
+  if(!/^sub_[A-Za-z0-9_]+$/.test(obj.id||''))throw Object.assign(Error('Missing subscription'),{status:400});
+  const sub=await stripeGet('subscriptions/'+encodeURIComponent(obj.id));
+  const row=database().prepare('SELECT id FROM accounts WHERE subscription_id=?').get(sub.id)||(sub.metadata?.account_id&&get(sub.metadata.account_id));
+  if(!row)return{ignored:'unknown subscription'};
+  const ended=['canceled','incomplete_expired','unpaid'].includes(sub.status);
+  setPlan(row.id,{plan_status:sub.status,...(ended?{plan:null,subscription_id:null}:{plan:sub.metadata?.plan||null})});
+  return{updated:row.id,status:sub.status};
+ }
+ return{ignored:event.type};
 }
 
 function email(id){return get(id)?.email||null}
-module.exports={email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,COOKIE};
+module.exports={plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,COOKIE};

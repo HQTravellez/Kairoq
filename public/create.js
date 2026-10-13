@@ -9,7 +9,7 @@ async function api(path,{method='GET',body}={}){
  if(!r.ok)throw Object.assign(new Error(data.error||'Request failed ('+r.status+')'),{status:r.status});
  return data;
 }
-function show(screen){for(const id of ['auth','home','editor'])$(id).classList.toggle('hidden',id!==screen);$('bar-project').classList.toggle('hidden',screen!=='editor')}
+function show(screen){for(const id of ['auth','home','editor','share-screen'])$(id).classList.toggle('hidden',id!==screen);$('bar-project').classList.toggle('hidden',screen!=='editor')}
 function text(el,value){el.textContent=value==null?'':String(value)}
 function when(iso){try{return new Date(iso).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}catch{return''}}
 
@@ -27,8 +27,10 @@ function renderCredits(account){
  const customer=Boolean(account);
  $('credits').classList.toggle('hidden',!customer);
  $('buy').classList.toggle('hidden',!customer||!state.me?.purchases);
- if(customer)text($('credits'),account.credits+' credit'+(account.credits===1?'':'s'));
+ $('plans-open').classList.toggle('hidden',!customer||!state.me?.subscriptions);
+ if(customer)text($('credits'),account.credits+' credit'+(account.credits===1?'':'s')+(account.plan?' · '+planName(account.plan):''));
 }
+function planName(id){return(state.me?.plans||[]).find(p=>p.id===id)?.name||id}
 function setMode(mode){
  state.mode=mode;
  $('tab-signup').setAttribute('aria-selected',String(mode==='signup'));
@@ -51,6 +53,7 @@ $('logout').onclick=async()=>{await api('/logout',{method:'POST'}).catch(()=>{})
 // ---------- home ----------
 async function loadHome(){
  show('home');history.replaceState(null,'','/create');
+ renderTemplates($('home-templates'),id=>startFromTemplate(id));
  const {projects}=await api('/projects');
  const list=$('projects');list.replaceChildren();
  if(!projects.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects yet. Describe one above.';list.append(li);return}
@@ -59,6 +62,7 @@ async function loadHome(){
   open.type='button';open.className='open';open.textContent=p.name;open.onclick=()=>openProject(p.id);
   meta.className='meta';meta.textContent='v'+p.current_version+' · '+when(p.updated_at);
   li.append(open,meta);
+  if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
   if(p.published){const b=document.createElement('span');b.className='badge live';b.textContent='Live';li.append(b)}
   list.append(li);
  }
@@ -81,6 +85,7 @@ async function openProject(id,{pendingText,job}={}){
  state.project=project;
  if(account)renderCredits(account);
  show('editor');history.replaceState(null,'','/create?project='+id);
+ applyRole();
  $('project-name').value=project.name;
  renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
@@ -341,7 +346,7 @@ $('fix').onclick=()=>{
 };
 
 // ---------- publish & domains ----------
-$('publish-open').onclick=()=>{renderPublish();$('publish-dialog').showModal()};
+$('publish-open').onclick=()=>{renderPublish();renderInsights().catch(()=>{});$('publish-dialog').showModal()};
 function slugFrom(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)}
 function renderPublish(){
  const p=state.project;
@@ -452,9 +457,133 @@ function openBuy(){
 }
 
 // ---------- start ----------
+// ---------- landing, templates, plans ----------
+function setPending(p){try{sessionStorage.setItem('kairoq-pending',JSON.stringify(p))}catch{}state.pending=p}
+function takePending(){let p=state.pending;try{p=p||JSON.parse(sessionStorage.getItem('kairoq-pending')||'null');sessionStorage.removeItem('kairoq-pending')}catch{}state.pending=null;return p}
+async function renderTemplates(wrap,onPick){
+ if(!state.templates)state.templates=(await api('/templates')).templates;
+ wrap.replaceChildren();
+ for(const t of state.templates){
+  const b=document.createElement('button');b.type='button';
+  b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:t.category}),Object.assign(document.createElement('strong'),{textContent:t.name}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description}));
+  b.onclick=()=>onPick(t.id);wrap.append(b);
+ }
+}
+async function startFromTemplate(id){
+ text($('home-error'),'');
+ try{const {project}=await api('/projects',{method:'POST',body:{template:id}});await openProject(project.id)}catch(err){text($('home-error'),err.message)}
+}
+function planCard(title,price,lines,action){
+ const card=document.createElement('div');card.className='plan';
+ card.append(Object.assign(document.createElement('h3'),{textContent:title}),Object.assign(document.createElement('span'),{className:'price',textContent:price}));
+ const ul=document.createElement('ul');for(const l of lines)ul.append(Object.assign(document.createElement('li'),{textContent:l}));card.append(ul);
+ if(action)card.append(action);
+ return card;
+}
+function renderLanding(){
+ renderTemplates($('landing-templates'),id=>{setPending({template:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()}).catch(()=>{});
+ const wrap=$('landing-plans');wrap.replaceChildren();
+ const per=(state.me.tiers||[]).map(t=>t.label+' '+t.credits+' credit'+(t.credits===1?'':'s')).join(', ');
+ wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a free URL','No card needed']));
+ for(const p of state.me.plans||[])wrap.append(planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features]));
+ for(const p of state.me.packs||[])wrap.append(planCard(p.name,p.label||p.credits+' credits',[p.credits+' credits, one-time','Never expire']));
+ text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. Failed changes are refunded.');
+}
+$('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+$('plans-open').onclick=()=>{
+ text($('plans-error'),'');
+ const account=state.me.viewer?.account||{};
+ text($('plan-current'),account.plan?'Current plan: '+planName(account.plan)+' ('+(account.plan_status||'active')+')'+(account.plan_renews_at?' · renews '+when(account.plan_renews_at):''):'You are on the free plan.');
+ const wrap=$('plans-list');wrap.replaceChildren();
+ for(const p of state.me.plans||[]){
+  const btn=Object.assign(document.createElement('button'),{type:'button',className:'primary',textContent:account.plan===p.id?'Current plan':'Choose '+p.name});
+  btn.disabled=account.plan===p.id;
+  btn.onclick=async()=>{btn.disabled=true;try{const {url}=await api('/subscribe',{method:'POST',body:{plan:p.id}});location.href=url}catch(err){text($('plans-error'),err.message);btn.disabled=false}};
+  const card=planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features],btn);if(account.plan===p.id)card.classList.add('current');wrap.append(card);
+ }
+ $('billing').classList.toggle('hidden',!account.billing);
+ $('plans-dialog').showModal();
+};
+$('billing').onclick=async()=>{try{const {url}=await api('/billing',{method:'POST'});location.href=url}catch(err){text($('plans-error'),err.message)}};
+
+// ---------- roles, sharing, team ----------
+function applyRole(){
+ const role=state.project.role||'owner';
+ document.body.classList.toggle('readonly',role==='viewer');
+ for(const id of ['team-open','settings-open'])$(id).classList.toggle('hidden',role!=='owner');
+}
+$('team-open').onclick=()=>{renderTeam();$('team-dialog').showModal()};
+function renderTeam(){
+ text($('team-error'),'');
+ const p=state.project,list=$('members');list.replaceChildren();
+ for(const m of p.members||[]){
+  const li=document.createElement('li'),row=document.createElement('div');row.className='row';row.style.marginTop='0';
+  const who=Object.assign(document.createElement('span'),{textContent:m.email});who.style.flex='1';
+  const role=Object.assign(document.createElement('span'),{className:'role-badge',textContent:m.role});
+  const rm=Object.assign(document.createElement('button'),{type:'button',className:'ghost',textContent:'Remove'});
+  rm.onclick=()=>teamCall('/members','DELETE',{email:m.email});
+  row.append(who,role,rm);li.append(row);list.append(li);
+ }
+ $('share-on').checked=!!p.share;$('share-remix').checked=!!p.share?.remix;$('share-remix').disabled=!p.share;
+ $('share-link-row').classList.toggle('hidden',!p.share);
+ if(p.share)$('share-link').value=location.origin+p.share.url;
+}
+async function teamCall(path,method,body){
+ text($('team-error'),'');
+ try{const r=await api('/projects/'+state.project.id+path,{method,body});if(r.project)state.project=r.project;renderTeam()}catch(err){text($('team-error'),err.message)}
+}
+$('member-add').onclick=async()=>{await teamCall('/members','POST',{email:$('member-email').value,role:$('member-role').value});if(!$('team-error').textContent)$('member-email').value=''};
+$('share-on').onchange=()=>teamCall('/share','POST',{enabled:$('share-on').checked,remix:$('share-remix').checked});
+$('share-remix').onchange=()=>teamCall('/share','POST',{enabled:true,remix:$('share-remix').checked});
+$('share-copy').onclick=()=>{navigator.clipboard?.writeText($('share-link').value).then(()=>text($('share-copy'),'Copied')).catch(()=>{$('share-link').select()})};
+async function openShare(token,v){
+ show('share-screen');
+ try{
+  const {share}=await api('/share/'+token);
+  text($('share-name'),share.name);document.title=share.name+' · Kairoq Create';
+  $('share-frame').src=share.preview_url;
+  $('remix').classList.toggle('hidden',!share.remix);
+  $('remix').onclick=()=>{if(!v){setPending({remix:token});location.href='/create#signup';return}remix(token)};
+ }catch(err){text($('share-error'),err.message);$('remix').classList.add('hidden')}
+}
+async function remix(token){
+ try{const {project}=await api('/remix',{method:'POST',body:{token}});await openProject(project.id)}
+ catch(err){show('share-screen');text($('share-error'),err.message)}
+}
+
+// ---------- analytics & SEO (publish dialog) ----------
+async function renderInsights(){
+ const p=state.project;
+ $('seo-title').value=p.seo?.title||'';$('seo-description').value=p.seo?.description||'';$('seo-image').value=p.seo?.image||'';text($('seo-status'),'');
+ $('analytics').classList.toggle('hidden',!p.published);
+ if(!p.published)return;
+ const {analytics:a}=await api('/projects/'+p.id+'/analytics');
+ text($('an-views'),a.totals.views.toLocaleString());text($('an-visitors'),a.totals.visitors.toLocaleString());
+ const bars=$('an-bars'),max=Math.max(1,...a.series.map(d=>d.views));bars.replaceChildren();
+ bars.setAttribute('aria-label','Daily page views: '+a.series.filter(d=>d.views).map(d=>d.day+' '+d.views).join(', ')||'none yet');
+ for(const d of a.series){const s=document.createElement('span');s.style.height=Math.max(d.views?6:1,Math.round(d.views/max*100))+'%';if(!d.views)s.style.opacity='.25';s.tabIndex=-1;
+  const tip=new Date(d.day+'T00:00:00Z').toLocaleDateString([], {month:'short',day:'numeric',timeZone:'UTC'})+': '+d.views+' view'+(d.views===1?'':'s')+', '+d.visitors+' visitor'+(d.visitors===1?'':'s');
+  s.onmouseenter=()=>{$('an-tip').classList.remove('hidden');text($('an-tip'),tip)};bars.append(s)}
+ bars.onmouseleave=()=>$('an-tip').classList.add('hidden');
+ const refs=$('an-referrers');refs.replaceChildren();
+ for(const r of a.referrers)refs.append(Object.assign(document.createElement('li'),{textContent:r.referrer+' · '+r.views}));
+}
+$('seo-save').onclick=async()=>{
+ try{const {project}=await api('/projects/'+state.project.id+'/seo',{method:'POST',body:{title:$('seo-title').value,description:$('seo-description').value,image:$('seo-image').value}});state.project=project;text($('seo-status'),'Saved. Applies to the live site right away.')}
+ catch(err){text($('seo-status'),err.message)}
+};
+
 async function start(){
  const v=await loadMe();
- if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);return}
+ const share=/^\/create\/share\/([a-f0-9]{24})\/?$/.exec(location.pathname);
+ if(share)return openShare(share[1],v);
+ if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}
+ const pending=takePending();
+ if(pending){
+  if(pending.remix)return remix(pending.remix);
+  try{const {project,job}=await api('/projects',{method:'POST',body:pending.template?{template:pending.template}:{prompt:pending.prompt}});return openProject(project.id,{pendingText:pending.prompt,job})}catch(err){await loadHome();text($('home-error'),err.message);return}
+ }
+ if(new URLSearchParams(location.search).get('purchase')==='success')setTimeout(refreshCredits,3000);
  const params=new URLSearchParams(location.search);
  const id=params.get('project');
  if(id&&/^[a-f0-9]{12}$/.test(id)){try{return await openProject(id)}catch{}}

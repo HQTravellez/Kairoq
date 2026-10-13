@@ -6626,8 +6626,8 @@ const server = http.createServer(async (req, res) => {
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
-  if(req.method==="GET"&&/^\/create\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
   if(url.startsWith("/apps/") && (await appRuntime.handle(req,res)||await housingBuilder.handle(req,res)))return;
@@ -6917,6 +6917,8 @@ if (process.env.NODE_ENV !== "test") {
   setTimeout(() => schedulerTick().catch(()=>{}), 5_000);
   setInterval(() => schedulerTick().catch(()=>{}), 60_000);
   setInterval(() => reactBackend.runAllSchedules().catch(e=>console.warn("[create-schedules]",e.message)), 5*60_000).unref();
+  const runBackup=()=>{try{const b=require("./create-backups").run();if(b.errors.length)console.warn("[create-backups]",b.errors.join("; "))}catch(e){console.warn("[create-backups]",e.message)}};
+  setTimeout(runBackup,10*60_000).unref();setInterval(runBackup,24*3600_000).unref();
   require("./scripts/verify-builder-assets").startup().catch(e=>console.warn("[builder-assets] PROVIDER SMOKE ERROR "+e.message));
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);

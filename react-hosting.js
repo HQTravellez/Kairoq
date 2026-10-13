@@ -108,10 +108,41 @@ async function removeDomain(id,hostname,{railway=require('./react-railway')}={})
  return{removed:host};
 }
 
-function serveProject(req,res,id,rest,sandbox){
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function siteBase(req,basePath){
+ const host=String(req.headers.host||'localhost');
+ const proto=String(req.headers['x-forwarded-proto']||'').split(',')[0]||(/^(localhost|127\.|\[::1\])/.test(host)?'http':'https');
+ return proto+'://'+host+basePath;
+}
+// Adds title, description, canonical and social share tags to the published page.
+function withSeo(html,meta,base){
+ const seo=meta.seo||{},title=seo.title||meta.name,desc=seo.description||'';
+ const ogFile=path.join(builder.projectDir(meta.id),'og.png');
+ const image=seo.image?new URL(seo.image,base).toString():fs.existsSync(ogFile)?base+'og-image.png':'';
+ const tags=['<link rel="canonical" href="'+escapeHtml(base)+'">','<meta property="og:type" content="website">','<meta property="og:title" content="'+escapeHtml(title)+'">','<meta property="og:url" content="'+escapeHtml(base)+'">',
+  ...(desc?['<meta name="description" content="'+escapeHtml(desc)+'">','<meta property="og:description" content="'+escapeHtml(desc)+'">']:[]),
+  ...(image?['<meta property="og:image" content="'+escapeHtml(image)+'">','<meta name="twitter:card" content="summary_large_image">']:['<meta name="twitter:card" content="summary">'])];
+ return html.replace(/<title>[\s\S]*?<\/title>/,'<title>'+escapeHtml(title)+'</title>').replace('</head>','    '+tags.join('\n    ')+'\n  </head>');
+}
+function serveProject(req,res,id,rest,sandbox,basePath='/'){
  let meta;try{meta=builder.loadMeta(id)}catch{return false}
  if(!meta.published)return false;
- builder.serveDist(req,res,path.join(builder.versionDir(id,meta.published.version),'dist'),rest,{sandbox});
+ const dist=path.join(builder.versionDir(id,meta.published.version),'dist');
+ const rel=decodeURIComponent(String(rest||'/').split('?')[0]).replace(/^\/+/,'');
+ const base=siteBase(req,basePath);
+ const text=(type,body)=>{res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:body)};
+ if(rel==='robots.txt')return text('text/plain; charset=utf-8','User-agent: *\nAllow: /\nSitemap: '+base+'sitemap.xml\n'),true;
+ if(rel==='sitemap.xml')return text('application/xml; charset=utf-8','<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>'+escapeHtml(base)+'</loc><lastmod>'+meta.published.at.slice(0,10)+'</lastmod></url></urlset>\n'),true;
+ if(rel==='og-image.png'){const f=path.join(builder.projectDir(id),'og.png');if(fs.existsSync(f)){res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'});res.end(fs.readFileSync(f));return true}}
+ const page=(req.method==='GET'||req.method==='HEAD')&&(!path.extname(rel)||rel.endsWith('.html'));
+ if(page&&fs.existsSync(path.join(dist,'index.html'))&&(!rel||rel==='index.html'||!fs.existsSync(path.join(dist,rel)))){
+  require('./react-analytics').record(id,req);
+  const html=withSeo(fs.readFileSync(path.join(dist,'index.html'),'utf8'),meta,base);
+  res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Content-Security-Policy':builder.contentPolicy(sandbox)});
+  res.end(req.method==='HEAD'?undefined:html);
+  return true;
+ }
+ builder.serveDist(req,res,dist,rest,{sandbox});
  return true;
 }
 // Requests for a custom domain or <slug>.<KAIROQ_SITES_DOMAIN>. Returns true when handled.
@@ -124,7 +155,7 @@ function handleHost(req,res){
  if(!id)return false;
  if(String(req.url||'').startsWith('/api/apps/'))return'backend:'+id;
  // Separate origin from Kairoq, so no sandbox is needed and storage works normally.
- if(!serveProject(req,res,id,String(req.url||'/').split('?')[0],false)){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Site not found')}
+ if(!serveProject(req,res,id,String(req.url||'/').split('?')[0],false,'/')){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Site not found')}
  return true;
 }
 // /sites/<slug>/... on the main Kairoq host (sandboxed: same origin as the Kairoq API).
@@ -134,7 +165,7 @@ function handlePath(req,res){
  const id=readRegistry().slugs[m[1]];
  if(!id){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Site not found');return true}
  if(!m[2]){res.writeHead(301,{Location:'/sites/'+m[1]+'/'});res.end();return true}
- if(!serveProject(req,res,id,m[2],true)){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Site not found')}
+ if(!serveProject(req,res,id,m[2],true,'/sites/'+m[1]+'/')){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Site not found')}
  return true;
 }
 

@@ -16,6 +16,7 @@
   </div>
   <div class="bar-right">
     <span class="credits hidden" id="credits"></span>
+    <button class="ghost hidden" id="plans-open" type="button">Plans</button>
     <button class="ghost hidden" id="buy" type="button">Buy credits</button>
     <span class="who" id="who"></span>
     <button class="ghost hidden" id="logout" type="button">Sign out</button>
@@ -24,20 +25,49 @@
 
 <!-- Sign in / sign up -->
 <section class="screen hidden" id="auth">
-  <div class="auth-card">
-    <h1>Build apps by chatting.</h1>
-    <p class="muted">Describe what you want. Kairoq writes a real React app, shows it live, and publishes it in one click.</p>
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" id="tab-signup" aria-selected="true">Create account</button>
-      <button type="button" role="tab" id="tab-login" aria-selected="false">Sign in</button>
-    </div>
-    <form id="auth-form">
-      <label>Email<input id="email" type="email" autocomplete="email" required></label>
-      <label>Password<input id="password" type="password" autocomplete="new-password" minlength="8" required></label>
-      <button class="primary" id="auth-submit" type="submit">Create account</button>
-      <p class="muted small" id="free-note"></p>
-      <p class="error" id="auth-error" role="alert"></p>
-    </form>
+  <div class="landing">
+    <section class="hero">
+      <p class="eyebrow">Kairoq Create</p>
+      <h1>Build real apps by chatting.</h1>
+      <p class="lede">Describe your idea. Kairoq writes a React app with sign-in, a database, payments and email, tests it in a real browser, and publishes it to your own domain.</p>
+      <form id="landing-form" class="prompt-box">
+        <textarea id="landing-prompt" rows="3" placeholder="A booking site for my yoga studio with class times, prices and online payments" required></textarea>
+        <button class="primary" type="submit">Start building</button>
+      </form>
+    </section>
+    <section class="features" aria-label="Features">
+      <div><h3>Watch it being built</h3><p>Code streams in live and the preview updates in seconds.</p></div>
+      <div><h3>Tested before you see it</h3><p>Every version opens in a real browser. Errors are fixed automatically.</p></div>
+      <div><h3>A real backend</h3><p>Sign-in, saved data, file uploads, email and Stripe payments built in.</p></div>
+      <div><h3>Click to edit</h3><p>Change text, colours and images directly in the preview, free.</p></div>
+      <div><h3>Your code, your domain</h3><p>Download the code, sync with GitHub and publish with HTTPS.</p></div>
+      <div><h3>Build together</h3><p>Invite your team, share a preview link or let others remix your app.</p></div>
+    </section>
+    <section aria-labelledby="tpl-title"><h2 id="tpl-title">Start from a template</h2><div class="templates" id="landing-templates"></div></section>
+    <section aria-labelledby="price-title" id="pricing"><h2 id="price-title">Pricing</h2><div class="plans" id="landing-plans"></div><p class="muted small" id="pricing-note"></p></section>
+    <section class="auth-card" id="signup" aria-labelledby="auth-title">
+      <h2 id="auth-title">Get started</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-signup" aria-selected="true">Create account</button>
+        <button type="button" role="tab" id="tab-login" aria-selected="false">Sign in</button>
+      </div>
+      <form id="auth-form">
+        <label>Email<input id="email" type="email" autocomplete="email" required></label>
+        <label>Password<input id="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <button class="primary" id="auth-submit" type="submit">Create account</button>
+        <p class="muted small" id="free-note"></p>
+        <p class="error" id="auth-error" role="alert"></p>
+      </form>
+    </section>
+  </div>
+</section>
+
+<!-- Public share page -->
+<section class="screen hidden" id="share-screen">
+  <div class="share-page">
+    <div class="share-head"><div><p class="eyebrow">Shared app</p><h1 id="share-name"></h1></div><button class="primary" id="remix" type="button">Remix this app</button></div>
+    <p class="error" id="share-error" role="alert"></p>
+    <iframe id="share-frame" title="Shared app preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
   </div>
 </section>
 
@@ -56,6 +86,8 @@
       <button type="button" class="example">A habit tracker with streaks and a weekly chart</button>
     </div>
     <p class="error" id="home-error" role="alert"></p>
+    <h2>Start from a template</h2>
+    <div class="templates" id="home-templates"></div>
     <h2>Your projects</h2>
     <ul class="projects" id="projects"></ul>
   </div>
@@ -115,6 +147,7 @@
       <button class="ghost" id="restore" type="button">Restore</button>
       <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits">✎ Edit</button>
       <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
+      <button class="ghost" id="team-open" type="button">Share</button>
       <button class="ghost" id="settings-open" type="button">Settings</button>
       <button class="primary" id="publish-open" type="button">Publish</button>
     </div>
@@ -147,6 +180,18 @@
     <p class="muted small">Your app will be live at <code id="slug-preview"></code></p>
     <div class="row"><button class="primary" id="publish" type="button">Publish current version</button><button class="ghost hidden" id="unpublish" type="button">Unpublish</button></div>
     <div id="live-links"></div>
+    <div id="analytics" class="analytics hidden">
+      <h3>Visitors, last 30 days</h3>
+      <div class="tiles"><div><span class="tile-value" id="an-views">0</span><span class="muted small">page views</span></div><div><span class="tile-value" id="an-visitors">0</span><span class="muted small">visitors</span></div></div>
+      <div class="bars" id="an-bars" role="img"></div>
+      <div class="bar-tip hidden" id="an-tip" role="status"></div>
+      <ul class="referrers" id="an-referrers"></ul>
+    </div>
+    <h3>Search and sharing</h3>
+    <label>Page title<input id="seo-title" maxlength="70"></label>
+    <label>Description<textarea id="seo-description" rows="2" maxlength="200"></textarea></label>
+    <label>Share image <span class="muted small">(empty: an automatic screenshot)</span><input id="seo-image" placeholder="https://… or ./uploads/…"></label>
+    <div class="row"><button class="ghost" id="seo-save" type="button">Save</button><span class="muted small" id="seo-status"></span></div>
     <h3>Custom domain</h3>
     <div class="row"><input id="domain" placeholder="www.example.com"><button class="ghost" id="add-domain" type="button">Add</button></div>
     <ul class="domains" id="domains"></ul>
@@ -173,6 +218,33 @@
     <h3>Email</h3>
     <p class="muted small" id="email-status"></p>
     <p class="error" id="settings-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="team-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Share and collaborate</h2>
+    <h3>Collaborators</h3>
+    <p class="muted small">Editors can chat, edit and publish. Viewers can look. Each person uses their own credits.</p>
+    <div class="row"><input id="member-email" type="email" placeholder="teammate@example.com"><select id="member-role" style="width:auto"><option value="editor">Editor</option><option value="viewer">Viewer</option></select><button class="primary" id="member-add" type="button">Invite</button></div>
+    <ul class="domains" id="members"></ul>
+    <h3>Share link</h3>
+    <label class="check"><input type="checkbox" id="share-on"> Anyone with the link can see a live preview</label>
+    <label class="check"><input type="checkbox" id="share-remix"> Let them remix (copy) the app into their account</label>
+    <div class="row hidden" id="share-link-row"><input id="share-link" readonly><button class="ghost" id="share-copy" type="button">Copy</button></div>
+    <p class="error" id="team-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="plans-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Plans</h2>
+    <p class="muted small" id="plan-current"></p>
+    <div class="plans compact" id="plans-list"></div>
+    <div class="row"><button class="ghost hidden" id="billing" type="button">Manage billing</button></div>
+    <p class="error" id="plans-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>

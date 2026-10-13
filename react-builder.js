@@ -52,7 +52,7 @@ Rules:
 - Backend: import { auth, collection } from 'kairoq' for user accounts and saved data shared by all visitors.
   auth.signUp(email,password,name?) / auth.signIn(email,password) / auth.signOut() return promises; auth.user() returns the signed-in user or null; auth.onChange(fn) subscribes and returns an unsubscribe function.
   collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
-  Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (contact forms, guestbooks). Only a record's creator can update or delete it.
+  Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (guestbooks, public comments); "submit-only" = anyone can add but nobody can read them back, only the owner sees them in Kairoq (use this for contact, booking, reservation, order and waitlist forms; show a thank-you message after create). Only a record's creator can update or delete it.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
   Optional features (add them to src/backend.json only when the app needs them):
   - File uploads: "storage":{"access":"signed-in"} (or "public"). import { storage } from 'kairoq'; const f=await storage.upload(fileFromInput) returns {id,url,name}; save f.url in a record to show it later. Images, PDF, text and CSV up to 5 MB.
@@ -119,12 +119,52 @@ function validateFiles(files){
 }
 
 // ---------- build ----------
-let buildQueue=Promise.resolve();
+// Builds run in a pool of worker threads (KAIROQ_BUILD_WORKERS, default 2) so several
+// projects can build at once without blocking the server; 0 builds inline, one at a time.
+const BUILD_TIMEOUT_MS=Number(process.env.KAIROQ_BUILD_TIMEOUT_MS||90000);
+const pool={workers:[],queue:[],seq:0};
+function workerCount(){const n=Number(process.env.KAIROQ_BUILD_WORKERS??2);return Number.isInteger(n)&&n>=0?Math.min(n,8):2}
+let inlineQueue=Promise.resolve();
 function build(files,outDir,options={}){
- const task=buildQueue.then(()=>runBuild(files,outDir,options));
- buildQueue=task.catch(()=>{});
- return task;
+ if(workerCount()===0){const task=inlineQueue.then(()=>runBuild(files,outDir,options));inlineQueue=task.catch(()=>{});return task}
+ return new Promise((resolve,reject)=>{pool.queue.push({files,outDir,options,resolve,reject});pump()});
 }
+function spawnWorker(){
+ const {Worker}=require('worker_threads');
+ const w={thread:new Worker(path.join(__dirname,'build-worker.js')),task:null};
+ w.thread.unref();
+ w.thread.on('message',msg=>{
+  const t=w.task;if(!t||msg.id!==t.id)return;
+  clearTimeout(t.timer);w.task=null;w.thread.unref();
+  msg.ok?t.resolve(msg.result):t.reject(Object.assign(Error(msg.message),{build:msg.build}));
+  pump();
+ });
+ w.thread.on('error',e=>retire(w,Object.assign(Error('Build worker crashed: '+e.message),{build:true})));
+ w.thread.on('exit',()=>retire(w,Object.assign(Error('Build worker stopped'),{build:true})));
+ pool.workers.push(w);
+ return w;
+}
+function retire(w,error){
+ const i=pool.workers.indexOf(w);if(i>=0)pool.workers.splice(i,1);
+ if(w.task){clearTimeout(w.task.timer);const t=w.task;w.task=null;t.reject(error)}
+ pump();
+}
+function pump(){
+ while(pool.queue.length){
+  let w=pool.workers.find(x=>!x.task);
+  if(!w&&pool.workers.length<workerCount())w=spawnWorker();
+  if(!w)return;
+  const job=pool.queue.shift(),id=++pool.seq;
+  w.task={id,resolve:job.resolve,reject:job.reject,timer:setTimeout(()=>{
+   // A stuck build is stopped by terminating its worker.
+   const t=w.task;w.task=null;t&&t.reject(Object.assign(Error('Build timed out after '+Math.round(BUILD_TIMEOUT_MS/1000)+' seconds'),{build:true}));
+   w.thread.terminate().catch(()=>{});
+  },BUILD_TIMEOUT_MS)};
+  w.thread.ref();
+  w.thread.postMessage({id,files:job.files,outDir:job.outDir,projectId:job.options.projectId,root:ROOT()});
+ }
+}
+function buildStats(){return{workers:pool.workers.length,busy:pool.workers.filter(w=>w.task).length,queued:pool.queue.length,max:workerCount()}}
 async function runBuild(files,outDir,{projectId='000000000000'}={}){
  fs.mkdirSync(ROOT(),{recursive:true});
  const work=fs.mkdtempSync(path.join(ROOT(),'.build-'));
@@ -145,7 +185,7 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
    server:{fs:{strict:true,allow:[work]}},
    build:{outDir,emptyOutDir:true,assetsInlineLimit:0,reportCompressedSize:false,sourcemap:false}});
   let timer;
-  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Build timed out after 90 seconds')),90000)});
+  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Build timed out after '+Math.round(BUILD_TIMEOUT_MS/1000)+' seconds')),BUILD_TIMEOUT_MS)});
   try{await Promise.race([run,timeout])}finally{clearTimeout(timer)}
   return{warnings:output.slice(0,20)};
  }catch(e){
@@ -190,6 +230,19 @@ function create({name,owner}){
  fs.mkdirSync(projectDir(id),{recursive:true});
  saveMeta(meta);
  return meta;
+}
+// Starts a project from given files (a template or a remix) as version 1.
+async function initializeFrom(meta,files,summary){
+ const errors=validateFiles(files);
+ if(errors.length)throw Object.assign(Error(errors[0]),{status:400});
+ await build(files,path.join(versionDir(meta.id,1),'dist'),{projectId:meta.id});
+ writeJson(path.join(versionDir(meta.id,1),'files.json'),files);
+ const fresh=loadMeta(meta.id);
+ fresh.versions.push({n:1,at:new Date().toISOString(),summary});
+ fresh.current_version=1;
+ fresh.messages.push({role:'assistant',text:summary+'. Tell me what to change.',version:1,mode:'system',at:new Date().toISOString()});
+ saveMeta(fresh);
+ return fresh;
 }
 async function initialize(meta){
  const files=template(meta.name);
@@ -352,4 +405,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={contentPolicy,initializeFrom,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
