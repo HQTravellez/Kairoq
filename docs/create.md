@@ -30,7 +30,7 @@
   - Pro, Max and image tiers also get a screenshot after each test. Standard models (DeepSeek) get the page's visible text instead.
   - The result is one new version. The chat shows each step, and the finished message keeps a list of them.
   - Limits: `KAIROQ_AGENT_MAX_STEPS` (15) steps per task. A task costs the tier's credits × `KAIROQ_AGENT_MULTIPLIER` (3).
-  - **Stop** cancels any running job (build, discuss or agent) and refunds its credits.
+  - **Stop** cancels any running job (build, discuss or agent) and refunds its credits. An agent task that ends without changing anything is refunded too.
 - **Figma import.** The **Figma** button takes a frame link and a Figma personal access token (scope "File content: read"). The owner can save the token encrypted for the project.
   - Kairoq reads the frame's layers and turns them into a compact spec: layout, gaps, padding, colours, fonts, text, radius and shadows. Image fills are saved as uploads.
   - With paid models enabled, the rendered frame is sent to a vision model as a reference image (plus 1 image credit).
@@ -178,6 +178,27 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 
 Generated apps can import: react, react-dom, react-router-dom, lucide-react, recharts, framer-motion, date-fns, clsx, tailwind-merge, class-variance-authority, zod, react-hook-form, the Radix primitives (dialog, dropdown-menu, tabs, tooltip, popover, select, accordion, switch), sonner, react-markdown, @tanstack/react-query, canvas-confetti, react-day-picker, embla-carousel-react and qrcode.react. Other imports are rejected before the build. Code downloads list only the packages the app uses.
 
+## Mobile apps
+
+- **Installable on phones.** Every published app is a progressive web app: a web manifest, home-screen icons (192, 512 and Apple 180 px) and a service worker.
+  - The service worker loads pages network-first with an offline fallback and caches built assets. It never caches `/api/`.
+  - People install from Safari (Share → Add to Home Screen) or Chrome (Install app).
+  - Installing needs the app's own origin: its subdomain (`KAIROQ_SITES_DOMAIN`) or a custom domain. The sandboxed `/sites/` path opens as a normal web page.
+- **The App button** in the editor holds the mobile settings:
+  - app name, home-screen name, theme colour, icon (letters on the theme colour, or a project upload) and app ID
+  - a QR code to open the published app on a phone
+  - store instructions
+
+  Icons are rendered with headless Chromium. Without Chromium, a plain theme-colour icon is used.
+- **"This is a mobile app" setting:**
+  - The AI designs phone-first: bottom tabs, 44 px touch targets, safe areas and HashRouter.
+  - The editor preview starts in the phone frame, and the published page uses `viewport-fit=cover`.
+  - The code download and GitHub push become a [Capacitor](https://capacitorjs.com) iOS/Android project: `capacitor.config.json`, Capacitor packages, and `npm run android` / `npm run ios`.
+- **Android APK on every push.** The project includes `.github/workflows/kairoq-android.yml`, which builds `app-debug.apk` and attaches it to the Actions run.
+  - Writing workflow files needs a GitHub token with **Workflows: read and write**. Without it, Kairoq pushes everything else and says how to enable the build.
+- **Store releases** need the owner's own Google Play and Apple Developer accounts. iOS builds need a Mac with Xcode.
+- **Native sign-in.** The native app talks to the Kairoq backend over HTTPS. Google sign-in and password-reset links open the published web app, so the native app uses email sign-in.
+
 ## Growth features
 
 - **Landing page and pricing.**
@@ -264,4 +285,5 @@ On Railway, `workspace/` should be on the persistent volume.
 ## Limits
 
 - Up to 80 source files, 200 KB per file and 1.5 MB per project.
+- Third-party images or fonts that fail to load are not reported as app problems (no Fix it), since they aren't code errors.
 - Builds run in `KAIROQ_BUILD_WORKERS` worker threads and time out after `KAIROQ_BUILD_TIMEOUT_MS` (90 seconds).

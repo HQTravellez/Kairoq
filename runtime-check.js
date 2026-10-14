@@ -20,10 +20,13 @@ async function check(url,{timeoutMs=15000}={}){
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage(),errors=[];
  const add=e=>{const text=String(e).slice(0,500);if(!IGNORED.test(text)&&!errors.includes(text)&&errors.length<10)errors.push(text)};
+ // Images or fonts from other sites that fail to load are not bugs in the app's code
+ // (and can't be fixed by the AI), so they are not reported as problems here.
+ const own=u=>{try{return new URL(u).origin===new URL(url).origin}catch{return false}};
  page.on('pageerror',e=>add('Uncaught error: '+(e.stack||e.message||e)));
- page.on('console',m=>{if(m.type()==='error'){const at=m.location()?.url;add('Console error: '+m.text()+(at&&/Failed to load resource/.test(m.text())?' ('+at+')':''))}});
- page.on('requestfailed',r=>add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')'));
- page.on('response',r=>{if(r.status()>=400)add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())});
+ page.on('console',m=>{if(m.type()==='error'){const at=m.location()?.url;if(/Failed to load resource/.test(m.text())&&at&&!own(at))return;add('Console error: '+m.text()+(at&&/Failed to load resource/.test(m.text())?' ('+at+')':''))}});
+ page.on('requestfailed',r=>{if(own(r.url()))add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')')});
+ page.on('response',r=>{if(r.status()>=400&&own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())});
  try{
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
   await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
@@ -96,5 +99,16 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
  finally{await context.close().catch(()=>{})}
  return{skipped:false,errors,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot};
 }
+// Renders a small HTML document offline (no network) to PNG, e.g. app icons.
+async function renderHtml(html,{width,height}){
+ if(!available())throw Error('Chromium is not available');
+ const context=await (await browser()).newContext({viewport:{width,height},deviceScaleFactor:1});
+ try{
+  const page=await context.newPage();
+  await page.route('**/*',r=>r.request().url().startsWith('data:')?r.continue():r.abort());
+  await page.setContent(html,{waitUntil:'load',timeout:10000});
+  return await page.screenshot({type:'png',clip:{x:0,y:0,width,height}});
+ }finally{await context.close().catch(()=>{})}
+}
 async function close(){if(browserPromise){const b=await browserPromise.catch(()=>null);browserPromise=null;await b?.close().catch(()=>{})}}
-module.exports={check,screenshot,inspect,available,close};
+module.exports={check,screenshot,inspect,renderHtml,available,close};

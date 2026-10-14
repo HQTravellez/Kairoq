@@ -183,9 +183,10 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
  }
  function noChange(message){
   if(built)fs.rmSync(built.dir,{recursive:true,force:true});
+  message='No changes were made. '+message;
   builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40)}]);
   const fresh=builder.loadMeta(id);
-  return{version:fresh.current_version,message,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
+  return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
 

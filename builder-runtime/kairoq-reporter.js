@@ -2,7 +2,10 @@
 // Kairoq editor (the parent frame) so it can offer "Fix it".
 const send=(type,data)=>{try{if(window.parent!==window)window.parent.postMessage({source:'kairoq-app',type,...data},'*')}catch{}};
 const report=(kind,message)=>send('runtime-error',{kind,message:String(message||'').slice(0,800)});
-window.addEventListener('error',e=>{if(e.target&&e.target!==window&&e.target.tagName){report('resource','Failed to load '+e.target.tagName.toLowerCase()+' '+(e.target.src||e.target.href||''));return}report('error',(e.error&&e.error.stack)||e.message)},true);
+// Files from other sites that fail to load (a broken image link, a blocked font) are not
+// code problems, so only the app's own files are reported.
+const ownUrl=u=>{try{return new URL(u,location.href).origin===location.origin}catch{return false}};
+window.addEventListener('error',e=>{if(e.target&&e.target!==window&&e.target.tagName){const src=e.target.src||e.target.href||'';if(ownUrl(src))report('resource','Failed to load '+e.target.tagName.toLowerCase()+' '+src);return}report('error',(e.error&&e.error.stack)||e.message)},true);
 window.addEventListener('unhandledrejection',e=>report('promise',(e.reason&&(e.reason.stack||e.reason.message))||e.reason));
 const consoleError=console.error.bind(console);
 console.error=(...args)=>{report('console',args.map(a=>a instanceof Error?a.stack||a.message:typeof a==='object'?(()=>{try{return JSON.stringify(a)}catch{return String(a)}})():String(a)).join(' '));consoleError(...args)};

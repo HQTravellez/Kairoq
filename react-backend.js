@@ -423,8 +423,13 @@ function ownerRecords(id,collection){
 function ownerDelete(id,recordId){const d=database(id),row=d.prepare('SELECT collection,owner_id FROM records WHERE id=?').get(String(recordId));if(!row)throw fail(404,'Record not found');d.prepare('DELETE FROM records WHERE id=?').run(String(recordId));publish(id,row.collection,'deleted',{id:String(recordId)},row.owner_id);return{deleted:recordId}}
 
 // ---------- browser client (virtual module "kairoq") ----------
-function clientSource(projectId,apiOrigin='',version=0){
+function clientSource(projectId,apiOrigin='',version=0,appUrl=''){
  return `const BASE=${JSON.stringify(apiOrigin.replace(/\/$/,'')+'/api/apps/'+projectId)};
+const APP_URL=${JSON.stringify(String(appUrl||''))};
+// Inside a native (Capacitor) app the page is https://localhost, so links that come back to
+// the app (password reset, Google sign-in) go to its published web address instead.
+const NATIVE=typeof location!=='undefined'&&(location.protocol==='capacitor:'||location.hostname==='localhost'&&!location.port&&Boolean(APP_URL));
+function returnUrl(){return NATIVE&&APP_URL?APP_URL:location.href.split('#')[0]}
 const VERSION=${JSON.stringify(String(version||''))};
 const PREVIEW=(()=>{try{const m=/\\/builder\\/p\\/[a-f0-9]{12}-([a-f0-9]{24})\\//.exec(location.pathname);return m?m[1]:''}catch{return''}})();
 function versionHeaders(){return VERSION?{'X-Kairoq-Version':VERSION,...(PREVIEW?{'X-Kairoq-Preview':PREVIEW}:{})}:{}}
@@ -452,9 +457,10 @@ export const auth={
   ready(){return ready},
   async signInWithGoogle(){
     if(window.top!==window)throw new Error('Google sign-in works on your published app. In the preview, use email sign-in.');
+    if(NATIVE)throw new Error('Google sign-in is available on the web version of this app. In the mobile app, use email sign-in.');
     location.href=BASE+'/auth/google/start?return='+encodeURIComponent(location.href);
   },
-  async requestPasswordReset(email){return call('/auth/reset/request',{method:'POST',body:{email,return_url:location.href.split('#')[0]}})},
+  async requestPasswordReset(email){return call('/auth/reset/request',{method:'POST',body:{email,return_url:returnUrl()}})},
   resetToken(){return pendingReset},
   async resetPassword(password,tokenValue=pendingReset){const d=await call('/auth/reset/complete',{method:'POST',body:{token:tokenValue,password}});pendingReset=null;token=d.token;currentUser=d.user;save();return d.user},
   user(){return currentUser},

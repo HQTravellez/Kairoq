@@ -124,6 +124,13 @@ function withSeo(html,meta,base){
   ...(image?['<meta property="og:image" content="'+escapeHtml(image)+'">','<meta name="twitter:card" content="summary_large_image">']:['<meta name="twitter:card" content="summary">'])];
  return html.replace(/<title>[\s\S]*?<\/title>/,()=>'<title>'+escapeHtml(title)+'</title>').replace('</head>',()=>'    '+tags.join('\n    ')+'\n  </head>');
 }
+// Installable app: manifest, icons and service worker tags (react-mobile.js).
+function withPwa(html,meta){
+ const mobile=require('./react-mobile');
+ let out=html.replace('</head>',()=>'    '+mobile.headTags(meta).join('\n    ')+'\n  </head>');
+ if(mobile.settings(meta).enabled)out=out.replace(/<meta name="viewport" content="([^"]*)"/,(m,c)=>/viewport-fit/.test(c)?m:'<meta name="viewport" content="'+c+', viewport-fit=cover"');
+ return out;
+}
 function serveProject(req,res,id,rest,sandbox,basePath='/'){
  let meta;try{meta=builder.loadMeta(id)}catch{return false}
  if(!meta.published)return false;
@@ -132,13 +139,14 @@ function serveProject(req,res,id,rest,sandbox,basePath='/'){
  const rel=decoded.replace(/^\/+/,'');
  const base=siteBase(req,basePath);
  const text=(type,body)=>{res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:body)};
+ if(require('./react-mobile').serveSiteFile(req,res,meta,rel))return true;
  if(rel==='robots.txt')return text('text/plain; charset=utf-8','User-agent: *\nAllow: /\nSitemap: '+base+'sitemap.xml\n'),true;
  if(rel==='sitemap.xml')return text('application/xml; charset=utf-8','<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>'+escapeHtml(base)+'</loc><lastmod>'+meta.published.at.slice(0,10)+'</lastmod></url></urlset>\n'),true;
  if(rel==='og-image.png'){const f=path.join(builder.projectDir(id),'og.png');if(fs.existsSync(f)){res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'});res.end(fs.readFileSync(f));return true}}
  const page=(req.method==='GET'||req.method==='HEAD')&&(!path.extname(rel)||rel.endsWith('.html'));
  if(page&&fs.existsSync(path.join(dist,'index.html'))&&(!rel||rel==='index.html'||!fs.existsSync(path.join(dist,rel)))){
   require('./react-analytics').record(id,req);
-  const html=withSeo(fs.readFileSync(path.join(dist,'index.html'),'utf8'),meta,base);
+  const html=withPwa(withSeo(fs.readFileSync(path.join(dist,'index.html'),'utf8'),meta,base),meta);
   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Content-Security-Policy':builder.contentPolicy(sandbox)});
   res.end(req.method==='HEAD'?undefined:html);
   return true;

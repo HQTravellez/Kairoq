@@ -287,7 +287,7 @@ function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.version
 function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_version);if(!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});return files[name]}
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
-function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:''}
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];

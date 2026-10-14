@@ -66,7 +66,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -76,7 +76,7 @@ function findShare(token){
  for(const p of builder.list()){const meta=builder.loadMeta(p.id);if(meta.share&&meta.share.token===token)return meta}
  return null;
 }
-function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
+function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working']);
 function intEnv(name,fallback){const n=Number(process.env[name]);return Number.isInteger(n)&&n>=0?n:fallback}
@@ -150,6 +150,8 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
     job.result=await builder.edit(id,message,{callModel,onStream,tier:modelTier,images,checkRuntime,assetNote,signal,onProgress:s=>update({status:s,stream:null})});
    }
+   // An agent task that changed nothing is not charged.
+   if(mode==='agent'&&job.result&&job.result.unchanged&&v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: agent made no changes','refund:'+job.id)}catch{}job.refunded=true}
    update({status:'complete'});
   }catch(e){
    update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
@@ -351,6 +353,18 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    // The owner's SQL console. Queries run in a SQL process that is killed if they overrun.
    const b=await readJson(req,40000);
    return send(res,200,{result:await require('./react-sql').run.query(builder.projectDir(id),String(b.query||''),Array.isArray(b.params)?b.params:[])}),true;
+  }
+  // Mobile app settings, the QR code to open the published app on a phone, and its icon.
+  if(action==='/mobile'||action==='/qr'||action==='/appicon'){
+   const mobile=require('./react-mobile'),meta=builder.loadMeta(id),urls=require('./react-hosting').siteUrls(meta);
+   const best=urls?(urls.domains[0]||urls.subdomain||urls.path):null;
+   if(action==='/mobile'&&method==='GET')return send(res,200,{mobile:mobile.settings(meta),url:best,installable:Boolean(urls&&(urls.domains.length||urls.subdomain)),assets:require('./react-assets').list(id).filter(a=>/\.(png|jpe?g|webp)$/.test(a.name)).map(a=>a.name)}),true;
+   if(action==='/mobile'&&method==='POST'){const s=mobile.update(id,await readJson(req,4000));mobile.renderIcons(id).catch(()=>{});return send(res,200,{mobile:s}),true}
+   if(action==='/qr'&&method==='GET'){
+    if(!best)throw Object.assign(Error('Publish the app first'),{status:409});
+    res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'"});res.end(mobile.qrSvg(best));return true;
+   }
+   if(action==='/appicon'&&method==='GET'){res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(mobile.icon(id,'icon-192.png'));return true}
   }
   if(action==='/figma'&&method==='GET'){let saved=false;try{saved=Boolean(require('./project-secrets').status(id).figma_token)}catch{}return send(res,200,{token_saved:saved}),true}
   if(action==='/figma'&&method==='POST'){
