@@ -289,6 +289,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const meta=builder.create({name:b.name||(tpl&&!prompt?tpl.name:prompt.split(/[.\n]/)[0].slice(0,60))||'Untitled app',owner:v.owner});
    if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
    else await builder.initialize(meta);
+   // Mobile templates start with the mobile app setting on (phone preview, installable app).
+   if(tpl&&tpl.mobile)require('./react-mobile').update(meta.id,{enabled:true,...tpl.mobile});
    const job=prompt?startJob(v,meta.id,{message:prompt,tier:b.tier||'standard',images:parseImages(b.images)},{callModel,checkRuntime,inspect,webSearch}):null;
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
