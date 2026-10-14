@@ -29,6 +29,8 @@ ${web?`- {"tool":"web_search","query":"..."}: search the web; returns links.
 Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors. Be economical: you have at most ${maxSteps} steps.`;
 }
 
+// Never throws: a reply that is not valid JSON comes back as {invalid} so the loop can ask again.
+function parseStepSafe(content){try{return parseStep(content)}catch(e){const raw=typeof content==='string'?content:JSON.stringify(content);return{invalid:String(e.message||e),thought:'',actions:[],raw:String(raw||'').slice(0,400)}}}
 function parseStep(content){
  let v=content;
  if(typeof v==='string'){
@@ -74,7 +76,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
  const limit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
  const vision=tier!=='standard',web=typeof webSearch==='function';
  const started=new Date().toISOString();
- let work={...base},built=null,dirty=false,lastTest=null,finishWarned=false;
+ let work={...base},built=null,dirty=false,lastTest=null,finishWarned=false,invalidReplies=0;
  const steps=[];
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(base,60000)+(assetNote?'\n\n'+assetNote:'')+'\n\nRequest: '+text;
@@ -84,7 +86,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
 
  function dropOldImages(){for(const m of messages)if(Array.isArray(m.content)&&m!==introMsg)m.content=m.content.filter(p=>p.type==='text').map(p=>p.text).join('\n')+'\n(screenshot omitted)'}
  function trimContext(){
-  let total=JSON.stringify(messages).length;
+  const size=m=>typeof m.content==='string'?m.content.length:m.content.reduce((n,p)=>n+(p.type==='text'?p.text.length:0),0);
+  let total=messages.reduce((n,m)=>n+size(m),0);
   for(let i=messages.indexOf(introMsg)+1;i<messages.length-4&&total>350000;i++){const m=messages[i];if(typeof m.content==='string'&&m.content.length>2000){total-=m.content.length-1500;m.content=m.content.slice(0,1500)+'\n…(older content trimmed)'}}
  }
  async function testBuild(a,prefix){
@@ -191,7 +194,16 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   signal?.throwIfAborted();
   report({status:'thinking',step});
   trimContext();
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:16000,signal,tier},parseStep);
+  // Streaming keeps long steps (several files) under the provider's streaming timeout.
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:16000,signal,tier,onToken:()=>{}},parseStepSafe);
+  if(reply.invalid){
+   invalidReplies++;
+   steps.push({n:step,thought:'',actions:['Reply was not valid JSON'],summary:'Reply was not valid JSON'});
+   if(invalidReplies>=3)break;
+   messages.push({role:'assistant',content:reply.raw||'(empty)'},{role:'user',content:'Your reply could not be used ('+reply.invalid+'). Reply with ONLY a JSON object: {"thought":"...","actions":[{"tool":"...", ...}]}. Use the finish tool when the task is done.'});
+   continue;
+  }
+  invalidReplies=0;
   messages.push({role:'assistant',content:JSON.stringify({thought:reply.thought,actions:reply.actions})});
   const entry={n:step,thought:reply.thought,actions:reply.actions.map(describe)};
   steps.push({...entry,summary:(reply.thought?reply.thought+' — ':'')+entry.actions.join('; ')});
@@ -203,7 +215,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
     const message=String(a.message||reply.thought||'Done.').slice(0,2000);
     if(unchanged()){finished=noChange(message);break}
     if(dirty||!built){const r=await buildAndTest({});results.push(r.text);if(r.image)image=r.image}
-    if(!built){results.push('finish: the project does not build yet. Fix the problems above, then finish.');continue}
+    if(!built||dirty){results.push('finish: your latest changes do not build yet. Fix the problems above, then finish.');continue}
     if(lastTest&&lastTest.errors.length&&!finishWarned){finishWarned=true;results.push('finish: the last test still shows problems (listed above). Fix them and test again, or call finish again to stop anyway.');continue}
     finished=save(message);break;
    }
@@ -212,14 +224,15 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   }
   if(finished)return finished;
   dropOldImages();
-  const body='Results of step '+step+' of '+limit+':\n\n'+results.join('\n\n')+(step===limit-1?'\n\nYou have one step left: fix what you can and call finish.':'');
+  const body='Results of step '+step+' of '+limit+':\n\n'+clip(results.join('\n\n'),60000)+(step===limit-1?'\n\nYou have one step left: fix what you can and call finish.':'');
   messages.push({role:'user',content:image?[{type:'text',text:body},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+image}}]:body});
  }
  // Out of steps: keep the work if it builds.
  if(unchanged())return noChange(steps.at(-1)?.thought||'Stopped without changes.');
  if(dirty||!built)await buildAndTest({});
- if(!built)throw Object.assign(Error('The agent used all '+limit+' steps and the project still does not build.'),{status:422});
- return save('Stopped after '+limit+' steps. '+(steps.at(-1)?.thought||''),{stopped:true});
+ if(!built)throw Object.assign(Error('The agent stopped after '+steps.length+' steps and the project does not build.'),{status:422});
+ if(dirty)return save('Stopped after '+steps.length+' steps. The last changes did not build, so the last working build was saved. '+(steps.at(-1)?.thought||''),{stopped:true});
+ return save('Stopped after '+steps.length+' steps. '+(steps.at(-1)?.thought||''),{stopped:true});
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id)}
 }

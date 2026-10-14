@@ -125,14 +125,20 @@ async function stripe(secretKey,pathname,{method='GET',form}={}){
  return data;
 }
 function projectStripeKey(id){const k=require('./project-secrets').get(id,'stripe_secret_key');if(!k)throw fail(409,'The app owner has not connected Stripe yet');return k}
+// Return URLs (password reset, Google sign-in, checkout) must be this app's own pages:
+// its verified domains, its subdomain, or its /sites/<slug>/ and preview paths on Kairoq.
 function allowedReturn(url,req,meta){
  let u;try{u=new URL(String(url))}catch{throw fail(400,'return_url must be a full URL')}
  if(!/^https?:$/.test(u.protocol))throw fail(400,'return_url must be http(s)');
- const hosts=new Set([String(req.headers.host||'').toLowerCase(),...(meta.domains||[]).filter(d=>d.verified).map(d=>d.hostname)]);
- try{const p=process.env.KAIROQ_PUBLIC_URL||(process.env.RAILWAY_PUBLIC_DOMAIN?'https://'+process.env.RAILWAY_PUBLIC_DOMAIN:'');if(p)hosts.add(new URL(p).host)}catch{}
+ const host=u.host.toLowerCase();
+ if((meta.domains||[]).some(d=>d.verified&&d.hostname===host))return u;
  const sites=String(process.env.KAIROQ_SITES_DOMAIN||'').toLowerCase();
- if(!hosts.has(u.host.toLowerCase())&&!(sites&&meta.published&&u.host.toLowerCase()===meta.published.slug+'.'+sites))throw fail(400,'return_url must point to this app');
- return u;
+ if(sites&&meta.published&&host===meta.published.slug+'.'+sites)return u;
+ let kairoq='';
+ try{const p=process.env.KAIROQ_PUBLIC_URL||(process.env.RAILWAY_PUBLIC_DOMAIN?'https://'+process.env.RAILWAY_PUBLIC_DOMAIN:'');kairoq=p?new URL(p).host.toLowerCase():String(req.headers.host||'').toLowerCase()}catch{}
+ const paths=['/builder/p/'+meta.id+'-'+meta.preview_key+'/',...(meta.published?['/sites/'+meta.published.slug+'/']:[])];
+ if(host===kairoq&&paths.some(p=>u.pathname.startsWith(p)))return u;
+ throw fail(400,'return_url must point to this app');
 }
 async function checkout(body,{id,meta,cfg,user,req,stripeCall=stripe}){
  if(!cfg.payments)throw fail(404,'Payments are not enabled. Add "payments" to src/backend.json.');
@@ -158,6 +164,10 @@ async function paymentWebhook(req,{id,meta,db,stripeCall=stripe,now}){
   const paid=s.payment_status==='paid'||(s.mode==='subscription'&&s.status==='complete');
   if(!paid)return{pending:s.id};
   const at=new Date().toISOString();
+  // A late or replayed "completed" event must not revive a cancelled subscription.
+  const existing=db.prepare('SELECT status FROM payments WHERE session_id=?').get(s.id);
+  if(existing&&existing.status==='cancelled')return{ignored:'cancelled'};
+  if(s.mode==='subscription'&&s.subscription){const sub=await stripeCall(projectStripeKey(id),'subscriptions/'+encodeURIComponent(typeof s.subscription==='string'?s.subscription:s.subscription.id)).catch(()=>null);if(sub&&/^(canceled|incomplete_expired|unpaid)$/.test(sub.status))return{ignored:sub.status}}
   db.prepare('INSERT INTO payments(session_id,user_id,product,mode,status,subscription_id,amount,currency,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at')
    .run(s.id,s.metadata.user_id,s.metadata.product,s.mode,'active',s.subscription||null,s.amount_total??null,s.currency||null,at,at);
   return{recorded:s.id};

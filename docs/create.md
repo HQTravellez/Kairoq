@@ -108,6 +108,7 @@ Enable these in `src/backend.json`. The model adds them when the app needs them.
   - In code: `storage.upload(file)` returns `{id, url}`.
   - Allowed: images, PDF, text and CSV, up to 5 MB each, with `KAIROQ_APP_STORAGE_MB` per app (default 500).
   - Files are served with a sandbox CSP. Only the uploader can delete a file.
+  - Anyone with a file's URL can open it, whatever the storage access. Don't store private documents there.
 - **Email.** Add `"email":true`.
   - In code: `email.send({to:'owner'|'me', subject, text})`.
   - Mail goes only to the app owner (the Create account's email, or `KAIROQ_OWNER_EMAIL` for owner-built apps) or to the signed-in user. Apps can't be used to spam other people.
@@ -169,7 +170,7 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 
 ### Real-time updates
 
-- In code: `collection('messages').subscribe(items => …)` keeps a list up to date as records change.
+- In code: `const stop = collection('messages').subscribe(({type, item}) => …)` delivers `created`, `updated` and `deleted` events; call `stop()` to unsubscribe. Subscriptions reconnect after sign-in and sign-out.
 - Uses Server-Sent Events with single-use, 60-second tickets. Each person only receives records they're allowed to read under the collection's access rule.
 - Up to `KAIROQ_REALTIME_MAX_PER_APP` (500) open connections per app.
 
@@ -263,5 +264,4 @@ On Railway, `workspace/` should be on the persistent volume.
 ## Limits
 
 - Up to 80 source files, 200 KB per file and 1.5 MB per project.
-- Builds run one at a time and time out after 90 seconds.
-- Generated apps can't take payments yet. Stripe checkout inside generated apps is a possible next step.
+- Builds run in `KAIROQ_BUILD_WORKERS` worker threads and time out after `KAIROQ_BUILD_TIMEOUT_MS` (90 seconds).

@@ -44,6 +44,7 @@ async function screenshot(url,file){
 // Opens a page, optionally runs simple UI steps (click, fill, press, expect, goto, wait),
 // and returns runtime errors, step results, visible text and a JPEG screenshot.
 const MAX_STEPS=20;
+function privateHost(h){h=h.replace(/^\[|\]$/g,'').toLowerCase();return h==='localhost'||h.endsWith('.localhost')||h.endsWith('.internal')||/^\d+\.\d+\.\d+\.\d+$/.test(h)||h.includes(':')||!h.includes('.')}
 async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
  if(!available())return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
@@ -54,6 +55,16 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
  page.on('requestfailed',r=>add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')'));
  page.on('response',r=>{if(r.status()>=400)add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())});
  const origin=new URL(url).origin,root=new URL('./',url).pathname;
+ const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(root)||[])[1];
+ // Only the app itself, its backend and public https resources may load; anything else
+ // (other Kairoq paths, internal hosts, cloud metadata) is blocked, including by clicking links.
+ await context.route('**/*',r=>{
+  let u;try{u=new URL(r.request().url())}catch{return r.abort()}
+  if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
+  if(u.origin===origin)return u.pathname.startsWith(root)||(appId&&u.pathname.startsWith('/api/apps/'+appId+'/'))?r.continue():r.abort();
+  if(u.protocol==='https:'&&!privateHost(u.hostname))return r.continue();
+  return r.abort();
+ });
  let text='',shot=null;
  try{
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
@@ -76,6 +87,7 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
    }catch(e){results.push({step:label,ok:false,error:String(e.message||e).split('\n')[0].slice(0,300)})}
   }
   await page.waitForLoadState('networkidle',{timeout:3000}).catch(()=>{});
+  if(!page.url().startsWith(origin+root))add('The page left the app: '+page.url());
   text=await page.evaluate(()=>document.body?document.body.innerText:'').catch(()=>'');
   const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))}).catch(()=>false);
   if(blank)add('Blank page: nothing rendered inside #root.');

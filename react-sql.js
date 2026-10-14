@@ -9,7 +9,20 @@ const {DatabaseSync}=require('node:sqlite');
 
 const MIGRATION_PATH=/^sql\/(\d{3})_[a-z0-9_]{1,40}\.sql$/;
 const MAX_ROWS=1000,MAX_PARAMS=100,MAX_QUERY=20000;
-const BANNED=/\b(ATTACH|DETACH|PRAGMA|VACUUM|REINDEX|LOAD_EXTENSION|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i;
+const BANNED=/\b(ATTACH|DETACH|PRAGMA|VACUUM|REINDEX|LOAD_EXTENSION)\b/i;
+const TX=/^\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|END)\b/i;
+const MAX_RESULT_BYTES=4*1024*1024;
+// Transaction statements are not allowed (Kairoq manages transactions), but BEGIN … END
+// inside CREATE TRIGGER is fine.
+function transactionStatement(stripped){
+ let inTrigger=false;
+ for(const seg of stripped.split(';')){
+  if(inTrigger){if(/^\s*END\b/i.test(seg)){inTrigger=false;continue}}
+  else{const m=TX.exec(seg);if(m)return m[1].toUpperCase()}
+  if(/\bCREATE\s+(?:TEMP\s+|TEMPORARY\s+)?TRIGGER\b/i.test(seg))inTrigger=!/\bEND\s*$/i.test(seg);
+ }
+ return null;
+}
 
 function fail(status,message){return Object.assign(Error(message),{status})}
 function file(projectDir){return path.join(projectDir,'app-sql.sqlite')}
@@ -39,8 +52,11 @@ function check(sql,{multiple=false}={}){
  const bare=strip(text);
  const m=BANNED.exec(bare);
  if(m)throw fail(400,m[1].toUpperCase()+' is not allowed in app SQL');
- if(/\bpragma_\w+/i.test(bare))throw fail(400,'pragma functions are not allowed in app SQL');
- if(/\b_kairoq_\w*/i.test(bare))throw fail(400,'Tables starting with _kairoq_ are reserved');
+ const tx=transactionStatement(bare);
+ if(tx)throw fail(400,tx+' is not allowed in app SQL (Kairoq runs migrations and db.batch in transactions)');
+ // Checked on the raw text too, so quoting a name ("_kairoq_migrations", [pragma_table_info]) does not hide it.
+ if(/pragma_\w+/i.test(text))throw fail(400,'pragma functions are not allowed in app SQL');
+ if(/_kairoq_\w*/i.test(text))throw fail(400,'Tables starting with _kairoq_ are reserved');
  if(!multiple&&statementCount(bare)>1)throw fail(400,'Run one SQL statement at a time (use db.batch for several)');
  return bare;
 }
@@ -69,6 +85,7 @@ function open(projectDir){
  const page=db.prepare('PRAGMA page_size').get().page_size||4096;
  db.exec('PRAGMA journal_mode=WAL;PRAGMA foreign_keys=ON;PRAGMA busy_timeout=3000;PRAGMA trusted_schema=OFF;PRAGMA max_page_count='+Math.floor(maxBytes()/page)+';');
  db.exec('CREATE TABLE IF NOT EXISTS _kairoq_migrations(name TEXT PRIMARY KEY,sha TEXT NOT NULL,applied_at TEXT NOT NULL)');
+ try{db.exec('ALTER TABLE _kairoq_migrations ADD COLUMN sql TEXT')}catch{}
  if(conns.size>=50){const [k,old]=conns.entries().next().value;try{old.close()}catch{}conns.delete(k)}
  conns.set(f,db);
  return db;
@@ -81,19 +98,23 @@ function migrate(projectDir,files){
  const names=migrations(files);
  if(!names.length&&!exists(projectDir))return{applied:[]};
  const db=open(projectDir);
- const done=new Map(db.prepare('SELECT name,sha FROM _kairoq_migrations').all().map(r=>[r.name,r.sha]));
- const applied=[];
+ const rows=db.prepare('SELECT name,sha,sql FROM _kairoq_migrations').all(),done=new Map(rows.map(r=>[r.name,r.sha])),texts=new Map(rows.map(r=>[r.name,r.sql]));
+ const applied=[],todo=[];
  for(const name of names){
   const sha=crypto.createHash('sha256').update(files[name]).digest('hex');
   if(done.has(name)){
-   if(done.get(name)!==sha)throw fail(400,name+' has already been applied to the database and cannot be changed. Add a new migration (for example sql/'+String(Number(names.at(-1).slice(4,7))+1).padStart(3,'0')+'_change.sql) instead.');
+   if(done.get(name)!==sha)throw fail(400,name+' has already been applied to the database (possibly by an earlier attempt) and cannot be changed. Put back its applied content and add a new migration (for example sql/'+String(Number(names.at(-1).slice(4,7))+1).padStart(3,'0')+'_change.sql) for further changes.'+(texts.get(name)?' Applied content of '+name+':\n'+String(texts.get(name)).slice(0,3000):''));
    continue;
   }
   check(files[name],{multiple:true});
+  todo.push({name,sha});
+ }
+ // All new migrations of one save apply together, or none do.
+ if(todo.length){
   db.exec('BEGIN');
-  try{db.exec(files[name]);db.prepare('INSERT INTO _kairoq_migrations(name,sha,applied_at) VALUES(?,?,?)').run(name,sha,new Date().toISOString());db.exec('COMMIT')}
-  catch(e){try{db.exec('ROLLBACK')}catch{}throw fail(400,name+' failed: '+String(e.message).replace(/^.*?:\s*/,'').slice(0,300))}
-  applied.push(name);
+  let current='';
+  try{for(const {name,sha} of todo){current=name;db.exec(files[name]);db.prepare('INSERT INTO _kairoq_migrations(name,sha,applied_at,sql) VALUES(?,?,?,?)').run(name,sha,new Date().toISOString(),files[name]);applied.push(name)}db.exec('COMMIT')}
+  catch(e){try{db.exec('ROLLBACK')}catch{}throw fail(400,current+' failed: '+String(e.message).replace(/^.*?:\s*/,'').slice(0,300)+(todo.length>1?' (none of the new migrations were applied)':''))}
  }
  return{applied,pending:[...done.keys()].filter(n=>!names.includes(n))};
 }
@@ -119,8 +140,13 @@ function runOne(db,sql,list){
  const values=params(list);
  try{
   if(readsRows(stmt,bare)){
-   const rows=[];
-   for(const row of stmt.iterate(...values)){rows.push(plain(row));if(rows.length>MAX_ROWS)throw fail(400,'Query returned more than '+MAX_ROWS+' rows; add LIMIT')}
+   const rows=[];let bytes=0;
+   for(const row of stmt.iterate(...values)){
+    const r=plain(row);rows.push(r);
+    if(rows.length>MAX_ROWS)throw fail(400,'Query returned more than '+MAX_ROWS+' rows; add LIMIT');
+    for(const v of Object.values(r))bytes+=typeof v==='string'?v.length:8;
+    if(bytes>MAX_RESULT_BYTES)throw fail(400,'Query result is larger than 4 MB; select fewer rows or columns');
+   }
    return rows;
   }
   const r=stmt.run(...values);

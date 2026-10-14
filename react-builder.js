@@ -67,7 +67,7 @@ Rules:
   Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (guestbooks, public comments); "submit-only" = anyone can add but nobody can read them back, only the owner sees them in Kairoq (use this for contact, booking, reservation, order and waitlist forms; show a thank-you message after create). Only a record's creator can update or delete it.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
   Optional features (add them to src/backend.json only when the app needs them):
-  - File uploads: "storage":{"access":"signed-in"} (or "public"). import { storage } from 'kairoq'; const f=await storage.upload(fileFromInput) returns {id,url,name}; save f.url in a record to show it later. Images, PDF, text and CSV up to 5 MB.
+  - File uploads: "storage":{"access":"signed-in"} (or "public"). import { storage } from 'kairoq'; const f=await storage.upload(fileFromInput) returns {id,url,name}; save f.url in a record to show it later. Images, PDF, text and CSV up to 5 MB. Anyone with a file URL can open it, so never upload private documents.
   - Email: "email":true. import { email } from 'kairoq'; await email.send({to:'owner',subject,text}) notifies the app owner (for contact and booking forms); to:'me' emails the signed-in user.
   - Payments: "payments":{"products":{"pro":{"price":"price_REPLACE_ME","mode":"payment"}}} (mode "subscription" for plans). import { payments } from 'kairoq'; await payments.checkout('pro') opens Stripe Checkout for the signed-in user; await payments.has('pro') checks a purchase. Tell the user to replace price ids with their Stripe price ids and connect Stripe in Settings.
   - AI in the app: "ai":true. import { ai } from 'kairoq'; const { text } = await ai.chat({ system, messages:[{role:'user',content}] }) (also ai.chat('prompt')). Use it for chatbots, summaries, suggestions and generators. Show a loading state; errors can include "out of AI credits".
@@ -415,7 +415,8 @@ const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
 function serveDist(req,res,distDir,rest,{sandbox}){
  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);return res.end()}
- let rel=decodeURIComponent(String(rest||'').split('?')[0]).replace(/^\/+/,'');
+ let decoded;try{decoded=decodeURIComponent(String(rest||'').split('?')[0])}catch{res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Bad request');return true}
+ let rel=decoded.replace(/^\/+/,'');
  if(!rel||rel.endsWith('/'))rel+='index.html';
  const file=path.resolve(distDir,rel);
  if(!file.startsWith(path.resolve(distDir)+path.sep)){res.writeHead(400);return res.end()}

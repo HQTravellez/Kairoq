@@ -77,7 +77,8 @@ test('server functions use secrets, the database and the signed-in user; drafts 
  // Publish v2, then change the function in a draft v3: each version runs its own code.
  hosting.publish(id,{slug:'fn-app'});
  await builder.saveSource(id,{...builder.loadFiles(id,2),'functions/order.js':'export default async function(){return {json:"draft"}}','src/App.jsx':"import {functions} from 'kairoq';\nexport default function App(){return <button onClick={()=>functions.invoke('order',{})}>Order</button>}\n"},{summary:'draft'});
- assert.equal((await request(server,'POST',base+'/functions/order',{body:{},headers:{'x-kairoq-version':'3'}})).json,'draft');
+ assert.equal((await request(server,'POST',base+'/functions/order',{body:{},headers:{'x-kairoq-version':'3','x-kairoq-preview':builder.loadMeta(id).preview_key}})).json,'draft');
+ assert.equal((await request(server,'POST',base+'/functions/order',{body:{},headers:{'x-kairoq-version':'3'}})).status,401,'visitors cannot pick the draft without the preview key');
  assert.equal((await request(server,'POST',base+'/functions/order',{body:{}})).status,401,'published version by default');
  assert.equal((await request(server,'POST',base+'/functions/order',{body:{},headers:{'x-kairoq-version':'1'}})).status,401,'old versions are never served');
  const dist=path.join(builder.versionDir(id,3),'dist','assets');
@@ -141,19 +142,24 @@ test('Google sign-in for Kairoq accounts creates or links accounts by verified e
   assert.equal(start.status,302);
   const loc=new URL(start.headers.location);
   assert.equal(loc.host,'accounts.google.com');assert.equal(loc.searchParams.get('client_id'),'cid.apps.googleusercontent.com');
-  const state=loc.searchParams.get('state');
-  const cb=await request(server,'GET','/api/create/auth/google/callback?code=abc&state='+state);
+  const state=loc.searchParams.get('state'),oauth=start.headers['set-cookie'][0].split(';')[0];
+  assert.match((await request(server,'GET','/api/create/auth/google/callback?code=abc&state='+state)).headers.location,/finish%20in%20the%20browser/,'a callback without the starting browser\'s cookie is refused');
+  const start2=await request(server,'GET','/api/create/auth/google');
+  const state2=new URL(start2.headers.location).searchParams.get('state');
+  const cb=await request(server,'GET','/api/create/auth/google/callback?code=abc&state='+state2,{headers:{cookie:start2.headers['set-cookie'][0].split(';')[0]}});
   assert.equal(cb.status,302);assert.equal(cb.headers.location,'/create');
   const cookie=cb.headers['set-cookie'][0].split(';')[0];
   const me=(await request(server,'GET','/api/create/me',{headers:{cookie}})).json.viewer.account;
   assert.equal(me.id,existing.account.id,'linked to the existing account');assert.equal(me.email_verified,true);
-  const replay=await request(server,'GET','/api/create/auth/google/callback?code=abc&state='+state);
+  const replay=await request(server,'GET','/api/create/auth/google/callback?code=abc&state='+state2,{headers:{cookie:start2.headers['set-cookie'][0].split(';')[0]}});
   assert.match(replay.headers.location,/auth_error=/,'state is single-use');
+  assert.equal((await request(server,'POST','/api/create/login',{body:{email:'linked@example.com',password:'password1'},headers:{'x-forwarded-for':'10.9.9.9'}})).status,401,'a password set before the email was proven no longer works');
+  void oauth;
  }finally{restore()}
  const restore2=mockGoogle({sub:'g-999',email:'unverified@example.com',email_verified:false});
  try{
-  const state=new URL((await request(server,'GET','/api/create/auth/google')).headers.location).searchParams.get('state');
-  assert.match((await request(server,'GET','/api/create/auth/google/callback?code=x&state='+state)).headers.location,/auth_error=/);
+  const st=await request(server,'GET','/api/create/auth/google'),state=new URL(st.headers.location).searchParams.get('state');
+  assert.match((await request(server,'GET','/api/create/auth/google/callback?code=x&state='+state,{headers:{cookie:st.headers['set-cookie'][0].split(';')[0]}})).headers.location,/auth_error=Google%20did%20not/);
  }finally{restore2()}
 });
 

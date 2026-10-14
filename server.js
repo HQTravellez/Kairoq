@@ -6645,6 +6645,8 @@ async function handleDeveloperPublish(req,res){
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
 reactBackend.configure({appAi:callAppAi});
+// A failed request must never take the whole server down.
+process.on("unhandledRejection",e=>console.error("[unhandled]",e&&e.stack||e));
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
   const hostRoute=reactHosting.handleHost(req,res);

@@ -20,7 +20,7 @@ function parseConfig(files){
 }
 function normalizeConfig(cfg){
  if(!cfg||typeof cfg!=='object'||Array.isArray(cfg))throw Error('src/backend.json must be an object like {"collections":{"tasks":{"access":"private"}}}');
- const collections={};
+ const collections=Object.create(null);
  for(const [name,def] of Object.entries(cfg.collections||{})){
   if(!/^[a-z][a-z0-9_]{0,39}$/.test(name))throw Error('Collection name "'+name+'" must be lowercase letters, numbers or _ (max 40).');
   const access=typeof def==='string'?def:def&&def.access;
@@ -51,26 +51,36 @@ function database(id){
 function close(id){const file=path.join(builder.projectDir(id),'data.sqlite');const db=dbs.get(file);if(db){db.close();dbs.delete(file)}}
 
 function hash(t){return crypto.createHash('sha256').update(String(t)).digest('hex')}
-function hashPassword(p,salt=crypto.randomBytes(16).toString('hex')){return'scrypt$'+salt+'$'+crypto.scryptSync(String(p),salt,32).toString('hex')}
-function checkPassword(p,stored){const [,salt,hex]=String(stored).split('$');if(!salt||!hex)return false;const a=Buffer.from(hex,'hex'),b=crypto.scryptSync(String(p),salt,32);return a.length===b.length&&crypto.timingSafeEqual(a,b)}
+// scrypt runs on the libuv thread pool so sign-ins never block the server.
+const scrypt=require('util').promisify(crypto.scrypt);
+async function hashPassword(p,salt=crypto.randomBytes(16).toString('hex')){return'scrypt$'+salt+'$'+(await scrypt(String(p),salt,32)).toString('hex')}
+async function checkPassword(p,stored){const [,salt,hex]=String(stored).split('$');if(!salt||!hex)return false;const a=Buffer.from(hex,'hex'),b=await scrypt(String(p),salt,32);return a.length===b.length&&crypto.timingSafeEqual(a,b)}
 function fail(status,message){return Object.assign(Error(message),{status})}
 function publicUser(u){return u&&{id:u.id,email:u.email,name:u.name||null,created_at:u.created_at}}
 function record(r){return{id:r.id,...JSON.parse(r.data),_owner:r.owner_id,_created_at:r.created_at,_updated_at:r.updated_at}}
 
 // ---------- auth ----------
-function signUp(db,{email,password,name}){
+async function signUp(db,{email,password,name}){
  const e=String(email||'').trim().toLowerCase();
  if(e.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))throw fail(400,'Enter a valid email address');
  if(String(password||'').length<8)throw fail(400,'Use a password with at least 8 characters');
  if(db.prepare('SELECT id FROM users WHERE email=?').get(e))throw fail(409,'An account with that email already exists');
  if(db.prepare('SELECT COUNT(*) n FROM users').get().n>=MAX_USERS)throw fail(403,'This app has reached its user limit');
  const id=crypto.randomUUID();
- db.prepare('INSERT INTO users(id,email,password,name,created_at) VALUES(?,?,?,?,?)').run(id,e,hashPassword(password),name?String(name).slice(0,120):null,new Date().toISOString());
+ const hashed=await hashPassword(password);
+ if(db.prepare('SELECT id FROM users WHERE email=?').get(e))throw fail(409,'An account with that email already exists');
+ db.prepare('INSERT INTO users(id,email,password,name,created_at) VALUES(?,?,?,?,?)').run(id,e,hashed,name?String(name).slice(0,120):null,new Date().toISOString());
  return session(db,id);
 }
-function signIn(db,{email,password}){
- const u=db.prepare('SELECT * FROM users WHERE email=?').get(String(email||'').trim().toLowerCase());
- if(!u||!checkPassword(password,u.password))throw fail(401,'Email or password is incorrect');
+// Failed sign-ins per app and email: 10 per 15 minutes, then a short lockout.
+const failures=new Map();
+function failedRecently(key){const now=Date.now(),list=(failures.get(key)||[]).filter(t=>now-t<900000);failures.set(key,list);return list}
+async function signIn(db,{email,password}){
+ const e=String(email||'').trim().toLowerCase(),key=(db.__projectId||'')+':'+e;
+ if(failedRecently(key).length>=10)throw fail(429,'Too many failed sign-ins. Try again in 15 minutes or reset your password.');
+ const u=db.prepare('SELECT * FROM users WHERE email=?').get(e);
+ if(!u||!await checkPassword(password,u.password)){failedRecently(key).push(Date.now());if(failures.size>20000)failures.delete(failures.keys().next().value);throw fail(401,'Email or password is incorrect')}
+ failures.delete(key);
  return session(db,u.id);
 }
 function session(db,userId){
@@ -165,7 +175,7 @@ function limited(req,id){
  const list=(hits.get(key)||[]).filter(t=>now-t<60000);list.push(now);hits.set(key,list);
  if(list.length>240)throw fail(429,'Too many requests. Slow down and try again.');
 }
-const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Authorization, Content-Type, X-Kairoq-Version','Access-Control-Allow-Methods':'GET, POST, PUT, PATCH, DELETE, OPTIONS','Access-Control-Max-Age':'600'};
+const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Authorization, Content-Type, X-Kairoq-Version, X-Kairoq-Preview','Access-Control-Allow-Methods':'GET, POST, PUT, PATCH, DELETE, OPTIONS','Access-Control-Max-Age':'600'};
 const aiHits=new Map();
 function limitedAi(req,id){
  if(aiHits.size>20000)aiHits.clear();
@@ -178,9 +188,17 @@ function readJson(req,limit=40000){return new Promise((resolve,reject)=>{let b='
 function liveConfig(meta){const n=meta.published?.version||meta.current_version;return n?parseConfig(builder.loadFiles(meta.id,n)):{collections:{}}}
 // Builds send X-Kairoq-Version so the preview of the draft runs the draft's functions and
 // rules while the published site runs the published ones. Only those two versions are served.
+// At most 3 reset emails per app user every 15 minutes.
+const resetSends=new Map(),fnRunning=new Map();
+function resetThrottled(appId,userId){const k=appId+':'+userId,now=Date.now(),list=(resetSends.get(k)||[]).filter(t=>now-t<900000);if(list.length>=3)return true;list.push(now);resetSends.set(k,list);if(resetSends.size>10000)resetSends.delete(resetSends.keys().next().value);return false}
 function requestVersion(meta,req){
  const v=Number(req.headers['x-kairoq-version']);
- if(Number.isInteger(v)&&(v===meta.current_version||v===meta.published?.version||v===builder.testingVersion(meta.id)))return v;
+ if(Number.isInteger(v)&&v===meta.published?.version)return v;
+ // Drafts (and a version under test) are only served to the editor's preview, which knows the preview key.
+ if(Number.isInteger(v)&&(v===meta.current_version||v===builder.testingVersion(meta.id))){
+  const k=Buffer.from(String(req.headers['x-kairoq-preview']||'')),want=Buffer.from(String(meta.preview_key||''));
+  if(!meta.published||k.length===want.length&&crypto.timingSafeEqual(k,want))return v;
+ }
  return meta.published?.version||meta.current_version;
 }
 let appAiImpl=null;
@@ -196,6 +214,8 @@ async function appAi(meta,db,args){
  const maxTokens=Math.max(64,Math.min(4000,Number(args&&args.max_tokens)||1000));
  db.exec('CREATE TABLE IF NOT EXISTS app_ai_usage(day TEXT PRIMARY KEY,calls INTEGER NOT NULL)');
  const accounts=require('./builder-accounts');
+ const today=db.prepare('SELECT calls FROM app_ai_usage WHERE day=?').get(new Date().toISOString().slice(0,10));
+ if(today&&today.calls>=Math.max(1,Number(process.env.KAIROQ_APP_AI_DAILY_LIMIT||2000)))throw fail(429,'This app has reached its daily AI limit');
  if(meta.owner!=='owner'){const owner=accounts.database().prepare('SELECT credits FROM accounts WHERE id=?').get(meta.owner);if(!owner||owner.credits<1)throw fail(402,'This app is out of AI credits')}
  const out=await appAiImpl({system,messages:clean,maxTokens});
  const day=new Date().toISOString().slice(0,10);
@@ -208,7 +228,7 @@ async function appAi(meta,db,args){
 // Service-level data access for server functions (they run as the app, not as a visitor).
 function functionDb(db,cfg,op,a,user){
  const name=String(a&&a.collection||'');
- if(!cfg.collections[name])throw fail(404,'Collection "'+name+'" is not declared in src/backend.json');
+ if(!Object.hasOwn(cfg.collections,name))throw fail(404,'Collection "'+name+'" is not declared in src/backend.json');
  const row=id=>{const r=db.prepare('SELECT * FROM records WHERE id=? AND collection=?').get(String(id),name);if(!r)throw fail(404,'Record not found');return r};
  if(op==='list'){
   const limit=Math.max(1,Math.min(LIST_LIMIT,Number(a.limit)||100)),order=a.order==='asc'?'ASC':'DESC';
@@ -280,8 +300,8 @@ async function handle(req,res,{onlyProject}={}){
   let meta;try{meta=builder.loadMeta(id)}catch{throw fail(404,'App not found')}
   const db=database(id),user=currentUser(db,req);db.__projectId=id;
   const version=requestVersion(meta,req);
-  if(route==='/auth/signup'&&req.method==='POST')return send(res,201,signUp(db,await readJson(req))),true;
-  if(route==='/auth/signin'&&req.method==='POST')return send(res,200,signIn(db,await readJson(req))),true;
+  if(route==='/auth/signup'&&req.method==='POST')return send(res,201,await signUp(db,await readJson(req))),true;
+  if(route==='/auth/signin'&&req.method==='POST')return send(res,200,await signIn(db,await readJson(req))),true;
   if(route==='/auth/signout'&&req.method==='POST'){const t=/^Bearer (.+)$/.exec(String(req.headers.authorization||''));if(t)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(t[1]));return send(res,200,{ok:true}),true}
   if(route==='/auth/user'&&req.method==='GET')return send(res,200,{user:publicUser(user)}),true;
   if(route==='/auth/google/start'&&req.method==='GET'){
@@ -293,6 +313,7 @@ async function handle(req,res,{onlyProject}={}){
   if(route==='/auth/reset/request'&&req.method==='POST'){
    const b=await readJson(req,4000),back=require('./react-backend-extras').allowedReturn(b.return_url,req,meta);
    const e=String(b.email||'').trim().toLowerCase(),found=db.prepare('SELECT * FROM users WHERE email=?').get(e);
+   if(found&&resetThrottled(id,found.id))return send(res,200,{sent:true}),true;
    if(found&&process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM){
     const token=crypto.randomBytes(24).toString('base64url');
     db.prepare('DELETE FROM app_tokens WHERE user_id=?').run(found.id);
@@ -308,7 +329,7 @@ async function handle(req,res,{onlyProject}={}){
    const row=db.prepare('SELECT * FROM app_tokens WHERE token_hash=?').get(hash(String(b.token||'')));
    if(!row||row.expires_at<Date.now())throw fail(400,'This reset link has expired. Ask for a new one.');
    db.prepare('DELETE FROM app_tokens WHERE token_hash=?').run(row.token_hash);
-   db.prepare('UPDATE users SET password=? WHERE id=?').run(hashPassword(b.password),row.user_id);
+   db.prepare('UPDATE users SET password=? WHERE id=?').run(await hashPassword(b.password),row.user_id);
    db.prepare('DELETE FROM sessions WHERE user_id=?').run(row.user_id);
    return send(res,200,session(db,row.user_id)),true;
   }
@@ -326,15 +347,20 @@ async function handle(req,res,{onlyProject}={}){
    const host={
     secret:async name=>require('./project-secrets').get(id,'app_'+String(name).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
     db:async(op,a,u)=>functionDb(db,cfg,op,a,u),
-    ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');return appAi(meta,db,a)},
+    ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');limitedAi(req,id);return appAi(meta,db,a)},
     sql:(q,p)=>require('./react-sql').run.query(builder.projectDir(id),q,p),
     sqlBatch:steps=>require('./react-sql').run.batch(builder.projectDir(id),steps),
     email:async(a,u)=>extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
    };
    const applog=require('./react-logs');
+   // Each app may run a few functions at once, so one busy app cannot starve the others.
+   const running=fnRunning.get(id)||0;
+   if(running>=Math.max(1,Number(process.env.KAIROQ_FUNCTION_CONCURRENCY_PER_APP||3)))throw fail(429,'This app is busy. Try again in a moment.');
+   fnRunning.set(id,running+1);
    let out;
    try{out=await require('./react-functions').invoke({source,request:{method:req.method,path:route,query:q0,headers,body,rawBody},user:publicUser(user),host})}
    catch(e){applog.add(id,{level:'error',source:'functions/'+fnm[1]+'.js',message:req.method+' '+route+': '+(e.message||e)});throw e}
+   finally{const n=(fnRunning.get(id)||1)-1;if(n>0)fnRunning.set(id,n);else fnRunning.delete(id)}
    for(const line of out.logs||[])applog.add(id,{level:'log',source:'functions/'+fnm[1]+'.js',message:line});
    require('./react-functions').respond(res,out.result,CORS);
    return true;
@@ -353,7 +379,7 @@ async function handle(req,res,{onlyProject}={}){
   if(route==='/payments/mine'&&req.method==='GET')return send(res,200,{purchases:extras.myPurchases(db,user)}),true;
   const rt=/^\/realtime\/([a-z][a-z0-9_]{0,39})(\/ticket)?$/.exec(route);
   if(rt){
-   const def=cfg.collections[rt[1]];
+   const def=Object.hasOwn(cfg.collections,rt[1])?cfg.collections[rt[1]]:undefined;
    if(!def)throw fail(404,'Collection "'+rt[1]+'" is not declared in src/backend.json');
    if(rt[2]&&req.method==='POST')return send(res,200,{ticket:issueTicket(id,rt[1],def.access,user)}),true;
    if(!rt[2]&&req.method==='GET'){subscribe(req,res,id,rt[1],u.searchParams.get('ticket'));return true}
@@ -361,7 +387,7 @@ async function handle(req,res,{onlyProject}={}){
   }
   const c=/^\/collections\/([a-z][a-z0-9_]{0,39})(?:\/([a-f0-9-]{36}))?$/.exec(route);
   if(!c)throw fail(404,'Unknown backend route');
-  const collection=c[1],rid=c[2],def=cfg.collections[collection];
+  const collection=c[1],rid=c[2],def=Object.hasOwn(cfg.collections,collection)?cfg.collections[collection]:undefined;
   if(!def)throw fail(404,'Collection "'+collection+'" is not declared in src/backend.json');
   const q=Object.fromEntries(u.searchParams);
   if(!rid&&req.method==='GET')return send(res,200,{items:list(db,def.access,collection,user,q)}),true;
@@ -400,13 +426,15 @@ function ownerDelete(id,recordId){const d=database(id),row=d.prepare('SELECT col
 function clientSource(projectId,apiOrigin='',version=0){
  return `const BASE=${JSON.stringify(apiOrigin.replace(/\/$/,'')+'/api/apps/'+projectId)};
 const VERSION=${JSON.stringify(String(version||''))};
+const PREVIEW=(()=>{try{const m=/\\/builder\\/p\\/[a-f0-9]{12}-([a-f0-9]{24})\\//.exec(location.pathname);return m?m[1]:''}catch{return''}})();
+function versionHeaders(){return VERSION?{'X-Kairoq-Version':VERSION,...(PREVIEW?{'X-Kairoq-Preview':PREVIEW}:{})}:{}}
 const KEY='kairoq-session-${projectId}';
 let token=null,currentUser=null;const listeners=new Set();
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){token=s.token;currentUser=s.user}}catch{}
 function save(){try{token?localStorage.setItem(KEY,JSON.stringify({token,user:currentUser})):localStorage.removeItem(KEY)}catch{}listeners.forEach(fn=>{try{fn(currentUser)}catch{}})}
 async function call(path,{method='GET',body,query}={}){
   const qs=query?'?'+new URLSearchParams(Object.entries(query).filter(([,v])=>v!==undefined).map(([k,v])=>[k,typeof v==='object'?JSON.stringify(v):String(v)])).toString():'';
-  const r=await fetch(BASE+path+qs,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{}),...(VERSION?{'X-Kairoq-Version':VERSION}:{})},body:body?JSON.stringify(body):undefined});
+  const r=await fetch(BASE+path+qs,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:body?JSON.stringify(body):undefined});
   const data=await r.json().catch(()=>({}));
   if(r.status===401&&token&&!path.startsWith('/auth/')){token=null;currentUser=null;save()}
   if(!r.ok)throw Object.assign(new Error(data.error||('Request failed ('+r.status+')')),{status:r.status});
@@ -454,16 +482,18 @@ export function collection(name){
           es=new EventSource(BASE+'/realtime/'+encodeURIComponent(name)+'?ticket='+encodeURIComponent(ticket));
           for(const type of ['created','updated','deleted'])es.addEventListener(type,e=>{try{callback(JSON.parse(e.data))}catch{}});
           es.onerror=()=>{es.close();es=null;if(!stopped)timer=setTimeout(connect,3000)};
-        }catch(err){if(!stopped&&err.status!==403)timer=setTimeout(connect,5000)}
+        }catch(err){if(!stopped&&!(err.status>=400&&err.status<500&&err.status!==429))timer=setTimeout(connect,5000)}
       };
+      // Reconnect as the new user after sign-in or sign-out.
+      const offAuth=auth.onChange(()=>{if(stopped)return;clearTimeout(timer);if(es){es.close();es=null}connect()});
       connect();
-      return()=>{stopped=true;clearTimeout(timer);if(es)es.close()};
+      return()=>{stopped=true;offAuth();clearTimeout(timer);if(es)es.close()};
     }
   };
 }
 export const storage={
   async upload(file,{name}={}){
-    const r=await fetch(BASE+'/files?name='+encodeURIComponent(name||file.name||'file'),{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream',...(token?{Authorization:'Bearer '+token}:{}),...(VERSION?{'X-Kairoq-Version':VERSION}:{})},body:file});
+    const r=await fetch(BASE+'/files?name='+encodeURIComponent(name||file.name||'file'),{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:file});
     const d=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(d.error||'Upload failed'),{status:r.status});
     return{...d.file,url:new URL(d.file.url,BASE.startsWith('http')?BASE:location.href).toString()};
   },
@@ -485,7 +515,7 @@ export const payments={
 export const functions={
   // Calls functions/<name>.js on the server with a JSON body; returns its JSON (or text) response.
   async invoke(name,body){
-    const r=await fetch(BASE+'/functions/'+encodeURIComponent(name),{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(VERSION?{'X-Kairoq-Version':VERSION}:{})},body:JSON.stringify(body===undefined?{}:body)});
+    const r=await fetch(BASE+'/functions/'+encodeURIComponent(name),{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:JSON.stringify(body===undefined?{}:body)});
     const type=r.headers.get('content-type')||'',data=type.includes('json')?await r.json().catch(()=>null):await r.text();
     if(!r.ok)throw Object.assign(new Error((data&&data.error)||('Function failed ('+r.status+')')),{status:r.status,data});
     return data;

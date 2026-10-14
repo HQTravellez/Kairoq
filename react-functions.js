@@ -43,6 +43,10 @@ function privateAddress(ip){
  const v=ip.toLowerCase();
  if(v==='::'||v==='::1')return true;
  const mapped=/^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);if(mapped)return privateAddress(mapped[1]);
+ // IPv4 embedded in IPv6 in hex form (::ffff:7f00:1, 64:ff9b::7f00:1, ::7f00:1): check the IPv4 part.
+ const hex=/^(?:::ffff:|64:ff9b::|::ffff:0:|::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v);
+ if(hex){const n=(parseInt(hex[1],16)<<16>>>0)+parseInt(hex[2],16);return privateAddress([n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join('.'))}
+ if(/^(::ffff:|64:ff9b:)/.test(v))return true;
  return /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(v);
 }
 // DNS lookup that refuses private addresses at connect time, so rebinding cannot reach internal hosts.
@@ -102,6 +106,8 @@ globalThis.__ctx=user=>({user,fetch:__fetch,log:__log,
  crypto:{hmacSha256Hex:(k,m)=>__sync('hmac',{key:String(k),message:String(m)}),sha256Hex:m=>__sync('sha256',{message:String(m)}),timingSafeEqual:(a,b)=>__sync('tseq',{a:String(a),b:String(b)}),randomId:()=>__sync('random',null)}});
 `;
 // host: {secret(name), db(op,args,user), ai(args,user), email(args,user)}
+// Host helpers only accept strings (the sandbox can call them with anything).
+function str(v){return typeof v==='string'?v.slice(0,5000000):''}
 async function run({source,request,user,host}){
  const {mod,deadline}=await quickjs();
  const runtime=mod.newRuntime();
@@ -119,9 +125,9 @@ async function run({source,request,user,host}){
   email:a=>host.email(a,user)
  };
  const pure={
-  hmac:a=>crypto.createHmac('sha256',a.key).update(a.message).digest('hex'),
-  sha256:a=>crypto.createHash('sha256').update(a.message).digest('hex'),
-  tseq:a=>{const x=Buffer.from(a.a),y=Buffer.from(a.b);return x.length===y.length&&crypto.timingSafeEqual(x,y)},
+  hmac:a=>crypto.createHmac('sha256',str(a.key)).update(str(a.message)).digest('hex'),
+  sha256:a=>crypto.createHash('sha256').update(str(a.message)).digest('hex'),
+  tseq:a=>{const x=Buffer.from(str(a.a)),y=Buffer.from(str(a.b));return x.length===y.length&&crypto.timingSafeEqual(x,y)},
   random:()=>crypto.randomUUID(),
   log:a=>{if(logs.length<50)logs.push(a.args.join(' ').slice(0,1000));return null}
  };
@@ -174,12 +180,13 @@ async function run({source,request,user,host}){
 function respond(res,result,cors){
  const r=result&&typeof result==='object'?result:{json:result};
  const status=Number.isInteger(r.status)&&r.status>=200&&r.status<600?r.status:200;
- const headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...cors};
- if(r.headers&&typeof r.headers==='object')for(const [k,v] of Object.entries(r.headers))if(/^(content-type|cache-control|location)$/i.test(k))headers[k]=String(v).slice(0,500);
+ // Responses never run scripts on Kairoq's origin: every body gets a sandbox CSP.
+ const headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'",...cors};
+ const extra={};
+ if(r.headers&&typeof r.headers==='object')for(const [k,v] of Object.entries(r.headers)){const key=k.toLowerCase();if(key==='content-type')extra['Content-Type']=String(v).slice(0,200);else if(key==='cache-control')headers['Cache-Control']=String(v).slice(0,200);else if(key==='location')headers['Location']=String(v).slice(0,2000)}
  let body='';
  if(r.json!==undefined){headers['Content-Type']='application/json; charset=utf-8';body=JSON.stringify(r.json)}
- else if(r.body!==undefined){body=String(r.body);headers['Content-Type']=headers['Content-Type']||headers['content-type']||'text/plain; charset=utf-8'}
- if(/html/i.test(headers['Content-Type']||headers['content-type']||''))headers['Content-Security-Policy']="sandbox; default-src 'none'";
+ else if(r.body!==undefined){body=String(r.body);headers['Content-Type']=extra['Content-Type']||'text/plain; charset=utf-8'}
  res.writeHead(status,headers);res.end(status===204?undefined:body);
 }
 module.exports={validate,list,run,respond,guardedFetch,privateAddress,functionName};
@@ -230,7 +237,8 @@ function pump(){
   if(!w)return;
   const job=pool.queue.shift();job.id=++pool.seq;
   const limit=timeoutMs();
-  job.timer=setTimeout(()=>{const j=w.job;w.job=null;j&&j.reject(fail(504,'Function timed out after '+Math.round(limit/1000)+' seconds'));w.thread.terminate().catch(()=>{})},limit+1000);
+  // On timeout the worker leaves the pool at once, so no new job is sent to a thread that is still stuck.
+  job.timer=setTimeout(()=>{const j=w.job;w.job=null;const i=pool.workers.indexOf(w);if(i>=0)pool.workers.splice(i,1);j&&j.reject(fail(504,'Function timed out after '+Math.round(limit/1000)+' seconds'));w.thread.terminate().catch(()=>{});pump()},limit+1000);
   w.job=job;w.thread.ref();
   w.thread.postMessage({type:'run',id:job.id,source:job.source,request:job.request,user:job.user,timeoutMs:limit});
  }

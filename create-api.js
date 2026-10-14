@@ -12,7 +12,7 @@ function readJson(req,limit=200000){
 }
 async function readRaw(req,limit=65536){const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>limit)throw Object.assign(Error('Request too large'),{status:413});chunks.push(c)}return Buffer.concat(chunks)}
 function limited(req,bucket,max=20,windowMs=600000){
- if(attempts.size>5000)attempts.clear();
+ if(attempts.size>5000)for(const k of [...attempts.keys()].slice(0,1000))attempts.delete(k);
  const key=bucket+':'+require('./client-ip').clientIp(req),now=Date.now();
  const list=(attempts.get(key)||[]).filter(t=>now-t<windowMs);list.push(now);attempts.set(key,list);
  if(list.length>max)throw Object.assign(Error('Too many attempts. Try again in a few minutes.'),{status:429});
@@ -20,8 +20,24 @@ function limited(req,bucket,max=20,windowMs=600000){
 function origin(req){
  const configured=process.env.KAIROQ_PUBLIC_URL||(process.env.RAILWAY_PUBLIC_DOMAIN?'https://'+process.env.RAILWAY_PUBLIC_DOMAIN:'');
  if(configured)return configured.replace(/\/$/,'');
- return'http://'+String(req.headers.host||'localhost');
+ // Links in emails, OAuth and Stripe must not come from a forged Host header.
+ const host=String(req.headers.host||'localhost');
+ if(!/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host))throw Object.assign(Error('Set KAIROQ_PUBLIC_URL to the public address of this server first.'),{status:409});
+ return'http://'+host;
 }
+// Cookie-authenticated changes must come from the editor itself, not another site.
+function sameOrigin(req){
+ const site=req.headers['sec-fetch-site'];
+ if(site&&site!=='same-origin'&&site!=='none')return false;
+ const o=req.headers.origin;
+ if(o===undefined)return true;
+ let h;try{h=new URL(o).host}catch{return false}
+ const configured=process.env.KAIROQ_PUBLIC_URL||(process.env.RAILWAY_PUBLIC_DOMAIN?'https://'+process.env.RAILWAY_PUBLIC_DOMAIN:'');
+ let pub='';try{pub=configured?new URL(configured).host:''}catch{}
+ return h===String(req.headers.host||'')||h===pub;
+}
+// Invited members must prove they own the email (when email or Google sign-in is set up).
+function verifiedMember(account){return Boolean(account&&(account.email_verified||!(accounts.mailReady()||require('./google-oauth').configured())))}
 
 // Who is calling: a customer account, the Kairoq owner, or nobody.
 function viewer(req,isOwner){
@@ -35,7 +51,7 @@ function requireViewer(req,isOwner){const v=viewer(req,isOwner);if(!v)throw Obje
 const RANK={viewer:1,editor:2,owner:3};
 function roleFor(v,meta){
  if(meta.owner===v.owner)return'owner';
- if(v.kind==='customer'){const m=(meta.members||[]).find(x=>x.email===v.account.email);if(m)return m.role}
+ if(v.kind==='customer'&&verifiedMember(v.account)){const m=(meta.members||[]).find(x=>x.email===v.account.email);if(m)return m.role}
  return null;
 }
 function ownedProject(v,id,need='owner'){
@@ -52,7 +68,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
  'GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor'};
 function listFor(v){
- return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer')return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
+ return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
 }
 function findShare(token){
@@ -74,11 +90,13 @@ function tiers(){
 }
 // Agent tasks take many model calls, so they cost a multiple of the tier's price.
 function agentMultiplier(){const n=intEnv('KAIROQ_AGENT_MULTIPLIER',3);return n>=1?n:3}
+// Every mode checks the tier; Discuss on Pro or Max costs that tier's price.
 function cost({mode,tier,images}){
- if(mode==='discuss')return intEnv('KAIROQ_DISCUSS_CREDITS',1)+(images?intEnv('KAIROQ_IMAGE_CREDITS',1):0);
  const t=tiers().find(x=>x.id===tier);
  if(!t||!t.enabled)throw Object.assign(Error('That model tier is not available'),{status:400});
- return t.credits*(mode==='agent'?agentMultiplier():1)+(images?intEnv('KAIROQ_IMAGE_CREDITS',1):0);
+ const image=images?intEnv('KAIROQ_IMAGE_CREDITS',1):0;
+ if(mode==='discuss')return(tier==='standard'?intEnv('KAIROQ_DISCUSS_CREDITS',1):Math.max(t.credits,intEnv('KAIROQ_DISCUSS_CREDITS',1)))+image;
+ return t.credits*(mode==='agent'?agentMultiplier():1)+image;
 }
 const IMAGE_TYPES={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif'};
 function parseImages(list){
@@ -107,12 +125,15 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
  if(!['build','discuss','agent'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
  const credits=cost({mode,tier,images:images.length>0});
- if(mode!=='discuss'&&images.length&&!referenceOnly){const names=require('./react-assets').save(id,images);images=images.map((img,i)=>({...img,name:names[i]}))}
  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
- const controller=new AbortController();controllers.set(job.id,controller);
  const update=patch=>{Object.assign(job,patch);job.seq++};
- // Customers pay up front; credits are refunded if the job fails.
+ // Customers pay up front, before anything is saved; credits are refunded if the job fails.
  if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,mode==='discuss'?'Discuss message':(mode==='agent'?'Agent task':'Chat edit')+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
+ if(mode!=='discuss'&&images.length&&!referenceOnly){
+  try{const names=require('./react-assets').save(id,images);images=images.map((img,i)=>({...img,name:names[i]}))}
+  catch(e){if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: images not saved','refund:'+job.id)}catch{}throw e}
+ }
+ const controller=new AbortController();controllers.set(job.id,controller);
  jobs.set(job.id,job);
  setImmediate(async()=>{
   const modelTier=images.length&&tier==='standard'?'vision':tier;
@@ -141,6 +162,8 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
  return job;
 }
 const controllers=new Map();
+// The person who started a job, or anyone with at least `need` access to its project.
+function canSeeJob(v,job,need){if(job.owner===v.owner)return true;try{const r=roleFor(v,builder.loadMeta(job.projectId));return Boolean(r)&&RANK[r]>=RANK[need]}catch{return false}}
 function publicJob(job){const {owner,...rest}=job;return rest}
 function streamJob(req,res,job){
  res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no'});
@@ -161,19 +184,20 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
  try{
+  if(!['GET','HEAD','OPTIONS'].includes(method)&&!sameOrigin(req))throw Object.assign(Error('Cross-site request blocked'),{status:403});
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
    return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1)}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
-   const url=require('./google-oauth').startUrl({kind:'kairoq'},origin(req));
-   res.writeHead(302,{Location:url,'Cache-Control':'no-store'});res.end();return true;
+   const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
+   res.writeHead(302,{Location:url,'Set-Cookie':google.stateCookie(url,secure),'Cache-Control':'no-store'});res.end();return true;
   }
   if(route==='/auth/google/callback'&&method==='GET'){
    const google=require('./google-oauth'),q=Object.fromEntries(new URL(req.url,'http://x').searchParams);
    try{
-    const {entry,profile}=await google.finish(q,origin(req));
+    const {entry,profile}=await google.finish(q,origin(req),{browserState:google.readStateCookie(req)});
     if(entry.kind==='app'){
      const session=require('./react-backend').googleAppSignIn(entry.appId,profile);
      const back=new URL(entry.returnUrl);back.hash='kairoq_code='+google.issueAppCode(entry.appId,session);
@@ -269,14 +293,14 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
   if(jm&&method==='GET'){
    const job=jobs.get(jm[1]);
-   if(!job||job.owner!==v.owner)throw Object.assign(Error('Job not found or expired'),{status:404});
+   if(!job||!canSeeJob(v,job,'viewer'))throw Object.assign(Error('Job not found or expired'),{status:404});
    if(jm[2])return streamJob(req,res,job),true;
    return send(res,200,{job:publicJob(job)}),true;
   }
   const cm=/^\/jobs\/([a-f0-9-]{36})\/cancel$/.exec(route);
   if(cm&&method==='POST'){
    const job=jobs.get(cm[1]);
-   if(!job||job.owner!==v.owner)throw Object.assign(Error('Job not found or expired'),{status:404});
+   if(!job||!canSeeJob(v,job,'editor'))throw Object.assign(Error('Job not found or expired'),{status:404});
    controllers.get(job.id)?.abort();
    return send(res,200,{job:publicJob(job)}),true;
   }
@@ -305,9 +329,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    meta.members.push({email,role:r,added_at:new Date().toISOString()});builder.saveMeta(meta);
    return send(res,200,{members:meta.members,project:projectView(id)}),true;
   }
-  if(action==='/members'&&method==='DELETE'){const b=await readJson(req,2000),meta=builder.loadMeta(id);meta.members=(meta.members||[]).filter(m=>m.email!==String(b.email||'').toLowerCase());builder.saveMeta(meta);return send(res,200,{members:meta.members,project:projectView(id)}),true}
+  if(action==='/members'&&method==='DELETE'){const b=await readJson(req,2000),meta=builder.loadMeta(id);meta.members=(meta.members||[]).filter(m=>m.email!==String(b.email||'').toLowerCase());meta.preview_key=crypto.randomBytes(12).toString('hex');builder.saveMeta(meta);return send(res,200,{members:meta.members,project:projectView(id)}),true}
   if(action==='/share'&&method==='POST'){
    const b=await readJson(req,2000),meta=builder.loadMeta(id);
+   if(!b.enabled&&meta.share)meta.preview_key=crypto.randomBytes(12).toString('hex');
    meta.share=b.enabled?{token:meta.share?.token||crypto.randomBytes(12).toString('hex'),remix:!!b.remix,at:new Date().toISOString()}:null;
    builder.saveMeta(meta);return send(res,200,{project:projectView(id)}),true;
   }
@@ -333,8 +358,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const b=await readJson(req,20000),secrets=require('./project-secrets'),figma=require('./react-figma');
    let token=String(b.token||'').trim();
    if(token&&b.save_token){if(role!=='owner')throw Object.assign(Error('Only the project owner can save the Figma token'),{status:403});secrets.set(id,'figma_token',token)}
-   if(!token){try{token=secrets.get(id,'figma_token')||''}catch{}}
+   if(!token&&role==='owner'){try{token=secrets.get(id,'figma_token')||''}catch{}}
    for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+   const price=cost({mode:b.mode==='agent'?'agent':'build',tier:b.tier||'standard',images:process.env.KAIROQ_BUILDER_PAID_APPROVED==='true'});
+   if(v.kind==='customer'&&v.account.credits<price)throw Object.assign(Error('You need '+price+' credits for this import.'),{status:402});
    const frame=await figma.importFrame({url:b.url,token},{fetchImpl:figmaFetch||fetch});
    const saved=frame.images.length?require('./react-assets').save(id,frame.images.map(({name,mime,data})=>({name,mime,data}))):[];
    const names=new Map(frame.images.map((img,i)=>[img.ref,saved[i]]));

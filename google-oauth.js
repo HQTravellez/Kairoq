@@ -19,9 +19,15 @@ function startUrl({kind,appId,returnUrl},fallbackOrigin){
  const q=new URLSearchParams({client_id:clientId(),redirect_uri:redirectUri(fallbackOrigin),response_type:'code',scope:'openid email profile',state,prompt:'select_account'});
  return'https://accounts.google.com/o/oauth2/v2/auth?'+q;
 }
-async function finish(query,fallbackOrigin,{fetchImpl=fetch}={}){
+// The state is also kept in a short-lived cookie, so a callback only completes in the
+// browser that started it (no login CSRF with someone else's code).
+const STATE_COOKIE='kq_oauth';
+function stateCookie(url,secure){const s=new URL(url).searchParams.get('state');return STATE_COOKIE+'='+s+'; Path=/api/create/auth/google; HttpOnly; SameSite=Lax; Max-Age=600'+(secure?'; Secure':'')}
+function readStateCookie(req){const m=new RegExp('(?:^|;\\s*)'+STATE_COOKIE+'=([A-Za-z0-9_-]+)').exec(String(req.headers.cookie||''));return m?m[1]:null}
+async function finish(query,fallbackOrigin,{fetchImpl=fetch,browserState}={}){
  const entry=states.get(String(query.state||''));
  if(!entry||entry.expires<Date.now())throw Object.assign(Error('Sign-in expired. Please try again.'),{status:400});
+ if(entry.kind==='kairoq'&&browserState!==String(query.state)){states.delete(String(query.state));throw Object.assign(Error('Sign-in must finish in the browser that started it. Please try again.'),{status:400})}
  states.delete(String(query.state));
  if(query.error)throw Object.assign(Error('Google sign-in was cancelled'),{status:400});
  const tokenRes=await fetchImpl('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code:String(query.code||''),client_id:clientId(),client_secret:clientSecret(),redirect_uri:redirectUri(fallbackOrigin),grant_type:'authorization_code'}).toString(),signal:AbortSignal.timeout(15000)});
@@ -39,4 +45,4 @@ function redeemAppCode(appId,code){
  if(!entry||entry.expires<Date.now()||entry.appId!==appId)throw Object.assign(Error('Sign-in expired. Please try again.'),{status:400});
  return entry.session;
 }
-module.exports={configured,startUrl,finish,issueAppCode,redeemAppCode,redirectUri,_states:states};
+module.exports={configured,startUrl,finish,stateCookie,readStateCookie,issueAppCode,redeemAppCode,redirectUri,_states:states};

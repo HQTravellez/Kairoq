@@ -240,7 +240,12 @@ function googleLogin({sub,email,email_verified}){
  if(!sub||!email||email_verified===false)throw Object.assign(Error('Google did not confirm this email address'),{status:400});
  const d=database(),e=normalizeEmail(email);
  let a=d.prepare('SELECT * FROM accounts WHERE google_sub=?').get(String(sub))||d.prepare('SELECT * FROM accounts WHERE email=?').get(e);
- if(a){d.prepare('UPDATE accounts SET google_sub=?,email_verified=1 WHERE id=?').run(String(sub),a.id);return startSession(a.id)}
+ if(a){
+  // An unverified password account with this email may have been created by someone else:
+  // Google proves the email, so drop that password and its sessions before linking.
+  if(!a.google_sub&&!a.email_verified){d.prepare('UPDATE accounts SET password=? WHERE id=?').run('google$'+crypto.randomBytes(16).toString('hex'),a.id);d.prepare('DELETE FROM sessions WHERE account_id=?').run(a.id)}
+  d.prepare('UPDATE accounts SET google_sub=?,email_verified=1 WHERE id=?').run(String(sub),a.id);return startSession(a.id);
+ }
  if(process.env.KAIROQ_BUILDER_SIGNUPS==='closed')throw Object.assign(Error('Sign-ups are closed'),{status:403});
  const id=crypto.randomUUID(),at=new Date().toISOString(),credits=freeCredits();
  d.prepare('INSERT INTO accounts(id,email,password,credits,created_at,email_verified,google_sub) VALUES(?,?,?,?,?,1,?)').run(id,e,'google$'+crypto.randomBytes(16).toString('hex'),credits,at,String(sub));

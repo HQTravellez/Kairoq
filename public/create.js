@@ -227,7 +227,7 @@ $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
 function costHint(){
  if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');return}
  const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
- const n=(state.mode==='discuss'?state.me.discuss_credits:(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.length?state.me.image_credits:0);
+ const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.length?state.me.image_credits:0);
  text($('cost-hint'),n+' credit'+(n===1?'':'s'));
 }
 // Attachments: button, paste or drop.

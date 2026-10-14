@@ -112,7 +112,7 @@ test('payments use the owner Stripe key, check the return URL and record verifie
   const host='127.0.0.1:'+server.address().port;
   assert.equal((await request(server,'POST',base+'/payments/checkout',{body:{product:'pro',return_url:'http://'+host+'/sites/x/'}})).status,401);
   assert.equal((await request(server,'POST',base+'/payments/checkout',{body:{product:'pro',return_url:'https://evil.example/'},headers:{authorization:'Bearer '+user.token}})).status,400);
-  const co=await request(server,'POST',base+'/payments/checkout',{body:{product:'pro',return_url:'http://'+host+'/sites/x/#/pricing'},headers:{authorization:'Bearer '+user.token}});
+  const co=await request(server,'POST',base+'/payments/checkout',{body:{product:'pro',return_url:'http://'+host+'/builder/p/'+id+'-'+require('../react-builder').loadMeta(id).preview_key+'/v/2/#/pricing'},headers:{authorization:'Bearer '+user.token}});
   assert.equal(co.status,200,co.text);assert.equal(co.json.url,'https://checkout.stripe.com/c/cs_test_9');
   assert.equal(calls[0].auth,'Bearer sk_test_abcdefghijkl123');assert.match(calls[0].body,/price_123/);assert.match(decodeURIComponent(calls[0].body),/kairoq_payment=success/);
   const raw=JSON.stringify({type:'checkout.session.completed',data:{object:{id:'cs_test_9'}}}),stamp=Math.floor(Date.now()/1000);
