@@ -200,6 +200,48 @@ Generated apps can import: react, react-dom, react-router-dom, lucide-react, rec
 - **Store releases** need the owner's own Google Play and Apple Developer accounts. iOS builds need a Mac with Xcode.
 - **Native sign-in.** The native app talks to the Kairoq backend over HTTPS. Google sign-in and password-reset links open the published web app, so the native app uses email sign-in.
 
+## Design
+
+New apps get a designed look by default. Kairoq uses four layers:
+
+1. **Starter kit.** Every new project starts with a UI kit and a design system:
+   - 19 polished components in `src/components/ui/`: Button (including a `hero` variant), Card, Input, Textarea, Label, Badge, Dialog, Sheet, Tabs, Select, Accordion, Switch, DropdownMenu, Tooltip, Avatar, Skeleton, Separator, Toaster, and Container/Section/Eyebrow.
+   - Design tokens: CSS variables in `src/index.css`, between `kairoq:tokens` markers. They set colours, radius, fonts, gradients and shadows, and the Tailwind theme reads them (`bg-primary`, `text-muted-foreground`, `font-display`, `shadow-glow`, `bg-gradient-hero` and so on).
+   - Unchanged kit files are sent to the model as a one-line API list instead of their code.
+   - Projects without tokens look the same as before, because every theme value falls back to Tailwind's default.
+   - Older projects get the kit and tokens from **Design → Add design system**.
+2. **Design brief.** Before the first build of a new app, the AI acts as art director:
+   - It picks a style name, palette, fonts (from about 30 Google Fonts), radius, layout, imagery and design rules, plus the best matching design skill.
+   - Kairoq writes the brief into the tokens. Every later build, Discuss and Agent message follows it.
+   - The brief is skipped for templates and when images are attached. To turn it off, set `KAIROQ_DESIGN_BRIEF=off`.
+   - The coding prompt also carries general design rules: hierarchy, spacing, imagery, states, responsiveness and "avoid the generic AI look".
+3. **Design skills.** A skill is a `SKILL.md` (front matter with `name` and `description`, then the rules) that the AI follows.
+   - Built-in skills (in `design-skills/`): Luxury hospitality, Modern SaaS, Mobile app, Dashboard and admin, and Editorial and content.
+   - Owners can add their own: paste the text, or import from a public GitHub link (a folder with a `SKILL.md`, a Markdown file, or a whole repository, in which case Kairoq lists the skills it finds).
+   - A skill can be on for one project or for all the owner's projects. Skills share a 16,000-character prompt budget.
+4. **Design review (✨ Polish).**
+   - Kairoq screenshots the app on desktop (1280 px) and phone (390 px). The model gets both screenshots and fixes what looks off without changing behaviour, and the result is saved as a new version.
+   - Standard uses the vision model; Pro and Max use their own models. The review costs one message on the chosen tier.
+   - On Pro and Max, the first build of a new app gets one review for free. To turn this off, set `KAIROQ_AUTO_POLISH=off`.
+   - The review needs Chromium on the server.
+
+The **Design** button in the editor shows:
+- the brief, with editable colours, fonts, corners and notes (saving restyles the app as a new version)
+- **New direction**: the AI writes a new brief, priced like a Discuss message
+- the skills
+- the image generator
+
+### Generated images
+
+When `OPENROUTER_API_KEY` and `KAIROQ_BUILDER_PAID_APPROVED=true` are set, the AI can generate images:
+- **How the AI asks.** In Build mode it adds `"images":[{name,prompt,aspect}]` to its reply (up to 4 per message). In Agent mode it uses the `generate_images` tool.
+- **Where they go.** Images are saved to the project uploads (up to 6 MB each), and the code is pointed at the saved file names.
+- **Model.** `KAIROQ_IMAGE_MODEL` (default `google/gemini-2.5-flash-image`). The brief's imagery style is added to every prompt.
+- **Cost.** Each image costs `KAIROQ_GENERATED_IMAGE_CREDITS` (default 2). A failed image is refunded and replaced by a plain placeholder in the brand colour.
+- **Budget.** Spending counts against the builder budget. `KAIROQ_IMAGE_COST_USD` (default 0.05) is reserved for each image.
+- **Turning it off.** Set `KAIROQ_IMAGE_GENERATION=off`.
+- **Manual images.** Owners can also generate an image from the Design dialog.
+
 ## Growth features
 
 - **Landing page and pricing.**

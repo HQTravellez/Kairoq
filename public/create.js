@@ -111,6 +111,8 @@ function messageItem(m,last){
  const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
  const body=document.createElement('div');body.textContent=m.text;li.append(body);
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
+ if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
+ if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
  if(m.changed&&m.changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+m.changed.join(', ');li.append(s)}
  if(m.steps&&m.steps.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}
@@ -266,7 +268,7 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
+const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
 function streamItem(){
  let li=$('stream');
  if(!li){li=document.createElement('li');li.id='stream';li.className='assistant streaming';li.innerHTML='<div class="stream-msg"></div><div class="stream-files changed"></div><pre class="stream-code hidden"></pre>';$('messages').append(li)}
@@ -323,6 +325,7 @@ async function watch(job){
   renderMessages();renderVersions();
   if(done.mode!=='discuss')setPreview(project.preview_url);
   if(done.refunded)$('messages').append(messageItem({role:'assistant',text:'Nothing changed, so this agent task was free.'}));
+  if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
   if(state.code)renderFiles();
   if(state.data)renderData();
@@ -754,4 +757,70 @@ async function start(){
  await loadHome();
 }
 start().catch(err=>{document.body.append(Object.assign(document.createElement('p'),{className:'error',textContent:err.message}))});
+// ---------- design ----------
+const PALETTE_KEYS=['background','foreground','primary','secondary','accent','muted'];
+state.designData=null;
+async function renderDesign(){
+ const id=state.project.id,d=await api('/projects/'+id+'/design');state.designData=d;
+ const ds=d.design||{},editor=state.project.role!=='viewer';
+ text($('design-intro'),d.design?'The AI follows this design in every change. Colours and fonts live in src/index.css, so saving here restyles the whole app at once.':'No design brief yet. One is created automatically with the first build of a new app, or describe a direction below.');
+ $('design-missing').classList.toggle('hidden',d.has_tokens);
+ $('design-name').value=ds.name||'';$('design-summary').value=ds.summary||'';$('design-notes').value=ds.notes||'';
+ const pal=$('design-palette');pal.replaceChildren();
+ for(const k of PALETTE_KEYS){const l=document.createElement('label'),inp=document.createElement('input');inp.type='color';inp.dataset.key=k;inp.value=(ds.palette&&ds.palette[k])||({background:'#ffffff',foreground:'#0f172a',primary:'#4f46e5',secondary:'#f1f5f9',accent:'#ec4899',muted:'#f4f4f5'})[k];inp.disabled=!editor;l.append(inp,document.createTextNode(k));pal.append(l)}
+ for(const [sel,val] of [['design-display',ds.fonts?.display||'Inter'],['design-body',ds.fonts?.body||'Inter']]){const el=$(sel);el.replaceChildren();for(const f of d.fonts)el.append(new Option(f,f));el.value=val}
+ $('design-radius').value=['0rem','0.375rem','0.75rem','1.25rem'].includes(ds.radius)?ds.radius:'0.75rem';
+ renderSkills();
+ $('genimage-section').classList.toggle('hidden',!state.me.image_generation?.enabled);
+ const c=state.me.image_generation?.credits;text($('genimage-status'),state.me.viewer?.kind==='customer'&&c?c+' credits per image. Saved to the project images; then ask the chat to use it.':'Saved to the project images; then ask the chat to use it.');
+ for(const el of ['design-name','design-summary','design-notes','design-display','design-body','design-radius','design-save','design-direction','design-regenerate','design-add-system','genimage-go'])$(el).disabled=!editor;
+ const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
+ text($('design-regenerate-note'),'Picks new colours and fonts with the '+(t?t.label:'chosen')+' model'+(state.me.viewer?.kind==='customer'?' ('+(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits))+' credits)':'')+'. Ask the chat afterwards to restyle pages that need more than new colours.');
+}
+function renderSkills(){
+ const d=state.designData,list=$('skills-list');list.replaceChildren();
+ const on=new Set(d.skills),editor=state.project.role!=='viewer',owner=state.project.role==='owner';
+ for(const sk of d.library){
+  const li=document.createElement('li'),cb=document.createElement('input');cb.type='checkbox';cb.checked=on.has(sk.id)||sk.always;cb.disabled=!editor||sk.always;cb.title=sk.always?'On for all your projects':'Use in this project';
+  cb.onchange=()=>saveDesign({skills:[...d.library.filter(x=>x.id===sk.id?cb.checked:on.has(x.id)).map(x=>x.id)]});
+  const t=document.createElement('div');t.className='skill-text';const b=document.createElement('b');b.textContent=sk.name+(sk.source==='builtin'?'':sk.source==='github'?' · GitHub':' · yours');const sp=document.createElement('span');sp.textContent=sk.description;t.append(b,sp);
+  const act=document.createElement('div');act.className='skill-actions';
+  if(owner){const all=document.createElement('label');const ab=document.createElement('input');ab.type='checkbox';ab.checked=sk.always;ab.onchange=async()=>{try{await api('/skills/default',{method:'POST',body:{id:sk.id,on:ab.checked}});await renderDesign()}catch(err){text($('design-error'),err.message)}};all.append(ab,document.createTextNode(' all projects'));act.append(all)}
+  if(owner&&sk.source!=='builtin'){const del=document.createElement('button');del.type='button';del.className='ghost link-btn';del.textContent='Remove';del.onclick=async()=>{if(!confirm('Remove the skill "'+sk.name+'"?'))return;try{await api('/skills',{method:'DELETE',body:{id:sk.id}});await renderDesign()}catch(err){text($('design-error'),err.message)}};act.append(del)}
+  if(sk.url){const a=document.createElement('a');a.href=sk.url;a.target='_blank';a.rel='noopener';a.className='muted';a.textContent='source';act.append(a)}
+  li.append(cb,t,act);list.append(li);
+ }
+ $('skill-add').classList.toggle('hidden',!owner);
+}
+async function saveDesign(body,status='Saved.'){
+ text($('design-error'),'');text($('design-status'),'Saving…');
+ try{
+  const r=await api('/projects/'+state.project.id+'/design',{method:'POST',body});
+  state.project=r.project;renderVersions();renderMessages();
+  if(r.version)setPreview(r.project.preview_url);
+  await renderDesign();text($('design-status'),r.version?status+' The preview now uses it (version '+r.version+').':status);
+ }catch(err){text($('design-status'),'');text($('design-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+}
+$('design-open').onclick=async()=>{text($('design-error'),'');text($('design-status'),'');text($('skill-status'),'');$('skill-choices').replaceChildren();try{await renderDesign();$('design-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
+$('design-save').onclick=()=>{const palette={};for(const inp of $('design-palette').querySelectorAll('input'))palette[inp.dataset.key]=inp.value;saveDesign({design:{name:$('design-name').value,summary:$('design-summary').value,notes:$('design-notes').value,palette,fonts:{display:$('design-display').value,body:$('design-body').value},radius:$('design-radius').value}})};
+$('design-regenerate').onclick=async()=>{$('design-regenerate').disabled=true;text($('design-status'),'Creating a new direction…');try{await saveDesign({regenerate:$('design-direction').value,tier:state.tier},'New direction saved.');refreshCredits()}finally{$('design-regenerate').disabled=false}};
+$('design-add-system').onclick=()=>saveDesign({add_system:true},'Design system added.');
+async function importSkill(path){
+ text($('skill-status'),'Importing…');text($('design-error'),'');$('skill-choices').replaceChildren();
+ try{
+  const r=await api('/skills',{method:'POST',body:{url:$('skill-url').value,path}});
+  if(r.choices){text($('skill-status'),'This repository has '+r.choices.length+' skills. Pick one:');for(const c of r.choices){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.className='ghost';b.textContent=c.name;b.title=c.path;b.onclick=()=>importSkill(c.path);li.append(b);$('skill-choices').append(li)};return}
+  text($('skill-status'),'Added "'+r.skill.name+'". Tick it to use it in this project.');$('skill-url').value='';await renderDesign();
+ }catch(err){text($('skill-status'),'');text($('design-error'),err.message)}
+}
+$('skill-import').onclick=()=>importSkill();
+$('skill-save').onclick=async()=>{text($('design-error'),'');try{const r=await api('/skills',{method:'POST',body:{text:$('skill-text').value}});$('skill-text').value='';text($('skill-status'),'Added "'+r.skill.name+'".');await renderDesign()}catch(err){text($('design-error'),err.message)}};
+$('genimage-go').onclick=async()=>{
+ const btn=$('genimage-go');btn.disabled=true;text($('genimage-status'),'Generating… (up to a minute)');text($('design-error'),'');
+ try{const r=await api('/projects/'+state.project.id+'/images',{method:'POST',body:{prompt:$('genimage-prompt').value,aspect:$('genimage-aspect').value}});text($('genimage-status'),'Saved ./uploads/'+r.saved[0]+'. Ask the chat to use it, for example "use ./uploads/'+r.saved[0]+' as the hero image".');$('genimage-prompt').value='';refreshCredits()}
+ catch(err){text($('genimage-status'),'');text($('design-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{btn.disabled=false}
+};
+$('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The design review needs a browser on the server (Chromium), which is not available here.');return}const note=$('chat-input').value.trim();send(note?'Polish the design: '+note:'Polish the design','polish',undefined,{message:note})};
+
 })();

@@ -172,8 +172,10 @@ test('GitHub push writes a commit that keeps unrelated files, and pull brings sr
   if(p==='/repos/ana/shop/git/trees'&&m==='POST')return ok({sha:'t2'});
   if(p==='/repos/ana/shop/git/commits'&&m==='POST')return ok({sha:'c2'});
   if(p==='/repos/ana/shop/git/refs/heads/main'&&m==='PATCH'){headSha=body.sha;return ok({})}
-  if(p==='/repos/ana/shop/git/trees/t2?recursive=1')return ok({tree:[{path:'src/App.jsx',type:'blob',sha:'s1',size:400},{path:'src/main.jsx',type:'blob',sha:'s2',size:200},{path:'src/index.css',type:'blob',sha:'s3',size:60},{path:'src/kairoq.js',type:'blob',sha:'ignored',size:10}]});
-  if(p.startsWith('/repos/ana/shop/git/blobs/s')){const files=builder.loadFiles(id,builder.loadMeta(id).current_version);const content={s1:remoteApp,s2:files['src/main.jsx'],s3:files['src/index.css']}[p.split('/').pop()];return ok({content:Buffer.from(content).toString('base64')})}
+  // The pushed tree: every project source file (App.jsx edited on GitHub) plus the generated client.
+  const current=()=>builder.loadFiles(id,builder.loadMeta(id).current_version);
+  if(p==='/repos/ana/shop/git/trees/t2?recursive=1')return ok({tree:[...Object.keys(current()).map((f,i)=>({path:f,type:'blob',sha:'s'+i,size:400})),{path:'src/kairoq.js',type:'blob',sha:'ignored',size:10}]});
+  if(p.startsWith('/repos/ana/shop/git/blobs/s')){const files=current(),name=Object.keys(files)[Number(p.split('/').pop().slice(1))];return ok({content:Buffer.from(name==='src/App.jsx'?remoteApp:files[name]).toString('base64')})}
   return new Response(JSON.stringify({message:'Not Found'}),{status:404});
  };
  try{

@@ -6598,6 +6598,27 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   }
   throw Error("No coding model returned usable project files. "+errors.join(" | "));
 }
+// Generates one image for a Create project (hero photos, illustrations) with an OpenRouter
+// image model. Returns {mime, data(base64)}. Counts against the builder budget.
+function builderImagesEnabled(){return Boolean(process.env.OPENROUTER_API_KEY)&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&process.env.KAIROQ_IMAGE_GENERATION!=="off"}
+async function generateBuilderImage({prompt,aspect="16:9",signal}={}){
+  if(!builderImagesEnabled())throw Error("Image generation needs OPENROUTER_API_KEY and KAIROQ_BUILDER_PAID_APPROVED=true");
+  const model=String(process.env.KAIROQ_IMAGE_MODEL||"google/gemini-2.5-flash-image");
+  const reserve=Number(process.env.KAIROQ_IMAGE_COST_USD||0.05);
+  const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
+  const totals=await enforceBudget();
+  if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
+  if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
+  const timeout=AbortSignal.timeout(120000);
+  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:signal?AbortSignal.any([signal,timeout]):timeout,body:JSON.stringify({model,modalities:["image","text"],image_config:{aspect_ratio:aspect},messages:[{role:"user",content:"Create one high-quality image for a website or app. "+String(prompt).slice(0,2000)+"\nPhotographic and natural unless an illustration is asked for. No text, captions, watermarks or logos in the image."}]})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.error?.message||"Image provider HTTP "+response.status);
+  const url=data.choices?.[0]?.message?.images?.[0]?.image_url?.url||"";
+  const m=/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(url);
+  await recordUsage({...data.usage,cost:Number(data.usage?.cost)||reserve},{purpose:"developer-build",model});
+  if(!m)throw Error("The image model returned no image");
+  return{mime:m[1],data:m[2]};
+}
 // Reads an OpenAI-compatible SSE stream into the same shape as a non-streamed response.
 async function readChatStream(body,onToken){
   const reader=body.getReader(),decoder=new TextDecoder();
@@ -6658,7 +6679,7 @@ const server = http.createServer(async (req, res) => {
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null,secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;

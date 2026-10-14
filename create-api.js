@@ -66,7 +66,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -76,7 +76,7 @@ function findShare(token){
  for(const p of builder.list()){const meta=builder.loadMeta(p.id);if(meta.share&&meta.share.token===token)return meta}
  return null;
 }
-function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
+function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working']);
 function intEnv(name,fallback){const n=Number(process.env[name]);return Number.isInteger(n)&&n>=0?n:fallback}
@@ -88,6 +88,7 @@ function tiers(){
   {id:'max',label:'Max',credits:intEnv('KAIROQ_MAX_CREDITS',15),enabled:paid}
  ].filter(t=>t.id!=='max'||max);
 }
+function generatedImageCredits(){return intEnv('KAIROQ_GENERATED_IMAGE_CREDITS',2)}
 // Agent tasks take many model calls, so they cost a multiple of the tier's price.
 function agentMultiplier(){const n=intEnv('KAIROQ_AGENT_MULTIPLIER',3);return n>=1?n:3}
 // Every mode checks the tier; Discuss on Pro or Max costs that tier's price.
@@ -121,34 +122,52 @@ function streamSnapshot(text,mode){
  const code=last?text.slice(last.index+last[0].length).split(/(?<!\\)",\s*"(?:src\/|delete)/)[0].replace(/"\s*}\s*}?\s*$/,''):'';
  return{chars:text.length,files,current:last?last[1]:null,message:msg?msg[1].replace(/\\n/g,'\n').replace(/\\"/g,'"'):'',tail:code.slice(-1600)};
 }
-function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false},{callModel,checkRuntime,inspect,webSearch}){
+function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
- if(!['build','discuss','agent'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ if(mode==='polish'&&!designShots)throw Object.assign(Error('The design review needs screenshots, which are not available on this server.'),{status:503});
  const credits=cost({mode,tier,images:images.length>0});
  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
  const update=patch=>{Object.assign(job,patch);job.seq++};
  // Customers pay up front, before anything is saved; credits are refunded if the job fails.
- if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,mode==='discuss'?'Discuss message':(mode==='agent'?'Agent task':'Chat edit')+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
- if(mode!=='discuss'&&images.length&&!referenceOnly){
+ if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,mode==='discuss'?'Discuss message':(mode==='agent'?'Agent task':mode==='polish'?'Design review':'Chat edit')+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
+ if(mode!=='discuss'&&mode!=='polish'&&images.length&&!referenceOnly){
   try{const names=require('./react-assets').save(id,images);images=images.map((img,i)=>({...img,name:names[i]}))}
   catch(e){if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: images not saved','refund:'+job.id)}catch{}throw e}
  }
  const controller=new AbortController();controllers.set(job.id,controller);
  jobs.set(job.id,job);
+ // Generated images cost credits each; a failed generation is refunded.
+ const imgCredits=generatedImageCredits();
+ const imageGen=generateImage&&mode!=='discuss'?async img=>{
+  const meta=builder.loadMeta(id),style=meta.design&&meta.design.imagery?'\nVisual style of the app: '+meta.design.imagery:'';
+  const ref='img:'+job.id+':'+img.name;
+  if(v.kind==='customer'&&imgCredits>0)accounts.charge(v.account.id,imgCredits,'Generated image','charge-'+ref);
+  try{const picture=await generateImage({prompt:img.prompt+style,aspect:img.aspect,signal:controller.signal});job.images_generated=(job.images_generated||0)+1;return picture}
+  catch(e){if(v.kind==='customer'&&imgCredits>0)try{accounts.grant(v.account.id,imgCredits,'Refund: image not generated','refund-'+ref)}catch{}throw e}
+ }:null;
+ const imageNote=imageGen?'Image generation is available for this message: add "images" to your reply for the few key visuals the app needs (hero, main photos; at most 4'+(v.kind==='customer'&&imgCredits?', '+imgCredits+' credits each':'')+'). Do not generate images that already exist in the uploads.':'';
  setImmediate(async()=>{
-  const modelTier=images.length&&tier==='standard'?'vision':tier;
+  const modelTier=(images.length||mode==='polish')&&tier==='standard'?'vision':tier;
   const onStream=text=>update({stream:streamSnapshot(text,mode)});
   try{
    const signal=controller.signal;
    if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,tier:modelTier,images,signal})}
+   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,tier:modelTier,checkRuntime,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
-    job.result=await require('./react-agent').run(id,message,{callModel,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,
+    job.result=await require('./react-agent').run(id,message,{callModel,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
      onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
    }
    else{
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
-    job.result=await builder.edit(id,message,{callModel,onStream,tier:modelTier,images,checkRuntime,assetNote,signal,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{callModel,onStream,tier:modelTier,images,checkRuntime,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    // The first build of a new project on Pro or Max gets a free design review.
+    if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
+     const first=job.result;
+     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,tier,checkRuntime,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
+     catch(e){job.result={...first,polish_error:signal.aborted?'Stopped before the design review.':'The design review did not finish: '+String(e.message||e).slice(0,300)}}
+    }
    }
    // An agent task that changed nothing is not charged.
    if(mode==='agent'&&job.result&&job.result.unchanged&&v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: agent made no changes','refund:'+job.id)}catch{}job.refunded=true}
@@ -181,7 +200,8 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,webSearch,figmaFetch}){
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,webSearch,figmaFetch,designShots,generateImage}){
+ const deps={callModel,checkRuntime,inspect,webSearch,designShots,generateImage};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
@@ -190,7 +210,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1)}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots)}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -260,6 +280,17 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(v.kind!=='customer')throw Object.assign(Error('Owner accounts do not need verification'),{status:400});
    limited(req,'verify',5);return send(res,200,await accounts.sendVerification(v.account.id,origin(req))),true;
   }
+  // ----- design skills (per account) -----
+  if(route==='/skills'&&method==='GET'){const skills=require('./react-skills');return send(res,200,{skills:skills.library(v.owner).map(({body,...x})=>({...x,chars:body.length}))}),true}
+  if(route==='/skills'&&method==='POST'){
+   const b=await readJson(req,60000),skills=require('./react-skills');
+   if(b.url){limited(req,'skills-import',20);const r=await skills.importFromGithub(v.owner,String(b.url),{choose:b.path?String(b.path):undefined});return send(res,r.skill?201:200,r.skill?{skill:{...r.skill,body:undefined}}:{choices:r.choices}),true}
+   return send(res,201,{skill:{...skills.add(v.owner,{name:b.name,description:b.description,body:String(b.text||'')}),body:undefined}}),true;
+  }
+  if(route==='/skills/default'&&method==='POST'){const b=await readJson(req,2000),skills=require('./react-skills');skills.setDefault(v.owner,String(b.id||''),Boolean(b.on));return send(res,200,{skills:skills.library(v.owner).map(({body,...x})=>x)}),true}
+  if(route==='/skills'&&method==='DELETE'){const b=await readJson(req,2000),skills=require('./react-skills');skills.remove(v.owner,String(b.id||''));return send(res,200,{skills:skills.library(v.owner).map(({body,...x})=>x)}),true}
+  const sv=/^\/skills\/(u-[a-f0-9]{10}|[a-z0-9-]{1,60})$/.exec(route);
+  if(sv&&method==='GET'){const skill=require('./react-skills').find(v.owner,sv[1]);if(!skill)throw Object.assign(Error('Unknown skill'),{status:404});return send(res,200,{skill}),true}
   if(route==='/credits'&&method==='GET'){
    if(v.kind!=='customer')return send(res,200,{unlimited:true,history:[]}),true;
    return send(res,200,{account:accounts.fromRequest(req),history:accounts.history(v.account.id)}),true;
@@ -291,7 +322,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    else await builder.initialize(meta);
    // Mobile templates start with the mobile app setting on (phone preview, installable app).
    if(tpl&&tpl.mobile)require('./react-mobile').update(meta.id,{enabled:true,...tpl.mobile});
-   const job=prompt?startJob(v,meta.id,{message:prompt,tier:b.tier||'standard',images:parseImages(b.images)},{callModel,checkRuntime,inspect,webSearch}):null;
+   const job=prompt?startJob(v,meta.id,{message:prompt,tier:b.tier||'standard',images:parseImages(b.images)},deps):null;
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
@@ -345,7 +376,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
-  if(action==='/chat'&&method==='POST'){const b=await readJson(req,16000000);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',images:parseImages(b.images)},{callModel,checkRuntime,inspect,webSearch}))}),true}
+  if(action==='/chat'&&method==='POST'){const b=await readJson(req,16000000);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',images:parseImages(b.images)},deps))}),true}
   if(action==='/assets'&&method==='GET')return send(res,200,{assets:require('./react-assets').list(id)}),true;
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}
@@ -384,7 +415,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true';
    const message=String(b.message||'').trim().slice(0,4000)||'Build the Figma design "'+frame.name+'" as a responsive page. Match its layout, spacing, colours, fonts and text closely and use the images from the design.';
    const context='Figma design spec for the frame "'+frame.name+'". Sizes are px at the design width; turn them into a responsive Tailwind layout (mobile first). Load Google Fonts with an https @import at the top of src/index.css when the design uses them.'+(paid&&frame.screenshot?' The attached image is the rendered frame.':'')+'\n'+figma.spec(frame.root,names).slice(0,40000)+(saved.length?'\nImages from the design (saved as uploads): '+saved.map(n=>'./uploads/'+n).join(', '):'');
-   const job=startJob(v,id,{message,mode:b.mode==='agent'?'agent':'build',tier:b.tier||'standard',images:paid&&frame.screenshot?[frame.screenshot]:[],context,referenceOnly:true},{callModel,checkRuntime,inspect,webSearch});
+   const job=startJob(v,id,{message,mode:b.mode==='agent'?'agent':'build',tier:b.tier||'standard',images:paid&&frame.screenshot?[frame.screenshot]:[],context,referenceOnly:true},deps);
    return send(res,202,{job:publicJob(job),frame:{name:frame.name,images:saved,rendered:Boolean(frame.screenshot)}}),true;
   }
   if(action==='/logs'&&method==='GET')return send(res,200,{logs:require('./react-logs').list(id)}),true;
@@ -392,6 +423,58 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const meta=builder.loadMeta(id),files=builder.loadFiles(id,meta.current_version);
    let cfg={collections:{}};try{cfg=backend.parseConfig(files)}catch{}
    return send(res,200,{version:meta.current_version,findings:require('./react-security').scan(files,cfg)}),true;
+  }
+  // Design brief, design skills and the "add design system" action for older projects.
+  if(action==='/design'&&method==='GET'){
+   const design=require('./react-design'),meta=builder.loadMeta(id),files=meta.current_version?builder.loadFiles(id,meta.current_version):{};
+   return send(res,200,{design:meta.design||null,skills:meta.skills||[],library:require('./react-skills').library(meta.owner||v.owner).map(({body,...x})=>x),has_tokens:design.hasTokens(files),fonts:Object.keys(design.FONTS).filter(n=>design.FONTS[n][0]!=='mono')}),true;
+  }
+  if(action==='/design'&&method==='POST'){
+   const b=await readJson(req,20000),design=require('./react-design');
+   let meta=builder.loadMeta(id);
+   if(Array.isArray(b.skills)){meta.skills=require('./react-skills').setProject(meta,b.skills);builder.saveMeta(meta)}
+   let next=null,summary='';
+   if(typeof b.regenerate==='string'){
+    // A new visual direction from the AI, priced like a Discuss message on the chosen tier.
+    for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+    const tier=b.tier||'standard',price=cost({mode:'discuss',tier});
+    const ref='design:'+crypto.randomUUID();
+    if(v.kind==='customer'&&price>0)accounts.charge(v.account.id,price,'New design direction',ref);
+    try{
+     const lib=require('./react-skills').library(meta.owner||v.owner).map(s=>({id:s.id,description:s.name+': '+s.description}));
+     const files=builder.loadFiles(id,meta.current_version);
+     const what=String(b.regenerate).trim().slice(0,1500)||'A fresh, distinctive direction for this app.';
+     next=await design.createBrief('Direction from the owner: '+what+'\nThe app today (its main page):\n'+String(files['src/App.jsx']||'').slice(0,4000)+(meta.knowledge?'\nProject knowledge: '+String(meta.knowledge).slice(0,1500):''),{callModel,tier,skills:lib,projectName:meta.name});
+    }catch(e){if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: design direction failed','refund-'+ref)}catch{}throw Object.assign(Error('Could not create a design direction: '+String(e.message||e).slice(0,300)),{status:502})}
+    summary='New design direction: '+next.name;
+   }else if(b.design&&typeof b.design==='object'){
+    const cur=meta.design||{};
+    next={...design.normalize({...cur,...b.design,palette:{...(cur.palette||{}),...(b.design.palette||{})},fonts:{...(cur.fonts||{}),...(b.design.fonts||{})}}),created_at:cur.created_at||new Date().toISOString(),updated_at:new Date().toISOString()};
+    summary='Updated the design: '+next.name;
+   }
+   if(next){meta=builder.loadMeta(id);if(next.skill&&!(meta.skills||[]).includes(next.skill))meta.skills=[...(meta.skills||[]),next.skill];meta.design=next;builder.saveMeta(meta)}
+   const files=builder.loadFiles(id,meta.current_version);
+   let version=null;
+   if(b.add_system&&!design.hasTokens(files)){version=(await builder.saveSource(id,design.addDesignSystem(files,meta.design||{}),{summary:'Added the design system (UI kit and design tokens)',changed:['src/index.css','src/components/ui/']})).version}
+   else if(next&&design.hasTokens(files)){const css=design.applyToCss(files['src/index.css'],next);if(css!==files['src/index.css'])version=(await builder.saveSource(id,{...files,'src/index.css':css},{summary,changed:['src/index.css']})).version}
+   const fresh=builder.loadMeta(id);
+   return send(res,200,{design:fresh.design||null,skills:fresh.skills||[],has_tokens:design.hasTokens(builder.loadFiles(id,fresh.current_version)),version,project:projectView(id)}),true;
+  }
+  if(action==='/images'&&method==='POST'){
+   // Generates one image into the project's uploads from a prompt.
+   if(!generateImage)throw Object.assign(Error('Image generation is not enabled on this server'),{status:503});
+   const b=await readJson(req,6000),prompt=String(b.prompt||'').trim().slice(0,1500);
+   if(prompt.length<4)throw Object.assign(Error('Describe the image'),{status:400});
+   limited(req,'genimage',30);
+   const req1=builder.imageRequests([{name:b.name||prompt.split(/\s+/).slice(0,4).join('-'),prompt,aspect:b.aspect}])[0];
+   const credits=generatedImageCredits(),ref='genimage:'+crypto.randomUUID();
+   if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,'Generated image',ref);
+   let picture;
+   try{const meta=builder.loadMeta(id);picture=await generateImage({prompt:req1.prompt+(meta.design&&meta.design.imagery?'\nVisual style of the app: '+meta.design.imagery:''),aspect:req1.aspect})}
+   catch(e){if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: image not generated','refund-'+ref)}catch{}throw Object.assign(Error('Image generation failed: '+String(e.message||e).slice(0,300)),{status:502})}
+   const stem=req1.name.replace(/\.[a-z]+$/,''),ext={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[picture.mime]||'png';
+   const saved=require('./react-assets').save(id,[{name:stem+'.'+ext,mime:picture.mime,data:picture.data}],{maxBytes:6*1024*1024});
+   return send(res,201,{saved,assets:require('./react-assets').list(id)}),true;
   }
   if(action==='/knowledge'&&method==='POST'){
    const b=await readJson(req,20000),meta=builder.loadMeta(id);
@@ -450,7 +533,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const known=meta.versions.find(x=>x.n===meta.current_version)?.runtime_errors||[];
    const errors=[...new Set([...reported,...known])];
    if(!errors.length)throw Object.assign(Error('No errors to fix right now'),{status:400});
-   return send(res,202,{job:publicJob(startJob(v,id,{message:'Fix these errors from the running app:\n'+errors.join('\n'),tier:b.tier||'standard'},{callModel,checkRuntime,inspect,webSearch}))}),true;
+   return send(res,202,{job:publicJob(startJob(v,id,{message:'Fix these errors from the running app:\n'+errors.join('\n'),tier:b.tier||'standard'},deps))}),true;
   }
   if(action==='/file'&&method==='GET'){const name=new URL(req.url,'http://x').searchParams.get('path')||'';return send(res,200,{path:name,content:builder.readFile(id,name)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}

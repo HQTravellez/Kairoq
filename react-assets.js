@@ -18,7 +18,7 @@ function uniqueName(id,name){
  for(let i=2;;i++){const n=stem+'-'+i+ext;if(!existing.has(n))return n}
 }
 // images: [{name:'logo.png',mime,data(base64)}]; returns the saved names.
-function save(id,images){
+function save(id,images,{maxBytes=MAX_BYTES}={}){
  builder.loadMeta(id);
  const d=dir(id);fs.mkdirSync(d,{recursive:true});
  const current=list(id);
@@ -28,7 +28,7 @@ function save(id,images){
  for(const img of images){
   if(!/^[a-z0-9-]+\.(png|jpg|jpeg|webp|gif)$/.test(img.name))throw Object.assign(Error('Bad image name'),{status:400});
   const bytes=Buffer.from(img.data,'base64');
-  if(bytes.length>MAX_BYTES)throw Object.assign(Error('Each image must be 3 MB or smaller'),{status:413});
+  if(bytes.length>maxBytes)throw Object.assign(Error('Each image must be '+Math.round(maxBytes/1048576)+' MB or smaller'),{status:413});
   if(!looksLike(bytes,img.name))throw Object.assign(Error(img.name+' is not a valid image'),{status:400});
   total+=bytes.length;if(total>MAX_TOTAL)throw Object.assign(Error('Project images are limited to 40 MB'),{status:413});
   const name=uniqueName(id,img.name);
