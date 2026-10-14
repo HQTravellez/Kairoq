@@ -122,13 +122,14 @@ function withSeo(html,meta,base){
  const tags=['<link rel="canonical" href="'+escapeHtml(base)+'">','<meta property="og:type" content="website">','<meta property="og:title" content="'+escapeHtml(title)+'">','<meta property="og:url" content="'+escapeHtml(base)+'">',
   ...(desc?['<meta name="description" content="'+escapeHtml(desc)+'">','<meta property="og:description" content="'+escapeHtml(desc)+'">']:[]),
   ...(image?['<meta property="og:image" content="'+escapeHtml(image)+'">','<meta name="twitter:card" content="summary_large_image">']:['<meta name="twitter:card" content="summary">'])];
- return html.replace(/<title>[\s\S]*?<\/title>/,'<title>'+escapeHtml(title)+'</title>').replace('</head>','    '+tags.join('\n    ')+'\n  </head>');
+ return html.replace(/<title>[\s\S]*?<\/title>/,()=>'<title>'+escapeHtml(title)+'</title>').replace('</head>',()=>'    '+tags.join('\n    ')+'\n  </head>');
 }
 function serveProject(req,res,id,rest,sandbox,basePath='/'){
  let meta;try{meta=builder.loadMeta(id)}catch{return false}
  if(!meta.published)return false;
  const dist=path.join(builder.versionDir(id,meta.published.version),'dist');
- const rel=decodeURIComponent(String(rest||'/').split('?')[0]).replace(/^\/+/,'');
+ let decoded;try{decoded=decodeURIComponent(String(rest||'/').split('?')[0])}catch{res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Bad request');return true}
+ const rel=decoded.replace(/^\/+/,'');
  const base=siteBase(req,basePath);
  const text=(type,body)=>{res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:body)};
  if(rel==='robots.txt')return text('text/plain; charset=utf-8','User-agent: *\nAllow: /\nSitemap: '+base+'sitemap.xml\n'),true;

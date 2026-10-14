@@ -53,6 +53,8 @@ $('logout').onclick=async()=>{await api('/logout',{method:'POST'}).catch(()=>{})
 // ---------- home ----------
 async function loadHome(){
  show('home');history.replaceState(null,'','/create');
+ const acct=state.me.viewer?.account;
+ $('verify-notice').classList.toggle('hidden',!(acct&&!acct.email_verified&&state.me.email_ready));
  renderTemplates($('home-templates'),id=>startFromTemplate(id));
  const {projects}=await api('/projects');
  const list=$('projects');list.replaceChildren();
@@ -109,6 +111,7 @@ function messageItem(m,last){
  const body=document.createElement('div');body.textContent=m.text;li.append(body);
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.changed&&m.changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+m.changed.join(', ');li.append(s)}
+ if(m.steps&&m.steps.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>send('Implement the plan you just described.','build');li.append(b)}
  return li;
 }
@@ -153,6 +156,7 @@ async function renderData(){
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
  text($('records-title'),state.collection?'Records in '+state.collection:'Records');
+ renderSql().catch(()=>{});renderLogs().catch(()=>{});
  if(!state.collection)return;
  const {items}=await api('/projects/'+state.project.id+'/records?collection='+encodeURIComponent(state.collection));
  if(!items.length){const li=document.createElement('li');li.className='muted small';li.textContent='No records yet.';records.append(li)}
@@ -163,6 +167,43 @@ async function renderData(){
   li.append(pre,del);records.append(li);
  }
 }
+// SQL tables (sql/ migrations) and recent server logs, shown under the Data tab.
+function sqlTable(rows){
+ const table=document.createElement('table');table.className='sql-table';
+ if(!rows.length){const p=document.createElement('p');p.className='muted small';p.textContent='No rows.';return p}
+ const cols=Object.keys(rows[0]),head=table.createTHead().insertRow();
+ for(const c of cols){const th=document.createElement('th');th.textContent=c;head.append(th)}
+ const body=table.createTBody();
+ for(const r of rows){const tr=body.insertRow();for(const c of cols){const td=tr.insertCell();const v=r[c];td.textContent=v===null?'null':typeof v==='object'?JSON.stringify(v):String(v)}}
+ const wrap=document.createElement('div');wrap.className='sql-scroll';wrap.append(table);return wrap;
+}
+async function renderSql(){
+ const d=await api('/projects/'+state.project.id+'/sql');
+ const owner=state.project.role==='owner'||!state.project.role;
+ $('sql-section').classList.toggle('hidden',!d.tables.length&&!d.migrations.length);
+ $('sql-form').classList.toggle('hidden',!owner);
+ text($('sql-migrations'),d.migrations.length?'Migrations applied: '+d.migrations.map(m=>m.name.replace(/^sql\//,'')).join(', '):'');
+ const wrap=$('sql-tables');wrap.replaceChildren();
+ for(const t of d.tables){
+  const det=document.createElement('details'),sum=document.createElement('summary');
+  sum.textContent=t.name+' ('+t.count+' row'+(t.count===1?'':'s')+') · '+t.columns.map(c=>c.name+(c.type?' '+c.type.toLowerCase():'')+(c.pk?' pk':'')).join(', ');
+  det.append(sum);
+  if(t.foreign_keys.length){const p=document.createElement('p');p.className='muted small';p.textContent='Links: '+t.foreign_keys.map(f=>f.col+' → '+f.ref+'.'+f.ref_col).join(', ');det.append(p)}
+  det.append(sqlTable(t.rows));wrap.append(det);
+ }
+}
+$('sql-form').onsubmit=async e=>{
+ e.preventDefault();text($('sql-error'),'');$('sql-result').replaceChildren();
+ try{const {result}=await api('/projects/'+state.project.id+'/sql',{method:'POST',body:{query:$('sql-query').value}});$('sql-result').append(Array.isArray(result)?sqlTable(result):Object.assign(document.createElement('p'),{className:'small',textContent:result.changes+' row'+(result.changes===1?'':'s')+' changed'}));renderSql()}
+ catch(err){text($('sql-error'),err.message)}
+};
+async function renderLogs(){
+ const {logs}=await api('/projects/'+state.project.id+'/logs');
+ const ol=$('logs');ol.replaceChildren();
+ if(!logs.length){const li=document.createElement('li');li.className='muted small';li.textContent='No server logs yet. Function console.log output and backend errors appear here.';ol.append(li)}
+ for(const l of logs.slice(-60).reverse()){const li=document.createElement('li');li.className='log '+l.level;li.textContent=when(l.at)+' · '+l.source+' · '+l.message;ol.append(li)}
+}
+$('logs-refresh').onclick=()=>renderLogs().catch(()=>{});
 async function renderFiles(){
  const list=$('file-list');list.replaceChildren();
  const files=state.project.files;
@@ -174,8 +215,9 @@ async function renderFiles(){
 // ---------- chat ----------
 state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
 $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('chat-form').requestSubmit()}});
-function setChatMode(mode){state.mode=mode;$('mode-build').setAttribute('aria-pressed',String(mode==='build'));$('mode-discuss').setAttribute('aria-pressed',String(mode==='discuss'));$('chat-input').placeholder=mode==='discuss'?'Ask a question or plan a feature. No code changes, no surprises.':'Ask for a change: add a pricing section, make the header sticky…';text($('send'),mode==='discuss'?'Ask':'Send');costHint()}
-$('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');
+const PLACEHOLDERS={build:'Ask for a change: add a pricing section, make the header sticky…',discuss:'Ask a question or plan a feature. No code changes, no surprises.',agent:'Give the agent a bigger task: "add room booking with availability, test the whole flow and fix any errors"'};
+function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));$('chat-input').placeholder=PLACEHOLDERS[mode];text($('send'),mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');costHint()}
+$('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');$('mode-agent').onclick=()=>setChatMode('agent');
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+' · '+t.credits+' credit'+(t.credits===1?'':'s')+(t.enabled?'':' (not enabled)');if(t.id===state.tier)o.selected=true;sel.append(o)}
@@ -185,7 +227,7 @@ $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
 function costHint(){
  if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');return}
  const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
- const n=(state.mode==='discuss'?state.me.discuss_credits:(t?t.credits:1))+(state.attachments.length?state.me.image_credits:0);
+ const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.length?state.me.image_credits:0);
  text($('cost-hint'),n+' credit'+(n===1?'':'s'));
 }
 // Attachments: button, paste or drop.
@@ -223,13 +265,24 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={queued:'Starting…',thinking:'Thinking…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
+const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
 function streamItem(){
  let li=$('stream');
  if(!li){li=document.createElement('li');li.id='stream';li.className='assistant streaming';li.innerHTML='<div class="stream-msg"></div><div class="stream-files changed"></div><pre class="stream-code hidden"></pre>';$('messages').append(li)}
  return li;
 }
+function renderAgent(job){
+ const li=streamItem(),a=job.agent;
+ const steps=a.steps||[];
+ text(li.querySelector('.stream-msg'),steps.length?(steps.at(-1).thought||'Working…'):'Reading the project…');
+ const box=li.querySelector('.stream-files');box.replaceChildren();
+ const ol=document.createElement('ol');ol.className='agent-steps';
+ for(const s of steps.slice(-12)){const item=document.createElement('li');item.textContent='Step '+s.n+': '+s.actions.join('; ');ol.append(item)}
+ box.append(ol);li.querySelector('.stream-code').classList.add('hidden');
+ $('messages').scrollTop=$('messages').scrollHeight;
+}
 function renderStream(job){
+ if(job.mode==='agent'&&job.agent){renderAgent(job);return}
  const st=job.stream;
  if(!st){$('stream')?.remove();return}
  const li=streamItem();
@@ -248,7 +301,7 @@ async function watch(job){
  const done=await new Promise(resolve=>{
   let finished=false;
   const finish=j=>{if(!finished){finished=true;resolve(j)}};
-  const apply=j=>{text($('progress-text'),LABELS[j.status]||'Working…');renderStream(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(LABELS[j.status]||'Working…'));renderStream(j);if(j.status==='complete'||j.status==='failed')finish(j)};
   if(window.EventSource){
    const es=new EventSource('/api/create/jobs/'+job.id+'/events');
    es.onmessage=e=>{const j=JSON.parse(e.data);apply(j);if(j.status==='complete'||j.status==='failed')es.close()};
@@ -274,6 +327,29 @@ async function watch(job){
  }
  state.job=null;busy(false);
 }
+// ---------- Figma import ----------
+$('figma-open').onclick=async()=>{
+ text($('figma-error'),'');
+ const owner=state.project.role==='owner'||!state.project.role;
+ $('figma-save').closest('label').classList.toggle('hidden',!owner);
+ text($('figma-cost'),'Builds with the '+(state.mode==='agent'?'Agent':'Build')+' mode and the tier selected in the chat.');
+ try{const {token_saved}=await api('/projects/'+state.project.id+'/figma');text($('figma-token-status'),token_saved?'(saved; leave empty to reuse)':'')}catch{}
+ $('figma-dialog').showModal();
+};
+$('figma-import').onclick=async()=>{
+ if(state.job)return;
+ text($('figma-error'),'');
+ const url=$('figma-url').value.trim();if(!url){text($('figma-error'),'Paste the frame link.');return}
+ $('figma-import').disabled=true;
+ try{
+  const r=await api('/projects/'+state.project.id+'/figma',{method:'POST',body:{url,token:$('figma-token').value.trim()||undefined,save_token:$('figma-save').checked,message:$('figma-message').value.trim(),mode:state.mode==='agent'?'agent':'build',tier:state.tier}});
+  $('figma-dialog').close();$('figma-token').value='';
+  $('messages').append(messageItem({role:'user',text:'Import from Figma: '+r.frame.name+(r.frame.images.length?' ('+r.frame.images.length+' images)':'')}));
+  watch(r.job);
+ }catch(err){text($('figma-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{$('figma-import').disabled=false}
+};
+$('stop-job').onclick=async()=>{if(!state.job)return;$('stop-job').disabled=true;try{await api('/jobs/'+state.job.id+'/cancel',{method:'POST'})}catch(err){text($('chat-error'),err.message)}finally{$('stop-job').disabled=false}};
 function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;$('fix').disabled=on;if(label)text($('progress-text'),label)}
 async function refreshCredits(){try{const v=await loadMe();if(v&&v.account)renderCredits(v.account)}catch{}}
 
@@ -396,7 +472,9 @@ async function domainAction(path,method,hostname){
 
 // ---------- settings: code, GitHub, Stripe ----------
 $('settings-open').onclick=async()=>{
- text($('settings-error'),'');text($('gh-status'),'');
+ text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
+ $('knowledge').value=state.project.knowledge||'';
+ renderSecrets().catch(err=>text($('settings-error'),err.message));
  $('download').href='/api/create/projects/'+state.project.id+'/download';
  try{
   const [{settings},gh]=await Promise.all([api('/projects/'+state.project.id+'/settings'),api('/projects/'+state.project.id+'/github')]);
@@ -573,8 +651,68 @@ $('seo-save').onclick=async()=>{
  catch(err){text($('seo-status'),err.message)}
 };
 
+// ---------- password reset, verification, Google ----------
+$('forgot-open').onclick=()=>{$('forgot-form').classList.toggle('hidden');$('forgot-email').value=$('email').value;$('forgot-email').focus()};
+$('forgot-form').onsubmit=async e=>{e.preventDefault();try{await api('/password/forgot',{method:'POST',body:{email:$('forgot-email').value}});text($('forgot-status'),state.me.email_ready?'If that email has an account, a reset link is on its way.':'Email is not set up on this server yet, so reset links cannot be sent.')}catch(err){text($('forgot-status'),err.message)}};
+$('reset-form').onsubmit=async e=>{e.preventDefault();text($('reset-error'),'');try{await api('/password/reset',{method:'POST',body:{token:state.resetToken,password:$('reset-password').value}});state.resetToken=null;history.replaceState(null,'','/create');await start()}catch(err){text($('reset-error'),err.message)}};
+$('verify-resend').onclick=async()=>{try{await api('/verify/resend',{method:'POST'});text($('verify-resend'),'Sent. Check your inbox.')}catch(err){text($('verify-resend'),err.message)}};
+async function handleLinks(){
+ const q=new URLSearchParams(location.search);
+ if(q.get('verify')){try{await api('/verify',{method:'POST',body:{token:q.get('verify')}});state.flash='Your email is confirmed.'}catch(err){state.flash=err.message}history.replaceState(null,'','/create')}
+ if(q.get('reset')){state.resetToken=q.get('reset');history.replaceState(null,'','/create')}
+ if(q.get('auth_error')){state.flash=q.get('auth_error');history.replaceState(null,'','/create')}
+}
+
+// ---------- security check ----------
+$('security-open').onclick=async()=>{
+ const list=$('findings');list.replaceChildren();text($('security-summary'),'Checking…');$('security-fix').classList.add('hidden');
+ $('security-dialog').showModal();
+ try{
+  const {findings,version}=await api('/projects/'+state.project.id+'/security');
+  const counts=['high','medium','low'].map(s=>findings.filter(f=>f.severity===s).length);
+  text($('security-summary'),findings.length?'Version '+version+': '+counts[0]+' high, '+counts[1]+' medium, '+counts[2]+' low.':'Version '+version+': no problems found.');
+  for(const f of findings){
+   const li=document.createElement('li');
+   li.append(Object.assign(document.createElement('span'),{className:'sev '+f.severity,textContent:f.severity}),Object.assign(document.createElement('strong'),{textContent:f.title}));
+   li.append(Object.assign(document.createElement('p'),{textContent:f.detail}),Object.assign(document.createElement('p'),{textContent:'Fix: '+f.fix}));
+   list.append(li);
+  }
+  const serious=findings.filter(f=>f.severity!=='low');
+  const canEdit=(state.project.role||'owner')!=='viewer';
+  $('security-fix').classList.toggle('hidden',!serious.length||!canEdit);
+  $('security-fix').onclick=()=>{$('security-dialog').close();send('Fix these security problems:\n'+serious.map(f=>'- '+f.title+(f.file?' ('+f.file+')':'')+': '+f.detail+' Suggested fix: '+f.fix).join('\n'),'build')};
+ }catch(err){text($('security-summary'),err.message)}
+};
+
+// ---------- knowledge and server secrets (settings) ----------
+async function renderSecrets(){
+ const {secrets}=await api('/projects/'+state.project.id+'/secrets');
+ const list=$('secrets-list');list.replaceChildren();
+ if(!secrets.length)list.append(Object.assign(document.createElement('li'),{className:'muted small',textContent:'No secrets yet.'}));
+ for(const sec of secrets){
+  const li=document.createElement('li'),row=document.createElement('div');row.className='row';row.style.marginTop='0';
+  const name=Object.assign(document.createElement('code'),{textContent:sec.name});name.style.flex='1';
+  const rm=Object.assign(document.createElement('button'),{type:'button',className:'ghost',textContent:'Delete'});
+  rm.onclick=async()=>{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:sec.name,value:null}});renderSecrets()};
+  row.append(name,Object.assign(document.createElement('span'),{className:'muted small',textContent:sec.hint}),rm);li.append(row);list.append(li);
+ }
+}
+$('secret-add').onclick=async()=>{
+ text($('settings-error'),'');
+ try{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:$('secret-name').value,value:$('secret-value').value}});$('secret-name').value='';$('secret-value').value='';renderSecrets()}
+ catch(err){text($('settings-error'),err.message)}
+};
+$('knowledge-save').onclick=async()=>{
+ try{const {project}=await api('/projects/'+state.project.id+'/knowledge',{method:'POST',body:{text:$('knowledge').value}});state.project=project;text($('knowledge-status'),'Saved. The AI will follow this from the next message.')}
+ catch(err){text($('knowledge-status'),err.message)}
+};
+
 async function start(){
+ await handleLinks();
  const v=await loadMe();
+ $('google-login').classList.toggle('hidden',!state.me.google);
+ if(state.resetToken){show('auth');renderLanding();$('auth-form').classList.add('hidden');$('reset-form').classList.remove('hidden');$('signup').scrollIntoView();return}
+ if(state.flash){text($('auth-error'),state.flash);text($('home-error'),state.flash);state.flash=null}
  const share=/^\/create\/share\/([a-f0-9]{24})\/?$/.exec(location.pathname);
  if(share)return openShare(share[1],v);
  if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}

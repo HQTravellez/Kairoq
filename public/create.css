@@ -169,3 +169,26 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .referrers{list-style:none;padding:0;margin:8px 0 0;font-size:12px;color:var(--muted)}
 .role-badge{font-size:11px;border:1px solid var(--border);border-radius:999px;padding:1px 8px;color:var(--muted)}
 .readonly #chat-form,.readonly #visual-toggle,.readonly #publish-open,.readonly #restore{display:none!important}
+
+.link-btn{border:0;background:transparent;padding:4px 0;color:var(--accent);text-decoration:underline;cursor:pointer}
+.google{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);text-decoration:none;font-weight:600}
+.notice{margin-top:16px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--side)}
+.findings{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px}
+.findings li{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--panel)}
+.findings .sev{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
+.findings .sev.high{color:var(--error)}.findings .sev.medium{color:var(--accent)}.findings .sev.low{color:var(--muted)}
+.findings p{margin:6px 0 0;color:var(--muted);line-height:1.45}
+.sql-section,.logs-section{margin-top:18px}
+.sql-section details{border:1px solid var(--line,#e5e2dc);border-radius:10px;padding:8px 10px;margin:6px 0}
+.sql-section summary{cursor:pointer;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+.sql-scroll{overflow:auto;max-height:280px;margin-top:6px}
+.sql-table{border-collapse:collapse;font-size:12px;font-family:ui-monospace,Menlo,monospace}
+.sql-table th,.sql-table td{border:1px solid var(--line,#e5e2dc);padding:3px 6px;text-align:left;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.sql-table th{background:rgba(0,0,0,.04)}
+.sql-form textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.logs{list-style:none;padding:0;margin:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;max-height:240px;overflow:auto}
+.logs li{padding:3px 0;border-bottom:1px solid var(--line,#e5e2dc);word-break:break-word}
+.logs li.error{color:#b42318}.logs li.warn{color:#9a6700}
+.agent-steps{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--muted,#6b6660)}
+.agent-steps li{margin:2px 0}
+#stop-job{margin-left:auto}

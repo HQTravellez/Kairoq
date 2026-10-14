@@ -6523,6 +6523,30 @@ function parseDeveloperResponse(content,model="coding model"){
   throw Error("Response did not contain complete project files; "+clean.length+" characters");
 }
 async function callDeveloperCodingModel(opts={}){return callBuilderModel(opts,parseDeveloperResponse)}
+// AI used inside generated apps (ai.chat). Own model setting and monthly cap (purpose app-ai).
+async function callAppAi({system,messages,maxTokens=1000}){
+  if(!process.env.OPENROUTER_API_KEY)throw Object.assign(Error("AI is not configured on this server"),{status:503});
+  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+  const cap=Number(process.env.KAIROQ_APP_AI_MONTHLY_LIMIT_USD??20);
+  const overCap=cap>0&&(await usageTotals({purpose:"app-ai"})).monthly>=cap;
+  const models=(paid&&!overCap?String(process.env.KAIROQ_APP_AI_MODEL||"deepseek/deepseek-v3.2").split(",").map(m=>m.trim()).filter(Boolean):[]).concat(["openrouter/free"]);
+  const errors=[];
+  for(const model of models){
+    const free=model.endsWith(":free")||model==="openrouter/free";
+    try{
+      if(!free)await enforceBudget();
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(60000),body:JSON.stringify({model,max_tokens:maxTokens,messages:[...(system?[{role:"system",content:system}]:[]),...messages]})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
+      const raw=data.choices?.[0]?.message?.content;
+      const text=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
+      if(!free)await recordUsage({...data.usage,cost:Number(data.usage?.cost||0)},{purpose:"app-ai",model});
+      if(!text.trim())throw Error("Empty response");
+      return{text};
+    }catch(e){errors.push(model+": "+String(e.message||e).slice(0,120))}
+  }
+  throw Object.assign(Error("AI is unavailable right now. "+errors.join(" | ")),{status:503});
+}
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
@@ -6537,7 +6561,9 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   const proCandidates=String(process.env.KAIROQ_PRO_MODELS||"anthropic/claude-sonnet-4.5,openai/gpt-5").split(",").map(m=>m.trim()).filter(Boolean);
   const visionCandidates=String(process.env.KAIROQ_VISION_MODELS||"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean);
   if((opts.tier==="pro"||opts.tier==="vision")&&!allowPaid)throw Error("Pro and image models need KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left this month."+(errors.length?" "+errors.join(" | "):""));
-  const ordered=opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
+  const maxCandidates=String(process.env.KAIROQ_MAX_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
+  if(opts.tier==="max"&&(!allowPaid||!maxCandidates.length))throw Error("The Max tier needs KAIROQ_MAX_MODELS, KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left.");
+  const ordered=opts.tier==="max"?[...maxCandidates,...proCandidates]:opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
   const models=ordered.filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
@@ -6554,7 +6580,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
         if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
       }
       const stream=typeof opts.onToken==="function";
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?240000:110000)]):AbortSignal.timeout(stream?240000:110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},...(stream?{stream:true,usage:{include:true}}:{})})});
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(opts.tier==='max'?900000:300000):110000)]):AbortSignal.timeout(stream?(opts.tier==='max'?900000:300000):110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},...(stream?{stream:true,usage:{include:true}}:{})})});
       const data=stream&&response.ok&&response.body?await readChatStream(response.body,opts.onToken):await response.json().catch(()=>({}));
       if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
       const message=data.choices?.[0]?.message||{};
@@ -6618,6 +6644,9 @@ async function handleDeveloperPublish(req,res){
     return json(res,200,result);
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
+reactBackend.configure({appAi:callAppAi});
+// A failed request must never take the whole server down.
+process.on("unhandledRejection",e=>console.error("[unhandled]",e&&e.stack||e));
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
   const hostRoute=reactHosting.handleHost(req,res);
@@ -6626,7 +6655,7 @@ const server = http.createServer(async (req, res) => {
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
@@ -6951,6 +6980,6 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
-  callDeveloperCodingModel, callBuilderModel, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
+  callDeveloperCodingModel, callBuilderModel, callAppAi, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };
