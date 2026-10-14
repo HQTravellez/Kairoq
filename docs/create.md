@@ -25,6 +25,16 @@
   - Pro, Max and image requests need `KAIROQ_BUILDER_PAID_APPROVED=true` and count toward the builder budget.
 - **Project knowledge.** Under **Settings**, owners write instructions the model follows on every message (brand, tone, rules). Up to 8,000 characters.
 - **Security scan.** The **Security** button checks the code and backend settings: secrets in browser code, collections with personal data open to everyone, unsafe HTML, server functions that change data without checking the user, and unsigned webhooks. **Fix with AI** sends the findings to the model.
+- **Agent mode.** For bigger tasks, the model works in steps until the job is done.
+  - Tools: read and search files, write files, build and open the app in headless Chromium, run UI steps (click, fill, select, expect text, go to a route), read server logs, run SELECT queries on the app's SQL tables, search the web and read pages (`fetch_url` is SSRF-guarded).
+  - Pro, Max and image tiers also get a screenshot after each test. Standard models (DeepSeek) get the page's visible text instead.
+  - The result is one new version. The chat shows each step, and the finished message keeps a list of them.
+  - Limits: `KAIROQ_AGENT_MAX_STEPS` (15) steps per task. A task costs the tier's credits × `KAIROQ_AGENT_MULTIPLIER` (3).
+  - **Stop** cancels any running job (build, discuss or agent) and refunds its credits.
+- **Figma import.** The **Figma** button takes a frame link and a Figma personal access token (scope "File content: read"). The owner can save the token encrypted for the project.
+  - Kairoq reads the frame's layers and turns them into a compact spec: layout, gaps, padding, colours, fonts, text, radius and shadows. Image fills are saved as uploads.
+  - With paid models enabled, the rendered frame is sent to a vision model as a reference image (plus 1 image credit).
+  - The import runs as a Build or Agent task, using the mode and tier selected in the chat.
 - **Discuss mode.** The model answers or plans without changing code or creating a version. An **Implement this plan** button sends the plan as a build request.
 - **Images in chat.** Attach, paste or drop up to 4 images (PNG/JPEG/WebP/GIF, 3 MB each).
   - Images are shown to the model as reference, for example "build this screenshot".
@@ -123,6 +133,25 @@ Enable these in `src/backend.json`. The model adds them when the app needs them.
 - Functions run in a QuickJS sandbox with no Node APIs, 16 MB of memory and `KAIROQ_FUNCTION_TIMEOUT_MS` (10 s), in `KAIROQ_FUNCTION_WORKERS` (4) worker threads, so a stuck function never blocks the server.
 - `fetch` allows only http/https on ports 80, 443, 8080 and 8443 and blocks private and metadata addresses, including after DNS lookup. Bodies are limited to 5 MB.
 - Each version runs its own functions. The preview runs the draft; the published site runs the published version.
+
+### SQL tables
+
+- Migrations live in `sql/001_init.sql`, `sql/002_add_rooms.sql`, and so on (SQLite syntax: tables, indexes, foreign keys, checks). They run once, in order, when a version is built.
+  - A migration that already ran cannot be edited; add a new numbered file instead.
+  - Restoring an older version does not undo migrations.
+- Data is stored in each project's `app-sql.sqlite`, separate from users and collections. Foreign keys are enforced. Size is capped by `KAIROQ_APP_SQL_MB` (200).
+- Server functions query with `db.sql` and `db.batch`.
+  - `` db.sql`SELECT * FROM rooms WHERE price <= ${max}` `` (values become parameters) or `db.sql('… WHERE id = ?', [id])`.
+  - `db.batch([[sql, params], …])` runs several statements in one transaction.
+  - Results are capped at 1,000 rows.
+  - The browser has no direct SQL access.
+- Not allowed: ATTACH, PRAGMA, `pragma_*` functions, VACUUM, transaction statements (BEGIN, COMMIT and so on), or tables named `_kairoq_*`.
+- Queries run in child processes (`KAIROQ_SQL_PROCESSES`, default 2). A query longer than `KAIROQ_SQL_TIMEOUT_MS` (5,000) is killed and its process replaced, so runaway queries can't hang the server.
+- The **Data** tab lists tables with columns, links and rows. Owners also get a SQL console. The security scan flags SQL built from strings.
+
+### Server logs
+
+The **Data** tab shows recent server logs for each app: `console.log` output from server functions, function errors and failed backend requests. The last 200 are kept in memory. Agent mode reads them with `view_logs`.
 
 ### AI in generated apps
 
