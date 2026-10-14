@@ -507,7 +507,18 @@ async function domainAction(path,method,hostname){
 }
 
 // ---------- settings: code, GitHub, Stripe ----------
+// The owner's AI cost report: real cost per call next to what that message sells for.
+async function renderCosts(){
+ const owner=state.me?.viewer?.kind==='owner';$('costs-section').classList.toggle('hidden',!owner);if(!owner)return;
+ try{
+  const {costs}=await api('/admin/costs'),body=$('costs-body');body.replaceChildren();
+  const usd=n=>'$'+(n<1?n.toFixed(3):n.toFixed(2));
+  for(const g of costs.groups){const tr=document.createElement('tr');const loss=g.credit_value!==null&&g.avg_cost>g.credit_value;for(const v of [g.tier,g.model,g.calls,usd(g.cost),usd(g.avg_cost),g.credit_value===null?'-':usd(g.credit_value),g.cached_share+'%']){const td=document.createElement('td');td.textContent=v;tr.append(td)}if(loss)tr.className='loss';body.append(tr)}
+  text($('costs-note'),costs.groups.length?'Total '+usd(costs.total_cost)+' over '+costs.total_calls+' AI calls. "Sells for" uses $'+costs.credit_price_usd+' per credit (KAIROQ_CREDIT_PRICE_USD); rows in red cost more than they earn. Agent tasks make several calls each.':'No paid AI calls in the last 30 days.');
+ }catch(err){text($('costs-note'),err.message)}
+}
 $('settings-open').onclick=async()=>{
+ renderCosts();
  text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
  $('knowledge').value=state.project.knowledge||'';
  renderSecrets().catch(err=>text($('settings-error'),err.message));

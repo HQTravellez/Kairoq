@@ -208,7 +208,7 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,webSearch,figmaFetch,designShots,generateImage}){
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,webSearch,figmaFetch,designShots,generateImage,usageRows}){
  const deps={callModel,checkRuntime,inspect,webSearch,designShots,generateImage};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
@@ -282,6 +282,11 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     return send(res,200,{builds:builder.buildStats(),jobs:[...jobs.values()].filter(j=>ACTIVE.has(j.status)).length,projects:builder.list().length,accounts:d.prepare('SELECT COUNT(*) n FROM accounts').get().n,subscribers:d.prepare("SELECT COUNT(*) n FROM accounts WHERE plan IS NOT NULL AND plan_status='active'").get().n,last_backup:backups.latest()}),true;
    }
    if(route==='/admin/backup'&&method==='POST')return send(res,200,{backup:backups.run()}),true;
+   // AI cost per tier and model over the last 30 days, next to what one message of that tier sells for.
+   if(route==='/admin/costs'&&method==='GET'){
+    const credits=Object.fromEntries(tiers().map(t=>[t.id,t.credits]));credits.design=polishCredits();credits.image=generatedImageCredits();
+    return send(res,200,{costs:require('./builder-costs').summarize(usageRows?usageRows():[],{credits}),agent_multiplier:agentMultiplier()}),true;
+   }
    return send(res,404,{error:'Route not found'}),true;
   }
   if(route==='/verify/resend'&&method==='POST'){

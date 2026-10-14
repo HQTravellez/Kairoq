@@ -263,6 +263,11 @@
     <div class="row"><button class="primary" id="settings-save" type="button">Save keys</button></div>
     <h3>Email</h3>
     <p class="muted small" id="email-status"></p>
+    <section id="costs-section" class="hidden">
+      <h3>AI costs, last 30 days <span class="muted small">(server owner only)</span></h3>
+      <p class="muted small" id="costs-note"></p>
+      <div class="table-wrap"><table class="costs"><thead><tr><th>Tier</th><th>Model</th><th>Calls</th><th>Total</th><th>Per call</th><th>Sells for</th><th>From cache</th></tr></thead><tbody id="costs-body"></tbody></table></div>
+    </section>
     <p class="error" id="settings-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>

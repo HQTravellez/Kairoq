@@ -262,6 +262,15 @@ The most common complaints about AI app builders are changes that break what use
 - **Publish gate.** Publishing re-runs the checks on the version going live and asks before publishing a version that fails them.
 - **Live monitor.** Every `KAIROQ_MONITOR_HOURS` (default 24, `0` to turn off), the checks run on each published app's live version. The owner gets one email when a check starts failing, not one per day.
 
+## AI costs and prompt caching
+
+- **Prompt caching.** Every message resends the project to the model, and most of it is the same as last time: the rules, design brief, skills and knowledge, plus the project files during retries and agent steps.
+  - DeepSeek, OpenAI and Gemini cache that repeated part automatically on OpenRouter.
+  - For Claude models (`anthropic/…`), Kairoq marks cache breakpoints (`cache_control`): on the system prompt and on the last two large user messages. Cache reads cost about a tenth of the normal input price, and cache writes about 1.25×.
+  - Turn it off with `KAIROQ_PROMPT_CACHE=off`.
+- **Usage ledger.** Every paid AI call records its cost, model, tier and how many prompt tokens came from the cache.
+- **Cost report.** The server owner sees **Settings → AI costs, last 30 days**, also available as `GET /api/create/admin/costs`. It shows calls, total and average cost per tier and model, the share of tokens read from cache, and what one message of that tier sells for at `KAIROQ_CREDIT_PRICE_USD` per credit (default $0.25). Rows that cost more than they earn are shown in red.
+
 ## Growth features
 
 - **Landing page and pricing.**

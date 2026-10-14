@@ -229,3 +229,5 @@ input[type=color]{padding:2px 4px;height:40px;width:72px;cursor:pointer}
 .check-state.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
 .check-state.bad{background:color-mix(in srgb,var(--error) 15%,transparent);color:var(--error)}
 .check-chip{margin-top:6px;font-size:12px}.check-chip.ok{color:var(--ok)}.check-chip.bad{color:var(--error)}
+
+.table-wrap{overflow-x:auto}.costs{width:100%;border-collapse:collapse;font-size:12px}.costs th,.costs td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);white-space:nowrap}.costs tr.loss td{color:var(--error)}
