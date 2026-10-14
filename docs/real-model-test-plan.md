@@ -13,6 +13,7 @@ On the deployed server (Railway):
 | `KAIROQ_BUILDER_MODEL` | `deepseek/deepseek-v3.2` (Standard) |
 | `KAIROQ_PRO_MODELS` | `anthropic/claude-opus-5.5` (check the exact id on openrouter.ai/models) |
 | `KAIROQ_MAX_MODELS` | `anthropic/claude-fable-5.1` (check the exact id on openrouter.ai/models) |
+| `KAIROQ_DESIGN_MODELS` | Fable's OpenRouter id: Fable writes the design brief and does the Polish review |
 | `KAIROQ_BUILDER_MONTHLY_LIMIT_USD` | your test budget, for example `100`. Kairoq stops paid calls at this limit. |
 | `APP_ENCRYPTION_KEY` | 32 random characters (needed for the webhook and Stripe cases) |
 | `KAIROQ_RESEND_API_KEY`, `KAIROQ_EMAIL_FROM` | optional; needed to see emails from the hotel, spa and webhook cases |
@@ -89,7 +90,43 @@ Write anything notable in `notes`, for example "booking form saved but owner pag
 
 ## 5. Lovable comparison
 
-Paste the same prompt and the same two follow-ups into Lovable, using one new project per case. Score them in the `lovable_*` columns with the same rubric. Doing the 4 hard cases (`tours`, `crm`, `webhook`, `guest-app`) plus `hotel` and `saas` is enough for a fair picture.
+Paste the same prompt and the same two follow-ups into Lovable, using one new project per case. Doing the 4 hard cases (`tours`, `crm`, `webhook`, `guest-app`) plus `hotel` and `saas` is enough for a fair picture.
+
+Publish each Lovable app, then list the links in a file, for example `lovable-urls.json`:
+
+```json
+{"hotel":"https://casa-azul.lovable.app","saas":"https://ledgerly.lovable.app","crm":"https://….lovable.app"}
+```
+
+The automatic judge (next section) screenshots them and scores them the same way as Kairoq's apps. You can also put your own screenshots in a folder as `<case>-desktop.png` and `<case>-phone.png` and pass `--lovable <folder>`. To score by hand instead, use the `lovable_*` columns.
+
+## 5b. Automatic design judge
+
+A strong vision model (Fable is a good choice) looks at every app's desktop and phone screenshots and scores them 1–5 on the rubric's matches-request, design and mobile, plus an overall score. It also lists the concrete problems it sees.
+- **Blind scoring.** The judge is not told which builder made which app.
+- **What it can't score.** It only sees screenshots, so "works" and "edits" stay yours to score.
+
+Add `--judge` to a run (the OpenRouter key comes from `OPENROUTER_API_KEY`):
+
+```
+node scripts/model-eval.js --url https://kairoq.app --email you@example.com --password '…' \
+  --cases hotel,saas,crm,tours,webhook,guest-app --tiers pro --modes build \
+  --judge --judge-model <Fable's OpenRouter id> --lovable-urls lovable-urls.json --yes
+```
+
+To judge an earlier run again without building anything (for example after adding Lovable links), use `npm run eval:judge -- eval-results/<run> --judge-model <id> --lovable-urls lovable-urls.json`.
+
+**Results:**
+- **`summary.md`** gains:
+  - judge averages per tier
+  - a **Kairoq vs Lovable** table per case, with the gap
+  - the **most common design problems** in Kairoq apps
+- **`judge-notes.md`** has every app's problems and strengths.
+- **`scoring-sheet.csv`** gains `judge_*` columns, and Lovable's judge scores pre-fill the `lovable_*` columns.
+
+**Cost.** Each judged app costs roughly $0.03–0.20 on OpenRouter, depending on the model.
+
+**Checking the judge.** Spot-check 10–20 apps yourself: a model judging work like its own can be a little generous. If the judge and you disagree a lot on some cases, trust your scores and send me those cases.
 
 ## 6. Reading the results
 
@@ -110,4 +147,4 @@ Paste the same prompt and the same two follow-ups into Lovable, using one new pr
 
 ## 7. After testing
 
-Delete the test projects in the Kairoq home screen when you no longer need them, and set `KAIROQ_BUILDER_MONTHLY_LIMIT_USD` back to your normal budget. Send me `summary.md` and the filled-in `scoring-sheet.csv`, and I'll turn the weak spots into fixes.
+Delete the test projects in the Kairoq home screen when you no longer need them, and set `KAIROQ_BUILDER_MONTHLY_LIMIT_USD` back to your normal budget. Send me `summary.md`, `judge-notes.md` and the filled-in `scoring-sheet.csv`, and I'll turn the most common problems into better design rules, skills and starter components. Then run the same cases again and compare.

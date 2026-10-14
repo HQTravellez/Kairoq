@@ -10,7 +10,8 @@
     "benchmark:verify": "node scripts/verify-benchmark.js",
     "check": "node --check server.js && node --check public/app.js",
     "higgsfield:seedance": "tsx index.ts",
-    "eval:models": "node scripts/model-eval.js"
+    "eval:models": "node scripts/model-eval.js",
+    "eval:judge": "node scripts/model-eval.js --judge-only"
   },
   "engines": {
     "node": ">=22.13"
