@@ -43,13 +43,23 @@ test('builds run in parallel worker threads',async()=>{
 test('every template is valid; projects can start from a template',async()=>{
  for(const t of templates.TEMPLATES)assert.deepEqual(builder.validateFiles(t.files),[],t.id);
  const list=(await request(server,'GET','/api/create/templates')).json.templates;
- assert.deepEqual(list.map(t=>t.id),['restaurant','guest-portal','saas-landing','crm','booking','portfolio']);
+ assert.deepEqual(list.map(t=>t.id),['boutique-hotel','calorie-tracker','restaurant','guest-portal','saas-landing','crm','booking','portfolio']);
  assert.equal(list[0].files,undefined);
  const {cookie}=await signup('tpl@example.com');
  const r=await request(server,'POST','/api/create/projects',{headers:{cookie},body:{template:'restaurant'}});
  assert.equal(r.status,201,r.text);assert.equal(r.json.project.name,'Restaurant');assert.equal(r.json.project.current_version,1);
  assert.match(builder.loadFiles(r.json.project.id,1)['src/App.jsx'],/Trattoria Lume/);
  assert.equal((await request(server,'POST','/api/create/projects',{headers:{cookie},body:{template:'nope'}})).status,400);
+ // The boutique hotel template brings SQL tables, server functions and seeded rooms.
+ const hotel=await request(server,'POST','/api/create/projects',{headers:{cookie},body:{template:'boutique-hotel'}});
+ assert.equal(hotel.status,201,hotel.text);
+ assert.deepEqual(require('../react-sql').overview(builder.projectDir(hotel.json.project.id)).tables.map(t=>[t.name,t.count]),[['bookings',0],['rooms',3]]);
+ assert.ok(builder.loadFiles(hotel.json.project.id,1)['functions/book.js']);
+ // The calorie tracker is a mobile template: the mobile app setting starts on, and its food database is seeded.
+ const fit=await request(server,'POST','/api/create/projects',{headers:{cookie},body:{template:'calorie-tracker'}});
+ assert.equal(fit.status,201,fit.text);
+ assert.equal(builder.loadMeta(fit.json.project.id).mobile.enabled,true);
+ assert.equal(require('../react-sql').overview(builder.projectDir(fit.json.project.id)).tables.find(t=>t.name==='foods').count,58);
 });
 
 test('form collections are submit-only: anyone can send, only the owner can read',async()=>{

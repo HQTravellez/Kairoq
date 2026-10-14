@@ -23,6 +23,7 @@
   - Messages with images and the Standard tier use `KAIROQ_VISION_MODELS`, because DeepSeek cannot read images.
   - **Max** uses `KAIROQ_MAX_MODELS` (for example Fable 5.1). It is hidden until that is set, and costs `KAIROQ_MAX_CREDITS` (15) per message.
   - Pro, Max and image requests need `KAIROQ_BUILDER_PAID_APPROVED=true` and count toward the builder budget.
+  - Output limit per reply: `KAIROQ_STANDARD_OUTPUT_TOKENS` (16,000) for Standard and `KAIROQ_PREMIUM_OUTPUT_TOKENS` (32,000) for Pro and Max, with a 15-minute streaming timeout for Pro and Max. In Agent mode, a reply cut off at the limit is sent back to the model with a request to write fewer files per step.
 - **Project knowledge.** Under **Settings**, owners write instructions the model follows on every message (brand, tone, rules). Up to 8,000 characters.
 - **Security scan.** The **Security** button checks the code and backend settings: secrets in browser code, collections with personal data open to everyone, unsafe HTML, server functions that change data without checking the user, and unsigned webhooks. **Fix with AI** sends the findings to the model.
 - **Agent mode.** For bigger tasks, the model works in steps until the job is done.
@@ -30,7 +31,7 @@
   - Pro, Max and image tiers also get a screenshot after each test. Standard models (DeepSeek) get the page's visible text instead.
   - The result is one new version. The chat shows each step, and the finished message keeps a list of them.
   - Limits: `KAIROQ_AGENT_MAX_STEPS` (15) steps per task. A task costs the tier's credits × `KAIROQ_AGENT_MULTIPLIER` (3).
-  - **Stop** cancels any running job (build, discuss or agent) and refunds its credits.
+  - **Stop** cancels any running job (build, discuss or agent) and refunds its credits. An agent task that ends without changing anything is refunded too.
 - **Figma import.** The **Figma** button takes a frame link and a Figma personal access token (scope "File content: read"). The owner can save the token encrypted for the project.
   - Kairoq reads the frame's layers and turns them into a compact spec: layout, gaps, padding, colours, fonts, text, radius and shadows. Image fills are saved as uploads.
   - With paid models enabled, the rendered frame is sent to a vision model as a reference image (plus 1 image credit).
@@ -178,6 +179,27 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 
 Generated apps can import: react, react-dom, react-router-dom, lucide-react, recharts, framer-motion, date-fns, clsx, tailwind-merge, class-variance-authority, zod, react-hook-form, the Radix primitives (dialog, dropdown-menu, tabs, tooltip, popover, select, accordion, switch), sonner, react-markdown, @tanstack/react-query, canvas-confetti, react-day-picker, embla-carousel-react and qrcode.react. Other imports are rejected before the build. Code downloads list only the packages the app uses.
 
+## Mobile apps
+
+- **Installable on phones.** Every published app is a progressive web app: a web manifest, home-screen icons (192, 512 and Apple 180 px) and a service worker.
+  - The service worker loads pages network-first with an offline fallback and caches built assets. It never caches `/api/`.
+  - People install from Safari (Share → Add to Home Screen) or Chrome (Install app).
+  - Installing needs the app's own origin: its subdomain (`KAIROQ_SITES_DOMAIN`) or a custom domain. The sandboxed `/sites/` path opens as a normal web page.
+- **The App button** in the editor holds the mobile settings:
+  - app name, home-screen name, theme colour, icon (letters on the theme colour, or a project upload) and app ID
+  - a QR code to open the published app on a phone
+  - store instructions
+
+  Icons are rendered with headless Chromium. Without Chromium, a plain theme-colour icon is used.
+- **"This is a mobile app" setting:**
+  - The AI designs phone-first: bottom tabs, 44 px touch targets, safe areas and HashRouter.
+  - The editor preview starts in the phone frame, and the published page uses `viewport-fit=cover`.
+  - The code download and GitHub push become a [Capacitor](https://capacitorjs.com) iOS/Android project: `capacitor.config.json`, Capacitor packages, and `npm run android` / `npm run ios`.
+- **Android APK on every push.** The project includes `.github/workflows/kairoq-android.yml`, which builds `app-debug.apk` and attaches it to the Actions run.
+  - Writing workflow files needs a GitHub token with **Workflows: read and write**. Without it, Kairoq pushes everything else and says how to enable the build.
+- **Store releases** need the owner's own Google Play and Apple Developer accounts. iOS builds need a Mac with Xcode.
+- **Native sign-in.** The native app talks to the Kairoq backend over HTTPS. Google sign-in and password-reset links open the published web app, so the native app uses email sign-in.
+
 ## Growth features
 
 - **Landing page and pricing.**
@@ -264,4 +286,5 @@ On Railway, `workspace/` should be on the persistent volume.
 ## Limits
 
 - Up to 80 source files, 200 KB per file and 1.5 MB per project.
+- Third-party images or fonts that fail to load are not reported as app problems (no Fix it), since they aren't code errors.
 - Builds run in `KAIROQ_BUILD_WORKERS` worker threads and time out after `KAIROQ_BUILD_TIMEOUT_MS` (90 seconds).

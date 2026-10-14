@@ -96,8 +96,12 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .packs button{display:flex;justify-content:space-between;text-align:left}
 
 @media (max-width:820px){
- #editor{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
- .chat{border-right:0;border-bottom:1px solid var(--border);order:2}
+ #editor{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
+ .chat{border-right:0;border-top:1px solid var(--border);order:2;max-height:42vh;min-height:0}
+ .chat .messages{min-height:0}
+ .stage-bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+ .stage-bar>*{flex:none}
+ .stage-bar::-webkit-scrollbar{display:none}
  .stage{order:1}
  .who{display:none}
  .code{grid-template-columns:1fr}
@@ -192,3 +196,10 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .agent-steps{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--muted,#6b6660)}
 .agent-steps li{margin:2px 0}
 #stop-job{margin-left:auto}
+.app-icon{border-radius:14px;border:1px solid var(--border,#e5e2dc);align-self:center}
+.qr{border:1px solid var(--border,#e5e2dc);border-radius:10px;background:#fff;flex:none}
+.qr-row{align-items:flex-start;gap:16px}
+.row.wrap{flex-wrap:wrap}
+.steps{padding-left:18px;margin:6px 0}.steps li{margin:4px 0}
+@media (max-width:520px){.qr{width:160px;height:160px}}
+input[type=color]{padding:2px 4px;height:40px;width:72px;cursor:pointer}

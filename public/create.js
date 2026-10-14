@@ -92,6 +92,7 @@ async function openProject(id,{pendingText,job}={}){
  renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
  renderVersions();
+ device(Boolean(project.mobile&&project.mobile.enabled));
  setPreview(project.preview_url);
  if(state.code)await renderFiles();
  if(state.data)await renderData();
@@ -112,7 +113,7 @@ function messageItem(m,last){
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.changed&&m.changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+m.changed.join(', ');li.append(s)}
  if(m.steps&&m.steps.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
- if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>send('Implement the plan you just described.','build');li.append(b)}
+ if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}
  return li;
 }
 function renderVersions(){
@@ -321,12 +322,36 @@ async function watch(job){
   state.runtimeErrors=[];
   renderMessages();renderVersions();
   if(done.mode!=='discuss')setPreview(project.preview_url);
+  if(done.refunded)$('messages').append(messageItem({role:'assistant',text:'Nothing changed, so this agent task was free.'}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
   if(state.code)renderFiles();
   if(state.data)renderData();
  }
  state.job=null;busy(false);
 }
+// ---------- mobile app ----------
+async function renderMobile(){
+ const id=state.project.id,d=await api('/projects/'+id+'/mobile'),m=d.mobile;
+ $('mobile-enabled').checked=m.enabled;$('mobile-name').value=m.name;$('mobile-short').value=m.short_name;$('mobile-theme').value=m.theme_color;$('mobile-appid').value=m.app_id;
+ const sel=$('mobile-icon');sel.replaceChildren(new Option('Letters on the theme colour',''));for(const a of d.assets)sel.append(new Option(a,a));sel.value=m.icon||'';
+ $('mobile-icon-preview').src='/api/create/projects/'+id+'/appicon?t='+Date.now();
+ $('mobile-download').href='/api/create/projects/'+id+'/download';
+ $('mobile-qr').classList.toggle('hidden',!d.url);
+ if(d.url)$('mobile-qr').src='/api/create/projects/'+id+'/qr?t='+Date.now();
+ text($('mobile-url'),d.url?d.url:'Publish the app first, then scan the code with your phone camera.');
+ text($('mobile-install-note'),d.url&&!d.installable?'Installing works on the app\'s own subdomain or custom domain (set KAIROQ_SITES_DOMAIN or add a domain in Publish). The /sites/ link opens as a normal web page.':'');
+ const editor=state.project.role!=='viewer';for(const el of ['mobile-enabled','mobile-name','mobile-short','mobile-theme','mobile-icon','mobile-appid','mobile-save'])$(el).disabled=!editor;
+}
+$('mobile-open').onclick=async()=>{text($('mobile-error'),'');text($('mobile-status'),'');try{await renderMobile();$('mobile-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
+$('mobile-save').onclick=async()=>{
+ text($('mobile-error'),'');
+ try{
+  const {mobile}=await api('/projects/'+state.project.id+'/mobile',{method:'POST',body:{enabled:$('mobile-enabled').checked,name:$('mobile-name').value,short_name:$('mobile-short').value,theme_color:$('mobile-theme').value,icon:$('mobile-icon').value,app_id:$('mobile-appid').value}});
+  state.project.mobile=mobile;device(mobile.enabled);
+  text($('mobile-status'),mobile.enabled?'Saved. The AI now designs phone-first; ask it to "make this a mobile app" to adapt the current screens.':'Saved.');
+  setTimeout(()=>{$('mobile-icon-preview').src='/api/create/projects/'+state.project.id+'/appicon?t='+Date.now()},1500);
+ }catch(err){text($('mobile-error'),err.message)}
+};
 // ---------- Figma import ----------
 $('figma-open').onclick=async()=>{
  text($('figma-error'),'');
@@ -456,6 +481,7 @@ function renderPublish(){
  }
 }
 $('slug').oninput=()=>text($('slug-preview'),location.origin+'/sites/'+(slugFrom($('slug').value)||'…')+'/');
+$('slug').onblur=()=>{const v=slugFrom($('slug').value);if(v&&v!==$('slug').value)$('slug').value=v};
 async function publishAction(path,body){
  text($('publish-error'),'');
  try{const {project,error}=await api('/projects/'+state.project.id+path,{method:'POST',body});state.project=project;renderPublish();if(error)text($('publish-error'),error)}

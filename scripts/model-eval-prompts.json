@@ -1,0 +1,102 @@
+{
+  "about": "Real-model test set for Kairoq Create. Each case is built from the prompt, then the follow-ups are sent one by one as edits. 'expect' lists words the finished preview should show; 'mobile' turns on the mobile app setting first. Run the same prompts in Lovable for the side-by-side score.",
+  "cases": [
+    {
+      "id": "hotel",
+      "name": "Boutique hotel website",
+      "category": "hospitality",
+      "prompt": "Build a website for Casa Azul, a 12-room boutique hotel in Lisbon's Alfama district. Pages: home with a full-width hero and a short story, rooms (Garden, Terrace and Suite with prices from 140, 190 and 260 EUR per night and photos), a photo gallery, location with nearby sights, and a booking request form (name, email, dates, room, guests, message). Booking requests must be saved for the owner only and email the owner. Warm Mediterranean colours.",
+      "followups": ["Add a guest reviews section with five short reviews and an average rating.", "Make the booking form check that the check-out date is after check-in and show a friendly thank-you message after sending."],
+      "expect": ["Casa Azul", "Garden", "Suite", "Book"]
+    },
+    {
+      "id": "restaurant",
+      "name": "Restaurant with table reservations",
+      "category": "hospitality",
+      "prompt": "Create a site for Tasca do Mar, a seafood restaurant. Show a menu grouped into starters, mains and desserts with prices, opening hours, and a table reservation form (date, time slot between 12:00-15:00 and 19:00-23:00 every 30 minutes, party size 1-10, name, phone). Reservations are visible only to the owner. Add a signed-in staff page that lists today's reservations.",
+      "followups": ["Add a vegetarian filter to the menu.", "Let staff mark a reservation as seated or no-show."],
+      "expect": ["Tasca do Mar", "Menu", "Reserv"]
+    },
+    {
+      "id": "tours",
+      "name": "Tour booking with SQL availability",
+      "category": "hospitality",
+      "prompt": "Build a booking app for a small tour operator. Use SQL tables: tours (name, description, price, duration), departures (tour, date, seats) and bookings (departure, name, email, people). Seed three tours with departures over the next two weeks. Visitors pick a tour, see departures with remaining seats, and book; a server function must refuse a booking when not enough seats are left. Add an owner page with bookings per departure.",
+      "followups": ["Show a 'Only N seats left' badge when a departure has 3 or fewer seats.", "Add a cancel booking button for the owner that frees the seats again."],
+      "expect": ["seats", "Book"]
+    },
+    {
+      "id": "guest-app",
+      "name": "Guest phone app with host chat",
+      "category": "hospitality",
+      "mobile": true,
+      "prompt": "Make a phone app for guests of a holiday apartment. Tabs: Welcome (check-in time, door code shown only after sign-in, wifi name and password), House guide (rules, appliances, trash days), Local tips (restaurants, beaches, transport) and Chat, a live chat between signed-in guests and the host that updates in real time.",
+      "followups": ["Add a checkout checklist with tick boxes that remembers what was ticked.", "Add an emergency contacts card at the top of the Welcome tab."],
+      "expect": ["Welcome", "Wifi", "Chat"]
+    },
+    {
+      "id": "spa",
+      "name": "Spa appointments with accounts",
+      "category": "hospitality",
+      "prompt": "Create an appointment booking site for Lotus Spa. Treatments: massage 60 min 80 EUR, facial 45 min 65 EUR, manicure 30 min 35 EUR. Customers sign up or sign in (email or Google), pick a treatment, a day and a free 30-minute slot between 10:00 and 19:00 (taken slots are not shown), and see and cancel their own upcoming appointments. Password reset must work.",
+      "followups": ["Send the customer a confirmation email after booking.", "Add a gift card page where people can buy a 50 or 100 EUR gift card with Stripe."],
+      "expect": ["Lotus Spa", "massage", "Sign"]
+    },
+    {
+      "id": "crm",
+      "name": "Travel agency CRM",
+      "category": "business",
+      "prompt": "Build a small CRM for a travel agency team. Signed-in users manage leads (name, email, phone, destination, budget, travel dates, source) in a kanban board with columns New, Contacted, Quote sent, Booked and Lost, with drag or buttons to move between columns, notes on each lead, search, and a dashboard with counts per column and total booked budget this month. Use SQL tables with leads and notes linked.",
+      "followups": ["Add a CSV export of all leads.", "Add a follow-up date to each lead and highlight overdue ones in red."],
+      "expect": ["New", "Booked", "Lead"]
+    },
+    {
+      "id": "saas",
+      "name": "SaaS landing page with checkout",
+      "category": "business",
+      "prompt": "Create a landing page for Ledgerly, an invoicing tool for freelancers: hero with product screenshot mockup, three feature sections, testimonials, an FAQ accordion, and pricing (Free, Pro 12 USD/month, Team 39 USD/month) where Pro and Team start a Stripe subscription checkout for signed-in users. Modern, clean, dark hero.",
+      "followups": ["Add a monthly/yearly toggle to pricing with 20% off yearly.", "Add a newsletter signup at the bottom that saves emails for the owner."],
+      "expect": ["Ledgerly", "Pro", "Team"]
+    },
+    {
+      "id": "dashboard",
+      "name": "Sales dashboard with charts",
+      "category": "business",
+      "prompt": "Build an internal dashboard for a coffee roaster. SQL tables for products and daily sales seeded with 90 days of realistic data for 6 products. Show KPI cards (revenue this month, orders, average order, best seller), a revenue line chart by day, a bar chart by product and a table of recent sales with date range filtering. Signed-in users only.",
+      "followups": ["Add a comparison with the previous period on each KPI card.", "Add a form to record a new sale that updates the charts."],
+      "expect": ["Revenue", "Orders"]
+    },
+    {
+      "id": "planner",
+      "name": "AI trip planner",
+      "category": "ai",
+      "prompt": "Make an AI trip planner. The user enters a destination, number of days, budget level and interests; the app uses AI to generate a day-by-day itinerary with morning, afternoon and evening plans and an estimated budget, shown as cards. Signed-in users can save itineraries and reopen them later.",
+      "followups": ["Let the user regenerate a single day without changing the others.", "Add a share link button that copies a read-only link to an itinerary."],
+      "expect": ["Destination", "Days"]
+    },
+    {
+      "id": "events",
+      "name": "Event tickets with QR codes",
+      "category": "business",
+      "prompt": "Create an event page for a wine tasting evening on a fixed date with a programme, venue map link and a free ticket signup (name, email, number of tickets 1-4). After signing up, show a ticket with a QR code containing the ticket id. Add an owner check-in page where the owner types or scans a ticket id and sees whether it is valid and not already used.",
+      "followups": ["Close signups automatically when 80 tickets are taken.", "Add a countdown to the event on the home page."],
+      "expect": ["ticket", "Sign"]
+    },
+    {
+      "id": "webhook",
+      "name": "Webhook and secret keys",
+      "category": "technical",
+      "prompt": "Build an order status page for a small online shop. A server function receives order webhooks from the shop platform (JSON with order id, customer email, status), verifies an HMAC-SHA256 signature from the X-Signature header using a secret named SHOP_WEBHOOK_SECRET, and stores orders. Customers enter their order id and email to see the status and a timeline of status changes.",
+      "followups": ["Email the customer when the status changes to shipped.", "Add an owner page listing the last 50 webhook events with their result."],
+      "expect": ["Order", "status"]
+    },
+    {
+      "id": "blog",
+      "name": "Blog with admin editor",
+      "category": "content",
+      "prompt": "Create a travel blog called Slow Roads with a home page of post cards, post pages rendered from markdown, tags, and search. The owner signs in to an admin page to write, edit, publish and unpublish posts in markdown with a live preview and a cover image upload. Visitors only see published posts.",
+      "followups": ["Add reading time to each post.", "Add comments on posts that only signed-in readers can write."],
+      "expect": ["Slow Roads"]
+    }
+  ]
+}

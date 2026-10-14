@@ -429,6 +429,14 @@ export default function App() {
 `}}
 ];
 for(const t of TEMPLATES){t.files={'src/main.jsx':MAIN,'src/index.css':CSS,...t.files}}
+// Larger templates live as real project folders under templates/<id>/.
+function folder(name){
+ const fs=require('fs'),path=require('path'),root=path.join(__dirname,'templates',name),files={};
+ (function walk(dir){for(const f of fs.readdirSync(dir).sort()){const p=path.join(dir,f);if(fs.statSync(p).isDirectory())walk(p);else files[path.relative(root,p).split(path.sep).join('/')]=fs.readFileSync(p,'utf8')}})(root);
+ return files;
+}
+TEMPLATES.unshift({id:'calorie-tracker',name:'Calorie & fitness tracker',category:'Health',description:'A phone-first app: daily calorie and macro targets, a food database with search, water, workouts, progress charts and AI meal estimates. Installable on iPhone and Android.',mobile:{name:'Plate & Pulse',short_name:'Plate',theme_color:'#0c1222'},get files(){return folder('calorie-tracker')}});
+TEMPLATES.unshift({id:'boutique-hotel',name:'Boutique hotel',category:'Hospitality',description:'Rooms, live availability and booking (no double bookings), guest accounts with My stays, and a front-desk dashboard with charts. Add team emails as the OWNER_EMAILS server secret.',get files(){return folder('boutique-hotel')}});
 function list(){return TEMPLATES.map(({files,...t})=>t)}
 function get(id){return TEMPLATES.find(t=>t.id===id)||null}
 module.exports={list,get,TEMPLATES};

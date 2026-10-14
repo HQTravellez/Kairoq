@@ -7,7 +7,7 @@ const builder=require('./react-builder');
 
 function key(){
  const raw=process.env.APP_ENCRYPTION_KEY||'';
- if(raw.length<16)throw Object.assign(Error('Set APP_ENCRYPTION_KEY (at least 16 characters) in Railway before saving keys or tokens.'),{status:409});
+ if(raw.length<16)throw Object.assign(Error('Saving keys is not enabled on this server yet. (Server admin: set APP_ENCRYPTION_KEY to 16 or more random characters.)'),{status:409});
  return crypto.createHash('sha256').update('kairoq-project-secrets:'+raw).digest();
 }
 function file(id){return path.join(builder.projectDir(id),'secrets.json')}

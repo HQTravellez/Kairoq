@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --ink: #0c1222; --lime: #c6f432; --mint: #34d399; --protein: #7c6cff; --carbs: #ffb547; --fat: #ff6b9a; --water: #38bdf8; }
+html, body { background: #f2f3ee; }
+body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: var(--ink); -webkit-tap-highlight-color: transparent; }
+.tabular { font-variant-numeric: tabular-nums; }
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 12px); }
+.safe-top { padding-top: env(safe-area-inset-top); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+@layer components {
+  .card { @apply rounded-[28px] bg-white p-5 shadow-[0_1px_2px_rgba(12,18,34,0.04),0_8px_24px_-12px_rgba(12,18,34,0.12)]; }
+  .field { @apply w-full rounded-2xl border-0 bg-[#f2f3ee] px-4 py-3.5 text-base font-medium outline-none ring-1 ring-transparent transition focus:bg-white focus:ring-2 focus:ring-[#0c1222]; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0c1222] px-5 py-3.5 font-semibold text-white transition active:scale-[0.98] disabled:opacity-50; }
+  .btn-soft { @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-[#f2f3ee] px-4 py-3 font-semibold text-[#0c1222] transition hover:bg-[#e8eae1] active:scale-[0.98]; }
+  .chip { @apply rounded-full px-3 py-1 text-xs font-semibold; }
+}

@@ -166,6 +166,7 @@
       <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
       <button class="ghost" id="security-open" type="button">Security</button>
       <button class="ghost" id="team-open" type="button">Share</button>
+      <button class="ghost" id="mobile-open" type="button" title="Phone app: install on iPhone and Android, native iOS/Android project">App</button>
       <button class="ghost" id="settings-open" type="button">Settings</button>
       <button class="primary" id="publish-open" type="button">Publish</button>
     </div>
@@ -262,6 +263,42 @@
   </form>
 </dialog>
 
+<dialog id="mobile-dialog">
+  <form method="dialog" class="dialog" id="mobile-form">
+    <h2>Mobile app</h2>
+    <label class="check"><input type="checkbox" id="mobile-enabled"> This is a mobile app <span class="muted small">(the AI designs phone-first; downloads include an iOS and Android project)</span></label>
+    <div class="row wrap">
+      <label>App name<input id="mobile-name" maxlength="45"></label>
+      <label>Home-screen name<input id="mobile-short" maxlength="12" placeholder="max 12 letters"></label>
+    </div>
+    <div class="row wrap">
+      <label>Theme colour<input id="mobile-theme" type="color" value="#111827"></label>
+      <label>Icon<select id="mobile-icon"><option value="">Letters on the theme colour</option></select></label>
+      <img id="mobile-icon-preview" class="app-icon" alt="App icon preview" width="64" height="64">
+    </div>
+    <label>App ID <span class="muted small">(for the App Store and Google Play)</span><input id="mobile-appid" spellcheck="false" placeholder="com.yourcompany.yourapp"></label>
+    <div class="row"><button class="primary" id="mobile-save" type="button">Save</button><span class="muted small" id="mobile-status" role="status"></span></div>
+    <h3>Install on your phone</h3>
+    <div class="row wrap qr-row">
+      <img id="mobile-qr" class="qr hidden" alt="QR code to open the published app" width="200" height="200">
+      <div class="small" id="mobile-install">
+        <p id="mobile-url" class="muted"></p>
+        <p><b>iPhone:</b> open the link in Safari → Share → <i>Add to Home Screen</i>.</p>
+        <p><b>Android:</b> open it in Chrome → menu → <i>Install app</i>.</p>
+        <p class="muted" id="mobile-install-note"></p>
+      </div>
+    </div>
+    <h3>App Store and Google Play</h3>
+    <p class="small">Turn on <i>This is a mobile app</i>, then:</p>
+    <ul class="small steps">
+      <li><a class="link" id="mobile-download" download>Download the iOS + Android project (ZIP)</a>: open it in Android Studio or Xcode (<code>npm run android</code> / <code>npm run ios</code>).</li>
+      <li>Or push it to GitHub from Settings: every push builds an Android APK you can install, under <i>Actions → Artifacts</i>.</li>
+      <li>Publishing to the stores needs your own Apple Developer and Google Play accounts.</li>
+    </ul>
+    <p class="error" id="mobile-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="figma-dialog">
   <form method="dialog" class="dialog" id="figma-form">
     <h2>Import from Figma</h2>
