@@ -102,6 +102,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   const lines=[prefix];
   if(r.steps.length)lines.push('UI steps:\n'+r.steps.map((s,i)=>(i+1)+'. '+(s.ok?'ok ':'FAILED ')+s.step+(s.ok?'':' → '+s.error)).join('\n'));
   lines.push(r.errors.length?'Problems in the browser:\n'+r.errors.join('\n'):'No errors in the browser.');
+  if(r.external&&r.external.length)lines.push('Files from other sites that did not load (not code errors; fine if they are just unreachable from the test browser):\n'+r.external.join('\n'));
   lines.push('Visible text:\n'+clip(r.text||'(none)',2500));
   return{text:lines.join('\n\n'),image:r.screenshot};
  }

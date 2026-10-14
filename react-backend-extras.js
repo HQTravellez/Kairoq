@@ -106,7 +106,7 @@ async function deliver(to,subject,text,replyTo){
 async function sendEmail(body,{meta,db,cfg,user}){
  if(!cfg.email)throw fail(404,'Email is not enabled. Add "email": true to src/backend.json.');
  const to=body.to==='owner'?ownerEmail(meta):body.to==='me'?(user&&user.email):null;
- if(!to)throw fail(body.to==='me'?401:400,body.to==='me'?'Sign in to email yourself':'Send to "owner" (the app owner) or "me" (the signed-in user)');
+ if(!to)throw fail(body.to==='me'?401:body.to==='owner'?409:400,body.to==='me'?'Sign in to email yourself':body.to==='owner'?'The app owner has no email address yet (server admin: set KAIROQ_OWNER_EMAIL)':'Send to "owner" (the app owner) or "me" (the signed-in user)');
  const subject=String(body.subject||'').trim().slice(0,200),text=String(body.text||'').trim().slice(0,10000);
  if(!subject||!text)throw fail(400,'Email needs a subject and text');
  const now=Date.now(),who=user?user.id:'anonymous';

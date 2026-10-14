@@ -51,12 +51,16 @@ function privateHost(h){h=h.replace(/^\[|\]$/g,'').toLowerCase();return h==='loc
 async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
  if(!available())return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
- const page=await context.newPage(),errors=[],results=[];
+ const page=await context.newPage(),errors=[],results=[],external=[];
  const add=e=>{const text=String(e).slice(0,500);if(!IGNORED.test(text)&&!errors.includes(text)&&errors.length<15)errors.push(text)};
+ // Files from other sites that fail to load (blocked images, fonts) are listed separately:
+ // they are not code errors and must not stop the agent from finishing.
+ const own=u=>{try{return new URL(u).origin===new URL(url).origin}catch{return false}};
+ const ext=u=>{if(external.length<10&&!external.includes(u))external.push(u)};
  page.on('pageerror',e=>add('Uncaught error: '+(e.stack||e.message||e)));
- page.on('console',m=>{if(m.type()==='error'){const at=m.location()?.url;add('Console error: '+m.text()+(at&&/Failed to load resource/.test(m.text())?' ('+at+')':''))}});
- page.on('requestfailed',r=>add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')'));
- page.on('response',r=>{if(r.status()>=400)add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())});
+ page.on('console',m=>{if(m.type()==='error'){const at=m.location()?.url;if(/Failed to load resource/.test(m.text())&&at&&!own(at))return ext(at);add('Console error: '+m.text()+(at&&/Failed to load resource/.test(m.text())?' ('+at+')':''))}});
+ page.on('requestfailed',r=>{if(own(r.url()))add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')');else ext(r.url())});
+ page.on('response',r=>{if(r.status()>=400){if(own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url());else ext(r.url())}});
  const origin=new URL(url).origin,root=new URL('./',url).pathname;
  const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(root)||[])[1];
  // Only the app itself, its backend and public https resources may load; anything else
@@ -97,7 +101,7 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
   if(screenshot)shot=(await page.screenshot({type:'jpeg',quality:60})).toString('base64');
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
- return{skipped:false,errors,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot};
+ return{skipped:false,errors,external,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot};
 }
 // Renders a small HTML document offline (no network) to PNG, e.g. app icons.
 async function renderHtml(html,{width,height}){
