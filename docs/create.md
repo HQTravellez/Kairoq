@@ -245,6 +245,23 @@ When `OPENROUTER_API_KEY` and `KAIROQ_BUILDER_PAID_APPROVED=true` are set, the A
 - **Turning it off.** Set `KAIROQ_IMAGE_GENERATION=off`.
 - **Manual images.** Owners can also generate an image from the Design dialog.
 
+## Saved checks (apps that don't break)
+
+The most common complaints about AI app builders are changes that break what used to work, paying for the AI's own mistakes, and tests that touch real data. Kairoq handles all three:
+
+- **Saved checks.** A check is a short browser script for a flow that must keep working, for example "fill *Your name*, click *Book*, expect *Thank you*".
+  - Agent mode saves the flows it proves with `"save_as"`.
+  - Owners can describe a check in plain English. The AI writes the steps (priced like a Discuss message), and the check is kept only if it passes now, unless the owner chooses **Save it anyway**.
+  - Up to 15 checks per project. Each can be switched on or off in the **Checks** dialog.
+- **After every change.** In Build, Agent and Polish, after the build and the browser test, Kairoq replays the enabled checks. If one fails, the AI is told exactly which step broke and must fix it before the version is saved. This takes up to three attempts.
+- **Pay only for working changes.** A change that still breaks a check, or still shows errors in the browser, after the automatic fixes is saved but **refunded**, and the chat says so.
+- **A test copy of the data** (`react-sandbox.js`).
+  - Checks and the agent's browser tests run against a snapshot of the app's databases (records, users, SQL tables), never the real ones. The snapshot is taken with SQLite `VACUUM INTO`.
+  - Uploads go to the copy's own folder. Emails are not sent, and payment checkout returns a test URL. Realtime events stay inside the copy.
+  - `query_db` in Agent mode reads the same copy. Copies are deleted after the run.
+- **Publish gate.** Publishing re-runs the checks on the version going live and asks before publishing a version that fails them.
+- **Live monitor.** Every `KAIROQ_MONITOR_HOURS` (default 24, `0` to turn off), the checks run on each published app's live version. The owner gets one email when a check starts failing, not one per day.
+
 ## Growth features
 
 - **Landing page and pricing.**

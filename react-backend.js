@@ -33,8 +33,8 @@ function normalizeConfig(cfg){
 function configErrors(files){try{parseConfig(files);return[]}catch(e){return[e.message]}}
 
 // ---------- storage ----------
-function database(id){
- const file=path.join(builder.projectDir(id),'data.sqlite');
+function database(id){return openFile(path.join(builder.projectDir(id),'data.sqlite'))}
+function openFile(file){
  if(dbs.has(file))return dbs.get(file);
  const db=new DatabaseSync(file);
  db.exec(`PRAGMA journal_mode=WAL;
@@ -48,7 +48,8 @@ function database(id){
  dbs.set(file,db);
  return db;
 }
-function close(id){const file=path.join(builder.projectDir(id),'data.sqlite');const db=dbs.get(file);if(db){db.close();dbs.delete(file)}}
+function close(id){closeFile(path.join(builder.projectDir(id),'data.sqlite'))}
+function closeFile(file){const db=dbs.get(file);if(db){db.close();dbs.delete(file)}}
 
 function hash(t){return crypto.createHash('sha256').update(String(t)).digest('hex')}
 // scrypt runs on the libuv thread pool so sign-ins never block the server.
@@ -298,7 +299,11 @@ async function handle(req,res,{onlyProject}={}){
   if(req.method==='OPTIONS')return send(res,204),true;
   limited(req,id);
   let meta;try{meta=builder.loadMeta(id)}catch{throw fail(404,'App not found')}
-  const db=database(id),user=currentUser(db,req);db.__projectId=id;
+  // A saved check's requests use a test copy of the data (see react-sandbox.js).
+  const sb=req.headers['x-kairoq-sandbox']?require('./react-sandbox').lookup(id,req.headers['x-kairoq-sandbox']):null;
+  if(req.headers['x-kairoq-sandbox']&&!sb)throw fail(410,'This test run has ended');
+  const db=sb?openFile(path.join(sb.dir,'data.sqlite')):database(id),user=currentUser(db,req);
+  db.__projectId=sb?id+'~test':id;if(sb){db.__filesDir=path.join(sb.dir,'files');db.__sandbox=true}
   const version=requestVersion(meta,req);
   if(route==='/auth/signup'&&req.method==='POST')return send(res,201,await signUp(db,await readJson(req))),true;
   if(route==='/auth/signin'&&req.method==='POST')return send(res,200,await signIn(db,await readJson(req))),true;
@@ -314,7 +319,7 @@ async function handle(req,res,{onlyProject}={}){
    const b=await readJson(req,4000),back=require('./react-backend-extras').allowedReturn(b.return_url,req,meta);
    const e=String(b.email||'').trim().toLowerCase(),found=db.prepare('SELECT * FROM users WHERE email=?').get(e);
    if(found&&resetThrottled(id,found.id))return send(res,200,{sent:true}),true;
-   if(found&&process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM){
+   if(found&&!sb&&process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM){
     const token=crypto.randomBytes(24).toString('base64url');
     db.prepare('DELETE FROM app_tokens WHERE user_id=?').run(found.id);
     db.prepare('INSERT INTO app_tokens(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash(token),found.id,Date.now()+3600000);
@@ -334,7 +339,7 @@ async function handle(req,res,{onlyProject}={}){
    return send(res,200,session(db,row.user_id)),true;
   }
   const extras=require('./react-backend-extras'),q0=Object.fromEntries(u.searchParams);
-  if(route==='/payments/webhook'&&req.method==='POST')return send(res,200,await extras.paymentWebhook(req,{id,meta,db})),true;
+  if(route==='/payments/webhook'&&req.method==='POST'&&!sb)return send(res,200,await extras.paymentWebhook(req,{id,meta,db})),true;
   const cfg=version?parseConfig(builder.loadFiles(id,version)):{collections:{}};
   const fnm=/^\/functions\/([a-z][a-z0-9-]{0,39})$/.exec(route);
   if(fnm){
@@ -348,9 +353,9 @@ async function handle(req,res,{onlyProject}={}){
     secret:async name=>require('./project-secrets').get(id,'app_'+String(name).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
     db:async(op,a,u)=>functionDb(db,cfg,op,a,u),
     ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');limitedAi(req,id);return appAi(meta,db,a)},
-    sql:(q,p)=>require('./react-sql').run.query(builder.projectDir(id),q,p),
-    sqlBatch:steps=>require('./react-sql').run.batch(builder.projectDir(id),steps),
-    email:async(a,u)=>extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
+    sql:(q,p)=>require('./react-sql').run.query(sb?sb.dir:builder.projectDir(id),q,p),
+    sqlBatch:steps=>require('./react-sql').run.batch(sb?sb.dir:builder.projectDir(id),steps),
+    email:async(a,u)=>sb?{sent:true,test:true}:extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
    };
    const applog=require('./react-logs');
    // Each app may run a few functions at once, so one busy app cannot starve the others.
@@ -374,8 +379,9 @@ async function handle(req,res,{onlyProject}={}){
   const fm=/^\/files\/([a-f0-9-]{36})$/.exec(route);
   if(fm&&req.method==='GET'){extras.serveFile(res,{id,db,fid:fm[1]});return true}
   if(fm&&req.method==='DELETE')return send(res,200,extras.removeFile({id,db,user,fid:fm[1]})),true;
-  if(route==='/email'&&req.method==='POST')return send(res,200,await extras.sendEmail(await readJson(req,20000),{meta,db,cfg,user})),true;
-  if(route==='/payments/checkout'&&req.method==='POST')return send(res,200,await extras.checkout(await readJson(req),{id,meta,cfg,user,req})),true;
+  // In a test run, emails and payments are not real.
+  if(route==='/email'&&req.method==='POST')return send(res,200,sb?{sent:true,test:true}:await extras.sendEmail(await readJson(req,20000),{meta,db,cfg,user})),true;
+  if(route==='/payments/checkout'&&req.method==='POST')return send(res,200,sb?{url:'#kairoq-test-checkout',test:true}:await extras.checkout(await readJson(req),{id,meta,cfg,user,req})),true;
   if(route==='/payments/mine'&&req.method==='GET')return send(res,200,{purchases:extras.myPurchases(db,user)}),true;
   const rt=/^\/realtime\/([a-z][a-z0-9_]{0,39})(\/ticket)?$/.exec(route);
   if(rt){
@@ -545,4 +551,4 @@ async function runAllSchedules(options){
  }
  return out;
 }
-module.exports={googleAppSignIn,configure,appAi,runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+module.exports={openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};

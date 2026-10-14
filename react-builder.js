@@ -325,7 +325,7 @@ function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_ver
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
 // Also carries the design brief and the design skills switched on for the project.
-function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
@@ -334,7 +334,7 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -346,7 +346,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
- let lastError='',runtimeErrors=[];
+ let lastError='',runtimeErrors=[],checkResult=null;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
@@ -363,16 +363,25 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
   catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
   try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\nMigrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
-  runtimeErrors=[];
-  if(checkRuntime){
+  runtimeErrors=[];checkResult=null;
+  if(checkRuntime||inspect){
    onProgress('testing');
    markTesting(id,n,next);
-   try{runtimeErrors=(await checkRuntime(previewUrl(meta,n))).errors||[]}catch(e){runtimeErrors=[]}
-   finally{clearTesting(id,n)}
+   try{
+    if(checkRuntime){try{runtimeErrors=(await checkRuntime(previewUrl(meta,n))).errors||[]}catch(e){runtimeErrors=[]}}
+    // Saved checks: flows that worked before must still work (run on a test copy of the data).
+    if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
+   }finally{clearTesting(id,n)}
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError=runtimeErrors.join('\n');
     messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'});
+    continue;
+   }
+   if(checkResult&&checkResult.failed.length&&attempt<MAX_ATTEMPTS){
+    fs.rmSync(dir,{recursive:true,force:true});
+    lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);
+    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\nFix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'});
     continue;
    }
   }
@@ -382,12 +391,13 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   const fresh=loadMeta(id);
   const message=reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   saveMeta(fresh);
-  return{version:n,message,changed,attempts:attempt,runtime_errors:runtimeErrors,preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }

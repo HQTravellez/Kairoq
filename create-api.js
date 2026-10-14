@@ -66,7 +66,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -157,7 +157,7 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
   try{
    const signal=controller.signal;
    if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,tier:modelTier,images,signal})}
-   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,tier:modelTier,checkRuntime,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
+   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
     job.result=await require('./react-agent').run(id,message,{callModel,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
@@ -165,16 +165,20 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    }
    else{
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
-    job.result=await builder.edit(id,message,{callModel,onStream,tier:modelTier,images,checkRuntime,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{callModel,onStream,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // The first build of a new project on Pro or Max gets a free design review.
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
-     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,tier,checkRuntime,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
+     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
      catch(e){job.result={...first,polish_error:signal.aborted?'Stopped before the design review.':'The design review did not finish: '+String(e.message||e).slice(0,300)}}
     }
    }
    // An agent task that changed nothing is not charged.
    if(mode==='agent'&&job.result&&job.result.unchanged&&v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: agent made no changes','refund:'+job.id)}catch{}job.refunded=true}
+   // You only pay for working changes: a change that still breaks a saved check or shows errors
+   // in the browser after the automatic fixes is free.
+   const broken=mode!=='discuss'&&job.result&&!job.result.unchanged&&((job.result.check_failures||[]).length||(job.result.runtime_errors||[]).length);
+   if(broken&&!job.refunded){job.refund_reason=(job.result.check_failures||[]).length?'checks':'errors';if(v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: the change still has problems','refund:'+job.id)}catch{}job.refunded=true}}
    update({status:'complete'});
   }catch(e){
    update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
@@ -480,6 +484,29 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const saved=require('./react-assets').save(id,[{name:stem+'.'+ext,mime:picture.mime,data:picture.data}],{maxBytes:6*1024*1024});
    return send(res,201,{saved,assets:require('./react-assets').list(id)}),true;
   }
+  // Saved checks: list, add (steps or a plain-English description), switch on/off, run now, remove.
+  if(action==='/checks'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{checks:require('./react-checks').list(meta),monitor:meta.monitor||null}),true}
+  if(action==='/checks'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{checks:require('./react-checks').remove(id,String(b.id||''))}),true}
+  if(action==='/checks'&&method==='POST'){
+   const b=await readJson(req,40000),checks=require('./react-checks');
+   if(b.id&&b.enabled!==undefined){checks.setEnabled(id,String(b.id),b.enabled);return send(res,200,{checks:checks.list(builder.loadMeta(id))}),true}
+   for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is being updated. Try again when it is done.'),{status:409});
+   const meta=builder.loadMeta(id),url=builder.previewUrl(meta);
+   if(!url)throw Object.assign(Error('Build the app first'),{status:400});
+   if(b.run){const r=await checks.run(id,url,{inspect,version:meta.current_version});if(r.skipped)throw Object.assign(Error('Checks need a browser on the server (Chromium), which is not available here.'),{status:503});return send(res,200,{result:r,checks:checks.list(builder.loadMeta(id))}),true}
+   let draft;
+   if(typeof b.describe==='string'&&b.describe.trim()){
+    // The AI writes the steps (priced like a Discuss message); the check is kept only if it passes now.
+    const tier=b.tier||'standard',price=cost({mode:'discuss',tier}),ref='check:'+crypto.randomUUID();
+    if(v.kind==='customer'&&price>0)accounts.charge(v.account.id,price,'Write a check',ref);
+    try{draft=await checks.write(id,b.describe,{callModel,tier})}
+    catch(e){if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: check not written','refund-'+ref)}catch{}throw Object.assign(Error('Could not write that check: '+String(e.message||e).slice(0,300)),{status:502})}
+   }else draft=checks.normalize(b);
+   const r=await checks.run(id,url,{inspect,checks:[{...draft,id:'draft'}],record:false});
+   if(!r.skipped&&r.failed.length&&!b.force)return send(res,200,{saved:false,draft,failed:r.failed[0]}),true;
+   const saved=checks.save(id,draft,{source:b.describe?'ai':'user'});
+   return send(res,201,{saved:true,check:saved,verified:!r.skipped,checks:checks.list(builder.loadMeta(id))}),true;
+  }
   if(action==='/knowledge'&&method==='POST'){
    const b=await readJson(req,20000),meta=builder.loadMeta(id);
    meta.knowledge=String(b.text||'').slice(0,8000);builder.saveMeta(meta);
@@ -541,7 +568,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   }
   if(action==='/file'&&method==='GET'){const name=new URL(req.url,'http://x').searchParams.get('path')||'';return send(res,200,{path:name,content:builder.readFile(id,name)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
-  if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);hosting.publish(id,{slug:b.slug,version:b.version});
+  if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);
+   // Publishing re-runs the saved checks on the version going live, unless the owner overrides.
+   if(!b.force&&inspect){const meta=builder.loadMeta(id),n=Number(b.version)||meta.current_version;if(require('./react-checks').list(meta).some(c=>c.enabled!==false)&&meta.versions.some(x=>x.n===n)){const r=await require('./react-checks').run(id,builder.previewUrl(meta,n),{inspect,version:n});if(r.failed.length)return send(res,409,{error:'Saved checks fail on this version: '+r.failed.map(f=>f.name).join(', ')+'. Fix them first, or publish anyway.',checks_failed:r.failed}),true}}
+   hosting.publish(id,{slug:b.slug,version:b.version});
    // Social share image: a screenshot of the published version, taken in the background.
    if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
   return send(res,200,{project:projectView(id)}),true}

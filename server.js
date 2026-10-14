@@ -6976,6 +6976,9 @@ if (process.env.NODE_ENV !== "test") {
   setInterval(() => reactBackend.runAllSchedules().catch(e=>console.warn("[create-schedules]",e.message)), 5*60_000).unref();
   const runBackup=()=>{try{const b=require("./create-backups").run();if(b.errors.length)console.warn("[create-backups]",b.errors.join("; "))}catch(e){console.warn("[create-backups]",e.message)}};
   setTimeout(runBackup,10*60_000).unref();setInterval(runBackup,24*3600_000).unref();
+  // Live-app monitor: re-runs saved checks on every published app (KAIROQ_MONITOR_HOURS, 0 = off).
+  const monitorHours=Number(process.env.KAIROQ_MONITOR_HOURS??24);
+  if(monitorHours>0){const runMonitor=()=>require("./react-checks").monitorAll({inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[create-monitor]",e.message));setTimeout(runMonitor,20*60_000).unref();setInterval(runMonitor,monitorHours*3600_000).unref();}
   require("./scripts/verify-builder-assets").startup().catch(e=>console.warn("[builder-assets] PROVIDER SMOKE ERROR "+e.message));
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);
