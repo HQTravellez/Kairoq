@@ -88,6 +88,9 @@ function tiers(){
   {id:'max',label:'Max',credits:intEnv('KAIROQ_MAX_CREDITS',15),enabled:paid}
  ].filter(t=>t.id!=='max'||max);
 }
+// The design review costs at least KAIROQ_POLISH_CREDITS (default 5 when a design model such
+// as Fable does the review, else 1), so a Standard review by Fable is not sold at a loss.
+function polishCredits(){return intEnv('KAIROQ_POLISH_CREDITS',process.env.KAIROQ_DESIGN_MODELS?5:1)}
 function generatedImageCredits(){return intEnv('KAIROQ_GENERATED_IMAGE_CREDITS',2)}
 // Agent tasks take many model calls, so they cost a multiple of the tier's price.
 function agentMultiplier(){const n=intEnv('KAIROQ_AGENT_MULTIPLIER',3);return n>=1?n:3}
@@ -97,6 +100,7 @@ function cost({mode,tier,images}){
  if(!t||!t.enabled)throw Object.assign(Error('That model tier is not available'),{status:400});
  const image=images?intEnv('KAIROQ_IMAGE_CREDITS',1):0;
  if(mode==='discuss')return(tier==='standard'?intEnv('KAIROQ_DISCUSS_CREDITS',1):Math.max(t.credits,intEnv('KAIROQ_DISCUSS_CREDITS',1)))+image;
+ if(mode==='polish')return Math.max(t.credits,polishCredits())+image;
  return t.credits*(mode==='agent'?agentMultiplier():1)+image;
 }
 const IMAGE_TYPES={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif'};
@@ -210,7 +214,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots)}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));

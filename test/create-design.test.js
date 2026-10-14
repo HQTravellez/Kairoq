@@ -94,6 +94,7 @@ test('the first build gets a design brief and a matching skill; later builds fol
  const id=created.project.id,meta=builder.loadMeta(id);
  assert.equal(meta.design.name,'Warm Lisbon editorial');assert.deepEqual(meta.skills,['luxury-hospitality']);
  assert.match(calls[0].messages[0].content,/luxury-hospitality: Luxury hospitality/,'the art director sees the skills');
+ assert.equal(calls[0].design,true,'the brief goes to the design model');assert.ok(!calls[1].design,'the code goes to the tier model');
  const system=calls[1].messages[0].content;
  assert.match(system,/DESIGN \(as important as working code/);
  assert.match(system,/DESIGN BRIEF for this project[\s\S]*Warm Lisbon editorial[\s\S]*Cormorant Garamond for headings/);
@@ -225,11 +226,19 @@ test('design review: screenshots go to the model and the fix is saved; Pro first
  const job=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{mode:'polish',message:'',tier:'pro'}})).json.job);
  assert.equal(job.status,'complete',job.error);
  const user=lastUser(calls.at(-1));
+ assert.equal(calls.at(-1).design,true,'the review goes to the design model');
  assert.match(user[0].text,/Design review\. The attached screenshots[\s\S]*Keep every feature/);
  assert.deepEqual(user.slice(1).map(p=>p.image_url.url.slice(0,27)),['data:image/jpeg;base64,AAAA','data:image/jpeg;base64,BBBB']);
  const meta=builder.loadMeta(id);
  assert.equal(meta.messages.at(-2).text,'Polish the design');assert.equal(meta.messages.at(-1).polish,true);
  assert.equal(meta.versions.at(-1).polish,true);
+ // The review costs at least KAIROQ_POLISH_CREDITS, so a Standard review by a design model is not sold at a loss.
+ process.env.KAIROQ_POLISH_CREDITS='3';queue=[{message:'Polished.',files:{'src/App.jsx':APP}}];
+ const p0=await credits(cookie);
+ assert.equal((await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{mode:'polish',tier:'standard'}})).json.job)).status,'complete');
+ assert.equal(await credits(cookie),p0-3);
+ assert.equal((await request(server,'GET','/api/create/me',{headers:{cookie}})).json.polish_credits,3);
+ delete process.env.KAIROQ_POLISH_CREDITS;
  // Without screenshots on the server the review is refused before charging.
  enabled.designShots=false;
  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{mode:'polish'}})).status,503);

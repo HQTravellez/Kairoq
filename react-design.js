@@ -260,7 +260,7 @@ function normalize(v){
 }
 async function createBrief(request,{callModel,tier,signal,skills=[],projectName=''}){
  const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)}];
- const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier},parseBrief);
+ const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier,design:true},parseBrief);
  if(brief.skill&&!skills.some(s=>s.id===brief.skill))brief.skill='';
  return{...brief,created_at:new Date().toISOString()};
 }

@@ -6564,7 +6564,10 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   const maxCandidates=String(process.env.KAIROQ_MAX_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
   if(opts.tier==="max"&&(!allowPaid||!maxCandidates.length))throw Error("The Max tier needs KAIROQ_MAX_MODELS, KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left.");
   const ordered=opts.tier==="max"?[...maxCandidates,...proCandidates]:opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
-  const models=ordered.filter((m,i,a)=>m&&a.indexOf(m)===i);
+  // Design work (the design brief and the screenshot review) can go to a stronger model
+  // (KAIROQ_DESIGN_MODELS, e.g. Fable) first, whatever tier wrote the code.
+  const designFirst=opts.design&&allowPaid?String(process.env.KAIROQ_DESIGN_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean):[];
+  const models=[...designFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
@@ -6572,10 +6575,11 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
       // Pro and Max models can write whole apps in one reply, so they get a larger output cap.
-      const premium=opts.tier==="pro"||opts.tier==="max";
+      const designModel=designFirst.includes(model);
+      const premium=opts.tier==="pro"||opts.tier==="max"||designModel;
       const outputCap=premium?Math.max(4000,Number(process.env.KAIROQ_PREMIUM_OUTPUT_TOKENS)||32000):Math.max(2000,Number(process.env.KAIROQ_STANDARD_OUTPUT_TOKENS)||16000);
       const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):10000;
-      const rates=free?[0,0]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"?[10,50]:[5,25];
+      const rates=free?[0,0]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
       if(!free){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;

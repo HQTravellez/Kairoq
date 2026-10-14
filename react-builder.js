@@ -334,7 +334,7 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={}}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -350,7 +350,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design})}
   const next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
@@ -405,7 +405,7 @@ async function polish(id,{shots,note='',...opts}){
  const pictures=shots?await shots(previewUrl(meta)):[];
  if(!pictures.length)throw Object.assign(Error('Screenshots are not available on this server, so the design review cannot run.'),{status:503});
  const extraNote=String(note||'').trim().slice(0,1000);
- return edit(id,POLISH_REQUEST+(extraNote?'\nThe user also asked for: '+extraNote:''),{...opts,images:pictures.map(p=>({...p,name:p.name+'.jpg'})),displayText:'Polish the design'+(extraNote?': '+extraNote:''),extra:{polish:true}});
+ return edit(id,POLISH_REQUEST+(extraNote?'\nThe user also asked for: '+extraNote:''),{...opts,images:pictures.map(p=>({...p,name:p.name+'.jpg'})),displayText:'Polish the design'+(extraNote?': '+extraNote:''),extra:{polish:true},design:true});
 }
 
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.

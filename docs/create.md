@@ -224,6 +224,9 @@ New apps get a designed look by default. Kairoq uses four layers:
    - Standard uses the vision model; Pro and Max use their own models. The review costs one message on the chosen tier.
    - On Pro and Max, the first build of a new app gets one review for free. To turn this off, set `KAIROQ_AUTO_POLISH=off`.
    - The review needs Chromium on the server.
+5. **Design model.** `KAIROQ_DESIGN_MODELS` (for example the OpenRouter id of Fable) is tried first for the design brief and the Polish review, whatever tier writes the code. The customer gets the strongest model's design judgement while most code is written by the cheaper tier model.
+   - A Polish review costs at least `KAIROQ_POLISH_CREDITS`: 5 by default when a design model is set, 1 otherwise.
+   - The free review after a Pro or Max first build is paid by the server owner.
 
 The **Design** button in the editor shows:
 - the brief, with editable colours, fonts, corners and notes (saving restyles the app as a new version)

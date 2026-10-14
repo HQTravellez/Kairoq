@@ -228,8 +228,10 @@ function renderTiers(){
 }
 $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
 function costHint(){
- if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');return}
+ const base='Screenshot the app on desktop and phone and let the AI fix what looks off';
+ if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');$('polish').title=base;return}
  const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
+ const p=Math.max(t?t.credits:1,state.me.polish_credits||1);$('polish').title=base+' ('+p+' credit'+(p===1?'':'s')+')';
  const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.length?state.me.image_credits:0);
  text($('cost-hint'),n+' credit'+(n===1?'':'s'));
 }
