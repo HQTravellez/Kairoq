@@ -23,6 +23,7 @@
   - Messages with images and the Standard tier use `KAIROQ_VISION_MODELS`, because DeepSeek cannot read images.
   - **Max** uses `KAIROQ_MAX_MODELS` (for example Fable 5.1). It is hidden until that is set, and costs `KAIROQ_MAX_CREDITS` (15) per message.
   - Pro, Max and image requests need `KAIROQ_BUILDER_PAID_APPROVED=true` and count toward the builder budget.
+  - Output limit per reply: `KAIROQ_STANDARD_OUTPUT_TOKENS` (16,000) for Standard and `KAIROQ_PREMIUM_OUTPUT_TOKENS` (32,000) for Pro and Max, with a 15-minute streaming timeout for Pro and Max. In Agent mode, a reply cut off at the limit is sent back to the model with a request to write fewer files per step.
 - **Project knowledge.** Under **Settings**, owners write instructions the model follows on every message (brand, tone, rules). Up to 8,000 characters.
 - **Security scan.** The **Security** button checks the code and backend settings: secrets in browser code, collections with personal data open to everyone, unsafe HTML, server functions that change data without checking the user, and unsigned webhooks. **Fix with AI** sends the findings to the model.
 - **Agent mode.** For bigger tasks, the model works in steps until the job is done.

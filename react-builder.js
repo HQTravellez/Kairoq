@@ -308,7 +308,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:16000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
   const next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;

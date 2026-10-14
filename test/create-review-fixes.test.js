@@ -126,4 +126,8 @@ test('agent: a bad reply is retried, and finish never saves an older build than 
  assert.equal(r.message,'Added v3');
  assert.match(builder.loadFiles(id,r.version)['src/App.jsx'],/v3/);
  assert.equal(script.length,0);
+ // A reply cut off by the output limit is recognised, and the model is told to write fewer files per step.
+ const cut=agent.parseStepSafe('{"thought":"big","actions":[{"tool":"write_files","files":{"src/App.jsx":"export default function App(){return <main>');
+ assert.match(cut.invalid,/cut off[\s\S]*fewer files per step/);
+ assert.match(agent.protocol({vision:false,web:false,maxSteps:15}),/over two or three steps/);
 });

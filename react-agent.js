@@ -26,11 +26,11 @@ Tools (several per step are fine; they run in order):
 ${web?`- {"tool":"web_search","query":"..."}: search the web; returns links.
 - {"tool":"fetch_url","url":"https://..."}: read a public web page or API documentation as text.
 `:''}- {"tool":"finish","message":"for the user: what you built and how to use it"}: end when the request is done and the last build_and_test or test_ui passed.
-Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors. Be economical: you have at most ${maxSteps} steps.`;
+Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. For a big app, write the files over two or three steps (a few files per write_files) so no reply gets too long. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors. Be economical: you have at most ${maxSteps} steps.`;
 }
 
 // Never throws: a reply that is not valid JSON comes back as {invalid} so the loop can ask again.
-function parseStepSafe(content){try{return parseStep(content)}catch(e){const raw=typeof content==='string'?content:JSON.stringify(content);return{invalid:String(e.message||e),thought:'',actions:[],raw:String(raw||'').slice(0,400)}}}
+function parseStepSafe(content){try{return parseStep(content)}catch(e){const raw=typeof content==='string'?content:JSON.stringify(content);const cut=/^\s*(```(json)?\s*)?\{/.test(raw||'')&&!/\}\s*(```)?\s*$/.test(raw||'');return{invalid:cut?'it was cut off because it was too long; write fewer files per step (for example 4 to 6) and continue':String(e.message||e),thought:'',actions:[],raw:String(raw||'').slice(0,400)}}}
 function parseStep(content){
  let v=content;
  if(typeof v==='string'){
@@ -197,7 +197,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   report({status:'thinking',step});
   trimContext();
   // Streaming keeps long steps (several files) under the provider's streaming timeout.
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:16000,signal,tier,onToken:()=>{}},parseStepSafe);
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:()=>{}},parseStepSafe);
   if(reply.invalid){
    invalidReplies++;
    steps.push({n:step,thought:'',actions:['Reply was not valid JSON'],summary:'Reply was not valid JSON'});
@@ -238,4 +238,4 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id)}
 }
-module.exports={run,parseStep,protocol,htmlToText,describe};
+module.exports={run,parseStep,parseStepSafe,protocol,htmlToText,describe};

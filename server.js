@@ -6571,8 +6571,11 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
     if(!free&&!allowPaid)continue;
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
-      const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(20000,opts.maxOutputTokens)):10000;
-      const rates=free?[0,0]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:[5,25];
+      // Pro and Max models can write whole apps in one reply, so they get a larger output cap.
+      const premium=opts.tier==="pro"||opts.tier==="max";
+      const outputCap=premium?Math.max(4000,Number(process.env.KAIROQ_PREMIUM_OUTPUT_TOKENS)||32000):Math.max(2000,Number(process.env.KAIROQ_STANDARD_OUTPUT_TOKENS)||16000);
+      const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):10000;
+      const rates=free?[0,0]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"?[10,50]:[5,25];
       if(!free){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
@@ -6580,7 +6583,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
         if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
       }
       const stream=typeof opts.onToken==="function";
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(opts.tier==='max'?900000:300000):110000)]):AbortSignal.timeout(stream?(opts.tier==='max'?900000:300000):110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},...(stream?{stream:true,usage:{include:true}}:{})})});
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(premium?900000:300000):110000)]):AbortSignal.timeout(stream?(premium?900000:300000):110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},...(stream?{stream:true,usage:{include:true}}:{})})});
       const data=stream&&response.ok&&response.body?await readChatStream(response.body,opts.onToken):await response.json().catch(()=>({}));
       if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
       const message=data.choices?.[0]?.message||{};
