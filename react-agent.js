@@ -19,6 +19,7 @@ Tools (several per step are fine; they run in order):
 - {"tool":"read_files","paths":["src/App.jsx"]}: read up to 8 files.
 - {"tool":"search","query":"text or regex"}: search every project file; returns matching lines.
 - {"tool":"write_files","files":{"src/path.jsx":"full new content"},"delete":["src/old.jsx"]}: create or replace whole files (src/, functions/ and sql/ migrations).
+- {"tool":"edit_files","edits":{"src/path.jsx":[{"find":"exact current lines (unique in the file)","replace":"new lines"}]}}: change part of existing files. Prefer this over write_files for small changes: it is faster and cheaper. "find" must be copied exactly from the file (read it first) and match one place.
 - {"tool":"build_and_test","path":"#/optional-hash-route","steps":[...]}: build the project, open it in a real browser, run optional UI steps, and report errors and visible text${vision?' plus a screenshot':''}.
 - {"tool":"test_ui","path":"#/rooms","steps":[{"action":"click","text":"Book now"},{"action":"fill","label":"Email","value":"ana@example.com"},{"action":"select","label":"Room","value":"Suite"},{"action":"press","key":"Enter"},{"action":"expect","text":"Thank you"},{"action":"goto","path":"#/rooms"},{"action":"wait","ms":500}]}: run steps against the last build. Target elements by text, label, placeholder, role (+ text) or selector.
   Tests run on a test copy of the app's data: nothing they create is real, and emails and payments are simulated. Add "save_as":"Book a room" to a test_ui or build_and_test whose steps prove a main flow works (ending with expect steps): when it passes it becomes a saved check that is re-run after every future change.
@@ -42,7 +43,7 @@ function parseStep(content){
  if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Agent reply was not a JSON object');
  let actions=Array.isArray(v.actions)?v.actions:v.tool?[v]:[];
  // Accept a plain build-mode answer too.
- if(!actions.length&&v.files&&typeof v.files==='object')actions=[{tool:'write_files',files:v.files,delete:v.delete},{tool:'build_and_test'}];
+ if(!actions.length&&((v.files&&typeof v.files==='object')||(v.edits&&typeof v.edits==='object')))actions=[...(v.files?[{tool:'write_files',files:v.files,delete:v.delete}]:[]),...(v.edits?[{tool:'edit_files',edits:v.edits}]:[]),{tool:'build_and_test'}];
  actions=actions.filter(a=>a&&typeof a==='object'&&typeof a.tool==='string').slice(0,8);
  if(!actions.length)throw Error('Agent reply needs an "actions" list');
  return{thought:String(v.thought||v.message||'').slice(0,1000),actions};
@@ -57,6 +58,7 @@ function describe(a){
  if(t==='read_files')return'Read '+(Array.isArray(a.paths)?a.paths.slice(0,8).join(', '):'files');
  if(t==='search')return'Searched for "'+String(a.query||'').slice(0,60)+'"';
  if(t==='write_files'){const n=Object.keys(a.files||{});const d=Array.isArray(a.delete)?a.delete:[];return'Wrote '+(n.length?n.join(', '):'nothing')+(d.length?'; deleted '+d.join(', '):'')}
+ if(t==='edit_files'){const f=Object.keys(a.edits||{});return'Edited '+(f.length?f.join(', '):'nothing')}
  if(t==='build_and_test')return'Built and tested the app'+(Array.isArray(a.steps)&&a.steps.length?' ('+a.steps.length+' UI steps)':'');
  if(t==='test_ui')return'Tested in the browser ('+(Array.isArray(a.steps)?a.steps.length:0)+' steps)';
  if(t==='view_logs')return'Checked server logs';
@@ -157,6 +159,14 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
    if(written.length)dirty=true;
    const problems=builder.validateFiles(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
+  }
+  if(t==='edit_files'){
+   let edits;try{edits=require('./react-edits').normalize(a.edits)}catch(e){return{text:'edit_files: '+e.message}}
+   const r=require('./react-edits').apply(work,edits);
+   if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
+   work=r.files;if(r.changed.length)dirty=true;
+   const problems=builder.validateFiles(work);
+   return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
   if(t==='build_and_test')return buildAndTest(a);
   if(t==='test_ui')return testBuild(a,'test_ui on version '+(built?built.n:'?')+':');

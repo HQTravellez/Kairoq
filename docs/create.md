@@ -268,6 +268,11 @@ The most common complaints about AI app builders are changes that break what use
   - DeepSeek, OpenAI and Gemini cache that repeated part automatically on OpenRouter.
   - For Claude models (`anthropic/…`), Kairoq marks cache breakpoints (`cache_control`): on the system prompt and on the last two large user messages. Cache reads cost about a tenth of the normal input price, and cache writes about 1.25×.
   - Turn it off with `KAIROQ_PROMPT_CACHE=off`.
+- **Small edits instead of whole files.** The model's output is the most expensive part of a call (about 5× the input price for Claude). In Build mode the model can reply with `"edits":{"src/file.jsx":[{"find":"…","replace":"…"}]}`, and in Agent mode it can use the `edit_files` tool, instead of rewriting whole files.
+  - Each `find` must match exactly one place. An exact match is tried first, then one that ignores indentation and trailing spaces.
+  - If any edit fails, nothing is applied, and the model is told which edit failed and why.
+  - New files, and files that mostly change, are still sent whole.
+  - A one-line change shrinks from the whole file to a few hundred characters of output.
 - **Usage ledger.** Every paid AI call records its cost, model, tier and how many prompt tokens came from the cache.
 - **Cost report.** The server owner sees **Settings → AI costs, last 30 days**, also available as `GET /api/create/admin/costs`. It shows calls, total and average cost per tier and model, the share of tokens read from cache, and what one message of that tier sells for at `KAIROQ_CREDIT_PRICE_USD` per credit (default $0.25). Rows that cost more than they earn are shown in red.
 

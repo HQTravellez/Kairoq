@@ -63,8 +63,8 @@ Rules:
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
-{"message":"one or two sentences telling the user what you changed","files":{"src/path.jsx":"full new file content"},"delete":["src/unused.jsx"]}
-Include only files you create or change, each with its complete content. "delete" and "images" are optional.`;
+{"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
+Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.${require('./react-edits').PROMPT_NOTE}`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
 function projectDir(id){if(!/^[a-f0-9]{12}$/.test(String(id)))throw Object.assign(Error('Unknown project'),{status:404});return path.join(ROOT(),id)}
@@ -217,9 +217,11 @@ function parseEdit(content){
    value=JSON.parse(text.slice(start,end+1));
   }
  }
- if(!value||typeof value!=='object'||!value.files||typeof value.files!=='object'||Array.isArray(value.files))throw Error('Response JSON needs a "files" object');
+ if(!value||typeof value!=='object'||(value.files!==undefined&&(typeof value.files!=='object'||value.files===null||Array.isArray(value.files))))throw Error('Response JSON needs a "files" object');
+ const edits=require('./react-edits').normalize(value.edits);
+ if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
- return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files,delete:del,images:imageRequests(value.images)};
+ return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
@@ -352,12 +354,15 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   onProgress(attempt===1?'writing':'fixing');
   const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design})}
-  const next={...base};
+  let next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;
-  const errors=validateFiles(next);
-  messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,delete:reply.delete})});
-  if(errors.length){lastError=errors.slice(0,12).join('\n');messages.push({role:'user',content:'That change was rejected:\n'+lastError+'\nReturn corrected JSON with the full content of every file you need to change.'});continue}
+  // Small changes arrive as find/replace edits (cheaper than rewriting whole files).
+  const both=Object.keys(reply.edits).filter(f=>Object.hasOwn(reply.files,f));
+  const applied=require('./react-edits').apply(next,reply.edits);next=applied.files;
+  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:validateFiles(next))];
+  messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,edits:reply.edits,delete:reply.delete})});
+  if(errors.length){lastError=errors.slice(0,12).join('\n');messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again: fix the edits that failed (copy "find" exactly from the current files above) or send those files whole in "files".'});continue}
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}

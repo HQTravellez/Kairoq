@@ -119,7 +119,9 @@ function parseImages(list){
 function streamSnapshot(text,mode){
  if(mode==='discuss')return{text:text.slice(-6000)};
  const matches=[...text.matchAll(/"(src\/[^"\\]+\.(?:jsx|js|tsx|ts|css|json))"\s*:\s*"/g)];
- const files=[...new Set(matches.map(m=>m[1]))];
+ // Files changed by find/replace edits ("src/x.jsx":[{"find":…) are listed too.
+ const edited=[...text.matchAll(/"(src\/[^"\\]+\.(?:jsx|js|tsx|ts|css|json))"\s*:\s*\[/g)].map(m=>m[1]);
+ const files=[...new Set([...matches.map(m=>m[1]),...edited])];
  const msg=/"message"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(text);
  const last=matches.at(-1);
  // Only the code of the file being written, not the surrounding JSON.
