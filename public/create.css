@@ -203,3 +203,23 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .steps{padding-left:18px;margin:6px 0}.steps li{margin:4px 0}
 @media (max-width:520px){.qr{width:160px;height:160px}}
 input[type=color]{padding:2px 4px;height:40px;width:72px;cursor:pointer}
+
+/* Design dialog */
+.palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:10px 0}
+.palette label{display:flex;align-items:center;gap:8px;font-size:12px;text-transform:capitalize}
+.palette input[type=color],#mobile-theme{width:36px;height:30px;padding:2px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer}
+.skills{list-style:none;padding:0;margin:8px 0;display:grid;gap:6px}
+.skills li{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border);border-radius:10px}
+.skills li .skill-text{flex:1;min-width:0}
+.skills li .skill-text b{display:block;font-size:13px}
+.skills li .skill-text span{font-size:12px;color:var(--muted)}
+.skills li .skill-actions{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:12px;white-space:nowrap}
+.skill-choices{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.design-chip{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+.design-chip i{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.12)}
+.generated{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.generated img{width:64px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border)}
+.skills li>input[type=checkbox]{width:auto;flex:none;margin:3px 0 0}
+.skills li .skill-actions label{display:flex;align-items:center;gap:4px;margin:0;font-weight:400;font-size:12px}
+.skills li .skill-actions input{width:auto;margin:0}
+.palette label{margin-top:0;font-weight:500}

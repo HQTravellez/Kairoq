@@ -48,6 +48,39 @@ async function screenshot(url,file){
 // and returns runtime errors, step results, visible text and a JPEG screenshot.
 const MAX_STEPS=20;
 function privateHost(h){h=h.replace(/^\[|\]$/g,'').toLowerCase();return h==='localhost'||h.endsWith('.localhost')||h.endsWith('.internal')||/^\d+\.\d+\.\d+\.\d+$/.test(h)||h.includes(':')||!h.includes('.')}
+// Only the app itself, its backend and public https resources may load; anything else
+// (other Kairoq paths, internal hosts, cloud metadata) is blocked, including by clicking links.
+async function guard(context,url){
+ const origin=new URL(url).origin,root=new URL('./',url).pathname;
+ const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(root)||[])[1];
+ await context.route('**/*',r=>{
+  let u;try{u=new URL(r.request().url())}catch{return r.abort()}
+  if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
+  if(u.origin===origin)return u.pathname.startsWith(root)||(appId&&u.pathname.startsWith('/api/apps/'+appId+'/'))?r.continue():r.abort();
+  if(u.protocol==='https:'&&!privateHost(u.hostname))return r.continue();
+  return r.abort();
+ });
+}
+// Desktop and phone screenshots of a page (JPEG, base64) for the design review. Long pages
+// are captured down to a height limit so the model sees the whole first part of the page.
+async function designShots(url,{timeoutMs=20000}={}){
+ if(!available())return[];
+ const shots=[];
+ for(const [name,width,height,maxHeight] of [['desktop',1280,800,2600],['phone',390,844,2200]]){
+  const context=await (await browser()).newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:name==='phone',hasTouch:name==='phone'});
+  try{
+   await guard(context,url);
+   const page=await context.newPage();
+   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
+   await page.waitForLoadState('networkidle',{timeout:6000}).catch(()=>{});
+   await page.waitForTimeout(900);
+   const full=await page.evaluate(()=>document.documentElement.scrollHeight).catch(()=>height);
+   const buf=await page.screenshot({type:'jpeg',quality:62,fullPage:true,clip:{x:0,y:0,width,height:Math.max(height,Math.min(full,maxHeight))}});
+   shots.push({name,mime:'image/jpeg',data:buf.toString('base64')});
+  }catch{}finally{await context.close().catch(()=>{})}
+ }
+ return shots;
+}
 async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
  if(!available())return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
@@ -62,16 +95,7 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
  page.on('requestfailed',r=>{if(own(r.url()))add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')');else ext(r.url())});
  page.on('response',r=>{if(r.status()>=400){if(own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url());else ext(r.url())}});
  const origin=new URL(url).origin,root=new URL('./',url).pathname;
- const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(root)||[])[1];
- // Only the app itself, its backend and public https resources may load; anything else
- // (other Kairoq paths, internal hosts, cloud metadata) is blocked, including by clicking links.
- await context.route('**/*',r=>{
-  let u;try{u=new URL(r.request().url())}catch{return r.abort()}
-  if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
-  if(u.origin===origin)return u.pathname.startsWith(root)||(appId&&u.pathname.startsWith('/api/apps/'+appId+'/'))?r.continue():r.abort();
-  if(u.protocol==='https:'&&!privateHost(u.hostname))return r.continue();
-  return r.abort();
- });
+ await guard(context,url);
  let text='',shot=null;
  try{
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
@@ -115,4 +139,4 @@ async function renderHtml(html,{width,height}){
  }finally{await context.close().catch(()=>{})}
 }
 async function close(){if(browserPromise){const b=await browserPromise.catch(()=>null);browserPromise=null;await b?.close().catch(()=>{})}}
-module.exports={check,screenshot,inspect,renderHtml,available,close};
+module.exports={check,screenshot,inspect,designShots,renderHtml,available,close};

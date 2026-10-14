@@ -32,26 +32,8 @@ const INDEX_HTML=`<!doctype html>
   </body>
 </html>
 `;
-function template(name){
- return{
-  'src/main.jsx':`import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.jsx';
-import './index.css';
-
-createRoot(document.getElementById('root')).render(<App />);
-`,
-  'src/App.jsx':`export default function App() {
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900">
-      <h1 className="text-3xl font-semibold">${String(name||'New app').replace(/[^\w .,'-]/g,'')}</h1>
-    </main>
-  );
-}
-`,
-  'src/index.css':'@tailwind base;\n@tailwind components;\n@tailwind utilities;\n'
- };
-}
+// A new project: the starter page, the UI kit and default design tokens (see react-design.js).
+function template(name){return require('./react-design').starterFiles(name)}
 
 const SYSTEM_PROMPT=`You are the coding engine of an app builder like Lovable. You edit a React 18 + Vite + Tailwind CSS 3 project.
 Rules:
@@ -79,9 +61,10 @@ Rules:
   - Scheduled jobs: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
+- Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
 {"message":"one or two sentences telling the user what you changed","files":{"src/path.jsx":"full new file content"},"delete":["src/unused.jsx"]}
-Include only files you create or change, each with its complete content. "delete" is optional.`;
+Include only files you create or change, each with its complete content. "delete" and "images" are optional.`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
 function projectDir(id){if(!/^[a-f0-9]{12}$/.test(String(id)))throw Object.assign(Error('Unknown project'),{status:404});return path.join(ROOT(),id)}
@@ -204,7 +187,7 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
   const logger={info(){},warn(m){output.push(String(m))},warnOnce(m){output.push(String(m))},error(m){output.push(String(m))},clearScreen(){},hasErrorLogged(){return false},hasWarned:false};
   const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId,version)],
    resolve:{dedupe:['react','react-dom']},
-   css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:{extend:{}}})]}},
+   css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:require('./react-design').THEME})]}},
    server:{fs:{strict:true,allow:[work]}},
    build:{outDir,emptyOutDir:true,assetsInlineLimit:0,reportCompressedSize:false,sourcemap:false}});
   let timer;
@@ -236,13 +219,67 @@ function parseEdit(content){
  }
  if(!value||typeof value!=='object'||!value.files||typeof value.files!=='object'||Array.isArray(value.files))throw Error('Response JSON needs a "files" object');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
- return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files,delete:del};
+ return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files,delete:del,images:imageRequests(value.images)};
+}
+// Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
+const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
+function imageRequests(list){
+ if(!Array.isArray(list))return[];
+ const seen=new Set();
+ return list.filter(i=>i&&typeof i==='object'&&typeof i.prompt==='string'&&i.prompt.trim()).slice(0,4).map((i,n)=>{
+  const ext=(/\.(png|jpe?g|webp)$/i.exec(String(i.name||''))||[])[1];
+  let stem=String(i.name||'').toLowerCase().replace(/\.[a-z0-9]+$/,'').replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'image-'+(n+1);
+  while(seen.has(stem))stem+='-'+(n+1);seen.add(stem);
+  return{name:stem+'.'+(ext?ext.toLowerCase().replace('jpeg','jpg'):'jpg'),prompt:i.prompt.trim().slice(0,1500),aspect:ASPECTS.includes(i.aspect)?i.aspect:'16:9'};
+ });
+}
+// Generates requested images into the project's uploads and points the code at the saved
+// names (a saved name can differ: another extension or a -2 suffix). Without generation,
+// or when it fails, a plain placeholder in the brand colour keeps the app working.
+async function materializeImages(id,reply,{imageGen,cache,design}){
+ if(!reply.images.length)return[];
+ const assets=require('./react-assets'),notes=[];
+ for(const img of reply.images){
+  const key=img.name+'|'+img.prompt;
+  let saved=cache.get(key);
+  if(!saved){
+   let picture=null;
+   if(imageGen){try{picture=await imageGen(img)}catch(e){notes.push('Image "'+img.name+'" could not be generated: '+String(e.message||e).slice(0,160))}}
+   const stem=img.name.replace(/\.[a-z]+$/,'');
+   if(picture){const ext={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[picture.mime]||'png';saved=assets.save(id,[{name:stem+'.'+ext,mime:picture.mime,data:picture.data}],{maxBytes:6*1024*1024})[0]}
+   else{const hex=(design&&design.palette&&(design.palette.muted||design.palette.secondary))||'#e5e7eb';saved=assets.save(id,[{name:stem+'.png',mime:'image/png',data:require('./react-mobile').solidPng(64,hex).toString('base64')}])[0];if(!imageGen)notes.push('Image generation is not available, so "'+img.name+'" is a plain placeholder; upload a photo to replace it.')}
+   cache.set(key,saved);
+  }
+  if(saved!==img.name)for(const [f,code] of Object.entries(reply.files))if(typeof code==='string')reply.files[f]=code.split('uploads/'+img.name).join('uploads/'+saved);
+ }
+ return notes;
+}
+// Before the first real build of a new project the AI picks a visual direction (the design
+// brief); Kairoq saves it on the project and writes its colours and fonts into src/index.css.
+async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress=()=>{}}){
+ const meta=loadMeta(id);
+ if(meta.design||images.length||process.env.KAIROQ_DESIGN_BRIEF==='off')return null;
+ const design=require('./react-design'),files=loadFiles(id,meta.current_version);
+ if(!design.isUntouchedStarter(files)||!design.hasTokens(files))return null;
+ onProgress('designing');
+ let brief;
+ try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
+ catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
+ const fresh=loadMeta(id);
+ fresh.design=brief;
+ if(brief.skill&&!(fresh.skills||[]).includes(brief.skill))fresh.skills=[...(fresh.skills||[]),brief.skill];
+ saveMeta(fresh);
+ return brief;
 }
 function contextFiles(files,budget=160000){
  const parts=[];let used=0;const omitted=[];
- const order=Object.keys(files).sort((a,b)=>(a==='src/App.jsx'?-1:b==='src/App.jsx'?1:a.localeCompare(b)));
+ const design=require('./react-design');
+ // Unchanged UI kit files are listed by their API instead of their code.
+ const kitFiles=Object.keys(files).filter(n=>design.isKitFile(n,files[n])).sort();
+ const order=Object.keys(files).filter(n=>!kitFiles.includes(n)).sort((a,b)=>(a==='src/App.jsx'?-1:b==='src/App.jsx'?1:a.localeCompare(b)));
  for(const name of order){const block='--- '+name+' ---\n'+files[name]+'\n';if(used+block.length>budget){omitted.push(name);continue}used+=block.length;parts.push(block)}
- return parts.join('\n')+(omitted.length?'\n(Not shown to save space: '+omitted.join(', ')+'. Do not rewrite them unless needed.)\n':'');
+ const kitNote=kitFiles.length?'\n--- UI kit (unchanged starter files; import them, e.g. import { Button } from \'./components/ui/button.jsx\') ---\n'+kitFiles.map(n=>n+': '+(design.KIT_API[n]||'')).join('\n')+'\n':'';
+ return parts.join('\n')+kitNote+(omitted.length?'\n(Not shown to save space: '+omitted.join(', ')+'. Do not rewrite them unless needed.)\n':'');
 }
 
 // ---------- projects ----------
@@ -287,7 +324,8 @@ function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.version
 function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_version);if(!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});return files[name]}
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
-function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
+// Also carries the design brief and the design skills switched on for the project.
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
@@ -296,19 +334,24 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote=''}={}){
- const meta=loadMeta(id);
- const text=String(instruction||'').trim().slice(0,8000);
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={}}={}){
+ let meta=loadMeta(id);
+ const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
  if(!meta.current_version)await initialize(meta);
- const base=loadFiles(id,meta.current_version);
- const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+'\n\nRequest: '+text;
+ const brief=await prepareDesign(id,text,{callModel,tier,signal,images,onProgress});
+ meta=loadMeta(id);
+ let base=loadFiles(id,meta.current_version);
+ if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
+ const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
+ const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[];
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
   const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
+  if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design})}
   const next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;
@@ -334,16 +377,35 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
    }
   }
   writeJson(path.join(dir,'files.json'),next);
-  const changed=Object.keys(reply.files).filter(k=>base[k]!==reply.files[k]).concat(reply.delete.filter(k=>Object.hasOwn(base,k)&&!Object.hasOwn(next,k)));
+  const prev=loadFiles(id,meta.current_version);
+  const changed=Object.keys(next).filter(k=>prev[k]!==next[k]).concat(reply.delete.filter(k=>Object.hasOwn(base,k)&&!Object.hasOwn(next,k)));
   const fresh=loadMeta(id);
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  const message=reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
+  const generated=[...imageCache.values()];
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text,at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:reply.message,version:n,changed,at:now,...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   saveMeta(fresh);
-  return{version:n,message:reply.message,changed,attempts:attempt,runtime_errors:runtimeErrors,preview_url:previewUrl(fresh)};
+  return{version:n,message,changed,attempts:attempt,runtime_errors:runtimeErrors,preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
+}
+
+// The design review: screenshots of the current version (desktop and phone) go to the
+// model, which fixes what looks off without changing behaviour. Saved as a new version.
+const POLISH_REQUEST=`Design review. The attached screenshots show the current app: first a desktop browser 1280 px wide, then a phone 390 px wide (long pages are cut off at the bottom). Look at them like a senior product designer and improve the visual design without changing what the app does.
+1. Find the 5 to 8 most visible problems, for example: weak hierarchy or a hero without a focal point, cramped or uneven spacing, misaligned elements, low contrast text, plain or empty-looking sections, missing or poor imagery, inconsistent buttons and cards, hard-coded colours that ignore the design tokens, a phone layout that is cramped, overflowing or not tappable, missing hover and focus states.
+2. Fix them in the code: spacing, type scale, design tokens in src/index.css, imagery, section backgrounds, cards, hover and focus states, motion, the phone layout.
+Keep every feature, page, route, text content, form, data call and server function working exactly as before, and do not remove sections. In "message", tell the user in one or two sentences what you improved.`;
+async function polish(id,{shots,note='',...opts}){
+ const meta=loadMeta(id);
+ if(!meta.current_version)throw Object.assign(Error('Build the app first'),{status:400});
+ (opts.onProgress||(()=>{}))('reviewing');
+ const pictures=shots?await shots(previewUrl(meta)):[];
+ if(!pictures.length)throw Object.assign(Error('Screenshots are not available on this server, so the design review cannot run.'),{status:503});
+ const extraNote=String(note||'').trim().slice(0,1000);
+ return edit(id,POLISH_REQUEST+(extraNote?'\nThe user also asked for: '+extraNote:''),{...opts,images:pictures.map(p=>({...p,name:p.name+'.jpg'})),displayText:'Polish the design'+(extraNote?': '+extraNote:''),extra:{polish:true}});
 }
 
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.
@@ -444,4 +506,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

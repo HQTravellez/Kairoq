@@ -31,7 +31,7 @@ function exportFiles(id){
    dependencies:usedDependencies(source,pkg),
    devDependencies:{vite:pkg.vite,'@vitejs/plugin-react':pkg['@vitejs/plugin-react'],tailwindcss:pkg.tailwindcss}},null,2)+'\n',
   'vite.config.js':"import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nimport { fileURLToPath } from 'node:url';\n\nexport default defineConfig({\n  base: './',\n  plugins: [react()],\n  resolve: { alias: { kairoq: fileURLToPath(new URL('./src/kairoq.js', import.meta.url)) } }\n});\n",
-  'tailwind.config.js':"export default {\n  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],\n  theme: { extend: {} },\n  plugins: []\n};\n",
+  'tailwind.config.js':"export default {\n  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],\n  // Colours, fonts, radius and shadows come from the CSS variables in src/index.css.\n  theme: "+JSON.stringify(require('./react-design').THEME,null,2).replace(/\n/g,'\n  ')+",\n  plugins: []\n};\n",
   'postcss.config.js':"import tailwind from 'tailwindcss';\n\nexport default { plugins: [tailwind()] };\n",
   'index.html':builder.INDEX_HTML.replace('    <script type="module" src="/kairoq-reporter.js"></script>\n',''),
   '.gitignore':'node_modules\ndist\n',

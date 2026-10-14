@@ -9,7 +9,7 @@ const builder=require('./react-builder');
 function intEnv(name,fallback,min,max){const n=Number(process.env[name]);return Number.isInteger(n)?Math.min(max,Math.max(min,n)):fallback}
 function maxStepsDefault(){return intEnv('KAIROQ_AGENT_MAX_STEPS',15,2,40)}
 function codingRules(){return builder.SYSTEM_PROMPT.replace(/\nRespond with ONLY a JSON object[\s\S]*$/,'')}
-function protocol({vision,web,maxSteps}){
+function protocol({vision,web,maxSteps,images}){
  return `
 
 You are working in AGENT MODE: keep working in steps until the request is fully done and verified, like a careful senior engineer.
@@ -23,7 +23,8 @@ Tools (several per step are fine; they run in order):
 - {"tool":"test_ui","path":"#/rooms","steps":[{"action":"click","text":"Book now"},{"action":"fill","label":"Email","value":"ana@example.com"},{"action":"select","label":"Room","value":"Suite"},{"action":"press","key":"Enter"},{"action":"expect","text":"Thank you"},{"action":"goto","path":"#/rooms"},{"action":"wait","ms":500}]}: run steps against the last build. Target elements by text, label, placeholder, role (+ text) or selector.
 - {"tool":"view_logs"}: server logs: console.log output and errors from server functions, failed backend requests.
 - {"tool":"query_db","sql":"SELECT * FROM rooms LIMIT 5"}: read the app's SQL tables (SELECT only).
-${web?`- {"tool":"web_search","query":"..."}: search the web; returns links.
+${images?`- {"tool":"generate_images","images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}]}: create up to 4 photos or illustrations (aspect 1:1, 4:3, 3:2, 16:9, 9:16, 3:4) saved as ./uploads/<name>; use the returned paths in the code. Use this tool instead of an "images" field.
+`:''}${web?`- {"tool":"web_search","query":"..."}: search the web; returns links.
 - {"tool":"fetch_url","url":"https://..."}: read a public web page or API documentation as text.
 `:''}- {"tool":"finish","message":"for the user: what you built and how to use it"}: end when the request is done and the last build_and_test or test_ui passed.
 Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. For a big app, write the files over two or three steps (a few files per write_files) so no reply gets too long. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors. Be economical: you have at most ${maxSteps} steps.`;
@@ -59,6 +60,7 @@ function describe(a){
  if(t==='test_ui')return'Tested in the browser ('+(Array.isArray(a.steps)?a.steps.length:0)+' steps)';
  if(t==='view_logs')return'Checked server logs';
  if(t==='query_db')return'Queried the database';
+ if(t==='generate_images')return'Generated '+(Array.isArray(a.images)?a.images.length:0)+' image(s)';
  if(t==='web_search')return'Searched the web for "'+String(a.query||'').slice(0,60)+'"';
  if(t==='fetch_url')return'Read '+String(a.url||'').slice(0,80);
  if(t==='finish')return'Finished';
@@ -67,20 +69,24 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=()=>{},signal,tier='standard',images=[],assetNote='',maxSteps}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=()=>{},signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
  if(!meta.current_version){await builder.initialize(meta);meta=builder.loadMeta(id)}
+ // A new project gets its design brief first (colours and fonts go into src/index.css).
+ const brief=await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
+ if(brief)meta=builder.loadMeta(id);
  const base=builder.loadFiles(id,meta.current_version);
+ const generated=[];
  const limit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
  const vision=tier!=='standard',web=typeof webSearch==='function';
  const started=new Date().toISOString();
- let work={...base},built=null,dirty=false,lastTest=null,finishWarned=false,invalidReplies=0;
+ let work={...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=false,lastTest=null,finishWarned=false,invalidReplies=0;
  const steps=[];
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(base,60000)+(assetNote?'\n\n'+assetNote:'')+'\n\nRequest: '+text;
- const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+protocol({vision,web,maxSteps:limit})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
+ const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
 
@@ -160,6 +166,17 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
    if(!sql.exists(builder.projectDir(id)))return{text:'query_db: the app has no SQL tables yet.'};
    try{return{text:clip(JSON.stringify(await sql.run.query(builder.projectDir(id),q,[])),8000)}}catch(e){return{text:'query_db failed: '+e.message}}
   }
+  if(t==='generate_images'){
+   if(!imageGen)return{text:'generate_images is not available on this server. Use https photo URLs (for example from images.unsplash.com) or uploaded images.'};
+   const req=builder.imageRequests(a.images);
+   if(!req.length)return{text:'generate_images: give "images":[{"name","prompt","aspect"}].'};
+   if(generated.length+req.length>8)return{text:'generate_images: this task already generated '+generated.length+' images; reuse them.'};
+   report({status:'images'});
+   const cache=new Map(),notes=await builder.materializeImages(id,{images:req,files:work},{imageGen,cache,design:builder.loadMeta(id).design});
+   const saved=req.map(r=>'./uploads/'+cache.get(r.name+'|'+r.prompt));
+   generated.push(...saved);
+   return{text:'generate_images: saved '+saved.join(', ')+'. Use exactly these paths in the code.'+(notes.length?'\n'+notes.join('\n'):'')};
+  }
   if(t==='web_search'){
    if(!web)return{text:'web_search is not available.'};
    try{const urls=await webSearch(String(a.query||'').slice(0,240));return{text:urls.length?'Results:\n'+urls.join('\n'):'No results.'}}catch(e){return{text:'web_search failed: '+String(e.message||e).slice(0,300)}}
@@ -178,7 +195,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
   fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
-  fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),at:now,...(errors.length?{runtime_errors:errors}:{})});
+  fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
   builder.saveMeta(fresh);
   return{version:built.n,message,changed,steps:steps.length,runtime_errors:errors,preview_url:builder.previewUrl(fresh)};
  }

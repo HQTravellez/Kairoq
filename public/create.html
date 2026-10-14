@@ -142,6 +142,7 @@
         <select id="tier" aria-label="Model"></select>
         <button type="button" class="ghost icon" id="attach" aria-label="Attach images" title="Attach images (or paste a screenshot)">＋ Image</button>
         <button type="button" class="ghost icon" id="figma-open" title="Build a Figma frame">Figma</button>
+        <button type="button" class="ghost icon" id="polish" title="Screenshot the app on desktop and phone and let the AI fix what looks off (uses the chosen model)">✨ Polish</button>
         <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
         <span class="muted small" id="cost-hint"></span>
         <button class="primary" id="send" type="submit">Send</button>
@@ -166,6 +167,7 @@
       <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
       <button class="ghost" id="security-open" type="button">Security</button>
       <button class="ghost" id="team-open" type="button">Share</button>
+      <button class="ghost" id="design-open" type="button" title="Design direction, colours, fonts, design skills and images">Design</button>
       <button class="ghost" id="mobile-open" type="button" title="Phone app: install on iPhone and Android, native iOS/Android project">App</button>
       <button class="ghost" id="settings-open" type="button">Settings</button>
       <button class="primary" id="publish-open" type="button">Publish</button>
@@ -263,6 +265,46 @@
   </form>
 </dialog>
 
+<dialog id="design-dialog">
+  <form method="dialog" class="dialog" id="design-form">
+    <h2>Design</h2>
+    <p class="muted small" id="design-intro"></p>
+    <div id="design-missing" class="notice hidden"><p class="small">This project was made before the design system. Add the UI kit and design tokens so colours and fonts can be changed in one place.</p><button class="ghost" id="design-add-system" type="button">Add design system</button></div>
+    <div class="row wrap"><label>Style name<input id="design-name" maxlength="60" placeholder="Warm Mediterranean editorial"></label></div>
+    <label>Direction<textarea id="design-summary" rows="2" maxlength="600" placeholder="Calm, photographic and generous, with serif headlines and terracotta accents."></textarea></label>
+    <div class="palette" id="design-palette"></div>
+    <div class="row wrap">
+      <label>Heading font<select id="design-display"></select></label>
+      <label>Text font<select id="design-body"></select></label>
+      <label>Corners<select id="design-radius"><option value="0rem">Square</option><option value="0.375rem">Subtle</option><option value="0.75rem">Rounded</option><option value="1.25rem">Soft</option></select></label>
+    </div>
+    <label>Notes for the AI<textarea id="design-notes" rows="2" maxlength="1500" placeholder="Lots of white space. Photos of the sea, never people. Buttons always pill-shaped."></textarea></label>
+    <div class="row"><button class="primary" id="design-save" type="button">Save design</button><span class="muted small" id="design-status" role="status"></span></div>
+    <h3>New direction from the AI</h3>
+    <div class="row"><input id="design-direction" maxlength="1500" placeholder="Darker and more luxurious, like a five-star hotel"><button class="ghost" id="design-regenerate" type="button">Create</button></div>
+    <p class="muted small" id="design-regenerate-note">Picks new colours and fonts. Ask the chat afterwards to restyle pages that need more than new colours.</p>
+    <h3>Design skills</h3>
+    <p class="muted small">Design instructions the AI follows when it builds this app. Turn a skill on for this project, or for all your projects.</p>
+    <ul class="skills" id="skills-list"></ul>
+    <details id="skill-add"><summary>Add a skill</summary>
+      <label>From GitHub<input id="skill-url" spellcheck="false" placeholder="https://github.com/owner/repo/tree/main/skills/my-skill"></label>
+      <div class="row"><button class="ghost" id="skill-import" type="button">Import</button><span class="muted small" id="skill-status" role="status"></span></div>
+      <ul class="skill-choices" id="skill-choices"></ul>
+      <label>Or paste the instructions<textarea id="skill-text" rows="5" placeholder="---&#10;name: Our brand&#10;description: Colours, type and tone for all our apps&#10;---&#10;# Rules&#10;- Navy and gold, serif headlines…"></textarea></label>
+      <div class="row"><button class="ghost" id="skill-save" type="button">Add skill</button></div>
+      <p class="muted small">Only add skills from sources you trust: the AI follows them when it writes your app. A skill is a SKILL.md (name, description, then the rules).</p>
+    </details>
+    <section id="genimage-section" class="hidden">
+      <h3>Generate an image</h3>
+      <div class="row wrap"><input id="genimage-prompt" maxlength="1500" placeholder="Sunlit terrace with blue tiles overlooking Lisbon rooftops, morning light">
+        <select id="genimage-aspect" aria-label="Shape"><option value="16:9">Wide 16:9</option><option value="4:3">4:3</option><option value="1:1">Square</option><option value="3:4">Portrait 3:4</option><option value="9:16">Phone 9:16</option></select>
+        <button class="ghost" id="genimage-go" type="button">Generate</button></div>
+      <p class="muted small" id="genimage-status" role="status"></p>
+    </section>
+    <p class="error" id="design-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="mobile-dialog">
   <form method="dialog" class="dialog" id="mobile-form">
     <h2>Mobile app</h2>

@@ -2,6 +2,8 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('fs'),os=require('os'),path=require('path'),http=require('http'),crypto=require('crypto');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-react-'));
+// These tests script the model's replies in order; the design brief has its own tests.
+process.env.KAIROQ_DESIGN_BRIEF='off';
 process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_FREE_CREDITS='2';
