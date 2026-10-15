@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kairoq Create</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/create.css?v=20261014">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/create.css?v=20261017">
 </head>
 <body>
 <header class="bar">
@@ -27,7 +30,7 @@
 <section class="screen hidden" id="auth">
   <div class="landing">
     <section class="hero">
-      <p class="eyebrow">Kairoq Create</p>
+      <p class="eyebrow">New · Build from any website, repo or screenshot</p>
       <h1>Build real apps by chatting. Keep them working.</h1>
       <p class="lede">Describe your idea. Kairoq writes a React app with sign-in, a database, payments and email, tests it in a real browser, and publishes it to your own domain. Every flow that works is saved as a check and re-tested after each change, so your app doesn't break as it grows.</p>
       <form id="landing-form" class="prompt-box">
@@ -144,6 +147,7 @@
         <select id="tier" aria-label="Model"></select>
         <button type="button" class="ghost icon" id="attach" aria-label="Attach images" title="Attach images (or paste a screenshot)">＋ Image</button>
         <button type="button" class="ghost icon" id="figma-open" title="Build a Figma frame">Figma</button>
+        <button type="button" class="ghost icon" id="ref-open" title="Study a website, GitHub repository or screenshots and build your own version">Reference</button>
         <button type="button" class="ghost icon" id="polish" title="Screenshot the app on desktop and phone and let the AI fix what looks off (uses the chosen model)">✨ Polish</button>
         <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
         <span class="muted small" id="cost-hint"></span>
@@ -179,6 +183,16 @@
       <details><summary id="errors-count"></summary><ul id="errors-list"></ul></details>
       <button class="primary" id="fix" type="button">Fix it</button>
     </div>
+    <section class="detail hidden" id="detail" aria-label="Details of a change">
+      <header class="detail-head">
+        <button type="button" class="ghost back-btn" id="detail-close"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Back to preview</button>
+        <span class="meta-pill"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="detail-time"></span></span>
+        <span class="meta-pill" title="Credits"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.2 0 1.1-1.1 1.9-2.5 1.9a2.5 2 0 0 1-2.5-1.5M12 6.5V8M12 16v1.5"/></svg><span id="detail-credits"></span></span>
+        <b id="detail-title">Details</b>
+        <div class="seg detail-tabs" role="group" aria-label="View"><button type="button" data-tab="timeline" aria-pressed="true">Timeline</button><button type="button" data-tab="changes" aria-pressed="false">Changes</button></div>
+      </header>
+      <div class="detail-body" id="detail-body"></div>
+    </section>
     <div class="canvas" id="canvas">
       <iframe id="frame" title="App preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
       <div class="data hidden" id="data">
@@ -364,6 +378,42 @@
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
+<dialog id="ref-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Build from a reference</h2>
+    <p class="muted small">Kairoq studies a product (its public pages, its code or screenshots), writes a plan for you to approve, then builds <b>its own version</b>: comparable features and design, with an original name, text and images. It follows robots.txt and never signs in or submits forms on the reference site.</p>
+    <div id="ref-step1">
+      <label>Website<input id="ref-url" type="url" placeholder="https://example.com"></label>
+      <label>or a GitHub repository<input id="ref-repo" placeholder="github.com/owner/name"></label>
+      <label>Screenshots <span class="muted small">(optional, up to 4)</span><input id="ref-images" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+      <div id="ref-app-box" class="hidden">
+        <label>or app files <span class="muted small">(zip of a JavaScript or Electron app, analyzed with REA)</span><input id="ref-app" type="file" accept=".zip,application/zip"></label>
+        <label class="check"><input type="checkbox" id="ref-rights"> I own this app or have the right to analyze it</label>
+      </div>
+      <label>What you want <span class="muted small">(optional)</span><textarea id="ref-note" rows="2" placeholder="A booking site for my 12-room hotel in Lisbon, with the same easy date search"></textarea></label>
+      <p class="muted small" id="ref-cost"></p>
+      <div class="row end"><button class="primary" id="ref-analyze" type="button">Analyze</button><button class="ghost" value="close">Cancel</button></div>
+    </div>
+    <div id="ref-step2" class="hidden">
+      <p id="ref-summary"></p>
+      <div id="ref-shots" class="ref-shots"></div>
+      <h3>Features <span class="muted small">(untick what you don't want)</span></h3><ul id="ref-features" class="ref-list"></ul>
+      <h3>Pages</h3><ul id="ref-pages" class="ref-list"></ul>
+      <h3>Data, sign-in and integrations</h3><ul id="ref-data" class="ref-list"></ul>
+      <h3>Journeys tested on desktop and phone</h3><ul id="ref-journeys" class="ref-list"></ul>
+      <h3>Design</h3><div id="ref-design" class="ref-design"></div>
+      <details><summary class="small">Edit the full plan (JSON)</summary><textarea id="ref-plan" rows="12" spellcheck="false"></textarea></details>
+      <div id="ref-owner-box">
+        <label class="check"><input type="checkbox" id="ref-publish"> Publish when every journey passes, then check the live site</label>
+        <label class="check"><input type="checkbox" id="ref-github"> Push the code to GitHub</label>
+        <input id="ref-github-repo" class="hidden" placeholder="owner/name (leave empty to use the connected repository)">
+      </div>
+      <p class="muted small" id="ref-build-cost"></p>
+      <div class="row end"><button class="primary" id="ref-build" type="button">Build it</button><button class="ghost" type="button" id="ref-back">Analyze something else</button><button class="ghost" value="close">Close</button></div>
+    </div>
+    <p class="error" id="ref-error" role="alert"></p>
+  </form>
+</dialog>
 <dialog id="figma-dialog">
   <form method="dialog" class="dialog" id="figma-form">
     <h2>Import from Figma</h2>
@@ -423,6 +473,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261014"></script>
+<script src="/create.js?v=20261017"></script>
 </body>
 </html>

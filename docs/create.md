@@ -278,6 +278,72 @@ The most common complaints about AI app builders are changes that break what use
 - **Usage ledger.** Every paid AI call records its cost, model, tier and how many prompt tokens came from the cache.
 - **Cost report.** The server owner sees **Settings → AI costs, last 30 days**, also available as `GET /api/create/admin/costs`. It shows calls, total and average cost per tier and model, the share of tokens read from cache, and what one message of that tier sells for at `KAIROQ_CREDIT_PRICE_USD` per credit (default $0.25). Rows that cost more than they earn are shown in red.
 
+## Watching the AI work
+
+Like Lovable, the chat stays clean and the details open beside it.
+
+- **Timeline** (`react-timeline.js`). Every Build, Agent and Polish change records what happened, streams it to the editor as it happens, and keeps it with the finished message:
+  - thoughts (the model's reasoning, how long it thought, and in Agent mode each step's headline);
+  - the plan (2 to 6 steps the model writes before the code);
+  - files read, and files created, edited or deleted;
+  - builds, browser tests, saved checks and each fix with its reason;
+  - design directions, generated images, database queries and web searches.
+- **In the chat:**
+  - **While it works**, a shimmering status line ("Writing ChildUsageCard.jsx", "Testing in a browser") with a timer and a Stop button, and the latest activity on a small rail.
+  - **Finished answers** have no bubble. They show "Thought for Ns", the answer as formatted text (headings, lists, bold, code), a folded summary ("Edited 3 files · tested in a browser · fixed 1 problem") that opens the rail, and the version, duration, credits and a **Details** link.
+- **Details panel.** Click the status line, "Thought for Ns" or Details. A panel opens over the preview, with:
+  - **Back to preview**, the duration and the credits;
+  - **Timeline**: the full rail. Thoughts and errors expand, and each edited file expands to its diff. The finished answer comes last.
+  - **Changes**: every file the version changed, with a line diff from `GET /api/create/projects/:id/changes?version=n`.
+  - Esc or any preview toolbar button closes it.
+- To keep the editor light, the full reasoning is sent only for the last 10 messages.
+- **Fonts.** Geist and Geist Mono.
+
+## Build from a reference
+
+Give Kairoq a website, a GitHub repository, screenshots or the files of a JavaScript app. It studies how the product works, writes a plan for you to approve, and builds **its own version**: comparable features and design quality, with an original name, original text and openly licensed or generated images. Open it with **Reference** in the editor.
+
+1. **Analyze** (`react-reference.js`). One credit-priced step (a Discuss message on the chosen tier, with images). Refunded if it fails.
+   - **Website.** A real browser (Playwright) opens up to 6 public pages of the site, navigation first. It records:
+     - headings, navigation, buttons and forms (fields, labels, required);
+     - the API calls the pages make: method, path, query names and the JSON *shape* (keys and types, never values);
+     - an OpenAPI document if the site publishes one at a well-known path;
+     - third-party services it can recognise (Stripe, maps, chat, analytics, booking engines and so on);
+     - computed design values: colours, fonts, type scale, radii, shadows, breakpoints, animations and sticky elements;
+     - the home page on a 390px phone: menu button, sideways overflow, bottom bar;
+     - screenshots on desktop and phone.
+   - **What the website analysis never does.** It reads only what any visitor's browser receives. It follows `robots.txt`, never signs in, submits forms or follows logout and delete links, and only opens public hosts (private and internal addresses are blocked, including after DNS lookup).
+   - **GitHub repository.** Reads the license, languages, frameworks (from `package.json`), the route, page and model files, the README, the schema files (Prisma or SQL) and any OpenAPI file. A private repository uses the project's GitHub token. It never reads `.env` files or `node_modules`. If the license is not permissive (MIT, Apache-2.0, BSD, ISC and similar), the plan says so and the AI writes all code itself.
+   - **Screenshots.** Up to 4 images. The planner sees them.
+   - **App files with REA.** A zip of a JavaScript or Electron app (an ASAR file inside is used directly), analyzed with [REA](https://github.com/morluto/rea) `analyze-javascript-application`. You must confirm that you own the app or have the right to analyze it. This needs REA on the server (below).
+2. **Plan.** The model turns the analysis into a feature inventory with priorities, plus:
+   - pages and their sections, data collections, sign-in and roles, and integrations with the documented API or SDK and app secret each one needs;
+   - server functions, user journeys to test, a design direction (palette and fonts from Kairoq's list), assets to look for, build steps and assumptions.
+   - The plan is shown in the dialog. Untick features you don't want, or edit the full JSON.
+3. **Build.** Runs as an Agent task with the approved plan, with the reference screenshots as visual input. Before the agent starts:
+   - The plan's design becomes the project's colours and fonts.
+   - Kairoq looks for **openly licensed assets** (`react-asset-search.js`):
+     - photos and sounds from Openverse, only with licenses that allow commercial use (CC0, public domain, CC BY, CC BY-SA);
+     - 3D models from Poly Haven (CC0); generated apps can show them with `three`.
+   - Photos are saved as uploads, and every asset's credit is kept in the project. The AI is told to add a "Photo credits" line where a license requires attribution.
+4. **Test and repair** (`react-reference-run.js`).
+   - Each planned journey is written as a saved check and run in a browser on desktop and on a phone. The phone run also fails on sideways scrolling.
+   - Failures go back to the AI with the exact failing step, for up to two repair rounds.
+   - A journey that still fails on desktop is switched off, so it does not block later changes, and reported. That build is free, as with any change that still breaks a check.
+   - The finished app is then screenshotted and compared with the reference by the design model (a 0 to 10 score, strengths and concrete improvements, never "copy their brand"). Below 8, Kairoq runs one Polish pass with those improvements.
+5. **Deploy** (owners only, optional).
+   - **Publish when every journey passes** publishes the app, then opens the live site in the browser to check it has no errors and, with a public URL, that it answers.
+   - **Push to GitHub** pushes the source with the project's GitHub token (Settings).
+   - Hosting runs on Kairoq's own server (Railway), with custom domains as usual. Each app's database, sign-in and storage are built in, so nothing else has to be provisioned.
+
+- **Price.** A reference build costs an agent task plus `KAIROQ_REFERENCE_CREDITS` for the tests, repairs and design review (default: twice the tier price plus one design review). The dialog shows both prices.
+- **REA.** Install it on the server (`npm install --global rea-agents`, Node 22.19 or newer) and set `KAIROQ_REA_COMMAND=rea`. With REA:
+  - website analysis also records the browser session as a HAR file and adds REA's `inspect-web-network-capture` analysis to the plan;
+  - zip uploads of JavaScript or Electron apps are accepted.
+  - Native binaries (which need Hopper, Ghidra or IDA) are not supported on a hosted server.
+- **Turning parts off.** `KAIROQ_ASSET_SEARCH=off` stops the asset search (photos can still be generated). Without a browser on the server, use a repository or screenshots.
+- **Responsible use.** The prompts tell the AI to study and not copy. Kairoq does not get around logins, paywalls, `robots.txt` or terms of service, and the owner is responsible for having the right to use what they analyze.
+
 ## Growth features
 
 - **Landing page and pricing.**

@@ -72,14 +72,15 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=()=>{},signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
  if(!meta.current_version){await builder.initialize(meta);meta=builder.loadMeta(id)}
+ const tl=require('./react-timeline').create(onEvent);
  // A new project gets its design brief first (colours and fonts go into src/index.css).
  const brief=await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
- if(brief)meta=builder.loadMeta(id);
+ if(brief){meta=builder.loadMeta(id);tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'"'})}
  const base=builder.loadFiles(id,meta.current_version);
  const generated=[],pendingChecks=[];
  // The agent's browser tests and SQL reads use a test copy of the data, never the real one.
@@ -111,6 +112,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   const r=await inspect(url,{steps:Array.isArray(a.steps)?a.steps.slice(0,20):[],screenshot:vision,sandbox:box.token});
   if(r.skipped)return{text:prefix+' (Browser testing is not available on this server.)'};
   lastTest={errors:r.errors,failed:r.steps.filter(s=>!s.ok).length};
+  tl.add({t:'test',ok:!r.errors.length&&!lastTest.failed,text:r.steps.length?'Tested '+r.steps.length+' step'+(r.steps.length===1?'':'s')+' in a browser':'Opened the app in a browser',detail:[...r.steps.filter(s=>!s.ok).map(s=>s.step+' → '+s.error),...r.errors]});
   // A passing flow named with save_as becomes a saved check once the work is saved.
   if(a.save_as&&!lastTest.failed&&!r.errors.length&&Array.isArray(a.steps)&&a.steps.length){try{const c=require('./react-checks').normalize({name:a.save_as,path:a.path,steps:a.steps});const i=pendingChecks.findIndex(x=>x.name.toLowerCase()===c.name.toLowerCase());if(i>=0)pendingChecks.splice(i,1);pendingChecks.push(c);prefix+=' Saved as the check "'+c.name+'" when you finish.'}catch(e){prefix+=' Not saved as a check: '+e.message+'.'}}
   const lines=[prefix];
@@ -129,10 +131,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   fs.rmSync(dir,{recursive:true,force:true});built=null;
   report({status:'building'});
   try{await builder.build(work,path.join(dir,'dist'),{projectId:id})}
-  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});return{text:'build_and_test: the Vite build failed:\n'+clip(e.message,3000)}}
+  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});tl.add({t:'build',ok:false,detail:e.message});return{text:'build_and_test: the Vite build failed:\n'+clip(e.message,3000)}}
   try{await builder.applyMigrations(id,work);await require('./react-sql').run.migrate(box.dir,work)}
   catch(e){fs.rmSync(dir,{recursive:true,force:true});return{text:'build_and_test: a SQL migration failed:\n'+e.message+'\nMigrations that already ran cannot change; add a new numbered migration instead.'}}
   built={n,dir,url:builder.previewUrl(meta,n),files:{...work}};dirty=false;
+  tl.add({t:'build',ok:true});
   builder.markTesting(id,n,built.files);
   report({status:'testing'});
   return testBuild(a,'build_and_test: built OK.');
@@ -141,11 +144,13 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   const t=a.tool;
   if(t==='read_files'){
    const paths=(Array.isArray(a.paths)?a.paths:[a.path]).filter(p=>typeof p==='string').slice(0,8);
+   if(paths.length)tl.add({t:'read',files:paths});
    let budget=60000;
    return{text:paths.map(p=>{if(!Object.hasOwn(work,p))return'--- '+p+' --- (no such file)';const body=clip(work[p],Math.max(2000,budget));budget-=body.length;return'--- '+p+' ---\n'+body}).join('\n\n')||'read_files: give "paths".'};
   }
   if(t==='search'){
    const q=String(a.query||'').slice(0,200);if(!q)return{text:'search: give a "query".'};
+   tl.add({t:'note',icon:'search',text:'Searched the code for "'+q.slice(0,80)+'"'});
    let re;try{re=new RegExp(q,'i')}catch{re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i')}
    const hits=[];
    for(const [name,code] of Object.entries(work)){code.split('\n').forEach((line,i)=>{if(hits.length<80&&re.test(line))hits.push(name+':'+(i+1)+': '+line.trim().slice(0,200))})}
@@ -153,10 +158,12 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   }
   if(t==='write_files'){
    const files=a.files&&typeof a.files==='object'&&!Array.isArray(a.files)?a.files:{};
+   const before={...work};
    const written=[],bad=[];
    for(const [name,code] of Object.entries(files)){if(typeof code!=='string'){bad.push(name+' (content must be a string)');continue}work[name]=code;written.push(name)}
    for(const name of Array.isArray(a.delete)?a.delete:[])if(typeof name==='string'&&name!=='src/main.jsx'&&name!=='src/App.jsx'&&Object.hasOwn(work,name)){delete work[name];written.push('deleted '+name)}
    if(written.length)dirty=true;
+   tl.edits(before,work);
    const problems=builder.validateFiles(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
@@ -164,6 +171,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
    let edits;try{edits=require('./react-edits').normalize(a.edits)}catch(e){return{text:'edit_files: '+e.message}}
    const r=require('./react-edits').apply(work,edits);
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
+   for(const f of r.changed)tl.add({t:'edit',file:f,kind:'edited'});
    work=r.files;if(r.changed.length)dirty=true;
    const problems=builder.validateFiles(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
@@ -171,12 +179,14 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   if(t==='build_and_test')return buildAndTest(a);
   if(t==='test_ui')return testBuild(a,'test_ui on version '+(built?built.n:'?')+':');
   if(t==='view_logs'){
+   tl.add({t:'note',icon:'logs',text:'Read the server logs'});
    const logs=require('./react-logs').list(id).slice(-60);
    const fresh=logs.filter(l=>l.at>=started);
    return{text:logs.length?(fresh.length?'Logs since this task started:\n'+fresh.map(l=>l.at.slice(11,19)+' '+l.level+' '+l.source+': '+l.message).join('\n'):'No new logs since this task started. Older logs:\n'+logs.slice(-15).map(l=>l.at+' '+l.level+' '+l.source+': '+l.message).join('\n')):'No server logs yet.'};
   }
   if(t==='query_db'){
    const q=String(a.sql||'');
+   tl.add({t:'note',icon:'db',text:'Queried the test database',detail:q.slice(0,300)});
    if(!/^\s*(SELECT|WITH)\b/i.test(q))return{text:'query_db: only SELECT queries are allowed.'};
    const sql=require('./react-sql');
    if(!sql.exists(box.dir)&&!sql.exists(builder.projectDir(id)))return{text:'query_db: the app has no SQL tables yet.'};
@@ -191,14 +201,17 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
    const cache=new Map(),notes=await builder.materializeImages(id,{images:req,files:work},{imageGen,cache,design:builder.loadMeta(id).design});
    const saved=req.map(r=>'./uploads/'+cache.get(r.name+'|'+r.prompt));
    generated.push(...saved);
+   tl.add({t:'note',icon:'image',text:'Generated '+saved.length+' image'+(saved.length===1?'':'s')});
    return{text:'generate_images: saved '+saved.join(', ')+'. Use exactly these paths in the code.'+(notes.length?'\n'+notes.join('\n'):'')};
   }
   if(t==='web_search'){
    if(!web)return{text:'web_search is not available.'};
+   tl.add({t:'note',icon:'web',text:'Searched the web for "'+String(a.query||'').slice(0,80)+'"'});
    try{const urls=await webSearch(String(a.query||'').slice(0,240));return{text:urls.length?'Results:\n'+urls.join('\n'):'No results.'}}catch(e){return{text:'web_search failed: '+String(e.message||e).slice(0,300)}}
   }
   if(t==='fetch_url'){
    if(!fetchUrl)return{text:'fetch_url is not available.'};
+   tl.add({t:'note',icon:'web',text:'Read '+String(a.url||'').slice(0,120)});
    try{const r=await fetchUrl(String(a.url||''));const body=/html/i.test(r.headers?.['content-type']||'')||/^\s*</.test(r.body)?htmlToText(r.body):r.body;return{text:'HTTP '+r.status+'\n'+clip(body,12000)}}catch(e){return{text:'fetch_url failed: '+String(e.message||e).slice(0,300)}}
   }
   return{text:'Unknown tool "'+t+'". Use one of the listed tools.'};
@@ -211,16 +224,16 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
   fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
-  fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
+  fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
   builder.saveMeta(fresh);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
   const failedChecks=require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.enabled!==false&&c.last&&c.last.version===built.n&&!c.last.ok).map(c=>({name:c.name,step:c.last.step||'',error:c.last.error||''}));
-  return{version:built.n,message,changed,steps:steps.length,runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
+  return{version:built.n,message,changed,steps:steps.length,timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
  }
  function noChange(message){
   if(built)fs.rmSync(built.dir,{recursive:true,force:true});
   message='No changes were made. '+message;
-  builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40)}]);
+  builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}]);
   const fresh=builder.loadMeta(id);
   return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
  }
@@ -232,7 +245,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   report({status:'thinking',step});
   trimContext();
   // Streaming keeps long steps (several files) under the provider's streaming timeout.
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:()=>{}},parseStepSafe);
+  const asked=Date.now();let reasoning='';
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:()=>{},onReasoning:(_d,all)=>{reasoning=all;if(onThinking)onThinking(all)}},parseStepSafe);
+  if(!reply.invalid)tl.add({t:'think',ms:Date.now()-asked,title:reply.thought,text:reasoning});
   if(reply.invalid){
    invalidReplies++;
    steps.push({n:step,thought:'',actions:['Reply was not valid JSON'],summary:'Reply was not valid JSON'});

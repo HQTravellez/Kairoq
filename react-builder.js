@@ -11,7 +11,7 @@ const APP_PACKAGES={react:'UI',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
- 'embla-carousel-react':'carousels','qrcode.react':'QR codes'};
+ 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'3D scenes (glTF models via three/examples/jsm/loaders/GLTFLoader.js)'};
 const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq'];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
 function allowedImport(spec){if(spec==='kairoq')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
@@ -64,7 +64,7 @@ Rules:
 - Before you answer, check your own work: (1) if the request is already implemented exactly as asked, say so and change nothing; (2) every import resolves to a file you include or that already exists, or to an available package, so leave no import unresolved; (3) new pages and components are actually rendered: add routes and navigation links in App.jsx or the layout, or the user cannot see them; (4) the whole feature works, with no placeholders, TODOs or "rest of the code unchanged" comments. If not everything fits in one reply, finish the most important part completely and say in "message" what is left.
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
-{"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
+{"plan":["2 to 6 short steps you will take, written for the user, e.g. \"Add a booking form to the home page\""],"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
 Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.${require('./react-edits').PROMPT_NOTE}`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
@@ -222,7 +222,8 @@ function parseEdit(content){
  const edits=require('./react-edits').normalize(value.edits);
  if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
- return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
+ const plan=(Array.isArray(value.plan)?value.plan:[]).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,6);
+ return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
@@ -261,14 +262,19 @@ async function materializeImages(id,reply,{imageGen,cache,design}){
 // brief); Kairoq saves it on the project and writes its colours and fonts into src/index.css.
 async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress=()=>{}}){
  const meta=loadMeta(id);
- if(meta.design||images.length||process.env.KAIROQ_DESIGN_BRIEF==='off')return null;
+ // A design already chosen (from a reference build plan) is used instead of a new brief.
+ const planned=meta.planned_design&&!meta.design?meta.planned_design:null;
+ if(!planned&&(meta.design||images.length||process.env.KAIROQ_DESIGN_BRIEF==='off'))return null;
  const design=require('./react-design'),files=loadFiles(id,meta.current_version);
- if(!design.isUntouchedStarter(files)||!design.hasTokens(files))return null;
- onProgress('designing');
- let brief;
- try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
- catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
+ if(!design.isUntouchedStarter(files)||!design.hasTokens(files)){if(meta.planned_design){const f=loadMeta(id);if(!f.design)f.design=f.planned_design;delete f.planned_design;saveMeta(f)}return null}
+ let brief=planned;
+ if(!brief){
+  onProgress('designing');
+  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
+  catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
+ }
  const fresh=loadMeta(id);
+ delete fresh.planned_design;
  fresh.design=brief;
  if(brief.skill&&!(fresh.skills||[]).includes(brief.skill))fresh.skills=[...(fresh.skills||[]),brief.skill];
  saveMeta(fresh);
@@ -323,7 +329,16 @@ function list(owner){
 }
 function summary(m){return{id:m.id,name:m.name,owner:m.owner,current_version:m.current_version,updated_at:m.updated_at,published:m.published,preview_url:previewUrl(m)}}
 function previewUrl(m,n=m.current_version){return n?'/builder/p/'+m.id+'-'+m.preview_key+'/v/'+n+'/':null}
-function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.versions,messages:m.messages.slice(-100),domains:m.domains,files:m.current_version?Object.keys(loadFiles(id,m.current_version)).sort():[]}}
+// Messages for the editor. Long reasoning is kept in full only on the last few messages.
+function lightMessages(list){
+ const recent=list.length-10;
+ return list.map((m,i)=>{
+  if(!m.timeline&&!m.thinking)return m;
+  const keep=i>=recent?2000:0;
+  return{...m,...(m.thinking?{thinking:keep?m.thinking.slice(0,keep):''}:{}),...(m.timeline?{timeline:m.timeline.map(e=>e.t==='think'&&e.text?{...e,text:keep?e.text.slice(0,keep):''}:e)}:{})};
+ });
+}
+function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.versions,messages:lightMessages(m.messages.slice(-100)),domains:m.domains,files:m.current_version?Object.keys(loadFiles(id,m.current_version)).sort():[]}}
 function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_version);if(!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});return files[name]}
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
@@ -337,12 +352,14 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
  if(!meta.current_version)await initialize(meta);
+ const tl=require('./react-timeline').create(onEvent);
  const brief=await prepareDesign(id,text,{callModel,tier,signal,images,onProgress});
+ if(brief)tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'" ('+brief.fonts.display+' / '+brief.fonts.body+')'});
  meta=loadMeta(id);
  let base=loadFiles(id,meta.current_version);
  if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
@@ -350,11 +367,19 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0;
+ // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
+ let thinking='',thoughtMs=null,firstPlan=null;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
-  if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design})}
+  const started=Date.now();let firstToken=null;
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),
+   onToken:onStream?(_d,all)=>{if(firstToken===null)firstToken=Date.now();onStream(all,attempt)}:undefined,
+   onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},parseEdit);
+  if(attempt===1){thoughtMs=(firstToken||Date.now())-started;firstPlan=reply.plan}
+  tl.add({t:'think',ms:(firstToken||Date.now())-started,text:attempt===1?thinking:''});
+  if(attempt===1&&reply.plan.length)tl.add({t:'plan',items:reply.plan});
+  if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design});tl.add({t:'note',icon:'image',text:'Generated '+reply.images.length+' image'+(reply.images.length===1?'':'s')})}
   let next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;
@@ -369,12 +394,15 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
    const editFailed=applied.errors.length>0;
    editFailures+=editFailed?1:0;
    const how=editFailed&&editFailures>=2?'Your find/replace edits failed twice, so do not use "edits" this time: send every file you change whole in "files".':'Fix the edits that failed (copy "find" exactly, character for character, from the current files above) or send those files whole in "files".';
+   tl.add({t:'fix',text:editFailed?'Some edits did not match the files, retrying':'The change had problems, retrying',detail:lastError});
    messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again. '+how});continue;
   }
+  tl.edits(base,next);
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
-  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
+  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
+  tl.add({t:'build',ok:true});
   try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\nMigrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
   runtimeErrors=[];checkResult=null;
   if(checkRuntime||inspect){
@@ -385,15 +413,19 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
     // Saved checks: flows that worked before must still work (run on a test copy of the data).
     if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
    }finally{clearTesting(id,n)}
+   if(checkRuntime)tl.add({t:'test',ok:!runtimeErrors.length,detail:runtimeErrors});
+   if(checkResult&&checkResult.ran)tl.add({t:'check',ok:!checkResult.failed.length,text:checkResult.failed.length?'Broke '+checkResult.failed.length+' of '+checkResult.ran+' saved checks':'All '+checkResult.ran+' saved check'+(checkResult.ran===1?'':'s')+' passed',detail:checkResult.failed.length?require('./react-checks').failureText(checkResult.failed):''});
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError=runtimeErrors.join('\n');
+    tl.add({t:'fix',text:'Fixing the errors the browser showed'});
     messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
     continue;
    }
    if(checkResult&&checkResult.failed.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);
+    tl.add({t:'fix',text:'Fixing the saved checks this change broke'});
     messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\nFix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
     continue;
    }
@@ -408,9 +440,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   saveMeta(fresh);
-  return{version:n,message,changed,attempts:attempt,runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }
@@ -434,13 +466,13 @@ async function polish(id,{shots,note='',...opts}){
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.
 Answer questions about the app, suggest improvements, and when the user wants a change, reply with a short numbered plan of what you would change and which files. Keep answers brief and concrete. Plain text, no JSON.`;
 function parseText(content){if(typeof content==='string'){const t=content.trim();if(!t)throw Error('Empty answer');return t}return String(content?.message||content?.answer||JSON.stringify(content))}
-async function discuss(id,question,{callModel,onStream,signal,tier='standard',images=[]}={}){
+async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[]}={}){
  const meta=loadMeta(id);
  const text=String(question||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Ask a question or describe an idea'),{status:400});
  const files=meta.current_version?loadFiles(id,meta.current_version):template(meta.name);
  const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+'\n\nMessage: '+text,images)}];
- const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined},parseText)).slice(0,12000);
+ const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
  addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:answer,mode:'discuss'}]);
  return{message:answer};
 }
