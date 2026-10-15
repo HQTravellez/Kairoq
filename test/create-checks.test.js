@@ -102,12 +102,13 @@ test('saved checks run in a browser on a test copy, and a change that breaks one
  assert.equal(builder.loadMeta(id).messages.at(-1).checks.passed,1);
  assert.match(builder.loadFiles(id,builder.loadMeta(id).current_version)['src/App.jsx'],/<h1>Casa<\/h1>/);
  assert.equal(realBookings(id),0,'still no real bookings after all those test runs');
- // A change that still breaks it after every attempt is saved but free.
+ // A change that still breaks it after every attempt is saved and charged; the chat reports the problem
+ // and refunds go through support.
  const c0=await credits(cookie);
  queue=[1,2,3].map(()=>({message:'Renamed.',files:{'src/App.jsx':app('Reserve')}}));
  const j2=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{message:'Rename it'}})).json.job);
  assert.equal(j2.status,'complete');assert.equal(j2.result.check_failures.length,1);
- assert.equal(j2.refunded,true);assert.equal(j2.refund_reason,'checks');assert.equal(await credits(cookie),c0,'a broken change costs nothing');
+ assert.ok(!j2.refunded);assert.equal(j2.problem,'checks');assert.ok(await credits(cookie)<c0,'completed work is charged');
  // Publishing a version that breaks a check needs an explicit override.
  const pub=await request(server,'POST','/api/create/projects/'+id+'/publish',{headers:{cookie},body:{slug:'casa-checks'}});
  assert.equal(pub.status,409);assert.match(pub.json.error,/Saved checks fail on this version: Book a room/);

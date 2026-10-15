@@ -277,6 +277,14 @@
     <div class="row"><button class="primary" id="settings-save" type="button">Save keys</button></div>
     <h3>Email</h3>
     <p class="muted small" id="email-status"></p>
+    <section id="support-section" class="hidden">
+      <h3>Support credits <span class="muted small">(server owner only)</span></h3>
+      <p class="muted small">Kairoq never refunds completed work by itself. When a customer contacts support, look up their history, review the request, and grant credits back with a reason; it is kept in their history.</p>
+      <div class="row"><input id="support-email" type="email" placeholder="customer@example.com" aria-label="Customer email"><button class="ghost" id="support-find" type="button">Look up</button></div>
+      <div id="support-result" class="small"></div>
+      <div class="row"><input id="support-amount" type="number" min="1" max="10000" step="1" placeholder="Credits" aria-label="Credits to grant" style="max-width:110px"><input id="support-reason" placeholder="Reason, e.g. ticket #123: booking form never worked" aria-label="Reason"><button class="ghost" id="support-grant" type="button">Grant credits</button></div>
+      <p class="muted small" id="support-status" role="status"></p>
+    </section>
     <section id="costs-section" class="hidden">
       <h3>AI costs, last 30 days <span class="muted small">(server owner only)</span></h3>
       <p class="muted small" id="costs-note"></p>

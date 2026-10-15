@@ -158,8 +158,6 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
   catch(e){if(v.kind==='customer'&&imgCredits>0)try{accounts.grant(v.account.id,imgCredits,'Refund: image not generated','refund-'+ref)}catch{}throw e}
  }:null;
  const imageNote=imageGen?'Image generation is available for this message: add "images" to your reply for the few key visuals the app needs (hero, main photos; at most 4'+(v.kind==='customer'&&imgCredits?', '+imgCredits+' credits each':'')+'). Do not generate images that already exist in the uploads.':'';
- // Checks that pass before this change: only breaking one of these makes the change free.
- let passingBefore=new Set();try{passingBefore=new Set(require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.last&&c.last.ok).map(c=>c.id))}catch{}
  setImmediate(async()=>{
   const modelTier=(images.length||mode==='polish')&&tier==='standard'?'vision':tier;
   const onStream=text=>update({stream:streamSnapshot(text,mode)});
@@ -189,14 +187,12 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
      catch(e){job.result={...first,polish_error:signal.aborted?'Stopped before the design review.':'The design review did not finish: '+String(e.message||e).slice(0,300)}}
     }
    }
-   // An agent task that changed nothing is not charged.
-   if(mode==='agent'&&job.result&&job.result.unchanged&&v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: agent made no changes','refund:'+job.id)}catch{}job.refunded=true}
-   // You only pay for working changes: a change that breaks a check that passed before it, or
-   // shows errors in the browser after the automatic fixes, is free. Checks that never passed
-   // (for example one saved with force) do not count, so they cannot make every change free.
-   const brokeChecks=(job.result&&job.result.check_failures||[]).filter(f=>passingBefore.has(f.id));
-   const broken=mode!=='discuss'&&job.result&&!job.result.unchanged&&(brokeChecks.length||(job.result.runtime_errors||[]).length);
-   if(broken&&!job.refunded){job.refund_reason=brokeChecks.length?'checks':'errors';if(v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: the change still has problems','refund:'+job.id)}catch{}job.refunded=true}}
+   // Completed work is always charged: Kairoq never refunds by itself because a change did not
+   // turn out as hoped. Customers who are unhappy contact support, who review the request and
+   // can grant credits back (POST /api/create/admin/credits). The chat still says when a
+   // change breaks a saved check or shows errors, so the customer can ask for a fix.
+   const problem=mode!=='discuss'&&job.result&&!job.result.unchanged&&((job.result.check_failures||[]).length?'checks':(job.result.runtime_errors||[]).length?'errors':null);
+   if(problem)job.problem=problem;
    // The finished message shows what it cost (0 when refunded).
    try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;builder.saveMeta(meta)}}catch{}
    update({status:'complete'});
@@ -350,6 +346,22 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(route==='/admin/costs'&&method==='GET'){
     const credits=Object.fromEntries(tiers().map(t=>[t.id,t.credits]));credits.design=polishCredits();credits.image=generatedImageCredits();
     return send(res,200,{costs:require('./builder-costs').summarize(usageRows?usageRows():[],{credits}),agent_multiplier:agentMultiplier()}),true;
+   }
+   // Support: look up a customer and their credit history, then grant credits back after review.
+   if(route.startsWith('/admin/account')&&method==='GET'){
+    const email=String(new URL(req.url,'http://x').searchParams.get('email')||'').trim().toLowerCase();
+    const a=accounts.database().prepare('SELECT id FROM accounts WHERE email=?').get(email);
+    if(!a)throw Object.assign(Error('No account with that email'),{status:404});
+    return send(res,200,{account:accounts.publicAccount(accounts.get(a.id)),history:accounts.history(a.id,100)}),true;
+   }
+   if(route==='/admin/credits'&&method==='POST'){
+    const b=await readJson(req,4000),email=String(b.email||'').trim().toLowerCase(),amount=Number(b.amount),reason=String(b.reason||'').trim();
+    if(!Number.isInteger(amount)||amount<1||amount>10000)throw Object.assign(Error('Credits must be a whole number from 1 to 10000'),{status:400});
+    if(reason.length<5)throw Object.assign(Error('Write why these credits are granted (at least 5 characters); it is kept in the customer\'s history'),{status:400});
+    const a=accounts.database().prepare('SELECT id FROM accounts WHERE email=?').get(email);
+    if(!a)throw Object.assign(Error('No account with that email'),{status:404});
+    accounts.grant(a.id,amount,'Support: '+reason.slice(0,200),'support:'+crypto.randomUUID());
+    return send(res,200,{account:accounts.publicAccount(accounts.get(a.id)),history:accounts.history(a.id,100)}),true;
    }
    return send(res,404,{error:'Route not found'}),true;
   }

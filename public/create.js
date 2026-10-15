@@ -503,7 +503,7 @@ async function watch(job){
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
   if(done.mode!=='discuss')setPreview(project.preview_url);
-  if(done.refunded)$('messages').append(messageItem({role:'assistant',text:done.refund_reason==='checks'?'This change still breaks a saved check, so it was free. Use Fix it or describe the problem.':done.refund_reason==='errors'?'This change still shows errors in the browser, so it was free. Use Fix it to repair them.':'Nothing changed, so this agent task was free.'}));
+  if(done.problem)$('messages').append(messageItem({role:'assistant',text:done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.'}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
@@ -781,8 +781,24 @@ async function renderCosts(){
   text($('costs-note'),costs.groups.length?'Total '+usd(costs.total_cost)+' over '+costs.total_calls+' AI calls. "Sells for" uses $'+costs.credit_price_usd+' per credit (KAIROQ_CREDIT_PRICE_USD); rows in red cost more than they earn. Agent tasks make several calls each.':'No paid AI calls in the last 30 days.');
  }catch(err){text($('costs-note'),err.message)}
 }
+// Support (server owner only): look up a customer and grant credits back after reviewing a request.
+function renderSupport(r){
+ const out=$('support-result');out.replaceChildren();
+ if(!r)return;
+ const p=document.createElement('p');p.textContent=r.account.email+' · '+r.account.credits+' credits · joined '+String(r.account.created_at).slice(0,10);out.append(p);
+ const ul=document.createElement('ul');ul.className='support-history';
+ for(const h of r.history.slice(0,30)){const li=document.createElement('li');li.textContent=String(h.at).slice(0,16).replace('T',' ')+'  '+(h.delta>0?'+':'')+h.delta+'  '+h.reason;ul.append(li)}
+ out.append(ul);
+}
+$('support-find').onclick=async()=>{text($('support-status'),'');try{renderSupport(await api('/admin/account?email='+encodeURIComponent($('support-email').value.trim())))}catch(err){renderSupport(null);text($('support-status'),err.message)}};
+$('support-grant').onclick=async()=>{
+ text($('support-status'),'');
+ try{const r=await api('/admin/credits',{method:'POST',body:{email:$('support-email').value.trim(),amount:Number($('support-amount').value),reason:$('support-reason').value}});renderSupport(r);$('support-reason').value='';text($('support-status'),'Credits granted.')}
+ catch(err){text($('support-status'),err.message)}
+};
 $('settings-open').onclick=async()=>{
  renderCosts();
+ $('support-section').classList.toggle('hidden',state.me?.viewer?.kind!=='owner');
  text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
  $('knowledge').value=state.project.knowledge||'';
  renderSecrets().catch(err=>text($('settings-error'),err.message));
@@ -876,7 +892,7 @@ function renderLanding(){
  wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a free URL','No card needed']));
  for(const p of state.me.plans||[])wrap.append(planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features]));
  for(const p of state.me.packs||[])wrap.append(planCard(p.name,p.label||p.credits+' credits',[p.credits+' credits, one-time','Never expire']));
- text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. Failed changes are refunded.');
+ text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. A request that fails before anything is saved is not charged. Not happy with a change? Contact support.');
 }
 $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
 $('plans-open').onclick=()=>{
