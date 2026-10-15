@@ -233,9 +233,20 @@ function functionDb(db,cfg,op,a,user){
  const row=id=>{const r=db.prepare('SELECT * FROM records WHERE id=? AND collection=?').get(String(id),name);if(!r)throw fail(404,'Record not found');return r};
  if(op==='list'){
   const limit=Math.max(1,Math.min(LIST_LIMIT,Number(a.limit)||100)),order=a.order==='asc'?'ASC':'DESC';
-  let items=db.prepare('SELECT * FROM records WHERE collection=? ORDER BY created_at '+order+' LIMIT ?').all(name,a.where?MAX_RECORDS:limit).map(record);
-  if(a.where&&typeof a.where==='object')items=items.filter(it=>Object.entries(a.where).every(([k,v])=>JSON.stringify(it[k])===JSON.stringify(v))).slice(0,limit);
-  return items;
+  // where filters run in SQL, so a filtered list never loads the whole collection.
+  const conds=[],params=[name];
+  if(a.where&&typeof a.where==='object')for(const [k,v] of Object.entries(a.where).slice(0,10)){
+   if(k==='id'||k==='_owner'){conds.push((k==='id'?'id':'owner_id')+' IS ?');params.push(v==null?null:String(v));continue}
+   if(!/^[A-Za-z0-9_-]{1,64}$/.test(k))throw fail(400,'Invalid field name in where: '+String(k).slice(0,64));
+   const p="'$.\""+k+"\"'";
+   if(v===null)conds.push('json_type(data,'+p+")='null'");
+   else if(typeof v==='boolean')conds.push('json_type(data,'+p+")='"+(v?'true':'false')+"'");
+   else if(typeof v==='number'){conds.push('json_type(data,'+p+") IN ('integer','real') AND json_extract(data,"+p+')=?');params.push(v)}
+   else if(typeof v==='string'){conds.push('json_type(data,'+p+")='text' AND json_extract(data,"+p+')=?');params.push(v)}
+   else{conds.push('json_type(data,'+p+") IN ('object','array') AND json_extract(data,"+p+')=?');params.push(JSON.stringify(v))}
+  }
+  params.push(limit);
+  return db.prepare('SELECT * FROM records WHERE collection=?'+conds.map(c=>' AND ('+c+')').join('')+' ORDER BY created_at '+order+' LIMIT ?').all(...params).map(record);
  }
  if(op==='get')return record(row(a.id));
  if(op==='create'){
@@ -367,7 +378,7 @@ async function handle(req,res,{onlyProject}={}){
    catch(e){applog.add(id,{level:'error',source:'functions/'+fnm[1]+'.js',message:req.method+' '+route+': '+(e.message||e)});throw e}
    finally{const n=(fnRunning.get(id)||1)-1;if(n>0)fnRunning.set(id,n);else fnRunning.delete(id)}
    for(const line of out.logs||[])applog.add(id,{level:'log',source:'functions/'+fnm[1]+'.js',message:line});
-   require('./react-functions').respond(res,out.result,CORS);
+   require('./react-functions').respond(res,out.result,CORS,{externalRedirects:Boolean(onlyProject)});
    return true;
   }
   if(route==='/ai'&&req.method==='POST'){
@@ -551,4 +562,4 @@ async function runAllSchedules(options){
  }
  return out;
 }
-module.exports={openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+module.exports={functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};

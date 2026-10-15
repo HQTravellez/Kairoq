@@ -8,6 +8,9 @@
 const crypto=require('crypto'),dns=require('dns'),net=require('net'),http=require('http'),https=require('https');
 
 const MAX_FUNCTIONS=20,MAX_SOURCE=50000,MAX_RESPONSE=1024*1024,MAX_FETCHES=10,MAX_FETCH_BYTES=5*1024*1024;
+// Host calls (db, sql, secrets, ai, email, fetch) per invocation, and how many may be waiting at once,
+// so one function cannot flood the main thread or the shared SQL pool.
+const MAX_HOST_CALLS=200,MAX_HOST_INFLIGHT=8;
 let modulePromise=null;
 function quickjs(){
  if(!modulePromise)modulePromise=import('quickjs-emscripten').then(m=>m.newQuickJSWASMModule().then(mod=>({mod,deadline:m.shouldInterruptAfterDeadline})));
@@ -114,7 +117,7 @@ async function run({source,request,user,host}){
  runtime.setMemoryLimit(16*1024*1024);runtime.setMaxStackSize(512*1024);
  const limit=timeoutMs(),stop=Date.now()+limit;
  runtime.setInterruptHandler(deadline(stop));
- const context=runtime.newContext(),logs=[];let fetches=0,disposed=false;
+ const context=runtime.newContext(),logs=[];let fetches=0,hostCalls=0,inflight=0,disposed=false;
  const io={
   fetch:async a=>{if(++fetches>MAX_FETCHES)throw fail(429,'fetch: at most '+MAX_FETCHES+' requests per call');return guardedFetch(a)},
   secret:async a=>host.secret(a.name),
@@ -141,7 +144,13 @@ async function run({source,request,user,host}){
   const name=context.getString(nameH),args=context.getString(argsH),deferred=context.newPromise();
   (async()=>{
    let text;
-   try{if(Date.now()>stop)throw fail(504,'Function timed out');const fn=io[name];if(!fn)throw Error('Unknown host call');text=encode(await fn(JSON.parse(args)))}
+   try{
+    if(Date.now()>stop)throw fail(504,'Function timed out');
+    if(++hostCalls>MAX_HOST_CALLS)throw fail(429,'At most '+MAX_HOST_CALLS+' database, secret, AI, email and fetch calls per request');
+    if(inflight>=MAX_HOST_INFLIGHT)throw fail(429,'At most '+MAX_HOST_INFLIGHT+' calls can run at once; await them in smaller batches');
+    const fn=io[name];if(!fn)throw Error('Unknown host call');
+    inflight++;try{text=encode(await fn(JSON.parse(args)))}finally{inflight--}
+   }
    catch(e){text=encode(null,e)}
    if(disposed)return;
    const h=context.newString(text);deferred.resolve(h);h.dispose();
@@ -177,13 +186,16 @@ async function run({source,request,user,host}){
  }
 }
 // Turns a handler's return value into an HTTP response.
-function respond(res,result,cors){
+// Redirects stay on the app's own pages unless the app is served from its own domain
+// (custom domain or sites host), so Kairoq's domain is never an open redirect.
+function safeLocation(v,external){const u=String(v).slice(0,2000);if(/^\/(?![\/\\])/.test(u))return u;return external&&/^https?:\/\//i.test(u)?u:null}
+function respond(res,result,cors,{externalRedirects=false}={}){
  const r=result&&typeof result==='object'?result:{json:result};
  const status=Number.isInteger(r.status)&&r.status>=200&&r.status<600?r.status:200;
  // Responses never run scripts on Kairoq's origin: every body gets a sandbox CSP.
  const headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'",...cors};
  const extra={};
- if(r.headers&&typeof r.headers==='object')for(const [k,v] of Object.entries(r.headers)){const key=k.toLowerCase();if(key==='content-type')extra['Content-Type']=String(v).slice(0,200);else if(key==='cache-control')headers['Cache-Control']=String(v).slice(0,200);else if(key==='location')headers['Location']=String(v).slice(0,2000)}
+ if(r.headers&&typeof r.headers==='object')for(const [k,v] of Object.entries(r.headers)){const key=k.toLowerCase();if(key==='content-type')extra['Content-Type']=String(v).slice(0,200);else if(key==='cache-control')headers['Cache-Control']=String(v).slice(0,200);else if(key==='location'){const loc=safeLocation(v,externalRedirects);if(loc)headers['Location']=loc}}
  let body='';
  if(r.json!==undefined){headers['Content-Type']='application/json; charset=utf-8';body=JSON.stringify(r.json)}
  else if(r.body!==undefined){body=String(r.body);headers['Content-Type']=extra['Content-Type']||'text/plain; charset=utf-8'}
@@ -212,6 +224,8 @@ function spawn(){
   if(msg.type==='host'){
    let reply;
    try{
+    // A call that arrives after its function's time is up is refused without doing the work.
+    if(Date.now()>job.deadline)throw fail(504,'Function timed out');
     const value=msg.op==='secret'?await job.host.secret(msg.args.name):msg.op==='db'?await job.host.db(msg.args.op,msg.args.args,msg.user):msg.op==='ai'?await job.host.ai(msg.args,msg.user):msg.op==='email'?await job.host.email(msg.args,msg.user):msg.op==='sql'?await need(job.host.sql)(msg.args.query,msg.args.params):msg.op==='sqlBatch'?await need(job.host.sqlBatch)(msg.args.steps):(()=>{throw Error('Unknown host call')})();
     reply={type:'hostReply',callId:msg.callId,value:value===undefined?null:value};
    }catch(e){reply={type:'hostReply',callId:msg.callId,error:String(e.message||e),status:e.status}}
@@ -236,7 +250,7 @@ function pump(){
   if(!w&&pool.workers.length<poolSize())w=spawn();
   if(!w)return;
   const job=pool.queue.shift();job.id=++pool.seq;
-  const limit=timeoutMs();
+  const limit=timeoutMs();job.deadline=Date.now()+limit;
   // On timeout the worker leaves the pool at once, so no new job is sent to a thread that is still stuck.
   job.timer=setTimeout(()=>{const j=w.job;w.job=null;const i=pool.workers.indexOf(w);if(i>=0)pool.workers.splice(i,1);j&&j.reject(fail(504,'Function timed out after '+Math.round(limit/1000)+' seconds'));w.thread.terminate().catch(()=>{});pump()},limit+1000);
   w.job=job;w.thread.ref();
