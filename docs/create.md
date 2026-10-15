@@ -227,6 +227,13 @@ New apps get a designed look by default. Kairoq uses four layers:
      - *Remotion video*: product videos and animated explainers as React compositions (license note included).
      - *Three.js 3D*: 3D only where it adds meaning, such as a globe of routes.
      - *Modern CSS*: container queries, `:has()`, view transitions, fluid type and scroll-driven animations.
+   - **Product skills**, for the kind of app being built:
+     - *Online shop*: collection and product pages, variants, cart drawer, checkout, stock checked in the same transaction as the order.
+     - *Booking and marketplace*: search, filters, list and map, listing pages, availability, price breakdown and booking without double booking.
+     - *Charts and data*: the right chart for the question, KPI tiles, recharts defaults, colour-blind-safe palettes and dashboard layout.
+     - *Brand from a logo*: derives the palette (OKLCH tint scale, tinted neutrals, contrast-checked button colour), fonts, radius, icons and voice from the user's logo.
+     - *Illustrations and icons*: one icon set and stroke scale, and simple on-brand inline SVG illustrations for empty states and onboarding.
+     - *Accessibility*, on by default: WCAG 2.2 AA (keyboard, focus, screen readers, contrast, forms, reduced motion).
    - A skill with `default: on` in its front matter is on for every project until the owner turns it off.
    - Owners can add their own: paste the text, or import from a public GitHub link (a folder with a `SKILL.md`, a Markdown file, or a whole repository, in which case Kairoq lists the skills it finds).
    - A skill can be on for one project or for all the owner's projects. Skills share a 26,000-character prompt budget.
