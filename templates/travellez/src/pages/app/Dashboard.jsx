@@ -13,9 +13,9 @@ export default function Dashboard() {
   const pending = approvals.filter((a) => a.status === 'pending').slice(0, 4);
   const kpis = [
     { label: 'Requested', value: stats.requested, icon: Clock, tone: 'text-amber-600 bg-amber-50' },
-    { label: 'Approved', value: stats.approved, icon: CheckCircle2, tone: 'text-indigo-600 bg-indigo-50' },
+    { label: 'Approved', value: stats.approved, icon: CheckCircle2, tone: 'text-[#d0202f] bg-[#fdf0f1]' },
     { label: 'Booked', value: stats.booked, icon: Plane, tone: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Spend this month', value: money(stats.spend_month, cur), icon: Wallet, tone: 'text-teal-600 bg-teal-50' },
+    { label: 'Spend this month', value: money(stats.spend_month, cur), icon: Wallet, tone: 'text-[#17804a] bg-[#e8f6ee]' },
     { label: 'Active travelers', value: stats.active_travelers, icon: Users, tone: 'text-slate-600 bg-slate-100' }
   ];
   const chart = stats.by_category.map((c) => ({ ...c, label: CATEGORIES.find((x) => x.id === c.category).label, color: CATEGORIES.find((x) => x.id === c.category).color }));
@@ -33,12 +33,12 @@ export default function Dashboard() {
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <section className="card p-6">
-          <div className="flex items-center justify-between"><h2 className="font-display text-lg font-semibold text-slate-900">Upcoming trips</h2><Link to="/app/trips" className="text-sm font-medium text-indigo-600 hover:underline">All trips</Link></div>
+          <div className="flex items-center justify-between"><h2 className="font-display text-lg font-semibold text-slate-900">Upcoming trips</h2><Link to="/app/trips" className="text-sm font-medium text-[#d0202f] hover:underline">All trips</Link></div>
           {upcoming.length === 0 ? <p className="mt-6 text-sm text-slate-500">No upcoming trips yet.</p> : (
             <ul className="mt-4 divide-y divide-slate-100">
               {upcoming.map((t) => (
                 <li key={t.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-700">{t.traveler[0]}</span>
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-[#fdf0f1] text-sm font-semibold text-[#d0202f]">{t.traveler[0]}</span>
                   <div className="min-w-0 flex-1"><p className="truncate font-medium text-slate-900">{t.origin} → {t.destination}</p><p className="text-sm text-slate-500">{t.traveler} · {niceDate(t.departure_date)}</p></div>
                   {t.over_policy ? <AlertTriangle size={16} className="text-amber-500" aria-label="Outside policy" /> : null}
                   <span className={'pill capitalize ' + STATUS[t.status]}>{t.status}</span>
@@ -64,7 +64,7 @@ export default function Dashboard() {
       </div>
       {pending.length > 0 && (
         <section className="card mt-6 p-6">
-          <div className="flex items-center justify-between"><h2 className="font-display text-lg font-semibold text-slate-900">Waiting for your approval</h2><Link to="/app/approvals" className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline">Review <ArrowRight size={14} /></Link></div>
+          <div className="flex items-center justify-between"><h2 className="font-display text-lg font-semibold text-slate-900">Waiting for your approval</h2><Link to="/app/approvals" className="inline-flex items-center gap-1 text-sm font-medium text-[#d0202f] hover:underline">Review <ArrowRight size={14} /></Link></div>
           <ul className="mt-4 grid gap-3 md:grid-cols-2">
             {pending.map((a) => <li key={a.id} className="rounded-xl border border-slate-100 p-4"><p className="font-medium text-slate-900">{a.requester} → {a.destination}</p><p className="text-sm text-slate-500">{niceDate(a.departure_date)} · {money(a.estimate, cur)}{a.over_policy ? ' · outside policy' : ''}</p></li>)}
           </ul>

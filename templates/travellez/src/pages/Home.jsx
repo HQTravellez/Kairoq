@@ -1,113 +1,171 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, Plane, CheckCircle2, Wallet, Users, ShieldCheck, Sparkles, FileCheck2, Building2 } from 'lucide-react';
-import RouteMap from '../components/RouteMap.jsx';
-import ProductMockup from '../components/ProductMockup.jsx';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, Check, MessageSquareText, Route, Landmark } from 'lucide-react';
+import Devices from '../components/Devices.jsx';
+import TabsVsTrip from '../components/TabsVsTrip.jsx';
+import LiveStream from '../components/LiveStream.jsx';
+import TripBrief from '../components/TripBrief.jsx';
+import Copilot from '../components/Copilot.jsx';
+import SavingsCalculator from '../components/SavingsCalculator.jsx';
 import Reveal from '../components/Reveal.jsx';
+import { Comparison, EarlyAccess } from '../components/Closing.jsx';
 
-const PILLARS = [
-  { icon: Plane, title: 'Trips', text: 'Every request, approval and booking in one place, with the traveler, dates, purpose and budget attached.' },
-  { icon: CheckCircle2, title: 'Approvals', text: 'Managers approve or reject in one click. Trips inside policy can be approved automatically.' },
-  { icon: Wallet, title: 'Spend', text: 'Expenses belong to a trip, move from draft to submitted to paid, and show up in the numbers right away.' },
-  { icon: ShieldCheck, title: 'Controls', text: 'Set trip caps, hotel limits and how far ahead to book. Anything outside policy is flagged before money is spent.' }
-];
+function Hero() {
+  const [email, setEmail] = useState('');
+  const go = useNavigate();
+  return (
+    <section className="relative overflow-hidden">
+      <div className="mx-auto grid max-w-[1280px] items-center gap-14 px-5 pb-24 pt-14 lg:grid-cols-[1fr_1.05fr] lg:px-8 lg:pt-20">
+        <div>
+          <p className="tag">All-in-one booking, policy and expenses</p>
+          <h1 className="mt-6 text-balance font-display text-[44px] font-bold leading-[0.98] sm:text-[64px]">
+            Corporate travel that{' '}
+            <span className="relative inline-block">gives you time back<span className="text-[#ef3444]">.</span>
+              <svg className="absolute -bottom-2 left-0 w-full" height="12" viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><motion.path d="M2 9C70 3 170 2 298 6" fill="none" stroke="#ef3444" strokeWidth="5" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, delay: 0.3, ease: 'easeOut' }} /></svg>
+            </span>
+          </h1>
+          <p className="mt-7 max-w-xl text-pretty text-lg leading-relaxed text-[#5f646d]">Travellez puts flights, hotels, ground and expenses in one place. Your travelers book faster, finance stays in control, and every trip comes back coded to the right cost centre.</p>
+          <form className="mt-8 flex max-w-md gap-2 rounded-full border border-[#e3e1dd] bg-white p-1.5 shadow-sm" onSubmit={(e) => { e.preventDefault(); go('/app?email=' + encodeURIComponent(email)); }}>
+            <label htmlFor="hero-email" className="sr-only">Work email</label>
+            <input id="hero-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className="min-w-0 flex-1 bg-transparent px-4 text-[15px] outline-none" />
+            <button className="btn-primary">Get started</button>
+          </form>
+          <p className="mt-4 text-sm text-[#5f646d]">Prefer a walkthrough? <Link to="/demo" className="font-semibold text-[#14161a] underline underline-offset-4 hover:text-[#ef3444]">Book a demo</Link> or <Link to="/savings-calculator" className="font-semibold text-[#14161a] underline underline-offset-4 hover:text-[#ef3444]">run the numbers</Link>.</p>
+          <div className="mt-10 max-w-md border-l-2 border-[#ef3444] pl-4">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#ef3444]">Founding cohort open</p>
+            <p className="mt-1 text-sm leading-relaxed text-[#3c4048]">We're onboarding a small group of founding Canadian companies at early-access pricing, with setup handled by our team.</p>
+          </div>
+        </div>
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}><Devices /></motion.div>
+      </div>
+    </section>
+  );
+}
+
 const STEPS = [
-  { n: '01', title: 'Request', text: 'A traveler describes the trip: where, when, why and roughly what it costs.' },
-  { n: '02', title: 'Approve', text: 'Policy checks run instantly. The manager sees what is in and out of policy and decides.' },
-  { n: '03', title: 'Book & reconcile', text: 'Approved trips are booked, expenses are added against them, and finance marks them paid.' }
+  [MessageSquareText, 'You say it plainly', '"Toronto to Calgary, two client meetings, back Thursday."', "No forms, no tab hopping. Write the trip the way you'd say it out loud."],
+  [Route, 'Travellez builds the trip', 'Flights, hotel and ground, sequenced around the meetings', 'Policy applied as it plans, so what you see is already approvable.'],
+  [Landmark, 'Finance sees the point', "Cost of the trip against the revenue it's chasing", 'Every trip lands with a client and a reason attached, not just a receipt.']
 ];
+function SmartIntro() {
+  return (
+    <section className="mx-auto max-w-[1280px] px-5 py-24 lg:px-8">
+      <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-end">
+        <div><p className="eyebrow text-[#ef3444]">Smart Itinerary</p><h2 className="mt-3 text-balance font-display text-4xl font-bold leading-[1.02] sm:text-5xl">From a sentence to a trip your CFO can justify.</h2></div>
+        <p className="max-w-lg text-lg text-[#5f646d] lg:justify-self-end">Describe the trip, get the whole thing planned in policy, and see what it's worth against the client you're going to see.</p>
+      </div>
+      <ol className="mt-14 grid border-t border-[#14161a] md:grid-cols-3">
+        {STEPS.map(([Icon, k, t, d], i) => (
+          <Reveal key={k} delay={i * 0.08} className={'py-8 md:px-8 ' + (i ? 'border-t border-[#edebe8] md:border-l md:border-t-0' : 'md:pl-0')}>
+            <li className="list-none">
+              <div className="flex items-center justify-between"><span className="font-display text-sm font-bold text-[#9a9ea6]">0{i + 1}</span><Icon size={20} className="text-[#ef3444]" /></div>
+              <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.16em] text-[#5f646d]">{k}</p>
+              <p className="mt-2 font-display text-xl font-bold leading-snug">{t}</p>
+              <p className="mt-3 text-[15px] text-[#5f646d]">{d}</p>
+            </li>
+          </Reveal>
+        ))}
+      </ol>
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-6 rounded-3xl bg-[#14161a] px-7 py-7 text-white">
+        <dl className="flex flex-wrap gap-x-14 gap-y-5">
+          {[['6 min', 'to a full trip plan'], ['1 invoice', 'at the end of the month'], ['Per client', 'cost and return, tracked']].map(([a, b]) => <div key={a}><dt className="font-display text-3xl font-bold">{a}</dt><dd className="text-sm text-white/60">{b}</dd></div>)}
+        </dl>
+        <Link to="/product/smart-itinerary" className="btn-primary">See how it works <ArrowRight size={15} /></Link>
+      </div>
+    </section>
+  );
+}
+
+const ROLES = [
+  ['Finance & CFOs', "Every booking is coded to a cost center automatically, and out-of-policy spend is flagged before it's approved, not after it hits the P&L.", '/solutions/finance'],
+  ['Travel Managers & Ops', "Set policy and negotiated rates once. Every search shows what's in-policy and what isn't, so nobody has to chase it down after the fact.", '/solutions/travel-managers'],
+  ['Travelers & Assistants', 'Search flights, hotels, and ground in one place, with the itinerary and approvals built around the actual trip, not a stack of separate tabs.', '/solutions/travelers']
+];
+function Stakeholders() {
+  return (
+    <section className="bg-[#14161a] py-24 text-white">
+      <div className="mx-auto max-w-[1280px] px-5 lg:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#ff8a94]">Built for every stakeholder</p>
+        <h2 className="mt-3 font-display text-4xl font-bold sm:text-5xl">Different job, same login.</h2>
+        <div className="mt-12 divide-y divide-white/10 border-y border-white/10">
+          {ROLES.map(([t, d, to]) => (
+            <Link key={t} to={to} className="group grid gap-3 py-8 transition md:grid-cols-[1fr_1.6fr_auto] md:items-center md:gap-10">
+              <h3 className="font-display text-2xl font-bold transition group-hover:text-[#ff5a68]">{t}</h3>
+              <p className="text-white/65">{d}</p>
+              <span className="inline-flex items-center gap-1 text-sm font-semibold text-white/80 group-hover:text-white">See how <ArrowRight size={15} className="transition group-hover:translate-x-1" /></span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const TABS = {
+  Booking: ['Book', 'Everything in one search, with policy applied.', "No more flipping between six tabs. Search flights, hotels, and ground, with your company's negotiated rates and travel policy already baked in. Every option is tagged in-policy or out-of-policy, so travelers know before they book.", ['Real-time inventory from GDS + direct partners', 'Loyalty programs auto-attached to every booking', 'In-policy / out-of-policy tagged on every result']],
+  'Trip planner': ['Plan', 'The meetings come first. The bookings follow.', 'Add the clients and the reason for the trip, and Travellez sequences flights, the hotel and ground transfers around them, with the route mapped and the brief ready to share.', ['Itinerary built around meetings, not flights', 'Smarter alternatives priced side by side', 'One brief for the traveler, approver and finance']],
+  'Spend & reporting': ['Report', 'Spend you can see before the month closes.', 'Every booking lands coded to a cost centre, with receipts attached and CO₂ counted. Finance gets one invoice and an export that matches the ERP.', ['Live spend by team, client and cost centre', 'One consolidated invoice each month', 'ERP export for QuickBooks, NetSuite or CSV']]
+};
+function Everything() {
+  const [tab, setTab] = useState('Booking');
+  const [k, t, d, items] = TABS[tab];
+  return (
+    <section className="mx-auto max-w-[1280px] px-5 py-24 lg:px-8">
+      <p className="eyebrow">Why Travellez</p>
+      <h2 className="mt-3 font-display text-4xl font-bold sm:text-5xl">Everything business travel needs.</h2>
+      <p className="mt-3 max-w-xl text-lg text-[#5f646d]">One platform for booking, managing, and planning, built for how teams actually travel.</p>
+      <div className="mt-10 inline-flex rounded-full border border-[#e3e1dd] bg-white p-1" role="tablist" aria-label="Product areas">
+        {Object.keys(TABS).map((name) => (
+          <button key={name} role="tab" aria-selected={tab === name} onClick={() => setTab(name)} className={'relative rounded-full px-4 py-2 text-sm font-semibold transition ' + (tab === name ? 'text-white' : 'text-[#5f646d] hover:text-[#14161a]')}>
+            {tab === name && <motion.span layoutId="tab-pill" className="absolute inset-0 rounded-full bg-[#14161a]" transition={{ type: 'spring', stiffness: 400, damping: 34 }} />}
+            <span className="relative">{name}</span>
+          </button>
+        ))}
+      </div>
+      <AnimatePresence mode="wait">
+        <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }} className="mt-8 grid gap-10 rounded-3xl border border-[#edebe8] bg-white p-7 sm:p-10 lg:grid-cols-[1.1fr_1fr]" role="tabpanel">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#ef3444]">{k}</p>
+            <h3 className="mt-2 text-balance font-display text-3xl font-bold">{t}</h3>
+            <p className="mt-4 text-[#5f646d]">{d}</p>
+          </div>
+          <ul className="space-y-3 self-center">
+            {items.map((x) => <li key={x} className="flex items-start gap-3 rounded-2xl bg-[#f7f6f3] px-4 py-3.5 text-[15px] font-medium"><Check size={18} className="mt-0.5 shrink-0 text-[#ef3444]" />{x}</li>)}
+          </ul>
+        </motion.div>
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function Savings() {
+  return (
+    <section className="border-y border-[#edebe8] bg-white py-24">
+      <div className="mx-auto max-w-[1280px] px-5 lg:px-8">
+        <p className="tag">Free · No sign-up wall</p>
+        <h2 className="mt-4 max-w-3xl text-balance font-display text-4xl font-bold sm:text-5xl">Find out what your travel programme is actually costing you.</h2>
+        <p className="mt-3 max-w-2xl text-lg text-[#5f646d]">Four inputs, run against our 2026 spend benchmark. You get the number on screen straight away, every assumption shown, nothing to fill in first.</p>
+        <div className="mt-12"><SavingsCalculator /></div>
+      </div>
+    </section>
+  );
+}
 
 export default function Home() {
   return (
     <>
-      <section className="aurora relative overflow-hidden text-white">
-        <div className="grid-lines absolute inset-0 opacity-60" aria-hidden="true" />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-32 lg:grid-cols-[1.05fr_1fr] lg:px-8 lg:pb-28 lg:pt-40">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/80"><Sparkles size={14} className="text-amber-300" /> Corporate travel, approvals and spend</p>
-            <h1 className="mt-6 font-display text-5xl font-semibold leading-[1.02] sm:text-6xl lg:text-7xl">Business travel that <span className="text-gradient">runs itself.</span></h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/75">Travellez turns trip requests into approved, booked and reconciled travel. One workspace for travelers, managers and finance, with your policy built in.</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/app" className="btn-light px-6 py-3 text-base">Start free <ArrowRight size={18} /></Link>
-              <Link to="/platform" className="btn border border-white/25 px-6 py-3 text-base text-white hover:bg-white/10">See the platform</Link>
-            </div>
-            <p className="mt-5 text-sm text-white/55">Free for up to 10 travelers. No credit card.</p>
-          </div>
-          <div className="relative">
-            <RouteMap className="absolute -inset-x-10 -top-16 w-[120%] opacity-90" />
-            <div className="relative mt-24 lg:mt-36"><ProductMockup /></div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
-        <Reveal className="max-w-2xl">
-          <p className="eyebrow">One platform</p>
-          <h2 className="mt-3 font-display text-4xl font-semibold text-slate-900 sm:text-5xl">Everything a business trip needs, from request to reconciliation.</h2>
-        </Reveal>
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {PILLARS.map((p, i) => (
-            <Reveal key={p.title} delay={i * 0.08}>
-              <div className="card group h-full p-6 transition hover:-translate-y-1 hover:shadow-lg">
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-teal-400 to-indigo-600 text-white shadow-md"><p.icon size={20} /></span>
-                <h3 className="mt-5 font-display text-xl font-semibold text-slate-900">{p.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{p.text}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      <section className="bg-white py-24">
-        <div className="mx-auto grid max-w-7xl gap-14 px-5 lg:grid-cols-2 lg:items-center lg:px-8">
-          <Reveal>
-            <p className="eyebrow">How it works</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold text-slate-900">Three steps. No email chains.</h2>
-            <ol className="mt-10 space-y-8">
-              {STEPS.map((s) => (
-                <li key={s.n} className="flex gap-5">
-                  <span className="font-display text-2xl font-semibold text-indigo-600">{s.n}</span>
-                  <div><h3 className="font-display text-xl font-semibold text-slate-900">{s.title}</h3><p className="mt-1 text-slate-600">{s.text}</p></div>
-                </li>
-              ))}
-            </ol>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <div className="aurora rounded-3xl p-6 sm:p-10"><ProductMockup compact /><div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur"><FileCheck2 size={18} className="mb-2 text-teal-300" />Every approval keeps who decided, when and why.</div>
-              <div className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur"><Users size={18} className="mb-2 text-amber-300" />Travelers, managers and finance share one source of truth.</div>
-            </div></div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
-        <Reveal className="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-center">
-          <div>
-            <p className="eyebrow">Smart Itinerary</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold text-slate-900">One sentence in. A structured trip out.</h2>
-            <p className="mt-4 text-lg text-slate-600">Write "Lisbon offsite for 6 people, 12 to 14 March, under €900 each" and Travellez lays out the trip, the budget and what needs approval.</p>
-            <Link to="/smart-itinerary" className="btn-dark mt-8">Try Smart Itinerary <ArrowRight size={16} /></Link>
-          </div>
-          <div className="card p-6">
-            <p className="rounded-xl bg-slate-50 p-4 font-medium text-slate-800">“Lisbon offsite for 6 people, 12 to 14 March, under €900 each”</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3 text-sm">
-              {[['Destination', 'Lisbon'], ['Travelers', '6'], ['Budget', '€5,400 total']].map(([k, v]) => <div key={k} className="rounded-xl border border-slate-100 p-3"><p className="text-xs text-slate-500">{k}</p><p className="mt-1 font-semibold text-slate-900">{v}</p></div>)}
-            </div>
-          </div>
-        </Reveal>
-      </section>
-
-      <section className="px-5 pb-24 lg:px-8">
-        <Reveal className="aurora relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] px-8 py-16 text-center text-white sm:px-16">
-          <div className="grid-lines absolute inset-0 opacity-50" aria-hidden="true" />
-          <div className="relative">
-            <Building2 className="mx-auto text-teal-300" size={28} />
-            <h2 className="mx-auto mt-4 max-w-2xl font-display text-4xl font-semibold sm:text-5xl">Give your team a calmer way to travel.</h2>
-            <p className="mx-auto mt-4 max-w-xl text-white/75">Create a workspace in a minute, add your travelers and set your policy. Your first trip can be approved today.</p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3"><Link to="/app" className="btn-light px-6 py-3 text-base">Start free</Link><Link to="/pricing" className="btn border border-white/25 px-6 py-3 text-base text-white hover:bg-white/10">See pricing</Link></div>
-          </div>
-        </Reveal>
-      </section>
+      <Hero />
+      <SmartIntro />
+      <TabsVsTrip />
+      <LiveStream />
+      <TripBrief />
+      <Stakeholders />
+      <Everything />
+      <Copilot />
+      <Savings />
+      <Comparison />
+      <EarlyAccess />
     </>
   );
 }

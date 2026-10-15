@@ -16,15 +16,15 @@ export default function Controls() {
       <PageTitle title="Controls" text="Your travel policy. New trip requests are checked against it instantly." />
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <form onSubmit={submit} className="card grid gap-5 p-6 sm:grid-cols-2">
-          <Field id="pol-currency" label="Currency"><select id="pol-currency" value={f.currency} onChange={set('currency')} className="input">{['EUR', 'USD', 'GBP', 'CAD'].map((c) => <option key={c}>{c}</option>)}</select></Field>
+          <Field id="pol-currency" label="Currency"><select id="pol-currency" value={f.currency} onChange={set('currency')} className="input">{['CAD', 'USD', 'EUR', 'GBP'].map((c) => <option key={c}>{c}</option>)}</select></Field>
           <Field id="pol-cap" label="Trip cap" hint="Trips estimated above this need a manager."><input id="pol-cap" type="number" min="0" value={f.trip_cap} onChange={set('trip_cap')} className="input" /></Field>
           <Field id="pol-hotel" label="Hotel night cap"><input id="pol-hotel" type="number" min="0" value={f.hotel_night_cap} onChange={set('hotel_night_cap')} className="input" /></Field>
           <Field id="pol-advance" label="Book at least (days ahead)"><input id="pol-advance" type="number" min="0" value={f.advance_days} onChange={set('advance_days')} className="input" /></Field>
           <div className="sm:col-span-2"><Field id="pol-auto" label="Approve automatically up to" hint="In-policy trips at or below this amount skip the manager. 0 means every trip needs a manager."><input id="pol-auto" type="number" min="0" value={f.require_approval_above} onChange={set('require_approval_above')} className="input" /></Field></div>
           <div className="sm:col-span-2"><button disabled={busy} className="btn-primary py-3">{busy ? 'Saving…' : 'Save policy'}</button></div>
         </form>
-        <aside className="aurora rounded-3xl p-7 text-white">
-          <ShieldCheck className="text-teal-300" />
+        <aside className="bg-[#14161a] rounded-3xl p-7 text-white">
+          <ShieldCheck className="text-[#ff8a94]" />
           <h2 className="mt-4 font-display text-2xl font-semibold">Your policy in plain words</h2>
           <ul className="mt-4 space-y-3 text-sm text-white/80">
             <li>Trips up to {money(f.trip_cap, f.currency)} are within the cap.</li>

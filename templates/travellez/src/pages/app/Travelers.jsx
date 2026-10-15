@@ -17,7 +17,7 @@ export default function Travelers() {
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {data.travelers.map((t) => (
             <li key={t.id} className="card flex items-center gap-4 p-5">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-indigo-600 font-semibold text-white">{t.name.split(' ').map((w) => w[0]).slice(0, 2).join('')}</span>
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#ef3444] font-semibold text-white">{t.name.split(' ').map((w) => w[0]).slice(0, 2).join('')}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-slate-900">{t.name}</p>
                 <p className="truncate text-sm text-slate-500">{t.department} · {tripsBy(t.id)} trip{tripsBy(t.id) === 1 ? '' : 's'}</p>

@@ -11,7 +11,7 @@ const daysUntil = (d) => Math.round((Date.parse(d) - Date.parse(today())) / 8640
 
 async function policy(db, owner) {
   const [p] = await db.sql`SELECT currency, trip_cap, hotel_night_cap, advance_days, require_approval_above FROM policies WHERE owner_id = ${owner}`;
-  return p || { currency: 'EUR', trip_cap: 1500, hotel_night_cap: 180, advance_days: 7, require_approval_above: 0 };
+  return p || { currency: 'CAD', trip_cap: 1500, hotel_night_cap: 250, advance_days: 7, require_approval_above: 0 };
 }
 
 async function load(db, owner) {
@@ -126,7 +126,7 @@ async function savePolicy(db, owner, b) {
   const n = (v, lo, hi) => { const x = Math.round(Number(v)); return Number.isInteger(x) && x >= lo && x <= hi ? x : null; };
   const p = { trip_cap: n(b.trip_cap, 0, 1000000), hotel_night_cap: n(b.hotel_night_cap, 0, 100000), advance_days: n(b.advance_days, 0, 365), require_approval_above: n(b.require_approval_above, 0, 1000000) };
   if (Object.values(p).some((v) => v === null)) return bad('Use whole numbers for every limit.');
-  const currency = ['EUR', 'USD', 'GBP', 'CAD'].includes(b.currency) ? b.currency : 'EUR';
+  const currency = ['EUR', 'USD', 'GBP', 'CAD'].includes(b.currency) ? b.currency : 'CAD';
   await db.sql`
     INSERT INTO policies (owner_id, currency, trip_cap, hotel_night_cap, advance_days, require_approval_above)
     VALUES (${owner}, ${currency}, ${p.trip_cap}, ${p.hotel_night_cap}, ${p.advance_days}, ${p.require_approval_above})
@@ -143,13 +143,13 @@ async function sample(db, owner) {
   const ids = [];
   for (const [name, email, dept] of people) ids.push((await db.sql`INSERT INTO travelers (owner_id, name, email, department) VALUES (${owner}, ${name}, ${email}, ${dept}) RETURNING id`)[0].id);
   const day = (d) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
-  const trips = [[ids[0], 'London', 'Lisbon', day(21), day(23), 'Client workshop with a hotel group', 980, 'booked'], [ids[1], 'Berlin', 'Amsterdam', day(30), day(31), 'Partner integration kickoff', 640, 'approved'], [ids[2], 'Paris', 'Toronto', day(45), day(49), 'Customer success summit', 2350, 'requested']];
+  const trips = [[ids[0], 'Toronto', 'Calgary', day(21), day(23), 'Client renewal review at Moretti', 980, 'booked'], [ids[1], 'Montreal', 'Vancouver', day(30), day(31), 'Partner integration kickoff', 640, 'approved'], [ids[2], 'Toronto', 'London', day(45), day(49), 'Customer success summit', 2350, 'requested']];
   for (const [tv, from, to, dep, ret, purpose, est, status] of trips) {
     const over = est > 1500 ? 1 : 0;
     const [t] = await db.sql`INSERT INTO trips (owner_id, traveler_id, origin, destination, departure_date, return_date, purpose, estimate, status, over_policy) VALUES (${owner}, ${tv}, ${from}, ${to}, ${dep}, ${ret}, ${purpose}, ${est}, ${status}, ${over}) RETURNING id`;
-    await db.sql`INSERT INTO approvals (owner_id, trip_id, status, note, decided_at) VALUES (${owner}, ${t.id}, ${status === 'requested' ? 'pending' : 'approved'}, ${over ? 'Outside policy: above the 1500 EUR trip cap' : null}, ${status === 'requested' ? null : new Date().toISOString()})`;
+    await db.sql`INSERT INTO approvals (owner_id, trip_id, status, note, decided_at) VALUES (${owner}, ${t.id}, ${status === 'requested' ? 'pending' : 'approved'}, ${over ? 'Outside policy: above the 1500 CAD trip cap' : null}, ${status === 'requested' ? null : new Date().toISOString()})`;
     if (status === 'booked') {
-      await db.sql`INSERT INTO expenses (owner_id, trip_id, description, amount, category, status) VALUES (${owner}, ${t.id}, 'Return flight LHR–LIS', 286, 'flight', 'paid')`;
+      await db.sql`INSERT INTO expenses (owner_id, trip_id, description, amount, category, status) VALUES (${owner}, ${t.id}, 'Return flight YYZ–YYC', 286, 'flight', 'paid')`;
       await db.sql`INSERT INTO expenses (owner_id, trip_id, description, amount, category, status) VALUES (${owner}, ${t.id}, 'Hotel, 2 nights', 312, 'hotel', 'submitted')`;
       await db.sql`INSERT INTO expenses (owner_id, trip_id, description, amount, category) VALUES (${owner}, ${t.id}, 'Team dinner with client', 145, 'meals')`;
     }

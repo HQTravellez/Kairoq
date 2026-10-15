@@ -1,27 +1,35 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Travellez: midnight ink, aurora teal-to-indigo, warm amber for attention. */
-:root { --ink: #0b1020; --ink-2: #141a33; --paper: #f6f7fb; --indigo: #4f46e5; --teal: #14b8a6; --amber: #f59e0b; }
+/* Travellez: warm paper, ink, and one confident red. */
+:root { --paper: #fbfaf9; --ink: #14161a; --muted: #5f646d; --red: #ef3444; --red-dark: #d0202f; --surface: #f4f3f0; --line: #edebe8; }
 html { scroll-behavior: smooth; }
-body { font-family: 'Inter', system-ui, sans-serif; background: var(--paper); color: #0f172a; -webkit-font-smoothing: antialiased; }
-.font-display { font-family: 'Sora', 'Inter', sans-serif; letter-spacing: -0.03em; }
-.aurora { background: radial-gradient(60% 80% at 15% 10%, rgba(20,184,166,.35), transparent 60%), radial-gradient(50% 70% at 85% 0%, rgba(79,70,229,.45), transparent 60%), radial-gradient(60% 60% at 60% 110%, rgba(245,158,11,.18), transparent 60%), var(--ink); }
-.grid-lines { background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 48px 48px; }
-.text-gradient { background: linear-gradient(90deg, #5eead4, #a5b4fc 55%, #fcd34d); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html.lenis, html.lenis body { height: auto; }
+body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+.font-display { font-family: 'Sora', 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.045em; }
+.paper-grid { background-image: linear-gradient(rgb(20 22 26 / .035) 1px, transparent 1px), linear-gradient(90deg, rgb(20 22 26 / .035) 1px, transparent 1px); background-size: 40px 40px; }
+.text-balance { text-wrap: balance; } .text-pretty { text-wrap: pretty; }
+.tabular { font-variant-numeric: tabular-nums; }
+::selection { background: rgb(239 52 68 / .18); }
+input[type=range] { accent-color: var(--red); }
 input, select, textarea { font: inherit; }
+.fade-edges { mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 
 @layer components {
-  .input { @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-60; }
-  .btn-primary { @apply btn bg-indigo-600 text-white shadow-sm shadow-indigo-600/30 hover:bg-indigo-500; }
-  .btn-dark { @apply btn bg-slate-900 text-white hover:bg-slate-800; }
-  .btn-ghost { @apply btn border border-slate-200 bg-white text-slate-800 hover:bg-slate-50; }
-  .btn-light { @apply btn bg-white text-slate-900 hover:bg-slate-100; }
-  .card { @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm; }
-  .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600; }
-  .pill { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .input { @apply w-full rounded-full border border-[#e3e1dd] bg-white px-4 py-2.5 text-[15px] text-[#14161a] outline-none transition placeholder:text-[#9a9ea6] focus:border-[#ef3444] focus:ring-4 focus:ring-[#ef3444]/15; }
+  textarea.input, select.input.box { @apply rounded-2xl; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ef3444]/30 disabled:cursor-not-allowed disabled:opacity-60; }
+  .btn-primary { @apply btn bg-[#ef3444] text-white shadow-[0_8px_20px_-8px_rgb(239_52_68/.6)] hover:bg-[#d0202f]; }
+  .btn-dark { @apply btn bg-[#14161a] text-white hover:bg-black; }
+  .btn-ghost { @apply btn border border-[#e3e1dd] bg-white text-[#14161a] hover:border-[#cfccc6]; }
+  .btn-light { @apply btn bg-white text-[#14161a] hover:bg-[#f4f3f0]; }
+  .card { @apply rounded-2xl border border-[#edebe8] bg-white shadow-[0_1px_2px_rgb(20_24_31/.04),0_12px_32px_-16px_rgb(20_24_31/.10)]; }
+  .panel { @apply rounded-3xl border border-[#edebe8] bg-[#f7f6f3]; }
+  .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-[#5f646d]; }
+  .tag { @apply inline-flex items-center gap-1.5 rounded-full border border-[#f6c9cd] bg-[#fdf0f1] px-3 py-1 text-xs font-semibold text-[#d0202f]; }
+  .pill { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .ok { @apply pill bg-[#e8f6ee] text-[#17804a]; }
 }

@@ -146,7 +146,7 @@ test('design dialog: edit colours and fonts, new direction from the AI, add the 
 });
 
 test('skills: built-in library, your own skills, always-on, and import from GitHub',async()=>{
- assert.deepEqual(skills.builtin().map(s=>s.id),['dashboard','editorial','luxury-hospitality','mobile-app','modern-saas']);
+ assert.deepEqual(skills.builtin().map(s=>s.id),['dashboard','editorial','framer-motion','frontend-design','human-crafted','luxury-hospitality','mobile-app','modern-css','modern-saas','remotion-video','scroll-story','three-3d']);
  for(const s of skills.builtin())assert.ok(s.name&&s.description.length>40&&s.body.length>1500,s.id);
  const cookie=await signup('skills@example.com');
  const add=await request(server,'POST','/api/create/skills',{headers:{cookie},body:{text:'---\nname: Our brand\ndescription: Navy and gold for all our apps\n---\n# Rules\n- Navy (#14213d) and gold (#fca311), serif headlines, pill buttons.'}});
@@ -156,6 +156,12 @@ test('skills: built-in library, your own skills, always-on, and import from GitH
  await request(server,'POST','/api/create/skills/default',{headers:{cookie},body:{id:mine.id,on:true}});
  const pid=(await request(server,'POST','/api/create/projects',{headers:{cookie},body:{name:'Brand test'}})).json.project.id;
  assert.match(builder.knowledgeNote(builder.loadMeta(pid)),/### Skill: Our brand[\s\S]*pill buttons/);
+ // Craft skills marked "default: on" reach every project until the owner turns them off.
+ const note=builder.knowledgeNote(builder.loadMeta(pid));assert.match(note,/### Skill: Human-crafted/);assert.match(note,/### Skill: Frontend design \(Anthropic\)/);
+ await request(server,'POST','/api/create/skills/default',{headers:{cookie},body:{id:'human-crafted',on:false}});
+ assert.ok(!builder.knowledgeNote(builder.loadMeta(pid)).includes('### Skill: Human-crafted'));
+ await request(server,'POST','/api/create/skills/default',{headers:{cookie},body:{id:'human-crafted',on:true}});
+ assert.match(builder.knowledgeNote(builder.loadMeta(pid)),/### Skill: Human-crafted/);
  // Another account cannot see or remove it.
  const other=await signup('other-skills@example.com');
  assert.ok(!(await request(server,'GET','/api/create/skills',{headers:{cookie:other}})).json.skills.some(s=>s.id===mine.id));

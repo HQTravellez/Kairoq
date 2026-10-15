@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { auth } from 'kairoq';
 import { toast } from 'sonner';
 
 // Email sign-in and sign-up, Google sign-in and password reset in one card.
 export default function AuthPanel() {
   const [mode, setMode] = useState('signup');
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [params] = useSearchParams();
+  const [form, setForm] = useState({ name: '', email: params.get('email') || '', password: '' });
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   async function submit(e) {
@@ -32,7 +34,7 @@ export default function AuthPanel() {
       </form>
       {mode !== 'reset' && <button type="button" onClick={google} className="btn-ghost mt-3 w-full py-3">Continue with Google</button>}
       <div className="mt-5 flex flex-wrap justify-between gap-2 text-sm">
-        <button type="button" className="font-medium text-indigo-600 hover:underline" onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}>{mode === 'signup' ? 'I already have an account' : 'Create a workspace'}</button>
+        <button type="button" className="font-medium text-[#d0202f] hover:underline" onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}>{mode === 'signup' ? 'I already have an account' : 'Create a workspace'}</button>
         <button type="button" className="text-slate-500 hover:underline" onClick={() => setMode(mode === 'reset' ? 'signin' : 'reset')}>{mode === 'reset' ? 'Back to sign in' : 'Forgot password?'}</button>
       </div>
     </div>

@@ -177,7 +177,9 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 
 ### npm packages
 
-Generated apps can import: react, react-dom, react-router-dom, lucide-react, recharts, framer-motion, date-fns, clsx, tailwind-merge, class-variance-authority, zod, react-hook-form, the Radix primitives (dialog, dropdown-menu, tabs, tooltip, popover, select, accordion, switch), sonner, react-markdown, @tanstack/react-query, canvas-confetti, react-day-picker, embla-carousel-react and qrcode.react. Other imports are rejected before the build. Code downloads list only the packages the app uses.
+Generated apps can import: react, react-dom, react-router-dom, lucide-react, recharts, framer-motion, date-fns, clsx, tailwind-merge, class-variance-authority, zod, react-hook-form, the Radix primitives (dialog, dropdown-menu, tabs, tooltip, popover, select, accordion, switch), sonner, react-markdown, @tanstack/react-query, canvas-confetti, react-day-picker, embla-carousel-react, qrcode.react, three (3D), gsap (timelines and ScrollTrigger), lenis (smooth scrolling), remotion and @remotion/player (video compositions). Other imports are rejected before the build. Code downloads list only the packages the app uses.
+
+Licenses are listed in `THIRD_PARTY_NOTICES.md`. Remotion is free for individuals and companies of up to 3 people; larger companies need a Remotion company license.
 
 ## Mobile apps
 
@@ -216,9 +218,18 @@ New apps get a designed look by default. Kairoq uses four layers:
    - The brief is skipped for templates and when images are attached. To turn it off, set `KAIROQ_DESIGN_BRIEF=off`.
    - The coding prompt also carries general design rules: hierarchy, spacing, imagery, states, responsiveness and "avoid the generic AI look".
 3. **Design skills.** A skill is a `SKILL.md` (front matter with `name` and `description`, then the rules) that the AI follows.
-   - Built-in skills (in `design-skills/`): Luxury hospitality, Modern SaaS, Mobile app, Dashboard and admin, and Editorial and content.
+   - Built-in skills (in `design-skills/`): Luxury hospitality, Modern SaaS, Mobile app, Dashboard and admin, Editorial and content, plus the craft skills below.
+   - **Craft skills**, so a site reads as designed by a person rather than generated:
+     - *Human-crafted*, on by default: removes AI tells (gradient text, glow blobs, identical icon-card grids, vague copy, invented logos and testimonials) and lists what designers do instead.
+     - *Frontend design (Anthropic)*, on by default: Anthropic's open `frontend-design` skill (Apache-2.0, from github.com/anthropics/skills).
+     - *Framer Motion*: purposeful motion, shared layouts and reduced-motion support.
+     - *Scroll story*: GSAP ScrollTrigger and Lenis for pinned, scroll-driven sections.
+     - *Remotion video*: product videos and animated explainers as React compositions (license note included).
+     - *Three.js 3D*: 3D only where it adds meaning, such as a globe of routes.
+     - *Modern CSS*: container queries, `:has()`, view transitions, fluid type and scroll-driven animations.
+   - A skill with `default: on` in its front matter is on for every project until the owner turns it off.
    - Owners can add their own: paste the text, or import from a public GitHub link (a folder with a `SKILL.md`, a Markdown file, or a whole repository, in which case Kairoq lists the skills it finds).
-   - A skill can be on for one project or for all the owner's projects. Skills share a 16,000-character prompt budget.
+   - A skill can be on for one project or for all the owner's projects. Skills share a 26,000-character prompt budget.
 4. **Design review (✨ Polish).**
    - Kairoq screenshots the app on desktop (1280 px) and phone (390 px). The model gets both screenshots and fixes what looks off without changing behaviour, and the result is saved as a new version.
    - Standard uses the vision model; Pro and Max use their own models. The review costs one message on the chosen tier.
@@ -301,12 +312,22 @@ Like Lovable, the chat stays clean and the details open beside it.
 
 ## Showcase: Travellez (website and app)
 
-`templates/travellez` is a complete corporate travel and spend product built through Kairoq: a marketing site (Home, Platform, Smart Itinerary, Industries, About, Pricing with a talk-to-sales form) and a signed-in workspace (Dashboard, Trips, Approvals, Spend, Travelers, Controls).
+`templates/travellez` is a complete corporate travel and spend product built through Kairoq. Its website follows the real travellez.com, with its copy, brand and page structure, and was built with the craft skills above.
 
-- **Backend.** SQL tables (`sql/001_init.sql`) and one server function (`functions/travel.js`). Each account is its own company workspace.
-- **Workflow rules.** They are enforced in SQL: a trip is approved only while requested and booked only once approved; an expense goes draft → submitted → paid.
-- **Policy.** Trip caps, booking ahead and automatic approval for small in-policy trips are checked when a trip is requested.
-- **Pipeline run.** `node scripts/showcase-travellez.js <out-dir> [port]` sends it through the Build pipeline: build, browser test and timeline. It then saves three user journeys as checks and runs them on desktop and phone: website navigation, talk to sales, and create workspace → approve → book. Finally it publishes the app and takes screenshots.
+- **Website.**
+  - Home: hero with the product on a laptop and phone, Smart Itinerary, "Six tabs. Or one trip.", the live inventory stream, the trip-brief demo, stakeholders, product tabs, the AI Copilot demo, the savings calculator, the comparison and the early-access band.
+  - Smart Itinerary (`#/product/smart-itinerary`): a London trip where each segment can swap to the smarter option, with the running total.
+  - Pricing: monthly or annual billing, a team-size slider that recommends a plan, and the compare table.
+  - Savings calculator: the travellez.com formulas. At the defaults (40 travelers, 6 trips, $1,800, 29% hotel) it shows $432,000 a year and $94,915 recoverable.
+  - Book a demo, and Solutions for finance, travel managers and travelers.
+- **Design.** Warm paper (#fbfaf9), ink (#14161a) and one red (#ef3444). Sora and Plus Jakarta Sans. framer-motion reveals and Lenis smooth scrolling, both off with reduced motion.
+- **Workspace** behind sign-in: Dashboard, Trips, Approvals, Spend, Travelers, Controls (in CAD by default).
+- **Backend.** SQL tables (`sql/001_init.sql`) and two server functions. Each account is its own company workspace.
+  - `functions/travel.js` enforces the workflow in SQL: a trip is approved only while requested and booked only once approved; an expense goes draft → submitted → paid. Trip caps, booking ahead and automatic approval for small in-policy trips are checked when a trip is requested.
+  - `functions/lead.js` saves demo requests and calculator breakdown requests. It is public, with a honeypot and one request per email a day.
+- **Pipeline run.** `node scripts/showcase-travellez.js <out-dir> [port]` sends it through the Build pipeline: build, browser test and timeline.
+  - It saves three user journeys as checks and runs them on desktop and phone: website navigation (including the itinerary savings, the plan fit and the calculator total), book a demo, and create workspace → approve → book.
+  - It then publishes the app and takes full-page screenshots.
 - **Template.** It is available as the "Corporate travel & spend" template.
 
 ## Build from a reference

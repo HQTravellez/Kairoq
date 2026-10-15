@@ -1,62 +1,60 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X, ChevronRight, ArrowUpRight, Mail, Phone, MapPin, Leaf } from 'lucide-react';
+import useSmoothScroll from '../lib/useSmoothScroll.js';
 
 const LINKS = [
-  { to: '/platform', label: 'Platform' },
-  { to: '/smart-itinerary', label: 'Smart Itinerary' },
-  { to: '/industries', label: 'Industries' },
+  { to: '/product/smart-itinerary', label: 'Smart itinerary' },
   { to: '/pricing', label: 'Pricing' },
-  { to: '/about', label: 'About' }
+  { to: '/savings-calculator', label: 'Savings calculator' }
 ];
 
-export function Logo({ light }) {
+export function Logo({ light, small }) {
   return (
-    <Link to="/" className={'flex items-center gap-2 font-display text-xl font-semibold ' + (light ? 'text-white' : 'text-slate-900')} aria-label="Travellez home">
-      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
-        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#14b8a6" /><stop offset="1" stopColor="#4f46e5" /></linearGradient></defs>
-        <rect width="32" height="32" rx="9" fill="url(#lg)" />
-        <path d="M8 21c4-9 12-12 16-10M20 9l4 2-2 4" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      Travellez
+    <Link to="/" className={'flex items-center gap-1 font-display font-bold ' + (small ? 'text-xl' : 'text-[26px]') + ' ' + (light ? 'text-white' : 'text-[#ef3444]')} aria-label="Travellez home">
+      <svg width={small ? 20 : 26} height={small ? 20 : 26} viewBox="0 0 26 26" aria-hidden="true"><path d="M1 5.5 25 2l-9.5 21-3.4-8.6L1 5.5Z" fill="currentColor" /><path d="m12.1 14.4 3.2-3.5" stroke={light ? '#14161a' : '#fbfaf9'} strokeWidth="1.6" strokeLinecap="round" /></svg>
+      <span className="tracking-[-0.06em]">travellez</span>
     </Link>
   );
 }
 
 export default function SiteLayout({ children }) {
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [bar, setBar] = useState(true);
   const { pathname } = useLocation();
-  const dark = pathname === '/';
+  useSmoothScroll();
   useEffect(() => { setOpen(false); window.scrollTo(0, 0); }, [pathname]);
-  useEffect(() => { const f = () => setScrolled(window.scrollY > 24); f(); window.addEventListener('scroll', f); return () => window.removeEventListener('scroll', f); }, []);
-  const solid = scrolled || !dark || open;
   return (
     <div className="min-h-screen flex flex-col">
-      <header className={'fixed inset-x-0 top-0 z-40 transition-colors ' + (solid ? 'border-b border-slate-200/70 bg-white/85 backdrop-blur-xl' : 'bg-transparent')}>
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
-          <Logo light={!solid} />
-          <nav className="hidden items-center gap-8 text-sm font-medium lg:flex" aria-label="Main">
+      {bar && (
+        <div className="relative bg-[#ef3444] px-10 py-2 text-center text-[13px] text-white">
+          Early access is now open for growing Canadian teams. <Link to="/demo" className="ml-1 inline-flex items-center gap-0.5 font-semibold underline underline-offset-2">Request an invitation <ArrowUpRight size={13} /></Link>
+          <button type="button" onClick={() => setBar(false)} aria-label="Dismiss announcement" className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-white/15"><X size={15} /></button>
+        </div>
+      )}
+      <header className="sticky top-0 z-40 border-b border-[#edebe8] bg-[#fbfaf9]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between px-5 lg:px-8">
+          <Logo />
+          <nav className="hidden items-center gap-8 text-sm font-semibold md:flex" aria-label="Main">
             {LINKS.map((l) => (
-              <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? (solid ? 'text-indigo-600' : 'text-white') : solid ? 'text-slate-600 hover:text-slate-900' : 'text-white/75 hover:text-white')}>{l.label}</NavLink>
+              <NavLink key={l.to} to={l.to} className={({ isActive }) => 'relative py-6 transition ' + (isActive ? 'text-[#ef3444] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-[#ef3444]' : 'text-[#3c4048] hover:text-[#14161a]')}>{l.label}</NavLink>
             ))}
           </nav>
-          <div className="hidden items-center gap-3 lg:flex">
-            <Link to="/app" className={solid ? 'text-sm font-medium text-slate-700 hover:text-slate-900' : 'text-sm font-medium text-white/80 hover:text-white'}>Sign in</Link>
-            <Link to="/app" className={solid ? 'btn-primary' : 'btn-light'}>Start free <ArrowRight size={16} /></Link>
+          <div className="hidden items-center gap-4 md:flex">
+            <Link to="/app" className="text-sm font-semibold text-[#3c4048] hover:text-[#14161a]">Log in</Link>
+            <Link to="/demo" className="btn-primary">Book a demo <ChevronRight size={16} /></Link>
           </div>
-          <button type="button" className={'rounded-lg p-2 lg:hidden ' + (solid ? 'text-slate-900' : 'text-white')} aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}>
-            {open ? <X size={22} /> : <Menu size={22} />}
-          </button>
+          <button type="button" className="rounded-lg p-2 md:hidden" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}</button>
         </div>
         {open && (
-          <nav className="border-t border-slate-200 bg-white px-5 pb-5 pt-2 lg:hidden" aria-label="Mobile">
-            {LINKS.map((l) => <NavLink key={l.to} to={l.to} className="block py-3 text-base font-medium text-slate-800">{l.label}</NavLink>)}
-            <Link to="/app" className="btn-primary mt-3 w-full">Start free</Link>
+          <nav className="border-t border-[#edebe8] bg-[#fbfaf9] px-5 pb-5 pt-1 md:hidden" aria-label="Mobile">
+            {LINKS.map((l) => <NavLink key={l.to} to={l.to} className="block border-b border-[#edebe8] py-3.5 text-base font-semibold">{l.label}</NavLink>)}
+            <Link to="/app" className="block py-3.5 text-base font-semibold">Log in</Link>
+            <Link to="/demo" className="btn-primary mt-2 w-full py-3">Book a demo</Link>
           </nav>
         )}
       </header>
-      <main className={'flex-1 ' + (dark ? '' : 'pt-16')}>{children}</main>
+      <main className="flex-1">{children}</main>
       <Footer />
     </div>
   );
@@ -64,29 +62,31 @@ export default function SiteLayout({ children }) {
 
 function Footer() {
   const cols = [
-    ['Product', [['Platform', '/platform'], ['Smart Itinerary', '/smart-itinerary'], ['Pricing', '/pricing']]],
-    ['Company', [['About', '/about'], ['Industries', '/industries'], ['Talk to sales', '/pricing']]],
-    ['Workspace', [['Sign in', '/app'], ['Create a workspace', '/app']]]
+    ['Get started', [['Smart itinerary', '/product/smart-itinerary'], ['Pricing', '/pricing'], ['Savings calculator', '/savings-calculator'], ['Book a demo', '/demo']]],
+    ['Solutions', [['Finance & CFOs', '/solutions/finance'], ['Travel managers', '/solutions/travel-managers'], ['Travelers', '/solutions/travelers']]],
+    ['Account', [['Log in', '/app'], ['Create a workspace', '/app']]]
   ];
   return (
-    <footer className="aurora text-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 lg:grid-cols-[1.4fr_repeat(3,1fr)] lg:px-8">
+    <footer className="border-t border-[#edebe8] bg-white">
+      <div className="mx-auto grid max-w-[1280px] gap-10 px-5 py-14 md:grid-cols-[1.5fr_repeat(3,1fr)] lg:px-8">
         <div>
-          <Logo light />
-          <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">Business travel, approvals and spend in one calm workspace. Requests become approved, booked and reconciled trips without the email chains.</p>
+          <Logo small />
+          <p className="mt-4 max-w-xs text-sm leading-relaxed text-[#5f646d]">Business travel that respects everyone's time. Booking, approvals and expense reporting under one login.</p>
+          <ul className="mt-5 space-y-2 text-sm text-[#3c4048]">
+            <li className="flex items-center gap-2"><Mail size={15} className="text-[#ef3444]" /><a href="mailto:info@travellez.com" className="hover:underline">info@travellez.com</a></li>
+            <li className="flex items-center gap-2"><Phone size={15} className="text-[#ef3444]" /><a href="tel:18663430689" className="hover:underline">1-866-343-0689</a></li>
+            <li className="flex items-start gap-2"><MapPin size={15} className="mt-0.5 shrink-0 text-[#ef3444]" />2030 Bristol Cir #210, Oakville, ON L6H 0H2</li>
+          </ul>
+          <p className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[#e8f6ee] px-3 py-1 text-xs font-semibold text-[#17804a]"><Leaf size={13} />Carbon-conscious travel</p>
         </div>
         {cols.map(([title, links]) => (
           <div key={title}>
-            <p className="text-sm font-semibold text-white">{title}</p>
-            <ul className="mt-3 space-y-2 text-sm text-white/70">
-              {links.map(([label, to]) => <li key={label}><Link to={to} className="hover:text-white">{label}</Link></li>)}
-            </ul>
+            <p className="eyebrow">{title}</p>
+            <ul className="mt-4 space-y-2.5 text-sm font-medium text-[#3c4048]">{links.map(([label, to]) => <li key={label}><Link to={to} className="hover:text-[#ef3444]">{label}</Link></li>)}</ul>
           </div>
         ))}
       </div>
-      <div className="border-t border-white/10">
-        <p className="mx-auto max-w-7xl px-5 py-5 text-xs text-white/50 lg:px-8">© {new Date().getFullYear()} Travellez. Built with Kairoq.</p>
-      </div>
+      <div className="border-t border-[#edebe8]"><p className="mx-auto max-w-[1280px] px-5 py-5 text-xs text-[#8a8e96] lg:px-8">© {new Date().getFullYear()} Travellez. All rights reserved. · IATA # 67600035 · TICO # 5003155</p></div>
     </footer>
   );
 }

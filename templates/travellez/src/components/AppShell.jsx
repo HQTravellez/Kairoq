@@ -19,7 +19,7 @@ export default function AppShell() {
   const [user, setUser] = useState(auth.user());
   useEffect(() => auth.onChange(setUser), []);
   if (!user) return (
-    <div className="aurora grid min-h-screen place-items-center px-5 py-16">
+    <div className="bg-[#14161a] grid min-h-screen place-items-center px-5 py-16">
       <div className="flex w-full max-w-md flex-col items-center gap-8"><Logo light /><AuthPanel /><Link to="/" className="text-sm text-white/70 hover:text-white">← Back to travellez</Link></div>
     </div>
   );
@@ -48,13 +48,13 @@ function Shell({ user }) {
     </nav>
   );
   return (
-    <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[260px_1fr]">
-      <aside className="aurora sticky top-0 hidden h-screen lg:block">{side}</aside>
-      <div className="flex items-center justify-between bg-slate-950 px-4 py-3 lg:hidden">
+    <div className="min-h-screen bg-[#fbfaf9] lg:grid lg:grid-cols-[260px_1fr]">
+      <aside className="bg-[#14161a] sticky top-0 hidden h-screen lg:block">{side}</aside>
+      <div className="flex items-center justify-between bg-[#14161a] px-4 py-3 lg:hidden">
         <Logo light />
         <button type="button" className="rounded-lg p-2 text-white" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}</button>
       </div>
-      {open && <div className="aurora fixed inset-x-0 bottom-0 top-14 z-40 lg:hidden">{side}</div>}
+      {open && <div className="bg-[#14161a] fixed inset-x-0 bottom-0 top-14 z-40 lg:hidden">{side}</div>}
       <main className="min-w-0 px-4 py-6 sm:px-8 lg:py-10">
         {error ? <p className="card p-6 text-rose-700">{error}</p>
           : !data ? <div className="space-y-4" aria-busy="true">{[0, 1, 2].map((i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-200/60" />)}</div>
@@ -69,7 +69,7 @@ function Welcome({ act }) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="mx-auto max-w-2xl py-10 text-center">
-      <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-teal-400 to-indigo-600 text-white"><Plane /></span>
+      <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#ef3444] text-white"><Plane /></span>
       <h1 className="mt-6 font-display text-4xl font-semibold text-slate-900">Welcome to your workspace</h1>
       <p className="mt-3 text-slate-600">Start by adding the people who travel. Or load a small sample company to see how trips, approvals and spend fit together; you can remove it later by starting a new workspace.</p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">

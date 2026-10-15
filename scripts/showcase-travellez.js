@@ -16,7 +16,7 @@ function read(d,rel=''){const o={};for(const n of fs.readdirSync(path.join(d,rel
  const base='http://127.0.0.1:'+server.address().port;
  const meta=builder.create({name:'Travellez'});await builder.initialize(meta);
  const files=read(dir);
- const plan=['Marketing site: Home, Platform, Smart Itinerary, Industries, About, Pricing with a talk-to-sales form','Workspace app behind sign-in: dashboard, trips, approvals, spend, travelers, controls','SQL tables and a travel server function that enforces requested → approved → booked and draft → submitted → paid','Policy checks: trip cap, booking ahead, automatic approval for small in-policy trips'];
+ const plan=['Marketing site matching travellez.com: Home, Smart Itinerary, Pricing (billing toggle, team-size fit, compare table), Savings calculator, Book a demo, Solutions for finance, travel managers and travelers','Workspace app behind sign-in: dashboard, trips, approvals, spend, travelers, controls','SQL tables, a lead function for demo requests and savings breakdowns, and a travel server function that enforces requested → approved → booked and draft → submitted → paid','Human-crafted design: one red brand colour, Sora and Plus Jakarta Sans, real copy and sample data, framer-motion reveals and Lenis smooth scrolling'];
  const reply=JSON.stringify({plan,message:'Built Travellez: the marketing website and the signed-in travel workspace with approvals, spend and policy controls.',files});
  const callModel=async(opts,parse)=>{opts.onReasoning&&opts.onReasoning('','Travellez is a corporate travel and spend platform: a marketing site plus a workspace for travelers, managers and finance. I will keep the workflow rules in SQL inside one server function so the UI cannot skip a state.');opts.onToken&&opts.onToken(reply,reply);return parse(reply)};
  const t0=Date.now();
@@ -25,8 +25,8 @@ function read(d,rel=''){const o={};for(const n of fs.readdirSync(path.join(d,rel
  console.log('timeline',r.timeline.map(e=>e.t+(e.file?':'+e.file:'')+(e.ok===false?'(failed)':'')).join(', ').slice(0,600));
  // The user journeys, as saved checks: run on desktop and on a phone.
  const J=[
-  {name:'Website navigation',path:'#/',steps:[{action:'expect',text:'Business travel that'},{action:'goto',path:'#/platform'},{action:'expect',text:'Five surfaces'},{action:'goto',path:'#/smart-itinerary'},{action:'expect',text:'Suggested budget per person'},{action:'expect',text:'2 nights'},{action:'goto',path:'#/pricing'},{action:'expect',text:'Talk to sales'}]},
-  {name:'Talk to sales',path:'#/pricing',steps:[{action:'fill',label:'Your name',value:'Test Lead'},{action:'fill',label:'Work email',value:'test-lead@example.com'},{action:'fill',label:'Company',value:'Acme'},{action:'select',label:'Team size',value:'11-50'},{action:'click',text:'Send request'},{action:'expect',text:'We received your request'}]},
+  {name:'Website navigation',path:'#/',steps:[{action:'expect',text:'gives you time back'},{action:'goto',path:'#/product/smart-itinerary'},{action:'expect',text:'The whole trip, assembled'},{action:'click',role:'button',text:'Apply every suggestion'},{action:'expect',text:'Saves $214'},{action:'goto',path:'#/pricing'},{action:'expect',text:'Growth plan'},{action:'goto',path:'#/savings-calculator'},{action:'expect',text:'$94,915'},{action:'goto',path:'#/solutions/travel-managers'},{action:'expect',text:'Set policy once'}]},
+  {name:'Book a demo',path:'#/demo',steps:[{action:'fill',label:'First Name',value:'Test'},{action:'fill',label:'Last Name',value:'Lead'},{action:'fill',label:'Work Email',value:'test-lead@example.com'},{action:'fill',label:'Company Name',value:'Acme'},{action:'select',label:'Number of Employees',value:'11-50'},{action:'click',role:'button',text:'Request Demo'},{action:'expect',text:'We received your request'}]},
   {name:'Create workspace, request, approve and book a trip',path:'#/app',steps:[{action:'fill',label:'Your name',value:'Test Manager'},{action:'fill',label:'Work email',value:'test-manager@example.com'},{action:'fill',label:'Password',value:'password123'},{action:'click',role:'button',text:'Create workspace'},{action:'click',text:'Load sample data'},{action:'expect',text:'Upcoming trips'},{action:'goto',path:'#/app/approvals'},{action:'click',role:'button',text:'Approve'},{action:'expect',text:'Trip approved'},{action:'goto',path:'#/app/trips'},{action:'click',role:'button',text:'Mark as booked'},{action:'expect',text:'Trip booked'}]}
  ];
  for(const j of J)checks.save(meta.id,j,{source:'showcase'});
@@ -40,11 +40,11 @@ function read(d,rel=''){const o={};for(const n of fs.readdirSync(path.join(d,rel
  console.log('published',base+'/sites/'+pub.published.slug+'/','live errors',live.errors);
  // Screenshots of the website and the app, desktop and phone.
  const b=await runtime.browser();
- const shots=[['home','#/'],['platform','#/platform'],['smart-itinerary','#/smart-itinerary'],['industries','#/industries'],['pricing','#/pricing'],['about','#/about']];
+ const shots=[['home','#/'],['smart-itinerary','#/product/smart-itinerary'],['pricing','#/pricing'],['savings','#/savings-calculator'],['demo','#/demo'],['solutions','#/solutions/finance']];
  for(const [w,h,tag] of [[1440,900,'desktop'],[390,844,'phone']]){
   const ctx=await b.newContext({viewport:{width:w,height:h},deviceScaleFactor:1,...(tag==='phone'?{isMobile:true,hasTouch:true}:{})});
   const p=await ctx.newPage();
-  for(const [name,hash] of shots){await p.goto(base+'/sites/travellez/'+hash,{waitUntil:'load'});await p.waitForLoadState('networkidle',{timeout:6000}).catch(()=>{});await p.waitForTimeout(1500);await p.evaluate(async()=>{for(let y=0;y<document.body.scrollHeight;y+=500){window.scrollTo(0,y);await new Promise(r=>setTimeout(r,120))}window.scrollTo(0,0)});await p.waitForTimeout(700);await p.screenshot({path:path.join(out,tag+'-'+name+'.png'),fullPage:tag==='desktop'&&name!=='home'?false:false})}
+  for(const [name,hash] of shots){await p.goto(base+'/sites/travellez/'+hash,{waitUntil:'load'});await p.waitForLoadState('networkidle',{timeout:6000}).catch(()=>{});await p.waitForTimeout(1500);await p.evaluate(async()=>{for(let y=0;y<document.body.scrollHeight;y+=500){window.scrollTo(0,y);await new Promise(r=>setTimeout(r,120))}window.scrollTo(0,0)});await p.waitForTimeout(700);await p.screenshot({path:path.join(out,tag+'-'+name+'.png'),fullPage:true})}
   // The app: sign up, load the sample company, visit each screen.
   await p.goto(base+'/sites/travellez/#/app',{waitUntil:'load'});await p.waitForTimeout(800);
   await p.getByLabel('Your name').fill('Maya Chen');await p.getByLabel('Work email').fill('maya-'+tag+'@example.com');await p.getByLabel('Password').fill('password123');

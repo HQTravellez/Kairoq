@@ -11,7 +11,7 @@ const APP_PACKAGES={react:'UI',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
- 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'3D scenes (glTF models via three/examples/jsm/loaders/GLTFLoader.js)'};
+ 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'3D scenes (glTF models via three/examples/jsm/loaders/GLTFLoader.js)',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
 const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq'];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
 function allowedImport(spec){if(spec==='kairoq')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}

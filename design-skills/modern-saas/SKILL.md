@@ -13,21 +13,21 @@ Think of the best product launches: one sharp promise, the product shown big, pr
 - Radius 0.5rem to 0.75rem.
 
 ## Page structure
-1. Nav: logo, 3-5 links, "Sign in" ghost button and a primary "Get started" button. Sticky with backdrop-blur and a bottom border when scrolled.
-2. Hero: small pill badge ("New: AI invoices →"), a 2-line headline (text-5xl lg:text-7xl), one sentence of value, two buttons (primary + outline), a line of social proof (avatars + "Trusted by 2,000 freelancers"). Below, a large product mockup: a browser frame (rounded-xl border shadow-glow) containing a realistic UI built with real components and numbers, not a grey box.
-3. Logo cloud of customers in muted grey.
-4. Features: a bento grid (grid-cols-6 with cards spanning 2, 3 or 4 columns) mixing small UI previews, metrics and icons; or alternating text and screenshots.
+1. Nav: logo, 3-5 links, "Sign in" ghost button and a primary "Get started" button. Sticky with a hairline bottom border when scrolled. An announcement bar with a real offer is a nice touch.
+2. Hero: left-aligned, a short specific headline (text-5xl lg:text-7xl, one word in the brand colour or underlined), one sentence of value, one primary action (an email field + button works well) and a quiet secondary link. Beside or below, a large product mockup (laptop or phone frame) with a realistic UI and real-looking numbers, not a grey box.
+3. Proof only if it is real (customer logos you have permission to show, a real metric, a founder note). Otherwise skip it or state something true ("Founding cohort open").
+4. Features shown as product slices: a before/after comparison ("Six tabs. Or one trip."), a bento grid of small realistic UI previews and metrics (not icon cards), alternating text and screenshots, or a sticky scroll story.
 5. How it works in 3 numbered steps.
-6. Testimonials with real-sounding names, roles, photos and specific results.
+6. Testimonials only when they are real; never invent names or quotes.
 7. Pricing: 3 plans, the middle one highlighted (ring-2 ring-primary, "Most popular" badge), monthly/yearly toggle, feature lists with check icons, clear CTAs.
-8. FAQ accordion, then a final call to action band (bg-gradient-hero text-primary-foreground rounded-2xl).
+8. FAQ accordion, then a final call to action band in the brand colour or near-black.
 9. Footer with columns of links.
 
 ## Details that make it look premium
-- Subtle background texture: a radial gradient glow behind the hero (absolute blurred circle bg-primary/20 blur-3xl) or a faint grid pattern made with a CSS background.
-- Gradient text on one key word (bg-gradient-hero bg-clip-text text-transparent).
+- Subtle background texture: a faint paper grid or noise (CSS background), never glowing blobs.
+- One key word in the brand colour, or a hand-drawn SVG underline under it (not gradient text).
 - Numbers that matter: "Save 6 hours a week", "99.9% uptime". Use tabular-nums.
-- Cards with border plus shadow-soft, lifting on hover. Icons from lucide-react inside small rounded-lg squares tinted bg-primary/10 text-primary.
+- Cards with a hairline border and a soft shadow, lifting slightly on hover. Icons are small and sparing; prefer a slice of real UI over an icon.
 - Copy is specific and active ("Send invoices in 30 seconds"), never vague ("Revolutionize your workflow").
 
 ## In-app screens
@@ -35,4 +35,4 @@ Think of the best product launches: one sharp promise, the product shown big, pr
 - Empty states with an illustration-like icon, one sentence and a primary action.
 
 ## Avoid
-- Generic blue (#3b82f6) everything, stock photos of people pointing at laptops, centred walls of text, more than one gradient style, lorem ipsum, fake 5-star widgets.
+- Generic blue (#3b82f6) everything, gradient text and glowing blobs, rows of identical icon cards, stock photos of people pointing at laptops, centred walls of text, lorem ipsum, invented logos, testimonials or 5-star widgets. See also the Human-crafted skill.

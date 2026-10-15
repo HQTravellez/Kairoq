@@ -52,19 +52,22 @@ CREATE INDEX expenses_owner ON expenses (owner_id, status);
 
 CREATE TABLE policies (
   owner_id TEXT PRIMARY KEY,
-  currency TEXT NOT NULL DEFAULT 'EUR',
+  currency TEXT NOT NULL DEFAULT 'CAD',
   trip_cap INTEGER NOT NULL DEFAULT 1500,
-  hotel_night_cap INTEGER NOT NULL DEFAULT 180,
+  hotel_night_cap INTEGER NOT NULL DEFAULT 250,
   advance_days INTEGER NOT NULL DEFAULT 7,
   require_approval_above INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE leads (
   id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'demo',
+  first_name TEXT,
+  last_name TEXT,
   email TEXT NOT NULL,
   company TEXT NOT NULL,
-  team_size TEXT NOT NULL,
+  company_size TEXT,
+  phone TEXT,
   message TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
