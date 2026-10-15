@@ -6,7 +6,7 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 
 const BUILTIN_DIR=path.join(__dirname,'design-skills');
-const MAX_BODY=20000,MAX_PROMPT=16000,MAX_CUSTOM=30;
+const MAX_BODY=20000,MAX_PROMPT=26000,MAX_CUSTOM=30;
 
 function parse(text){
  let body=String(text||'').replace(/\r\n/g,'\n').trim(),meta={};
@@ -14,7 +14,7 @@ function parse(text){
  if(fm){for(const line of fm[1].split('\n')){const m=/^([a-zA-Z_-]+)\s*:\s*(.*)$/.exec(line);if(m)meta[m[1].toLowerCase()]=m[2].trim().replace(/^["']|["']$/g,'')}body=body.slice(fm[0].length).trim()}
  const heading=(/^#\s+(.+)$/m.exec(body)||[])[1];
  const firstPara=body.split(/\n\s*\n/).map(p=>p.trim()).find(p=>p&&!p.startsWith('#'))||'';
- return{name:String(meta.name||heading||'Untitled skill').slice(0,80),description:String(meta.description||firstPara).replace(/\s+/g,' ').slice(0,300),body:body.slice(0,MAX_BODY)};
+ return{...(meta.default==='on'?{defaultOn:true}:{}),name:String(meta.name||heading||'Untitled skill').slice(0,80),description:String(meta.description||firstPara).replace(/\s+/g,' ').slice(0,300),body:body.slice(0,MAX_BODY)};
 }
 
 let builtinCache=null;
@@ -40,9 +40,11 @@ function db(){
 function custom(owner){return db().prepare('SELECT id,name,description,body,source,url,created_at FROM design_skills WHERE owner=? ORDER BY created_at').all(String(owner))}
 function defaults(owner){return db().prepare('SELECT skill_id FROM design_skill_defaults WHERE owner=?').all(String(owner)).map(r=>r.skill_id)}
 // Every skill an owner can use: built-in first, then their own.
+// Built-in skills marked "default: on" are on for every project unless the owner turned them
+// off (stored as "!id").
 function library(owner){
  const on=new Set(defaults(owner));
- return[...builtin(),...custom(owner)].map(s=>({...s,always:on.has(s.id)}));
+ return[...builtin(),...custom(owner)].map(s=>({...s,always:on.has(s.id)||Boolean(s.defaultOn&&!on.has('!'+s.id))}));
 }
 function find(owner,id){return library(owner).find(s=>s.id===id)||null}
 function add(owner,{name,description,body,source='custom',url=null}){
@@ -62,8 +64,9 @@ function remove(owner,id){
 // Turns a skill on or off for all of an owner's projects.
 function setDefault(owner,id,on){
  if(!find(owner,id))throw Object.assign(Error('Unknown skill'),{status:404});
- if(on)db().prepare('INSERT OR IGNORE INTO design_skill_defaults(owner,skill_id) VALUES(?,?)').run(String(owner),String(id));
- else db().prepare('DELETE FROM design_skill_defaults WHERE owner=? AND skill_id=?').run(String(owner),String(id));
+ const del=db().prepare('DELETE FROM design_skill_defaults WHERE owner=? AND skill_id=?'),ins=db().prepare('INSERT OR IGNORE INTO design_skill_defaults(owner,skill_id) VALUES(?,?)');
+ if(find(owner,id).defaultOn){if(on)del.run(String(owner),'!'+id);else ins.run(String(owner),'!'+id);return library(owner)}
+ if(on)ins.run(String(owner),String(id));else del.run(String(owner),String(id));
  return library(owner);
 }
 

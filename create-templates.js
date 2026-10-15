@@ -437,6 +437,7 @@ function folder(name){
 }
 TEMPLATES.unshift({id:'calorie-tracker',name:'Calorie & fitness tracker',category:'Health',description:'A phone-first app: daily calorie and macro targets, a food database with search, water, workouts, progress charts and AI meal estimates. Installable on iPhone and Android.',mobile:{name:'Plate & Pulse',short_name:'Plate',theme_color:'#0c1222'},get files(){return folder('calorie-tracker')}});
 TEMPLATES.unshift({id:'boutique-hotel',name:'Boutique hotel',category:'Hospitality',description:'Rooms, live availability and booking (no double bookings), guest accounts with My stays, and a front-desk dashboard with charts. Add team emails as the OWNER_EMAILS server secret.',get files(){return folder('boutique-hotel')}});
+TEMPLATES.splice(1,0,{id:'travellez',name:'Corporate travel & spend',category:'Travel',description:'Travellez: a marketing site (platform, smart itinerary, industries, pricing with a sales form) and a signed-in workspace for trips, approvals, spend, travelers and policy controls. The workflow rules live in SQL.',get files(){return folder('travellez')}});
 function list(){return TEMPLATES.map(({files,...t})=>t)}
 function get(id){return TEMPLATES.find(t=>t.id===id)||null}
 module.exports={list,get,TEMPLATES};

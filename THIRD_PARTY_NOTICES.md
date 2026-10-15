@@ -20,3 +20,12 @@ Kairoq does not bundle Open Generative AI, MuAPI, Wan2GP, model weights, or thir
 ## Optional external integrations in v16
 
 Kairoq can invoke a separately installed OpenEnrich CLI and can call the Postiz Public API. Neither OpenEnrich nor Postiz source code is bundled into this archive. Review the licenses/terms of those external projects/services before redistributing or offering a hosted product that incorporates them.
+
+## Anthropic skills: frontend-design
+
+`design-skills/frontend-design/SKILL.md` is the "frontend-design" skill from https://github.com/anthropics/skills, licensed under the Apache License 2.0 (full text in `design-skills/frontend-design/LICENSE.txt`). Kairoq changed only its front matter (display name, `default: on`).
+
+## Packages for generated apps
+
+- gsap 3.13 (GreenSock standard no-charge license, https://gsap.com/standard-license), lenis 1.3 (MIT), three 0.169 (MIT).
+- remotion and @remotion/player 4.0 (Remotion License: free for individuals, non-profits and companies of up to 3 people; larger companies need a company license from remotion.pro). Generated apps only include them when the app imports them.
