@@ -80,6 +80,8 @@ async function signIn(db,{email,password}){
  const e=String(email||'').trim().toLowerCase(),key=(db.__projectId||'')+':'+e;
  if(failedRecently(key).length>=10)throw fail(429,'Too many failed sign-ins. Try again in 15 minutes or reset your password.');
  const u=db.prepare('SELECT * FROM users WHERE email=?').get(e);
+ // Unknown emails still cost one scrypt, so timing does not reveal which accounts exist.
+ if(!u){await scrypt(String(password||''),'kairoq-dummy-salt',32)}
  if(!u||!await checkPassword(password,u.password)){failedRecently(key).push(Date.now());if(failures.size>20000)failures.delete(failures.keys().next().value);throw fail(401,'Email or password is incorrect')}
  failures.delete(key);
  return session(db,u.id);
@@ -93,6 +95,10 @@ function session(db,userId){
 function googleAppSignIn(id,profile){
  const db=database(id),e=String(profile.email).toLowerCase();
  let u=db.prepare('SELECT * FROM users WHERE google_sub=?').get(profile.sub)||db.prepare('SELECT * FROM users WHERE email=?').get(e);
+ // App sign-up does not prove email ownership, so when Google first proves it for an existing
+ // password account, that password and its sessions are cleared: someone who registered the
+ // address earlier cannot keep access. The owner can set a new password with a reset.
+ if(u&&!u.google_sub){db.prepare('UPDATE users SET password=? WHERE id=?').run('google$'+crypto.randomBytes(16).toString('hex'),u.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id)}
  if(u)db.prepare('UPDATE users SET google_sub=? WHERE id=?').run(profile.sub,u.id);
  else{
   if(db.prepare('SELECT COUNT(*) n FROM users').get().n>=MAX_USERS)throw fail(403,'This app has reached its user limit');

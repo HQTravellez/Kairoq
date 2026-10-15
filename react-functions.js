@@ -50,6 +50,8 @@ function privateAddress(ip){
  const hex=/^(?:::ffff:|64:ff9b::|::ffff:0:|::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v);
  if(hex){const n=(parseInt(hex[1],16)<<16>>>0)+parseInt(hex[2],16);return privateAddress([n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join('.'))}
  if(/^(::ffff:|64:ff9b:)/.test(v))return true;
+ // 6to4 (2002::/16) and Teredo (2001:0::/32) embed IPv4 addresses that may be private.
+ if(/^2002:/.test(v)||/^2001:0{0,4}:/.test(v))return true;
  return /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(v);
 }
 // DNS lookup that refuses private addresses at connect time, so rebinding cannot reach internal hosts.
@@ -76,7 +78,8 @@ function guardedFetch({url,method='GET',headers={},body}){
   if(payload)h['Content-Length']=payload.length;
   h['User-Agent']=h['User-Agent']||'KairoqFunctions/1.0';
   const lib=u.protocol==='https:'?https:http;
-  const req=lib.request(u,{method:String(method).toUpperCase(),headers:h,lookup:guardedLookup,timeout:15000},res=>{
+  // agent:false: a fresh direct connection, never an environment proxy that would skip the address check.
+  const req=lib.request(u,{method:String(method).toUpperCase(),headers:h,lookup:guardedLookup,timeout:15000,agent:false},res=>{
    const chunks=[];let size=0;
    res.on('data',c=>{size+=c.length;if(size>MAX_FETCH_BYTES){req.destroy(fail(413,'fetch: response larger than 5 MB'));return}chunks.push(c)});
    res.on('end',()=>{const headersOut={};for(const [k,v] of Object.entries(res.headers))headersOut[k]=Array.isArray(v)?v.join(', '):String(v);resolve({status:res.statusCode,headers:headersOut,body:Buffer.concat(chunks).toString('utf8')})});

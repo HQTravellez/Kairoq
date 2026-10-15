@@ -577,7 +577,11 @@ function serveDist(req,res,distDir,rest,{sandbox}){
  const ext=path.extname(target).toLowerCase(),html=ext==='.html';
  const headers={'Content-Type':TYPES[ext]||'application/octet-stream','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Cache-Control':html?'no-cache':'public, max-age=31536000, immutable'};
  if(html)headers['Content-Security-Policy']=contentPolicy(sandbox);
- else headers['Access-Control-Allow-Origin']='*';
+ else{
+  headers['Access-Control-Allow-Origin']='*';
+  // Other files opened directly (an SVG, say) must not run script on Kairoq's origin either.
+  if(sandbox)headers['Content-Security-Policy']="sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+ }
  res.writeHead(200,headers);
  if(req.method==='HEAD')return res.end();
  fs.createReadStream(target).pipe(res);

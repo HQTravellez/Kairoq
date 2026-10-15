@@ -158,6 +158,8 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
   catch(e){if(v.kind==='customer'&&imgCredits>0)try{accounts.grant(v.account.id,imgCredits,'Refund: image not generated','refund-'+ref)}catch{}throw e}
  }:null;
  const imageNote=imageGen?'Image generation is available for this message: add "images" to your reply for the few key visuals the app needs (hero, main photos; at most 4'+(v.kind==='customer'&&imgCredits?', '+imgCredits+' credits each':'')+'). Do not generate images that already exist in the uploads.':'';
+ // Checks that pass before this change: only breaking one of these makes the change free.
+ let passingBefore=new Set();try{passingBefore=new Set(require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.last&&c.last.ok).map(c=>c.id))}catch{}
  setImmediate(async()=>{
   const modelTier=(images.length||mode==='polish')&&tier==='standard'?'vision':tier;
   const onStream=text=>update({stream:streamSnapshot(text,mode)});
@@ -189,10 +191,12 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    }
    // An agent task that changed nothing is not charged.
    if(mode==='agent'&&job.result&&job.result.unchanged&&v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: agent made no changes','refund:'+job.id)}catch{}job.refunded=true}
-   // You only pay for working changes: a change that still breaks a saved check or shows errors
-   // in the browser after the automatic fixes is free.
-   const broken=mode!=='discuss'&&job.result&&!job.result.unchanged&&((job.result.check_failures||[]).length||(job.result.runtime_errors||[]).length);
-   if(broken&&!job.refunded){job.refund_reason=(job.result.check_failures||[]).length?'checks':'errors';if(v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: the change still has problems','refund:'+job.id)}catch{}job.refunded=true}}
+   // You only pay for working changes: a change that breaks a check that passed before it, or
+   // shows errors in the browser after the automatic fixes, is free. Checks that never passed
+   // (for example one saved with force) do not count, so they cannot make every change free.
+   const brokeChecks=(job.result&&job.result.check_failures||[]).filter(f=>passingBefore.has(f.id));
+   const broken=mode!=='discuss'&&job.result&&!job.result.unchanged&&(brokeChecks.length||(job.result.runtime_errors||[]).length);
+   if(broken&&!job.refunded){job.refund_reason=brokeChecks.length?'checks':'errors';if(v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: the change still has problems','refund:'+job.id)}catch{}job.refunded=true}}
    // The finished message shows what it cost (0 when refunded).
    try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;builder.saveMeta(meta)}}catch{}
    update({status:'complete'});
@@ -496,7 +500,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     else if(images.length)source={type:'screenshots',value:images.length+' screenshots'};
     else throw Object.assign(Error('Give a website address, a GitHub repository, app files or screenshots'),{status:400});
     let token=null;
-    if(source.type==='repo'){try{token=require('./project-secrets').get(id,'github_token')}catch{}if(!token&&v.kind==='owner')token=process.env.GITHUB_TOKEN||null}
+    // The project's saved GitHub token can read the owner's private repositories, so only the owner's runs use it.
+    if(source.type==='repo'&&role==='owner'){try{token=require('./project-secrets').get(id,'github_token')}catch{}if(!token&&v.kind==='owner')token=process.env.GITHUB_TOKEN||null}
     const job=startAnalysis(v,id,{source,images,note:String(b.note||'').slice(0,2000),tier},{callModel,fetchImpl,token});
     return send(res,202,{job:publicJob(job)}),true;
    }

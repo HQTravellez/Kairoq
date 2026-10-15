@@ -270,13 +270,25 @@ function authEnabled() {
   return Boolean(process.env.APP_PASSWORD);
 }
 
+// The owner cookie is an HMAC of the password with a server-side secret, so a leaked cookie
+// cannot be used to guess the password offline. The secret comes from KAIROQ_SESSION_SECRET
+// or is generated once and kept next to the project data.
+let ownerSessionSecret=null;
+function sessionSecret(){
+  if(ownerSessionSecret)return ownerSessionSecret;
+  if(process.env.KAIROQ_SESSION_SECRET)return(ownerSessionSecret=process.env.KAIROQ_SESSION_SECRET);
+  const file=path.join(require("./react-builder").ROOT(),".owner-session-secret");
+  try{ownerSessionSecret=fs.readFileSync(file,"utf8").trim()}catch{}
+  if(!ownerSessionSecret){ownerSessionSecret=crypto.randomBytes(32).toString("hex");try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,ownerSessionSecret,{mode:0o600,flag:"wx"})}catch{try{ownerSessionSecret=fs.readFileSync(file,"utf8").trim()||ownerSessionSecret}catch{}}}
+  return ownerSessionSecret;
+}
 function sessionToken() {
   if (!authEnabled()) return "";
-  return crypto
-    .createHash("sha256")
-    .update(`openrouter-private-ai:${process.env.APP_PASSWORD}`)
-    .digest("hex");
+  return crypto.createHmac("sha256",sessionSecret()).update(`owner-session:${process.env.APP_PASSWORD}`).digest("hex");
 }
+// Without APP_PASSWORD only requests made on the server machine itself (local development)
+// act as the owner; a deployed server without a password does not hand ownership to visitors.
+function localRequest(req){const a=String(req.socket?.remoteAddress||"");return(a==="127.0.0.1"||a==="::1"||a==="::ffff:127.0.0.1")&&!req.headers["x-forwarded-for"]&&!req.headers["forwarded"]}
 
 function parseCookies(req) {
   const out = {};
@@ -289,8 +301,15 @@ function parseCookies(req) {
   return out;
 }
 
+function crossSiteRequest(req){
+  const site=String(req.headers["sec-fetch-site"]||"");
+  if(site&&site!=="same-origin"&&site!=="none")return true;
+  const origin=req.headers.origin;
+  if(origin===undefined)return false;
+  try{return new URL(origin).host!==String(req.headers.host||"")}catch{return true}
+}
 function isAuthenticated(req) {
-  if (!authEnabled()) return true;
+  if (!authEnabled()) return localRequest(req);
   const cookies = parseCookies(req);
   const received = cookies[SESSION_COOKIE] || "";
   const expected = sessionToken();
@@ -4037,13 +4056,22 @@ async function handleConnectorStatus(_req, res) {
   });
 }
 
+const ownerLoginFailures=new Map();
 async function handleLogin(req, res) {
   if (!authEnabled()) return json(res, 200, { ok: true, authRequired: false });
+  // Failed attempts are limited per address (10 per 15 minutes) and overall (100 per 15 minutes).
+  const ip=require("./client-ip").clientIp(req),now=Date.now();
+  for(const [k,v] of ownerLoginFailures)if(v.every(t=>now-t>900000))ownerLoginFailures.delete(k);
+  const mine=(ownerLoginFailures.get(ip)||[]).filter(t=>now-t<900000),all=[...ownerLoginFailures.values()].flat().filter(t=>now-t<900000);
+  if(mine.length>=10||all.length>=100)return json(res,429,{error:"Too many sign-in attempts. Try again in 15 minutes."});
   const body = await getBody(req, 100_000);
-  if (body.password !== process.env.APP_PASSWORD) {
+  const given=crypto.createHash("sha256").update(String(body.password??"")).digest(),expected=crypto.createHash("sha256").update(String(process.env.APP_PASSWORD)).digest();
+  if (!crypto.timingSafeEqual(given,expected)) {
+    ownerLoginFailures.set(ip,[...mine,now].slice(-20));
     return json(res, 401, { error: "Incorrect password." });
   }
-  const secure = (process.env.SITE_URL || "").startsWith("https://");
+  ownerLoginFailures.delete(ip);
+  const secure = /^https:\/\//.test(process.env.SITE_URL || process.env.KAIROQ_PUBLIC_URL || "") || Boolean(process.env.RAILWAY_PUBLIC_DOMAIN);
   const cookie = `${SESSION_COOKIE}=${sessionToken()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${secure ? "; Secure" : ""}`;
   return json(res, 200, { ok: true }, { "Set-Cookie": cookie });
 }
@@ -6691,8 +6719,12 @@ const server = http.createServer(async (req, res) => {
   if(hostRoute)return;
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
+  // Owner routes use a cookie, so state-changing requests must come from Kairoq's own pages
+  // (a published app on a sibling subdomain could otherwise send them with the owner's cookie).
+  // Inbound channel webhooks are called by outside services and check their own secrets.
+  if(!/^(GET|HEAD|OPTIONS)$/.test(req.method)&&url.startsWith("/api/")&&!url.startsWith("/api/create/")&&!url.startsWith("/api/channels/")&&crossSiteRequest(req))return json(res,403,{error:"Cross-site request refused"});
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>authEnabled()&&isAuthenticated(r)||!authEnabled(),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
@@ -6993,6 +7025,9 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);
     console.log(`Free Only defaults to ON.`);
     console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
+    {const sites=String(process.env.KAIROQ_SITES_DOMAIN||"").toLowerCase().replace(/^\.+|\.+$/g,"");let main="";try{main=new URL(process.env.KAIROQ_PUBLIC_URL||"").hostname}catch{}
+     const parent=h=>h.split(".").slice(-2).join(".");
+     if(sites&&main&&parent(sites)===parent(main))console.warn("WARNING: KAIROQ_SITES_DOMAIN ("+sites+") shares its parent domain with Kairoq ("+main+"). Use a separate domain for published apps; see docs/create.md.");}
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
     if(process.env.TRAVELLEZ_BENCHMARK==="true"&&experiential.configured())require("./travellez-benchmark").run(callDeveloperCodingModel).catch(e=>console.error("[travellez-benchmark] ERROR "+e.message));
     if(process.env.GENERIC_RELEASE_PROOF)require("./generic-release-proof").run(callDeveloperCodingModel).catch(e=>console.error("[generic-proof] ERROR "+e.message));

@@ -39,7 +39,9 @@ function signup(email,password){
  if(String(password||'').length<8)throw Object.assign(Error('Use a password with at least 8 characters'),{status:400});
  const d=database();
  if(d.prepare('SELECT id FROM accounts WHERE email=?').get(e))throw Object.assign(Error('An account with that email already exists'),{status:409});
- const id=crypto.randomUUID(),at=new Date().toISOString(),credits=freeCredits();
+ // When email can be sent, free credits wait until the address is verified, so throwaway
+ // sign-ups cannot farm them; without mail they are granted at once as before.
+ const id=crypto.randomUUID(),at=new Date().toISOString(),credits=mailReady()?0:freeCredits();
  d.prepare('INSERT INTO accounts(id,email,password,credits,created_at) VALUES(?,?,?,?,?)').run(id,e,hashPassword(password),credits,at);
  if(credits)d.prepare('INSERT INTO ledger(id,account_id,delta,reason,ref,at) VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),id,credits,'Free credits',null,at);
  return startSession(id);
@@ -220,7 +222,9 @@ async function sendVerification(accountId,origin){
  await mail(a.email,'Confirm your email for Kairoq Create','Confirm your email address:\n\n'+origin+'/create?verify='+encodeURIComponent(token)+'\n\nThe link works for 3 days.');
  return{sent:true};
 }
-function verifyEmail(token){const id=consumeToken(token,'verify');database().prepare('UPDATE accounts SET email_verified=1 WHERE id=?').run(id);return publicAccount(get(id))}
+// Free credits once per account, for accounts that did not get them at sign-up.
+function giveFreeCredits(id){const n=freeCredits();if(!n||database().prepare("SELECT id FROM ledger WHERE account_id=? AND reason='Free credits'").get(id))return;grant(id,n,'Free credits','free:'+id)}
+function verifyEmail(token){const id=consumeToken(token,'verify');database().prepare('UPDATE accounts SET email_verified=1 WHERE id=?').run(id);giveFreeCredits(id);return publicAccount(get(id))}
 // Always succeeds, so it never reveals whether an email has an account.
 async function requestReset(email,origin){
  let e;try{e=normalizeEmail(email)}catch{return{sent:true}}
@@ -233,6 +237,7 @@ function resetPassword(token,password){
  const id=consumeToken(token,'reset'),d=database();
  d.prepare('UPDATE accounts SET password=?,email_verified=1 WHERE id=?').run(hashPassword(password),id);
  d.prepare('DELETE FROM sessions WHERE account_id=?').run(id);
+ giveFreeCredits(id);
  return startSession(id);
 }
 // Google sign-in: links to an existing account with the same verified email, or creates one.
@@ -244,7 +249,7 @@ function googleLogin({sub,email,email_verified}){
   // An unverified password account with this email may have been created by someone else:
   // Google proves the email, so drop that password and its sessions before linking.
   if(!a.google_sub&&!a.email_verified){d.prepare('UPDATE accounts SET password=? WHERE id=?').run('google$'+crypto.randomBytes(16).toString('hex'),a.id);d.prepare('DELETE FROM sessions WHERE account_id=?').run(a.id)}
-  d.prepare('UPDATE accounts SET google_sub=?,email_verified=1 WHERE id=?').run(String(sub),a.id);return startSession(a.id);
+  d.prepare('UPDATE accounts SET google_sub=?,email_verified=1 WHERE id=?').run(String(sub),a.id);giveFreeCredits(a.id);return startSession(a.id);
  }
  if(process.env.KAIROQ_BUILDER_SIGNUPS==='closed')throw Object.assign(Error('Sign-ups are closed'),{status:403});
  const id=crypto.randomUUID(),at=new Date().toISOString(),credits=freeCredits();
