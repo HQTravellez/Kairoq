@@ -299,6 +299,16 @@ Like Lovable, the chat stays clean and the details open beside it.
 - To keep the editor light, the full reasoning is sent only for the last 10 messages.
 - **Fonts.** Geist and Geist Mono.
 
+## Showcase: Travellez (website and app)
+
+`templates/travellez` is a complete corporate travel and spend product built through Kairoq: a marketing site (Home, Platform, Smart Itinerary, Industries, About, Pricing with a talk-to-sales form) and a signed-in workspace (Dashboard, Trips, Approvals, Spend, Travelers, Controls).
+
+- **Backend.** SQL tables (`sql/001_init.sql`) and one server function (`functions/travel.js`). Each account is its own company workspace.
+- **Workflow rules.** They are enforced in SQL: a trip is approved only while requested and booked only once approved; an expense goes draft → submitted → paid.
+- **Policy.** Trip caps, booking ahead and automatic approval for small in-policy trips are checked when a trip is requested.
+- **Pipeline run.** `node scripts/showcase-travellez.js <out-dir> [port]` sends it through the Build pipeline: build, browser test and timeline. It then saves three user journeys as checks and runs them on desktop and phone: website navigation, talk to sales, and create workspace → approve → book. Finally it publishes the app and takes screenshots.
+- **Template.** It is available as the "Corporate travel & spend" template.
+
 ## Build from a reference
 
 Give Kairoq a website, a GitHub repository, screenshots or the files of a JavaScript app. It studies how the product works, writes a plan for you to approve, and builds **its own version**: comparable features and design quality, with an original name, original text and openly licensed or generated images. Open it with **Reference** in the editor.

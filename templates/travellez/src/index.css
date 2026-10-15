@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Travellez: midnight ink, aurora teal-to-indigo, warm amber for attention. */
+:root { --ink: #0b1020; --ink-2: #141a33; --paper: #f6f7fb; --indigo: #4f46e5; --teal: #14b8a6; --amber: #f59e0b; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--paper); color: #0f172a; -webkit-font-smoothing: antialiased; }
+.font-display { font-family: 'Sora', 'Inter', sans-serif; letter-spacing: -0.03em; }
+.aurora { background: radial-gradient(60% 80% at 15% 10%, rgba(20,184,166,.35), transparent 60%), radial-gradient(50% 70% at 85% 0%, rgba(79,70,229,.45), transparent 60%), radial-gradient(60% 60% at 60% 110%, rgba(245,158,11,.18), transparent 60%), var(--ink); }
+.grid-lines { background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 48px 48px; }
+.text-gradient { background: linear-gradient(90deg, #5eead4, #a5b4fc 55%, #fcd34d); -webkit-background-clip: text; background-clip: text; color: transparent; }
+input, select, textarea { font: inherit; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+@layer components {
+  .input { @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-60; }
+  .btn-primary { @apply btn bg-indigo-600 text-white shadow-sm shadow-indigo-600/30 hover:bg-indigo-500; }
+  .btn-dark { @apply btn bg-slate-900 text-white hover:bg-slate-800; }
+  .btn-ghost { @apply btn border border-slate-200 bg-white text-slate-800 hover:bg-slate-50; }
+  .btn-light { @apply btn bg-white text-slate-900 hover:bg-slate-100; }
+  .card { @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm; }
+  .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600; }
+  .pill { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+}
