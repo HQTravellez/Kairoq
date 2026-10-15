@@ -257,4 +257,4 @@ function googleLogin({sub,email,email_verified}){
  if(credits)d.prepare('INSERT INTO ledger(id,account_id,delta,reason,ref,at) VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),id,credits,'Free credits',null,at);
  return startSession(id);
 }
-module.exports={sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,COOKIE};
+module.exports={sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,get,publicAccount,COOKIE};

@@ -31,7 +31,7 @@
   - Pro, Max and image tiers also get a screenshot after each test. Standard models (DeepSeek) get the page's visible text instead.
   - The result is one new version. The chat shows each step, and the finished message keeps a list of them.
   - Limits: `KAIROQ_AGENT_MAX_STEPS` (15) steps per task. A task costs the tier's credits × `KAIROQ_AGENT_MULTIPLIER` (3).
-  - **Stop** cancels any running job (build, discuss or agent) and refunds its credits. An agent task that ends without changing anything is refunded too.
+  - **Stop** cancels any running job (build, discuss or agent) and refunds its credits, because nothing is saved.
 - **Figma import.** The **Figma** button takes a frame link and a Figma personal access token (scope "File content: read"). The owner can save the token encrypted for the project.
   - Kairoq reads the frame's layers and turns them into a compact spec: layout, gaps, padding, colours, fonts, text, radius and shadows. Image fills are saved as uploads.
   - With paid models enabled, the rendered frame is sent to a vision model as a reference image (plus 1 image credit).
@@ -272,7 +272,8 @@ The most common complaints about AI app builders are changes that break what use
   - Owners can describe a check in plain English. The AI writes the steps (priced like a Discuss message), and the check is kept only if it passes now, unless the owner chooses **Save it anyway**.
   - Up to 15 checks per project. Each can be switched on or off in the **Checks** dialog.
 - **After every change.** In Build, Agent and Polish, after the build and the browser test, Kairoq replays the enabled checks. If one fails, the AI is told exactly which step broke and must fix it before the version is saved. This takes up to three attempts.
-- **Pay only for working changes.** A change that breaks a check that passed before it, or still shows errors in the browser, after the automatic fixes is saved but **refunded**, and the chat says so. Checks that have never passed (for example one saved with **Save anyway**) do not count.
+- **No automatic refunds for completed work.** A change that still breaks a check, or still shows errors in the browser, after the automatic fixes is saved and charged, and the chat says what is wrong so the customer can ask for a fix. Kairoq only returns credits by itself when a request fails before anything is saved (an error, a model outage, or Stop).
+- **Support refunds.** A customer who is not happy contacts support. The server owner opens **Settings → Support credits**, looks up the customer's credit history, reviews the request, and grants credits back with a reason (`GET /api/create/admin/account?email=…`, `POST /api/create/admin/credits` with `{email, amount, reason}`, owner only). The grant and its reason are kept in the customer's history.
 - **A test copy of the data** (`react-sandbox.js`).
   - Checks and the agent's browser tests run against a snapshot of the app's databases (records, users, SQL tables), never the real ones. The snapshot is taken with SQLite `VACUUM INTO`.
   - Uploads go to the copy's own folder. Emails are not sent, and payment checkout returns a test URL. Realtime events stay inside the copy.
@@ -367,7 +368,7 @@ Give Kairoq a website, a GitHub repository, screenshots or the files of a JavaSc
 4. **Test and repair** (`react-reference-run.js`).
    - Each planned journey is written as a saved check and run in a browser on desktop and on a phone. The phone run also fails on sideways scrolling.
    - Failures go back to the AI with the exact failing step, for up to two repair rounds.
-   - A journey that still fails on desktop is switched off, so it does not block later changes, and reported. The build is still charged, because a new journey that never passed cannot prove the change broke anything.
+   - A journey that still fails on desktop is switched off, so it does not block later changes, and reported. The build is charged like any completed work; refunds go through support.
    - The finished app is then screenshotted and compared with the reference by the design model (a 0 to 10 score, strengths and concrete improvements, never "copy their brand"). Below 8, Kairoq runs one Polish pass with those improvements.
 5. **Deploy** (owners only, optional).
    - **Publish when every journey passes** publishes the app, then opens the live site in the browser to check it has no errors and, with a public URL, that it answers.
