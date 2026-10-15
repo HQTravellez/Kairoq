@@ -234,6 +234,11 @@ test('website analysis in a real browser: pages, forms, API calls, OpenAPI, desi
  const text=ref.describe(a);
  assert.match(text,/Navigation: Home, Rooms, Contact, Admin, Sign in/);assert.match(text,/GET http:\/\/127\.0\.0\.1:\d+\/api\/rooms \?city/);assert.match(text,/OpenAPI/);
  await assert.rejects(ref.crawlSite('http://127.0.0.1:'+site.address().port+'/private/admin',{fetchImpl:fakeFetch}),e=>e.status===403);
+ // A redirect to another origin (like example.com → www.example.com) moves the crawl there.
+ const hop=http.createServer((req,res)=>{res.writeHead(302,{Location:'http://127.0.0.1:'+site.address().port+'/'});res.end()});
+ await new Promise(r=>hop.listen(0,'127.0.0.1',r));
+ try{const b=await ref.crawlSite('http://127.0.0.1:'+hop.address().port+'/',{fetchImpl:fakeFetch,maxPages:3});assert.ok(b.pages.map(p=>p.path).includes('/rooms'));assert.equal(b.origin,'http://127.0.0.1:'+site.address().port);assert.equal(b.openapi.title,'Stays API')}
+ finally{hop.close()}
 });
 
 test('analyze → plan → build → journeys on desktop and phone → design check → publish',{skip:!runtime.available()&&'no browser'},async()=>{

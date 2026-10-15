@@ -145,7 +145,7 @@ async function shoot(page,width,height,maxHeight){
 async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=25000}={}){
  const runtime=require('./runtime-check');
  if(!runtime.available())throw fail(503,'Website analysis needs a browser, which is not available on this server.');
- const start=await safeUrl(raw),rules=await robots(start.origin,{fetchImpl});
+ const start=await safeUrl(raw);let rules=await robots(start.origin,{fetchImpl}),origin=start.origin;
  if(!robotsAllows(rules,start.pathname))throw fail(403,'This website asks automated tools not to read that page (robots.txt), so Kairoq will not analyze it. Try screenshots instead.');
  const b=await runtime.browser();
  const context=await b.newContext({viewport:{width:1280,height:800},userAgent:UA,deviceScaleFactor:1,...(har?{recordHar:{path:har,content:'omit'}}:{})});
@@ -156,9 +156,9 @@ async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=2
  page.on('response',async r=>{
   try{
    const type=r.request().resourceType();if(type!=='xhr'&&type!=='fetch')return;
-   const u=new URL(r.url()),key=r.request().method()+' '+u.origin+u.pathname;
+   const u=new URL(r.url()),key=r.request().method()+' '+u.origin+u.pathname,site=new URL(origin).hostname.replace(/^www\./,'');
    if(api.has(key)||api.size>=MAX_API)return;
-   const entry={method:r.request().method(),url:u.origin+u.pathname,query:[...u.searchParams.keys()].slice(0,10),status:r.status(),type:(r.headers()['content-type']||'').split(';')[0],same_site:u.hostname===start.hostname||u.hostname.endsWith('.'+start.hostname.replace(/^www\./,''))};
+   const entry={method:r.request().method(),url:u.origin+u.pathname,query:[...u.searchParams.keys()].slice(0,10),status:r.status(),type:(r.headers()['content-type']||'').split(';')[0],same_site:u.hostname===site||u.hostname.endsWith('.'+site)};
    api.set(key,entry);
    if(/json/.test(entry.type)&&Number(r.headers()['content-length']||0)<500000){const body=await r.json().catch(()=>null);entry.shape=shape(body)}
   }catch{}
@@ -175,17 +175,19 @@ async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=2
     const facts=await page.evaluate(pageFacts);
     const here=new URL(page.url());
     if(blockedHost(here.hostname))break;
+    // A redirect on the first page (example.com → www.example.com) moves the crawl to the new site.
+    if(!pages.length&&here.origin!==origin){if(!allowPrivate())await safeUrl(here.href);origin=here.origin;rules=await robots(origin,{fetchImpl});if(!robotsAllows(rules,here.pathname))throw fail(403,'This website asks automated tools not to read that page (robots.txt), so Kairoq will not analyze it.')}
     pages.push({url:here.href,path:here.pathname+(here.hash.startsWith('#/')?here.hash:''),...facts,links:undefined,nav:facts.links.filter(l=>l.nav).map(l=>({text:l.text,href:l.href})).slice(0,30),footer:facts.links.filter(l=>l.footer).map(l=>l.text).filter(Boolean).slice(0,30),link_count:facts.links.length});
     if(shots.length<2)shots.push({name:'reference-'+(shots.length?'page-2':'home')+'-desktop',page:here.pathname,mime:'image/jpeg',data:await shoot(page,1280,800,2600)});
     // Same-site pages, navigation first.
     const next=[...facts.links.filter(l=>l.nav),...facts.links.filter(l=>!l.nav&&!l.footer),...facts.links.filter(l=>l.footer)];
     for(const l of next){
      let n;try{n=new URL(l.href)}catch{continue}
-     if(n.origin!==start.origin||!/^https?:$/.test(n.protocol)||/\.(pdf|jpe?g|png|gif|webp|zip|mp4|mp3|svg)$/i.test(n.pathname)||/logout|signout|log-out|sign-out|cart\/add|delete/i.test(n.pathname))continue;
+     if(n.origin!==origin||!/^https?:$/.test(n.protocol)||/\.(pdf|jpe?g|png|gif|webp|zip|mp4|mp3|svg)$/i.test(n.pathname)||/logout|signout|log-out|sign-out|cart\/add|delete/i.test(n.pathname))continue;
      n.search='';n.hash=n.hash.startsWith('#/')?n.hash:'';
      const k=pageKey(n);if(seen.has(k))continue;seen.add(k);queue.push(n);
     }
-   }catch(e){pages.push({url:u.href,path:u.pathname,error:String(e.message||e).split('\n')[0].slice(0,200)})}
+   }catch(e){if(e.status)throw e;pages.push({url:u.href,path:u.pathname,error:String(e.message||e).split('\n')[0].slice(0,200)})}
   }
  }finally{await context.close().catch(()=>{})}
  // The home page on a phone: layout, navigation and overflow.
@@ -194,10 +196,10 @@ async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=2
  try{await guardContext(pc);const p=await pc.newPage();await p.goto(start.href,{waitUntil:'load',timeout:timeoutMs});await p.waitForLoadState('networkidle',{timeout:6000}).catch(()=>{});await p.waitForTimeout(600);await scrollThrough(p);phone=await p.evaluate(phoneFacts);shots.push({name:'reference-home-phone',page:start.pathname,mime:'image/jpeg',data:await shoot(p,390,844,2200)})}
  catch(e){phone={error:String(e.message||e).split('\n')[0].slice(0,200)}}finally{await pc.close().catch(()=>{})}
  const scripts=[...new Set(pages.flatMap(p=>p.scripts||[]))];
- const openapi=await discoverOpenApi(start.origin,{fetchImpl,extra:[...api.values()].map(a=>a.url).filter(u=>/openapi|swagger|api-docs/i.test(u))});
+ const openapi=await discoverOpenApi(origin,{fetchImpl,extra:[...api.values()].map(a=>a.url).filter(u=>/openapi|swagger|api-docs/i.test(u))});
  const ok=pages.filter(p=>!p.error);
  if(!ok.length)throw fail(422,'The website did not load in the browser: '+(pages[0]?.error||'no pages'));
- return{kind:'website',url:start.href,origin:start.origin,analyzed_at:new Date().toISOString(),pages:pages.map(({scripts,...p})=>p),phone,api:[...api.values()],integrations:integrations(scripts.concat([...api.values()].map(a=>a.url))),openapi,design:designTokens(ok[0]),robots_skipped:skipped,screenshots:shots};
+ return{kind:'website',url:start.href,origin,analyzed_at:new Date().toISOString(),pages:pages.map(({scripts,...p})=>p),phone,api:[...api.values()],integrations:integrations(scripts.concat([...api.values()].map(a=>a.url))),openapi,design:designTokens(ok[0]),robots_skipped:skipped,screenshots:shots};
 }
 // The JSON shape of an API response: keys and value types, never the values.
 function shape(v,depth=0){
