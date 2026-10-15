@@ -280,14 +280,19 @@ The most common complaints about AI app builders are changes that break what use
 
 ## Watching the AI work
 
-While a change is being made, the chat shows a live card, like Lovable:
+The chat stays compact, like Lovable. While a change is being made, it shows one card with:
+- the current step, with a timer and a Stop button;
+- a **Thinking / Thought for Ns** link;
+- what the AI says it is doing;
+- a chip for each file being written.
 
-- **Thoughts.** The model's own reasoning as it streams (OpenRouter `reasoning`), for models that share it. It is open while the AI thinks and collapses once it starts writing.
-- **Plan.** Before the code, the model writes 2 to 6 short steps (`"plan"` in its reply). They appear one by one and are ticked once the change builds.
-- **Steps.** A timeline (Thinking, Writing code, Building the preview, Testing in a browser, Re-running saved checks, and fixes) with how long each took. In Agent mode, the agent's steps and actions are listed instead.
-- **Files.** A chip for each file being written, with the current one highlighted, and "Show code" for the live code.
+Clicking **Thinking** (or **Thought for Ns** on a finished message) opens a panel on the right, over the preview. ✕ or Esc goes back to the preview. The panel shows:
+- **Thoughts.** The model's own reasoning as it streams (OpenRouter `reasoning`), for models that share it.
+- **Plan.** 2 to 6 short steps the model writes before the code (`"plan"` in its reply), ticked once the change builds. In Agent mode it shows the agent's steps and actions instead.
+- **Progress.** Thinking, Writing code, Building the preview, Testing in a browser, Re-running saved checks and any fixes, each with its time.
+- **Files** and the live **Code**.
 
-The finished message keeps "Thought for Ns" (with the reasoning), the ticked plan, the changed files, the version and the saved checks. The UI uses the Geist and Geist Mono fonts.
+The finished message keeps the reasoning, plan, changed files and saved checks for this panel. The UI uses the Geist and Geist Mono fonts.
 
 ## Build from a reference
 

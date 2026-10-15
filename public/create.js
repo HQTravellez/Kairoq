@@ -102,17 +102,16 @@ function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
  const msgs=state.project.messages;
  if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. Switch to Discuss to plan without changing code.';list.append(li)}
- msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1)));
+ msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1,i)));
  if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
  list.scrollTop=list.scrollHeight;
  renderErrors();
 }
-function messageItem(m,last){
+function messageItem(m,last,index){
  const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
  // Assistant replies: how long it thought (with its reasoning), what it said, the plan it followed.
- if(m.role==='assistant'&&(m.thought_ms!=null||m.thinking)){const d=el('details','thoughts done'),s=el('summary',null,'Thought for '+secs(m.thought_ms||0));d.append(s);if(m.thinking)d.append(el('p','thought-text',m.thinking));else d.classList.add('empty');li.append(d)}
+ if(m.role==='assistant'&&(m.thought_ms!=null||m.thinking||(m.plan&&m.plan.length))&&index!=null){const b=el('button','thought-link',(m.thought_ms!=null?'Thought for '+secs(m.thought_ms):'How it worked')+' ');b.type='button';b.append(el('span',null,'›'));b.onclick=()=>openDetail(index);li.append(b)}
  const body=document.createElement('div');body.className='msg-text';body.textContent=m.text;li.append(body);
- if(m.plan&&m.plan.length){const ol=el('ol','todo-list done');for(const t of m.plan){const item=el('li','done');item.append(el('span','plan-icon','✓'),el('span','plan-text',t));ol.append(item)}li.append(ol)}
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
@@ -135,7 +134,7 @@ $('restore').onclick=async()=>{
  const {project}=await api('/projects/'+state.project.id+'/restore',{method:'POST',body:{version:n}});
  state.project=project;renderMessages();renderVersions();setPreview(project.preview_url);
 };
-$('back').onclick=()=>{state.project=null;loadHome()};
+$('back').onclick=()=>{closeDetail();state.project=null;loadHome()};
 $('project-name').onchange=async()=>{try{const {project}=await api('/projects/'+state.project.id,{method:'PATCH',body:{name:$('project-name').value}});state.project.name=project.name}catch{}};
 function device(mobile){$('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile))}
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
@@ -286,30 +285,26 @@ function trackPhase(j){
  const p=phaseOf(j),last=work.timeline.at(-1);
  if(!last||last.phase!==p){if(last)last.end=Date.now();work.timeline.push({phase:p,start:Date.now(),n:work.timeline.filter(t=>t.phase===p).length+1})}
 }
+// The chat shows a compact card; the thoughts, plan, steps and code open in the panel on the
+// right (over the preview) when the user clicks "Thinking" / "Thought for …", like Lovable.
 function workCard(){
  let li=$('stream');
  if(!li){
   li=el('li','assistant work');li.id='stream';
   li.innerHTML='<div class="work-head"><span class="spark" aria-hidden="true"></span><b class="work-title">Thinking</b><span class="work-time"></span><button type="button" class="ghost work-stop">Stop</button></div>'+
-   '<details class="thoughts hidden"><summary>Thoughts</summary><p class="thought-text"></p></details>'+
-   '<div class="work-msg hidden"></div><div class="plan-box hidden"><p class="plan-label">Plan</p><ol class="todo-list"></ol></div>'+
-   '<ol class="timeline"></ol><div class="file-chips"></div>'+
-   '<details class="code-peek hidden"><summary>Show code</summary><pre class="stream-code"></pre></details>';
-  li.querySelector('.thoughts').addEventListener('toggle',e=>{e.target.dataset.touched='1'});
+   '<button type="button" class="thought-link">Thinking <span aria-hidden="true">›</span></button>'+
+   '<div class="work-msg hidden"></div><div class="file-chips"></div>';
   li.querySelector('.work-stop').onclick=()=>$('stop-job').click();
+  li.querySelector('.thought-link').onclick=()=>openDetail('live');
   $('messages').append(li);$('messages').scrollTop=$('messages').scrollHeight;
  }
  return li;
 }
 function fileChip(name,active){const c=el('span','chip'+(active?' active':''),name.replace(/^src\//,''));c.title=name;return c}
-function renderTimeline(li){
- const ol=li.querySelector('.timeline');ol.replaceChildren();
- work.timeline.forEach((t,i)=>{
-  const now=i===work.timeline.length-1;
-  const item=el('li',now?'now':'done');
-  item.append(el('span','tl-icon',now?'':'✓'),el('span','tl-label',(PHASES[t.phase]||'Working')+(t.phase==='fixing'&&t.n>1?' (try '+(t.n+1)+')':'')),el('span','tl-time',secs((t.end||Date.now())-t.start)));
-  ol.append(item);
- });
+function liveSteps(j){
+ const p=phaseOf(j),agent=j.mode==='agent'&&j.agent;
+ const after=['building','testing','checking','reviewing'].includes(p);
+ return agent?j.agent.steps.map(s=>({text:s.thought||s.actions.join('; '),sub:s.actions.join(' · '),done:s.n<j.agent.step})):work.plan.map(t=>({text:t,done:after}));
 }
 function renderWork(j){
  work.job=j;trackPhase(j);
@@ -318,36 +313,60 @@ function renderWork(j){
  if(st&&st.files)for(const f of st.files)if(!work.files.includes(f))work.files.push(f);
  if(st)work.current=st.current||null;
  if(st&&st.message)work.message=st.message;
+ if(st&&st.tail)work.tail=st.tail;
+ if(j.thinking)work.thinking=j.thinking;
  const agent=j.mode==='agent'&&j.agent;
  text(li.querySelector('.work-title'),agent&&j.agent.step?'Step '+j.agent.step+' · '+(PHASES[p]||'Working'):(PHASES[p]||'Working'));
- // Thoughts: the model's own reasoning, where the model shares it.
- const th=li.querySelector('.thoughts'),thought=String(j.thinking||'').trim();
- th.classList.toggle('hidden',!thought);
- if(thought){text(li.querySelector('.thought-text'),thought.length>1200?'…'+thought.slice(-1200):thought);if(!th.dataset.touched)th.open=p==='thinking'}
- // What the AI says it is doing.
+ const link=li.querySelector('.thought-link'),thinkingNow=p==='thinking';
+ link.firstChild.textContent=(thinkingNow?'Thinking':'Thought for '+secs((work.timeline.find(t=>t.phase==='thinking')?.end||Date.now())-work.started))+' ';
+ link.classList.toggle('active',detailState.source==='live'&&!$('detail').classList.contains('hidden'));
  const msg=li.querySelector('.work-msg');
  const said=j.mode==='discuss'?(st&&st.text)||'':agent&&j.agent.steps.length?j.agent.steps.at(-1).thought||'':work.message;
  msg.classList.toggle('hidden',!said);text(msg,said);
- // The plan, written before the code.
- const box=li.querySelector('.plan-box'),ol=li.querySelector('.todo-list');ol.replaceChildren();
- const after=['building','testing','checking','reviewing'].includes(p);
- const steps=agent?j.agent.steps.slice(-8).map(s=>({text:s.thought||s.actions.join('; '),sub:s.actions.join(' · '),done:s.n<j.agent.step})):work.plan.map(t=>({text:t,done:after}));
- box.classList.toggle('hidden',!steps.length);
- text(box.querySelector('.plan-label'),agent?'Steps':'Plan');
- for(const s of steps){const item=el('li',s.done?'done':'');item.append(el('span','plan-icon',s.done?'✓':''),el('span','plan-text',s.text));if(s.sub&&s.sub!==s.text)item.append(el('span','plan-sub',s.sub));ol.append(item)}
- renderTimeline(li);
  const chips=li.querySelector('.file-chips');chips.replaceChildren();
  for(const f of work.files)chips.append(fileChip(f,f===work.current&&p==='writing'));
- const pre=li.querySelector('.stream-code'),peek=li.querySelector('.code-peek');
- const tail=st&&st.tail?String(st.tail).replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-16).join('\n'):'';
- peek.classList.toggle('hidden',!tail);if(tail)pre.textContent=tail;
+ if(detailState.source==='live')renderDetail();
  const list=$('messages');if(list.scrollHeight-list.scrollTop-list.clientHeight<160)list.scrollTop=list.scrollHeight;
 }
-function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));renderTimeline(li)}
+// ---------- the details panel ----------
+const detailState={source:null};
+function openDetail(source){detailState.source=source;$('detail').classList.remove('hidden');document.querySelector('.stage').classList.add('show-detail');renderDetail();if(work.job&&source==='live')renderWork(work.job)}
+function closeDetail(){detailState.source=null;$('detail').classList.add('hidden');document.querySelector('.stage').classList.remove('show-detail');const l=document.querySelector('#stream .thought-link');if(l)l.classList.remove('active')}
+$('detail-close').onclick=closeDetail;
+document.querySelector('.stage-bar').addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&detailState.source!==null&&!document.querySelector('dialog[open]'))closeDetail()});
+function section(title,...children){const s=el('section','detail-section');s.append(el('h3',null,title),...children);return s}
+function todoList(items){const ol=el('ol','todo-list');for(const s of items){const item=el('li',s.done?'done':'');item.append(el('span','plan-icon',s.done?'✓':''),el('span','plan-text',s.text));if(s.sub&&s.sub!==s.text)item.append(el('span','plan-sub',s.sub));ol.append(item)}return ol}
+function renderDetail(){
+ const body=$('detail-body'),src=detailState.source;if(src===null)return;
+ body.replaceChildren();
+ const live=src==='live',j=work.job,m=live?null:state.project&&state.project.messages[src];
+ if(!live&&!m){closeDetail();return}
+ const running=live&&j&&j.status!=='complete'&&j.status!=='failed';
+ $('detail-spark').classList.toggle('still',!running);
+ text($('detail-title'),running?(PHASES[phaseOf(j)]||'Working'):'How the AI worked');
+ text($('detail-sub'),live?' · '+secs(Date.now()-work.started):(m.thought_ms!=null?' · thought for '+secs(m.thought_ms):''));
+ const thinking=live?work.thinking:m.thinking;
+ if(thinking)body.append(section('Thoughts',el('p','thought-text',thinking)));
+ else if(live&&running&&phaseOf(j)==='thinking')body.append(section('Thoughts',el('p','thought-text muted','Reading your project and planning the change…')));
+ const steps=live?liveSteps(j):(m.plan||[]).map(t=>({text:t,done:true}));
+ if(steps.length)body.append(section(live&&j.mode==='agent'?'Steps':'Plan',todoList(steps)));
+ if(live&&work.timeline.length){
+  const ol=el('ol','timeline');
+  work.timeline.forEach((t,i)=>{const now=running&&i===work.timeline.length-1;const item=el('li',now?'now':'done');item.append(el('span','tl-icon',now?'':'✓'),el('span','tl-label',(PHASES[t.phase]||'Working')+(t.phase==='fixing'&&t.n>1?' (try '+(t.n+1)+')':'')),el('span','tl-time',secs((t.end||Date.now())-t.start)));ol.append(item)});
+  body.append(section('Progress',ol));
+ }
+ const files=live?work.files:(m.changed||[]);
+ if(files.length){const c=el('div','file-chips');for(const f of files)c.append(fileChip(f,live&&f===work.current&&phaseOf(j)==='writing'));body.append(section(live&&running?'Files being written':'Files changed',c))}
+ if(!live&&m.checks)body.append(section('Saved checks',el('p',m.checks.failed.length?'check-chip bad':'check-chip ok',m.checks.failed.length?'Broke: '+m.checks.failed.join(', '):'All '+m.checks.ran+' passed')));
+ if(live&&work.tail&&running){const pre=el('pre','stream-code');pre.textContent=String(work.tail).replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-40).join('\n');body.append(section('Code',pre))}
+ if(!body.childElementCount)body.append(el('p','muted','Nothing to show for this message.'));
+}
+function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(detailState.source==='live')renderDetail()}
 async function watch(job){
  state.job=job;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
- Object.assign(work,{timeline:[],started:Date.now(),plan:[],files:[],current:null,message:''});
+ Object.assign(work,{timeline:[],started:Date.now(),plan:[],files:[],current:null,message:'',tail:'',thinking:''});if(detailState.source!==null)closeDetail();
  clearInterval(work.timer);work.timer=setInterval(tickWork,1000);
  const done=await new Promise(resolve=>{
   let finished=false;
@@ -366,12 +385,14 @@ async function watch(job){
   }
  });
  clearInterval(work.timer);
+ const wasLive=detailState.source==='live';
  $('stream')?.remove();
  if(done&&state.project&&state.project.id===id){
   const {project,account}=await api('/projects/'+id);
   state.project=project;if(account)renderCredits(account);
   state.runtimeErrors=[];
   renderMessages();renderVersions();
+  if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
   if(done.mode!=='discuss')setPreview(project.preview_url);
   if(done.refunded)$('messages').append(messageItem({role:'assistant',text:done.refund_reason==='checks'?'This change still breaks a saved check, so it was free. Use Fix it or describe the problem.':done.refund_reason==='errors'?'This change still shows errors in the browser, so it was free. Use Fix it to repair them.':'Nothing changed, so this agent task was free.'}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));

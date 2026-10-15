@@ -183,6 +183,10 @@
       <details><summary id="errors-count"></summary><ul id="errors-list"></ul></details>
       <button class="primary" id="fix" type="button">Fix it</button>
     </div>
+    <section class="detail hidden" id="detail" aria-label="How the AI worked">
+      <header class="detail-head"><span class="spark" id="detail-spark" aria-hidden="true"></span><div><b id="detail-title">Thoughts</b><span class="muted small" id="detail-sub"></span></div><button type="button" class="ghost" id="detail-close" aria-label="Back to the preview">✕</button></header>
+      <div class="detail-body" id="detail-body"></div>
+    </section>
     <div class="canvas" id="canvas">
       <iframe id="frame" title="App preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
       <div class="data hidden" id="data">
