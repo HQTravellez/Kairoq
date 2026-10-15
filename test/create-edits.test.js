@@ -67,3 +67,16 @@ test('agent mode has an edit_files tool',async()=>{
  assert.match(builder.loadFiles(meta.id,r.version)['src/App.jsx'],/Reserve<\/button>/);
  assert.equal(agent.describe({tool:'edit_files',edits:{'src/App.jsx':[]}}),'Edited src/App.jsx');
 });
+
+test('edits that fail twice escalate to whole files, and the prompt asks the model to check its own work',async()=>{
+ const meta=builder.create({name:'Escalate'});await builder.initialize(meta);
+ await builder.saveSource(meta.id,{...builder.loadFiles(meta.id,1),'src/App.jsx':PAGE},{summary:'Page'});
+ const bad={message:'x',edits:{'src/App.jsx':[{find:'<h1>Nope</h1>',replace:'x'}]}};
+ const calls=[],queue=[bad,bad,{message:'Whole file.',files:{'src/App.jsx':PAGE.replace('Book now','Reserve')}}];
+ const r=await builder.edit(meta.id,'Rename',{callModel:async(o,parse)=>{calls.push(o.messages.filter(m=>m.role==='user').at(-1).content);return parse(JSON.stringify(queue.shift()))}});
+ assert.equal(r.attempts,3);
+ const asks=calls;
+ assert.match(asks[1],/copy "find" exactly/);
+ assert.match(asks[2],/failed twice, so do not use "edits" this time: send every file you change whole/);
+ assert.match(builder.SYSTEM_PROMPT,/leave no import unresolved[\s\S]*actually rendered/);
+});

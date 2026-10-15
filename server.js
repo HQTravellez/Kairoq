@@ -6587,15 +6587,23 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
         if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
       }
       const stream=typeof opts.onToken==="function";
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(premium?900000:300000):110000)]):AbortSignal.timeout(stream?(premium?900000:300000):110000),body:JSON.stringify({model,messages:require("./builder-costs").withCacheBreakpoints(opts.messages,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
-      const data=stream&&response.ok&&response.body?await readChatStream(response.body,opts.onToken):await response.json().catch(()=>({}));
-      if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
-      const message=data.choices?.[0]?.message||{};
-      const raw=message.content;
-      const content=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
-      const cost=Number(data.usage?.cost||0);
-      if(free&&cost>0)throw Error("Free request unexpectedly billed");
-      if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model,tier:opts.tier||"standard",...(designModel?{design:true}:{})});
+      // One request; a reply cut off at the output limit is continued (model-continue.js).
+      let lastData=null;
+      const ask=async(msgs,onTok)=>{
+        const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(premium?900000:300000):110000)]):AbortSignal.timeout(stream?(premium?900000:300000):110000),body:JSON.stringify({model,messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
+        const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{})):await response.json().catch(()=>({}));
+        if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
+        const message=data.choices?.[0]?.message||{};
+        const raw=message.content;
+        const text=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
+        const cost=Number(data.usage?.cost||0);
+        if(free&&cost>0)throw Error("Free request unexpectedly billed");
+        if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model,tier:opts.tier||"standard",...(designModel?{design:true}:{})});
+        lastData=data;
+        return{content:text,finish:data.choices?.[0]?.finish_reason};
+      };
+      const {content}=await require("./model-continue").complete(ask,opts.messages,{onToken:stream?opts.onToken:undefined});
+      const data=lastData||{},message=data.choices?.[0]?.message||{};
       if(!content.trim())throw Error("Empty response; finish="+data.choices?.[0]?.finish_reason+" reasoning="+String(message.reasoning||"").length);
       return parse(content,model);
     }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}

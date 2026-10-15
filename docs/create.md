@@ -273,6 +273,8 @@ The most common complaints about AI app builders are changes that break what use
   - If any edit fails, nothing is applied, and the model is told which edit failed and why.
   - New files, and files that mostly change, are still sent whole.
   - A one-line change shrinks from the whole file to a few hundred characters of output.
+- **Cut-off replies are continued.** When a reply hits the output limit (`finish_reason: length`), Kairoq asks the model to continue exactly where it stopped and joins the parts, instead of failing and falling back to another model. This allows up to `KAIROQ_CONTINUATIONS` extra requests (default 2), as Bolt.new and Dyad do.
+- **Failed edits escalate.** After the first failed find/replace, the model is told to copy `find` exactly. After a second failure, it must send whole files. A fix that didn't work is followed by "take a different approach", not a small variation.
 - **Usage ledger.** Every paid AI call records its cost, model, tier and how many prompt tokens came from the cache.
 - **Cost report.** The server owner sees **Settings → AI costs, last 30 days**, also available as `GET /api/create/admin/costs`. It shows calls, total and average cost per tier and model, the share of tokens read from cache, and what one message of that tier sells for at `KAIROQ_CREDIT_PRICE_USD` per credit (default $0.25). Rows that cost more than they earn are shown in red.
 

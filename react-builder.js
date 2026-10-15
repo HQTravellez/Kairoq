@@ -61,6 +61,7 @@ Rules:
   - Scheduled jobs: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
+- Before you answer, check your own work: (1) if the request is already implemented exactly as asked, say so and change nothing; (2) every import resolves to a file you include or that already exists, or to an available package, so leave no import unresolved; (3) new pages and components are actually rendered: add routes and navigation links in App.jsx or the layout, or the user cannot see them; (4) the whole feature works, with no placeholders, TODOs or "rest of the code unchanged" comments. If not everything fits in one reply, finish the most important part completely and say in "message" what is left.
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
 {"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
@@ -348,7 +349,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
- let lastError='',runtimeErrors=[],checkResult=null;
+ let lastError='',runtimeErrors=[],checkResult=null,editFailures=0;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
@@ -362,7 +363,14 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   const applied=require('./react-edits').apply(next,reply.edits);next=applied.files;
   const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:validateFiles(next))];
   messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,edits:reply.edits,delete:reply.delete})});
-  if(errors.length){lastError=errors.slice(0,12).join('\n');messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again: fix the edits that failed (copy "find" exactly from the current files above) or send those files whole in "files".'});continue}
+  if(errors.length){
+   lastError=errors.slice(0,12).join('\n');
+   // Edits that failed once are retried; if they fail again, the model must send whole files.
+   const editFailed=applied.errors.length>0;
+   editFailures+=editFailed?1:0;
+   const how=editFailed&&editFailures>=2?'Your find/replace edits failed twice, so do not use "edits" this time: send every file you change whole in "files".':'Fix the edits that failed (copy "find" exactly, character for character, from the current files above) or send those files whole in "files".';
+   messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again. '+how});continue;
+  }
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
@@ -380,13 +388,13 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError=runtimeErrors.join('\n');
-    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'});
+    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
     continue;
    }
    if(checkResult&&checkResult.failed.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);
-    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\nFix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'});
+    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\nFix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
     continue;
    }
   }
