@@ -231,3 +231,15 @@ input[type=color]{padding:2px 4px;height:40px;width:72px;cursor:pointer}
 .check-chip{margin-top:6px;font-size:12px}.check-chip.ok{color:var(--ok)}.check-chip.bad{color:var(--error)}
 
 .table-wrap{overflow-x:auto}.costs{width:100%;border-collapse:collapse;font-size:12px}.costs th,.costs td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);white-space:nowrap}.costs tr.loss td{color:var(--error)}
+
+/* Build from a reference */
+dialog.wide{width:min(760px,calc(100vw - 32px))}
+.ref-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ref-list li{font-size:13px;line-height:1.45;padding:8px 10px;border:1px solid var(--border);border-radius:10px}
+.ref-list li label.check{margin:0}
+.ref-list .muted{display:block}
+.ref-shots{display:flex;gap:8px;overflow-x:auto;margin:8px 0}
+.ref-shots img{height:150px;border:1px solid var(--border);border-radius:8px;flex:none}
+.ref-design{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+.ref-design .swatch{width:28px;height:28px;border-radius:8px;border:1px solid var(--border)}
+#ref-plan{width:100%;font:12px/1.4 ui-monospace,monospace}

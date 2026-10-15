@@ -66,7 +66,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -78,8 +78,8 @@ function findShare(token){
 }
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
-const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working']);
-function intEnv(name,fallback){const n=Number(process.env[name]);return Number.isInteger(n)&&n>=0?n:fallback}
+const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing']);
+function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
  return[
@@ -128,15 +128,17 @@ function streamSnapshot(text,mode){
  const code=last?text.slice(last.index+last[0].length).split(/(?<!\\)",\s*"(?:src\/|delete)/)[0].replace(/"\s*}\s*}?\s*$/,''):'';
  return{chars:text.length,files,current:last?last[1]:null,message:msg?msg[1].replace(/\\n/g,'\n').replace(/\\"/g,'"'):'',tail:code.slice(-1600)};
 }
-function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
+// hooks (build from a reference): before() runs first and returns extra context for the model;
+// after(result) runs after the agent and returns the final result.
+function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
  if(mode==='polish'&&!designShots)throw Object.assign(Error('The design review needs screenshots, which are not available on this server.'),{status:503});
- const credits=cost({mode,tier,images:images.length>0});
+ const credits=cost({mode,tier,images:images.length>0})+extraCredits;
  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
  const update=patch=>{Object.assign(job,patch);job.seq++};
  // Customers pay up front, before anything is saved; credits are refunded if the job fails.
- if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,mode==='discuss'?'Discuss message':(mode==='agent'?'Agent task':mode==='polish'?'Design review':'Chat edit')+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
+ if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,label?label+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''):mode==='discuss'?'Discuss message':(mode==='agent'?'Agent task':mode==='polish'?'Design review':'Chat edit')+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
  if(mode!=='discuss'&&mode!=='polish'&&images.length&&!referenceOnly){
   try{const names=require('./react-assets').save(id,images);images=images.map((img,i)=>({...img,name:names[i]}))}
   catch(e){if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: images not saved','refund:'+job.id)}catch{}throw e}
@@ -161,9 +163,12 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,tier:modelTier,images,signal})}
    else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
-    const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
+    let extra='';
+    if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
+    const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',context,extra].filter(Boolean).join('\n\n');
     job.result=await require('./react-agent').run(id,message,{callModel,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
      onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
+    if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
    else{
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
@@ -193,6 +198,50 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
  return job;
 }
 const controllers=new Map();
+// Build from a reference: the build costs an agent task plus the browser tests, repairs and
+// design comparison that follow (KAIROQ_REFERENCE_CREDITS, default twice the tier price plus a design review).
+function referenceExtra(tier){const t=tiers().find(x=>x.id===tier);return intEnv('KAIROQ_REFERENCE_CREDITS',(t?t.credits:1)*2+polishCredits())}
+function referencePrices(){return tiers().filter(t=>t.enabled).map(t=>({tier:t.id,analyze:cost({mode:'discuss',tier:t.id,images:true}),build:cost({mode:'agent',tier:t.id,images:true})+referenceExtra(t.id)}))}
+// Analyzes a reference (website, GitHub repository, uploaded app or screenshots) and writes
+// the build plan, as a job the editor follows like any other.
+function startAnalysis(v,id,{source,images=[],note='',tier='standard'},{callModel,fetchImpl=fetch,token}){
+ for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+ const credits=cost({mode:'discuss',tier,images:true});
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'analyze',tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
+ const update=patch=>{Object.assign(job,patch);job.seq++};
+ if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,'Reference analysis'+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
+ const controller=new AbortController();controllers.set(job.id,controller);jobs.set(job.id,job);
+ setImmediate(async()=>{
+  const ref=require('./react-reference'),run=require('./react-reference-run'),signal=controller.signal;
+  try{
+   update({status:'analyzing'});
+   let analysis;
+   if(source.type==='url'){
+    // With REA installed, the browser session is also recorded (HAR) and analyzed by REA.
+    const har=ref.reaAvailable()?path.join(require('os').tmpdir(),'kairoq-'+job.id+'.har'):null;
+    try{analysis=await ref.crawlSite(source.value,{fetchImpl,har});if(har){const r=await ref.reaNetwork(har);if(r)analysis.rea_network=r}}
+    finally{if(har)fs.rmSync(har,{force:true})}
+   }else if(source.type==='repo')analysis=await ref.analyzeRepo(source.value,{fetchImpl,token});
+   else if(source.type==='app')analysis=await ref.analyzeApp(source.zip,{name:source.value});
+   else analysis={kind:'screenshots',count:images.length,analyzed_at:new Date().toISOString()};
+   if(signal.aborted)throw Error('Stopped.');
+   const crawled=analysis.screenshots||[];
+   const uploads=images.map((img,i)=>({name:'reference-upload-'+(i+1)+(i===0&&!crawled.length?'-desktop':''),mime:img.mime,data:img.data}));
+   update({status:'planning'});
+   const plan=await ref.createPlan(analysis,{callModel,tier,images:[...uploads,...crawled].slice(0,4),note,signal});
+   const names=run.saveShots(id,[...crawled,...uploads]);
+   run.save(id,{source:{type:source.type,value:String(source.value||'').slice(0,300)},analysis,plan,shots:names});
+   job.result={reference:run.view(builder.loadMeta(id))};
+   update({status:'complete'});
+  }catch(e){
+   update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
+   if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund for failed reference analysis','refund:'+job.id)}catch{}
+  }
+  controllers.delete(job.id);job.finished_at=new Date().toISOString();
+  setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+ });
+ return job;
+}
 // The person who started a job, or anyone with at least `need` access to its project.
 function canSeeJob(v,job,need){if(job.owner===v.owner)return true;try{const r=roleFor(v,builder.loadMeta(job.projectId));return Boolean(r)&&RANK[r]>=RANK[need]}catch{return false}}
 function publicJob(job){const {owner,...rest}=job;return rest}
@@ -210,7 +259,7 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,webSearch,figmaFetch,designShots,generateImage,usageRows}){
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch}){
  const deps={callModel,checkRuntime,inspect,webSearch,designShots,generateImage};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
@@ -413,6 +462,53 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'"});res.end(mobile.qrSvg(best));return true;
    }
    if(action==='/appicon'&&method==='GET'){res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(mobile.icon(id,'icon-192.png'));return true}
+  }
+  // ----- build from a reference -----
+  if(action==='/reference'&&method==='GET'){
+   const meta=builder.loadMeta(id),ref=require('./react-reference');
+   return send(res,200,{reference:require('./react-reference-run').view(meta),browser:require('./runtime-check').available(),rea:ref.reaAvailable(),asset_search:require('./react-asset-search').enabled(),prices:referencePrices(),can_publish:role==='owner'}),true;
+  }
+  if(action==='/refshot'&&method==='GET'){
+   const f=require('./react-reference-run').shotFile(id,new URL(req.url,'http://x').searchParams.get('name'));
+   if(!f)throw Object.assign(Error('Not found'),{status:404});
+   res.writeHead(200,{'Content-Type':f.endsWith('.png')?'image/png':'image/jpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(fs.readFileSync(f));return true;
+  }
+  if(action==='/reference'&&method==='POST'){
+   const b=await readJson(req,58*1024*1024),ref=require('./react-reference'),run=require('./react-reference-run');
+   const tier=b.tier||'standard',fetchImpl=referenceFetch||fetch;
+   if(b.step==='analyze'){
+    const images=parseImages(b.images);
+    let source;
+    if(b.app&&b.app.data){
+     if(!b.rights)throw Object.assign(Error('Confirm that you own this app or have the right to analyze it.'),{status:400});
+     source={type:'app',value:String(b.app.name||'app.zip').slice(0,80),zip:String(b.app.data).replace(/^data:[^,]*,/,'')};
+    }else if(String(b.repo||'').trim())source={type:'repo',value:String(b.repo).trim()};
+    else if(String(b.url||'').trim())source={type:'url',value:String(b.url).trim()};
+    else if(images.length)source={type:'screenshots',value:images.length+' screenshots'};
+    else throw Object.assign(Error('Give a website address, a GitHub repository, app files or screenshots'),{status:400});
+    let token=null;
+    if(source.type==='repo'){try{token=require('./project-secrets').get(id,'github_token')}catch{}if(!token&&v.kind==='owner')token=process.env.GITHUB_TOKEN||null}
+    const job=startAnalysis(v,id,{source,images,note:String(b.note||'').slice(0,2000),tier},{callModel,fetchImpl,token});
+    return send(res,202,{job:publicJob(job)}),true;
+   }
+   if(b.step==='build'){
+    const meta=builder.loadMeta(id);
+    if(!meta.reference)throw Object.assign(Error('Analyze a reference first'),{status:409});
+    const plan=ref.normalizePlan(b.plan&&typeof b.plan==='object'?b.plan:meta.reference.plan);
+    meta.reference.plan=plan;
+    // The plan's design direction becomes the project's colours and fonts (see prepareDesign).
+    if(plan.design&&!meta.design)meta.planned_design={...plan.design,created_at:new Date().toISOString()};
+    builder.saveMeta(meta);
+    const shots=run.loadShots(id,meta.reference.shots).slice(0,3);
+    const {message,context}=ref.buildTask(plan,meta.reference.analysis);
+    const canPublish=role==='owner',github=b.github?{repo:typeof b.github==='object'&&b.github.repo?String(b.github.repo):undefined}:null;
+    const job=startJob(v,id,{message,mode:'agent',tier,images:shots,context,referenceOnly:true,extraCredits:referenceExtra(tier),label:'Build from reference',hooks:{
+     before:async()=>(await run.prepare(id,plan,{fetchImpl})).note,
+     after:(result,c)=>run.finish(id,result,{plan,publish:Boolean(b.publish),github,slug:b.slug},{...deps,...c,tier,canPublish,isOwner:v.kind==='owner',fetchImpl})
+    }},deps);
+    return send(res,202,{job:publicJob(job)}),true;
+   }
+   throw Object.assign(Error('Unknown step (use analyze or build)'),{status:400});
   }
   if(action==='/figma'&&method==='GET'){let saved=false;try{saved=Boolean(require('./project-secrets').status(id).figma_token)}catch{}return send(res,200,{token_saved:saved}),true}
   if(action==='/figma'&&method==='POST'){

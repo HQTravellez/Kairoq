@@ -271,7 +271,7 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
+const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 function streamItem(){
  let li=$('stream');
  if(!li){li=document.createElement('li');li.id='stream';li.className='assistant streaming';li.innerHTML='<div class="stream-msg"></div><div class="stream-files changed"></div><pre class="stream-code hidden"></pre>';$('messages').append(li)}
@@ -329,11 +329,13 @@ async function watch(job){
   if(done.mode!=='discuss')setPreview(project.preview_url);
   if(done.refunded)$('messages').append(messageItem({role:'assistant',text:done.refund_reason==='checks'?'This change still breaks a saved check, so it was free. Use Fix it or describe the problem.':done.refund_reason==='errors'?'This change still shows errors in the browser, so it was free. Use Fix it to repair them.':'Nothing changed, so this agent task was free.'}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
+  if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
   if(state.code)renderFiles();
   if(state.data)renderData();
  }
  state.job=null;busy(false);
+ return done;
 }
 // ---------- mobile app ----------
 async function renderMobile(){
@@ -379,6 +381,92 @@ $('figma-import').onclick=async()=>{
   watch(r.job);
  }catch(err){text($('figma-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
  finally{$('figma-import').disabled=false}
+};
+// ---------- build from a reference ----------
+const refState={plan:null,info:null};
+function referenceReport(r){
+ const L=['Build from reference: finished.'];
+ if(r.last_run){const d=r.last_run.desktop,p=r.last_run.phone;L.push('Journeys: '+d.passed+'/'+d.ran+' pass on desktop, '+p.passed+'/'+p.ran+' on phone'+(r.repairs?' after '+r.repairs+' repair round'+(r.repairs>1?'s':''):'')+'.');for(const f of r.last_run.failed||[])L.push('• Still failing: '+f.name+(f.step?' (at '+f.step+')':'')+(f.error?': '+f.error:''))}
+ else if(!r.checks.length)L.push('No journeys were tested (the browser is not available or the plan had none).');
+ if(r.design)L.push('Design compared with the reference: '+r.design.score+'/10'+(r.polished?', then polished.':'.')+(r.design.improvements.length&&!r.polished?' Ideas: '+r.design.improvements.slice(0,3).join('; '):''));
+ if(r.published)L.push((r.published.ok?'Published and verified: ':'Published, but the live check found problems: ')+r.published.url+(r.published.errors.length?' ('+r.published.errors.join('; ')+')':''));
+ if(r.github)L.push('Pushed to GitHub: '+(r.github.url||r.github.repo)+(r.github.warning?' ('+r.github.warning+')':''));
+ for(const p of r.problems||[])L.push('• '+p);
+ return L.join('\n');
+}
+function refStep(n){$('ref-step1').classList.toggle('hidden',n!==1);$('ref-step2').classList.toggle('hidden',n!==2)}
+function priceFor(kind){const p=(refState.info&&refState.info.prices||[]).find(x=>x.tier===state.tier);return p?p[kind]:null}
+async function openReference(){
+ text($('ref-error'),'');
+ try{refState.info=await api('/projects/'+state.project.id+'/reference')}catch(err){text($('chat-error'),err.message);return}
+ const i=refState.info;
+ $('ref-app-box').classList.toggle('hidden',!i.rea);
+ $('ref-owner-box').classList.toggle('hidden',!i.can_publish);
+ const a=priceFor('analyze'),b=priceFor('build');
+ text($('ref-cost'),(i.browser?'':'Website analysis is not available on this server (no browser); use a repository or screenshots. ')+(a!=null&&state.me.viewer.kind==='customer'?'Analysis and plan: '+a+' credits on the '+state.tier+' model. Building it: '+b+' credits (agent build, browser tests, repairs and design review). A failed step is refunded.':''));
+ if(i.reference&&i.reference.plan){showPlan(i.reference);refStep(2)}else refStep(1);
+ $('ref-dialog').showModal();
+}
+function refItem(html){const x=document.createElement('li');x.append(...html);return x}
+function refSpan(t,cls){const x=document.createElement('span');x.textContent=t;if(cls)x.className=cls;return x}
+function showPlan(ref){
+ const plan=ref.plan,a=ref.analysis||{};refState.plan=plan;
+ const src=a.kind==='website'?a.url+' — '+a.pages.length+' page'+(a.pages.length===1?'':'s')+' studied, '+a.api_calls+' API call'+(a.api_calls===1?'':'s')+' observed'+(a.integrations.length?', services: '+a.integrations.join(', '):'')+(a.openapi?', OpenAPI with '+a.openapi.endpoints+' endpoints':'')+(a.rea?', REA network analysis':'')+(a.robots_skipped&&a.robots_skipped.length?' ('+a.robots_skipped.length+' page'+(a.robots_skipped.length===1?'':'s')+' skipped for robots.txt)':'')
+  :a.kind==='repo'?a.url+' — '+(a.frameworks.join(', ')||a.languages.join(', '))+'; license: '+a.license.name+(a.license.use!=='permissive'?' (code is not reused)':'')
+  :a.kind==='app'?a.name+' — '+a.files+' files analyzed with REA':(a.count||0)+' screenshots';
+ text($('ref-summary'),plan.name+': '+plan.summary+'\nFrom '+src);
+ $('ref-summary').style.whiteSpace='pre-line';
+ const shots=$('ref-shots');shots.replaceChildren();for(const n of ref.shots||[]){const img=document.createElement('img');img.alt='Reference screenshot';img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/refshot?name='+encodeURIComponent(n);shots.append(img)}
+ const fl=$('ref-features');fl.replaceChildren();
+ plan.features.forEach((f,i)=>{const l=document.createElement('label');l.className='check';const c=document.createElement('input');c.type='checkbox';c.checked=f.enabled!==false;c.dataset.i=i;l.append(c,refSpan(' '+f.name+' ('+(f.priority===1?'must have':f.priority===2?'should have':'nice to have')+')'));fl.append(refItem([l,refSpan(f.description,'muted')]))});
+ const pl=$('ref-pages');pl.replaceChildren();for(const p of plan.pages)pl.append(refItem([refSpan(p.path+' '+p.name),refSpan(p.purpose+(p.sections.length?' · '+p.sections.join(' · '):''),'muted')]));
+ const dl=$('ref-data');dl.replaceChildren();
+ for(const e of plan.entities)dl.append(refItem([refSpan('Data: '+e.name+' ('+e.access+')'),refSpan(e.fields.join(', '),'muted')]));
+ dl.append(refItem([refSpan(plan.auth.required?'Sign-in: '+(plan.auth.methods.join(', ')||'email')+(plan.auth.roles.length?' · roles: '+plan.auth.roles.join(', '):''):'No sign-in in the first version')]));
+ for(const x of plan.integrations)dl.append(refItem([refSpan('Integration: '+x.name),refSpan(x.purpose+' — '+x.how,'muted')]));
+ const jl=$('ref-journeys');jl.replaceChildren();for(const j of plan.journeys)jl.append(refItem([refSpan(j.name),refSpan(j.steps,'muted')]));
+ if(!plan.journeys.length)jl.append(refItem([refSpan('None planned','muted')]));
+ const d=$('ref-design');d.replaceChildren();
+ if(plan.design){for(const k of ['background','foreground','primary','secondary','accent']){const c=plan.design.palette[k];if(!c)continue;const sw=document.createElement('span');sw.className='swatch';sw.style.background=c;sw.title=k+' '+c;d.append(sw)}d.append(refSpan(plan.design.name+' · '+plan.design.fonts.display+' / '+plan.design.fonts.body))}
+ $('ref-plan').value=JSON.stringify(plan,null,2);
+ const b=priceFor('build');text($('ref-build-cost'),b!=null&&state.me.viewer.kind==='customer'?'Building costs '+b+' credits on the '+state.tier+' model. If journeys still fail or the app shows errors after the repairs, it is free.':'');
+}
+$('ref-features').onchange=e=>{const i=e.target.dataset.i;if(i===undefined)return;try{const p=JSON.parse($('ref-plan').value);if(p.features&&p.features[i]){p.features[i].enabled=e.target.checked;$('ref-plan').value=JSON.stringify(p,null,2)}}catch{}};
+$('ref-github').onchange=()=>$('ref-github-repo').classList.toggle('hidden',!$('ref-github').checked);
+$('ref-open').onclick=()=>{if(!state.project)return;openReference()};
+$('ref-back').onclick=()=>{text($('ref-error'),'');refStep(1)};
+const asDataUrl=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
+$('ref-analyze').onclick=async()=>{
+ if(state.job)return;
+ text($('ref-error'),'');
+ const url=$('ref-url').value.trim(),repo=$('ref-repo').value.trim(),files=[...$('ref-images').files].slice(0,4),zip=$('ref-app').files[0];
+ if(!url&&!repo&&!files.length&&!zip){text($('ref-error'),'Give a website, a repository, app files or screenshots.');return}
+ if(zip&&!$('ref-rights').checked){text($('ref-error'),'Confirm that you have the right to analyze this app.');return}
+ $('ref-analyze').disabled=true;
+ try{
+  const images=[];for(const f of files){if(f.size>3*1024*1024)throw Error(f.name+' is larger than 3 MB');images.push({name:f.name,dataUrl:await asDataUrl(f)})}
+  const app=zip?{name:zip.name,data:await asDataUrl(zip)}:undefined;
+  const r=await api('/projects/'+state.project.id+'/reference',{method:'POST',body:{step:'analyze',url:zip||repo?undefined:url,repo:zip?undefined:repo||undefined,app,rights:$('ref-rights').checked,images,note:$('ref-note').value.trim(),tier:state.tier}});
+  $('ref-dialog').close();
+  $('messages').append(messageItem({role:'user',text:'Study the reference: '+(zip?zip.name:repo||url||files.length+' screenshots')}));
+  const done=await watch(r.job);
+  if(done&&done.status==='complete'&&done.result&&done.result.reference){refState.info=await api('/projects/'+state.project.id+'/reference');showPlan(refState.info.reference);refStep(2);$('ref-dialog').showModal()}
+ }catch(err){text($('ref-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{$('ref-analyze').disabled=false}
+};
+$('ref-build').onclick=async()=>{
+ if(state.job)return;
+ text($('ref-error'),'');
+ let plan;try{plan=JSON.parse($('ref-plan').value)}catch{text($('ref-error'),'The plan JSON is not valid. Fix it or reopen the dialog.');return}
+ $('ref-build').disabled=true;
+ try{
+  const github=$('ref-github').checked?{repo:$('ref-github-repo').value.trim()||undefined}:undefined;
+  const r=await api('/projects/'+state.project.id+'/reference',{method:'POST',body:{step:'build',plan,tier:state.tier,publish:$('ref-publish').checked,github}});
+  $('ref-dialog').close();
+  $('messages').append(messageItem({role:'user',text:'Build "'+plan.name+'" from the approved plan'+($('ref-publish').checked?', then publish':'')}));
+  watch(r.job);
+ }catch(err){text($('ref-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{$('ref-build').disabled=false}
 };
 $('stop-job').onclick=async()=>{if(!state.job)return;$('stop-job').disabled=true;try{await api('/jobs/'+state.job.id+'/cancel',{method:'POST'})}catch(err){text($('chat-error'),err.message)}finally{$('stop-job').disabled=false}};
 function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;$('fix').disabled=on;if(label)text($('progress-text'),label)}

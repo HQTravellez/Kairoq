@@ -11,7 +11,7 @@ const APP_PACKAGES={react:'UI',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
- 'embla-carousel-react':'carousels','qrcode.react':'QR codes'};
+ 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'3D scenes (glTF models via three/examples/jsm/loaders/GLTFLoader.js)'};
 const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq'];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
 function allowedImport(spec){if(spec==='kairoq')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
@@ -261,14 +261,19 @@ async function materializeImages(id,reply,{imageGen,cache,design}){
 // brief); Kairoq saves it on the project and writes its colours and fonts into src/index.css.
 async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress=()=>{}}){
  const meta=loadMeta(id);
- if(meta.design||images.length||process.env.KAIROQ_DESIGN_BRIEF==='off')return null;
+ // A design already chosen (from a reference build plan) is used instead of a new brief.
+ const planned=meta.planned_design&&!meta.design?meta.planned_design:null;
+ if(!planned&&(meta.design||images.length||process.env.KAIROQ_DESIGN_BRIEF==='off'))return null;
  const design=require('./react-design'),files=loadFiles(id,meta.current_version);
- if(!design.isUntouchedStarter(files)||!design.hasTokens(files))return null;
- onProgress('designing');
- let brief;
- try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
- catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
+ if(!design.isUntouchedStarter(files)||!design.hasTokens(files)){if(meta.planned_design){const f=loadMeta(id);if(!f.design)f.design=f.planned_design;delete f.planned_design;saveMeta(f)}return null}
+ let brief=planned;
+ if(!brief){
+  onProgress('designing');
+  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
+  catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
+ }
  const fresh=loadMeta(id);
+ delete fresh.planned_design;
  fresh.design=brief;
  if(brief.skill&&!(fresh.skills||[]).includes(brief.skill))fresh.skills=[...(fresh.skills||[]),brief.skill];
  saveMeta(fresh);

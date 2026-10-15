@@ -50,18 +50,18 @@ function setEnabled(id,checkId,enabled){
 // Runs the enabled checks against a built version. versionUrl is the preview URL of that version
 // (a path like /builder/p/…/v/3/); inspect(url,{steps,sandbox}) comes from runtime-check.js.
 // Returns {ran, passed, failed:[{id,name,step,error}], skipped}.
-async function run(id,versionUrl,{inspect,checks,record=true,version}={}){
+async function run(id,versionUrl,{inspect,checks,record=true,version,viewport}={}){
  const meta=builder.loadMeta(id),todo=(checks||list(meta)).filter(c=>c.enabled!==false);
  if(!todo.length||!inspect)return{ran:0,passed:0,failed:[],skipped:!inspect&&todo.length>0};
  const sandbox=require('./react-sandbox'),results=[];
  for(const c of todo){
-  const r=await sandbox.withSandbox(id,async box=>inspect(versionUrl+(c.path||''),{steps:c.steps,screenshot:false,sandbox:box.token}));
+  const r=await sandbox.withSandbox(id,async box=>inspect(versionUrl+(c.path||''),{steps:c.steps,screenshot:false,sandbox:box.token,...(viewport?{viewport}:{})}));
   if(r.skipped)return{ran:0,passed:0,failed:[],skipped:true};
   const bad=r.steps.find(s=>!s.ok);
-  const crash=r.errors.find(e=>/^(Uncaught error|Blank page|Page did not load)/.test(e));
-  results.push({id:c.id,name:c.name,ok:!bad&&!crash,step:bad?stepLabel(bad.step):'',error:bad?String(bad.error).replace(/^locator\.\w+: /,''):crash||''});
+  const crash=r.errors.find(e=>/^(Uncaught error|Blank page|Page did not load|Layout overflow)/.test(e));
+results.push({id:c.id,name:c.name+(viewport==='phone'?' (phone)':''),ok:!bad&&!crash,step:bad?stepLabel(bad.step):'',error:bad?String(bad.error).replace(/^locator\.\w+: /,''):crash||''});
  }
- if(record){
+ if(record&&viewport!=='phone'){
   const fresh=builder.loadMeta(id),at=new Date().toISOString();
   for(const r of results){const c=list(fresh).find(x=>x.id===r.id);if(c)c.last={ok:r.ok,at,version:version||null,...(r.ok?{}:{step:r.step,error:String(r.error).slice(0,300)})}}
   builder.saveMeta(fresh);

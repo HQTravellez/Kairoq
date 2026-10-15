@@ -83,9 +83,11 @@ async function designShots(url,{timeoutMs=20000}={}){
  }
  return shots;
 }
-async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox}={}){
+// viewport 'phone' tests the page at 390x844 with touch, like a phone.
+async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,viewport}={}){
  if(!available())return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
- const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
+ const phone=viewport==='phone';
+ const context=await (await browser()).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
  const page=await context.newPage(),errors=[],results=[],external=[];
  const add=e=>{const text=String(e).slice(0,500);if(!IGNORED.test(text)&&!errors.includes(text)&&errors.length<15)errors.push(text)};
  // Files from other sites that fail to load (blocked images, fonts) are listed separately:
@@ -124,6 +126,7 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox}={}
   text=await page.evaluate(()=>document.body?document.body.innerText:'').catch(()=>'');
   const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))}).catch(()=>false);
   if(blank)add('Blank page: nothing rendered inside #root.');
+  if(phone&&await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2).catch(()=>false))add('Layout overflow: the page scrolls sideways on a 390px phone screen.');
   if(screenshot)shot=(await page.screenshot({type:'jpeg',quality:60})).toString('base64');
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
@@ -141,4 +144,4 @@ async function renderHtml(html,{width,height}){
  }finally{await context.close().catch(()=>{})}
 }
 async function close(){if(browserPromise){const b=await browserPromise.catch(()=>null);browserPromise=null;await b?.close().catch(()=>{})}}
-module.exports={check,screenshot,inspect,designShots,renderHtml,available,close};
+module.exports={check,screenshot,inspect,designShots,renderHtml,available,close,browser};
