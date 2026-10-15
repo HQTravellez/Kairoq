@@ -272,7 +272,7 @@ The most common complaints about AI app builders are changes that break what use
   - Owners can describe a check in plain English. The AI writes the steps (priced like a Discuss message), and the check is kept only if it passes now, unless the owner chooses **Save it anyway**.
   - Up to 15 checks per project. Each can be switched on or off in the **Checks** dialog.
 - **After every change.** In Build, Agent and Polish, after the build and the browser test, Kairoq replays the enabled checks. If one fails, the AI is told exactly which step broke and must fix it before the version is saved. This takes up to three attempts.
-- **Pay only for working changes.** A change that still breaks a check, or still shows errors in the browser, after the automatic fixes is saved but **refunded**, and the chat says so.
+- **Pay only for working changes.** A change that breaks a check that passed before it, or still shows errors in the browser, after the automatic fixes is saved but **refunded**, and the chat says so. Checks that have never passed (for example one saved with **Save anyway**) do not count.
 - **A test copy of the data** (`react-sandbox.js`).
   - Checks and the agent's browser tests run against a snapshot of the app's databases (records, users, SQL tables), never the real ones. The snapshot is taken with SQLite `VACUUM INTO`.
   - Uploads go to the copy's own folder. Emails are not sent, and payment checkout returns a test URL. Realtime events stay inside the copy.
@@ -367,7 +367,7 @@ Give Kairoq a website, a GitHub repository, screenshots or the files of a JavaSc
 4. **Test and repair** (`react-reference-run.js`).
    - Each planned journey is written as a saved check and run in a browser on desktop and on a phone. The phone run also fails on sideways scrolling.
    - Failures go back to the AI with the exact failing step, for up to two repair rounds.
-   - A journey that still fails on desktop is switched off, so it does not block later changes, and reported. That build is free, as with any change that still breaks a check.
+   - A journey that still fails on desktop is switched off, so it does not block later changes, and reported. The build is still charged, because a new journey that never passed cannot prove the change broke anything.
    - The finished app is then screenshotted and compared with the reference by the design model (a 0 to 10 score, strengths and concrete improvements, never "copy their brand"). Below 8, Kairoq runs one Polish pass with those improvements.
 5. **Deploy** (owners only, optional).
    - **Publish when every journey passes** publishes the app, then opens the live site in the browser to check it has no errors and, with a public URL, that it answers.
@@ -435,14 +435,15 @@ OPENROUTER_API_KEY=... KAIROQ_BUILDER_MODE=paid-first KAIROQ_BUILDER_PAID_APPROV
 ## Publishing and domains
 
 - **Publish** makes a version live at `/sites/<name>/` on the Kairoq host. Publishing again moves it to the current version.
-- **Subdomains (optional):** set `KAIROQ_SITES_DOMAIN=sites.example.com`, point wildcard DNS `*.sites.example.com` at Kairoq, and add the wildcard domain in Railway. Published apps are then also served at `<name>.sites.example.com`.
+- **Subdomains (optional):** set `KAIROQ_SITES_DOMAIN` to a **separate domain you own only for published apps** (for example `example-sites.com`, not a subdomain of Kairoq's own domain), point wildcard DNS `*.example-sites.com` at Kairoq, and add the wildcard domain in Railway. Published apps are then also served at `<name>.example-sites.com`.
+  - Published apps run their own code without a sandbox on these subdomains, so they must not share a site with the editor. Kairoq logs a warning at startup when `KAIROQ_SITES_DOMAIN` shares its parent domain with `KAIROQ_PUBLIC_URL`.
 - **Custom domains:** the customer adds a domain. Kairoq shows two DNS records: a `CNAME` to Kairoq and a `TXT` record at `_kairoq.<domain>` that proves ownership. After **Verify** succeeds, requests for that host serve the published app.
 - **HTTPS for custom domains:** Railway issues certificates only for domains added to the service. Add each verified custom domain in Railway (Settings → Networking → Custom Domain) until this is automated through the Railway API.
 
 ## Accounts and credits
 
 - Customers sign up at `/create` with email and password. Passwords are hashed with scrypt. Sessions are random tokens, stored hashed, in an HttpOnly cookie.
-- New accounts get `KAIROQ_FREE_CREDITS` credits (default 30). Each chat edit costs 1 credit, taken when the edit starts and refunded if it fails.
+- New accounts get `KAIROQ_FREE_CREDITS` credits (default 30). When email is set up, they are granted once the address is verified (by the email link, a password reset or Google sign-in), so throwaway sign-ups cannot collect them. Each chat edit costs 1 credit, taken when the edit starts and refunded if it fails.
 - The owner login (`APP_PASSWORD`) builds without credits. **Set `APP_PASSWORD` in production.** Without it, every visitor counts as the owner.
 - `KAIROQ_BUILDER_SIGNUPS=closed` turns off new sign-ups.
 

@@ -203,10 +203,17 @@ function pumpSql(){
   p.child.send({...job.msg,id:job.id});
  }
 }
+// Queries waiting or running per app: one app's slow queries cannot fill the shared pool.
+const perApp=new Map();
+function perAppLimit(){const n=Number(process.env.KAIROQ_SQL_PER_APP||4);return Number.isInteger(n)&&n>=1?n:4}
 function remote(msg,limit=sqlTimeout()){
  return new Promise((resolve,reject)=>{
   if(pool.queue.length>=200)return reject(fail(503,'The database is busy. Try again shortly.'));
-  pool.queue.push({msg,limit,resolve,reject});pumpSql();
+  const key=msg.dir,n=perApp.get(key)||0;
+  if(msg.op!=='migrate'&&n>=perAppLimit())return reject(fail(429,'Too many database queries at once for this app; run them one after another.'));
+  perApp.set(key,n+1);
+  const done=()=>{const m=(perApp.get(key)||1)-1;if(m>0)perApp.set(key,m);else perApp.delete(key)};
+  pool.queue.push({msg,limit,resolve:v=>{done();resolve(v)},reject:e=>{done();reject(e)}});pumpSql();
  });
 }
 module.exports.run={

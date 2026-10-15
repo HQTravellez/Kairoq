@@ -86,7 +86,7 @@ function resolveRelative(from,spec,files){
  return null;
 }
 function specifiers(code){
- const out=[],re=/\bimport\s*(?:[\w*{}\s,]+?\s*from\s*)?['"]([^'"]+)['"]|\bexport\s+[\w*{}\s,]+?\s+from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+ const out=[],re=/\bimport\s*(?:[\w$\u0080-\uffff*{}\s,]+?\s*from\s*)?['"]([^'"]+)['"]|\bexport\s+[\w$\u0080-\uffff*{}\s,]+?\s+from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
  let m;while((m=re.exec(code)))out.push(m[1]||m[2]||m[3]||m[4]);
  return out;
 }
@@ -186,7 +186,7 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
   const modules=path.join(__dirname,'node_modules');
   const output=[];
   const logger={info(){},warn(m){output.push(String(m))},warnOnce(m){output.push(String(m))},error(m){output.push(String(m))},clearScreen(){},hasErrorLogged(){return false},hasWarned:false};
-  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId,version)],
+  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[importGuard(fs.realpathSync(work)),react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId,version)],
    resolve:{dedupe:['react','react-dom']},
    css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:require('./react-design').THEME})]}},
    server:{fs:{strict:true,allow:[work]}},
@@ -198,6 +198,40 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
  }catch(e){
   throw Object.assign(Error(cleanBuildError(e)),{build:true});
  }finally{fs.rmSync(work,{recursive:true,force:true})}
+}
+// Enforces the import rules inside the build itself, so a specifier the source checks
+// miss (odd identifiers, string escapes) still cannot pull files from outside the project:
+// project code may import project files under src/, allowed packages and kairoq only.
+function importGuard(work){
+ const src=path.join(work,'src')+path.sep,modules=fs.realpathSync(path.join(__dirname,'node_modules'))+path.sep;
+ const inside=(file,dir)=>file.startsWith(dir);
+ const project=importer=>importer&&inside(importer,work+path.sep)&&!inside(importer,path.join(work,'node_modules')+path.sep);
+ return{name:'kairoq-import-guard',enforce:'pre',
+  resolveId(source,importer){
+   const from=importer&&importer.split('?')[0];
+   if(!project(from))return null;
+   if(source==='kairoq'||/^\0vite\//.test(source)||source==='vite/modulepreload-polyfill'||source==='vite/preload-helper.js')return null;
+   const deny=()=>this.error('Import "'+String(source).slice(0,120)+'" is not allowed: import project files under src/ or an available package.');
+   if(/[?#\0\\]/.test(source))deny();
+   if(source.startsWith('/')){
+    const target=path.join(work,source);
+    if(!(inside(target,src)||target===path.join(work,'kairoq-reporter.js'))||!fs.existsSync(target))deny();
+    return null;
+   }
+   if(source.startsWith('.')){
+    if(!inside(path.resolve(path.dirname(from),source),src))deny();
+    return null;
+   }
+   if(!allowedImport(source)||source.split('/').includes('..'))deny();
+   return null;
+  },
+  load(id){
+   if(id.startsWith('\0'))return null;
+   const file=id.split('?')[0];
+   let real;try{real=fs.realpathSync(file)}catch{return null}
+   if(!inside(real,work+path.sep)&&!inside(real,modules))this.error('Loading files outside the project is not allowed.');
+   return null;
+  }};
 }
 function kairoqClient(projectId,version=0){
  return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':null},load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):null}};
@@ -543,7 +577,11 @@ function serveDist(req,res,distDir,rest,{sandbox}){
  const ext=path.extname(target).toLowerCase(),html=ext==='.html';
  const headers={'Content-Type':TYPES[ext]||'application/octet-stream','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Cache-Control':html?'no-cache':'public, max-age=31536000, immutable'};
  if(html)headers['Content-Security-Policy']=contentPolicy(sandbox);
- else headers['Access-Control-Allow-Origin']='*';
+ else{
+  headers['Access-Control-Allow-Origin']='*';
+  // Other files opened directly (an SVG, say) must not run script on Kairoq's origin either.
+  if(sandbox)headers['Content-Security-Policy']="sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+ }
  res.writeHead(200,headers);
  if(req.method==='HEAD')return res.end();
  fs.createReadStream(target).pipe(res);

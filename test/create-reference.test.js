@@ -295,7 +295,7 @@ test('analyze → plan → build → journeys on desktop and phone → design ch
  assert.equal(j.refunded,undefined);
 });
 
-test('failing journeys are repaired; journeys that still fail block publishing and are free',{skip:!runtime.available()&&'no browser'},async()=>{
+test('failing journeys are repaired; journeys that still fail block publishing (new journeys that never passed are not refunded)',{skip:!runtime.available()&&'no browser'},async()=>{
  const cookie=await signup('repair@example.com'),id=await project(cookie,'Repair');
  queue=[{...PLAN,assets:[]}];
  const a=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/reference',{headers:{cookie},body:{step:'analyze',url:'http://127.0.0.1:'+site.address().port+'/rooms'}})).json.job);
@@ -310,7 +310,8 @@ test('failing journeys are repaired; journeys that still fail block publishing a
  assert.match(calls[2].messages.filter(m=>m.role==='user').map(m=>typeof m.content==='string'?m.content:'').join('\n'),/fail when tested in a browser[\s\S]*Book a stay/);
  assert.deepEqual(j.result.reference.last_run.failed,[]);
  assert.equal(j.result.reference.published,null,'publish was not asked for');
- // Round 2: the repair never works, so the journey is switched off, nothing is published and the build is free.
+ // Round 2: the repair never works, so the journey is switched off and nothing is published. The journey
+ // never passed, so the build is charged: otherwise a plan with an impossible journey would make any build free.
  const id2=await project(cookie,'Never');
  queue=[{...PLAN,assets:[]}];
  assert.equal((await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id2+'/reference',{headers:{cookie},body:{step:'analyze',url:'http://127.0.0.1:'+site.address().port+'/'}})).json.job)).status,'complete');
@@ -325,8 +326,8 @@ test('failing journeys are repaired; journeys that still fail block publishing a
  assert.equal(k.result.reference.published,null);
  assert.ok(k.result.reference.problems.some(p=>/Not published/.test(p)));
  assert.equal(checks.list(builder.loadMeta(id2))[0].enabled,false,'the failing journey no longer blocks later changes');
- assert.equal(k.refunded,true);assert.equal(k.refund_reason,'checks');
- assert.equal(await credits(cookie),mid,'a build whose journeys still fail is free');
+ assert.ok(!k.refunded,'journeys that never passed do not make a build free');
+ assert.ok(await credits(cookie)<mid,'the build is charged');
  assert.ok(before>mid);
 });
 

@@ -13,14 +13,35 @@ function fail(status,message){return Object.assign(Error(message),{status})}
 function allowPrivate(){return process.env.KAIROQ_REFERENCE_ALLOW_PRIVATE==='1'}
 
 // ---------- Safety: public hosts only ----------
-function privateIp(ip){
- if(net.isIPv4(ip)){
-  const [a,b]=ip.split('.').map(Number);
-  return a===0||a===10||a===127||a>=224||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&b===168)||(a===100&&b>=64&&b<=127)||(a===198&&(b===18||b===19));
+// The same address rules as server-function fetch: private, loopback, link-local and metadata
+// ranges, including IPv4 written inside IPv6 ([::ffff:7f00:1]).
+function privateIp(ip){return require('./react-functions').privateAddress(String(ip).toLowerCase())}
+// Resolves a host name and reports whether any of its addresses is private. A name that does
+// not resolve is left to fail on its own.
+const dnsCache=new Map();
+async function resolvesPrivate(host){
+ const h=String(host||'').replace(/^\[|\]$/g,'').toLowerCase();
+ if(allowPrivate())return false;
+ if(blockedHost(h))return true;
+ if(net.isIP(h))return false;
+ if(dnsCache.has(h))return dnsCache.get(h);
+ let bad=false;
+ try{const list=await require('dns').promises.lookup(h,{all:true});bad=list.some(a=>privateIp(a.address))}catch{}
+ if(dnsCache.size>500)dnsCache.clear();
+ dnsCache.set(h,bad);return bad;
+}
+// fetch that checks every redirect hop, so a public URL cannot bounce the server to an internal one.
+async function publicFetch(url,opts,fetchImpl=fetch){
+ let next=String(url);
+ for(let hop=0;hop<4;hop++){
+  const u=new URL(next);
+  if(!/^https?:$/.test(u.protocol)||await resolvesPrivate(u.hostname))throw fail(400,'Blocked address');
+  const r=await fetchImpl(u.href,{...opts,redirect:'manual'});
+  const loc=r.status>=300&&r.status<400&&r.headers&&r.headers.get&&r.headers.get('location');
+  if(!loc)return r;
+  next=new URL(loc,u).href;
  }
- const v=ip.toLowerCase();
- if(v.startsWith('::ffff:'))return privateIp(v.slice(7));
- return v==='::'||v==='::1'||/^f[cd]/.test(v)||/^fe[89ab]/.test(v);
+ throw fail(400,'Too many redirects');
 }
 function blockedHost(host){
  const h=String(host||'').replace(/^\[|\]$/g,'').toLowerCase();
@@ -66,7 +87,7 @@ function robotsAllows(rules,pathname){
  return!best||best.allow;
 }
 async function robots(origin,{fetchImpl=fetch}={}){
- try{const r=await fetchImpl(origin+'/robots.txt',{headers:{'User-Agent':UA},signal:AbortSignal.timeout(6000),redirect:'follow'});if(!r.ok)return[];return parseRobots((await r.text()).slice(0,200000))}catch{return[]}
+ try{const r=await publicFetch(origin+'/robots.txt',{headers:{'User-Agent':UA},signal:AbortSignal.timeout(6000)},fetchImpl);if(!r.ok)return[];return parseRobots((await r.text()).slice(0,200000))}catch{return[]}
 }
 
 // ---------- Website analysis (a real browser) ----------
@@ -131,7 +152,8 @@ async function guardContext(context){
   let u;try{u=new URL(r.request().url())}catch{return r.abort()}
   if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
   if(!/^https?:$/.test(u.protocol)||blockedHost(u.hostname))return r.abort();
-  return r.continue();
+  // Every request the page makes (redirects, frames, images) is checked by resolved address.
+  return resolvesPrivate(u.hostname).then(bad=>bad?r.abort():r.continue(),()=>r.abort());
  });
 }
 async function scrollThrough(page){
@@ -174,7 +196,7 @@ async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=2
     await scrollThrough(page);
     const facts=await page.evaluate(pageFacts);
     const here=new URL(page.url());
-    if(blockedHost(here.hostname))break;
+    if(await resolvesPrivate(here.hostname))break;
     // A redirect on the first page (example.com → www.example.com) moves the crawl to the new site.
     if(!pages.length&&here.origin!==origin){if(!allowPrivate())await safeUrl(here.href);origin=here.origin;rules=await robots(origin,{fetchImpl});if(!robotsAllows(rules,here.pathname))throw fail(403,'This website asks automated tools not to read that page (robots.txt), so Kairoq will not analyze it.')}
     pages.push({url:here.href,path:here.pathname+(here.hash.startsWith('#/')?here.hash:''),...facts,links:undefined,nav:facts.links.filter(l=>l.nav).map(l=>({text:l.text,href:l.href})).slice(0,30),footer:facts.links.filter(l=>l.footer).map(l=>l.text).filter(Boolean).slice(0,30),link_count:facts.links.length});
@@ -228,7 +250,7 @@ async function discoverOpenApi(origin,{fetchImpl=fetch,extra=[]}={}){
  for(const url of [...extra,...OPENAPI_PATHS.map(p=>origin+p)].slice(0,12)){
   try{
    const u=new URL(url);if(blockedHost(u.hostname))continue;
-   const r=await fetchImpl(u.href,{headers:{'User-Agent':UA,Accept:'application/json'},signal:AbortSignal.timeout(6000),redirect:'follow'});
+   const r=await publicFetch(u.href,{headers:{'User-Agent':UA,Accept:'application/json'},signal:AbortSignal.timeout(6000)},fetchImpl);
    if(!r.ok||!/json/.test(r.headers.get('content-type')||''))continue;
    const text=await r.text();if(text.length>3000000)continue;
    const s=summarizeOpenApi(JSON.parse(text));if(s)return{url:u.href,...s};

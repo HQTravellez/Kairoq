@@ -80,6 +80,8 @@ async function signIn(db,{email,password}){
  const e=String(email||'').trim().toLowerCase(),key=(db.__projectId||'')+':'+e;
  if(failedRecently(key).length>=10)throw fail(429,'Too many failed sign-ins. Try again in 15 minutes or reset your password.');
  const u=db.prepare('SELECT * FROM users WHERE email=?').get(e);
+ // Unknown emails still cost one scrypt, so timing does not reveal which accounts exist.
+ if(!u){await scrypt(String(password||''),'kairoq-dummy-salt',32)}
  if(!u||!await checkPassword(password,u.password)){failedRecently(key).push(Date.now());if(failures.size>20000)failures.delete(failures.keys().next().value);throw fail(401,'Email or password is incorrect')}
  failures.delete(key);
  return session(db,u.id);
@@ -93,6 +95,10 @@ function session(db,userId){
 function googleAppSignIn(id,profile){
  const db=database(id),e=String(profile.email).toLowerCase();
  let u=db.prepare('SELECT * FROM users WHERE google_sub=?').get(profile.sub)||db.prepare('SELECT * FROM users WHERE email=?').get(e);
+ // App sign-up does not prove email ownership, so when Google first proves it for an existing
+ // password account, that password and its sessions are cleared: someone who registered the
+ // address earlier cannot keep access. The owner can set a new password with a reset.
+ if(u&&!u.google_sub){db.prepare('UPDATE users SET password=? WHERE id=?').run('google$'+crypto.randomBytes(16).toString('hex'),u.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id)}
  if(u)db.prepare('UPDATE users SET google_sub=? WHERE id=?').run(profile.sub,u.id);
  else{
   if(db.prepare('SELECT COUNT(*) n FROM users').get().n>=MAX_USERS)throw fail(403,'This app has reached its user limit');
@@ -233,9 +239,20 @@ function functionDb(db,cfg,op,a,user){
  const row=id=>{const r=db.prepare('SELECT * FROM records WHERE id=? AND collection=?').get(String(id),name);if(!r)throw fail(404,'Record not found');return r};
  if(op==='list'){
   const limit=Math.max(1,Math.min(LIST_LIMIT,Number(a.limit)||100)),order=a.order==='asc'?'ASC':'DESC';
-  let items=db.prepare('SELECT * FROM records WHERE collection=? ORDER BY created_at '+order+' LIMIT ?').all(name,a.where?MAX_RECORDS:limit).map(record);
-  if(a.where&&typeof a.where==='object')items=items.filter(it=>Object.entries(a.where).every(([k,v])=>JSON.stringify(it[k])===JSON.stringify(v))).slice(0,limit);
-  return items;
+  // where filters run in SQL, so a filtered list never loads the whole collection.
+  const conds=[],params=[name];
+  if(a.where&&typeof a.where==='object')for(const [k,v] of Object.entries(a.where).slice(0,10)){
+   if(k==='id'||k==='_owner'){conds.push((k==='id'?'id':'owner_id')+' IS ?');params.push(v==null?null:String(v));continue}
+   if(!/^[A-Za-z0-9_-]{1,64}$/.test(k))throw fail(400,'Invalid field name in where: '+String(k).slice(0,64));
+   const p="'$.\""+k+"\"'";
+   if(v===null)conds.push('json_type(data,'+p+")='null'");
+   else if(typeof v==='boolean')conds.push('json_type(data,'+p+")='"+(v?'true':'false')+"'");
+   else if(typeof v==='number'){conds.push('json_type(data,'+p+") IN ('integer','real') AND json_extract(data,"+p+')=?');params.push(v)}
+   else if(typeof v==='string'){conds.push('json_type(data,'+p+")='text' AND json_extract(data,"+p+')=?');params.push(v)}
+   else{conds.push('json_type(data,'+p+") IN ('object','array') AND json_extract(data,"+p+')=?');params.push(JSON.stringify(v))}
+  }
+  params.push(limit);
+  return db.prepare('SELECT * FROM records WHERE collection=?'+conds.map(c=>' AND ('+c+')').join('')+' ORDER BY created_at '+order+' LIMIT ?').all(...params).map(record);
  }
  if(op==='get')return record(row(a.id));
  if(op==='create'){
@@ -367,7 +384,7 @@ async function handle(req,res,{onlyProject}={}){
    catch(e){applog.add(id,{level:'error',source:'functions/'+fnm[1]+'.js',message:req.method+' '+route+': '+(e.message||e)});throw e}
    finally{const n=(fnRunning.get(id)||1)-1;if(n>0)fnRunning.set(id,n);else fnRunning.delete(id)}
    for(const line of out.logs||[])applog.add(id,{level:'log',source:'functions/'+fnm[1]+'.js',message:line});
-   require('./react-functions').respond(res,out.result,CORS);
+   require('./react-functions').respond(res,out.result,CORS,{externalRedirects:Boolean(onlyProject)});
    return true;
   }
   if(route==='/ai'&&req.method==='POST'){
@@ -551,4 +568,4 @@ async function runAllSchedules(options){
  }
  return out;
 }
-module.exports={openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+module.exports={functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
