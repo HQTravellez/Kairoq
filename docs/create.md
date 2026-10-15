@@ -278,6 +278,17 @@ The most common complaints about AI app builders are changes that break what use
 - **Usage ledger.** Every paid AI call records its cost, model, tier and how many prompt tokens came from the cache.
 - **Cost report.** The server owner sees **Settings → AI costs, last 30 days**, also available as `GET /api/create/admin/costs`. It shows calls, total and average cost per tier and model, the share of tokens read from cache, and what one message of that tier sells for at `KAIROQ_CREDIT_PRICE_USD` per credit (default $0.25). Rows that cost more than they earn are shown in red.
 
+## Watching the AI work
+
+While a change is being made, the chat shows a live card, like Lovable:
+
+- **Thoughts.** The model's own reasoning as it streams (OpenRouter `reasoning`), for models that share it. It is open while the AI thinks and collapses once it starts writing.
+- **Plan.** Before the code, the model writes 2 to 6 short steps (`"plan"` in its reply). They appear one by one and are ticked once the change builds.
+- **Steps.** A timeline (Thinking, Writing code, Building the preview, Testing in a browser, Re-running saved checks, and fixes) with how long each took. In Agent mode, the agent's steps and actions are listed instead.
+- **Files.** A chip for each file being written, with the current one highlighted, and "Show code" for the live code.
+
+The finished message keeps "Thought for Ns" (with the reasoning), the ticked plan, the changed files, the version and the saved checks. The UI uses the Geist and Geist Mono fonts.
+
 ## Build from a reference
 
 Give Kairoq a website, a GitHub repository, screenshots or the files of a JavaScript app. It studies how the product works, writes a plan for you to approve, and builds **its own version**: comparable features and design quality, with an original name, original text and openly licensed or generated images. Open it with **Reference** in the editor.

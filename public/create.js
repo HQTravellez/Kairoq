@@ -109,11 +109,15 @@ function renderMessages(pendingText){
 }
 function messageItem(m,last){
  const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
- const body=document.createElement('div');body.textContent=m.text;li.append(body);
+ // Assistant replies: how long it thought (with its reasoning), what it said, the plan it followed.
+ if(m.role==='assistant'&&(m.thought_ms!=null||m.thinking)){const d=el('details','thoughts done'),s=el('summary',null,'Thought for '+secs(m.thought_ms||0));d.append(s);if(m.thinking)d.append(el('p','thought-text',m.thinking));else d.classList.add('empty');li.append(d)}
+ const body=document.createElement('div');body.className='msg-text';body.textContent=m.text;li.append(body);
+ if(m.plan&&m.plan.length){const ol=el('ol','todo-list done');for(const t of m.plan){const item=el('li','done');item.append(el('span','plan-icon','✓'),el('span','plan-text',t));ol.append(item)}li.append(ol)}
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
- if(m.changed&&m.changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+m.changed.join(', ');li.append(s)}
+ if(m.changed&&m.changed.length){const c=el('div','file-chips done');for(const f of m.changed.slice(0,12))c.append(fileChip(f));if(m.changed.length>12)c.append(el('span','chip more','+'+(m.changed.length-12)+' more'));li.append(c)}
+ if(m.version||m.attempts>1){const f=el('div','msg-meta');if(m.version)f.append(el('span','ver','v'+m.version));if(m.attempts>1)f.append(el('span',null,'Fixed '+(m.attempts-1)+' problem'+(m.attempts>2?'s':'')+' on the way'));li.append(f)}
  if(m.checks){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
  if(m.steps&&m.steps.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}
@@ -272,42 +276,83 @@ async function send(message,mode,path='/chat',extra={}){
  }
 }
 const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
-function streamItem(){
+// ---------- live work card: thoughts, plan, steps, files ----------
+const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
+const work={timeline:[],started:0,timer:null,job:null,plan:[],files:[],current:null,message:''};
+function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+function secs(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'}
+function phaseOf(j){if(j.mode==='discuss')return'thinking';if(j.status==='queued'||(j.status==='writing'&&!(j.stream&&j.stream.chars)))return'thinking';if(j.mode==='agent'&&j.status==='working')return'working';return j.status}
+function trackPhase(j){
+ const p=phaseOf(j),last=work.timeline.at(-1);
+ if(!last||last.phase!==p){if(last)last.end=Date.now();work.timeline.push({phase:p,start:Date.now(),n:work.timeline.filter(t=>t.phase===p).length+1})}
+}
+function workCard(){
  let li=$('stream');
- if(!li){li=document.createElement('li');li.id='stream';li.className='assistant streaming';li.innerHTML='<div class="stream-msg"></div><div class="stream-files changed"></div><pre class="stream-code hidden"></pre>';$('messages').append(li)}
+ if(!li){
+  li=el('li','assistant work');li.id='stream';
+  li.innerHTML='<div class="work-head"><span class="spark" aria-hidden="true"></span><b class="work-title">Thinking</b><span class="work-time"></span><button type="button" class="ghost work-stop">Stop</button></div>'+
+   '<details class="thoughts hidden"><summary>Thoughts</summary><p class="thought-text"></p></details>'+
+   '<div class="work-msg hidden"></div><div class="plan-box hidden"><p class="plan-label">Plan</p><ol class="todo-list"></ol></div>'+
+   '<ol class="timeline"></ol><div class="file-chips"></div>'+
+   '<details class="code-peek hidden"><summary>Show code</summary><pre class="stream-code"></pre></details>';
+  li.querySelector('.thoughts').addEventListener('toggle',e=>{e.target.dataset.touched='1'});
+  li.querySelector('.work-stop').onclick=()=>$('stop-job').click();
+  $('messages').append(li);$('messages').scrollTop=$('messages').scrollHeight;
+ }
  return li;
 }
-function renderAgent(job){
- const li=streamItem(),a=job.agent;
- const steps=a.steps||[];
- text(li.querySelector('.stream-msg'),steps.length?(steps.at(-1).thought||'Working…'):'Reading the project…');
- const box=li.querySelector('.stream-files');box.replaceChildren();
- const ol=document.createElement('ol');ol.className='agent-steps';
- for(const s of steps.slice(-12)){const item=document.createElement('li');item.textContent='Step '+s.n+': '+s.actions.join('; ');ol.append(item)}
- box.append(ol);li.querySelector('.stream-code').classList.add('hidden');
- $('messages').scrollTop=$('messages').scrollHeight;
+function fileChip(name,active){const c=el('span','chip'+(active?' active':''),name.replace(/^src\//,''));c.title=name;return c}
+function renderTimeline(li){
+ const ol=li.querySelector('.timeline');ol.replaceChildren();
+ work.timeline.forEach((t,i)=>{
+  const now=i===work.timeline.length-1;
+  const item=el('li',now?'now':'done');
+  item.append(el('span','tl-icon',now?'':'✓'),el('span','tl-label',(PHASES[t.phase]||'Working')+(t.phase==='fixing'&&t.n>1?' (try '+(t.n+1)+')':'')),el('span','tl-time',secs((t.end||Date.now())-t.start)));
+  ol.append(item);
+ });
 }
-function renderStream(job){
- if(job.mode==='agent'&&job.agent){renderAgent(job);return}
- const st=job.stream;
- if(!st){$('stream')?.remove();return}
- const li=streamItem();
- if(job.mode==='discuss'){text(li.querySelector('.stream-msg'),st.text);}
- else{
-  text(li.querySelector('.stream-msg'),st.message||'Planning the change…');
-  text(li.querySelector('.stream-files'),st.files&&st.files.length?'Writing '+st.files.join(', '):'');
-  const pre=li.querySelector('.stream-code');pre.classList.toggle('hidden',!st.tail);
-  pre.textContent=String(st.tail||'').replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-14).join('\n');
- }
- $('messages').scrollTop=$('messages').scrollHeight;
+function renderWork(j){
+ work.job=j;trackPhase(j);
+ const li=workCard(),p=phaseOf(j),st=j.stream||null;
+ if(st&&st.plan&&st.plan.length)work.plan=st.plan;
+ if(st&&st.files)for(const f of st.files)if(!work.files.includes(f))work.files.push(f);
+ if(st)work.current=st.current||null;
+ if(st&&st.message)work.message=st.message;
+ const agent=j.mode==='agent'&&j.agent;
+ text(li.querySelector('.work-title'),agent&&j.agent.step?'Step '+j.agent.step+' · '+(PHASES[p]||'Working'):(PHASES[p]||'Working'));
+ // Thoughts: the model's own reasoning, where the model shares it.
+ const th=li.querySelector('.thoughts'),thought=String(j.thinking||'').trim();
+ th.classList.toggle('hidden',!thought);
+ if(thought){text(li.querySelector('.thought-text'),thought.length>1200?'…'+thought.slice(-1200):thought);if(!th.dataset.touched)th.open=p==='thinking'}
+ // What the AI says it is doing.
+ const msg=li.querySelector('.work-msg');
+ const said=j.mode==='discuss'?(st&&st.text)||'':agent&&j.agent.steps.length?j.agent.steps.at(-1).thought||'':work.message;
+ msg.classList.toggle('hidden',!said);text(msg,said);
+ // The plan, written before the code.
+ const box=li.querySelector('.plan-box'),ol=li.querySelector('.todo-list');ol.replaceChildren();
+ const after=['building','testing','checking','reviewing'].includes(p);
+ const steps=agent?j.agent.steps.slice(-8).map(s=>({text:s.thought||s.actions.join('; '),sub:s.actions.join(' · '),done:s.n<j.agent.step})):work.plan.map(t=>({text:t,done:after}));
+ box.classList.toggle('hidden',!steps.length);
+ text(box.querySelector('.plan-label'),agent?'Steps':'Plan');
+ for(const s of steps){const item=el('li',s.done?'done':'');item.append(el('span','plan-icon',s.done?'✓':''),el('span','plan-text',s.text));if(s.sub&&s.sub!==s.text)item.append(el('span','plan-sub',s.sub));ol.append(item)}
+ renderTimeline(li);
+ const chips=li.querySelector('.file-chips');chips.replaceChildren();
+ for(const f of work.files)chips.append(fileChip(f,f===work.current&&p==='writing'));
+ const pre=li.querySelector('.stream-code'),peek=li.querySelector('.code-peek');
+ const tail=st&&st.tail?String(st.tail).replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-16).join('\n'):'';
+ peek.classList.toggle('hidden',!tail);if(tail)pre.textContent=tail;
+ const list=$('messages');if(list.scrollHeight-list.scrollTop-list.clientHeight<160)list.scrollTop=list.scrollHeight;
 }
+function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));renderTimeline(li)}
 async function watch(job){
  state.job=job;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
+ Object.assign(work,{timeline:[],started:Date.now(),plan:[],files:[],current:null,message:''});
+ clearInterval(work.timer);work.timer=setInterval(tickWork,1000);
  const done=await new Promise(resolve=>{
   let finished=false;
   const finish=j=>{if(!finished){finished=true;resolve(j)}};
-  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(LABELS[j.status]||'Working…'));renderStream(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
   if(window.EventSource){
    const es=new EventSource('/api/create/jobs/'+job.id+'/events');
    es.onmessage=e=>{const j=JSON.parse(e.data);apply(j);if(j.status==='complete'||j.status==='failed')es.close()};
@@ -320,6 +365,7 @@ async function watch(job){
    }
   }
  });
+ clearInterval(work.timer);
  $('stream')?.remove();
  if(done&&state.project&&state.project.id===id){
   const {project,account}=await api('/projects/'+id);

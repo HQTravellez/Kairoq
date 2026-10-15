@@ -1,4 +1,4 @@
-:root{--bg:#fbf8f6;--panel:#ffffff;--side:#f6f2f0;--border:#ebe5e1;--text:#1d1a22;--muted:#6e6873;--accent:#f0525f;--accent-2:#ff8a4c;--accent-3:#8b5cf6;--accent-ink:#fff;--hover:#f3eeeb;--error:#d92d20;--ok:#16a34a;--code:#f7f4f2;--ink:#17141c;--ink-text:#fff;--glass:rgba(255,255,255,.72);--shadow-sm:0 1px 2px rgba(23,20,28,.05),0 1px 3px rgba(23,20,28,.04);--shadow:0 10px 30px -12px rgba(60,30,60,.18),0 2px 6px rgba(23,20,28,.04);--shadow-lg:0 30px 70px -25px rgba(90,40,90,.35),0 6px 16px rgba(23,20,28,.06);--grad:linear-gradient(135deg,#ff8a4c 0%,#f0525f 45%,#8b5cf6 100%);--radius:14px;font-family:"Plus Jakarta Sans",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+:root{--bg:#fbf8f6;--panel:#ffffff;--side:#f6f2f0;--border:#ebe5e1;--text:#1d1a22;--muted:#6e6873;--accent:#f0525f;--accent-2:#ff8a4c;--accent-3:#8b5cf6;--accent-ink:#fff;--hover:#f3eeeb;--error:#d92d20;--ok:#16a34a;--code:#f7f4f2;--ink:#17141c;--ink-text:#fff;--glass:rgba(255,255,255,.72);--shadow-sm:0 1px 2px rgba(23,20,28,.05),0 1px 3px rgba(23,20,28,.04);--shadow:0 10px 30px -12px rgba(60,30,60,.18),0 2px 6px rgba(23,20,28,.04);--shadow-lg:0 30px 70px -25px rgba(90,40,90,.35),0 6px 16px rgba(23,20,28,.06);--grad:linear-gradient(135deg,#ff8a4c 0%,#f0525f 45%,#8b5cf6 100%);--radius:14px;font-family:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 @media (prefers-color-scheme:dark){:root{--bg:#0f0d14;--panel:#17141f;--side:#13111a;--border:#2a2533;--text:#f1edf5;--muted:#a69fb0;--accent:#ff6b77;--accent-2:#ff9a5c;--accent-3:#a78bfa;--hover:#211d2a;--error:#ff8a80;--ok:#4ade80;--code:#1b1823;--ink:#f6f2fa;--ink-text:#16131c;--glass:rgba(23,20,31,.72);--shadow-sm:0 1px 2px rgba(0,0,0,.4);--shadow:0 12px 30px -12px rgba(0,0,0,.6);--shadow-lg:0 30px 70px -25px rgba(0,0,0,.75)}}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -6,7 +6,7 @@ body{background:var(--bg);color:var(--text);font-size:14px;display:flex;flex-dir
 button,input,textarea,select{font:inherit;color:inherit}
 .hidden{display:none!important}
 .muted{color:var(--muted)}.small{font-size:12px}.error{color:var(--error);min-height:1em;margin:8px 0 0;white-space:pre-wrap}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+code{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--panel);padding:8px 12px}
 button:hover{background:var(--hover)}
 button:disabled{opacity:.55;cursor:default}
@@ -349,3 +349,58 @@ dialog::backdrop{background:rgba(20,14,28,.32);backdrop-filter:blur(4px)}
 .composer-bar .ghost.icon:hover{color:var(--text)}
 .composer-bar .seg button{font-size:13px}
 .hero h1{padding-bottom:.1em}
+
+/* ===== Fonts and the live work card (thoughts, plan, steps, files) ===== */
+body{font-feature-settings:"ss01","cv11";letter-spacing:-.01em}
+.hero h1,.home>h1,.landing h2,.home h2,.dialog h2{letter-spacing:-.045em}
+pre,#file-view,.stream-code,.file-list button,#ref-plan{font-family:"Geist Mono",ui-monospace,Menlo,monospace}
+.messages li{line-height:1.55}
+.messages .assistant{white-space:normal}
+.msg-text{white-space:pre-wrap}
+.work{display:grid;gap:10px;padding:14px 14px 12px!important;border:1px solid color-mix(in srgb,var(--accent-3) 22%,var(--border))!important;background:linear-gradient(180deg,color-mix(in srgb,var(--accent-3) 5%,var(--panel)),var(--panel))!important}
+.work-head{display:flex;align-items:center;gap:9px}
+.work-title{font-weight:600;font-size:14px;background:linear-gradient(90deg,var(--text) 0%,var(--text) 40%,color-mix(in srgb,var(--text) 35%,transparent) 50%,var(--text) 60%,var(--text) 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 2.2s linear infinite}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:-150% 0}}
+.work-time{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.spark{width:18px;height:18px;border-radius:6px;background:var(--grad);flex:none;animation:spin 2.4s ease-in-out infinite;box-shadow:0 0 0 0 rgba(240,82,95,.4)}
+@keyframes spin{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(.85);border-radius:50%}100%{transform:rotate(360deg) scale(1)}}
+@media (prefers-reduced-motion:reduce){.spark,.work-title,.timeline .now .tl-icon,.chip.active{animation:none}}
+.thoughts{border-left:2px solid transparent;border-image:var(--grad) 1;padding:0 0 0 10px}
+.thoughts summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);list-style:none;display:inline-flex;align-items:center;gap:6px}
+.thoughts summary::-webkit-details-marker{display:none}
+.thoughts summary::after{content:"›";transition:transform .15s;display:inline-block}
+.thoughts[open] summary::after{transform:rotate(90deg)}
+.thought-text{margin:6px 0 0;font-size:12.5px;line-height:1.6;color:var(--muted);white-space:pre-wrap;max-height:180px;overflow:auto}
+.thoughts.done{margin-bottom:6px}.thoughts.empty summary{cursor:default}.thoughts.empty summary::after{content:""}
+.work-msg{font-size:13.5px;white-space:pre-wrap}
+.plan-label{margin:0 0 6px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.todo-list{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.todo-list li{display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:start;font-size:13px;line-height:1.45;box-shadow:none!important;padding:0!important;border-radius:0!important;background:none!important}
+.plan-icon{width:16px;height:16px;margin-top:1px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--muted) 55%,transparent);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+.todo-list li.done .plan-icon{background:var(--ok);border-color:var(--ok)}
+.todo-list li.done .plan-text{color:var(--muted)}
+.plan-sub{grid-column:2;font-size:11.5px;color:var(--muted);font-family:"Geist Mono",ui-monospace,monospace}
+.todo-list.done{margin:8px 0 2px}
+.timeline{list-style:none;margin:0;padding:8px 0 0;border-top:1px dashed var(--border);display:grid;gap:4px}
+.timeline li{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;font-size:12.5px;padding:0!important;box-shadow:none!important;background:none!important;border-radius:0!important}
+.tl-icon{width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;background:var(--ok)}
+.timeline .now .tl-icon{background:transparent;border:2px solid color-mix(in srgb,var(--accent) 30%,transparent);border-top-color:var(--accent);animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.timeline .done .tl-label{color:var(--muted)}
+.timeline .now .tl-label{font-weight:600}
+.tl-time{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+.file-chips{display:flex;flex-wrap:wrap;gap:6px}
+.file-chips:empty{display:none}
+.file-chips.done{margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:5px;font:500 11.5px/1 "Geist Mono",ui-monospace,monospace;padding:5px 8px;border-radius:8px;background:var(--side);border:1px solid var(--border);color:var(--text)}
+.chip::before{content:"";width:6px;height:6px;border-radius:2px;background:color-mix(in srgb,var(--accent-3) 70%,transparent)}
+.chip.more::before{display:none}
+.chip.active{border-color:color-mix(in srgb,var(--accent) 50%,transparent);animation:glow 1.2s ease-in-out infinite}
+.chip.active::before{background:var(--accent)}
+@keyframes glow{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}}
+.code-peek summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.code-peek .stream-code{max-height:200px}
+.msg-meta{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:11.5px;color:var(--muted)}
+.msg-meta .ver{font:600 11px/1 "Geist Mono",ui-monospace,monospace;padding:4px 7px;border-radius:6px;background:var(--side);border:1px solid var(--border);color:var(--text)}
+#progress{display:none!important}
+.work-stop{padding:3px 10px;font-size:12px;color:var(--muted)}

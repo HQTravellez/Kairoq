@@ -72,7 +72,7 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=()=>{},signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=()=>{},onThinking,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
@@ -232,7 +232,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
   report({status:'thinking',step});
   trimContext();
   // Streaming keeps long steps (several files) under the provider's streaming timeout.
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:()=>{}},parseStepSafe);
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:()=>{},onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseStepSafe);
   if(reply.invalid){
    invalidReplies++;
    steps.push({n:step,thought:'',actions:['Reply was not valid JSON'],summary:'Reply was not valid JSON'});

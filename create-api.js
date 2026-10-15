@@ -126,7 +126,10 @@ function streamSnapshot(text,mode){
  const last=matches.at(-1);
  // Only the code of the file being written, not the surrounding JSON.
  const code=last?text.slice(last.index+last[0].length).split(/(?<!\\)",\s*"(?:src\/|delete)/)[0].replace(/"\s*}\s*}?\s*$/,''):'';
- return{chars:text.length,files,current:last?last[1]:null,message:msg?msg[1].replace(/\\n/g,'\n').replace(/\\"/g,'"'):'',tail:code.slice(-1600)};
+ // The plan the model writes first ("plan":["…","…"]), item by item as it streams.
+ const planBlock=/"plan"\s*:\s*\[((?:[^\]"]|"(?:[^"\\]|\\.)*"?)*)/.exec(text);
+ const plan=planBlock?[...planBlock[1].matchAll(/"((?:[^"\\]|\\.)*)("?)/g)].filter(m=>m[1].trim()).map(m=>m[1].replace(/\\"/g,'"').slice(0,140)).slice(0,6):[];
+ return{chars:text.length,files,current:last?last[1]:null,plan,message:msg?msg[1].replace(/\\n/g,'\n').replace(/\\"/g,'"'):'',tail:code.slice(-1600)};
 }
 // hooks (build from a reference): before() runs first and returns extra context for the model;
 // after(result) runs after the agent and returns the final result.
@@ -158,25 +161,27 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
  setImmediate(async()=>{
   const modelTier=(images.length||mode==='polish')&&tier==='standard'?'vision':tier;
   const onStream=text=>update({stream:streamSnapshot(text,mode)});
+  // The model's reasoning, shown live as "Thoughts" (only models that share it).
+  const onThinking=text=>update({thinking:String(text).slice(-1800)});
   try{
    const signal=controller.signal;
-   if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,tier:modelTier,images,signal})}
-   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
+   if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,tier:modelTier,images,signal})}
+   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,onThinking,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
     let extra='';
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',context,extra].filter(Boolean).join('\n\n');
-    job.result=await require('./react-agent').run(id,message,{callModel,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
+    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
      onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
    else{
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
-    job.result=await builder.edit(id,message,{callModel,onStream,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{callModel,onStream,onThinking,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // The first build of a new project on Pro or Max gets a free design review.
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
-     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
+     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,onThinking,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
      catch(e){job.result={...first,polish_error:signal.aborted?'Stopped before the design review.':'The design review did not finish: '+String(e.message||e).slice(0,300)}}
     }
    }
@@ -690,4 +695,4 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  }
 }
 
-module.exports={handle,jobs};
+module.exports={handle,jobs,streamSnapshot};

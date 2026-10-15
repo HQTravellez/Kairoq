@@ -64,7 +64,7 @@ Rules:
 - Before you answer, check your own work: (1) if the request is already implemented exactly as asked, say so and change nothing; (2) every import resolves to a file you include or that already exists, or to an available package, so leave no import unresolved; (3) new pages and components are actually rendered: add routes and navigation links in App.jsx or the layout, or the user cannot see them; (4) the whole feature works, with no placeholders, TODOs or "rest of the code unchanged" comments. If not everything fits in one reply, finish the most important part completely and say in "message" what is left.
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
-{"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
+{"plan":["2 to 6 short steps you will take, written for the user, e.g. \"Add a booking form to the home page\""],"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
 Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.${require('./react-edits').PROMPT_NOTE}`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
@@ -222,7 +222,8 @@ function parseEdit(content){
  const edits=require('./react-edits').normalize(value.edits);
  if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
- return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
+ const plan=(Array.isArray(value.plan)?value.plan:[]).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,6);
+ return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
@@ -342,7 +343,7 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -355,10 +356,16 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0;
+ // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
+ let thinking='',thoughtMs=null,firstPlan=null;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
+  const started=Date.now();let firstToken=null;
+  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),
+   onToken:onStream?(_d,all)=>{if(firstToken===null)firstToken=Date.now();onStream(all,attempt)}:undefined,
+   onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},parseEdit);
+  if(attempt===1){thoughtMs=(firstToken||Date.now())-started;firstPlan=reply.plan}
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design})}
   let next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
@@ -413,9 +420,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   saveMeta(fresh);
-  return{version:n,message,changed,attempts:attempt,runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }
@@ -439,13 +446,13 @@ async function polish(id,{shots,note='',...opts}){
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.
 Answer questions about the app, suggest improvements, and when the user wants a change, reply with a short numbered plan of what you would change and which files. Keep answers brief and concrete. Plain text, no JSON.`;
 function parseText(content){if(typeof content==='string'){const t=content.trim();if(!t)throw Error('Empty answer');return t}return String(content?.message||content?.answer||JSON.stringify(content))}
-async function discuss(id,question,{callModel,onStream,signal,tier='standard',images=[]}={}){
+async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[]}={}){
  const meta=loadMeta(id);
  const text=String(question||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Ask a question or describe an idea'),{status:400});
  const files=meta.current_version?loadFiles(id,meta.current_version):template(meta.name);
  const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+'\n\nMessage: '+text,images)}];
- const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined},parseText)).slice(0,12000);
+ const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
  addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:answer,mode:'discuss'}]);
  return{message:answer};
 }

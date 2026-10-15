@@ -6591,7 +6591,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
       let lastData=null;
       const ask=async(msgs,onTok)=>{
         const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(premium?900000:300000):110000)]):AbortSignal.timeout(stream?(premium?900000:300000):110000),body:JSON.stringify({model,messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
-        const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{})):await response.json().catch(()=>({}));
+        const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{}),opts.onReasoning):await response.json().catch(()=>({}));
         if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
         const message=data.choices?.[0]?.message||{};
         const raw=message.content;
@@ -6632,7 +6632,8 @@ async function generateBuilderImage({prompt,aspect="16:9",signal}={}){
   return{mime:m[1],data:m[2]};
 }
 // Reads an OpenAI-compatible SSE stream into the same shape as a non-streamed response.
-async function readChatStream(body,onToken){
+// onReasoning(delta, all) receives the model's reasoning ("thinking") as it streams, where the model shares it.
+async function readChatStream(body,onToken,onReasoning){
   const reader=body.getReader(),decoder=new TextDecoder();
   let buffer="",content="",reasoning="",usage=null,finish=null,error=null;
   const handle=line=>{
@@ -6645,7 +6646,7 @@ async function readChatStream(body,onToken){
     const choice=event.choices?.[0];
     if(choice?.finish_reason)finish=choice.finish_reason;
     const delta=choice?.delta||{};
-    if(delta.reasoning)reasoning+=delta.reasoning;
+    if(typeof delta.reasoning==="string"&&delta.reasoning){reasoning+=delta.reasoning;if(onReasoning)try{onReasoning(delta.reasoning,reasoning)}catch{}}
     if(typeof delta.content==="string"&&delta.content){content+=delta.content;try{onToken(delta.content,content)}catch{}}
   };
   for(;;){
