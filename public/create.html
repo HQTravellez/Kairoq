@@ -28,8 +28,8 @@
   <div class="landing">
     <section class="hero">
       <p class="eyebrow">Kairoq Create</p>
-      <h1>Build real apps by chatting.</h1>
-      <p class="lede">Describe your idea. Kairoq writes a React app with sign-in, a database, payments and email, tests it in a real browser, and publishes it to your own domain.</p>
+      <h1>Build real apps by chatting. Keep them working.</h1>
+      <p class="lede">Describe your idea. Kairoq writes a React app with sign-in, a database, payments and email, tests it in a real browser, and publishes it to your own domain. Every flow that works is saved as a check and re-tested after each change, so your app doesn't break as it grows.</p>
       <form id="landing-form" class="prompt-box">
         <textarea id="landing-prompt" rows="3" placeholder="A booking site for my yoga studio with class times, prices and online payments" required></textarea>
         <button class="primary" type="submit">Start building</button>
@@ -37,7 +37,9 @@
     </section>
     <section class="features" aria-label="Features">
       <div><h3>Watch it being built</h3><p>Code streams in live and the preview updates in seconds.</p></div>
-      <div><h3>Tested before you see it</h3><p>Every version opens in a real browser. Errors are fixed automatically.</p></div>
+      <div><h3>It doesn't break</h3><p>Booking, sign-up and checkout are saved as checks and re-run after every change, before publishing and daily on your live app.</p></div>
+      <div><h3>Pay only for working changes</h3><p>If a change still breaks your app after the automatic fixes, it's free.</p></div>
+      <div><h3>Your real data stays safe</h3><p>Tests run on a test copy: no fake bookings, emails or payments in your live app.</p></div>
       <div><h3>A real backend</h3><p>Sign-in, saved data, file uploads, email and Stripe payments built in.</p></div>
       <div><h3>Click to edit</h3><p>Change text, colours and images directly in the preview, free.</p></div>
       <div><h3>Your code, your domain</h3><p>Download the code, sync with GitHub and publish with HTTPS.</p></div>
@@ -167,6 +169,7 @@
       <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
       <button class="ghost" id="security-open" type="button">Security</button>
       <button class="ghost" id="team-open" type="button">Share</button>
+      <button class="ghost" id="checks-open" type="button" title="Saved checks: flows re-tested after every change, before publishing and daily on the live app">Checks</button>
       <button class="ghost" id="design-open" type="button" title="Design direction, colours, fonts, design skills and images">Design</button>
       <button class="ghost" id="mobile-open" type="button" title="Phone app: install on iPhone and Android, native iOS/Android project">App</button>
       <button class="ghost" id="settings-open" type="button">Settings</button>
@@ -260,11 +263,31 @@
     <div class="row"><button class="primary" id="settings-save" type="button">Save keys</button></div>
     <h3>Email</h3>
     <p class="muted small" id="email-status"></p>
+    <section id="costs-section" class="hidden">
+      <h3>AI costs, last 30 days <span class="muted small">(server owner only)</span></h3>
+      <p class="muted small" id="costs-note"></p>
+      <div class="table-wrap"><table class="costs"><thead><tr><th>Tier</th><th>Model</th><th>Calls</th><th>Total</th><th>Per call</th><th>Sells for</th><th>From cache</th></tr></thead><tbody id="costs-body"></tbody></table></div>
+    </section>
     <p class="error" id="settings-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
 
+<dialog id="checks-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Checks</h2>
+    <p class="muted small">Flows that must keep working, like booking a room or signing up. Kairoq re-runs them in a browser after every change, before publishing and once a day on the live app. They run on a <b>test copy of your data</b>: no real bookings, emails or payments. A change that still breaks a check after the automatic fixes is free.</p>
+    <p class="small" id="checks-monitor"></p>
+    <ul class="skills" id="checks-list"></ul>
+    <div class="row"><button class="ghost" id="checks-run" type="button">Run all now</button></div>
+    <h3>Add a check</h3>
+    <div class="row"><input id="checks-describe" maxlength="1000" placeholder="A guest can book the Garden room for two nights and sees the thank-you message"><button class="ghost" id="checks-add" type="button">Add</button></div>
+    <p class="muted small" id="checks-status" role="status"></p>
+    <div class="row"><button class="ghost hidden" id="checks-save-anyway" type="button">Save it anyway</button></div>
+    <p class="error" id="checks-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="design-dialog">
   <form method="dialog" class="dialog" id="design-form">
     <h2>Design</h2>

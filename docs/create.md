@@ -245,6 +245,39 @@ When `OPENROUTER_API_KEY` and `KAIROQ_BUILDER_PAID_APPROVED=true` are set, the A
 - **Turning it off.** Set `KAIROQ_IMAGE_GENERATION=off`.
 - **Manual images.** Owners can also generate an image from the Design dialog.
 
+## Saved checks (apps that don't break)
+
+The most common complaints about AI app builders are changes that break what used to work, paying for the AI's own mistakes, and tests that touch real data. Kairoq handles all three:
+
+- **Saved checks.** A check is a short browser script for a flow that must keep working, for example "fill *Your name*, click *Book*, expect *Thank you*".
+  - Agent mode saves the flows it proves with `"save_as"`.
+  - Owners can describe a check in plain English. The AI writes the steps (priced like a Discuss message), and the check is kept only if it passes now, unless the owner chooses **Save it anyway**.
+  - Up to 15 checks per project. Each can be switched on or off in the **Checks** dialog.
+- **After every change.** In Build, Agent and Polish, after the build and the browser test, Kairoq replays the enabled checks. If one fails, the AI is told exactly which step broke and must fix it before the version is saved. This takes up to three attempts.
+- **Pay only for working changes.** A change that still breaks a check, or still shows errors in the browser, after the automatic fixes is saved but **refunded**, and the chat says so.
+- **A test copy of the data** (`react-sandbox.js`).
+  - Checks and the agent's browser tests run against a snapshot of the app's databases (records, users, SQL tables), never the real ones. The snapshot is taken with SQLite `VACUUM INTO`.
+  - Uploads go to the copy's own folder. Emails are not sent, and payment checkout returns a test URL. Realtime events stay inside the copy.
+  - `query_db` in Agent mode reads the same copy. Copies are deleted after the run.
+- **Publish gate.** Publishing re-runs the checks on the version going live and asks before publishing a version that fails them.
+- **Live monitor.** Every `KAIROQ_MONITOR_HOURS` (default 24, `0` to turn off), the checks run on each published app's live version. The owner gets one email when a check starts failing, not one per day.
+
+## AI costs and prompt caching
+
+- **Prompt caching.** Every message resends the project to the model, and most of it is the same as last time: the rules, design brief, skills and knowledge, plus the project files during retries and agent steps.
+  - DeepSeek, OpenAI and Gemini cache that repeated part automatically on OpenRouter.
+  - For Claude models (`anthropic/…`), Kairoq marks cache breakpoints (`cache_control`): on the system prompt and on the last two large user messages. Cache reads cost about a tenth of the normal input price, and cache writes about 1.25×.
+  - Turn it off with `KAIROQ_PROMPT_CACHE=off`.
+- **Small edits instead of whole files.** The model's output is the most expensive part of a call (about 5× the input price for Claude). In Build mode the model can reply with `"edits":{"src/file.jsx":[{"find":"…","replace":"…"}]}`, and in Agent mode it can use the `edit_files` tool, instead of rewriting whole files.
+  - Each `find` must match exactly one place. An exact match is tried first, then one that ignores indentation and trailing spaces.
+  - If any edit fails, nothing is applied, and the model is told which edit failed and why.
+  - New files, and files that mostly change, are still sent whole.
+  - A one-line change shrinks from the whole file to a few hundred characters of output.
+- **Cut-off replies are continued.** When a reply hits the output limit (`finish_reason: length`), Kairoq asks the model to continue exactly where it stopped and joins the parts, instead of failing and falling back to another model. This allows up to `KAIROQ_CONTINUATIONS` extra requests (default 2), as Bolt.new and Dyad do.
+- **Failed edits escalate.** After the first failed find/replace, the model is told to copy `find` exactly. After a second failure, it must send whole files. A fix that didn't work is followed by "take a different approach", not a small variation.
+- **Usage ledger.** Every paid AI call records its cost, model, tier and how many prompt tokens came from the cache.
+- **Cost report.** The server owner sees **Settings → AI costs, last 30 days**, also available as `GET /api/create/admin/costs`. It shows calls, total and average cost per tier and model, the share of tokens read from cache, and what one message of that tier sells for at `KAIROQ_CREDIT_PRICE_USD` per credit (default $0.25). Rows that cost more than they earn are shown in red.
+
 ## Growth features
 
 - **Landing page and pricing.**

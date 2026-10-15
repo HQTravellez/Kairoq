@@ -61,10 +61,11 @@ Rules:
   - Scheduled jobs: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
+- Before you answer, check your own work: (1) if the request is already implemented exactly as asked, say so and change nothing; (2) every import resolves to a file you include or that already exists, or to an available package, so leave no import unresolved; (3) new pages and components are actually rendered: add routes and navigation links in App.jsx or the layout, or the user cannot see them; (4) the whole feature works, with no placeholders, TODOs or "rest of the code unchanged" comments. If not everything fits in one reply, finish the most important part completely and say in "message" what is left.
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
-{"message":"one or two sentences telling the user what you changed","files":{"src/path.jsx":"full new file content"},"delete":["src/unused.jsx"]}
-Include only files you create or change, each with its complete content. "delete" and "images" are optional.`;
+{"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
+Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.${require('./react-edits').PROMPT_NOTE}`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
 function projectDir(id){if(!/^[a-f0-9]{12}$/.test(String(id)))throw Object.assign(Error('Unknown project'),{status:404});return path.join(ROOT(),id)}
@@ -217,9 +218,11 @@ function parseEdit(content){
    value=JSON.parse(text.slice(start,end+1));
   }
  }
- if(!value||typeof value!=='object'||!value.files||typeof value.files!=='object'||Array.isArray(value.files))throw Error('Response JSON needs a "files" object');
+ if(!value||typeof value!=='object'||(value.files!==undefined&&(typeof value.files!=='object'||value.files===null||Array.isArray(value.files))))throw Error('Response JSON needs a "files" object');
+ const edits=require('./react-edits').normalize(value.edits);
+ if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
- return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files,delete:del,images:imageRequests(value.images)};
+ return{message:String(value.message||'Updated the app.').slice(0,2000),files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
@@ -325,7 +328,7 @@ function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_ver
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
 // Also carries the design brief and the design skills switched on for the project.
-function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
@@ -334,7 +337,7 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -346,33 +349,52 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
  const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
- let lastError='',runtimeErrors=[];
+ let lastError='',runtimeErrors=[],checkResult=null,editFailures=0;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
   const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),onToken:onStream?(_d,all)=>onStream(all,attempt):undefined},parseEdit);
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design})}
-  const next={...base};
+  let next={...base};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;
-  const errors=validateFiles(next);
-  messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,delete:reply.delete})});
-  if(errors.length){lastError=errors.slice(0,12).join('\n');messages.push({role:'user',content:'That change was rejected:\n'+lastError+'\nReturn corrected JSON with the full content of every file you need to change.'});continue}
+  // Small changes arrive as find/replace edits (cheaper than rewriting whole files).
+  const both=Object.keys(reply.edits).filter(f=>Object.hasOwn(reply.files,f));
+  const applied=require('./react-edits').apply(next,reply.edits);next=applied.files;
+  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:validateFiles(next))];
+  messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,edits:reply.edits,delete:reply.delete})});
+  if(errors.length){
+   lastError=errors.slice(0,12).join('\n');
+   // Edits that failed once are retried; if they fail again, the model must send whole files.
+   const editFailed=applied.errors.length>0;
+   editFailures+=editFailed?1:0;
+   const how=editFailed&&editFailures>=2?'Your find/replace edits failed twice, so do not use "edits" this time: send every file you change whole in "files".':'Fix the edits that failed (copy "find" exactly, character for character, from the current files above) or send those files whole in "files".';
+   messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again. '+how});continue;
+  }
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
   catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
   try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\nMigrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
-  runtimeErrors=[];
-  if(checkRuntime){
+  runtimeErrors=[];checkResult=null;
+  if(checkRuntime||inspect){
    onProgress('testing');
    markTesting(id,n,next);
-   try{runtimeErrors=(await checkRuntime(previewUrl(meta,n))).errors||[]}catch(e){runtimeErrors=[]}
-   finally{clearTesting(id,n)}
+   try{
+    if(checkRuntime){try{runtimeErrors=(await checkRuntime(previewUrl(meta,n))).errors||[]}catch(e){runtimeErrors=[]}}
+    // Saved checks: flows that worked before must still work (run on a test copy of the data).
+    if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
+   }finally{clearTesting(id,n)}
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError=runtimeErrors.join('\n');
-    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'});
+    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
+    continue;
+   }
+   if(checkResult&&checkResult.failed.length&&attempt<MAX_ATTEMPTS){
+    fs.rmSync(dir,{recursive:true,force:true});
+    lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);
+    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\nFix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
     continue;
    }
   }
@@ -382,12 +404,13 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,signal,
   const fresh=loadMeta(id);
   const message=reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   saveMeta(fresh);
-  return{version:n,message,changed,attempts:attempt,runtime_errors:runtimeErrors,preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }

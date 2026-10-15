@@ -62,7 +62,8 @@ function ownerEmail(meta){
 }
 
 // ---------- storage ----------
-function filesDir(id){return path.join(builder.projectDir(id),'files')}
+// A test run (react-sandbox.js) keeps its uploads in its own folder.
+function filesDir(id,db){return db&&db.__filesDir||path.join(builder.projectDir(id),'files')}
 function storageLimit(){return Number(process.env.KAIROQ_APP_STORAGE_MB||500)*1024*1024}
 async function readRaw(req,limit){const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>limit)throw fail(413,'File is larger than 5 MB');chunks.push(c)}return Buffer.concat(chunks)}
 async function upload(req,{id,db,cfg,user,query}){
@@ -75,14 +76,14 @@ async function upload(req,{id,db,cfg,user,query}){
  const used=db.prepare('SELECT COALESCE(SUM(size),0) n FROM files').get().n;
  if(used+bytes.length>storageLimit())throw fail(507,'This app is out of file storage');
  const fid=crypto.randomUUID(),name=String(query.name||'file.'+FILE_TYPES[type]).replace(/[^\w .-]+/g,'_').slice(0,120);
- fs.mkdirSync(filesDir(id),{recursive:true});
- fs.writeFileSync(path.join(filesDir(id),fid),bytes);
+ fs.mkdirSync(filesDir(id,db),{recursive:true});
+ fs.writeFileSync(path.join(filesDir(id,db),fid),bytes);
  db.prepare('INSERT INTO files(id,owner_id,name,type,size,created_at) VALUES(?,?,?,?,?,?)').run(fid,user?user.id:null,name,type,bytes.length,new Date().toISOString());
  return{id:fid,name,type,size:bytes.length,url:'/api/apps/'+id+'/files/'+fid};
 }
 function serveFile(res,{id,db,fid}){
  const f=db.prepare('SELECT * FROM files WHERE id=?').get(fid);
- const file=f&&path.join(filesDir(id),f.id);
+ const file=f&&path.join(filesDir(id,db),f.id);
  if(!f||!fs.existsSync(file))throw fail(404,'File not found');
  const inline=f.type.startsWith('image/');
  res.writeHead(200,{'Content-Type':f.type,'Content-Length':f.size,'Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Access-Control-Allow-Origin':'*','Content-Disposition':(inline?'inline':'attachment')+'; filename="'+f.name.replace(/"/g,'')+'"'});
@@ -92,7 +93,7 @@ function removeFile({id,db,user,fid}){
  const f=db.prepare('SELECT * FROM files WHERE id=?').get(fid);
  if(!f)throw fail(404,'File not found');
  if(!user||f.owner_id!==user.id)throw fail(403,'You can only delete your own files');
- db.prepare('DELETE FROM files WHERE id=?').run(fid);fs.rmSync(path.join(filesDir(id),fid),{force:true});
+ db.prepare('DELETE FROM files WHERE id=?').run(fid);fs.rmSync(path.join(filesDir(id,db),fid),{force:true});
  return{deleted:fid};
 }
 

@@ -50,13 +50,15 @@ const MAX_STEPS=20;
 function privateHost(h){h=h.replace(/^\[|\]$/g,'').toLowerCase();return h==='localhost'||h.endsWith('.localhost')||h.endsWith('.internal')||/^\d+\.\d+\.\d+\.\d+$/.test(h)||h.includes(':')||!h.includes('.')}
 // Only the app itself, its backend and public https resources may load; anything else
 // (other Kairoq paths, internal hosts, cloud metadata) is blocked, including by clicking links.
-async function guard(context,url){
+// With sandbox, the app's backend calls carry the test-run token (see react-sandbox.js).
+async function guard(context,url,{sandbox}={}){
  const origin=new URL(url).origin,root=new URL('./',url).pathname;
  const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(root)||[])[1];
  await context.route('**/*',r=>{
   let u;try{u=new URL(r.request().url())}catch{return r.abort()}
   if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
-  if(u.origin===origin)return u.pathname.startsWith(root)||(appId&&u.pathname.startsWith('/api/apps/'+appId+'/'))?r.continue():r.abort();
+  if(u.origin===origin&&appId&&u.pathname.startsWith('/api/apps/'+appId+'/'))return sandbox?r.continue({headers:{...r.request().headers(),'x-kairoq-sandbox':sandbox}}):r.continue();
+  if(u.origin===origin)return u.pathname.startsWith(root)?r.continue():r.abort();
   if(u.protocol==='https:'&&!privateHost(u.hostname))return r.continue();
   return r.abort();
  });
@@ -81,7 +83,7 @@ async function designShots(url,{timeoutMs=20000}={}){
  }
  return shots;
 }
-async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
+async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox}={}){
  if(!available())return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage(),errors=[],results=[],external=[];
@@ -95,7 +97,7 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000}={}){
  page.on('requestfailed',r=>{if(own(r.url()))add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')');else ext(r.url())});
  page.on('response',r=>{if(r.status()>=400){if(own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url());else ext(r.url())}});
  const origin=new URL(url).origin,root=new URL('./',url).pathname;
- await guard(context,url);
+ await guard(context,url,{sandbox});
  let text='',shot=null;
  try{
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});

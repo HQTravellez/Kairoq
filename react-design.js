@@ -217,7 +217,10 @@ DESIGN (as important as working code; the app must look like a polished product 
 - Typography: two font families at most (font-display and font-sans), three or four sizes per screen, tracking-tight on large headings, leading-relaxed body text, sentence case.
 - States: every list and page has a designed empty state, a loading state (Skeleton) and a friendly error state; forms have labels, helpful placeholders, inline validation and a success state.
 - Responsive: mobile first. At 375 px wide everything stacks, buttons are easy to tap and nothing scrolls sideways; at 1280 px use multi-column grids and wider imagery.
-- Avoid the generic AI look: no plain grey boxes, no walls of identical cards, no emoji used as icons (use lucide-react), no lorem ipsum, no centred-everything pages, no default blue buttons.`;
+- Avoid the generic AI look: no plain grey boxes, no walls of identical cards, no emoji used as icons (use lucide-react), no lorem ipsum, no centred-everything pages, no default blue buttons.
+- Make the kit yours: adapt the UI kit's components to this app's brand (shape, spacing, weight) rather than shipping them looking like everyone else's. Let typography carry character (a distinctive display font, confident sizes). Do not build text-only walls: break long text with imagery, icons, numbers or cards.
+- Contrast: body text must be easily readable on its background (dark text on light, light on dark; never light grey on white or mid-grey on a photo without an overlay). Use one primary colour confidently; do not use pure black as the primary colour.
+- Motion: a few coordinated entrance animations and hover feedback, not everything moving.`;
 
 function designNote(design){
  if(!design||!design.palette)return'';

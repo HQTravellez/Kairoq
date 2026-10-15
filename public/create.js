@@ -6,7 +6,7 @@ const state={me:null,project:null,job:null,mode:'signup',file:null};
 async function api(path,{method='GET',body}={}){
  const r=await fetch('/api/create'+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});
  const data=await r.json().catch(()=>({}));
- if(!r.ok)throw Object.assign(new Error(data.error||'Request failed ('+r.status+')'),{status:r.status});
+ if(!r.ok)throw Object.assign(new Error(data.error||'Request failed ('+r.status+')'),{status:r.status,data});
  return data;
 }
 function show(screen){for(const id of ['auth','home','editor','share-screen'])$(id).classList.toggle('hidden',id!==screen);$('bar-project').classList.toggle('hidden',screen!=='editor')}
@@ -114,6 +114,7 @@ function messageItem(m,last){
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
  if(m.changed&&m.changed.length){const s=document.createElement('span');s.className='changed';s.textContent='Changed: '+m.changed.join(', ');li.append(s)}
+ if(m.checks){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
  if(m.steps&&m.steps.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}
  return li;
@@ -270,7 +271,7 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
+const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…'};
 function streamItem(){
  let li=$('stream');
  if(!li){li=document.createElement('li');li.id='stream';li.className='assistant streaming';li.innerHTML='<div class="stream-msg"></div><div class="stream-files changed"></div><pre class="stream-code hidden"></pre>';$('messages').append(li)}
@@ -326,7 +327,7 @@ async function watch(job){
   state.runtimeErrors=[];
   renderMessages();renderVersions();
   if(done.mode!=='discuss')setPreview(project.preview_url);
-  if(done.refunded)$('messages').append(messageItem({role:'assistant',text:'Nothing changed, so this agent task was free.'}));
+  if(done.refunded)$('messages').append(messageItem({role:'assistant',text:done.refund_reason==='checks'?'This change still breaks a saved check, so it was free. Use Fix it or describe the problem.':done.refund_reason==='errors'?'This change still shows errors in the browser, so it was free. Use Fix it to repair them.':'Nothing changed, so this agent task was free.'}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
   if(state.code)renderFiles();
@@ -490,7 +491,11 @@ $('slug').onblur=()=>{const v=slugFrom($('slug').value);if(v&&v!==$('slug').valu
 async function publishAction(path,body){
  text($('publish-error'),'');
  try{const {project,error}=await api('/projects/'+state.project.id+path,{method:'POST',body});state.project=project;renderPublish();if(error)text($('publish-error'),error)}
- catch(err){text($('publish-error'),err.message)}
+ catch(err){
+  // Saved checks failed on the version going live: the owner decides.
+  if(err.status===409&&err.data&&err.data.checks_failed&&confirm(err.message+'\n\nPublish anyway?'))return publishAction(path,{...body,force:true});
+  text($('publish-error'),err.message);
+ }
 }
 $('publish').onclick=()=>publishAction('/publish',{slug:slugFrom($('slug').value)});
 $('unpublish').onclick=()=>publishAction('/unpublish',{});
@@ -502,7 +507,18 @@ async function domainAction(path,method,hostname){
 }
 
 // ---------- settings: code, GitHub, Stripe ----------
+// The owner's AI cost report: real cost per call next to what that message sells for.
+async function renderCosts(){
+ const owner=state.me?.viewer?.kind==='owner';$('costs-section').classList.toggle('hidden',!owner);if(!owner)return;
+ try{
+  const {costs}=await api('/admin/costs'),body=$('costs-body');body.replaceChildren();
+  const usd=n=>'$'+(n<1?n.toFixed(3):n.toFixed(2));
+  for(const g of costs.groups){const tr=document.createElement('tr');const loss=g.credit_value!==null&&g.avg_cost>g.credit_value;for(const v of [g.tier,g.model,g.calls,usd(g.cost),usd(g.avg_cost),g.credit_value===null?'-':usd(g.credit_value),g.cached_share+'%']){const td=document.createElement('td');td.textContent=v;tr.append(td)}if(loss)tr.className='loss';body.append(tr)}
+  text($('costs-note'),costs.groups.length?'Total '+usd(costs.total_cost)+' over '+costs.total_calls+' AI calls. "Sells for" uses $'+costs.credit_price_usd+' per credit (KAIROQ_CREDIT_PRICE_USD); rows in red cost more than they earn. Agent tasks make several calls each.':'No paid AI calls in the last 30 days.');
+ }catch(err){text($('costs-note'),err.message)}
+}
 $('settings-open').onclick=async()=>{
+ renderCosts();
  text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
  $('knowledge').value=state.project.knowledge||'';
  renderSecrets().catch(err=>text($('settings-error'),err.message));
@@ -759,6 +775,35 @@ async function start(){
  await loadHome();
 }
 start().catch(err=>{document.body.append(Object.assign(document.createElement('p'),{className:'error',textContent:err.message}))});
+// ---------- saved checks ----------
+async function renderChecks(){
+ const d=await api('/projects/'+state.project.id+'/checks'),list=$('checks-list'),editor=state.project.role!=='viewer';
+ list.replaceChildren();
+ text($('checks-monitor'),d.monitor?('Live app, checked '+when(d.monitor.at)+': '+(d.monitor.ok?'all '+d.monitor.ran+' passed.':'failing: '+d.monitor.failed.join(', ')+'.')):(state.project.published?'The live app is checked once a day.':'After you publish, the live app is checked once a day and you get an email if a check fails.'));
+ if(!d.checks.length){const li=document.createElement('li');li.className='muted small';li.textContent='No checks yet. Agent mode saves the flows it tests, or describe one below, for example "a guest can book the Garden room".';list.append(li)}
+ for(const c of d.checks){
+  const li=document.createElement('li'),st=document.createElement('span');st.className='check-state '+(c.last?(c.last.ok?'ok':'bad'):'');st.textContent=c.last?(c.last.ok?'✓':'✗'):'•';
+  const t=document.createElement('div');t.className='skill-text';const b=document.createElement('b');b.textContent=c.name;const sp=document.createElement('span');sp.textContent=c.steps.length+' step'+(c.steps.length===1?'':'s')+' · '+({agent:'saved by the agent',ai:'written by the AI',user:'added by you'}[c.source]||c.source)+(c.last?' · last run '+when(c.last.at)+(c.last.version?' on v'+c.last.version:''):'')+(c.last&&!c.last.ok?' · failed: '+(c.last.step?c.last.step+(c.last.error?' ('+c.last.error+')':''):c.last.error):'');t.append(b,sp);
+  const act=document.createElement('div');act.className='skill-actions';
+  const on=document.createElement('label'),cb=document.createElement('input');cb.type='checkbox';cb.checked=c.enabled!==false;cb.disabled=!editor;cb.onchange=async()=>{try{await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{id:c.id,enabled:cb.checked}})}catch(err){text($('checks-error'),err.message)}};on.append(cb,document.createTextNode(' on'));act.append(on);
+  if(editor){const del=document.createElement('button');del.type='button';del.className='ghost link-btn';del.textContent='Remove';del.onclick=async()=>{if(!confirm('Remove the check "'+c.name+'"?'))return;try{await api('/projects/'+state.project.id+'/checks',{method:'DELETE',body:{id:c.id}});renderChecks()}catch(err){text($('checks-error'),err.message)}};act.append(del)}
+  li.append(st,t,act);list.append(li);
+ }
+ for(const el of ['checks-run','checks-describe','checks-add'])$(el).disabled=!editor;
+ $('checks-run').disabled=!editor||!d.checks.length;
+}
+$('checks-open').onclick=async()=>{text($('checks-error'),'');text($('checks-status'),'');$('checks-save-anyway').classList.add('hidden');try{await renderChecks();$('checks-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
+$('checks-run').onclick=async()=>{const btn=$('checks-run');btn.disabled=true;text($('checks-status'),'Running the checks on a test copy of your data…');text($('checks-error'),'');
+ try{const {result}=await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{run:true}});text($('checks-status'),result.failed.length?result.failed.length+' of '+result.ran+' failed. Use Fix it in the chat, or describe what changed.':'All '+result.ran+' passed.');await renderChecks()}
+ catch(err){text($('checks-status'),'');text($('checks-error'),err.message)}finally{btn.disabled=false}};
+let checkDraft=null;
+$('checks-add').onclick=async()=>{const btn=$('checks-add');btn.disabled=true;text($('checks-status'),'Writing the check and trying it…');text($('checks-error'),'');$('checks-save-anyway').classList.add('hidden');
+ try{const r=await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{describe:$('checks-describe').value,tier:state.tier}});
+  if(r.saved){text($('checks-status'),'Added "'+r.check.name+'"'+(r.verified?' and it passes.':'.'));$('checks-describe').value='';await renderChecks()}
+  else{checkDraft=r.draft;text($('checks-status'),'"'+r.draft.name+'" does not pass on the current version ('+(r.failed.step?'failed at '+r.failed.step+': ':'')+r.failed.error+'). Either the app has a bug, or the description needs to be clearer.');$('checks-save-anyway').classList.remove('hidden')}
+  refreshCredits();
+ }catch(err){text($('checks-status'),'');text($('checks-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}finally{btn.disabled=false}};
+$('checks-save-anyway').onclick=async()=>{if(!checkDraft)return;try{await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{...checkDraft,force:true}});$('checks-save-anyway').classList.add('hidden');text($('checks-status'),'Saved. It will fail until the app is fixed.');$('checks-describe').value='';await renderChecks()}catch(err){text($('checks-error'),err.message)}};
 // ---------- design ----------
 const PALETTE_KEYS=['background','foreground','primary','secondary','accent','muted'];
 state.designData=null;
