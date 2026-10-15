@@ -109,16 +109,34 @@ function renderMessages(pendingText){
 }
 function messageItem(m,last,index){
  const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
- // Assistant replies: how long it thought (with its reasoning), what it said, the plan it followed.
- if(m.role==='assistant'&&(m.thought_ms!=null||m.thinking||(m.plan&&m.plan.length))&&index!=null){const b=el('button','thought-link',(m.thought_ms!=null?'Thought for '+secs(m.thought_ms):'How it worked')+' ');b.type='button';b.append(el('span',null,'›'));b.onclick=()=>openDetail(index);li.append(b)}
- const body=document.createElement('div');body.className='msg-text';body.textContent=m.text;li.append(body);
+ const tl=m.timeline||[];
+ if(m.role==='assistant'&&index!=null){
+  // Like Lovable: "Thought for Ns", the answer (formatted), then what was done, folded.
+  const think=tl.find(e=>e.t==='think');
+  const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
+  if(thoughtMs!=null){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secs(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
+  li.append(renderMarkdown(m.text));
+  const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan');
+  if(acts.length){
+   const d=el('details','acts'),s=el('summary');s.append(icon('down','toggle'),el('span',null,summarize(tl)||acts.length+' steps'));
+   d.append(s,rail(acts.slice(0,30),{}));li.append(d);
+  }
+ }else{const body=el('div','msg-text');body.textContent=m.text;li.append(body)}
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
- if(m.changed&&m.changed.length){const c=el('div','file-chips done');for(const f of m.changed.slice(0,12))c.append(fileChip(f));if(m.changed.length>12)c.append(el('span','chip more','+'+(m.changed.length-12)+' more'));li.append(c)}
- if(m.version||m.attempts>1){const f=el('div','msg-meta');if(m.version)f.append(el('span','ver','v'+m.version));if(m.attempts>1)f.append(el('span',null,'Fixed '+(m.attempts-1)+' problem'+(m.attempts>2?'s':'')+' on the way'));li.append(f)}
- if(m.checks){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
- if(m.steps&&m.steps.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
+ if(m.role==='assistant'&&!tl.length&&m.changed&&m.changed.length){const c=el('div','file-chips done');for(const f of m.changed.slice(0,12))c.append(fileChip(f));if(m.changed.length>12)c.append(el('span','chip more','+'+(m.changed.length-12)+' more'));li.append(c)}
+ if(m.role==='assistant'&&(m.version||m.credits!=null)&&index!=null){
+  const f=el('div','msg-meta');
+  if(m.version)f.append(el('span','ver','v'+m.version));
+  if(m.duration_ms!=null){const t=el('span');t.append(icon('clock'),secs(m.duration_ms));f.append(t)}
+  if(m.credits!=null){const t=el('span');t.append(icon('coin'),String(m.credits));f.append(t)}
+  if(m.attempts>1)f.append(el('span',null,'Fixed '+(m.attempts-1)+' problem'+(m.attempts>2?'s':'')));
+  const det=el('button','link-btn details-link','Details');det.type='button';det.onclick=()=>openDetail(index,'timeline');f.append(det);
+  li.append(f);
+ }
+ if(m.checks&&!tl.some(e=>e.t==='check')){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
+ if(m.steps&&m.steps.length&&!tl.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}
  return li;
 }
@@ -275,98 +293,189 @@ async function send(message,mode,path='/chat',extra={}){
  }
 }
 const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
-// ---------- live work card: thoughts, plan, steps, files ----------
+// ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
 const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
-const work={timeline:[],started:0,timer:null,job:null,plan:[],files:[],current:null,message:''};
+const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 function secs(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'}
-function phaseOf(j){if(j.mode==='discuss')return'thinking';if(j.status==='queued'||(j.status==='writing'&&!(j.stream&&j.stream.chars)))return'thinking';if(j.mode==='agent'&&j.status==='working')return'working';return j.status}
-function trackPhase(j){
- const p=phaseOf(j),last=work.timeline.at(-1);
- if(!last||last.phase!==p){if(last)last.end=Date.now();work.timeline.push({phase:p,start:Date.now(),n:work.timeline.filter(t=>t.phase===p).length+1})}
+function phaseOf(j){if(j.mode==='discuss')return'thinking';if(j.status==='queued'||(j.status==='writing'&&!(j.stream&&j.stream.chars)))return'thinking';return j.status}
+const ICONS={think:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',plan:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',read:'<path d="M4 19.5V5a2 2 0 0 1 2-2h8l6 6v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5z"/><path d="M14 3v6h6"/>',edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',build:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',test:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/>',check:'<path d="M20 6 9 17l-5-5"/>',fix:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',note:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',design:'<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"/>',image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',web:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',logs:'<path d="M4 17l6-6-6-6M12 19h8"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',coin:'<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.2 0 1.1-1.1 1.9-2.5 1.9a2.5 2 0 0 1-2.5-1.5M12 6.5V8M12 16v1.5"/>',back:'<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',chev:'<path d="m9 6 6 6-6 6"/>',down:'<path d="m6 9 6 6 6-6"/>'};
+function icon(name,cls){const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('class','ico'+(cls?' '+cls:''));s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[name]||ICONS.note;return s}
+function fileChip(name,active){const c=el('code','chip'+(active?' active':''),name.replace(/^src\//,''));c.title=name;return c}
+// Tiny, safe Markdown: headings, lists, bold, inline code, paragraphs (text only, no HTML).
+function inlineMd(parent,textIn){const re=/(\*\*[^*]+\*\*|`[^`]+`)/g;let last=0,m;while((m=re.exec(textIn))){if(m.index>last)parent.append(textIn.slice(last,m.index));const t=m[0];parent.append(t.startsWith('**')?el('strong',null,t.slice(2,-2)):el('code','inline',t.slice(1,-1)));last=m.index+t.length}if(last<textIn.length)parent.append(textIn.slice(last))}
+function renderMarkdown(src){
+ const root=el('div','md'),lines=String(src||'').replace(/\r/g,'').split('\n');let para=[],stack=[];
+ const flush=()=>{if(para.length){const p=el('p');inlineMd(p,para.join(' '));root.append(p);para=[]}};
+ const closeLists=()=>{stack=[]};
+ for(const raw of lines){
+  const line=raw.replace(/\s+$/,'');
+  const h=/^(#{1,4})\s+(.*)$/.exec(line),li=/^(\s*)([-*•]|\d+[.)])\s+(.*)$/.exec(line);
+  if(!line.trim()){flush();closeLists();continue}
+  if(h){flush();closeLists();const x=el(h[1].length<=2?'h3':'h4');inlineMd(x,h[2]);root.append(x);continue}
+  if(li){
+   flush();const depth=Math.min(3,Math.floor(li[1].replace(/\t/g,'  ').length/2)),ordered=/\d/.test(li[2]);
+   while(stack.length>depth+1)stack.pop();
+   if(stack.length<depth+1||stack.at(-1).ordered!==ordered&&stack.length===depth+1){
+    if(stack.length===depth+1)stack.pop();
+    const list=el(ordered?'ol':'ul');const parent=stack.length?stack.at(-1).list.lastElementChild||stack.at(-1).list:root;parent.append(list);stack.push({list,ordered});
+   }
+   const item=el('li');inlineMd(item,li[3]);stack.at(-1).list.append(item);continue;
+  }
+  if(stack.length&&/^\s{2,}/.test(raw)){inlineMd(stack.at(-1).list.lastElementChild,' '+line.trim());continue}
+  closeLists();para.push(line.trim());
+ }
+ flush();return root;
 }
-// The chat shows a compact card; the thoughts, plan, steps and code open in the panel on the
-// right (over the preview) when the user clicks "Thinking" / "Thought for …", like Lovable.
+// One row of the activity rail. Rows with more detail expand in place.
+function editVerb(k){return k==='created'?'Created':k==='deleted'?'Deleted':'Edited'}
+function eventRow(e,{expand=false,version=null,live=false}={}){
+ const row=el('li','ev ev-'+e.t+(e.ok===false?' bad':''));
+ const name=e.t==='note'?(e.icon||'note'):e.t;row.append(icon(name));
+ const main=el('div','ev-main'),head=el('div','ev-head');main.append(head);row.append(main);
+ let more=null;
+ if(e.t==='think'){
+  if(e.title){const t=el('div','ev-title');inlineMd(t,e.title);main.insertBefore(t,head)}
+  head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secs(e.ms||0)));
+  if(e.text)more=()=>el('p','ev-thought',e.text);
+ }else if(e.t==='plan'){head.append(el('span','ev-label','Plan'));const ol=el('ol','ev-plan');for(const it of e.items||[]){const x=el('li');inlineMd(x,it);ol.append(x)}main.append(ol)}
+ else if(e.t==='read'){head.append(el('span','ev-label','Read'));for(const f of e.files||[])head.append(fileChip(f))}
+ else if(e.t==='edit'){head.append(el('span','ev-label',editVerb(e.kind)),fileChip(e.file,live&&e.file===work.current));if(version&&expand)more=()=>diffFor(version,e.file)}
+ else if(e.t==='build'){head.append(el('span','ev-label',e.ok?'Built the preview':'The build failed'));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
+ else if(e.t==='test'){head.append(el('span','ev-label',(e.text||'Tested in a browser')+(e.ok?' · no errors':' · found problems')));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
+ else if(e.t==='check'){head.append(el('span','ev-label',e.text||'Saved checks'));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
+ else{head.append(el('span','ev-label',e.text||''));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
+ if(more&&expand){
+  row.classList.add('expandable');const t=icon(e.t==='edit'?'down':'chev','toggle');head.append(t);
+  let box=null;head.tabIndex=0;head.setAttribute('role','button');
+  const toggle=()=>{if(box){box.remove();box=null;row.classList.remove('open');return}box=el('div','ev-more');const c=more();if(c instanceof Promise)c.then(x=>box&&box.append(x));else box.append(c);main.append(box);row.classList.add('open')};
+  head.onclick=toggle;head.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();toggle()}};
+ }
+ return row;
+}
+function rail(events,opts){const ol=el('ol','rail');for(const e of events)ol.append(eventRow(e,opts));return ol}
+// A one-line summary of what a change did, e.g. "Edited 3 files · tested in a browser".
+function summarize(events){
+ const edits=[...new Set(events.filter(e=>e.t==='edit').map(e=>e.file))].length,reads=[...new Set(events.filter(e=>e.t==='read').flatMap(e=>e.files||[]))].length;
+ const tests=events.filter(e=>e.t==='test'),fixes=events.filter(e=>e.t==='fix').length;
+ return[reads&&'read '+reads+' file'+(reads===1?'':'s'),edits&&'edited '+edits+' file'+(edits===1?'':'s'),tests.length&&(tests.at(-1).ok?'tested in a browser':'browser test found problems'),fixes&&'fixed '+fixes+' problem'+(fixes===1?'':'s')].filter(Boolean).join(' · ').replace(/^./,c=>c.toUpperCase());
+}
+// ---------- live: the chat shows a status line and the latest activity ----------
 function workCard(){
  let li=$('stream');
  if(!li){
   li=el('li','assistant work');li.id='stream';
-  li.innerHTML='<div class="work-head"><span class="spark" aria-hidden="true"></span><b class="work-title">Thinking</b><span class="work-time"></span><button type="button" class="ghost work-stop">Stop</button></div>'+
-   '<button type="button" class="thought-link">Thinking <span aria-hidden="true">›</span></button>'+
-   '<div class="work-msg hidden"></div><div class="file-chips"></div>';
-  li.querySelector('.work-stop').onclick=()=>$('stop-job').click();
-  li.querySelector('.thought-link').onclick=()=>openDetail('live');
+  const status=el('button','status-line');status.type='button';status.append(el('span','status-text','Thinking'),icon('chev'));status.onclick=()=>openDetail('live');
+  const head=el('div','work-head');head.append(status,el('span','work-time'));const stop=el('button','ghost work-stop','Stop');stop.type='button';stop.onclick=()=>$('stop-job').click();head.append(stop);
+  li.append(head,el('ol','rail live'),el('div','work-msg hidden'));
   $('messages').append(li);$('messages').scrollTop=$('messages').scrollHeight;
  }
  return li;
 }
-function fileChip(name,active){const c=el('span','chip'+(active?' active':''),name.replace(/^src\//,''));c.title=name;return c}
-function liveSteps(j){
- const p=phaseOf(j),agent=j.mode==='agent'&&j.agent;
- const after=['building','testing','checking','reviewing'].includes(p);
- return agent?j.agent.steps.map(s=>({text:s.thought||s.actions.join('; '),sub:s.actions.join(' · '),done:s.n<j.agent.step})):work.plan.map(t=>({text:t,done:after}));
+function liveStatus(j){
+ const p=phaseOf(j);
+ if(j.mode==='agent'&&j.agent&&j.agent.step){const last=(j.events||[]).at(-1);return'Step '+j.agent.step+' · '+(p==='thinking'?'Thinking':last&&last.t==='edit'?'Editing '+last.file.replace(/^src\//,''):PHASES[p]||'Working')}
+ if(p==='writing'&&work.current)return'Writing '+work.current.replace(/^src\//,'');
+ return PHASES[p]||'Working';
+}
+function liveEvents(j){
+ const ev=(j.events||[]).slice();
+ // The current thinking, before the model has answered.
+ if(phaseOf(j)==='thinking'&&j.mode!=='discuss')ev.push({t:'think',live:true,ms:Date.now()-work.started,text:work.thinking});
+ // Files being written right now (from the streamed reply) in Build mode.
+ if(j.mode!=='agent'&&phaseOf(j)==='writing')for(const f of work.files)if(!ev.some(e=>e.t==='edit'&&e.file===f))ev.push({t:'edit',file:f,kind:'edited'});
+ return ev;
 }
 function renderWork(j){
- work.job=j;trackPhase(j);
- const li=workCard(),p=phaseOf(j),st=j.stream||null;
- if(st&&st.plan&&st.plan.length)work.plan=st.plan;
+ work.job=j;
+ const list=$('messages'),stick=list.scrollHeight-list.scrollTop-list.clientHeight<120;
+ const li=workCard(),st=j.stream||null;
  if(st&&st.files)for(const f of st.files)if(!work.files.includes(f))work.files.push(f);
  if(st)work.current=st.current||null;
  if(st&&st.message)work.message=st.message;
  if(st&&st.tail)work.tail=st.tail;
  if(j.thinking)work.thinking=j.thinking;
- const agent=j.mode==='agent'&&j.agent;
- text(li.querySelector('.work-title'),agent&&j.agent.step?'Step '+j.agent.step+' · '+(PHASES[p]||'Working'):(PHASES[p]||'Working'));
- const link=li.querySelector('.thought-link'),thinkingNow=p==='thinking';
- link.firstChild.textContent=(thinkingNow?'Thinking':'Thought for '+secs((work.timeline.find(t=>t.phase==='thinking')?.end||Date.now())-work.started))+' ';
- link.classList.toggle('active',detailState.source==='live'&&!$('detail').classList.contains('hidden'));
+ text(li.querySelector('.status-text'),liveStatus(j));
+ const r=li.querySelector('.rail.live');r.replaceChildren();
+ for(const e of liveEvents(j).filter(e=>e.t!=='plan').slice(-6))r.append(eventRow(e,{live:true}));
  const msg=li.querySelector('.work-msg');
- const said=j.mode==='discuss'?(st&&st.text)||'':agent&&j.agent.steps.length?j.agent.steps.at(-1).thought||'':work.message;
+ const said=j.mode==='discuss'?(st&&st.text)||'':j.mode==='agent'&&j.agent&&j.agent.steps.length?'':work.message;
  msg.classList.toggle('hidden',!said);text(msg,said);
- const chips=li.querySelector('.file-chips');chips.replaceChildren();
- for(const f of work.files)chips.append(fileChip(f,f===work.current&&p==='writing'));
  if(detailState.source==='live')renderDetail();
- const list=$('messages');if(list.scrollHeight-list.scrollTop-list.clientHeight<160)list.scrollTop=list.scrollHeight;
+ if(stick)list.scrollTop=list.scrollHeight;
 }
-// ---------- the details panel ----------
-const detailState={source:null};
-function openDetail(source){detailState.source=source;$('detail').classList.remove('hidden');document.querySelector('.stage').classList.add('show-detail');renderDetail();if(work.job&&source==='live')renderWork(work.job)}
-function closeDetail(){detailState.source=null;$('detail').classList.add('hidden');document.querySelector('.stage').classList.remove('show-detail');const l=document.querySelector('#stream .thought-link');if(l)l.classList.remove('active')}
+function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');if(r)text(r,'Thinking…')}if(detailState.source==='live')renderDetail()}
+// ---------- the Details panel (over the preview) ----------
+const detailState={source:null,tab:'timeline'};
+function openDetail(source,tab){detailState.source=source;if(tab)detailState.tab=tab;$('detail').classList.remove('hidden');document.querySelector('.stage').classList.add('show-detail');renderDetail()}
+function closeDetail(){detailState.source=null;$('detail').classList.add('hidden');document.querySelector('.stage').classList.remove('show-detail')}
 $('detail-close').onclick=closeDetail;
 document.querySelector('.stage-bar').addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&detailState.source!==null&&!document.querySelector('dialog[open]'))closeDetail()});
-function section(title,...children){const s=el('section','detail-section');s.append(el('h3',null,title),...children);return s}
-function todoList(items){const ol=el('ol','todo-list');for(const s of items){const item=el('li',s.done?'done':'');item.append(el('span','plan-icon',s.done?'✓':''),el('span','plan-text',s.text));if(s.sub&&s.sub!==s.text)item.append(el('span','plan-sub',s.sub));ol.append(item)}return ol}
+for(const b of document.querySelectorAll('#detail [data-tab]'))b.onclick=()=>{detailState.tab=b.dataset.tab;renderDetail()};
+const diffCache=new Map();
+async function changesFor(version){if(!diffCache.has(version))diffCache.set(version,api('/projects/'+state.project.id+'/changes?version='+version).catch(e=>{diffCache.delete(version);throw e}));return diffCache.get(version)}
+// Line diff (LCS) with 3 lines of context, as a list of hunks.
+function lineDiff(a,b){
+ const A=a===null?[]:a.split('\n'),B=b===null?[]:b.split('\n');
+ if(A.length*B.length>4e6)return[...A.map(t=>({k:'-',t})),...B.map(t=>({k:'+',t}))];
+ const n=A.length,m=B.length,dp=Array.from({length:n+1},()=>new Uint32Array(m+1));
+ for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i][j]=A[i]===B[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+ const out=[];let i=0,j=0;
+ while(i<n&&j<m){if(A[i]===B[j]){out.push({k:' ',t:A[i]});i++;j++}else if(dp[i+1][j]>=dp[i][j+1])out.push({k:'-',t:A[i++]});else out.push({k:'+',t:B[j++]})}
+ while(i<n)out.push({k:'-',t:A[i++]});while(j<m)out.push({k:'+',t:B[j++]});
+ return out;
+}
+function diffView(f){
+ const box=el('div','diff');
+ if(f.too_large){box.append(el('p','muted small','This file is too large to show here. Open it in the Code tab.'));return box}
+ const lines=lineDiff(f.before,f.after),show=new Array(lines.length).fill(false);
+ lines.forEach((l,i)=>{if(l.k!==' ')for(let k=Math.max(0,i-3);k<=Math.min(lines.length-1,i+3);k++)show[k]=true});
+ const pre=el('pre');let gap=false,added=0,removed=0;
+ lines.forEach((l,i)=>{if(l.k==='+')added++;if(l.k==='-')removed++;if(!show[i]){if(!gap){pre.append(el('span','dl gap','⋯'));gap=true}return}gap=false;pre.append(el('span','dl '+(l.k==='+'?'add':l.k==='-'?'del':'ctx'),(l.k===' '?'  ':l.k+' ')+l.t))});
+ const stats=el('div','diff-stats');stats.append(el('span','add','+'+added),el('span','del','−'+removed));
+ box.append(stats,pre);return box;
+}
+async function diffFor(version,file){const d=await changesFor(version);const f=d.files.find(x=>x.path===file);return f?diffView(f):el('p','muted small','No changes to show.')}
 function renderDetail(){
  const body=$('detail-body'),src=detailState.source;if(src===null)return;
- body.replaceChildren();
  const live=src==='live',j=work.job,m=live?null:state.project&&state.project.messages[src];
  if(!live&&!m){closeDetail();return}
  const running=live&&j&&j.status!=='complete'&&j.status!=='failed';
- $('detail-spark').classList.toggle('still',!running);
- text($('detail-title'),running?(PHASES[phaseOf(j)]||'Working'):'How the AI worked');
- text($('detail-sub'),live?' · '+secs(Date.now()-work.started):(m.thought_ms!=null?' · thought for '+secs(m.thought_ms):''));
- const thinking=live?work.thinking:m.thinking;
- if(thinking)body.append(section('Thoughts',el('p','thought-text',thinking)));
- else if(live&&running&&phaseOf(j)==='thinking')body.append(section('Thoughts',el('p','thought-text muted','Reading your project and planning the change…')));
- const steps=live?liveSteps(j):(m.plan||[]).map(t=>({text:t,done:true}));
- if(steps.length)body.append(section(live&&j.mode==='agent'?'Steps':'Plan',todoList(steps)));
- if(live&&work.timeline.length){
-  const ol=el('ol','timeline');
-  work.timeline.forEach((t,i)=>{const now=running&&i===work.timeline.length-1;const item=el('li',now?'now':'done');item.append(el('span','tl-icon',now?'':'✓'),el('span','tl-label',(PHASES[t.phase]||'Working')+(t.phase==='fixing'&&t.n>1?' (try '+(t.n+1)+')':'')),el('span','tl-time',secs((t.end||Date.now())-t.start)));ol.append(item)});
-  body.append(section('Progress',ol));
+ const version=live?null:m.version||null;
+ text($('detail-time'),live?secs(Date.now()-work.started):m.duration_ms!=null?secs(m.duration_ms):'');
+ $('detail-time').parentElement.classList.toggle('hidden',!$('detail-time').textContent);
+ const cr=live?(j&&j.credits):m.credits;text($('detail-credits'),cr!=null?String(cr):'');$('detail-credits').parentElement.classList.toggle('hidden',cr==null);
+ text($('detail-title'),running?liveStatus(j):'Details');
+ for(const b of document.querySelectorAll('#detail [data-tab]')){b.setAttribute('aria-pressed',String(b.dataset.tab===detailState.tab));b.disabled=b.dataset.tab==='changes'&&!version}
+ if(detailState.tab==='changes'&&!version)detailState.tab='timeline';
+ // Keep the scroll position while live updates arrive.
+ const top=body.scrollTop,atEnd=body.scrollHeight-body.scrollTop-body.clientHeight<40;
+ body.replaceChildren();
+ if(detailState.tab==='changes'){
+  const list=el('div','changes');body.append(list);list.append(el('p','muted small','Loading changes…'));
+  changesFor(version).then(d=>{list.replaceChildren();if(!d.files.length){list.append(el('p','muted','No file changes in this version.'));return}
+   list.append(el('p','muted small','Version '+d.version+(d.previous?' compared with version '+d.previous:'')));
+   d.files.forEach((f,i)=>{const det=el('details','change');det.open=i===0;const s=el('summary');s.append(el('span','ev-label',editVerb(f.status)),fileChip(f.path));det.append(s,diffView(f));list.append(det)});
+  }).catch(e=>{list.replaceChildren(el('p','error',e.message))});
+  return;
  }
- const files=live?work.files:(m.changed||[]);
- if(files.length){const c=el('div','file-chips');for(const f of files)c.append(fileChip(f,live&&f===work.current&&phaseOf(j)==='writing'));body.append(section(live&&running?'Files being written':'Files changed',c))}
- if(!live&&m.checks)body.append(section('Saved checks',el('p',m.checks.failed.length?'check-chip bad':'check-chip ok',m.checks.failed.length?'Broke: '+m.checks.failed.join(', '):'All '+m.checks.ran+' passed')));
- if(live&&work.tail&&running){const pre=el('pre','stream-code');pre.textContent=String(work.tail).replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-40).join('\n');body.append(section('Code',pre))}
- if(!body.childElementCount)body.append(el('p','muted','Nothing to show for this message.'));
+ const events=live?liveEvents(j):(m.timeline||[]);
+ if(!events.length&&!live){
+  // Older messages, saved before timelines existed.
+  if(m.plan&&m.plan.length)events.push({t:'plan',items:m.plan});
+  for(const f of m.changed||[])events.push({t:'edit',file:f,kind:'edited'});
+ }
+ body.append(rail(events,{expand:true,version,live}));
+ if(live&&running&&work.tail&&phaseOf(j)==='writing'){const pre=el('pre','stream-code');pre.textContent=String(work.tail).replace(/\\n/g,'\n').replace(/\\t/g,'  ').replace(/\\"/g,'"').split('\n').slice(-30).join('\n');body.append(pre)}
+ if(!live&&m.text){const card=el('div','detail-answer');card.append(renderMarkdown(m.text));body.append(card)}
+ if(!body.childElementCount||(!events.length&&live))body.append(el('p','muted','Reading your project…'));
+ body.scrollTop=live&&atEnd?body.scrollHeight:top;
 }
-function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(detailState.source==='live')renderDetail()}
 async function watch(job){
  state.job=job;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
- Object.assign(work,{timeline:[],started:Date.now(),plan:[],files:[],current:null,message:'',tail:'',thinking:''});if(detailState.source!==null)closeDetail();
+ Object.assign(work,{started:Date.now(),files:[],current:null,message:'',tail:'',thinking:''});if(detailState.source!==null)closeDetail();
  clearInterval(work.timer);work.timer=setInterval(tickWork,1000);
  const done=await new Promise(resolve=>{
   let finished=false;

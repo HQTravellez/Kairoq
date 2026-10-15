@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261016">
+<link rel="stylesheet" href="/create.css?v=20261017">
 </head>
 <body>
 <header class="bar">
@@ -183,8 +183,14 @@
       <details><summary id="errors-count"></summary><ul id="errors-list"></ul></details>
       <button class="primary" id="fix" type="button">Fix it</button>
     </div>
-    <section class="detail hidden" id="detail" aria-label="How the AI worked">
-      <header class="detail-head"><span class="spark" id="detail-spark" aria-hidden="true"></span><div><b id="detail-title">Thoughts</b><span class="muted small" id="detail-sub"></span></div><button type="button" class="ghost" id="detail-close" aria-label="Back to the preview">✕</button></header>
+    <section class="detail hidden" id="detail" aria-label="Details of a change">
+      <header class="detail-head">
+        <button type="button" class="ghost back-btn" id="detail-close"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Back to preview</button>
+        <span class="meta-pill"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="detail-time"></span></span>
+        <span class="meta-pill" title="Credits"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.2 0 1.1-1.1 1.9-2.5 1.9a2.5 2 0 0 1-2.5-1.5M12 6.5V8M12 16v1.5"/></svg><span id="detail-credits"></span></span>
+        <b id="detail-title">Details</b>
+        <div class="seg detail-tabs" role="group" aria-label="View"><button type="button" data-tab="timeline" aria-pressed="true">Timeline</button><button type="button" data-tab="changes" aria-pressed="false">Changes</button></div>
+      </header>
       <div class="detail-body" id="detail-body"></div>
     </section>
     <div class="canvas" id="canvas">
@@ -467,6 +473,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261014"></script>
+<script src="/create.js?v=20261017"></script>
 </body>
 </html>

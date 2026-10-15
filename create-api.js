@@ -66,7 +66,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -163,25 +163,27 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
   const onStream=text=>update({stream:streamSnapshot(text,mode)});
   // The model's reasoning, shown live as "Thoughts" (only models that share it).
   const onThinking=text=>update({thinking:String(text).slice(-1800)});
+  // The timeline (thoughts, files read and edited, builds, tests, fixes), streamed to the editor.
+  const onEvent=events=>update({events:events.slice(-80)});
   try{
    const signal=controller.signal;
-   if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,tier:modelTier,images,signal})}
-   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,onThinking,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
+   if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal})}
+   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
     let extra='';
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',context,extra].filter(Boolean).join('\n\n');
-    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
+    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
      onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
    else{
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
-    job.result=await builder.edit(id,message,{callModel,onStream,onThinking,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // The first build of a new project on Pro or Max gets a free design review.
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
-     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,onThinking,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
+     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,onThinking,onEvent,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
      catch(e){job.result={...first,polish_error:signal.aborted?'Stopped before the design review.':'The design review did not finish: '+String(e.message||e).slice(0,300)}}
     }
    }
@@ -191,6 +193,8 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    // in the browser after the automatic fixes is free.
    const broken=mode!=='discuss'&&job.result&&!job.result.unchanged&&((job.result.check_failures||[]).length||(job.result.runtime_errors||[]).length);
    if(broken&&!job.refunded){job.refund_reason=(job.result.check_failures||[]).length?'checks':'errors';if(v.kind==='customer'&&credits>0){try{accounts.grant(v.account.id,credits,'Refund: the change still has problems','refund:'+job.id)}catch{}job.refunded=true}}
+   // The finished message shows what it cost (0 when refunded).
+   try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;builder.saveMeta(meta)}}catch{}
    update({status:'complete'});
   }catch(e){
    update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
@@ -533,6 +537,21 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const context='Figma design spec for the frame "'+frame.name+'". Sizes are px at the design width; turn them into a responsive Tailwind layout (mobile first). Load Google Fonts with an https @import at the top of src/index.css when the design uses them.'+(paid&&frame.screenshot?' The attached image is the rendered frame.':'')+'\n'+figma.spec(frame.root,names).slice(0,40000)+(saved.length?'\nImages from the design (saved as uploads): '+saved.map(n=>'./uploads/'+n).join(', '):'');
    const job=startJob(v,id,{message,mode:b.mode==='agent'?'agent':'build',tier:b.tier||'standard',images:paid&&frame.screenshot?[frame.screenshot]:[],context,referenceOnly:true},deps);
    return send(res,202,{job:publicJob(job),frame:{name:frame.name,images:saved,rendered:Boolean(frame.screenshot)}}),true;
+  }
+  // The files a version changed, before and after (the Details panel's Changes tab).
+  if(action==='/changes'&&method==='GET'){
+   const meta=builder.loadMeta(id),n=Number(new URL(req.url,'http://x').searchParams.get('version'))||meta.current_version;
+   const ver=meta.versions.find(x=>x.n===n);if(!ver)throw Object.assign(Error('Unknown version'),{status:404});
+   const prevN=Math.max(0,...meta.versions.filter(x=>x.n<n).map(x=>x.n));
+   const after=builder.loadFiles(id,n),before=prevN?builder.loadFiles(id,prevN):{};
+   let budget=600000;const files=[];
+   for(const f of (ver.changed&&ver.changed.length?ver.changed:Object.keys(after).filter(k=>before[k]!==after[k]))){
+    const b=Object.hasOwn(before,f)?String(before[f]):null,a=Object.hasOwn(after,f)?String(after[f]):null;
+    const size=(b||'').length+(a||'').length;
+    files.push(size>budget?{path:f,status:b===null?'created':a===null?'deleted':'edited',too_large:true}:{path:f,status:b===null?'created':a===null?'deleted':'edited',before:b,after:a});
+    budget-=Math.min(size,budget);
+   }
+   return send(res,200,{version:n,previous:prevN||null,files}),true;
   }
   if(action==='/logs'&&method==='GET')return send(res,200,{logs:require('./react-logs').list(id)}),true;
   if(action==='/security'&&method==='GET'){

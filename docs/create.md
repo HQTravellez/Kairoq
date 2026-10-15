@@ -280,19 +280,24 @@ The most common complaints about AI app builders are changes that break what use
 
 ## Watching the AI work
 
-The chat stays compact, like Lovable. While a change is being made, it shows one card with:
-- the current step, with a timer and a Stop button;
-- a **Thinking / Thought for Ns** link;
-- what the AI says it is doing;
-- a chip for each file being written.
+Like Lovable, the chat stays clean and the details open beside it.
 
-Clicking **Thinking** (or **Thought for Ns** on a finished message) opens a panel on the right, over the preview. ✕ or Esc goes back to the preview. The panel shows:
-- **Thoughts.** The model's own reasoning as it streams (OpenRouter `reasoning`), for models that share it.
-- **Plan.** 2 to 6 short steps the model writes before the code (`"plan"` in its reply), ticked once the change builds. In Agent mode it shows the agent's steps and actions instead.
-- **Progress.** Thinking, Writing code, Building the preview, Testing in a browser, Re-running saved checks and any fixes, each with its time.
-- **Files** and the live **Code**.
-
-The finished message keeps the reasoning, plan, changed files and saved checks for this panel. The UI uses the Geist and Geist Mono fonts.
+- **Timeline** (`react-timeline.js`). Every Build, Agent and Polish change records what happened, streams it to the editor as it happens, and keeps it with the finished message:
+  - thoughts (the model's reasoning, how long it thought, and in Agent mode each step's headline);
+  - the plan (2 to 6 steps the model writes before the code);
+  - files read, and files created, edited or deleted;
+  - builds, browser tests, saved checks and each fix with its reason;
+  - design directions, generated images, database queries and web searches.
+- **In the chat:**
+  - **While it works**, a shimmering status line ("Writing ChildUsageCard.jsx", "Testing in a browser") with a timer and a Stop button, and the latest activity on a small rail.
+  - **Finished answers** have no bubble. They show "Thought for Ns", the answer as formatted text (headings, lists, bold, code), a folded summary ("Edited 3 files · tested in a browser · fixed 1 problem") that opens the rail, and the version, duration, credits and a **Details** link.
+- **Details panel.** Click the status line, "Thought for Ns" or Details. A panel opens over the preview, with:
+  - **Back to preview**, the duration and the credits;
+  - **Timeline**: the full rail. Thoughts and errors expand, and each edited file expands to its diff. The finished answer comes last.
+  - **Changes**: every file the version changed, with a line diff from `GET /api/create/projects/:id/changes?version=n`.
+  - Esc or any preview toolbar button closes it.
+- To keep the editor light, the full reasoning is sent only for the last 10 messages.
+- **Fonts.** Geist and Geist Mono.
 
 ## Build from a reference
 
