@@ -132,6 +132,50 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,vie
  finally{await context.close().catch(()=>{})}
  return{skipped:false,errors,external,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot};
 }
+// A browsing session a synthetic customer drives step by step (see synthetic-customers.js):
+// observe() lists what is on screen with numbered interactive elements, act() clicks, types,
+// selects, scrolls or goes back. Same guard as inspect(): the browser stays inside the app.
+async function session(url,{sandbox,viewport,timeoutMs=15000}={}){
+ if(!available())return null;
+ const phone=viewport==='phone';
+ const context=await (await browser()).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>{if(errors.length<10)errors.push('Uncaught error: '+String(e.message||e).slice(0,300))});
+ await guard(context,url,{sandbox});
+ const root=new URL('./',url);
+ const settle=async()=>{await page.waitForLoadState('networkidle',{timeout:3000}).catch(()=>{});await page.waitForTimeout(350)};
+ try{await page.goto(url,{waitUntil:'load',timeout:timeoutMs});await settle()}
+ catch(e){await context.close().catch(()=>{});throw Object.assign(Error('Page did not load: '+e.message),{status:502})}
+ async function observe(){
+  const snap=await page.evaluate(()=>{
+   const vis=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'};
+   const label=e=>{
+    const lab=e.id&&document.querySelector('label[for="'+CSS.escape(e.id)+'"]');
+    return [e.getAttribute('aria-label'),lab&&lab.innerText,e.closest('label')&&e.closest('label').innerText,e.placeholder,e.innerText,e.value&&e.type==='submit'?e.value:'',e.title,e.name].map(x=>String(x||'').trim()).find(Boolean)||'';
+   };
+   document.querySelectorAll('[data-kq-id]').forEach(e=>e.removeAttribute('data-kq-id'));
+   const els=[...document.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[role=button],[role=link],[role=tab],[role=checkbox],[role=switch],summary')].filter(vis).slice(0,70);
+   return{
+    title:document.title,
+    text:(document.body?document.body.innerText:'').replace(/\n{2,}/g,'\n').slice(0,2500),
+    elements:els.map((e,i)=>{e.setAttribute('data-kq-id',String(i+1));const tag=e.tagName.toLowerCase();return{id:i+1,kind:tag==='input'?'input:'+(e.type||'text'):tag==='a'?'link':e.getAttribute('role')||tag,label:label(e).replace(/\s+/g,' ').slice(0,80),...(tag==='select'?{options:[...e.options].map(o=>o.text).slice(0,12)}:{}),...(e.value&&tag!=='button'&&e.type!=='submit'?{value:String(e.value).slice(0,40)}:{})}})
+   };
+  }).catch(()=>({title:'',text:'',elements:[]}));
+  const u=new URL(page.url());
+  return{path:(u.pathname.startsWith(root.pathname)?'/'+u.pathname.slice(root.pathname.length):u.pathname)+u.hash,...snap,errors:errors.slice()};
+ }
+ async function act(a){
+  const loc=n=>page.locator('[data-kq-id="'+Number(n)+'"]').first();
+  if(a.action==='click')await loc(a.target).click({timeout:4000});
+  else if(a.action==='fill')await loc(a.target).fill(String(a.value??'').slice(0,300),{timeout:4000});
+  else if(a.action==='select')await loc(a.target).selectOption({label:String(a.value??'')},{timeout:4000}).catch(()=>loc(a.target).selectOption(String(a.value??''),{timeout:4000}));
+  else if(a.action==='scroll')await page.mouse.wheel(0,a.value==='up'?-600:600);
+  else if(a.action==='back')await page.goBack({timeout:timeoutMs}).catch(()=>{});
+  else throw Error('Unknown action');
+  await settle();
+ }
+ return{observe,act,close:()=>context.close().catch(()=>{})};
+}
 // Renders a small HTML document offline (no network) to PNG, e.g. app icons.
 async function renderHtml(html,{width,height}){
  if(!available())throw Error('Chromium is not available');
@@ -144,4 +188,4 @@ async function renderHtml(html,{width,height}){
  }finally{await context.close().catch(()=>{})}
 }
 async function close(){if(browserPromise){const b=await browserPromise.catch(()=>null);browserPromise=null;await b?.close().catch(()=>{})}}
-module.exports={check,screenshot,inspect,designShots,renderHtml,available,close,browser};
+module.exports={check,screenshot,inspect,session,designShots,renderHtml,available,close,browser};

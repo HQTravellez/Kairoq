@@ -338,6 +338,37 @@ Like Lovable, the chat stays clean and the details open beside it.
   - It then publishes the app and takes full-page screenshots.
 - **Template.** It is available as the "Corporate travel & spend" template.
 
+## Synthetic customers
+
+Test an app on AI customers before real ones arrive. Open **Customers** in the editor (or use the MCP server below).
+
+- **How a test runs** (`synthetic-customers.js`):
+  1. Describe who your customers are and what they come to do. Kairoq creates that many personas (default 10, at most `KAIROQ_SYNTHETIC_MAX`, 50), each with an age, a device (mostly phones), patience and tech comfort.
+  2. Each persona opens the current version in a real browser (`runtime-check.session`, the same guard as checks) on a **test copy of the app's data**, so no real bookings, emails or payments happen.
+  3. At every step the persona sees the page text and numbered buttons, links and fields, thinks out loud, and clicks, types, selects, scrolls, goes back, finishes or gives up. A visit has at most `KAIROQ_SYNTHETIC_STEPS` (12) steps; `KAIROQ_SYNTHETIC_CONCURRENCY` (4) visits run at once.
+- **The report:**
+  - **Counted from the visits, not the model:** how many reached the goal, gave up or ran out of steps, where the others left, results by device, and how many got frustrated.
+  - **From the model:** a headline, the main issues with quotes, and suggested fixes.
+  - **Fix these with AI** sends the issues to the builder as a change request.
+  - Reports are kept per project (the last 20).
+- **Price:** each visitor costs a Discuss message on the chosen tier, paid up front. Credits come back only if the run fails before a report exists.
+- Synthetic visitors show likely friction (unclear copy, hidden buttons, long forms). They are not a prediction of real sales.
+
+## API keys and the MCP server
+
+AI assistants that support MCP (Claude, ChatGPT, Cursor and others) can use Kairoq for an account.
+
+- **API keys:**
+  - Create them in **Settings → API keys and MCP** (`GET/POST/DELETE /api/create/api-keys`).
+  - A key (`kq_…`) is shown once. Only its hash is stored. An account can keep up to 10 keys.
+- **The MCP server:** `POST /mcp` speaks MCP over Streamable HTTP with JSON responses (`kairoq-mcp.js`, protocol versions 2025-06-18, 2025-03-26 and 2024-11-05). Send the header `Authorization: Bearer kq_…`.
+- **Tools:**
+  - `list_projects` lists the projects the account can open.
+  - `run_synthetic_test` sends synthetic customers through a project (editor access, charges credits). It returns a job id.
+  - `get_synthetic_test` returns the progress of a job, or a finished report with its fix request.
+  - `list_synthetic_reports` lists a project's reports.
+- **Access:** every call uses the account's own project roles and credits. A key from another account cannot see or test the project.
+
 ## Build from a reference
 
 Give Kairoq a website, a GitHub repository, screenshots or the files of a JavaScript app. It studies how the product works, writes a plan for you to approve, and builds **its own version**: comparable features and design quality, with an original name, original text and openly licensed or generated images. Open it with **Reference** in the editor.

@@ -528,3 +528,5 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .work-head .status-line{flex:1;min-width:0}
 .work-head .status-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .work-time,.work-stop{flex:none;white-space:nowrap}
+.cust-stats b{font-size:22px}.cust-visit{border-top:1px solid var(--border);padding:6px 0}.cust-visit ol{margin:4px 0 0;padding-left:20px}.cust-visit li.error{color:var(--error)}
+#customers-dialog textarea,#customers-dialog input,#customers-dialog select{width:100%}

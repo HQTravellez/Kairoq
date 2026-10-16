@@ -66,7 +66,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -78,7 +78,7 @@ function findShare(token){
 }
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
-const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing']);
+const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting']);
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
@@ -251,6 +251,43 @@ function startAnalysis(v,id,{source,images=[],note='',tier='standard'},{callMode
  });
  return job;
 }
+// Synthetic customers: AI personas use the current version in a real browser (on a test copy of
+// its data) and the report says how many reached the goal, where the others left and why.
+// Priced per visitor at the Discuss rate of the chosen tier, paid up front; credits come back
+// only when the run fails before a report exists.
+function syntheticPrice(count,tier){return Math.max(1,Math.round(Number(count))||1)*cost({mode:'discuss',tier})}
+function startSynthetic(v,id,{audience,goal,count,path:start,tier='standard'},{callModel,browse}){
+ const synthetic=require('./synthetic-customers');
+ if(!browse||!require('./runtime-check').available())throw Object.assign(Error('Synthetic customers need a browser (Chromium) on this server'),{status:409});
+ audience=String(audience||'').trim();goal=String(goal||'').trim();
+ if(audience.length<3)throw Object.assign(Error('Describe who your customers are'),{status:400});
+ if(goal.length<3)throw Object.assign(Error('Describe what they come to do'),{status:400});
+ count=Math.max(1,Math.min(synthetic.MAX_PERSONAS(),Math.round(Number(count))||10));
+ if(start!==undefined&&start!==null&&(!/^#?\/?[\w\-\/#?=&.]{0,200}$/.test(String(start))||String(start).includes("..")))throw Object.assign(Error('Start path must be a path inside the app, like #/pricing'),{status:400});
+ for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+ const meta=builder.loadMeta(id),credits=syntheticPrice(count,tier);
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'synthetic',tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
+ const update=patch=>{Object.assign(job,patch);job.seq++};
+ if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,'Synthetic customers: '+count+' visitors','job:'+job.id);
+ const controller=new AbortController();controllers.set(job.id,controller);jobs.set(job.id,job);
+ setImmediate(async()=>{
+  const signal=controller.signal;
+  try{
+   update({status:'personas'});
+   const test={audience:audience.slice(0,600),goal:goal.slice(0,400),count,path:start?String(start):''};
+   const r=await synthetic.run(id,builder.previewUrl(meta),test,{callModel,browse,tier,signal,onProgress:p=>update({status:p.status,progress:p.text})});
+   const report=synthetic.save(id,{at:new Date().toISOString(),version:meta.current_version,tier,credits,test,...r});
+   job.result={synthetic:{id:report.id,numbers:report.numbers,summary:report.summary}};
+   update({status:'complete'});
+  }catch(e){
+   update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
+   if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: synthetic test did not finish','refund:'+job.id)}catch{}
+  }
+  controllers.delete(job.id);job.finished_at=new Date().toISOString();
+  setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+ });
+ return job;
+}
 // The person who started a job, or anyone with at least `need` access to its project.
 function canSeeJob(v,job,need){if(job.owner===v.owner)return true;try{const r=roleFor(v,builder.loadMeta(job.projectId));return Boolean(r)&&RANK[r]>=RANK[need]}catch{return false}}
 function publicJob(job){const {owner,...rest}=job;return rest}
@@ -268,7 +305,7 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch}){
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch}){
  const deps={callModel,checkRuntime,inspect,webSearch,designShots,generateImage};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
@@ -380,6 +417,13 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(route==='/skills'&&method==='DELETE'){const b=await readJson(req,2000),skills=require('./react-skills');skills.remove(v.owner,String(b.id||''));return send(res,200,{skills:skills.library(v.owner).map(({body,...x})=>x)}),true}
   const sv=/^\/skills\/(u-[a-f0-9]{10}|[a-z0-9-]{1,60})$/.exec(route);
   if(sv&&method==='GET'){const skill=require('./react-skills').find(v.owner,sv[1]);if(!skill)throw Object.assign(Error('Unknown skill'),{status:404});return send(res,200,{skill}),true}
+  // API keys for tools that act for this account (the MCP server at /mcp, scripts).
+  if(route==='/api-keys'){
+   const who=v.kind==='owner'?'owner':v.account.id;
+   if(method==='GET')return send(res,200,{keys:accounts.listApiKeys(who)}),true;
+   if(method==='POST'){const b=await readJson(req,2000);return send(res,201,{created:accounts.createApiKey(who,b.name),keys:accounts.listApiKeys(who)}),true}
+   if(method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{keys:accounts.revokeApiKey(who,b.id)}),true}
+  }
   if(route==='/credits'&&method==='GET'){
    if(v.kind!=='customer')return send(res,200,{unlimited:true,history:[]}),true;
    return send(res,200,{account:accounts.fromRequest(req),history:accounts.history(v.account.id)}),true;
@@ -489,6 +533,15 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(action==='/appicon'&&method==='GET'){res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(mobile.icon(id,'icon-192.png'));return true}
   }
   // ----- build from a reference -----
+  if(action==='/synthetic'&&method==='GET'){
+   const rid=new URL(req.url,'http://x').searchParams.get('report'),synthetic=require('./synthetic-customers');
+   if(rid){const report=synthetic.load(id,rid);return send(res,200,{report,fix_message:synthetic.fixMessage(report)}),true}
+   return send(res,200,{reports:synthetic.list(id),browser:require('./runtime-check').available(),max:synthetic.MAX_PERSONAS(),price_per_visitor:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,syntheticPrice(1,t.id)]))}),true;
+  }
+  if(action==='/synthetic'&&method==='POST'){
+   const b=await readJson(req,8000);
+   return send(res,202,{job:publicJob(startSynthetic(v,id,{audience:b.audience,goal:b.goal,count:b.count,path:b.path,tier:b.tier||'standard'},{callModel,browse}))}),true;
+  }
   if(action==='/reference'&&method==='GET'){
    const meta=builder.loadMeta(id),ref=require('./react-reference');
    return send(res,200,{reference:require('./react-reference-run').view(meta),browser:require('./runtime-check').available(),rea:ref.reaAvailable(),asset_search:require('./react-asset-search').enabled(),prices:referencePrices(),can_publish:role==='owner'}),true;
@@ -731,4 +784,4 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  }
 }
 
-module.exports={handle,jobs,streamSnapshot};
+module.exports={handle,jobs,streamSnapshot,startSynthetic,syntheticPrice,ownedProject,publicJob,listFor};

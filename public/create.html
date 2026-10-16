@@ -174,6 +174,7 @@
       <button class="ghost" id="security-open" type="button">Security</button>
       <button class="ghost" id="team-open" type="button">Share</button>
       <button class="ghost" id="checks-open" type="button" title="Saved checks: flows re-tested after every change, before publishing and daily on the live app">Checks</button>
+      <button class="ghost" id="customers-open" type="button" title="Test the app on AI customers: who reaches the goal, where the others leave and why">Customers</button>
       <button class="ghost" id="design-open" type="button" title="Design direction, colours, fonts, design skills and images">Design</button>
       <button class="ghost" id="mobile-open" type="button" title="Phone app: install on iPhone and Android, native iOS/Android project">App</button>
       <button class="ghost" id="settings-open" type="button">Settings</button>
@@ -277,6 +278,14 @@
     <div class="row"><button class="primary" id="settings-save" type="button">Save keys</button></div>
     <h3>Email</h3>
     <p class="muted small" id="email-status"></p>
+    <section id="apikeys-section">
+      <h3>API keys and MCP</h3>
+      <p class="muted small">Let AI assistants such as Claude, ChatGPT or Cursor use Kairoq for you through MCP: list your projects, run synthetic-customer tests and read the reports, with your access and credits. Add an MCP server with the URL <code id="mcp-url"></code> and the header <code>Authorization: Bearer &lt;your key&gt;</code>.</p>
+      <div class="row"><input id="apikey-name" maxlength="60" placeholder="Name, e.g. Claude on my laptop" aria-label="API key name"><button class="ghost" id="apikey-create" type="button">Create key</button></div>
+      <p class="small hidden" id="apikey-new"></p>
+      <ul class="skills" id="apikey-list"></ul>
+      <p class="muted small" id="apikey-status" role="status"></p>
+    </section>
     <section id="support-section" class="hidden">
       <h3>Support credits <span class="muted small">(server owner only)</span></h3>
       <p class="muted small">Kairoq never refunds completed work by itself. When a customer contacts support, look up their history, review the request, and grant credits back with a reason; it is kept in their history.</p>
@@ -298,7 +307,7 @@
 <dialog id="checks-dialog">
   <form method="dialog" class="dialog">
     <h2>Checks</h2>
-    <p class="muted small">Flows that must keep working, like booking a room or signing up. Kairoq re-runs them in a browser after every change, before publishing and once a day on the live app. They run on a <b>test copy of your data</b>: no real bookings, emails or payments. A change that still breaks a check after the automatic fixes is free.</p>
+    <p class="muted small">Flows that must keep working, like booking a room or signing up. Kairoq re-runs them in a browser after every change, before publishing and once a day on the live app. They run on a <b>test copy of your data</b>: no real bookings, emails or payments. A change that still breaks a check after the automatic fixes is reported in the chat so you can ask for a fix.</p>
     <p class="small" id="checks-monitor"></p>
     <ul class="skills" id="checks-list"></ul>
     <div class="row"><button class="ghost" id="checks-run" type="button">Run all now</button></div>
@@ -307,6 +316,33 @@
     <p class="muted small" id="checks-status" role="status"></p>
     <div class="row"><button class="ghost hidden" id="checks-save-anyway" type="button">Save it anyway</button></div>
     <p class="error" id="checks-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+<dialog id="customers-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Test with synthetic customers</h2>
+    <p class="muted small">AI personas use the current version of your app in a real browser, each with their own age, device, patience and tech comfort. They think out loud, and either reach the goal or give up the way a real visitor would. They run on a <b>test copy of your data</b>: no real bookings, emails or payments. Use the report to find problems before real customers do; it shows likely friction, not guaranteed sales figures.</p>
+    <label>Who are your customers?<textarea id="cust-audience" rows="2" maxlength="600" placeholder="Busy parents booking swimming lessons for their kids, mostly on phones"></textarea></label>
+    <label>What do they come to do?<input id="cust-goal" maxlength="400" placeholder="Book a trial lesson for Saturday morning"></label>
+    <div class="row">
+      <label>Visitors<select id="cust-count"><option>5</option><option selected>10</option><option>25</option><option>50</option></select></label>
+      <label>Start page (optional)<input id="cust-path" maxlength="200" placeholder="#/pricing"></label>
+    </div>
+    <p class="muted small" id="cust-cost"></p>
+    <div class="row"><button class="primary" id="cust-run" type="button">Run the test</button></div>
+    <p class="error" id="cust-error" role="alert"></p>
+    <div id="cust-report" class="hidden">
+      <h3 id="cust-headline"></h3>
+      <p class="cust-stats"><b id="cust-rate"></b> <span id="cust-numbers" class="muted"></span></p>
+      <h4>Where the others left</h4><ul class="small" id="cust-drop"></ul>
+      <h4>Issues</h4><ul class="small" id="cust-issues"></ul>
+      <h4>Suggested fixes</h4><ul class="small" id="cust-fixes"></ul>
+      <div class="row"><button class="primary" id="cust-fix" type="button">Fix these with AI</button></div>
+      <details><summary>Every visit, step by step</summary><div id="cust-visits" class="small"></div></details>
+    </div>
+    <h3>Earlier tests</h3>
+    <ul class="skills" id="cust-reports"></ul>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>

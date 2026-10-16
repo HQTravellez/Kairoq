@@ -292,7 +292,7 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
+const LABELS={personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
 const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
@@ -480,7 +480,7 @@ async function watch(job){
  const done=await new Promise(resolve=>{
   let finished=false;
   const finish=j=>{if(!finished){finished=true;resolve(j)}};
-  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(j.progress||LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
   if(window.EventSource){
    const es=new EventSource('/api/create/jobs/'+job.id+'/events');
    es.onmessage=e=>{const j=JSON.parse(e.data);apply(j);if(j.status==='complete'||j.status==='failed')es.close()};
@@ -798,6 +798,7 @@ $('support-grant').onclick=async()=>{
 };
 $('settings-open').onclick=async()=>{
  renderCosts();
+ loadApiKeys();
  $('support-section').classList.toggle('hidden',state.me?.viewer?.kind!=='owner');
  text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
  $('knowledge').value=state.project.knowledge||'';
@@ -1072,6 +1073,90 @@ async function renderChecks(){
  for(const el of ['checks-run','checks-describe','checks-add'])$(el).disabled=!editor;
  $('checks-run').disabled=!editor||!d.checks.length;
 }
+// ---------- synthetic customers ----------
+const cust={info:null,report:null,fix:''};
+function li(textValue,cls){const el=document.createElement('li');el.textContent=textValue;if(cls)el.className=cls;return el}
+function custCost(){
+ const n=Number($('cust-count').value),per=cust.info&&cust.info.price_per_visitor&&cust.info.price_per_visitor[state.tier];
+ text($('cust-cost'),state.me.viewer.kind==='customer'&&per!=null?n+' visitors on the '+state.tier+' model cost '+n*per+' credits.':'');
+}
+function renderCustReports(){
+ const ul=$('cust-reports');ul.replaceChildren();
+ const list=cust.info?cust.info.reports:[];
+ if(!list.length){ul.append(li('No tests yet.','muted'));return}
+ for(const r of list){
+  const el=document.createElement('li'),b=document.createElement('button');b.type='button';b.className='ghost';
+  b.textContent=r.at.slice(0,16).replace('T',' ')+' · '+r.completion_rate+'% of '+r.visitors+' · '+r.goal;
+  b.onclick=()=>openCustReport(r.id);el.append(b);ul.append(el);
+ }
+}
+function showCustReport(report,fix){
+ cust.report=report;cust.fix=fix||'';
+ const n=report.numbers,s=report.summary;
+ text($('cust-headline'),s.headline||'Test from '+report.at.slice(0,16).replace('T',' '));
+ text($('cust-rate'),n.completion_rate+'% reached the goal');
+ text($('cust-numbers'),n.completed+' of '+n.visitors+' visitors · '+n.gave_up+' gave up · '+n.stuck+' ran out of steps'+(n.frustrated?' · '+n.frustrated+' got frustrated':'')+Object.entries(n.by_device||{}).map(([d,x])=>' · '+d+': '+x.completed+'/'+x.visitors).join(''));
+ const drop=$('cust-drop');drop.replaceChildren();for(const d of n.drop_off)drop.append(li(d.path+' — '+d.visitors+' visitor'+(d.visitors===1?'':'s')));if(!n.drop_off.length)drop.append(li('Nobody left early.','muted'));
+ const iss=$('cust-issues');iss.replaceChildren();for(const x of s.issues)iss.append(li(x.title+(x.why?': '+x.why:'')+(x.who?' ('+x.who+')':'')+(x.quote?' — “'+x.quote+'”':'')));if(!s.issues.length)iss.append(li('No issues found.','muted'));
+ const fx=$('cust-fixes');fx.replaceChildren();for(const f of s.fixes)fx.append(li(f));if(!s.fixes.length)fx.append(li('—','muted'));
+ $('cust-fix').classList.toggle('hidden',!s.issues.length);
+ const vis=$('cust-visits');vis.replaceChildren();
+ for(const v of report.visits){
+  const box=document.createElement('div');box.className='cust-visit';
+  const h=document.createElement('p');const p=v.persona;h.textContent=p.name+', '+p.age+' · '+p.device+' · patience '+p.patience+' · tech '+p.tech+' — '+({completed:'reached the goal',gave_up:'gave up',stuck:'ran out of steps',error:'error',skipped:'skipped'}[v.outcome]||v.outcome);h.className='small';box.append(h);
+  const ol=document.createElement('ol');for(const st of v.steps)ol.append(li(st.path+' — “'+st.thought+'” → '+st.action+(st.label?' “'+st.label+'”':'')+(st.value?' “'+st.value+'”':''),st.feeling==='frustrated'?'error':''));box.append(ol);vis.append(box);
+ }
+ $('cust-report').classList.remove('hidden');
+}
+async function openCustReport(rid){try{const r=await api('/projects/'+state.project.id+'/synthetic?report='+encodeURIComponent(rid));showCustReport(r.report,r.fix_message)}catch(err){text($('cust-error'),err.message)}}
+$('customers-open').onclick=async()=>{
+ if(!state.project)return;text($('cust-error'),'');$('cust-report').classList.add('hidden');
+ try{cust.info=await api('/projects/'+state.project.id+'/synthetic');if(!cust.info.browser)text($('cust-error'),'Synthetic customers need a browser (Chromium) on this server.');renderCustReports();custCost();$('customers-dialog').showModal()}
+ catch(err){text($('chat-error'),err.message)}
+};
+$('cust-count').onchange=custCost;
+$('cust-run').onclick=async()=>{
+ if(state.job)return;text($('cust-error'),'');
+ const audience=$('cust-audience').value.trim(),goal=$('cust-goal').value.trim();
+ if(!audience||!goal){text($('cust-error'),'Describe your customers and what they come to do.');return}
+ $('cust-run').disabled=true;
+ try{
+  const r=await api('/projects/'+state.project.id+'/synthetic',{method:'POST',body:{audience,goal,count:Number($('cust-count').value),path:$('cust-path').value.trim()||undefined,tier:state.tier}});
+  $('customers-dialog').close();
+  $('messages').append(messageItem({role:'user',text:'Test with '+$('cust-count').value+' synthetic customers: '+goal}));
+  const done=await watch(r.job);
+  if(done&&done.status==='complete'&&done.result&&done.result.synthetic){
+   const n=done.result.synthetic.numbers;
+   $('messages').append(messageItem({role:'assistant',text:(done.result.synthetic.summary.headline?done.result.synthetic.summary.headline+'\n':'')+n.completed+' of '+n.visitors+' synthetic customers reached the goal ('+n.completion_rate+'%). Open Customers to see the report.'}));
+   cust.info=await api('/projects/'+state.project.id+'/synthetic');renderCustReports();await openCustReport(done.result.synthetic.id);$('customers-dialog').showModal();
+  }
+ }catch(err){text($('cust-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{$('cust-run').disabled=false}
+};
+$('cust-fix').onclick=()=>{if(!cust.fix)return;$('customers-dialog').close();setChatMode('build');send(cust.fix,'build')};
+// ---------- API keys (MCP) ----------
+function renderApiKeys(keys){
+ const ul=$('apikey-list');ul.replaceChildren();
+ if(!keys.length){ul.append(li('No API keys yet.','muted'));return}
+ for(const k of keys){
+  const el=document.createElement('li'),t=document.createElement('span'),b=document.createElement('button');
+  t.textContent=k.name+' · '+k.hint+' · '+(k.last_used_at?'used '+k.last_used_at.slice(0,10):'never used');
+  b.type='button';b.className='ghost';b.textContent='Remove';
+  b.onclick=async()=>{try{renderApiKeys((await api('/api-keys',{method:'DELETE',body:{id:k.id}})).keys)}catch(err){text($('apikey-status'),err.message)}};
+  el.append(t,b);ul.append(el);
+ }
+}
+async function loadApiKeys(){text($('mcp-url'),location.origin+'/mcp');$('apikey-new').classList.add('hidden');try{renderApiKeys((await api('/api-keys')).keys)}catch(err){text($('apikey-status'),err.message)}}
+$('apikey-create').onclick=async()=>{
+ text($('apikey-status'),'');
+ try{
+  const r=await api('/api-keys',{method:'POST',body:{name:$('apikey-name').value.trim()}});
+  $('apikey-name').value='';renderApiKeys(r.keys);
+  const box=$('apikey-new');box.replaceChildren();
+  const code=document.createElement('code');code.textContent=r.created.key;
+  box.append('Copy this key now; it is shown only once: ',code);box.classList.remove('hidden');
+ }catch(err){text($('apikey-status'),err.message)}
+};
 $('checks-open').onclick=async()=>{text($('checks-error'),'');text($('checks-status'),'');$('checks-save-anyway').classList.add('hidden');try{await renderChecks();$('checks-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
 $('checks-run').onclick=async()=>{const btn=$('checks-run');btn.disabled=true;text($('checks-status'),'Running the checks on a test copy of your data…');text($('checks-error'),'');
  try{const {result}=await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{run:true}});text($('checks-status'),result.failed.length?result.failed.length+' of '+result.ran+' failed. Use Fix it in the chat, or describe what changed.':'All '+result.ran+' passed.');await renderChecks()}
