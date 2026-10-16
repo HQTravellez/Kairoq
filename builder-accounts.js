@@ -16,8 +16,32 @@ function database(){
   CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,expires_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS ledger(id TEXT PRIMARY KEY,account_id TEXT NOT NULL,delta INTEGER NOT NULL,reason TEXT NOT NULL,ref TEXT UNIQUE,at TEXT NOT NULL);`);
  db.exec('CREATE TABLE IF NOT EXISTS account_tokens(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,kind TEXT NOT NULL,expires_at INTEGER NOT NULL)');
+ db.exec('CREATE TABLE IF NOT EXISTS api_keys(id TEXT PRIMARY KEY,account_id TEXT NOT NULL,name TEXT NOT NULL,key_hash TEXT UNIQUE NOT NULL,hint TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT)');
  for(const col of ['plan TEXT','plan_status TEXT','stripe_customer TEXT','subscription_id TEXT','plan_renews_at TEXT','email_verified INTEGER NOT NULL DEFAULT 0','google_sub TEXT']){try{db.exec('ALTER TABLE accounts ADD COLUMN '+col)}catch{}}
  return db;
+}
+// API keys let tools act for an account (the MCP server, scripts). The key is shown once; only
+// its hash is stored. account_id 'owner' is the server owner.
+const MAX_KEYS=10;
+function createApiKey(accountId,name){
+ const d=database();
+ if(d.prepare('SELECT COUNT(*) n FROM api_keys WHERE account_id=?').get(accountId).n>=MAX_KEYS)throw Object.assign(Error('You can keep up to '+MAX_KEYS+' API keys. Remove one first.'),{status:400});
+ const key='kq_'+crypto.randomBytes(24).toString('base64url'),id=crypto.randomUUID();
+ const label=String(name||'').trim().slice(0,60)||'API key';
+ d.prepare('INSERT INTO api_keys(id,account_id,name,key_hash,hint,created_at) VALUES(?,?,?,?,?,?)').run(id,accountId,label,hashToken(key),key.slice(0,6)+'…'+key.slice(-4),new Date().toISOString());
+ return{id,name:label,key};
+}
+function listApiKeys(accountId){return database().prepare('SELECT id,name,hint,created_at,last_used_at FROM api_keys WHERE account_id=? ORDER BY created_at DESC').all(accountId)}
+function revokeApiKey(accountId,id){const r=database().prepare('DELETE FROM api_keys WHERE account_id=? AND id=?').run(accountId,String(id||''));if(!r.changes)throw Object.assign(Error('Unknown API key'),{status:404});return listApiKeys(accountId)}
+// {kind, owner, account} for a valid key, else null.
+function viewerForApiKey(key){
+ if(!/^kq_[A-Za-z0-9_-]{20,}$/.test(String(key||'')))return null;
+ const d=database(),row=d.prepare('SELECT * FROM api_keys WHERE key_hash=?').get(hashToken(key));
+ if(!row)return null;
+ d.prepare('UPDATE api_keys SET last_used_at=? WHERE id=?').run(new Date().toISOString(),row.id);
+ if(row.account_id==='owner')return{kind:'owner',owner:'owner',account:null};
+ const account=publicAccount(get(row.account_id));
+ return account?{kind:'customer',owner:account.id,account}:null;
 }
 function freeCredits(){const n=Number(process.env.KAIROQ_FREE_CREDITS??30);return Number.isInteger(n)&&n>=0?n:30}
 function hashToken(t){return crypto.createHash('sha256').update(String(t)).digest('hex')}
@@ -257,4 +281,4 @@ function googleLogin({sub,email,email_verified}){
  if(credits)d.prepare('INSERT INTO ledger(id,account_id,delta,reason,ref,at) VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),id,credits,'Free credits',null,at);
  return startSession(id);
 }
-module.exports={sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,get,publicAccount,COOKIE};
+module.exports={sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,get,publicAccount,createApiKey,listApiKeys,revokeApiKey,viewerForApiKey,COOKIE};

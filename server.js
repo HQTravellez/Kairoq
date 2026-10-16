@@ -6719,12 +6719,14 @@ const server = http.createServer(async (req, res) => {
   if(hostRoute)return;
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
+  // MCP server for AI assistants (API-key authenticated; see kairoq-mcp.js).
+  if(url==="/mcp"||url.startsWith("/mcp?"))return void await require("./kairoq-mcp").handle(req,res,{callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o)}).catch(e=>{if(!res.headersSent)json(res,500,{error:String(e.message||e).slice(0,300)})});
   // Owner routes use a cookie, so state-changing requests must come from Kairoq's own pages
   // (a published app on a sibling subdomain could otherwise send them with the owner's cookie).
   // Inbound channel webhooks are called by outside services and check their own secrets.
   if(!/^(GET|HEAD|OPTIONS)$/.test(req.method)&&url.startsWith("/api/")&&!url.startsWith("/api/create/")&&!url.startsWith("/api/channels/")&&crossSiteRequest(req))return json(res,403,{error:"Cross-site request refused"});
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;

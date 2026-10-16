@@ -292,7 +292,7 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
+const LABELS={personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
 const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
@@ -456,6 +456,7 @@ function renderDetail(){
   const list=el('div','changes');body.append(list);list.append(el('p','muted small','Loading changes…'));
   changesFor(version).then(d=>{list.replaceChildren();if(!d.files.length){list.append(el('p','muted','No file changes in this version.'));return}
    list.append(el('p','muted small','Version '+d.version+(d.previous?' compared with version '+d.previous:'')));
+   {const b=el('button','ghost','Explain in plain English');b.type='button';b.onclick=()=>explainProblem('change','','What changed in version '+d.version,d.version);list.append(b)}
    d.files.forEach((f,i)=>{const det=el('details','change');det.open=i===0;const s=el('summary');s.append(el('span','ev-label',editVerb(f.status)),fileChip(f.path));det.append(s,diffView(f));list.append(det)});
   }).catch(e=>{list.replaceChildren(el('p','error',e.message))});
   return;
@@ -480,7 +481,7 @@ async function watch(job){
  const done=await new Promise(resolve=>{
   let finished=false;
   const finish=j=>{if(!finished){finished=true;resolve(j)}};
-  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(j.progress||LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
   if(window.EventSource){
    const es=new EventSource('/api/create/jobs/'+job.id+'/events');
    es.onmessage=e=>{const j=JSON.parse(e.data);apply(j);if(j.status==='complete'||j.status==='failed')es.close()};
@@ -798,6 +799,7 @@ $('support-grant').onclick=async()=>{
 };
 $('settings-open').onclick=async()=>{
  renderCosts();
+ loadApiKeys();
  $('support-section').classList.toggle('hidden',state.me?.viewer?.kind!=='owner');
  text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
  $('knowledge').value=state.project.knowledge||'';
@@ -1072,6 +1074,139 @@ async function renderChecks(){
  for(const el of ['checks-run','checks-describe','checks-add'])$(el).disabled=!editor;
  $('checks-run').disabled=!editor||!d.checks.length;
 }
+// ---------- plain-English explanations ----------
+// A card: what is happening, where (and the real code lines, with what each one means), why,
+// what it costs and the fix. Code is optional reading behind "Show me the code".
+function explainCard(c,{onFix}={}){
+ const box=document.createElement('div');box.className='explain-card';
+ const what=document.createElement('p');what.className='explain-what';what.textContent=c.what||'';box.append(what);
+ const dl=document.createElement('dl');
+ for(const [k,v] of [['Where',c.where?(c.where+(c.file?' ('+c.file+', line '+c.line+')':'')):''],['Why',c.why],['What it costs',c.impact],['The fix',c.fix]]){if(!v)continue;const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;dl.append(dt,dd)}
+ box.append(dl);
+ if(c.sure===false)box.append(el('p','muted small','Kairoq is not certain this is the exact place; treat it as the most likely one.'));
+ if(c.snippet&&c.snippet.length){
+  const det=document.createElement('details'),sum=document.createElement('summary');sum.textContent='Show me the code';det.append(sum);
+  const meaning=new Map((c.code||[]).map(x=>[x.n,x.meaning]));
+  const pre=document.createElement('div');pre.className='explain-code';
+  for(const ln of c.snippet){
+   const row=document.createElement('div');row.className='explain-line'+(meaning.has(ln.n)?' marked':'')+(ln.n===c.line?' target':'');
+   const num=document.createElement('span');num.className='n';num.textContent=ln.n;
+   const code=document.createElement('code');code.textContent=ln.code||' ';
+   row.append(num,code);pre.append(row);
+   if(meaning.has(ln.n)){const m=document.createElement('div');m.className='explain-meaning';m.textContent='↳ '+meaning.get(ln.n);pre.append(m)}
+  }
+  det.append(pre);box.append(det);
+ }
+ if(onFix&&c.fix){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent='Fix this';b.onclick=onFix;box.append(b)}
+ return box;
+}
+async function explainProblem(kind,textValue,title,version){
+ const body=$('explain-body');body.replaceChildren(el('p','muted','Working it out…'));text($('explain-error'),'');text($('explain-title'),title);$('explain-fix').classList.add('hidden');
+ $('explain-dialog').showModal();
+ try{
+  const {explanation:x}=await api('/projects/'+state.project.id+'/explain',{method:'POST',body:{kind,text:textValue,version:version||previewVersion(),tier:state.tier}});
+  body.replaceChildren();
+  if(kind==='change'){
+   body.append(el('p','explain-what',x.summary||''));
+   const ul=document.createElement('ul');for(const c of x.changes){const item=document.createElement('li');item.textContent=c.what+(c.where?' — '+c.where:'')+(c.why_it_matters?'. '+c.why_it_matters:'');ul.append(item)}body.append(ul);
+   if(x.watch)body.append(el('p','small','Worth checking by hand: '+x.watch));
+  }else{
+   body.append(explainCard(x));
+   if(x.fix){const b=$('explain-fix');b.classList.remove('hidden');b.onclick=()=>{$('explain-dialog').close();setChatMode('build');send('Fix this problem: '+x.what+(x.file?' (in '+x.file+' around line '+x.line+')':'')+'. Cause: '+x.why+'. Fix: '+x.fix,'build')}}
+  }
+  refreshCredits();
+ }catch(err){body.replaceChildren();text($('explain-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+}
+$('explain-errors').onclick=()=>{const errors=[...new Set([...state.runtimeErrors,...currentVersionErrors()])];if(errors.length)explainProblem('error',errors.join('\n'),'What these problems mean')};
+// ---------- synthetic customers ----------
+const cust={info:null,report:null,fix:''};
+function li(textValue,cls){const el=document.createElement('li');el.textContent=textValue;if(cls)el.className=cls;return el}
+function custCost(){
+ const n=Number($('cust-count').value),per=cust.info&&cust.info.price_per_visitor&&cust.info.price_per_visitor[state.tier];
+ text($('cust-cost'),state.me.viewer.kind==='customer'&&per!=null?n+' visitors on the '+state.tier+' model cost '+n*per+' credits.':'');
+}
+function renderCustReports(){
+ const ul=$('cust-reports');ul.replaceChildren();
+ const list=cust.info?cust.info.reports:[];
+ if(!list.length){ul.append(li('No tests yet.','muted'));return}
+ for(const r of list){
+  const el=document.createElement('li'),b=document.createElement('button');b.type='button';b.className='ghost';
+  b.textContent=r.at.slice(0,16).replace('T',' ')+' · '+r.completion_rate+'% of '+r.visitors+' · '+r.goal;
+  b.onclick=()=>openCustReport(r.id);el.append(b);ul.append(el);
+ }
+}
+function showCustReport(report,fix){
+ cust.report=report;cust.fix=fix||'';
+ const n=report.numbers,s=report.summary;
+ text($('cust-headline'),s.headline||'Test from '+report.at.slice(0,16).replace('T',' '));
+ text($('cust-rate'),n.completion_rate+'% reached the goal');
+ text($('cust-numbers'),n.completed+' of '+n.visitors+' visitors · '+n.gave_up+' gave up · '+n.stuck+' ran out of steps'+(n.frustrated?' · '+n.frustrated+' got frustrated':'')+Object.entries(n.by_device||{}).map(([d,x])=>' · '+d+': '+x.completed+'/'+x.visitors).join(''));
+ const drop=$('cust-drop');drop.replaceChildren();for(const d of n.drop_off)drop.append(li(d.path+' — '+d.visitors+' visitor'+(d.visitors===1?'':'s')));if(!n.drop_off.length)drop.append(li('Nobody left early.','muted'));
+ const iss=$('cust-issues');iss.replaceChildren();for(const x of s.issues)iss.append(li(x.title+(x.why?': '+x.why:'')+(x.who?' ('+x.who+')':'')+(x.quote?' — “'+x.quote+'”':'')));if(!s.issues.length)iss.append(li('No issues found.','muted'));
+ const cards=$('cust-cards');cards.replaceChildren();
+ for(const c of report.explanations||[])cards.append(explainCard(c,{onFix:()=>{$('customers-dialog').close();setChatMode('build');send('Fix this problem found by synthetic customers: '+c.what+(c.file?' (in '+c.file+' around line '+c.line+')':'')+'. Cause: '+c.why+'. Fix: '+c.fix,'build')}}));
+ if(!(report.explanations||[]).length)cards.append(el('p','muted small','No explanations for this test.'));
+ // With explanations, the short issue list is a summary.
+ text($('cust-issues-title'),(report.explanations||[]).length?'Issues in short':'Issues');
+ const fx=$('cust-fixes');fx.replaceChildren();for(const f of s.fixes)fx.append(li(f));if(!s.fixes.length)fx.append(li('—','muted'));
+ $('cust-fix').classList.toggle('hidden',!s.issues.length);
+ const vis=$('cust-visits');vis.replaceChildren();
+ for(const v of report.visits){
+  const box=document.createElement('div');box.className='cust-visit';
+  const h=document.createElement('p');const p=v.persona;h.textContent=p.name+', '+p.age+' · '+p.device+' · patience '+p.patience+' · tech '+p.tech+' — '+({completed:'reached the goal',gave_up:'gave up',stuck:'ran out of steps',error:'error',skipped:'skipped'}[v.outcome]||v.outcome);h.className='small';box.append(h);
+  const ol=document.createElement('ol');for(const st of v.steps)ol.append(li(st.path+' — “'+st.thought+'” → '+st.action+(st.label?' “'+st.label+'”':'')+(st.value?' “'+st.value+'”':''),st.feeling==='frustrated'?'error':''));box.append(ol);vis.append(box);
+ }
+ $('cust-report').classList.remove('hidden');
+}
+async function openCustReport(rid){try{const r=await api('/projects/'+state.project.id+'/synthetic?report='+encodeURIComponent(rid));showCustReport(r.report,r.fix_message)}catch(err){text($('cust-error'),err.message)}}
+$('customers-open').onclick=async()=>{
+ if(!state.project)return;text($('cust-error'),'');$('cust-report').classList.add('hidden');
+ try{cust.info=await api('/projects/'+state.project.id+'/synthetic');if(!cust.info.browser)text($('cust-error'),'Synthetic customers need a browser (Chromium) on this server.');renderCustReports();custCost();$('customers-dialog').showModal()}
+ catch(err){text($('chat-error'),err.message)}
+};
+$('cust-count').onchange=custCost;
+$('cust-run').onclick=async()=>{
+ if(state.job)return;text($('cust-error'),'');
+ const audience=$('cust-audience').value.trim(),goal=$('cust-goal').value.trim();
+ if(!audience||!goal){text($('cust-error'),'Describe your customers and what they come to do.');return}
+ $('cust-run').disabled=true;
+ try{
+  const r=await api('/projects/'+state.project.id+'/synthetic',{method:'POST',body:{audience,goal,count:Number($('cust-count').value),path:$('cust-path').value.trim()||undefined,tier:state.tier}});
+  $('customers-dialog').close();
+  $('messages').append(messageItem({role:'user',text:'Test with '+$('cust-count').value+' synthetic customers: '+goal}));
+  const done=await watch(r.job);
+  if(done&&done.status==='complete'&&done.result&&done.result.synthetic){
+   const n=done.result.synthetic.numbers;
+   $('messages').append(messageItem({role:'assistant',text:(done.result.synthetic.summary.headline?done.result.synthetic.summary.headline+'\n':'')+n.completed+' of '+n.visitors+' synthetic customers reached the goal ('+n.completion_rate+'%). Open Customers to see the report.'}));
+   cust.info=await api('/projects/'+state.project.id+'/synthetic');renderCustReports();await openCustReport(done.result.synthetic.id);$('customers-dialog').showModal();
+  }
+ }catch(err){text($('cust-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{$('cust-run').disabled=false}
+};
+$('cust-fix').onclick=()=>{if(!cust.fix)return;$('customers-dialog').close();setChatMode('build');send(cust.fix,'build')};
+// ---------- API keys (MCP) ----------
+function renderApiKeys(keys){
+ const ul=$('apikey-list');ul.replaceChildren();
+ if(!keys.length){ul.append(li('No API keys yet.','muted'));return}
+ for(const k of keys){
+  const el=document.createElement('li'),t=document.createElement('span'),b=document.createElement('button');
+  t.textContent=k.name+' · '+k.hint+' · '+(k.last_used_at?'used '+k.last_used_at.slice(0,10):'never used');
+  b.type='button';b.className='ghost';b.textContent='Remove';
+  b.onclick=async()=>{try{renderApiKeys((await api('/api-keys',{method:'DELETE',body:{id:k.id}})).keys)}catch(err){text($('apikey-status'),err.message)}};
+  el.append(t,b);ul.append(el);
+ }
+}
+async function loadApiKeys(){text($('mcp-url'),location.origin+'/mcp');$('apikey-new').classList.add('hidden');try{renderApiKeys((await api('/api-keys')).keys)}catch(err){text($('apikey-status'),err.message)}}
+$('apikey-create').onclick=async()=>{
+ text($('apikey-status'),'');
+ try{
+  const r=await api('/api-keys',{method:'POST',body:{name:$('apikey-name').value.trim()}});
+  $('apikey-name').value='';renderApiKeys(r.keys);
+  const box=$('apikey-new');box.replaceChildren();
+  const code=document.createElement('code');code.textContent=r.created.key;
+  box.append('Copy this key now; it is shown only once: ',code);box.classList.remove('hidden');
+ }catch(err){text($('apikey-status'),err.message)}
+};
 $('checks-open').onclick=async()=>{text($('checks-error'),'');text($('checks-status'),'');$('checks-save-anyway').classList.add('hidden');try{await renderChecks();$('checks-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
 $('checks-run').onclick=async()=>{const btn=$('checks-run');btn.disabled=true;text($('checks-status'),'Running the checks on a test copy of your data…');text($('checks-error'),'');
  try{const {result}=await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{run:true}});text($('checks-status'),result.failed.length?result.failed.length+' of '+result.ran+' failed. Use Fix it in the chat, or describe what changed.':'All '+result.ran+' passed.');await renderChecks()}
