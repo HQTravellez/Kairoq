@@ -66,7 +66,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -276,6 +276,8 @@ function startSynthetic(v,id,{audience,goal,count,path:start,tier='standard'},{c
    update({status:'personas'});
    const test={audience:audience.slice(0,600),goal:goal.slice(0,400),count,path:start?String(start):''};
    const r=await synthetic.run(id,builder.previewUrl(meta),test,{callModel,browse,tier,signal,onProgress:p=>update({status:p.status,progress:p.text})});
+   // Plain-English cards for each issue, pointing at the real code behind it (part of the test's price).
+   if(r.summary.issues.length){update({status:'reporting',progress:'Explaining the problems in plain English'});r.explanations=await require('./explain').issues(id,{...r,test,version:meta.current_version},{callModel,tier,signal}).catch(()=>[])}
    const report=synthetic.save(id,{at:new Date().toISOString(),version:meta.current_version,tier,credits,test,...r});
    job.result={synthetic:{id:report.id,numbers:report.numbers,summary:report.summary}};
    update({status:'complete'});
@@ -533,6 +535,23 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(action==='/appicon'&&method==='GET'){res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(mobile.icon(id,'icon-192.png'));return true}
   }
   // ----- build from a reference -----
+  // Plain-English explanation of an error, a failed check or a change (one Discuss message;
+  // credits come back if no explanation could be written).
+  if(action==='/explain'&&method==='POST'){
+   const b=await readJson(req,12000),tier=b.tier||'standard',kind=String(b.kind||'');
+   if(!['error','check','change'].includes(kind))throw Object.assign(Error('Explain an error, a check or a change'),{status:400});
+   if(kind!=='change'&&String(b.text||'').trim().length<3)throw Object.assign(Error('Nothing to explain'),{status:400});
+   limited(req,'explain',30);
+   const price=cost({mode:'discuss',tier}),ref='explain:'+crypto.randomUUID();
+   if(v.kind==='customer'&&price>0)accounts.charge(v.account.id,price,'Explain in plain English',ref);
+   try{
+    const ex=require('./explain'),explanation=kind==='change'?await ex.change(id,b.version,{callModel,tier}):await ex.problem(id,{kind,text:String(b.text)},{callModel,tier});
+    return send(res,200,{explanation,credits:v.kind==='customer'?price:0}),true;
+   }catch(e){
+    if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: explanation not written','refund-'+ref)}catch{}
+    throw Object.assign(Error('Could not explain that: '+String(e.message||e).slice(0,300)),{status:e.status||502});
+   }
+  }
   if(action==='/synthetic'&&method==='GET'){
    const rid=new URL(req.url,'http://x').searchParams.get('report'),synthetic=require('./synthetic-customers');
    if(rid){const report=synthetic.load(id,rid);return send(res,200,{report,fix_message:synthetic.fixMessage(report)}),true}

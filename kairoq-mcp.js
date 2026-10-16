@@ -23,7 +23,8 @@ function reportText(r){
  return[(s.headline?s.headline+'\n\n':'')+n.completed+' of '+n.visitors+' visitors reached the goal ('+n.completion_rate+'%); '+n.gave_up+' gave up, '+n.stuck+' ran out of steps.',
   n.drop_off.length?'Where the others left: '+n.drop_off.map(d=>d.path+' ('+d.visitors+')').join(', '):'',
   s.issues.length?'Issues:\n'+s.issues.map((x,i)=>(i+1)+'. '+x.title+(x.why?': '+x.why:'')+(x.quote?' — "'+x.quote+'"':'')).join('\n'):'',
-  s.fixes.length?'Suggested fixes:\n'+s.fixes.map(f=>'- '+f).join('\n'):''].filter(Boolean).join('\n\n');
+  s.fixes.length?'Suggested fixes:\n'+s.fixes.map(f=>'- '+f).join('\n'):'',
+  (r.explanations||[]).length?'In plain English:\n'+r.explanations.map(c=>'- '+c.what+(c.where?' Where: '+c.where+(c.file?' ('+c.file+' line '+c.line+')':'')+'.':'')+(c.why?' Why: '+c.why:'')+(c.fix?' Fix: '+c.fix:'')).join('\n'):''].filter(Boolean).join('\n\n');
 }
 async function callTool(name,args,v,deps){
  const api=require('./create-api'),synthetic=require('./synthetic-customers');
@@ -39,13 +40,13 @@ async function callTool(name,args,v,deps){
    const job=api.jobs.get(String(args.job_id));
    if(!job||job.mode!=='synthetic')throw fail('Unknown or expired job; use project_id and report_id for finished tests');
    project(job.projectId,'viewer');
-   if(job.status==='complete'){const report=synthetic.load(job.projectId,job.result.synthetic.id);return text({status:'complete',project_id:job.projectId,report_id:report.id,numbers:report.numbers,summary:report.summary,fix_message:synthetic.fixMessage(report)},reportText(report))}
+   if(job.status==='complete'){const report=synthetic.load(job.projectId,job.result.synthetic.id);return text({status:'complete',project_id:job.projectId,report_id:report.id,numbers:report.numbers,summary:report.summary,explanations:report.explanations||[],fix_message:synthetic.fixMessage(report)},reportText(report))}
    if(job.status==='failed')return text({status:'failed',error:job.error},'The test failed: '+job.error);
    return text({status:job.status,progress:job.progress||null},'Still running: '+(job.progress||job.status)+'.');
   }
   project(args.project_id,'viewer');
   let report;try{report=synthetic.load(String(args.project_id),String(args.report_id||''))}catch(e){throw fail(e.message)}
-  return text({status:'complete',project_id:args.project_id,report_id:report.id,numbers:report.numbers,summary:report.summary,fix_message:synthetic.fixMessage(report)},reportText(report));
+  return text({status:'complete',project_id:args.project_id,report_id:report.id,numbers:report.numbers,summary:report.summary,explanations:report.explanations||[],fix_message:synthetic.fixMessage(report)},reportText(report));
  }
  if(name==='list_synthetic_reports'){project(args.project_id,'viewer');const reports=synthetic.list(String(args.project_id));return text({reports},reports.length?reports.map(r=>r.id+'  '+r.at.slice(0,16)+'  '+r.completion_rate+'% of '+r.visitors+' — '+r.goal).join('\n'):'No reports yet.')}
  throw fail('Unknown tool: '+String(name).slice(0,60));

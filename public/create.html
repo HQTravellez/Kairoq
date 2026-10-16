@@ -182,6 +182,7 @@
     </div>
     <div class="errors hidden" id="errors" role="status">
       <details><summary id="errors-count"></summary><ul id="errors-list"></ul></details>
+      <button class="ghost" id="explain-errors" type="button" title="What these problems mean, where they come from and the fix, in plain English">Explain</button>
       <button class="primary" id="fix" type="button">Fix it</button>
     </div>
     <section class="detail hidden" id="detail" aria-label="Details of a change">
@@ -336,7 +337,8 @@
       <h3 id="cust-headline"></h3>
       <p class="cust-stats"><b id="cust-rate"></b> <span id="cust-numbers" class="muted"></span></p>
       <h4>Where the others left</h4><ul class="small" id="cust-drop"></ul>
-      <h4>Issues</h4><ul class="small" id="cust-issues"></ul>
+      <h4>What is going wrong, in plain English</h4><div id="cust-cards"></div>
+      <h4 id="cust-issues-title">Issues</h4><ul class="small" id="cust-issues"></ul>
       <h4>Suggested fixes</h4><ul class="small" id="cust-fixes"></ul>
       <div class="row"><button class="primary" id="cust-fix" type="button">Fix these with AI</button></div>
       <details><summary>Every visit, step by step</summary><div id="cust-visits" class="small"></div></details>
@@ -344,6 +346,14 @@
     <h3>Earlier tests</h3>
     <ul class="skills" id="cust-reports"></ul>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+<dialog id="explain-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2 id="explain-title">In plain English</h2>
+    <div id="explain-body"><p class="muted">Working it out…</p></div>
+    <p class="error" id="explain-error" role="alert"></p>
+    <div class="row end"><button class="primary hidden" id="explain-fix" type="button">Fix it</button><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
 <dialog id="design-dialog">

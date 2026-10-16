@@ -72,7 +72,9 @@ async function visit({url,persona,goal,callModel,tier,browse,sandbox,signal}){
    const messages=[{role:'system',content:VISIT_PROMPT},{role:'user',content:'You are: '+describePersona(persona)+'\nYour goal: '+clip(goal,400)+'\nStep '+(i+1)+' of at most '+MAX_STEPS()+'.'+(history?'\nWhat you did so far:\n'+history:'')+'\n\n'+describePage(o)}];
    const a=cleanAction(await callModel({messages,temperature:0.7,maxOutputTokens:400,signal,tier},json),o);
    const el=o.elements.find(e=>e.id===a.target);
-   const step={n:i+1,path:o.path,thought:a.thought,feeling:a.feeling,action:a.action,...(el?{label:el.label}:{}),...(a.value&&a.action!=='click'?{value:a.value}:{})};
+   const step={n:i+1,path:o.path,thought:a.thought,feeling:a.feeling,action:a.action,...(el?{label:el.label}:{}),...(el&&el.loc?{loc:el.loc}:{}),...(a.value&&a.action!=='click'?{value:a.value}:{})};
+   // Where a visitor gave up or got stuck, the code behind what was on screen (for the explanations).
+   if(a.action==='give_up'||a.feeling==='frustrated'||i===MAX_STEPS()-1)step.screen=[...new Set(o.elements.map(e=>e.loc).filter(Boolean))].slice(0,12);
    steps.push(step);
    if(a.action==='done'){outcome='completed';break}
    if(a.action==='give_up'){outcome='gave_up';break}
@@ -170,9 +172,10 @@ function load(id,rid){
 }
 // The chat message that asks the builder to fix what a report found.
 function fixMessage(report){
- const s=report.summary;
+ const s=report.summary,cards=report.explanations||[];
+ const at=i=>{const c=cards.find(x=>x.issue===i+1);return c&&c.file?' ['+c.file+' line '+c.line+(c.fix?'; fix: '+c.fix:'')+']':''};
  return 'Synthetic customers ('+report.numbers.visitors+' visitors, '+report.numbers.completion_rate+'% reached the goal "'+clip(report.test.goal,200)+'") found these problems. Fix them without changing what already works:\n'+
-  s.issues.map((x,i)=>(i+1)+'. '+x.title+(x.why?': '+x.why:'')+(x.quote?' (a visitor said: "'+x.quote+'")':'')).join('\n')+
+  s.issues.map((x,i)=>(i+1)+'. '+x.title+(x.why?': '+x.why:'')+(x.quote?' (a visitor said: "'+x.quote+'")':'')+at(i)).join('\n')+
   (s.fixes.length?'\nSuggested changes:\n'+s.fixes.map(f=>'- '+f).join('\n'):'');
 }
 module.exports={personas,visit,run,funnel,summarize,save,list,load,fixMessage,normalizePersona,MAX_PERSONAS};

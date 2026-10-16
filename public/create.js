@@ -456,6 +456,7 @@ function renderDetail(){
   const list=el('div','changes');body.append(list);list.append(el('p','muted small','Loading changes…'));
   changesFor(version).then(d=>{list.replaceChildren();if(!d.files.length){list.append(el('p','muted','No file changes in this version.'));return}
    list.append(el('p','muted small','Version '+d.version+(d.previous?' compared with version '+d.previous:'')));
+   {const b=el('button','ghost','Explain in plain English');b.type='button';b.onclick=()=>explainProblem('change','','What changed in version '+d.version,d.version);list.append(b)}
    d.files.forEach((f,i)=>{const det=el('details','change');det.open=i===0;const s=el('summary');s.append(el('span','ev-label',editVerb(f.status)),fileChip(f.path));det.append(s,diffView(f));list.append(det)});
   }).catch(e=>{list.replaceChildren(el('p','error',e.message))});
   return;
@@ -1073,6 +1074,50 @@ async function renderChecks(){
  for(const el of ['checks-run','checks-describe','checks-add'])$(el).disabled=!editor;
  $('checks-run').disabled=!editor||!d.checks.length;
 }
+// ---------- plain-English explanations ----------
+// A card: what is happening, where (and the real code lines, with what each one means), why,
+// what it costs and the fix. Code is optional reading behind "Show me the code".
+function explainCard(c,{onFix}={}){
+ const box=document.createElement('div');box.className='explain-card';
+ const what=document.createElement('p');what.className='explain-what';what.textContent=c.what||'';box.append(what);
+ const dl=document.createElement('dl');
+ for(const [k,v] of [['Where',c.where?(c.where+(c.file?' ('+c.file+', line '+c.line+')':'')):''],['Why',c.why],['What it costs',c.impact],['The fix',c.fix]]){if(!v)continue;const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;dl.append(dt,dd)}
+ box.append(dl);
+ if(c.sure===false)box.append(el('p','muted small','Kairoq is not certain this is the exact place; treat it as the most likely one.'));
+ if(c.snippet&&c.snippet.length){
+  const det=document.createElement('details'),sum=document.createElement('summary');sum.textContent='Show me the code';det.append(sum);
+  const meaning=new Map((c.code||[]).map(x=>[x.n,x.meaning]));
+  const pre=document.createElement('div');pre.className='explain-code';
+  for(const ln of c.snippet){
+   const row=document.createElement('div');row.className='explain-line'+(meaning.has(ln.n)?' marked':'')+(ln.n===c.line?' target':'');
+   const num=document.createElement('span');num.className='n';num.textContent=ln.n;
+   const code=document.createElement('code');code.textContent=ln.code||' ';
+   row.append(num,code);pre.append(row);
+   if(meaning.has(ln.n)){const m=document.createElement('div');m.className='explain-meaning';m.textContent='↳ '+meaning.get(ln.n);pre.append(m)}
+  }
+  det.append(pre);box.append(det);
+ }
+ if(onFix&&c.fix){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent='Fix this';b.onclick=onFix;box.append(b)}
+ return box;
+}
+async function explainProblem(kind,textValue,title,version){
+ const body=$('explain-body');body.replaceChildren(el('p','muted','Working it out…'));text($('explain-error'),'');text($('explain-title'),title);$('explain-fix').classList.add('hidden');
+ $('explain-dialog').showModal();
+ try{
+  const {explanation:x}=await api('/projects/'+state.project.id+'/explain',{method:'POST',body:{kind,text:textValue,version:version||previewVersion(),tier:state.tier}});
+  body.replaceChildren();
+  if(kind==='change'){
+   body.append(el('p','explain-what',x.summary||''));
+   const ul=document.createElement('ul');for(const c of x.changes){const item=document.createElement('li');item.textContent=c.what+(c.where?' — '+c.where:'')+(c.why_it_matters?'. '+c.why_it_matters:'');ul.append(item)}body.append(ul);
+   if(x.watch)body.append(el('p','small','Worth checking by hand: '+x.watch));
+  }else{
+   body.append(explainCard(x));
+   if(x.fix){const b=$('explain-fix');b.classList.remove('hidden');b.onclick=()=>{$('explain-dialog').close();setChatMode('build');send('Fix this problem: '+x.what+(x.file?' (in '+x.file+' around line '+x.line+')':'')+'. Cause: '+x.why+'. Fix: '+x.fix,'build')}}
+  }
+  refreshCredits();
+ }catch(err){body.replaceChildren();text($('explain-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+}
+$('explain-errors').onclick=()=>{const errors=[...new Set([...state.runtimeErrors,...currentVersionErrors()])];if(errors.length)explainProblem('error',errors.join('\n'),'What these problems mean')};
 // ---------- synthetic customers ----------
 const cust={info:null,report:null,fix:''};
 function li(textValue,cls){const el=document.createElement('li');el.textContent=textValue;if(cls)el.className=cls;return el}
@@ -1098,6 +1143,11 @@ function showCustReport(report,fix){
  text($('cust-numbers'),n.completed+' of '+n.visitors+' visitors · '+n.gave_up+' gave up · '+n.stuck+' ran out of steps'+(n.frustrated?' · '+n.frustrated+' got frustrated':'')+Object.entries(n.by_device||{}).map(([d,x])=>' · '+d+': '+x.completed+'/'+x.visitors).join(''));
  const drop=$('cust-drop');drop.replaceChildren();for(const d of n.drop_off)drop.append(li(d.path+' — '+d.visitors+' visitor'+(d.visitors===1?'':'s')));if(!n.drop_off.length)drop.append(li('Nobody left early.','muted'));
  const iss=$('cust-issues');iss.replaceChildren();for(const x of s.issues)iss.append(li(x.title+(x.why?': '+x.why:'')+(x.who?' ('+x.who+')':'')+(x.quote?' — “'+x.quote+'”':'')));if(!s.issues.length)iss.append(li('No issues found.','muted'));
+ const cards=$('cust-cards');cards.replaceChildren();
+ for(const c of report.explanations||[])cards.append(explainCard(c,{onFix:()=>{$('customers-dialog').close();setChatMode('build');send('Fix this problem found by synthetic customers: '+c.what+(c.file?' (in '+c.file+' around line '+c.line+')':'')+'. Cause: '+c.why+'. Fix: '+c.fix,'build')}}));
+ if(!(report.explanations||[]).length)cards.append(el('p','muted small','No explanations for this test.'));
+ // With explanations, the short issue list is a summary.
+ text($('cust-issues-title'),(report.explanations||[]).length?'Issues in short':'Issues');
  const fx=$('cust-fixes');fx.replaceChildren();for(const f of s.fixes)fx.append(li(f));if(!s.fixes.length)fx.append(li('—','muted'));
  $('cust-fix').classList.toggle('hidden',!s.issues.length);
  const vis=$('cust-visits');vis.replaceChildren();

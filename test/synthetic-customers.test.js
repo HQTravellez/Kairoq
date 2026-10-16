@@ -39,7 +39,12 @@ const callModel=async(opts,parse)=>{
   if(/You are: Cora/.test(user))reply={thought:'Too small to read on my phone and I do not know what to press.',feeling:'frustrated',action:'give_up'};
   else if(/Thank you/.test(user))reply={thought:'Booked, great.',feeling:'confident',action:'done'};
   else{const name=el('Your name');if(name&&!/current:/.test(name.rest))reply={thought:'I type my name.',feeling:'confident',action:'fill',target:name.id,value:'Test Ana'};else reply={thought:'Now I book.',feeling:'confident',action:'click',target:el('Book a class').id}}
- }else if(/analyse a usability test/.test(sys))reply={headline:'Older visitors on phones give up on the first screen.',issues:[{title:'Small text on phones',why:'The booking form is hard to read on a phone',who:'older visitors',visitors:1,quote:'Too small to read on my phone'}],fixes:['Use larger text and a clear Book button on phones']};
+ }else if(/explain problems in a web app/.test(sys)){
+  const m=/(C\d+) — (src\/[\w.\/-]+) line (\d+)/.exec(user);
+  reply={cards:[{issue:1,what:'1 of 3 visitors gave up on the booking form.',where:'the Book a class button',place:m?m[1]:null,why:'On a phone the form is hard to read.',impact:'About a third of bookings are lost.',fix:'Make the text and button larger on phones.',lines:m?[{n:Number(m[3]),meaning:'This shows the form.'},{n:9999,meaning:'not a real line'}]:[]}]};
+ }else if(/explain a technical problem/.test(sys))reply={what:'The page shows an error when it opens.',where:'the booking form',file:/BOGUS/.test(user)?'src/Missing.jsx':'src/App.jsx',line:9,why:'A value is missing.',impact:'Visitors cannot book.',fix:'Give the value a default.',lines:[{n:9,meaning:'This line shows the name field.'}]};
+ else if(/explain what changed in a web app/.test(sys))reply={summary:'The booking form was added.',changes:[{what:'A form to book a class',where:'home page',why_it_matters:'Visitors can book online.'}],watch:''};
+ else if(/analyse a usability test/.test(sys))reply={headline:'Older visitors on phones give up on the first screen.',issues:[{title:'Small text on phones',why:'The booking form is hard to read on a phone',who:'older visitors',visitors:1,quote:'Too small to read on my phone'}],fixes:['Use larger text and a clear Book button on phones']};
  else throw Error('unexpected prompt');
  return parse(JSON.stringify(reply));
 };
@@ -99,6 +104,25 @@ test('personas use the real app in a browser on a test copy; the report counts w
  const ana=full.report.visits.find(v=>v.persona.name==='Ana');
  assert.equal(ana.outcome,'completed');assert.deepEqual(ana.steps.map(s=>s.action),['fill','click','done']);
  assert.match(full.fix_message,/Small text on phones[\s\S]*Too small to read/);
+ // Plain-English cards point at the real code behind what visitors saw; code text comes from the source.
+ const card=full.report.explanations[0];
+ assert.equal(card.file,'src/App.jsx');assert.match(card.what,/gave up/);
+ const src=FILES['src/App.jsx'].split('\n');
+ assert.equal(card.snippet.find(x=>x.n===card.line).code,src[card.line-1].slice(0,240));
+ assert.equal(card.code.length,1,'lines outside the shown code are dropped');assert.equal(card.code[0].meaning,'This shows the form.');
+ assert.match(full.fix_message,/src\/App\.jsx line \d+; fix: Make the text/);
+ // Explain an error and a change in plain English (one Discuss message each).
+ const c0=await credits(cookie);
+ const ex=await request(server,'POST','/api/create/projects/'+id+'/explain',{headers:{cookie},body:{kind:'error',text:'Uncaught TypeError: x is undefined'}});
+ assert.equal(ex.status,200,ex.text);
+ assert.equal(ex.json.explanation.file,'src/App.jsx');assert.equal(ex.json.explanation.sure,true);
+ assert.equal(ex.json.explanation.snippet.find(x=>x.n===9).code,src[8]);
+ assert.equal(await credits(cookie),c0-1);
+ const bogus=(await request(server,'POST','/api/create/projects/'+id+'/explain',{headers:{cookie},body:{kind:'error',text:'BOGUS error'}})).json.explanation;
+ assert.equal(bogus.file,undefined,'a file that does not exist is not shown');assert.equal(bogus.sure,false);
+ const ch=(await request(server,'POST','/api/create/projects/'+id+'/explain',{headers:{cookie},body:{kind:'change'}})).json.explanation;
+ assert.match(ch.summary,/booking form/);assert.equal(ch.changes.length,1);
+ assert.equal((await request(server,'POST','/api/create/projects/'+id+'/explain',{headers:{cookie},body:{kind:'nonsense'}})).status,400);
  // Another account cannot read the reports.
  const other=await signup('other-synthetic@example.com');
  assert.equal((await request(server,'GET','/api/create/projects/'+id+'/synthetic',{headers:{cookie:other}})).status,404);

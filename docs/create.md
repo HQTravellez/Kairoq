@@ -354,6 +354,24 @@ Test an app on AI customers before real ones arrive. Open **Customers** in the e
 - **Price:** each visitor costs a Discuss message on the chosen tier, paid up front. Credits come back only if the run fails before a report exists.
 - Synthetic visitors show likely friction (unclear copy, hidden buttons, long forms). They are not a prediction of real sales.
 
+## Explain it in plain English
+
+For owners who do not read code, Kairoq explains problems and changes in plain English (`explain.js`). Each problem gets a card:
+- **What is happening:** one sentence, with the numbers.
+- **Where:** the element in plain words, plus the file and line behind it.
+- **Why**, **what it costs**, and **the fix.**
+- **Show me the code:** the real source lines, with what each important line means.
+
+**Where it appears:**
+- **Synthetic-customer reports.** Every issue becomes a card. The card points at the exact elements visitors used, or saw when they gave up. Every build tags elements with `data-kq` file and line locations, so this is a real location, not a guess. These cards are part of the test's price. **Fix this** sends that one problem, with its file and line, to the builder.
+- **Errors in the preview.** **Explain** sits next to **Fix it**. If the source does not clearly show the cause, the card says the place is only the most likely one.
+- **Changes.** **Explain in plain English** in the Changes tab of Details describes what visitors will notice in that version.
+
+**How it stays accurate and what it costs:**
+- The code shown always comes from the project's source. Lines or files the model names that do not exist are dropped.
+- `POST /api/create/projects/:id/explain` takes `{kind: "error" | "check" | "change", text, version}`.
+- Each explanation costs a Discuss message (editor access). Credits come back if no explanation could be written.
+
 ## API keys and the MCP server
 
 AI assistants that support MCP (Claude, ChatGPT, Cursor and others) can use Kairoq for an account.
