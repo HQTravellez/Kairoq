@@ -340,7 +340,19 @@
       <h4>What is going wrong, in plain English</h4><div id="cust-cards"></div>
       <h4 id="cust-issues-title">Issues</h4><ul class="small" id="cust-issues"></ul>
       <h4>Suggested fixes</h4><ul class="small" id="cust-fixes"></ul>
-      <div class="row"><button class="primary" id="cust-fix" type="button">Fix these with AI</button></div>
+      <h4>Checked by replaying what visitors did</h4>
+      <p class="muted small">Kairoq replays each visit that failed, step by step, in a fresh browser (free). <b>Confirmed</b> problems happen again every time; problems that do not happen again are left alone. How visitors felt cannot be replayed, so it is judged by rerunning the same customers.</p>
+      <ul class="small cust-problems" id="cust-problems"></ul>
+      <div id="cust-repair-box" class="notice">
+        <p class="small"><b>Fix and retest.</b> The confirmed problems and what visitors found hard go to the AI. Kairoq then replays the same steps on the new version, tries again if a problem is still there, and saves each fixed problem as a check so it cannot come back.</p>
+        <div class="row wrap">
+          <label>Fix rounds at most<select id="cust-rounds"><option>1</option><option selected>2</option><option>3</option></select></label>
+          <label class="check"><input type="checkbox" id="cust-rerun" checked> Then rerun the same customers for a before and after</label>
+        </div>
+        <p class="muted small" id="cust-repair-cost"></p>
+        <div class="row"><button class="primary" id="cust-repair" type="button">Fix and retest</button><button class="ghost" id="cust-fix" type="button">Only send to the chat</button></div>
+      </div>
+      <div id="cust-repair-result" class="hidden"><h4>After the fix</h4><div id="cust-repair-body" class="small"></div></div>
       <details><summary>Every visit, step by step</summary><div id="cust-visits" class="small"></div></details>
     </div>
     <h3>Earlier tests</h3>

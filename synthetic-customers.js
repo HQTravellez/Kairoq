@@ -72,7 +72,7 @@ async function visit({url,persona,goal,callModel,tier,browse,sandbox,signal}){
    const messages=[{role:'system',content:VISIT_PROMPT},{role:'user',content:'You are: '+describePersona(persona)+'\nYour goal: '+clip(goal,400)+'\nStep '+(i+1)+' of at most '+MAX_STEPS()+'.'+(history?'\nWhat you did so far:\n'+history:'')+'\n\n'+describePage(o)}];
    const a=cleanAction(await callModel({messages,temperature:0.7,maxOutputTokens:400,signal,tier},json),o);
    const el=o.elements.find(e=>e.id===a.target);
-   const step={n:i+1,path:o.path,thought:a.thought,feeling:a.feeling,action:a.action,...(el?{label:el.label}:{}),...(el&&el.loc?{loc:el.loc}:{}),...(a.value&&a.action!=='click'?{value:a.value}:{})};
+   const step={n:i+1,path:o.path,thought:a.thought,feeling:a.feeling,action:a.action,...(el?{label:el.label,kind:el.kind,...(el.ph?{ph:el.ph}:{})}:{}),...(el&&el.loc?{loc:el.loc}:{}),...(a.value&&a.action!=='click'?{value:a.value}:{})};
    // Where a visitor gave up or got stuck, the code behind what was on screen (for the explanations).
    if(a.action==='give_up'||a.feeling==='frustrated'||i===MAX_STEPS()-1)step.screen=[...new Set(o.elements.map(e=>e.loc).filter(Boolean))].slice(0,12);
    steps.push(step);
@@ -131,10 +131,11 @@ async function summarize(visits,goal,{callModel,tier,signal}){
 }
 // test: {audience, goal, count, path}. url is the version's preview URL (a path), browse() comes from
 // the caller; each visit gets its own test copy of the app's data.
-async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgress=()=>{}}){
+// people: the personas of an earlier test, to rerun the same customers after a fix.
+async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgress=()=>{},people:given=null}){
  if(!browse)throw Object.assign(Error('Synthetic customers need a browser on the server'),{status:409});
- onProgress({status:'personas',text:'Creating '+(Number(test.count)||10)+' personas'});
- const people=await personas({...test,callModel,tier,signal});
+ onProgress({status:'personas',text:given?'Bringing back the same '+given.length+' customers':'Creating '+(Number(test.count)||10)+' personas'});
+ const people=given?given.map(normalizePersona):await personas({...test,callModel,tier,signal});
  const start=url+(test.path?String(test.path).replace(/^\//,''):'');
  let done=0;
  const sandbox=require('./react-sandbox');
@@ -147,7 +148,10 @@ async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgre
  onProgress({status:'reporting',text:'Writing the report'});
  const numbers=funnel(visits);
  const summary=numbers.visitors?await summarize(visits,test.goal,{callModel,tier,signal}):{headline:'',issues:[],fixes:[]};
- return{numbers,summary,visits};
+ // Replaying what the visitors who did not finish did (no model, free) confirms which problems are real.
+ onProgress({status:'reproducing',text:'Replaying what visitors did to confirm the problems'});
+ const problems=numbers.visitors?await require('./synthetic-repair').reproduce(id,{visits},{browse,startUrl:start,signal}).catch(()=>[]):[];
+ return{numbers,summary,visits,problems};
 }
 
 // ---------- storage ----------
@@ -165,6 +169,8 @@ function save(id,report){
  builder.saveMeta(meta);
  return full;
 }
+// Rewrites a kept report (e.g. after fix and retest) without moving it in the list.
+function update(id,report){load(id,report.id);fs.writeFileSync(path.join(dir(id),report.id+'.json'),JSON.stringify(report));return report}
 function list(id){return builder.loadMeta(id).synthetic||[]}
 function load(id,rid){
  if(!/^[0-9a-f-]{36}$/.test(String(rid)))throw Object.assign(Error('Unknown report'),{status:404});
@@ -178,4 +184,4 @@ function fixMessage(report){
   s.issues.map((x,i)=>(i+1)+'. '+x.title+(x.why?': '+x.why:'')+(x.quote?' (a visitor said: "'+x.quote+'")':'')+at(i)).join('\n')+
   (s.fixes.length?'\nSuggested changes:\n'+s.fixes.map(f=>'- '+f).join('\n'):'');
 }
-module.exports={personas,visit,run,funnel,summarize,save,list,load,fixMessage,normalizePersona,MAX_PERSONAS};
+module.exports={personas,visit,run,funnel,summarize,save,update,list,load,fixMessage,normalizePersona,MAX_PERSONAS};
