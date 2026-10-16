@@ -349,10 +349,38 @@ Test an app on AI customers before real ones arrive. Open **Customers** in the e
 - **The report:**
   - **Counted from the visits, not the model:** how many reached the goal, gave up or ran out of steps, where the others left, results by device, and how many got frustrated.
   - **From the model:** a headline, the main issues with quotes, and suggested fixes.
-  - **Fix these with AI** sends the issues to the builder as a change request.
+  - **Checked by replaying what visitors did:** see Fix and retest below.
+  - **Only send to the chat** sends the issues to the builder as an ordinary change request.
   - Reports are kept per project (the last 20).
 - **Price:** each visitor costs a Discuss message on the chosen tier, paid up front. Credits come back only if the run fails before a report exists.
 - Synthetic visitors show likely friction (unclear copy, hidden buttons, long forms). They are not a prediction of real sales.
+
+### Fix and retest
+
+A report is the start; the repair loop (`synthetic-repair.js`) goes on to **reproduce → fix → retest → lock in**:
+
+1. **Reproduce (free, part of every test).** Each visit that did not reach the goal is replayed step by step in a fresh browser, on a test copy of the data, with no model. Every problem gets one of these labels:
+   - **Confirmed:** the replay shows the problem again. That means a click that fails, a page error, or a button that changes nothing on the screen.
+   - **Could not reproduce:** a failure that does not happen again. It is left alone, so the builder does not "fix" something that works.
+   - **Visitor experience:** for example "the price felt high", or leaving without pressing anything. Opinions cannot be replayed. They are judged by the rerun.
+2. **Fix.** **Fix and retest** sends these to the builder:
+   - the confirmed problems, with the exact steps and the file and line behind the element;
+   - what visitors found hard.
+   It also lists the problems that could not be reproduced, as ones to leave alone.
+3. **Retest.** The same steps are replayed on the new version. Each confirmed problem is then marked one of:
+   - **fixed**;
+   - **still there:** the next round tells the builder its previous fix did not work;
+   - **steps changed:** for example the button was renamed. The rerun judges it.
+   Rounds stop when everything is fixed, when a later round fixes nothing more, or at the chosen maximum (1 to 3, at most `KAIROQ_REPAIR_ROUNDS`, default 3).
+4. **Lock in.** Each fixed problem becomes a **saved check**: the visitor's steps, plus an expectation of the text the working step now shows, such as "Thank you, Ana". It is verified on the new version first. From then on it runs after every change and before publishing, so the problem cannot quietly come back.
+5. **Rerun (optional).** The same customers use the new version, and you get a before-and-after: for example "0 of 3 → 2 of 3 reached the goal". Issues are marked **no longer reported**, **still reported** or **new**. The rerun is saved as its own report, linked to the original.
+
+**Price:**
+- Each fix round costs a chat edit on the chosen tier. The rerun costs the test's price.
+- Each is charged when it starts, so rounds that are never needed are never charged. The editor shows the most it can cost.
+- A round or rerun that fails is refunded. Finished rounds are not, the same as any completed work.
+
+**MCP:** the `fix_and_retest` tool does the same for AI assistants. `get_synthetic_test` follows the job.
 
 ## Explain it in plain English
 
@@ -383,7 +411,8 @@ AI assistants that support MCP (Claude, ChatGPT, Cursor and others) can use Kair
 - **Tools:**
   - `list_projects` lists the projects the account can open.
   - `run_synthetic_test` sends synthetic customers through a project (editor access, charges credits). It returns a job id.
-  - `get_synthetic_test` returns the progress of a job, or a finished report with its fix request.
+  - `get_synthetic_test` returns the progress of a job, or a finished report with its fix request and which problems the replays confirmed.
+  - `fix_and_retest` fixes what a report confirmed, replays the same steps, saves checks and can rerun the same customers (editor access, charges per round). It returns a job id.
   - `list_synthetic_reports` lists a project's reports.
 - **Access:** every call uses the account's own project roles and credits. A key from another account cannot see or test the project.
 

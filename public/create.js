@@ -292,7 +292,7 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
+const LABELS={reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
 const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
@@ -507,7 +507,7 @@ async function watch(job){
   if(done.problem)$('messages').append(messageItem({role:'assistant',text:done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.'}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
-  if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?'\nYour credits were refunded.':''),failed:true}));
+  if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?(done.mode==='repair'?'\nRounds that did not finish were refunded.':'\nYour credits were refunded.'):''),failed:true}));
   if(state.code)renderFiles();
   if(state.data)renderData();
  }
@@ -1149,7 +1149,15 @@ function showCustReport(report,fix){
  // With explanations, the short issue list is a summary.
  text($('cust-issues-title'),(report.explanations||[]).length?'Issues in short':'Issues');
  const fx=$('cust-fixes');fx.replaceChildren();for(const f of s.fixes)fx.append(li(f));if(!s.fixes.length)fx.append(li('—','muted'));
- $('cust-fix').classList.toggle('hidden',!s.issues.length);
+ const probs=$('cust-problems');probs.replaceChildren();
+ const word={confirmed:'Confirmed',not_reproduced:'Could not reproduce, left alone',experience:'Visitor experience (judged by the rerun)',not_checked:'Not checked'};
+ for(const p of report.problems||[]){const item=li(p.title+' — '+(word[p.status]||p.status)+' · '+p.visitors.join(', ')+(p.steps&&p.steps.length?' · steps: '+p.steps.map(x=>x.action+(x.label?' “'+x.label+'”':'')).join(' → '):''),p.status==='confirmed'?'error':p.status==='not_reproduced'?'muted':'');probs.append(item)}
+ if(!report.problems)probs.append(li('This test is older than replays; Fix and retest replays it first.','muted'));
+ else if(!report.problems.length)probs.append(li('Everyone reached the goal.','muted'));
+ const canFix=s.issues.length||(report.problems||[]).some(p=>p.status==='confirmed')||!report.problems;
+ $('cust-repair-box').classList.toggle('hidden',!canFix);
+ repairCost();
+ renderRepair(report.repair);
  const vis=$('cust-visits');vis.replaceChildren();
  for(const v of report.visits){
   const box=document.createElement('div');box.className='cust-visit';
@@ -1182,6 +1190,43 @@ $('cust-run').onclick=async()=>{
   }
  }catch(err){text($('cust-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
  finally{$('cust-run').disabled=false}
+};
+function repairCost(){
+ const r=cust.report;if(!r||!cust.info)return;
+ const round=cust.info.price_per_fix_round&&cust.info.price_per_fix_round[state.tier],visit=cust.info.price_per_visitor&&cust.info.price_per_visitor[state.tier];
+ if(state.me.viewer.kind!=='customer'||round==null){text($('cust-repair-cost'),'');return}
+ const rounds=Number($('cust-rounds').value),rerun=$('cust-rerun').checked?r.visits.length*visit:0;
+ text($('cust-repair-cost'),'At most '+(rounds*round+rerun)+' credits: '+round+' per fix round (only rounds that run are charged)'+(rerun?' plus '+rerun+' to rerun '+r.visits.length+' customers':'')+'.');
+}
+$('cust-rounds').onchange=repairCost;$('cust-rerun').onchange=repairCost;
+function renderRepair(r){
+ const box=$('cust-repair-result'),body=$('cust-repair-body');body.replaceChildren();
+ if(!r){box.classList.add('hidden');return}
+ box.classList.remove('hidden');
+ if(r.nothing){body.append(el('p','muted','Nothing to fix.'));return}
+ if(r.rerun){const x=r.rerun;body.append(el('p','cust-stats',x.before.completed+' of '+x.before.visitors+' reached the goal before → '+x.after.completed+' of '+x.after.visitors+' after ('+(x.change>=0?'+':'')+x.change+' points)'))}
+ const word={fixed:'✓ Fixed (the same steps now work)',still:'✗ Still there',changed:'? The steps changed, judged by the rerun',confirmed:'Not retested',not_reproduced:'Left alone (could not reproduce)',experience:'Visitor experience',not_checked:'Not checked'};
+ const ul=document.createElement('ul');for(const p of r.problems)ul.append(li(p.title+' — '+(word[p.after]||p.after),p.after==='still'?'error':''));body.append(ul);
+ if(r.rerun&&r.rerun.issues.length){const u2=document.createElement('ul');for(const x of r.rerun.issues)u2.append(li(x.title+' — '+({gone:'no longer reported',still:'still reported',new:'new'}[x.status]),x.status==='new'?'error':''));body.append(el('p','small','What visitors said, before and after:'),u2)}
+ if(r.checks.length)body.append(el('p','small','Saved as checks: '+r.checks.join('; ')));
+ body.append(el('p','muted small',r.rounds.length+' fix round'+(r.rounds.length===1?'':'s')+(r.rounds.length?' (version '+r.rounds.map(x=>x.version).join(', ')+')':'')+(r.credits?' · '+r.credits+' credits':'')+(r.stopped?' · '+r.stopped:'')+(r.rerun_error?' · The rerun did not finish: '+r.rerun_error:'')));
+ if(r.rerun&&r.rerun.report_id){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent='Open the new report';b.onclick=()=>openCustReport(r.rerun.report_id);body.append(b)}
+}
+$('cust-repair').onclick=async()=>{
+ if(state.job||!cust.report)return;text($('cust-error'),'');$('cust-repair').disabled=true;
+ const rid=cust.report.id;
+ try{
+  const r=await api('/projects/'+state.project.id+'/synthetic',{method:'POST',body:{repair:rid,rounds:Number($('cust-rounds').value),rerun:$('cust-rerun').checked,tier:state.tier}});
+  $('customers-dialog').close();
+  $('messages').append(messageItem({role:'user',text:'Fix and retest what synthetic customers found'}));
+  const done=await watch(r.job);
+  if(done&&done.status==='complete'&&done.result&&done.result.repair){
+   const x=done.result.repair,fixed=x.problems.filter(p=>p.after==='fixed').length,confirmed=x.problems.filter(p=>p.before==='confirmed').length;
+   $('messages').append(messageItem({role:'assistant',text:x.nothing?'The test found nothing to fix.':(confirmed?fixed+' of '+confirmed+' confirmed problems fixed and checked by replaying the same steps.':'Sent what visitors found hard to the AI.')+(x.rerun?' Rerun: '+x.rerun.before.completed+' → '+x.rerun.after.completed+' of '+x.rerun.after.visitors+' reached the goal.':'')+(x.checks.length?' Saved '+x.checks.length+' check'+(x.checks.length===1?'':'s')+'.':'')}));
+   cust.info=await api('/projects/'+state.project.id+'/synthetic');renderCustReports();await openCustReport(rid);$('customers-dialog').showModal();
+  }
+ }catch(err){text($('cust-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{$('cust-repair').disabled=false}
 };
 $('cust-fix').onclick=()=>{if(!cust.fix)return;$('customers-dialog').close();setChatMode('build');send(cust.fix,'build')};
 // ---------- API keys (MCP) ----------

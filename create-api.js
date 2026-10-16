@@ -78,7 +78,7 @@ function findShare(token){
 }
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
-const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting']);
+const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking']);
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
@@ -284,6 +284,107 @@ function startSynthetic(v,id,{audience,goal,count,path:start,tier='standard'},{c
   }catch(e){
    update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: synthetic test did not finish','refund:'+job.id)}catch{}
+  }
+  controllers.delete(job.id);job.finished_at=new Date().toISOString();
+  setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+ });
+ return job;
+}
+// Fix and retest: the problems a synthetic test confirmed (by replaying the visitors' steps) go
+// to the builder; the same steps are replayed on the new version, up to `rounds` fix rounds,
+// stopping early when everything is fixed or a round fixes nothing. Fixed problems become saved
+// checks. With rerun, the same customers then use the new version for a before-and-after.
+// Each fix round costs a chat edit and the rerun costs the test's price, charged when each
+// starts; a round that fails is refunded, finished rounds are not.
+function repairRounds(){return Math.max(1,Math.min(5,intEnv('KAIROQ_REPAIR_ROUNDS',3)))}
+function repairPrice(tier,{rounds,visitors,rerun}){return cost({mode:'build',tier})*rounds+(rerun?syntheticPrice(visitors,tier):0)}
+function startRepair(v,id,{report:rid,rounds=2,rerun=false,tier='standard'},{callModel,browse,checkRuntime,inspect}){
+ const synthetic=require('./synthetic-customers'),repair=require('./synthetic-repair');
+ if(!browse||!require('./runtime-check').available())throw Object.assign(Error('Fix and retest needs a browser (Chromium) on this server'),{status:409});
+ const report=synthetic.load(id,String(rid||''));
+ rounds=Math.max(1,Math.min(repairRounds(),Math.round(Number(rounds))||2));rerun=Boolean(rerun);
+ const people=report.visits.map(x=>x.persona);
+ const max=repairPrice(tier,{rounds,visitors:people.length,rerun});
+ for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+ const meta=builder.loadMeta(id);
+ if(!meta.versions.some(x=>x.n===report.version))throw Object.assign(Error('The version this test ran on no longer exists. Run a new test first.'),{status:409});
+ if(v.kind==='customer'&&accounts.publicAccount(accounts.get(v.account.id)).credits<cost({mode:'build',tier}))throw Object.assign(Error('Not enough credits for a fix round'),{status:402});
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'repair',tier,credits:max,charged:0,status:'queued',seq:0,created_at:new Date().toISOString()};
+ const update=patch=>{Object.assign(job,patch);job.seq++};
+ const controller=new AbortController();controllers.set(job.id,controller);jobs.set(job.id,job);
+ const pay=(n,label,ref)=>{if(v.kind==='customer'&&n>0){accounts.charge(v.account.id,n,label,ref);job.charged+=n}};
+ const refund=(n,label,ref)=>{if(v.kind==='customer'&&n>0)try{accounts.grant(v.account.id,n,label,ref);job.charged-=n}catch{}};
+ setImmediate(async()=>{
+  const signal=controller.signal,start=p=>builder.previewUrl(builder.loadMeta(id),p)+(report.test.path?String(report.test.path).replace(/^\//,''):'');
+  const out={report_id:report.id,rounds:[],problems:[],checks:[]};
+  try{
+   // 1. Reproduce (reports from before replays existed are replayed now; free).
+   if(!Array.isArray(report.problems)){update({status:'reproducing',progress:'Replaying what visitors did'});report.problems=await repair.reproduce(id,report,{browse,startUrl:start(report.version),signal})}
+   const confirmed=report.problems.filter(p=>p.status==='confirmed');
+   const status=new Map(report.problems.map(p=>[p.id,p.status])),replays=new Map();
+   if(!confirmed.length&&!(report.summary.issues||[]).length){out.nothing=true}
+   else{
+    // 2–3. Fix, then replay the same steps on the new version.
+    let open=confirmed.slice(),still=[],version=null;
+    for(let r=1;r<=rounds;r++){
+     if(r>1&&!open.length)break;
+     const price=cost({mode:'build',tier}),ref=':fix'+r;
+     pay(price,'Fix and retest'+(r>1?' (round '+r+')':''),'job:'+job.id+ref);
+     let result;
+     try{
+      update({status:'writing',progress:'Fix round '+r+' of up to '+rounds});
+      result=await builder.edit(id,repair.fixMessage(report,r===1?report.problems:open,{round:r,still}),{callModel,checkRuntime,inspect,tier,signal,displayText:'Fix what synthetic customers found'+(r>1?' (round '+r+')':''),onProgress:st=>update({status:st,stream:null}),onStream:text=>update({stream:streamSnapshot(text,'build')}),onEvent:events=>update({events:events.slice(-80)})});
+     }catch(e){refund(price,'Refund: fix round did not finish','refund:'+job.id+ref);if(r===1||signal.aborted)throw e;out.stopped='Round '+r+' did not finish: '+String(e.message||e).slice(0,300);break}
+     version=result.version;
+     const round={round:r,version,message:String(result.message||'').slice(0,400)};out.rounds.push(round);
+     if(!open.length)break;
+     update({status:'retesting',progress:'Replaying the same steps on version '+version});
+     let res;
+     // A replay that cannot run does not undo the fix that was made; the outcome says so.
+     try{res=await repair.retest(id,open,{browse,startUrl:start(version),signal})}
+     catch(e){if(signal.aborted)throw e;out.stopped='The replay on version '+version+' did not run: '+String(e.message||e).slice(0,300);break}
+     for(const x of res){status.set(x.id,x.status);replays.set(x.id,x.replay)}
+     round.fixed=res.filter(x=>x.status==='fixed').length;round.still=res.filter(x=>x.status==='still').length;
+     const left=open.filter(p=>status.get(p.id)==='still');
+     // Stop when a later round fixes nothing more.
+     const stuck=r>1&&left.length>=open.length;
+     still=left;open=left;
+     if(stuck)break;
+    }
+    // 4. Lock in: each fixed problem becomes a saved check, verified on the new version first.
+    if(version&&inspect){
+     update({status:'locking',progress:'Saving checks so fixed problems cannot come back'});
+     const checks=require('./react-checks');
+     for(const p of confirmed){
+      if(status.get(p.id)!=='fixed')continue;
+      const draft=repair.toCheck(p,replays.get(p.id),report.test.path);
+      if(!draft)continue;
+      try{
+       const r=await checks.run(id,builder.previewUrl(builder.loadMeta(id),version),{inspect,checks:[{...draft,id:'draft'}],record:false});
+       if(!r.skipped&&!r.failed.length){checks.save(id,draft,{source:'repair'});out.checks.push(draft.name)}
+      }catch{}
+     }
+    }
+    // 5. Rerun the same customers on the new version.
+    if(rerun&&version){
+     const price=syntheticPrice(people.length,tier);
+     pay(price,'Synthetic customers: rerun '+people.length+' visitors','job:'+job.id+':rerun');
+     try{
+      const meta2=builder.loadMeta(id);
+      const r2=await synthetic.run(id,builder.previewUrl(meta2),report.test,{callModel,browse,tier,signal,people,onProgress:p=>update({status:p.status,progress:p.text})});
+      if(r2.summary.issues.length)r2.explanations=await require('./explain').issues(id,{...r2,test:report.test,version:meta2.current_version},{callModel,tier,signal}).catch(()=>[]);
+      const after=synthetic.save(id,{at:new Date().toISOString(),version:meta2.current_version,tier,credits:price,test:report.test,after_fix_of:report.id,...r2});
+      out.rerun={report_id:after.id,...repair.compare(report,after)};
+     }catch(e){refund(price,'Refund: rerun did not finish','refund:'+job.id+':rerun');if(signal.aborted)throw e;out.rerun_error=String(e.message||e).slice(0,300)}
+    }
+   }
+   out.problems=report.problems.map(p=>({id:p.id,title:p.title,kind:p.kind,before:p.status,after:status.get(p.id)}));
+   out.at=new Date().toISOString();out.credits=job.charged;
+   report.repair=out;synthetic.update(id,report);
+   job.result={repair:out};
+   update({status:'complete',progress:null});
+  }catch(e){
+   update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
   }
   controllers.delete(job.id);job.finished_at=new Date().toISOString();
   setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
@@ -555,10 +656,11 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/synthetic'&&method==='GET'){
    const rid=new URL(req.url,'http://x').searchParams.get('report'),synthetic=require('./synthetic-customers');
    if(rid){const report=synthetic.load(id,rid);return send(res,200,{report,fix_message:synthetic.fixMessage(report)}),true}
-   return send(res,200,{reports:synthetic.list(id),browser:require('./runtime-check').available(),max:synthetic.MAX_PERSONAS(),price_per_visitor:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,syntheticPrice(1,t.id)]))}),true;
+   return send(res,200,{reports:synthetic.list(id),browser:require('./runtime-check').available(),max:synthetic.MAX_PERSONAS(),price_per_visitor:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,syntheticPrice(1,t.id)])),price_per_fix_round:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,cost({mode:'build',tier:t.id})])),max_rounds:repairRounds()}),true;
   }
   if(action==='/synthetic'&&method==='POST'){
    const b=await readJson(req,8000);
+   if(b.repair)return send(res,202,{job:publicJob(startRepair(v,id,{report:b.repair,rounds:b.rounds,rerun:b.rerun,tier:b.tier||'standard'},{callModel,browse,checkRuntime,inspect}))}),true;
    return send(res,202,{job:publicJob(startSynthetic(v,id,{audience:b.audience,goal:b.goal,count:b.count,path:b.path,tier:b.tier||'standard'},{callModel,browse}))}),true;
   }
   if(action==='/reference'&&method==='GET'){
@@ -803,4 +905,4 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  }
 }
 
-module.exports={handle,jobs,streamSnapshot,startSynthetic,syntheticPrice,ownedProject,publicJob,listFor};
+module.exports={handle,jobs,streamSnapshot,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor};
