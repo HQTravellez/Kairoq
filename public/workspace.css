@@ -1,0 +1,109 @@
+/* The signed-in workspace: home, editor chat, toolbar, dialogs. Loaded after create.css. */
+
+/* Header */
+.bar{min-height:52px;padding:8px 14px}
+.who{font-weight:500}
+.bar-project input{font-size:14px}
+
+/* Home */
+.home{padding-top:9vh}
+.home>h1{font-size:clamp(30px,4.6vw,44px);letter-spacing:-.04em}
+.home .prompt-box{margin-top:24px}
+.home .prompt-box .primary{border-radius:999px;padding:10px 18px}
+.home h2{font-size:15px;font-weight:700;letter-spacing:-.01em;margin:40px 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.templates button{border-radius:14px;padding:16px;box-shadow:var(--shadow-sm)}
+.templates button:hover{box-shadow:var(--shadow)}
+.projects li{border-radius:14px}
+
+/* Editor layout */
+#editor{grid-template-columns:minmax(320px,400px) minmax(0,1fr)}
+.chat{background:var(--panel);backdrop-filter:none;border-right:1px solid var(--border)}
+.stage{background:var(--bg)}
+
+/* Chat messages */
+.messages{padding:20px 20px 8px;gap:18px}
+.messages .user{background:var(--side);border:1px solid var(--border);border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.5;max-width:86%}
+.messages .assistant{position:relative;padding:0 0 0 28px!important}
+.messages .assistant::before{content:"";position:absolute;left:0;top:2px;width:18px;height:18px;border-radius:6px;background:var(--grad);box-shadow:0 3px 8px -3px rgba(240,82,95,.6)}
+.messages .assistant.failed{padding:10px 12px 10px 38px!important;border:1px solid color-mix(in srgb,var(--error) 40%,transparent)!important;border-radius:14px;background:color-mix(in srgb,var(--error) 6%,var(--panel))!important}
+.messages .assistant.failed::before{left:12px;top:12px;background:var(--error);box-shadow:none}
+.messages .assistant .md{font-size:14px}
+.msg-meta{margin-top:8px;gap:10px}
+.msg-meta .ver{border-radius:999px;padding:3px 8px}
+.file-chips.done{margin-top:8px}
+.chip,code.chip{border-radius:999px;padding:4px 9px}
+.status-line{font-size:13px}
+
+/* Composer */
+.composer{padding:10px 14px 0}
+#chat-form{margin:0 12px 12px;padding:10px 10px 8px;border-radius:18px;border-color:var(--border);box-shadow:var(--shadow)}
+#chat-form:focus-within{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent),var(--shadow)}
+#chat-form textarea{font-size:14px;line-height:1.5;min-height:60px;padding:4px 6px}
+.composer-bar{flex-wrap:nowrap;gap:5px;margin-top:4px;min-width:0}
+.composer-bar .seg{flex:none}
+.composer-bar .seg button{padding:5px 6px;font-size:12.5px}
+.composer-bar select{flex:none;width:auto;max-width:160px;padding:6px 20px 6px 8px;font-size:12.5px;border-radius:999px;background:var(--side);border-color:transparent;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+.composer-bar #cost-hint{display:none}
+.composer-bar .send{margin-left:auto;width:36px;height:36px;padding:0;border-radius:50%;display:inline-grid;place-items:center;flex:none}
+.composer-bar .send .ico{width:16px;height:16px;stroke-width:2.2}
+.chat .error{padding:0 16px 10px}
+
+/* Dropdown menus */
+.menu{position:relative}
+.menu>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;border:1px solid transparent;font-weight:500;color:var(--text);user-select:none;white-space:nowrap}
+.menu>summary::-webkit-details-marker{display:none}
+.menu>summary:hover,.menu[open]>summary{background:var(--hover);border-color:var(--border)}
+.menu .caret{width:7px;height:7px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:translateY(-2px) rotate(45deg);opacity:.6}
+.menu-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:30;min-width:260px;display:grid;gap:2px;padding:6px;background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);animation:menuin .12s ease-out}
+@keyframes menuin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.menu.up .menu-panel{top:auto;bottom:calc(100% + 6px);left:0;right:auto}
+.menu-panel button{display:grid;gap:1px;text-align:left;border:0;border-radius:10px;background:transparent;padding:8px 10px;box-shadow:none;width:100%}
+.menu-panel button:hover{background:var(--hover)}
+.menu-panel button b{font-size:13.5px;font-weight:600}
+.menu-panel button span{font-size:12px;color:var(--muted);line-height:1.35}
+.menu.up>summary{width:32px;height:32px;padding:0;justify-content:center;border-radius:50%;background:var(--side);font-size:18px;line-height:1;color:var(--muted)}
+.menu.up>summary:hover,.menu.up[open]>summary{color:var(--text)}
+
+/* Toolbar */
+.stage-bar{padding:8px 14px;gap:6px;flex-wrap:wrap;overflow:visible}
+.stage-bar>*{flex:none}
+.bar-spacer{flex:1 1 0!important;min-width:8px}
+.stage-bar select{border-radius:999px;background:var(--side);border-color:transparent;padding:7px 26px 7px 11px;max-width:190px;font-weight:500}
+.stage-bar .seg button{padding:6px 10px}
+#open{width:34px;padding:7px 0;justify-content:center;font-size:15px}
+.stage-bar .ghost,.stage-bar .link{border-radius:999px;border-color:transparent;font-weight:500}
+.stage-bar .ghost:hover,.stage-bar .link:hover{border-color:var(--border)}
+.stage-bar .primary{margin-left:0;border-radius:999px;padding:8px 16px}
+#visual-toggle[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.errors{margin:10px 14px 0;border:1px solid color-mix(in srgb,var(--error) 30%,transparent);border-radius:12px}
+
+/* Preview */
+.canvas{padding:12px 14px 14px}
+#frame{border-radius:14px;box-shadow:var(--shadow)}
+
+/* Dialogs */
+.dialog{padding:26px 28px}
+.dialog h2{font-size:21px;margin-bottom:6px}
+.dialog h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:26px 0 8px}
+.dialog label{font-size:12.5px;font-weight:600;color:var(--muted)}
+.dialog input,.dialog textarea,.dialog select{border-radius:10px;padding:9px 12px;font-size:14px;color:var(--text)}
+.dialog input:focus,.dialog textarea:focus,.dialog select:focus{outline:0;border-color:color-mix(in srgb,var(--accent) 50%,var(--border));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)}
+.dialog .primary{border-radius:999px;padding:9px 18px}
+.dialog .ghost{border-radius:999px}
+.dialog .error:empty{display:none}
+.notice{border:1px solid var(--border);border-radius:14px;padding:14px 16px;background:var(--side)}
+.skills{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
+.skills li{border:1px solid var(--border);border-radius:12px;padding:8px 12px;background:var(--panel)}
+
+@media (max-width:820px){
+ #editor{grid-template-columns:1fr}
+ .chat{border-right:0;border-top:1px solid var(--border)}
+ .menu-panel{right:auto;left:0}
+}
+
+/* Narrower stages: shrink the version select and hide the device labels before anything wraps */
+@media (max-width:1360px){
+ .stage-bar select{max-width:120px}
+ .stage-bar .seg button{padding:6px 8px}
+ #visual-toggle{padding-left:9px;padding-right:9px}
+}

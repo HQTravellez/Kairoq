@@ -171,7 +171,7 @@ test('Stripe credit purchases are verified, re-read from Stripe and credited onc
   const stamp=Math.floor(Date.now()/1000);
   const sig='t='+stamp+',v1='+crypto.createHmac('sha256',process.env.KAIROQ_STRIPE_WEBHOOK_SECRET).update(stamp+'.').update(raw).digest('hex');
   const session={id:'cs_test_1',payment_status:'paid',metadata:{account_id:account.id,pack:'starter'}};
-  await assert.rejects(accounts.stripeWebhook(raw,sig.replace(/v1=./,'v1=0'),{fetchSession:async()=>session}),/signature invalid/);
+  await assert.rejects(accounts.stripeWebhook(raw,sig.replace(/v1=(.)/,(m,c)=>'v1='+(c==='0'?'1':'0')),{fetchSession:async()=>session}),/signature invalid/);
   assert.deepEqual(await accounts.stripeWebhook(raw,sig,{fetchSession:async()=>({...session,payment_status:'unpaid'})}),{pending:'cs_test_1'});
   assert.equal((await accounts.stripeWebhook(raw,sig,{fetchSession:async()=>session})).credited,true);
   assert.equal((await accounts.stripeWebhook(raw,sig,{fetchSession:async()=>session})).credited,false);

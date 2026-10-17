@@ -241,11 +241,11 @@ async function renderFiles(){
 state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
 $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('chat-form').requestSubmit()}});
 const PLACEHOLDERS={build:'Ask for a change: add a pricing section, make the header sticky…',discuss:'Ask a question or plan a feature. No code changes, no surprises.',agent:'Give the agent a bigger task: "add room booking with availability, test the whole flow and fix any errors"'};
-function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));$('chat-input').placeholder=PLACEHOLDERS[mode];text($('send'),mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');costHint()}
+function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));$('chat-input').placeholder=PLACEHOLDERS[mode];$('send').setAttribute('aria-label',mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');$('send').title=$('send').getAttribute('aria-label');costHint()}
 $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');$('mode-agent').onclick=()=>setChatMode('agent');
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
- for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+' · '+t.credits+' credit'+(t.credits===1?'':'s')+(t.enabled?'':' (not enabled)');if(t.id===state.tier)o.selected=true;sel.append(o)}
+ for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
  costHint();
 }
 $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
@@ -292,7 +292,7 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
+const LABELS={pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
 const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
@@ -504,7 +504,8 @@ async function watch(job){
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
   if(done.mode!=='discuss')setPreview(project.preview_url);
-  if(done.problem)$('messages').append(messageItem({role:'assistant',text:done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.'}));
+  if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')}));
+  else if(done.free)$('messages').append(messageItem({role:'assistant',text:done.free}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?(done.mode==='repair'?'\nRounds that did not finish were refunded.':'\nYour credits were refunded.'):''),failed:true}));
@@ -897,6 +898,28 @@ function renderLanding(){
  text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. A request that fails before anything is saved is not charged. Not happy with a change? Contact support.');
 }
 $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent;$('landing-prompt').focus()};
+$('nav-signin').onclick=()=>{setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+$('nav-start').onclick=()=>{$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
+// Landing motion: a typing placeholder, reveal-on-scroll and a cursor glow on the tiles. Nothing here is needed to use the page.
+(function(){
+ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const ta=$('landing-prompt'),ideas=['A booking site for my yoga studio with class times, prices and online payments','A marketplace where parents find and pay private tutors','A guest portal for my hotel with Wi-Fi, check-out and local tips','A CRM for my agency with leads, deals and weekly follow-ups'];
+ let i=0,pos=0,del=false,timer;
+ function tick(){
+  if(document.activeElement===ta||ta.value||$('auth').classList.contains('hidden')){timer=setTimeout(tick,900);return}
+  const s=ideas[i];pos+=del?-1:1;ta.placeholder=s.slice(0,pos);
+  let wait=del?22:38;if(!del&&pos>=s.length){del=true;wait=2200}else if(del&&pos<=0){del=false;i=(i+1)%ideas.length;wait=350}
+  timer=setTimeout(tick,wait);
+ }
+ if(!reduce)timer=setTimeout(tick,1200);
+ const items=document.querySelectorAll('.landing .section-head,.landing .steps li,.landing .tile,.landing .proof div,.landing .cmp-table,.landing .credits-how,.landing .cta-text,.landing .cta .auth-card');
+ if(!reduce&&'IntersectionObserver' in window){
+  const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}},{rootMargin:'0px 0px -6% 0px',threshold:0});
+  for(const el of items){el.classList.add('rv');io.observe(el)}
+ }
+ for(const t of document.querySelectorAll('.landing .tile'))t.addEventListener('pointermove',e=>{const r=t.getBoundingClientRect();t.style.setProperty('--mx',(e.clientX-r.left)+'px');t.style.setProperty('--my',(e.clientY-r.top)+'px')});
+})();
 $('plans-open').onclick=()=>{
  text($('plans-error'),'');
  const account=state.me.viewer?.account||{};
@@ -1009,7 +1032,7 @@ $('security-open').onclick=async()=>{
   const serious=findings.filter(f=>f.severity!=='low');
   const canEdit=(state.project.role||'owner')!=='viewer';
   $('security-fix').classList.toggle('hidden',!serious.length||!canEdit);
-  $('security-fix').onclick=()=>{$('security-dialog').close();send('Fix these security problems:\n'+serious.map(f=>'- '+f.title+(f.file?' ('+f.file+')':'')+': '+f.detail+' Suggested fix: '+f.fix).join('\n'),'build')};
+  $('security-fix').onclick=()=>{$('security-dialog').close();send('Fix these security problems:\n'+serious.map(f=>'- '+f.title+(f.file?' ('+f.file+')':'')+': '+f.detail+' Suggested fix: '+f.fix).join('\n'),'build','/chat',{fix:true})};
  }catch(err){text($('security-summary'),err.message)}
 };
 
@@ -1112,7 +1135,7 @@ async function explainProblem(kind,textValue,title,version){
    if(x.watch)body.append(el('p','small','Worth checking by hand: '+x.watch));
   }else{
    body.append(explainCard(x));
-   if(x.fix){const b=$('explain-fix');b.classList.remove('hidden');b.onclick=()=>{$('explain-dialog').close();setChatMode('build');send('Fix this problem: '+x.what+(x.file?' (in '+x.file+' around line '+x.line+')':'')+'. Cause: '+x.why+'. Fix: '+x.fix,'build')}}
+   if(x.fix){const b=$('explain-fix');b.classList.remove('hidden');b.onclick=()=>{$('explain-dialog').close();setChatMode('build');send('Fix this problem: '+x.what+(x.file?' (in '+x.file+' around line '+x.line+')':'')+'. Cause: '+x.why+'. Fix: '+x.fix,'build','/chat',{fix:true})}}
   }
   refreshCredits();
  }catch(err){body.replaceChildren();text($('explain-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
@@ -1164,7 +1187,7 @@ function showCustReport(report,fix){
  const drop=$('cust-drop');drop.replaceChildren();for(const d of n.drop_off)drop.append(li(d.path+' — '+d.visitors+' visitor'+(d.visitors===1?'':'s')));if(!n.drop_off.length)drop.append(li('Nobody left early.','muted'));
  const iss=$('cust-issues');iss.replaceChildren();for(const x of s.issues)iss.append(li(x.title+(x.why?': '+x.why:'')+(x.who?' ('+x.who+')':'')+(x.quote?' — “'+x.quote+'”':'')));if(!s.issues.length)iss.append(li('No issues found.','muted'));
  const cards=$('cust-cards');cards.replaceChildren();
- for(const c of report.explanations||[])cards.append(explainCard(c,{onFix:()=>{$('customers-dialog').close();setChatMode('build');send('Fix this problem found by synthetic customers: '+c.what+(c.file?' (in '+c.file+' around line '+c.line+')':'')+'. Cause: '+c.why+'. Fix: '+c.fix,'build')}}));
+ for(const c of report.explanations||[])cards.append(explainCard(c,{onFix:()=>{$('customers-dialog').close();setChatMode('build');send('Fix this problem found by synthetic customers: '+c.what+(c.file?' (in '+c.file+' around line '+c.line+')':'')+'. Cause: '+c.why+'. Fix: '+c.fix,'build','/chat',{fix:true})}}));
  if(!(report.explanations||[]).length)cards.append(el('p','muted small','No explanations for this test.'));
  // With explanations, the short issue list is a summary.
  text($('cust-issues-title'),(report.explanations||[]).length?'Issues in short':'Issues');
@@ -1251,6 +1274,102 @@ $('cust-repair').onclick=async()=>{
  finally{$('cust-repair').disabled=false}
 };
 $('cust-fix').onclick=()=>{if(!cust.fix)return;$('customers-dialog').close();setChatMode('build');send(cust.fix,'build')};
+// ---------- customers before code ----------
+const launch={info:null,watch:null};
+function copyButton(value){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent='Copy';b.onclick=()=>navigator.clipboard?.writeText(value).then(()=>{b.textContent='Copied'}).catch(()=>{});return b}
+function launchPost(title,body,extra){
+ const box=document.createElement('div');box.className='launch-post';
+ const h=document.createElement('p');h.className='small';const b=document.createElement('b');b.textContent=title;h.append(b);if(extra)h.append(' · '+extra);
+ const pre=document.createElement('pre');pre.className='small';pre.textContent=body;
+ box.append(h,pre,copyButton(body));return box;
+}
+function launchCost(){
+ const parts=launch.info&&launch.info.price_parts&&launch.info.price_parts[state.tier];
+ if(state.me.viewer.kind!=='customer'||!parts){text($('launch-cost'),'');return}
+ const n=Number($('launch-visitors').value),total=parts.pitch+parts.page+(launch.info.browser?parts.per_visitor*n:0);
+ text($('launch-cost'),'At most '+total+' credits: '+parts.pitch+' for the pitch, '+parts.page+' for the page'+(launch.info.browser?', '+parts.per_visitor*n+' for '+n+' AI customers':'')+'. A part that does not work is free.');
+}
+function renderLaunch(){
+ const l=launch.info&&launch.info.launch;
+ $('launch-new').classList.toggle('hidden',Boolean(l));$('launch-view').classList.toggle('hidden',!l);
+ launchCost();
+ if(!l)return;
+ const st=l.status;
+ text($('launch-count'),st.signups+' of '+st.target+' signups');text($('launch-say'),st.say);
+ $('launch-bar').style.width=Math.min(100,Math.round(st.signups/st.target*100))+'%';
+ const link=$('launch-link');link.replaceChildren();
+ if(st.link){const a=document.createElement('a');a.href=st.link;a.target='_blank';a.rel='noopener';a.textContent=st.link;link.append('Your page: ',a,st.visitors_30d?' · '+st.visitors_30d+' visitors in 30 days'+(st.rate!=null?' · '+st.rate+'% signed up':''):'')}
+ else link.append('Publish the page (Publish, top right) to get the link to share.');
+ $('launch-target-edit').value=st.target;
+ text($('launch-headline'),l.pitch.headline);text($('launch-sub'),l.pitch.subheadline);
+ const r=l.reaction;
+ text($('launch-reaction'),r?r.joined+' of '+r.visitors+' AI customers joined the waitlist ('+r.rate+'%). '+(r.headline||'')+' This is a first read of the pitch, not a prediction: real signups decide.':'No AI customer reactions for this launch.');
+ const ul=$('launch-objections');ul.replaceChildren();for(const o of (r&&r.objections)||[])ul.append(li(o.title+(o.quote?' — “'+o.quote+'”':'')));
+ $('launch-report').classList.toggle('hidden',!l.report_id);
+ const posts=$('launch-posts');posts.replaceChildren();const p=l.posts;
+ if(p.reddit.title||p.reddit.body)posts.append(launchPost('Reddit',p.reddit.title+'\n\n'+p.reddit.body,p.reddit.where.length?'fits '+p.reddit.where.map(x=>'r/'+x).join(', ')+' (read each community\'s rules first)':''));
+ if(p.linkedin)posts.append(launchPost('LinkedIn',p.linkedin));
+ if(p.whatsapp)posts.append(launchPost('WhatsApp groups',p.whatsapp));
+ if(p.x)posts.append(launchPost('X',p.x));
+ if(p.email.body)posts.append(launchPost('Email to friends and contacts','Subject: '+p.email.subject+'\n\n'+p.email.body));
+}
+function renderWatch(){
+ const d=launch.watch;if(!d)return;const w=d.watch||{};
+ $('watch-enabled').checked=Boolean(w.enabled);
+ $('watch-audience').value=w.audience||(launch.info&&launch.info.launch&&launch.info.launch.pitch.audience)||'';
+ $('watch-goal').value=w.goal||'';
+ const sel=$('watch-collection');sel.replaceChildren();for(const c of d.collections)sel.append(new Option(c,c));if(!d.collections.length)sel.append(new Option('(no collections yet)',''));sel.value=w.collection||(d.collections.includes('waitlist')?'waitlist':d.collections[0]||'');
+ if(w.count)$('watch-count').value=String(w.count);
+ const per=d.price_per_visitor&&d.price_per_visitor[state.tier];
+ text($('watch-cost'),(d.published?'':'Publish the app first: the watch tests the live version. ')+(state.me.viewer.kind==='customer'&&per!=null?'Each weekly run costs '+Number($('watch-count').value)*per+' credits.':''));
+ $('watch-run').disabled=!d.published||!w.audience;
+ const box=$('watch-history');box.replaceChildren();
+ for(const e of d.history){
+  const div=document.createElement('div');div.className='watch-entry';
+  const n=e.numbers.this_week,last=e.numbers.last_week;
+  div.append(el('p','small muted',e.at.slice(0,10)+' · '+n.visitors+' visitors, '+n.signups+' signups'+(n.rate!=null?' ('+n.rate+'%)':'')+' · last week '+last.visitors+' / '+last.signups+' · AI customers '+e.ai.completed+' of '+e.ai.visitors));
+  div.append(el('p','',e.brief.headline));
+  if(e.brief.stopping.length){const u=document.createElement('ul');u.className='small';for(const x of e.brief.stopping)u.append(li(x.what+(x.evidence?' — '+x.evidence:'')));div.append(el('p','small','What is stopping signups:'),u)}
+  if(e.brief.next.length){const u=document.createElement('ul');u.className='small';for(const x of e.brief.next)u.append(li(x));div.append(el('p','small','What to change next:'),u)}
+  if(e.brief.good)div.append(el('p','small muted','Working well: '+e.brief.good));
+  const b=document.createElement('button');b.type='button';b.className='primary';b.textContent='Open the report and fix';b.onclick=async()=>{$('launch-dialog').close();cust.info=await api('/projects/'+state.project.id+'/synthetic');renderCustReports();await openCustReport(e.report_id);$('customers-dialog').showModal()};
+  div.append(b);box.append(div);
+ }
+}
+async function loadLaunch(){
+ [launch.info,launch.watch]=await Promise.all([api('/projects/'+state.project.id+'/launch'),api('/projects/'+state.project.id+'/watch')]);
+ renderLaunch();renderWatch();
+}
+$('launch-open').onclick=async()=>{if(!state.project)return;text($('launch-error'),'');text($('watch-status'),'');try{await loadLaunch();$('launch-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
+$('launch-visitors').onchange=launchCost;$('watch-count').onchange=renderWatch;
+$('launch-start').onclick=async()=>{
+ if(state.job)return;text($('launch-error'),'');
+ const idea=$('launch-idea').value.trim();if(idea.length<20){text($('launch-error'),'Describe the idea in a few sentences: who it is for and what it does.');return}
+ $('launch-start').disabled=true;
+ try{
+  const r=await api('/projects/'+state.project.id+'/launch',{method:'POST',body:{idea,target:Number($('launch-target').value),visitors:Number($('launch-visitors').value),tier:state.tier}});
+  $('launch-dialog').close();$('messages').append(messageItem({role:'user',text:'Test this idea before building it: '+idea}));
+  const done=await watch(r.job);
+  if(done&&done.status==='complete'&&done.result&&done.result.launch){const l=done.result.launch;$('messages').append(messageItem({role:'assistant',text:'Your landing page and launch posts are ready.'+(l.reaction?' '+l.reaction.joined+' of '+l.reaction.visitors+' AI customers joined the waitlist.':'')+' Publish the page, share the posts, and Kairoq counts real signups toward your goal of '+l.target+'. Open Launch to see everything.'}));await loadLaunch();$('launch-dialog').showModal()}
+ }catch(err){text($('launch-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ finally{$('launch-start').disabled=false}
+};
+$('launch-target-save').onclick=async()=>{try{launch.info.launch=(await api('/projects/'+state.project.id+'/launch',{method:'POST',body:{target:Number($('launch-target-edit').value)}})).launch;renderLaunch()}catch(err){text($('launch-error'),err.message)}};
+$('launch-report').onclick=async()=>{const rid=launch.info&&launch.info.launch&&launch.info.launch.report_id;if(!rid)return;$('launch-dialog').close();cust.info=await api('/projects/'+state.project.id+'/synthetic');renderCustReports();await openCustReport(rid);$('customers-dialog').showModal()};
+$('watch-save').onclick=async()=>{
+ text($('launch-error'),'');
+ try{const r=await api('/projects/'+state.project.id+'/watch',{method:'POST',body:{enabled:$('watch-enabled').checked,audience:$('watch-audience').value,goal:$('watch-goal').value,collection:$('watch-collection').value,count:Number($('watch-count').value),tier:state.tier}});launch.watch={...launch.watch,watch:r.watch,history:r.history};renderWatch();text($('watch-status'),'Saved.')}
+ catch(err){text($('launch-error'),err.message)}
+};
+$('watch-run').onclick=async()=>{
+ if(state.job)return;text($('launch-error'),'');
+ try{
+  const r=await api('/projects/'+state.project.id+'/watch',{method:'POST',body:{run:true}});
+  $('launch-dialog').close();$('messages').append(messageItem({role:'user',text:'Run the growth watch now'}));
+  const done=await watch(r.job);
+  if(done&&done.status==='complete'&&done.result&&done.result.watch){$('messages').append(messageItem({role:'assistant',text:done.result.watch.brief.headline+' Open Launch to see the brief.'}));await loadLaunch();$('launch-dialog').showModal()}
+ }catch(err){text($('launch-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+};
 // ---------- API keys (MCP) ----------
 function renderApiKeys(keys){
  const ul=$('apikey-list');ul.replaceChildren();
@@ -1353,3 +1472,7 @@ $('genimage-go').onclick=async()=>{
 $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The design review needs a browser on the server (Chromium), which is not available here.');return}const note=$('chat-input').value.trim();send(note?'Polish the design: '+note:'Polish the design','polish',undefined,{message:note})};
 
 })();
+
+// Dropdown menus (details.menu) close when something inside is chosen or when clicking elsewhere.
+document.addEventListener('click',e=>{for(const d of document.querySelectorAll('details.menu[open]'))if(!d.contains(e.target)||e.target.closest('.menu-panel button,.menu-panel a'))d.removeAttribute('open')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')for(const d of document.querySelectorAll('details.menu[open]'))d.removeAttribute('open')});

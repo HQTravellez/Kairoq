@@ -7,8 +7,10 @@
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/create.css?v=20261017">
+<link rel="stylesheet" href="/landing.css?v=20261018">
+<link rel="stylesheet" href="/workspace.css?v=20261017">
 </head>
 <body>
 <header class="bar">
@@ -17,7 +19,10 @@
     <button class="ghost" id="back" type="button" aria-label="All projects">←</button>
     <input id="project-name" aria-label="Project name" maxlength="80">
   </div>
+  <nav class="bar-nav" id="landing-nav" aria-label="Site"><a href="#how">How it works</a><a href="#features">What it does</a><a href="#tpl-title">Templates</a><a href="#pricing">Pricing</a></nav>
   <div class="bar-right">
+    <button class="ghost" id="nav-signin" type="button">Sign in</button>
+    <button class="primary" id="nav-start" type="button">Start building</button>
     <span class="credits hidden" id="credits"></span>
     <button class="ghost hidden" id="plans-open" type="button">Plans</button>
     <button class="ghost hidden" id="buy" type="button">Buy credits</button>
@@ -29,55 +34,210 @@
 <!-- Sign in / sign up -->
 <section class="screen hidden" id="auth">
   <div class="landing">
-    <section class="hero">
-      <p class="eyebrow">New · Build from any website, repo or screenshot</p>
-      <h1>Build real apps by chatting. Keep them working.</h1>
-      <p class="lede">Describe your idea. Kairoq writes a React app with sign-in, a database, payments and email, tests it in a real browser, and publishes it to your own domain. Every flow that works is saved as a check and re-tested after each change, so your app doesn't break as it grows.</p>
-      <form id="landing-form" class="prompt-box">
-        <textarea id="landing-prompt" rows="3" placeholder="A booking site for my yoga studio with class times, prices and online payments" required></textarea>
-        <button class="primary" type="submit">Start building</button>
-      </form>
-    </section>
-    <section class="features" aria-label="Features">
-      <div><h3>Watch it being built</h3><p>Code streams in live and the preview updates in seconds.</p></div>
-      <div><h3>It doesn't break</h3><p>Booking, sign-up and checkout are saved as checks and re-run after every change, before publishing and daily on your live app.</p></div>
-      <div><h3>Pay only for working changes</h3><p>If a change still breaks your app after the automatic fixes, it's free.</p></div>
-      <div><h3>Your real data stays safe</h3><p>Tests run on a test copy: no fake bookings, emails or payments in your live app.</p></div>
-      <div><h3>A real backend</h3><p>Sign-in, saved data, file uploads, email and Stripe payments built in.</p></div>
-      <div><h3>Click to edit</h3><p>Change text, colours and images directly in the preview, free.</p></div>
-      <div><h3>Your code, your domain</h3><p>Download the code, sync with GitHub and publish with HTTPS.</p></div>
-      <div><h3>Build together</h3><p>Invite your team, share a preview link or let others remix your app.</p></div>
-    </section>
-    <section aria-labelledby="tpl-title"><h2 id="tpl-title">Start from a template</h2><div class="templates" id="landing-templates"></div></section>
-    <section aria-labelledby="price-title" id="pricing"><h2 id="price-title">Pricing</h2><div class="plans" id="landing-plans"></div><p class="muted small" id="pricing-note"></p></section>
-    <section class="auth-card" id="signup" aria-labelledby="auth-title">
-      <h2 id="auth-title">Get started</h2>
-      <div class="tabs" role="tablist">
-        <button type="button" role="tab" id="tab-signup" aria-selected="true">Create account</button>
-        <button type="button" role="tab" id="tab-login" aria-selected="false">Sign in</button>
+    <section class="hero" id="top">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="hero-inner">
+        <p class="eyebrow">New · Synthetic customers test your app before real ones do</p>
+        <h1>Build real apps by chatting.<br> <em>Then prove they work.</em></h1>
+        <p class="lede">Describe your idea. Kairoq writes a full app with sign-in, a database and payments, tests it in a real browser, sends AI customers through it and fixes what they trip on. You pay only for changes that work.</p>
+        <form id="landing-form" class="prompt-box">
+          <textarea id="landing-prompt" rows="3" placeholder="A booking site for my yoga studio with class times, prices and online payments" required></textarea>
+          <div class="prompt-foot">
+            <span class="prompt-hint">React · sign-in · database · payments · tests · your domain</span>
+            <button class="primary" type="submit">Start building</button>
+          </div>
+        </form>
+        <div class="hero-chips" aria-label="Examples">
+          <button type="button" class="hero-chip">Booking site for a yoga studio</button>
+          <button type="button" class="hero-chip">Marketplace for private tutors</button>
+          <button type="button" class="hero-chip">Corporate travel dashboard</button>
+          <button type="button" class="hero-chip">Restaurant with reservations</button>
+        </div>
+        <p class="hero-trust"><span>30 free credits</span><span>No card needed</span><span>Publish to your own domain</span></p>
       </div>
-      <form id="auth-form">
-        <label>Email<input id="email" type="email" autocomplete="email" required></label>
-        <label>Password<input id="password" type="password" autocomplete="new-password" minlength="8" required></label>
-        <button class="primary" id="auth-submit" type="submit">Create account</button>
-        <p class="muted small" id="free-note"></p>
-        <p class="error" id="auth-error" role="alert"></p>
-        <button class="ghost link-btn" id="forgot-open" type="button">Forgot password?</button>
-      </form>
-      <a class="google hidden" id="google-login" href="/api/create/auth/google">Continue with Google</a>
-      <form id="forgot-form" class="hidden">
-        <p class="muted small">Enter your email and we will send a link to choose a new password.</p>
-        <label>Email<input id="forgot-email" type="email" autocomplete="email" required></label>
-        <button class="primary" type="submit">Send reset link</button>
-        <p class="small" id="forgot-status" role="status"></p>
-      </form>
-      <form id="reset-form" class="hidden">
-        <p class="muted small">Choose a new password.</p>
-        <label>New password<input id="reset-password" type="password" autocomplete="new-password" minlength="8" required></label>
-        <button class="primary" type="submit">Save password and sign in</button>
-        <p class="error" id="reset-error" role="alert"></p>
-      </form>
+      <div class="mock" aria-hidden="true">
+        <div class="mock-glow"></div>
+        <div class="mock-window">
+          <div class="mock-chrome"><span></span><span></span><span></span><div class="mock-url">kairoq.app/create · Sunrise Yoga</div></div>
+          <div class="mock-body">
+            <div class="mock-chat">
+              <div class="mock-msg user">A booking site for my yoga studio with class times, prices and online payments</div>
+              <div class="mock-msg ai">
+                <div class="mock-plan">
+                  <div class="mock-step done"><i></i>Plan: home, classes, booking, checkout</div>
+                  <div class="mock-step done"><i></i>Wrote 7 files · built in 4.2s</div>
+                  <div class="mock-step done"><i></i>Opened in a browser · no errors</div>
+                  <div class="mock-step done"><i></i>Saved check: <b>Book a class</b> passed</div>
+                  <div class="mock-step live"><i></i>10 AI customers using the app…</div>
+                </div>
+              </div>
+              <div class="mock-msg user">Make the Saturday 9am class easier to find</div>
+              <div class="mock-msg ai small">Moved Saturday classes to the top of the schedule and added a “Most popular” badge. Book a class still passes. <b>1 credit</b></div>
+            </div>
+            <div class="mock-preview">
+              <div class="mock-site">
+                <div class="mock-nav"><b>Sunrise Yoga</b><span>Classes · Prices · Book</span></div>
+                <div class="mock-hero"><h4>Morning flow, every day at 7am.</h4><p>Vinyasa, yin and beginner classes in Leslieville. Book in a minute.</p><span class="mock-btn">Book a class</span></div>
+                <div class="mock-rows">
+                  <div class="mock-row"><span class="mock-tag">Most popular</span><b>Saturday Flow</b><span>Sat 9:00 · 60 min · $22</span><span class="mock-mini">Book</span></div>
+                  <div class="mock-row"><b>Sunrise Vinyasa</b><span>Mon–Fri 7:00 · 60 min · $18</span><span class="mock-mini">Book</span></div>
+                  <div class="mock-row"><b>Yin &amp; Restore</b><span>Thu 19:30 · 75 min · $20</span><span class="mock-mini">Book</span></div>
+                </div>
+              </div>
+              <div class="mock-card">
+                <p class="mock-card-title">Synthetic customers</p>
+                <p class="mock-card-big">8 <small>of 10</small> booked a class</p>
+                <div class="mock-bar"><span style="width:80%"></span></div>
+                <p class="mock-card-note">2 gave up on the phone checkout: “Where do I put the card?”</p>
+                <span class="mock-fix">Fix and retest</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
+
+    <div class="marquee" aria-hidden="true"><div class="marquee-track">
+      <span>Sign-in</span><span>Database</span><span>SQL tables</span><span>Stripe payments</span><span>Email</span><span>File uploads</span><span>Server functions</span><span>Webhooks</span><span>Realtime</span><span>iPhone &amp; Android</span><span>GitHub sync</span><span>Custom domains</span><span>Figma import</span><span>Browser tests</span><span>AI customers</span>
+      <span>Sign-in</span><span>Database</span><span>SQL tables</span><span>Stripe payments</span><span>Email</span><span>File uploads</span><span>Server functions</span><span>Webhooks</span><span>Realtime</span><span>iPhone &amp; Android</span><span>GitHub sync</span><span>Custom domains</span><span>Figma import</span><span>Browser tests</span><span>AI customers</span>
+    </div></div>
+
+    <section class="proof" aria-label="How Kairoq keeps apps working">
+      <div><b>Tested in a real browser</b><span>before anything is saved</span></div>
+      <div><b>Checks re-run</b><span>after every change and before publishing</span></div>
+      <div><b>AI customers</b><span>use your app and say where they got stuck</span></div>
+      <div><b>Free if it does not work</b><span>a change that still breaks your app costs nothing</span></div>
+    </section>
+
+    <section class="how" id="how" aria-labelledby="how-title">
+      <div class="section-head"><p class="kicker">How it works</p><h2 id="how-title">From a sentence to an app <em>your customers can use.</em></h2></div>
+      <ol class="steps">
+        <li><span class="num">1</span><h3>Describe it</h3><p>Say who it is for and what it does. Kairoq picks a design direction, writes the code and shows the preview as it streams in.</p></li>
+        <li><span class="num">2</span><h3>Watch it get tested</h3><p>Every version opens in a real browser on a test copy of your data. Flows that work are saved as checks and re-run after each change.</p></li>
+        <li><span class="num">3</span><h3>Publish and keep improving</h3><p>Go live on a free URL or your own domain. AI customers keep visiting, and each week you get a plain-English note on what is stopping signups.</p></li>
+      </ol>
+    </section>
+
+    <section class="bento" id="features" aria-labelledby="feat-title">
+      <div class="section-head"><p class="kicker">What only Kairoq does</p><h2 id="feat-title">Other builders stop at the code. <em>Kairoq proves it works.</em></h2></div>
+      <div class="bento-grid">
+        <article class="tile wide">
+          <div class="tile-text"><h3>AI customers try your app before real ones do</h3><p>Personas with their own age, device and patience use your app in a real browser, think out loud, and either finish or give up the way people do. You see who got through, where the others left, and why, in their words.</p></div>
+          <div class="tile-ui funnel">
+            <div class="funnel-row"><span>Opened the app</span><i style="width:100%"></i><b>10</b></div>
+            <div class="funnel-row"><span>Picked a class</span><i style="width:90%"></i><b>9</b></div>
+            <div class="funnel-row"><span>Started checkout</span><i style="width:80%"></i><b>8</b></div>
+            <div class="funnel-row"><span>Booked</span><i style="width:60%"></i><b>6</b></div>
+            <p class="quote">“I could not find where to put the card number.” <span>Priya, 41, phone</span></p>
+          </div>
+        </article>
+        <article class="tile">
+          <div class="tile-text"><h3>Fix and retest</h3><p>Kairoq replays the exact steps that failed, sends the confirmed problem to the builder, replays again, and saves the working flow as a check so it cannot come back.</p></div>
+          <div class="tile-ui before-after"><div><span>Before</span><b>6 of 10</b></div><div class="arrow">→</div><div><span>After</span><b class="good">9 of 10</b></div></div>
+        </article>
+        <article class="tile">
+          <div class="tile-text"><h3>Pay only when it works</h3><p>A change is charged only if it builds, opens without errors and keeps your checks passing. If the AI goes round in circles, Kairoq stops and tells you instead of charging again.</p></div>
+          <div class="tile-ui receipt"><div><span>Add Saturday class</span><b>1 credit</b></div><div><span>Fix checkout on phones</span><b>1 credit</b></div><div class="free"><span>Fix checkout (still broken)</span><b>free</b></div></div>
+        </article>
+        <article class="tile">
+          <div class="tile-text"><h3>Customers before code</h3><p>Not sure anyone wants it? Kairoq writes the pitch, builds a landing page with a waitlist and the launch posts. Build the app when real people have signed up.</p></div>
+          <div class="tile-ui waitlist"><div class="wl-head"><span>Waitlist</span><b>17 of 20</b></div><div class="mock-bar"><span style="width:85%"></span></div><p>3 more signups and it is worth building.</p></div>
+        </article>
+        <article class="tile">
+          <div class="tile-text"><h3>Problems explained in plain English</h3><p>Every problem comes with what is happening, where it is in the app, why, what it costs you and the fix. The code behind it is shown line by line, in words.</p></div>
+          <div class="tile-ui explain"><p><b>What</b> 2 of 10 visitors could not pay on a phone.</p><p><b>Where</b> the card field on the checkout page.</p><p><b>Fix</b> show the card field above the fold on small screens.</p></div>
+        </article>
+        <article class="tile">
+          <div class="tile-text"><h3>A real backend, built in</h3><p>Sign-in with email or Google, saved data, SQL tables, file uploads, email and Stripe payments. Server functions and webhooks run in a sandbox.</p></div>
+          <div class="tile-ui chips"><span>Sign-in</span><span>Database</span><span>SQL</span><span>Payments</span><span>Email</span><span>Files</span><span>Functions</span><span>Webhooks</span><span>Realtime</span></div>
+        </article>
+        <article class="tile">
+          <div class="tile-text"><h3>Your code, your domain</h3><p>Download the project, sync it with GitHub, and publish with HTTPS on your own domain. Your real data is never touched by tests.</p></div>
+          <div class="tile-ui chips"><span>GitHub sync</span><span>Download ZIP</span><span>Custom domain</span><span>Mobile app</span><span>Team access</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="compare" aria-labelledby="cmp-title">
+      <div class="section-head"><p class="kicker">Side by side</p><h2 id="cmp-title">The parts most AI builders <em>leave to you.</em></h2></div>
+      <table class="cmp-table">
+        <thead><tr><th scope="col"></th><th scope="col">Most AI app builders</th><th scope="col" class="us">Kairoq</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Opens every version in a real browser</th><td>Sometimes</td><td class="us">Always, before saving</td></tr>
+          <tr><th scope="row">Flows saved as checks and re-run</th><td>—</td><td class="us">After every change, before publishing, daily</td></tr>
+          <tr><th scope="row">AI customers use the app and report back</th><td>—</td><td class="us">Yes, with a fix-and-retest loop</td></tr>
+          <tr><th scope="row">A change that breaks the app</th><td>Charged</td><td class="us">Free</td></tr>
+          <tr><th scope="row">Tests run against</th><td>Your live data</td><td class="us">A test copy of your data</td></tr>
+          <tr><th scope="row">Problems explained</th><td>Error messages</td><td class="us">Plain English, with the fix</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="templates-section" aria-labelledby="tpl-title">
+      <div class="section-head"><p class="kicker">Templates</p><h2 id="tpl-title">Start from a working app, <em>then make it yours.</em></h2></div>
+      <div class="templates" id="landing-templates"></div>
+    </section>
+
+    <section class="pricing-section" aria-labelledby="price-title" id="pricing">
+      <div class="section-head"><p class="kicker">Pricing</p><h2 id="price-title">Credits, not seats. <em>Pay for changes that work.</em></h2></div>
+      <div class="pricing-grid">
+        <div class="plans" id="landing-plans"></div>
+        <aside class="credits-how">
+          <h3>How credits work</h3>
+          <ul>
+            <li><b>One message, one price.</b> A build or a fix costs the credits of the model you pick. Discussing and visual edits are cheaper or free.</li>
+            <li><b>Broken changes are free.</b> If a change fails to build, opens with errors or breaks a saved check, you are not charged.</li>
+            <li><b>No loops.</b> If the AI cannot fix something after a few tries, Kairoq stops and tells you instead of charging again.</li>
+            <li><b>Never expire.</b> Credit packs stay until you use them. Subscriptions top up every month.</li>
+          </ul>
+          <p class="muted small" id="pricing-note"></p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="cta" id="get-started">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="cta-text">
+        <p class="kicker">Get started</p>
+        <h2>Your first app is <em>a sentence away.</em></h2>
+        <p>Create an account, describe the idea, and watch it get built and tested. Your prompt from above comes with you.</p>
+        <ul class="cta-list"><li>30 free credits to start</li><li>No card needed</li><li>Your code is yours to download</li></ul>
+      </div>
+      <div class="auth-card" id="signup" aria-labelledby="auth-title">
+        <h2 id="auth-title">Get started</h2>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" id="tab-signup" aria-selected="true">Create account</button>
+          <button type="button" role="tab" id="tab-login" aria-selected="false">Sign in</button>
+        </div>
+        <form id="auth-form">
+          <label>Email<input id="email" type="email" autocomplete="email" required></label>
+          <label>Password<input id="password" type="password" autocomplete="new-password" minlength="8" required></label>
+          <button class="primary" id="auth-submit" type="submit">Create account</button>
+          <p class="muted small" id="free-note"></p>
+          <p class="error" id="auth-error" role="alert"></p>
+          <button class="ghost link-btn" id="forgot-open" type="button">Forgot password?</button>
+        </form>
+        <a class="google hidden" id="google-login" href="/api/create/auth/google">Continue with Google</a>
+        <form id="forgot-form" class="hidden">
+          <p class="muted small">Enter your email and we will send a link to choose a new password.</p>
+          <label>Email<input id="forgot-email" type="email" autocomplete="email" required></label>
+          <button class="primary" type="submit">Send reset link</button>
+          <p class="small" id="forgot-status" role="status"></p>
+        </form>
+        <form id="reset-form" class="hidden">
+          <p class="muted small">Choose a new password.</p>
+          <label>New password<input id="reset-password" type="password" autocomplete="new-password" minlength="8" required></label>
+          <button class="primary" type="submit">Save password and sign in</button>
+          <p class="error" id="reset-error" role="alert"></p>
+        </form>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span class="brand-foot">Kairoq <b>Create</b></span>
+      <nav aria-label="Footer"><a href="#how">How it works</a><a href="#features">What it does</a><a href="#pricing">Pricing</a><a href="/docs/create.md">Docs</a><a href="#signup">Sign in</a></nav>
+      <span class="muted small">Built in Toronto. Moving to Dubai.</span>
+    </footer>
   </div>
 </section>
 
@@ -139,19 +299,24 @@
       <div class="attachments hidden" id="attachments"></div>
       <textarea id="chat-input" rows="3" placeholder="Ask for a change: add a pricing section, make the header sticky…" required></textarea>
       <div class="composer-bar">
+        <details class="menu up" id="menu-plus">
+          <summary aria-label="Add to your message" title="Images, Figma, a reference site, or a design polish">+</summary>
+          <div class="menu-panel">
+            <button type="button" id="attach"><b>Image</b><span>Attach or paste a screenshot</span></button>
+            <button type="button" id="figma-open"><b>Figma</b><span>Build a Figma frame</span></button>
+            <button type="button" id="ref-open"><b>Reference</b><span>Your own version of a site, repo or screenshots</span></button>
+            <button type="button" id="polish"><b>Polish the design</b><span>Screenshot the app and fix what looks off</span></button>
+          </div>
+        </details>
         <div class="seg" role="group" aria-label="Mode">
           <button type="button" id="mode-build" aria-pressed="true">Build</button>
           <button type="button" id="mode-discuss" aria-pressed="false">Discuss</button>
           <button type="button" id="mode-agent" aria-pressed="false" title="Works in steps: writes code, tests it in a browser, reads logs and fixes problems until done">Agent</button>
         </div>
         <select id="tier" aria-label="Model"></select>
-        <button type="button" class="ghost icon" id="attach" aria-label="Attach images" title="Attach images (or paste a screenshot)">＋ Image</button>
-        <button type="button" class="ghost icon" id="figma-open" title="Build a Figma frame">Figma</button>
-        <button type="button" class="ghost icon" id="ref-open" title="Study a website, GitHub repository or screenshots and build your own version">Reference</button>
-        <button type="button" class="ghost icon" id="polish" title="Screenshot the app on desktop and phone and let the AI fix what looks off (uses the chosen model)">✨ Polish</button>
         <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
         <span class="muted small" id="cost-hint"></span>
-        <button class="primary" id="send" type="submit">Send</button>
+        <button class="primary send" id="send" type="submit" aria-label="Send"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
       </div>
     </form>
     <p class="error" id="chat-error" role="alert"></p>
@@ -168,16 +333,28 @@
         <button type="button" id="mobile" aria-pressed="false">Mobile</button>
       </div>
       <select id="versions" aria-label="Version"></select>
-      <button class="ghost" id="restore" type="button">Restore</button>
       <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits">✎ Edit</button>
-      <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
-      <button class="ghost" id="security-open" type="button">Security</button>
-      <button class="ghost" id="team-open" type="button">Share</button>
-      <button class="ghost" id="checks-open" type="button" title="Saved checks: flows re-tested after every change, before publishing and daily on the live app">Checks</button>
-      <button class="ghost" id="customers-open" type="button" title="Test the app on AI customers: who reaches the goal, where the others leave and why">Customers</button>
-      <button class="ghost" id="design-open" type="button" title="Design direction, colours, fonts, design skills and images">Design</button>
-      <button class="ghost" id="mobile-open" type="button" title="Phone app: install on iPhone and Android, native iOS/Android project">App</button>
-      <button class="ghost" id="settings-open" type="button">Settings</button>
+      <a class="ghost link" id="open" target="_blank" rel="noopener" title="Open the preview in a new tab" aria-label="Open in a new tab">↗</a>
+      <span class="bar-spacer"></span>
+      <details class="menu" id="menu-test">
+        <summary>Test <i class="caret"></i></summary>
+        <div class="menu-panel">
+          <button type="button" id="checks-open"><b>Checks</b><span>Saved flows, re-run after every change</span></button>
+          <button type="button" id="customers-open"><b>Customers</b><span>AI customers use the app and report back</span></button>
+          <button type="button" id="launch-open"><b>Launch</b><span>Test the idea with a waitlist, then watch growth</span></button>
+          <button type="button" id="security-open"><b>Security</b><span>Scan for exposed secrets and open data</span></button>
+        </div>
+      </details>
+      <details class="menu" id="menu-project">
+        <summary>Project <i class="caret"></i></summary>
+        <div class="menu-panel">
+          <button type="button" id="restore"><b>Restore this version</b><span>Make the version shown in the preview the current one</span></button>
+          <button type="button" id="design-open"><b>Design</b><span>Colours, fonts, skills and images</span></button>
+          <button type="button" id="mobile-open"><b>Phone app</b><span>Install on iPhone and Android</span></button>
+          <button type="button" id="team-open"><b>Share</b><span>Invite your team or share a preview</span></button>
+          <button type="button" id="settings-open"><b>Settings</b><span>Knowledge, secrets, GitHub, API keys</span></button>
+        </div>
+      </details>
       <button class="primary" id="publish-open" type="button">Publish</button>
     </div>
     <div class="errors hidden" id="errors" role="status">
@@ -368,6 +545,45 @@
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
+<dialog id="launch-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Customers before code</h2>
+    <p class="muted small">Find out whether people want it before you build it. Kairoq writes the pitch, builds a landing page with a waitlist, writes launch posts for you to share, and lets AI customers react to the pitch. Build only when real people sign up. After launch, the growth watch tests the live app every week and tells you plainly what is stopping signups.</p>
+    <div id="launch-new">
+      <label>Your idea<textarea id="launch-idea" rows="4" maxlength="1500" placeholder="An app for busy parents in Dubai to book trial swimming lessons for their kids, with instructors who speak Arabic and English. Pay per lesson, no membership."></textarea></label>
+      <div class="row">
+        <label>Signups goal<input id="launch-target" type="number" min="1" max="10000" value="20"></label>
+        <label>AI customers<select id="launch-visitors"><option>5</option><option selected>8</option><option>15</option></select></label>
+      </div>
+      <p class="muted small" id="launch-cost"></p>
+      <div class="row"><button class="primary" id="launch-start" type="button">Write the pitch and build the page</button></div>
+    </div>
+    <div id="launch-view" class="hidden">
+      <div class="notice"><p class="cust-stats"><b id="launch-count"></b> <span id="launch-say" class="muted"></span></p><div class="launch-bar"><span id="launch-bar"></span></div><p class="small" id="launch-link"></p>
+        <div class="row"><label>Signups goal<input id="launch-target-edit" type="number" min="1" max="10000"></label><button class="ghost" id="launch-target-save" type="button">Save</button></div></div>
+      <h3 id="launch-headline"></h3><p class="muted" id="launch-sub"></p>
+      <h4>How AI customers reacted to the pitch</h4><p class="small" id="launch-reaction"></p><ul class="small" id="launch-objections"></ul>
+      <div class="row"><button class="ghost" id="launch-report" type="button">Open the full report</button></div>
+      <h4>Launch posts</h4>
+      <p class="muted small">Share these yourself, where they genuinely fit. Each one says you are the founder and asks for honest feedback.</p>
+      <div id="launch-posts"></div>
+    </div>
+    <h3>Growth watch (after launch)</h3>
+    <p class="muted small" id="watch-intro">Every week, AI customers use the live app and Kairoq counts real visitors and signups. You get a plain-English brief, by email too, with what is stopping signups and what to change. Use Fix and retest on the report: you pay only for fixes that work.</p>
+    <label class="check"><input type="checkbox" id="watch-enabled"> Run the growth watch every week</label>
+    <label>Who are your customers?<input id="watch-audience" maxlength="600"></label>
+    <label>What should they do?<input id="watch-goal" maxlength="400" placeholder="Join the waitlist"></label>
+    <div class="row">
+      <label>Signups are saved in<select id="watch-collection"></select></label>
+      <label>AI customers each week<select id="watch-count"><option>3</option><option selected>5</option><option>10</option></select></label>
+    </div>
+    <p class="muted small" id="watch-cost"></p>
+    <div class="row"><button class="ghost" id="watch-save" type="button">Save</button><button class="ghost" id="watch-run" type="button">Run now</button><span class="muted small" id="watch-status" role="status"></span></div>
+    <div id="watch-history"></div>
+    <p class="error" id="launch-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="explain-dialog" class="wide">
   <form method="dialog" class="dialog">
     <h2 id="explain-title">In plain English</h2>
@@ -547,6 +763,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261017"></script>
+<script src="/create.js?v=20261018"></script>
 </body>
 </html>
