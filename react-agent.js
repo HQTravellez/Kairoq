@@ -27,7 +27,9 @@ Tools (several per step are fine; they run in order):
 - {"tool":"query_db","sql":"SELECT * FROM rooms LIMIT 5"}: read the app's SQL tables (SELECT only; the same test copy your tests use).
 ${images?`- {"tool":"generate_images","images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}]}: create up to 4 photos or illustrations (aspect 1:1, 4:3, 3:2, 16:9, 9:16, 3:4) saved as ./uploads/<name>; use the returned paths in the code. Use this tool instead of an "images" field.
 `:''}${web?`- {"tool":"web_search","query":"..."}: search the web; returns links.
-- {"tool":"fetch_url","url":"https://..."}: read a public web page or API documentation as text.
+- {"tool":"web_open","url":"https://..."}: open a public website in a real browser (JavaScript runs) and read it: its text and a numbered list of links, buttons and fields${vision?', plus a screenshot':''}. Use it for docs, examples, prices, competitors and anything the user links.
+- {"tool":"web_act","steps":[{"action":"click","target":12},{"action":"click","target":"Pricing"},{"action":"fill","target":"Search","value":"..."},{"action":"select","target":9,"value":"..."},{"action":"scroll","value":"down"},{"action":"back"}]}: click around the page that is open (by number or by its text) and read the result. Reading only: nothing is sent to other sites.
+- {"tool":"fetch_url","url":"https://..."}: read a raw page or a JSON API response as text (no JavaScript).
 `:''}- {"tool":"finish","message":"for the user: what you built and how to use it"}: end when the request is done and the last build_and_test or test_ui passed.
 Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. For a big app, write the files over two or three steps (a few files per write_files) so no reply gets too long. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors, and keep the saved checks passing. Be economical: you have at most ${maxSteps} steps.`;
 }
@@ -65,14 +67,16 @@ function describe(a){
  if(t==='query_db')return'Queried the database';
  if(t==='generate_images')return'Generated '+(Array.isArray(a.images)?a.images.length:0)+' image(s)';
  if(t==='web_search')return'Searched the web for "'+String(a.query||'').slice(0,60)+'"';
+ if(t==='web_open')return'Opened '+String(a.url||'').slice(0,80);
+ if(t==='web_act')return'Clicked around '+(Array.isArray(a.steps)?a.steps.length:1)+' step'+(Array.isArray(a.steps)&&a.steps.length===1?'':'s')+' on the open website';
  if(t==='fetch_url')return'Read '+String(a.url||'').slice(0,80);
  if(t==='finish')return'Finished';
  return'Unknown tool '+t;
 }
 
-// Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url),
+// Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
@@ -87,7 +91,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
  const box=require('./react-sandbox').create(id);
  let checksWarned=false;
  const limit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
- const vision=tier!=='standard',web=typeof webSearch==='function';
+ const wb=require('./web').createBrowser({browseSite,maxOps:intEnv('KAIROQ_WEB_MAX_ACTIONS',30,5,100)});
+ const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
  const started=new Date().toISOString();
  let work={...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=false,lastTest=null,finishWarned=false,invalidReplies=0;
  const steps=[];
@@ -204,8 +209,19 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
    tl.add({t:'note',icon:'image',text:'Generated '+saved.length+' image'+(saved.length===1?'':'s')});
    return{text:'generate_images: saved '+saved.join(', ')+'. Use exactly these paths in the code.'+(notes.length?'\n'+notes.join('\n'):'')};
   }
+  if(t==='web_open'){
+   if(!wb.available())return{text:'web_open is not available on this server (no browser).'};
+   const u=String(a.url||'').slice(0,500);
+   tl.add({t:'note',icon:'web',text:'Opened '+u.slice(0,120)});
+   try{const text=await wb.open(u);return{text,image:vision?await wb.screenshot():null}}catch(e){return{text:'web_open failed: '+String(e.message||e).slice(0,300)}}
+  }
+  if(t==='web_act'){
+   if(!wb.available())return{text:'web_act is not available on this server (no browser).'};
+   tl.add({t:'note',icon:'web',text:'Clicked around '+require('./web').hostOf(wb.url)});
+   try{const text=await wb.act(a.steps||[]);return{text,image:vision?await wb.screenshot():null}}catch(e){return{text:'web_act failed: '+String(e.message||e).slice(0,300)}}
+  }
   if(t==='web_search'){
-   if(!web)return{text:'web_search is not available.'};
+   if(typeof webSearch!=='function')return{text:'web_search is not available on this server.'};
    tl.add({t:'note',icon:'web',text:'Searched the web for "'+String(a.query||'').slice(0,80)+'"'});
    try{const urls=await webSearch(String(a.query||'').slice(0,240));return{text:urls.length?'Results:\n'+urls.join('\n'):'No results.'}}catch(e){return{text:'web_search failed: '+String(e.message||e).slice(0,300)}}
   }
@@ -292,6 +308,6 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,onStep=(
  if(dirty)return save('Stopped after '+steps.length+' steps. The last changes did not build, so the last working build was saved. '+(steps.at(-1)?.thought||''),{stopped:true});
  return save('Stopped after '+steps.length+' steps. '+(steps.at(-1)?.thought||''),{stopped:true});
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
- finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token)}
+ finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token);await wb.close().catch(()=>{})}
 }
 module.exports={run,parseStep,parseStepSafe,protocol,htmlToText,describe};

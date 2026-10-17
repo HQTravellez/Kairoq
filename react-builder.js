@@ -500,12 +500,12 @@ async function polish(id,{shots,note='',...opts}){
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.
 Answer questions about the app, suggest improvements, and when the user wants a change, reply with a short numbered plan of what you would change and which files. Keep answers brief and concrete. Plain text, no JSON.`;
 function parseText(content){if(typeof content==='string'){const t=content.trim();if(!t)throw Error('Empty answer');return t}return String(content?.message||content?.answer||JSON.stringify(content))}
-async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[]}={}){
+async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[],context=''}={}){
  const meta=loadMeta(id);
  const text=String(question||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Ask a question or describe an idea'),{status:400});
  const files=meta.current_version?loadFiles(id,meta.current_version):template(meta.name);
- const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+'\n\nMessage: '+text,images)}];
+ const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+(context?'\n\n'+context:'')+'\n\nMessage: '+text,images)}];
  const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
  addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:answer,mode:'discuss'}]);
  return{message:answer};

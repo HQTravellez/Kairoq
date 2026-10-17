@@ -79,7 +79,7 @@ function findShare(token){
 }
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
-const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','watching']);
+const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','researching','watching']);
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
@@ -186,7 +186,15 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
   const onEvent=events=>update({events:events.slice(-80)});
   try{
    const signal=controller.signal;
-   if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal})}
+   // Build and Discuss look things up first when the message asks for it (links, "search", "latest", docs...).
+   let research={context:'',sources:[]};
+   if((mode==='build'||mode==='discuss')&&!referenceOnly&&process.env.KAIROQ_WEB_RESEARCH!=='off'){
+    update({status:'researching'});
+    research=await require('./web').gather(message,{callModel,tier:modelTier,signal,webSearch,onProgress:p=>update({status:'researching',progress:p})}).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
+    update({progress:null});
+    if(research.context)context=[context,research.context].filter(Boolean).join('\n\n');
+   }
+   if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
    else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
     let extra='';
@@ -210,6 +218,7 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    // turn out as hoped. Customers who are unhappy contact support, who review the request and
    // can grant credits back (POST /api/create/admin/credits). The chat still says when a
    // change breaks a saved check or shows errors, so the customer can ask for a fix.
+   if(research.sources.length&&job.result){job.result.sources=research.sources;const m=builder.loadMeta(id),lastMsg=m.messages.at(-1);if(lastMsg&&lastMsg.role==='assistant'){lastMsg.sources=research.sources;builder.saveMeta(m)}}
    const problem=mode!=='discuss'&&job.result&&!job.result.unchanged&&((job.result.check_failures||[]).length?'checks':(job.result.runtime_errors||[]).length?'errors':null);
    if(problem)job.problem=problem;
    // Pay only when it works: a change that still shows errors, breaks a check or changes

@@ -27,7 +27,7 @@
 - **Project knowledge.** Under **Settings**, owners write instructions the model follows on every message (brand, tone, rules). Up to 8,000 characters.
 - **Security scan.** The **Security** button checks the code and backend settings: secrets in browser code, collections with personal data open to everyone, unsafe HTML, server functions that change data without checking the user, and unsigned webhooks. **Fix with AI** sends the findings to the model.
 - **Agent mode.** For bigger tasks, the model works in steps until the job is done.
-  - Tools: read and search files, write files, build and open the app in headless Chromium, run UI steps (click, fill, select, expect text, go to a route), read server logs, run SELECT queries on the app's SQL tables, search the web and read pages (`fetch_url` is SSRF-guarded).
+  - Tools: read and search files, write files, build and open the app in headless Chromium, run UI steps (click, fill, select, expect text, go to a route), read server logs, run SELECT queries on the app's SQL tables, search the web, open any public website in a real browser and click through it (see Web research and browsing).
   - Pro, Max and image tiers also get a screenshot after each test. Standard models (DeepSeek) get the page's visible text instead.
   - The result is one new version. The chat shows each step, and the finished message keeps a list of them.
   - Limits: `KAIROQ_AGENT_MAX_STEPS` (15) steps per task. A task costs the tier's credits × `KAIROQ_AGENT_MULTIPLIER` (3).
@@ -434,6 +434,14 @@ A launch only starts in a new project, so an existing app is never replaced by a
 - **The brief:** a plain-English weekly summary. It covers the headline with numbers, what is stopping signups (with evidence), what to change next and what is working. It is kept in the project (the last 12) and emailed to the owner. The report behind it opens in Customers, ready for **Fix and retest**, where you pay only for fixes that work.
 - **Price:** the owner's account pays the AI customers' visits each week. A run that fails is refunded. An owner who is out of credits is skipped and told once; the watch continues after they top up.
 - **Run now** runs it straight away.
+
+## Web research and browsing
+
+The AI can use the web the way a person does before building: search, open any public website in a real browser (JavaScript runs), read it and click through it.
+
+- **Build and Discuss:** when a message contains a link or asks to look something up ("search", "latest", "docs", "pricing of", "compare", a site name…), Kairoq first decides what to search and open (at most 6 actions over two rounds), reads the pages and gives the result to the model with the request. The reply lists its **Sources** under the message. Nothing is charged for the research itself. `KAIROQ_WEB_RESEARCH=off` disables it.
+- **Agent mode:** the agent has the tools `web_search`, `web_open` (open a site and read its text plus a numbered list of links, buttons and fields; Pro and Max also get a screenshot), `web_act` (click, type, select, scroll and go back on the open page, by number or by text) and `fetch_url` (raw page or JSON API). At most `KAIROQ_WEB_MAX_ACTIONS` (30) browser actions per task.
+- **Safety:** pages open in the same guarded browser as synthetic customers on other websites: public https sites only (no private addresses, ports or credentials), reading only (anything but GET is answered locally, so no form is ever sent to another site), and the browser stays on the site it opened. Page text is given to the model as information, never as instructions. Search uses Brave when `BRAVE_SEARCH_API_KEY` is set, otherwise public Bing RSS or DuckDuckGo results. `KAIROQ_WEB_PAGE_CHARS` (7000) caps how much of a page the model sees.
 
 ## Explain it in plain English
 
