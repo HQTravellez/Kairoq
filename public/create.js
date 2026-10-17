@@ -1123,21 +1123,41 @@ const cust={info:null,report:null,fix:''};
 function li(textValue,cls){const el=document.createElement('li');el.textContent=textValue;if(cls)el.className=cls;return el}
 function custCost(){
  const n=Number($('cust-count').value),per=cust.info&&cust.info.price_per_visitor&&cust.info.price_per_visitor[state.tier];
- text($('cust-cost'),state.me.viewer.kind==='customer'&&per!=null?n+' visitors on the '+state.tier+' model cost '+n*per+' credits.':'');
+ const sites=$('cust-compare').value.trim()?2:1;
+ text($('cust-cost'),state.me.viewer.kind==='customer'&&per!=null?n+' visitors'+(sites>1?' on each of 2 sites':'')+' on the '+state.tier+' model cost '+n*per*sites+' credits.':'');
 }
+$('cust-compare').oninput=custCost;
 function renderCustReports(){
  const ul=$('cust-reports');ul.replaceChildren();
  const list=cust.info?cust.info.reports:[];
  if(!list.length){ul.append(li('No tests yet.','muted'));return}
  for(const r of list){
   const el=document.createElement('li'),b=document.createElement('button');b.type='button';b.className='ghost';
-  b.textContent=r.at.slice(0,16).replace('T',' ')+' · '+r.completion_rate+'% of '+r.visitors+' · '+r.goal;
+  b.textContent=r.at.slice(0,16).replace('T',' ')+(r.site?' · '+siteName(r.site):'')+' · '+r.completion_rate+'% of '+r.visitors+' · '+r.goal;
   b.onclick=()=>openCustReport(r.id);el.append(b);ul.append(el);
  }
+}
+function siteName(u){try{return new URL(u).hostname}catch{return u}}
+function renderComparison(c){
+ const box=$('cust-comparison'),body=$('cust-comparison-body');body.replaceChildren();
+ if(!c){box.classList.add('hidden');return}
+ box.classList.remove('hidden');
+ const best=Math.max(...c.sites.map(x=>x.numbers.completion_rate));
+ for(const x of c.sites){
+  const row=document.createElement('p');row.className='cust-stats';
+  const b=document.createElement('b');b.textContent=x.numbers.completion_rate+'%';
+  row.append(b,' '+x.label+': '+x.numbers.completed+' of '+x.numbers.visitors+' reached the goal'+(x.numbers.frustrated?' · '+x.numbers.frustrated+' got frustrated':'')+(x.numbers.completion_rate===best&&c.sites.some(y=>y.numbers.completion_rate<best)?' · better':''));
+  const open=document.createElement('button');open.type='button';open.className='ghost';open.textContent='Open report';open.onclick=()=>openCustReport(x.report_id);row.append(' ',open);
+  body.append(row);
+ }
+ if(!c.fair)body.append(el('p','muted small','This app ran on a test copy of its data; the other site had its sends answered by Kairoq. For the fairest comparison, test two published links.'));
 }
 function showCustReport(report,fix){
  cust.report=report;cust.fix=fix||'';
  const n=report.numbers,s=report.summary;
+ const site=report.target&&report.target.kind==='site';
+ text($('cust-target'),site?'Tested '+report.target.url+' (nothing was really sent to the site)':'Tested this app, version '+report.version+', on a test copy of its data');
+ renderComparison(report.comparison);
  text($('cust-headline'),s.headline||'Test from '+report.at.slice(0,16).replace('T',' '));
  text($('cust-rate'),n.completion_rate+'% reached the goal');
  text($('cust-numbers'),n.completed+' of '+n.visitors+' visitors · '+n.gave_up+' gave up · '+n.stuck+' ran out of steps'+(n.frustrated?' · '+n.frustrated+' got frustrated':'')+Object.entries(n.by_device||{}).map(([d,x])=>' · '+d+': '+x.completed+'/'+x.visitors).join(''));
@@ -1154,7 +1174,7 @@ function showCustReport(report,fix){
  for(const p of report.problems||[]){const item=li(p.title+' — '+(word[p.status]||p.status)+' · '+p.visitors.join(', ')+(p.steps&&p.steps.length?' · steps: '+p.steps.map(x=>x.action+(x.label?' “'+x.label+'”':'')).join(' → '):''),p.status==='confirmed'?'error':p.status==='not_reproduced'?'muted':'');probs.append(item)}
  if(!report.problems)probs.append(li('This test is older than replays; Fix and retest replays it first.','muted'));
  else if(!report.problems.length)probs.append(li('Everyone reached the goal.','muted'));
- const canFix=s.issues.length||(report.problems||[]).some(p=>p.status==='confirmed')||!report.problems;
+ const canFix=!site&&(s.issues.length||(report.problems||[]).some(p=>p.status==='confirmed')||!report.problems);
  $('cust-repair-box').classList.toggle('hidden',!canFix);
  repairCost();
  renderRepair(report.repair);
@@ -1169,7 +1189,7 @@ function showCustReport(report,fix){
 async function openCustReport(rid){try{const r=await api('/projects/'+state.project.id+'/synthetic?report='+encodeURIComponent(rid));showCustReport(r.report,r.fix_message)}catch(err){text($('cust-error'),err.message)}}
 $('customers-open').onclick=async()=>{
  if(!state.project)return;text($('cust-error'),'');$('cust-report').classList.add('hidden');
- try{cust.info=await api('/projects/'+state.project.id+'/synthetic');if(!cust.info.browser)text($('cust-error'),'Synthetic customers need a browser (Chromium) on this server.');renderCustReports();custCost();$('customers-dialog').showModal()}
+ try{cust.info=await api('/projects/'+state.project.id+'/synthetic');text($('cust-site-max'),cust.info.site_max||25);if(!cust.info.browser)text($('cust-error'),'Synthetic customers need a browser (Chromium) on this server.');renderCustReports();custCost();$('customers-dialog').showModal()}
  catch(err){text($('chat-error'),err.message)}
 };
 $('cust-count').onchange=custCost;
@@ -1179,13 +1199,15 @@ $('cust-run').onclick=async()=>{
  if(!audience||!goal){text($('cust-error'),'Describe your customers and what they come to do.');return}
  $('cust-run').disabled=true;
  try{
-  const r=await api('/projects/'+state.project.id+'/synthetic',{method:'POST',body:{audience,goal,count:Number($('cust-count').value),path:$('cust-path').value.trim()||undefined,tier:state.tier}});
+  const site=$('cust-site').value.trim(),compare=$('cust-compare').value.trim();
+  if((site||compare)&&!$('cust-permission').checked)throw Error('Confirm that you own the other website or have permission to test it.');
+  const r=await api('/projects/'+state.project.id+'/synthetic',{method:'POST',body:{audience,goal,count:Number($('cust-count').value),path:$('cust-path').value.trim()||undefined,tier:state.tier,...(site?{site}:{}),...(compare?{compare}:{}),...(site||compare?{permission:true}:{})}});
   $('customers-dialog').close();
   $('messages').append(messageItem({role:'user',text:'Test with '+$('cust-count').value+' synthetic customers: '+goal}));
   const done=await watch(r.job);
   if(done&&done.status==='complete'&&done.result&&done.result.synthetic){
-   const n=done.result.synthetic.numbers;
-   $('messages').append(messageItem({role:'assistant',text:(done.result.synthetic.summary.headline?done.result.synthetic.summary.headline+'\n':'')+n.completed+' of '+n.visitors+' synthetic customers reached the goal ('+n.completion_rate+'%). Open Customers to see the report.'}));
+   const n=done.result.synthetic.numbers,c=done.result.comparison;
+   $('messages').append(messageItem({role:'assistant',text:c?'Same customers, two sites: '+c.sites.map(x=>x.label+' '+x.numbers.completed+' of '+x.numbers.visitors+' ('+x.numbers.completion_rate+'%)').join(' · ')+'. Open Customers to see both reports.':(done.result.synthetic.summary.headline?done.result.synthetic.summary.headline+'\n':'')+n.completed+' of '+n.visitors+' synthetic customers reached the goal ('+n.completion_rate+'%). Open Customers to see the report.'}));
    cust.info=await api('/projects/'+state.project.id+'/synthetic');renderCustReports();await openCustReport(done.result.synthetic.id);$('customers-dialog').showModal();
   }
  }catch(err){text($('cust-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}

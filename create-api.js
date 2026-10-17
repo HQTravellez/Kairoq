@@ -11,9 +11,10 @@ function readJson(req,limit=200000){
  return new Promise((resolve,reject)=>{let body='';req.on('data',c=>{body+=c;if(body.length>limit){reject(Object.assign(Error('Request too large'),{status:413}));req.destroy()}});req.on('end',()=>{try{resolve(body?JSON.parse(body):{})}catch{reject(Object.assign(Error('Invalid JSON'),{status:400}))}});req.on('error',reject)});
 }
 async function readRaw(req,limit=65536){const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>limit)throw Object.assign(Error('Request too large'),{status:413});chunks.push(c)}return Buffer.concat(chunks)}
-function limited(req,bucket,max=20,windowMs=600000){
+function limited(req,bucket,max=20,windowMs=600000){return limitedKey(bucket+':'+require('./client-ip').clientIp(req),max,windowMs)}
+function limitedKey(key,max,windowMs){
  if(attempts.size>5000)for(const k of [...attempts.keys()].slice(0,1000))attempts.delete(k);
- const key=bucket+':'+require('./client-ip').clientIp(req),now=Date.now();
+ const now=Date.now();
  const list=(attempts.get(key)||[]).filter(t=>now-t<windowMs);list.push(now);attempts.set(key,list);
  if(list.length>max)throw Object.assign(Error('Too many attempts. Try again in a few minutes.'),{status:429});
 }
@@ -256,31 +257,57 @@ function startAnalysis(v,id,{source,images=[],note='',tier='standard'},{callMode
 // Priced per visitor at the Discuss rate of the chosen tier, paid up front; credits come back
 // only when the run fails before a report exists.
 function syntheticPrice(count,tier){return Math.max(1,Math.round(Number(count))||1)*cost({mode:'discuss',tier})}
-function startSynthetic(v,id,{audience,goal,count,path:start,tier='standard'},{callModel,browse}){
- const synthetic=require('./synthetic-customers');
- if(!browse||!require('./runtime-check').available())throw Object.assign(Error('Synthetic customers need a browser (Chromium) on this server'),{status:409});
+// Other websites: synthetic customers can also visit any public link the person has permission
+// to test (their own site, or the same app built elsewhere), alone or compared with this app.
+// Fewer visitors per site, and a few such tests per hour, so no one's site gets hammered.
+function siteMax(){return Math.max(1,Math.min(50,intEnv('KAIROQ_SYNTHETIC_SITE_MAX',25)))}
+async function startSynthetic(v,id,{audience,goal,count,path:start,tier='standard',site,compare,permission},{callModel,browse,browseSite}){
+ const synthetic=require('./synthetic-customers'),runtime=require('./runtime-check');
+ if(!browse||!runtime.available())throw Object.assign(Error('Synthetic customers need a browser (Chromium) on this server'),{status:409});
  audience=String(audience||'').trim();goal=String(goal||'').trim();
  if(audience.length<3)throw Object.assign(Error('Describe who your customers are'),{status:400});
  if(goal.length<3)throw Object.assign(Error('Describe what they come to do'),{status:400});
- count=Math.max(1,Math.min(synthetic.MAX_PERSONAS(),Math.round(Number(count))||10));
+ const sites=[site,compare].filter(x=>x!==undefined&&x!==null&&String(x).trim());
+ count=Math.max(1,Math.min(sites.length?Math.min(siteMax(),synthetic.MAX_PERSONAS()):synthetic.MAX_PERSONAS(),Math.round(Number(count))||10));
  if(start!==undefined&&start!==null&&(!/^#?\/?[\w\-\/#?=&.]{0,200}$/.test(String(start))||String(start).includes("..")))throw Object.assign(Error('Start path must be a path inside the app, like #/pricing'),{status:400});
+ if(sites.length&&permission!==true)throw Object.assign(Error('Confirm that you own the other website or have permission to test it'),{status:400});
+ // Per account, from the editor and the MCP server alike.
+ if(sites.length)limitedKey('synthetic-site:'+v.owner,intEnv('KAIROQ_SYNTHETIC_SITE_PER_HOUR',6),3600000);
+ // Targets in order: this app (unless `site` replaces it), then the site to compare with.
+ const targets=[site?{kind:'site',url:await runtime.checkSite(site)}:{kind:'app'}];
+ if(compare)targets.push({kind:'site',url:await runtime.checkSite(compare)});
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
- const meta=builder.loadMeta(id),credits=syntheticPrice(count,tier);
+ const meta=builder.loadMeta(id);
+ if(targets.some(t=>t.kind==='app')&&!meta.current_version)throw Object.assign(Error('Build the app first'),{status:400});
+ const credits=syntheticPrice(count,tier)*targets.length;
  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'synthetic',tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
  const update=patch=>{Object.assign(job,patch);job.seq++};
- if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,'Synthetic customers: '+count+' visitors','job:'+job.id);
+ if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,'Synthetic customers: '+count+' visitors'+(targets.length>1?' on 2 sites':targets[0].kind==='site'?' on '+new URL(targets[0].url).hostname:''),'job:'+job.id);
  const controller=new AbortController();controllers.set(job.id,controller);jobs.set(job.id,job);
  setImmediate(async()=>{
-  const signal=controller.signal;
+  const signal=controller.signal,label=t=>t.kind==='app'?'this app':new URL(t.url).hostname;
   try{
    update({status:'personas'});
    const test={audience:audience.slice(0,600),goal:goal.slice(0,400),count,path:start?String(start):''};
-   const r=await synthetic.run(id,builder.previewUrl(meta),test,{callModel,browse,tier,signal,onProgress:p=>update({status:p.status,progress:p.text})});
-   // Plain-English cards for each issue, pointing at the real code behind it (part of the test's price).
-   if(r.summary.issues.length){update({status:'reporting',progress:'Explaining the problems in plain English'});r.explanations=await require('./explain').issues(id,{...r,test,version:meta.current_version},{callModel,tier,signal}).catch(()=>[])}
-   const report=synthetic.save(id,{at:new Date().toISOString(),version:meta.current_version,tier,credits,test,...r});
-   job.result={synthetic:{id:report.id,numbers:report.numbers,summary:report.summary}};
-   update({status:'complete'});
+   const reports=[];let people=null;
+   for(const [i,t] of targets.entries()){
+    const pre=targets.length>1?'Site '+(i+1)+' of 2 ('+label(t)+'): ':'';
+    const r=await synthetic.run(id,t.kind==='app'?builder.previewUrl(meta):t.url,test,{callModel,browse,browseSite,tier,signal,people,site:t.kind==='site',onProgress:p=>update({status:p.status,progress:pre+p.text})});
+    // The same customers visit every site, so the numbers compare like for like.
+    people=r.visits.map(x=>x.persona);
+    // Plain-English cards point at this app's code, so only this app gets them.
+    if(t.kind==='app'&&r.summary.issues.length){update({status:'reporting',progress:pre+'Explaining the problems in plain English'});r.explanations=await require('./explain').issues(id,{...r,test,version:meta.current_version},{callModel,tier,signal}).catch(()=>[])}
+    reports.push({at:new Date().toISOString(),version:t.kind==='app'?meta.current_version:null,target:t,tier,credits:credits/targets.length,test,...(t.kind==='site'?{permission_confirmed:true}:{}),...r});
+   }
+   const compareId=reports.length>1?crypto.randomUUID():null;
+   const saved=reports.map(r=>synthetic.save(id,{...r,...(compareId?{compare_id:compareId}:{})}));
+   job.result={synthetic:{id:saved[0].id,target:saved[0].target,numbers:saved[0].numbers,summary:saved[0].summary}};
+   if(saved.length>1){
+    const c=require('./synthetic-repair').compare(saved[0],saved[1]);
+    job.result.comparison={id:compareId,sites:saved.map(r=>({report_id:r.id,label:label(r.target),url:r.target.url||null,numbers:r.numbers,headline:r.summary.headline})),change:c.change,issues:c.issues,fair:saved.every(r=>r.target.kind==='site')};
+    for(const r of saved){r.comparison=job.result.comparison;synthetic.update(id,r)}
+   }
+   update({status:'complete',progress:null});
   }catch(e){
    update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: synthetic test did not finish','refund:'+job.id)}catch{}
@@ -302,6 +329,7 @@ function startRepair(v,id,{report:rid,rounds=2,rerun=false,tier='standard'},{cal
  const synthetic=require('./synthetic-customers'),repair=require('./synthetic-repair');
  if(!browse||!require('./runtime-check').available())throw Object.assign(Error('Fix and retest needs a browser (Chromium) on this server'),{status:409});
  const report=synthetic.load(id,String(rid||''));
+ if(report.target&&report.target.kind==='site')throw Object.assign(Error('Fix and retest works on apps built here. For another website, share the report with whoever runs it.'),{status:400});
  rounds=Math.max(1,Math.min(repairRounds(),Math.round(Number(rounds))||2));rerun=Boolean(rerun);
  const people=report.visits.map(x=>x.persona);
  const max=repairPrice(tier,{rounds,visitors:people.length,rerun});
@@ -408,7 +436,7 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch}){
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch}){
  const deps={callModel,checkRuntime,inspect,webSearch,designShots,generateImage};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
@@ -656,12 +684,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/synthetic'&&method==='GET'){
    const rid=new URL(req.url,'http://x').searchParams.get('report'),synthetic=require('./synthetic-customers');
    if(rid){const report=synthetic.load(id,rid);return send(res,200,{report,fix_message:synthetic.fixMessage(report)}),true}
-   return send(res,200,{reports:synthetic.list(id),browser:require('./runtime-check').available(),max:synthetic.MAX_PERSONAS(),price_per_visitor:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,syntheticPrice(1,t.id)])),price_per_fix_round:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,cost({mode:'build',tier:t.id})])),max_rounds:repairRounds()}),true;
+   return send(res,200,{reports:synthetic.list(id),browser:require('./runtime-check').available(),max:synthetic.MAX_PERSONAS(),price_per_visitor:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,syntheticPrice(1,t.id)])),price_per_fix_round:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,cost({mode:'build',tier:t.id})])),max_rounds:repairRounds(),site_max:siteMax()}),true;
   }
   if(action==='/synthetic'&&method==='POST'){
    const b=await readJson(req,8000);
    if(b.repair)return send(res,202,{job:publicJob(startRepair(v,id,{report:b.repair,rounds:b.rounds,rerun:b.rerun,tier:b.tier||'standard'},{callModel,browse,checkRuntime,inspect}))}),true;
-   return send(res,202,{job:publicJob(startSynthetic(v,id,{audience:b.audience,goal:b.goal,count:b.count,path:b.path,tier:b.tier||'standard'},{callModel,browse}))}),true;
+   return send(res,202,{job:publicJob(await startSynthetic(v,id,{audience:b.audience,goal:b.goal,count:b.count,path:b.path,tier:b.tier||'standard',site:b.site,compare:b.compare,permission:b.permission},{callModel,browse,browseSite}))}),true;
   }
   if(action==='/reference'&&method==='GET'){
    const meta=builder.loadMeta(id),ref=require('./react-reference');

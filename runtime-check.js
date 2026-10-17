@@ -132,16 +132,89 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,vie
  finally{await context.close().catch(()=>{})}
  return{skipped:false,errors,external,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot};
 }
+// ---------- other websites (synthetic customers on any public link) ----------
+// A public website someone has permission to test, e.g. the same app built elsewhere. Chromium
+// reaches it only through a local proxy that resolves names itself and connects only to public
+// addresses on port 443, so neither links nor DNS tricks can reach internal hosts. Requests
+// that would change something (POST, PUT, PATCH, DELETE) are answered locally and never sent:
+// nothing is booked, emailed or paid on the real site.
+const KAIROQ_TEST_LOCAL=()=>process.env.NODE_ENV==='test'&&process.env.KAIROQ_EXTERNAL_ALLOW_LOCAL==='1';
+let proxyPromise=null,externalBrowserPromise=null;
+function startProxy(){
+ if(!proxyPromise)proxyPromise=new Promise((resolve,reject)=>{
+  const http=require('http'),net=require('net'),{guardedLookup}=require('./react-functions');
+  const server=http.createServer((req,res)=>{res.writeHead(403);res.end('Only https is allowed')});
+  server.on('connect',(req,client,head)=>{
+   const m=/^([a-z0-9.-]+):(\d+)$/i.exec(String(req.url||''));
+   if(!m||m[2]!=='443'||!m[1].includes('.')){client.end('HTTP/1.1 403 Forbidden\r\n\r\n');return}
+   guardedLookup(m[1],{},(err,address)=>{
+    if(err){client.end('HTTP/1.1 403 Forbidden\r\n\r\n');return}
+    const up=net.connect(443,address,()=>{client.write('HTTP/1.1 200 Connection Established\r\n\r\n');if(head&&head.length)up.write(head);up.pipe(client);client.pipe(up)});
+    up.setTimeout(30000,()=>up.destroy());
+    up.on('error',()=>client.destroy());client.on('error',()=>up.destroy());
+   });
+  });
+  server.on('error',reject);
+  server.listen(0,'127.0.0.1',()=>{server.unref();resolve(server.address().port)});
+ }).catch(e=>{proxyPromise=null;throw e});
+ return proxyPromise;
+}
+async function externalBrowser(){
+ if(KAIROQ_TEST_LOCAL())return browser();
+ if(!externalBrowserPromise){
+  const {chromium}=require('playwright-core');
+  externalBrowserPromise=startProxy().then(port=>chromium.launch({executablePath:chromiumPath(),args:['--no-sandbox','--disable-dev-shm-usage'],proxy:{server:'http://127.0.0.1:'+port,bypass:'<-loopback>'}})).catch(e=>{externalBrowserPromise=null;throw e});
+ }
+ const b=await externalBrowserPromise;
+ if(!b.isConnected()){externalBrowserPromise=null;return externalBrowser()}
+ return b;
+}
+// Checks a link before any test: https, a public name (not an IP address or local name) that
+// resolves only to public addresses, no credentials, no unusual port.
+async function checkSite(raw){
+ let u;try{u=new URL(String(raw||'').trim())}catch{throw Object.assign(Error('Enter a full link, like https://example.com'),{status:400})}
+ const local=KAIROQ_TEST_LOCAL()&&u.protocol==='http:'&&u.hostname==='127.0.0.1';
+ if(!local){
+  if(u.protocol!=='https:')throw Object.assign(Error('Only https links can be tested'),{status:400});
+  if(u.username||u.password||(u.port&&u.port!=='443'))throw Object.assign(Error('Links with a password or an unusual port cannot be tested'),{status:400});
+  if(privateHost(u.hostname))throw Object.assign(Error('Only public websites can be tested'),{status:400});
+  const {guardedLookup}=require('./react-functions');
+  await new Promise((resolve,reject)=>guardedLookup(u.hostname,{},err=>err?reject(Object.assign(Error(err.code==='EBLOCKED'?'Only public websites can be tested':'That website could not be found'),{status:400})):resolve()));
+ }
+ u.hash=u.hash||'';
+ return u.href.slice(0,500);
+}
+async function guardSite(context,url,{onSent}={}){
+ const origin=new URL(url).origin,local=KAIROQ_TEST_LOCAL();
+ await context.route('**/*',r=>{
+  const req=r.request();let u;try{u=new URL(req.url())}catch{return r.abort()}
+  if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
+  if(!(u.protocol==='https:'||(local&&u.origin===origin)))return r.abort();
+  // The visitor stays on the site: links to other sites do nothing.
+  if(req.isNavigationRequest()&&req.frame()===req.frame().page().mainFrame()&&u.origin!==origin)return r.abort();
+  if(!['GET','HEAD','OPTIONS'].includes(req.method())){
+   if(onSent)onSent(req);
+   return req.resourceType()==='document'?r.fulfill({status:204,body:''}):r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{}'});
+  }
+  return r.continue();
+ });
+}
+
 // A browsing session a synthetic customer drives step by step (see synthetic-customers.js):
 // observe() lists what is on screen with numbered interactive elements, act() clicks, types,
 // selects, scrolls or goes back. Same guard as inspect(): the browser stays inside the app.
-async function session(url,{sandbox,viewport,timeoutMs=15000}={}){
+// site: true for another website (see guardSite); observe() then counts the forms a visitor sent.
+async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
  if(!available())return null;
  const phone=viewport==='phone';
- const context=await (await browser()).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
+ const context=await (await (site?externalBrowser():browser())).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>{if(errors.length<10)errors.push('Uncaught error: '+String(e.message||e).slice(0,300))});
- await guard(context,url,{sandbox});
+ // Sends right after a visitor's click or typing count as the visitor sending a form (not
+ // analytics pings, which happen on their own).
+ let lastAct=0,sent=0;
+ if(site)await guardSite(context,url,{onSent:req=>{if(Date.now()-lastAct<4000&&['document','xhr','fetch'].includes(req.resourceType()))sent++}});
+ else await guard(context,url,{sandbox});
  const root=new URL('./',url);
  const settle=async()=>{await page.waitForLoadState('networkidle',{timeout:3000}).catch(()=>{});await page.waitForTimeout(350)};
  try{await page.goto(url,{waitUntil:'load',timeout:timeoutMs});await settle()}
@@ -162,9 +235,12 @@ async function session(url,{sandbox,viewport,timeoutMs=15000}={}){
    };
   }).catch(()=>({title:'',text:'',elements:[]}));
   const u=new URL(page.url());
-  return{path:(u.pathname.startsWith(root.pathname)?'/'+u.pathname.slice(root.pathname.length):u.pathname)+u.hash,...snap,errors:errors.slice()};
+  const out={path:(u.pathname.startsWith(root.pathname)?'/'+u.pathname.slice(root.pathname.length):u.pathname)+u.hash,...snap,errors:errors.slice()};
+  if(site){out.sent=sent;sent=0}
+  return out;
  }
  async function act(a){
+  lastAct=Date.now();
   const loc=n=>page.locator('[data-kq-id="'+Number(n)+'"]').first();
   if(a.action==='click')await loc(a.target).click({timeout:4000});
   else if(a.action==='fill')await loc(a.target).fill(String(a.value??'').slice(0,300),{timeout:4000});
@@ -187,5 +263,5 @@ async function renderHtml(html,{width,height}){
   return await page.screenshot({type:'png',clip:{x:0,y:0,width,height}});
  }finally{await context.close().catch(()=>{})}
 }
-async function close(){if(browserPromise){const b=await browserPromise.catch(()=>null);browserPromise=null;await b?.close().catch(()=>{})}}
-module.exports={check,screenshot,inspect,session,designShots,renderHtml,available,close,browser};
+async function close(){for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
+module.exports={check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};

@@ -204,7 +204,7 @@ function respond(res,result,cors,{externalRedirects=false}={}){
  else if(r.body!==undefined){body=String(r.body);headers['Content-Type']=extra['Content-Type']||'text/plain; charset=utf-8'}
  res.writeHead(status,headers);res.end(status===204?undefined:body);
 }
-module.exports={validate,list,run,respond,guardedFetch,privateAddress,functionName};
+module.exports={validate,list,run,respond,guardedFetch,guardedLookup,privateAddress,functionName};
 
 // ---------- worker pool (main thread) ----------
 // Functions run in worker threads so a slow or stuck function never blocks the

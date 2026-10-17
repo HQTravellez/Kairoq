@@ -72,7 +72,8 @@ function shows(p,r){
  return false;
 }
 // Replays one problem's steps on a version (url) in a fresh browser on a test copy of the data.
-async function play(id,url,p,{browse,device}){
+async function play(id,url,p,{browse,device,site=false}){
+ if(site){const s=await browse(url,{site:true,viewport:device});if(!s)return null;try{return await replay(s,p.steps)}finally{await s.close()}}
  const sandbox=require('./react-sandbox');
  return sandbox.withSandbox(id,async box=>{
   const s=await browse(url,{sandbox:box.token,viewport:device});
@@ -83,7 +84,7 @@ async function play(id,url,p,{browse,device}){
 
 // Reproduces the problems behind the visits that did not reach the goal.
 // startUrl: the tested version's preview URL plus the test's start path.
-async function reproduce(id,report,{browse,startUrl,signal}){
+async function reproduce(id,report,{browse,startUrl,signal,site=false}){
  const found=new Map();
  for(const v of report.visits){
   if(v.outcome==='completed'||v.outcome==='skipped')continue;
@@ -97,7 +98,7 @@ async function reproduce(id,report,{browse,startUrl,signal}){
   if(signal&&signal.aborted)throw Error('Stopped.');
   let status='experience';
   if(p.kind!=='experience'){
-   const r=await play(id,startUrl,p,{browse,device:p.device}).catch(()=>null);
+   const r=await play(id,startUrl,p,{browse,device:p.device,site}).catch(()=>null);
    if(!r)status='not_checked';
    else if(shows(p,r))status='confirmed';
    // A click that did change the screen was a visitor's judgement, not a broken button.
