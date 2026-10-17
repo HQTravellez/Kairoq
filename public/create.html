@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/create.css?v=20261017">
-<link rel="stylesheet" href="/landing.css?v=20261018">
+<link rel="stylesheet" href="/landing.css?v=20261019">
 <link rel="stylesheet" href="/workspace.css?v=20261017">
 </head>
 <body>
@@ -19,7 +19,7 @@
     <button class="ghost" id="back" type="button" aria-label="All projects">←</button>
     <input id="project-name" aria-label="Project name" maxlength="80">
   </div>
-  <nav class="bar-nav" id="landing-nav" aria-label="Site"><a href="#how">How it works</a><a href="#features">What it does</a><a href="#tpl-title">Templates</a><a href="#pricing">Pricing</a></nav>
+  <nav class="bar-nav" id="landing-nav" aria-label="Site"><a href="#how">How it works</a><a href="#features">What it does</a><a href="#showcase">Templates</a><a href="#pricing">Pricing</a></nav>
   <div class="bar-right">
     <button class="ghost" id="nav-signin" type="button">Sign in</button>
     <button class="primary" id="nav-start" type="button">Start building</button>
@@ -37,24 +37,34 @@
     <section class="hero" id="top">
       <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="hero-inner">
-        <p class="eyebrow">New · Synthetic customers test your app before real ones do</p>
-        <h1>Build real apps by chatting.<br> <em>Then prove they work.</em></h1>
-        <p class="lede">Describe your idea. Kairoq writes a full app with sign-in, a database and payments, tests it in a real browser, sends AI customers through it and fixes what they trip on. You pay only for changes that work.</p>
+        <p class="eyebrow">New · AI customers test your app before real ones do</p>
+        <h1>Build something <em>that works.</em></h1>
+        <p class="lede">Create apps and websites by chatting with AI. Every version is tested in a real browser, and AI customers try it before yours arrive.</p>
         <form id="landing-form" class="prompt-box">
-          <textarea id="landing-prompt" rows="3" placeholder="A booking site for my yoga studio with class times, prices and online payments" required></textarea>
+          <textarea id="landing-prompt" rows="3" placeholder="Ask Kairoq to build a booking site for my yoga studio with class times and payments…" required></textarea>
           <div class="prompt-foot">
-            <span class="prompt-hint">React · sign-in · database · payments · tests · your domain</span>
-            <button class="primary" type="submit">Start building</button>
+            <div class="prompt-tools" aria-hidden="true"><span class="ptool round">+</span><span class="ptool">Standard · 1 credit</span><span class="ptool">Public</span></div>
+            <button class="primary send" type="submit" aria-label="Start building"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
           </div>
         </form>
         <div class="hero-chips" aria-label="Examples">
-          <button type="button" class="hero-chip">Booking site for a yoga studio</button>
-          <button type="button" class="hero-chip">Marketplace for private tutors</button>
-          <button type="button" class="hero-chip">Corporate travel dashboard</button>
-          <button type="button" class="hero-chip">Restaurant with reservations</button>
+          <button type="button" class="hero-chip"><i class="ci ci-site"></i>Booking site for a yoga studio</button>
+          <button type="button" class="hero-chip"><i class="ci ci-shop"></i>Marketplace for private tutors</button>
+          <button type="button" class="hero-chip"><i class="ci ci-dash"></i>Corporate travel dashboard</button>
+          <button type="button" class="hero-chip"><i class="ci ci-phone"></i>Habit tracker for iPhone</button>
+          <button type="button" class="hero-chip"><i class="ci ci-crm"></i>CRM for a small agency</button>
         </div>
-        <p class="hero-trust"><span>30 free credits</span><span>No card needed</span><span>Publish to your own domain</span></p>
+        <p class="hero-trust"><span>30 free credits</span><span>No card needed</span><span>Your code, your domain</span></p>
       </div>
+    </section>
+
+    <section class="showcase" id="showcase" aria-labelledby="show-title">
+      <div class="show-head"><h2 id="show-title" class="small-title">Start from a working app</h2><nav class="show-tabs" aria-label="Template categories"><button type="button" class="tab" aria-pressed="true" data-cat="">Popular</button><button type="button" class="tab" data-cat="hospitality">Hospitality</button><button type="button" class="tab" data-cat="travel">Travel</button><button type="button" class="tab" data-cat="health">Health</button><button type="button" class="tab" data-cat="marketing">Marketing</button><button type="button" class="tab" data-cat="business">Business</button></nav></div>
+      <div class="templates gallery" id="landing-templates"></div>
+    </section>
+
+    <section class="product" aria-label="The editor">
+      <div class="section-head"><p class="kicker">The editor</p><h2>Watch it build, <em>then watch it get tested.</em></h2></div>
       <div class="mock" aria-hidden="true">
         <div class="mock-glow"></div>
         <div class="mock-window">
@@ -171,11 +181,6 @@
           <tr><th scope="row">Problems explained</th><td>Error messages</td><td class="us">Plain English, with the fix</td></tr>
         </tbody>
       </table>
-    </section>
-
-    <section class="templates-section" aria-labelledby="tpl-title">
-      <div class="section-head"><p class="kicker">Templates</p><h2 id="tpl-title">Start from a working app, <em>then make it yours.</em></h2></div>
-      <div class="templates" id="landing-templates"></div>
     </section>
 
     <section class="pricing-section" aria-labelledby="price-title" id="pricing">
@@ -763,6 +768,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261018"></script>
+<script src="/create.js?v=20261019"></script>
 </body>
 </html>
