@@ -7,9 +7,9 @@
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/create.css?v=20261017">
-<link rel="stylesheet" href="/landing.css?v=20261017">
+<link rel="stylesheet" href="/landing.css?v=20261018">
 <link rel="stylesheet" href="/workspace.css?v=20261017">
 </head>
 <body>
@@ -35,6 +35,7 @@
 <section class="screen hidden" id="auth">
   <div class="landing">
     <section class="hero" id="top">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="hero-inner">
         <p class="eyebrow">New · Synthetic customers test your app before real ones do</p>
         <h1>Build real apps by chatting.<br> <em>Then prove they work.</em></h1>
@@ -55,6 +56,7 @@
         <p class="hero-trust"><span>30 free credits</span><span>No card needed</span><span>Publish to your own domain</span></p>
       </div>
       <div class="mock" aria-hidden="true">
+        <div class="mock-glow"></div>
         <div class="mock-window">
           <div class="mock-chrome"><span></span><span></span><span></span><div class="mock-url">kairoq.app/create · Sunrise Yoga</div></div>
           <div class="mock-body">
@@ -95,6 +97,11 @@
       </div>
     </section>
 
+    <div class="marquee" aria-hidden="true"><div class="marquee-track">
+      <span>Sign-in</span><span>Database</span><span>SQL tables</span><span>Stripe payments</span><span>Email</span><span>File uploads</span><span>Server functions</span><span>Webhooks</span><span>Realtime</span><span>iPhone &amp; Android</span><span>GitHub sync</span><span>Custom domains</span><span>Figma import</span><span>Browser tests</span><span>AI customers</span>
+      <span>Sign-in</span><span>Database</span><span>SQL tables</span><span>Stripe payments</span><span>Email</span><span>File uploads</span><span>Server functions</span><span>Webhooks</span><span>Realtime</span><span>iPhone &amp; Android</span><span>GitHub sync</span><span>Custom domains</span><span>Figma import</span><span>Browser tests</span><span>AI customers</span>
+    </div></div>
+
     <section class="proof" aria-label="How Kairoq keeps apps working">
       <div><b>Tested in a real browser</b><span>before anything is saved</span></div>
       <div><b>Checks re-run</b><span>after every change and before publishing</span></div>
@@ -103,7 +110,7 @@
     </section>
 
     <section class="how" id="how" aria-labelledby="how-title">
-      <div class="section-head"><p class="kicker">How it works</p><h2 id="how-title">From a sentence to an app your customers can use.</h2></div>
+      <div class="section-head"><p class="kicker">How it works</p><h2 id="how-title">From a sentence to an app <em>your customers can use.</em></h2></div>
       <ol class="steps">
         <li><span class="num">1</span><h3>Describe it</h3><p>Say who it is for and what it does. Kairoq picks a design direction, writes the code and shows the preview as it streams in.</p></li>
         <li><span class="num">2</span><h3>Watch it get tested</h3><p>Every version opens in a real browser on a test copy of your data. Flows that work are saved as checks and re-run after each change.</p></li>
@@ -112,7 +119,7 @@
     </section>
 
     <section class="bento" id="features" aria-labelledby="feat-title">
-      <div class="section-head"><p class="kicker">What only Kairoq does</p><h2 id="feat-title">Other builders stop at the code. Kairoq proves the app works.</h2></div>
+      <div class="section-head"><p class="kicker">What only Kairoq does</p><h2 id="feat-title">Other builders stop at the code. <em>Kairoq proves it works.</em></h2></div>
       <div class="bento-grid">
         <article class="tile wide">
           <div class="tile-text"><h3>AI customers try your app before real ones do</h3><p>Personas with their own age, device and patience use your app in a real browser, think out loud, and either finish or give up the way people do. You see who got through, where the others left, and why, in their words.</p></div>
@@ -152,7 +159,7 @@
     </section>
 
     <section class="compare" aria-labelledby="cmp-title">
-      <div class="section-head"><p class="kicker">Side by side</p><h2 id="cmp-title">The parts most AI builders leave to you.</h2></div>
+      <div class="section-head"><p class="kicker">Side by side</p><h2 id="cmp-title">The parts most AI builders <em>leave to you.</em></h2></div>
       <table class="cmp-table">
         <thead><tr><th scope="col"></th><th scope="col">Most AI app builders</th><th scope="col" class="us">Kairoq</th></tr></thead>
         <tbody>
@@ -167,20 +174,32 @@
     </section>
 
     <section class="templates-section" aria-labelledby="tpl-title">
-      <div class="section-head"><p class="kicker">Templates</p><h2 id="tpl-title">Start from a working app, then make it yours.</h2></div>
+      <div class="section-head"><p class="kicker">Templates</p><h2 id="tpl-title">Start from a working app, <em>then make it yours.</em></h2></div>
       <div class="templates" id="landing-templates"></div>
     </section>
 
     <section class="pricing-section" aria-labelledby="price-title" id="pricing">
-      <div class="section-head"><p class="kicker">Pricing</p><h2 id="price-title">Credits, not seats. Pay for changes that work.</h2></div>
-      <div class="plans" id="landing-plans"></div>
-      <p class="muted small" id="pricing-note"></p>
+      <div class="section-head"><p class="kicker">Pricing</p><h2 id="price-title">Credits, not seats. <em>Pay for changes that work.</em></h2></div>
+      <div class="pricing-grid">
+        <div class="plans" id="landing-plans"></div>
+        <aside class="credits-how">
+          <h3>How credits work</h3>
+          <ul>
+            <li><b>One message, one price.</b> A build or a fix costs the credits of the model you pick. Discussing and visual edits are cheaper or free.</li>
+            <li><b>Broken changes are free.</b> If a change fails to build, opens with errors or breaks a saved check, you are not charged.</li>
+            <li><b>No loops.</b> If the AI cannot fix something after a few tries, Kairoq stops and tells you instead of charging again.</li>
+            <li><b>Never expire.</b> Credit packs stay until you use them. Subscriptions top up every month.</li>
+          </ul>
+          <p class="muted small" id="pricing-note"></p>
+        </aside>
+      </div>
     </section>
 
     <section class="cta" id="get-started">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="cta-text">
         <p class="kicker">Get started</p>
-        <h2>Your first app is a sentence away.</h2>
+        <h2>Your first app is <em>a sentence away.</em></h2>
         <p>Create an account, describe the idea, and watch it get built and tested. Your prompt from above comes with you.</p>
         <ul class="cta-list"><li>30 free credits to start</li><li>No card needed</li><li>Your code is yours to download</li></ul>
       </div>
@@ -744,6 +763,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261017"></script>
+<script src="/create.js?v=20261018"></script>
 </body>
 </html>

@@ -901,6 +901,25 @@ $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-
 for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent;$('landing-prompt').focus()};
 $('nav-signin').onclick=()=>{setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
 $('nav-start').onclick=()=>{$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
+// Landing motion: a typing placeholder, reveal-on-scroll and a cursor glow on the tiles. Nothing here is needed to use the page.
+(function(){
+ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const ta=$('landing-prompt'),ideas=['A booking site for my yoga studio with class times, prices and online payments','A marketplace where parents find and pay private tutors','A guest portal for my hotel with Wi-Fi, check-out and local tips','A CRM for my agency with leads, deals and weekly follow-ups'];
+ let i=0,pos=0,del=false,timer;
+ function tick(){
+  if(document.activeElement===ta||ta.value||$('auth').classList.contains('hidden')){timer=setTimeout(tick,900);return}
+  const s=ideas[i];pos+=del?-1:1;ta.placeholder=s.slice(0,pos);
+  let wait=del?22:38;if(!del&&pos>=s.length){del=true;wait=2200}else if(del&&pos<=0){del=false;i=(i+1)%ideas.length;wait=350}
+  timer=setTimeout(tick,wait);
+ }
+ if(!reduce)timer=setTimeout(tick,1200);
+ const items=document.querySelectorAll('.landing .section-head,.landing .steps li,.landing .tile,.landing .proof div,.landing .cmp-table,.landing .credits-how,.landing .cta-text,.landing .cta .auth-card');
+ if(!reduce&&'IntersectionObserver' in window){
+  const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}},{rootMargin:'0px 0px -6% 0px',threshold:0});
+  for(const el of items){el.classList.add('rv');io.observe(el)}
+ }
+ for(const t of document.querySelectorAll('.landing .tile'))t.addEventListener('pointermove',e=>{const r=t.getBoundingClientRect();t.style.setProperty('--mx',(e.clientX-r.left)+'px');t.style.setProperty('--my',(e.clientY-r.top)+'px')});
+})();
 $('plans-open').onclick=()=>{
  text($('plans-error'),'');
  const account=state.me.viewer?.account||{};
