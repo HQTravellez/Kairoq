@@ -175,6 +175,7 @@
       <button class="ghost" id="team-open" type="button">Share</button>
       <button class="ghost" id="checks-open" type="button" title="Saved checks: flows re-tested after every change, before publishing and daily on the live app">Checks</button>
       <button class="ghost" id="customers-open" type="button" title="Test the app on AI customers: who reaches the goal, where the others leave and why">Customers</button>
+      <button class="ghost" id="launch-open" type="button" title="Customers before code: test an idea with a landing page and waitlist, then watch how the live app grows">Launch</button>
       <button class="ghost" id="design-open" type="button" title="Design direction, colours, fonts, design skills and images">Design</button>
       <button class="ghost" id="mobile-open" type="button" title="Phone app: install on iPhone and Android, native iOS/Android project">App</button>
       <button class="ghost" id="settings-open" type="button">Settings</button>
@@ -365,6 +366,45 @@
     </div>
     <h3>Earlier tests</h3>
     <ul class="skills" id="cust-reports"></ul>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+<dialog id="launch-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Customers before code</h2>
+    <p class="muted small">Find out whether people want it before you build it. Kairoq writes the pitch, builds a landing page with a waitlist, writes launch posts for you to share, and lets AI customers react to the pitch. Build only when real people sign up. After launch, the growth watch tests the live app every week and tells you plainly what is stopping signups.</p>
+    <div id="launch-new">
+      <label>Your idea<textarea id="launch-idea" rows="4" maxlength="1500" placeholder="An app for busy parents in Dubai to book trial swimming lessons for their kids, with instructors who speak Arabic and English. Pay per lesson, no membership."></textarea></label>
+      <div class="row">
+        <label>Signups goal<input id="launch-target" type="number" min="1" max="10000" value="20"></label>
+        <label>AI customers<select id="launch-visitors"><option>5</option><option selected>8</option><option>15</option></select></label>
+      </div>
+      <p class="muted small" id="launch-cost"></p>
+      <div class="row"><button class="primary" id="launch-start" type="button">Write the pitch and build the page</button></div>
+    </div>
+    <div id="launch-view" class="hidden">
+      <div class="notice"><p class="cust-stats"><b id="launch-count"></b> <span id="launch-say" class="muted"></span></p><div class="launch-bar"><span id="launch-bar"></span></div><p class="small" id="launch-link"></p>
+        <div class="row"><label>Signups goal<input id="launch-target-edit" type="number" min="1" max="10000"></label><button class="ghost" id="launch-target-save" type="button">Save</button></div></div>
+      <h3 id="launch-headline"></h3><p class="muted" id="launch-sub"></p>
+      <h4>How AI customers reacted to the pitch</h4><p class="small" id="launch-reaction"></p><ul class="small" id="launch-objections"></ul>
+      <div class="row"><button class="ghost" id="launch-report" type="button">Open the full report</button></div>
+      <h4>Launch posts</h4>
+      <p class="muted small">Share these yourself, where they genuinely fit. Each one says you are the founder and asks for honest feedback.</p>
+      <div id="launch-posts"></div>
+    </div>
+    <h3>Growth watch (after launch)</h3>
+    <p class="muted small" id="watch-intro">Every week, AI customers use the live app and Kairoq counts real visitors and signups. You get a plain-English brief, by email too, with what is stopping signups and what to change. Use Fix and retest on the report: you pay only for fixes that work.</p>
+    <label class="check"><input type="checkbox" id="watch-enabled"> Run the growth watch every week</label>
+    <label>Who are your customers?<input id="watch-audience" maxlength="600"></label>
+    <label>What should they do?<input id="watch-goal" maxlength="400" placeholder="Join the waitlist"></label>
+    <div class="row">
+      <label>Signups are saved in<select id="watch-collection"></select></label>
+      <label>AI customers each week<select id="watch-count"><option>3</option><option selected>5</option><option>10</option></select></label>
+    </div>
+    <p class="muted small" id="watch-cost"></p>
+    <div class="row"><button class="ghost" id="watch-save" type="button">Save</button><button class="ghost" id="watch-run" type="button">Run now</button><span class="muted small" id="watch-status" role="status"></span></div>
+    <div id="watch-history"></div>
+    <p class="error" id="launch-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>

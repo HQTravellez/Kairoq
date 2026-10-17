@@ -272,7 +272,16 @@ The most common complaints about AI app builders are changes that break what use
   - Owners can describe a check in plain English. The AI writes the steps (priced like a Discuss message), and the check is kept only if it passes now, unless the owner chooses **Save it anyway**.
   - Up to 15 checks per project. Each can be switched on or off in the **Checks** dialog.
 - **After every change.** In Build, Agent and Polish, after the build and the browser test, Kairoq replays the enabled checks. If one fails, the AI is told exactly which step broke and must fix it before the version is saved. This takes up to three attempts.
-- **No automatic refunds for completed work.** A change that still breaks a check, or still shows errors in the browser, after the automatic fixes is saved and charged, and the chat says what is wrong so the customer can ask for a fix. Kairoq only returns credits by itself when a request fails before anything is saved (an error, a model outage, or Stop).
+- **Pay only when it works** (`KAIROQ_PAY_WHEN_WORKS`, on by default; `off` charges every completed change).
+  - A change is charged only when it builds, opens without errors in the browser and keeps the saved checks passing.
+  - A change that still shows errors or breaks a check after the automatic fixes, or that changes nothing, is saved but free, and the chat says so.
+  - A request that fails before anything is saved (an error, a model outage or Stop) is refunded as before.
+  - For a build from a reference, only browser errors make it free, because its new journeys are written from the plan and may never have passed.
+- **Loop guard** (`KAIROQ_LOOP_LIMIT`, default 2).
+  - Fix requests are the **Fix it** buttons, **Fix these** and **Fix this** on explanation cards, and the security fix.
+  - After 2 fix requests in a row that leave the same problem (the same browser errors and failing checks), the next fix request is refused (409, `stuck: true`) instead of charged.
+  - The refusal explains in plain words what to do instead: Explain, roll back, describe the problem in your own words, or contact support.
+  - Any change that leaves the app working resets the guard.
 - **Support refunds.** A customer who is not happy contacts support. The server owner opens **Settings → Support credits**, looks up the customer's credit history, reviews the request, and grants credits back with a reason (`GET /api/create/admin/account?email=…`, `POST /api/create/admin/credits` with `{email, amount, reason}`, owner only). The grant and its reason are kept in the customer's history.
 - **A test copy of the data** (`react-sandbox.js`).
   - Checks and the agent's browser tests run against a snapshot of the app's databases (records, users, SQL tables), never the real ones. The snapshot is taken with SQLite `VACUUM INTO`.
@@ -392,9 +401,39 @@ A report is the start; the repair loop (`synthetic-repair.js`) goes on to **repr
 **Price:**
 - Each fix round costs a chat edit on the chosen tier. The rerun costs the test's price.
 - Each is charged when it starts, so rounds that are never needed are never charged. The editor shows the most it can cost.
-- A round or rerun that fails is refunded. Finished rounds are not, the same as any completed work.
+- A round or rerun that fails is refunded.
+- **Pay only when it works:** a fix round that fixes none of the confirmed problems, or that leaves errors or a broken check, is free.
 
 **MCP:** the `fix_and_retest` tool does the same for AI assistants. `get_synthetic_test` follows the job.
+
+## Customers before code
+
+Lovable and Replit help you build an app. This helps you build a business: find out whether people want it before building it, then see every week what stops signups (`growth.js`). Open **Launch** in the editor.
+
+### Launch: test the idea first
+1. **Describe the idea** in a new project, set a signups goal (default 20) and choose how many AI customers react (default 8).
+2. **The pitch.** Kairoq writes:
+   - the pitch: product name, headline, benefits, the waitlist button and an optional question;
+   - launch posts for Reddit (with communities where it genuinely fits), LinkedIn, WhatsApp groups, X and an email to contacts.
+   Nothing is invented: no numbers, customers, reviews or press. Every post says you are the founder and asks for honest feedback. You share them yourself.
+3. **The landing page.** The builder makes a one-page landing page with a waitlist. Signups are saved in a `waitlist` collection with `submit-only` access: visitors can join, only the owner can read the list.
+4. **AI customers react.** They visit the page on a test copy of its data and decide whether to join. They never join the real list. You see how many joined, their objections in their own words, and the full report.
+5. **Publish and share.** Your link is filled into the posts. Real signups on the published page count toward the goal:
+   - *Not live*: the page isn't published yet;
+   - *Collecting*: published, with signups below the goal;
+   - *Ready*: "People want this: build it."
+6. **Price:** a Discuss message for the pitch, a chat edit for the page, and the test price for the AI customers. Each is charged when it starts. A part that fails, or a page that shows errors, is free.
+
+A launch only starts in a new project, so an existing app is never replaced by a landing page.
+
+### Growth watch: after launch
+- **Turn it on in Launch.** Say who your customers are, what they should do, and which collection holds signups (it defaults to `waitlist`).
+- **Every week** (`KAIROQ_WATCH_CHECK_HOURS`, checked every 6 hours; each project runs every 7 days):
+  - AI customers (default 5) use the **published** version on a test copy of its data.
+  - Kairoq counts real visitors (privacy-friendly analytics) and real signups for this week and last week.
+- **The brief:** a plain-English weekly summary. It covers the headline with numbers, what is stopping signups (with evidence), what to change next and what is working. It is kept in the project (the last 12) and emailed to the owner. The report behind it opens in Customers, ready for **Fix and retest**, where you pay only for fixes that work.
+- **Price:** the owner's account pays the AI customers' visits each week. A run that fails is refunded. An owner who is out of credits is skipped and told once; the watch continues after they top up.
+- **Run now** runs it straight away.
 
 ## Explain it in plain English
 
@@ -460,7 +499,7 @@ Give Kairoq a website, a GitHub repository, screenshots or the files of a JavaSc
 4. **Test and repair** (`react-reference-run.js`).
    - Each planned journey is written as a saved check and run in a browser on desktop and on a phone. The phone run also fails on sideways scrolling.
    - Failures go back to the AI with the exact failing step, for up to two repair rounds.
-   - A journey that still fails on desktop is switched off, so it does not block later changes, and reported. The build is charged like any completed work; refunds go through support.
+   - A journey that still fails on desktop is switched off, so it does not block later changes, and reported. Journeys that never passed do not make the build free; browser errors do (pay only when it works).
    - The finished app is then screenshotted and compared with the reference by the design model (a 0 to 10 score, strengths and concrete improvements, never "copy their brand"). Below 8, Kairoq runs one Polish pass with those improvements.
 5. **Deploy** (owners only, optional).
    - **Publish when every journey passes** publishes the app, then opens the live site in the browser to check it has no errors and, with a public URL, that it answers.
