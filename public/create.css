@@ -537,3 +537,9 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .explain-line{display:flex;gap:10px;padding:0 10px;white-space:pre}.explain-line .n{color:var(--muted);min-width:28px;text-align:right;user-select:none}
 .explain-line.marked{background:rgba(255,196,0,.14)}.explain-line.target{box-shadow:inset 3px 0 0 #e5a400}
 .explain-meaning{font:12px/1.4 var(--font,inherit);color:var(--muted);padding:0 10px 4px 48px;white-space:normal}
+
+.launch-bar{height:8px;border-radius:99px;background:var(--line,#e5e5e5);overflow:hidden;margin:6px 0}
+.launch-bar span{display:block;height:100%;background:var(--accent,#2563eb);width:0}
+.launch-post{border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin:8px 0}
+.launch-post pre{white-space:pre-wrap;font:inherit;margin:6px 0}
+.watch-entry{border-top:1px solid var(--line,#e5e5e5);padding:10px 0}

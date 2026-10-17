@@ -7022,6 +7022,10 @@ if (process.env.NODE_ENV !== "test") {
   // Live-app monitor: re-runs saved checks on every published app (KAIROQ_MONITOR_HOURS, 0 = off).
   const monitorHours=Number(process.env.KAIROQ_MONITOR_HOURS??24);
   if(monitorHours>0){const runMonitor=()=>require("./react-checks").monitorAll({inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[create-monitor]",e.message));setTimeout(runMonitor,20*60_000).unref();setInterval(runMonitor,monitorHours*3600_000).unref();}
+  // Growth watch: every few hours, runs the weekly AI-customer test and brief on published apps
+  // whose watch is due (KAIROQ_WATCH_CHECK_HOURS, 0 = off).
+  const watchHours=Number(process.env.KAIROQ_WATCH_CHECK_HOURS??6);
+  if(watchHours>0){const runWatch=()=>createApi.watchAll({callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[growth-watch]",e.message));setTimeout(runWatch,30*60_000).unref();setInterval(runWatch,watchHours*3600_000).unref();}
   require("./scripts/verify-builder-assets").startup().catch(e=>console.warn("[builder-assets] PROVIDER SMOKE ERROR "+e.message));
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);

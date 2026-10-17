@@ -117,7 +117,7 @@ test('payments use the owner Stripe key, check the return URL and record verifie
   assert.equal(calls[0].auth,'Bearer sk_test_abcdefghijkl123');assert.match(calls[0].body,/price_123/);assert.match(decodeURIComponent(calls[0].body),/kairoq_payment=success/);
   const raw=JSON.stringify({type:'checkout.session.completed',data:{object:{id:'cs_test_9'}}}),stamp=Math.floor(Date.now()/1000);
   const sig='t='+stamp+',v1='+crypto.createHmac('sha256','whsec_abcdefghijklmnop').update(stamp+'.'+raw).digest('hex');
-  assert.equal((await request(server,'POST',base+'/payments/webhook',{raw:Buffer.from(raw),headers:{'stripe-signature':sig.replace(/v1=./,'v1=0')}})).status,401);
+  assert.equal((await request(server,'POST',base+'/payments/webhook',{raw:Buffer.from(raw),headers:{'stripe-signature':sig.replace(/v1=(.)/,(m,c)=>'v1='+(c==='0'?'1':'0'))}})).status,401);
   assert.equal((await request(server,'POST',base+'/payments/webhook',{raw:Buffer.from(raw),headers:{'stripe-signature':sig}})).json.recorded,'cs_test_9');
   await request(server,'POST',base+'/payments/webhook',{raw:Buffer.from(raw),headers:{'stripe-signature':sig}});
   const mine=(await request(server,'GET',base+'/payments/mine',{headers:{authorization:'Bearer '+user.token}})).json.purchases;

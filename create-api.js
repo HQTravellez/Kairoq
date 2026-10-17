@@ -67,7 +67,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -79,7 +79,7 @@ function findShare(token){
 }
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
-const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking']);
+const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','watching']);
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
@@ -134,9 +134,27 @@ function streamSnapshot(text,mode){
 }
 // hooks (build from a reference): before() runs first and returns extra context for the model;
 // after(result) runs after the agent and returns the final result.
-function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
+// Pay only when it works: a change is charged only when it builds, opens without errors in the
+// browser and keeps the saved checks passing. A change that still shows errors, breaks a check
+// or changes nothing is free (KAIROQ_PAY_WHEN_WORKS=off charges completed work as before).
+function payWhenWorks(){return process.env.KAIROQ_PAY_WHEN_WORKS!=='off'}
+// What is wrong with a version, as one comparable string: its browser errors and failing checks.
+function problemSignature(meta,n){
+ const ver=meta.versions.find(x=>x.n===n);if(!ver)return'';
+ const parts=[...(ver.runtime_errors||[]).map(e=>'e:'+String(e).split('\n')[0].replace(/\d+/g,'#').slice(0,200)),...((ver.checks&&ver.checks.failed)||[]).map(c=>'c:'+c)].sort();
+ return parts.length?crypto.createHash('sha1').update(parts.join('\n')).digest('hex'):'';
+}
+// Loop guard: after LOOP_LIMIT fixes in a row that leave the same problem, Kairoq stops trying
+// (and charging) and explains instead, so nobody pays for the AI going in circles.
+function loopLimit(){return Math.max(1,intEnv('KAIROQ_LOOP_LIMIT',2))}
+function stuckError(meta){
+ return Object.assign(Error('Kairoq tried to fix this '+meta.loop.count+' times and the same problem is still there, so it stopped instead of charging you for going in circles. Use Explain to see what is wrong in plain English, roll back to an earlier version, describe the problem in your own words, or contact support for a person to look at it.'),{status:409,stuck:true});
+}
+function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ const before=builder.loadMeta(id),fixing=Boolean(fix)&&mode!=='discuss',sig=fixing?problemSignature(before,before.current_version):'';
+ if(fixing&&sig&&before.loop&&before.loop.sig===sig&&before.loop.count>=loopLimit())throw stuckError(before);
  if(mode==='polish'&&!designShots)throw Object.assign(Error('The design review needs screenshots, which are not available on this server.'),{status:503});
  const credits=cost({mode,tier,images:images.length>0})+extraCredits;
  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
@@ -194,6 +212,25 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    // change breaks a saved check or shows errors, so the customer can ask for a fix.
    const problem=mode!=='discuss'&&job.result&&!job.result.unchanged&&((job.result.check_failures||[]).length?'checks':(job.result.runtime_errors||[]).length?'errors':null);
    if(problem)job.problem=problem;
+   // Pay only when it works: a change that still shows errors, breaks a check or changes
+   // nothing is free, and says so.
+   // A reference build's own new journeys may never have passed (they are written from the plan),
+   // so there only browser errors make it free.
+   const notWorking=hooks?problem==='errors':problem||(job.result&&job.result.unchanged);
+   if(mode!=='discuss'&&payWhenWorks()&&notWorking){
+    job.free=problem==='checks'?'This change broke a saved check, so it was free.':problem==='errors'?'This change still shows errors in the browser, so it was free.':'Nothing changed, so it was free.';
+    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: the change did not work','refund:'+job.id);job.refunded=true}catch{}
+   }
+   // Loop guard: count fixes in a row that leave the same problem.
+   if(fixing&&sig){
+    const m=builder.loadMeta(id),after=problemSignature(m,m.current_version);
+    if(after===sig||(problem&&after)){m.loop={sig:after||sig,count:(m.loop&&m.loop.sig===(after||sig)?m.loop.count:0)+1,at:new Date().toISOString()};job.loop=m.loop.count}
+    else delete m.loop;
+    builder.saveMeta(m);
+   }else if(mode!=='discuss'){
+    // Any change that leaves the app without errors or failing checks resets the guard.
+    const m=builder.loadMeta(id);if(m.loop&&!problemSignature(m,m.current_version)){delete m.loop;builder.saveMeta(m)}
+   }
    // The finished message shows what it cost (0 when refunded).
    try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;builder.saveMeta(meta)}}catch{}
    update({status:'complete'});
@@ -365,6 +402,9 @@ function startRepair(v,id,{report:rid,rounds=2,rerun=false,tier='standard'},{cal
      }catch(e){refund(price,'Refund: fix round did not finish','refund:'+job.id+ref);if(r===1||signal.aborted)throw e;out.stopped='Round '+r+' did not finish: '+String(e.message||e).slice(0,300);break}
      version=result.version;
      const round={round:r,version,message:String(result.message||'').slice(0,400)};out.rounds.push(round);
+     // A round that leaves errors or breaks a saved check is free, like any change that does not work.
+     const broke=(result.check_failures||[]).length||(result.runtime_errors||[]).length;
+     if(payWhenWorks()&&broke){refund(price,'Free: the fix round did not work','free:'+job.id+ref);round.free=true}
      if(!open.length)break;
      update({status:'retesting',progress:'Replaying the same steps on version '+version});
      let res;
@@ -373,6 +413,8 @@ function startRepair(v,id,{report:rid,rounds=2,rerun=false,tier='standard'},{cal
      catch(e){if(signal.aborted)throw e;out.stopped='The replay on version '+version+' did not run: '+String(e.message||e).slice(0,300);break}
      for(const x of res){status.set(x.id,x.status);replays.set(x.id,x.replay)}
      round.fixed=res.filter(x=>x.status==='fixed').length;round.still=res.filter(x=>x.status==='still').length;
+     // Pay only when it works: a round that fixed none of the confirmed problems is free.
+     if(payWhenWorks()&&!round.fixed&&!round.free){refund(price,'Free: the fix round did not fix anything','free:'+job.id+ref);round.free=true}
      const left=open.filter(p=>status.get(p.id)==='still');
      // Stop when a later round fixes nothing more.
      const stuck=r>1&&left.length>=open.length;
@@ -418,6 +460,140 @@ function startRepair(v,id,{report:rid,rounds=2,rerun=false,tier='standard'},{cal
   setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
  });
  return job;
+}
+// ---------- customers before code (growth.js) ----------
+// Launch: the pitch (a Discuss message), the landing page (a chat edit) and AI customers reacting
+// to it (the test price), each charged when it starts; a part that fails or does not work is free.
+function launchPrice(tier,visitors){return cost({mode:'discuss',tier})+cost({mode:'build',tier})+syntheticPrice(visitors,tier)}
+function launchVisitors(n){return Math.max(1,Math.min(25,Math.round(Number(n))||8))}
+const REACT_GOAL='Read the page and decide whether you want this. Join the waitlist only if you really would; leave if it is not for you.';
+function startLaunch(v,id,{idea,target,visitors,tier='standard'},{callModel,checkRuntime,inspect,browse}){
+ const growth=require('./growth'),synthetic=require('./synthetic-customers');
+ idea=String(idea||'').trim();
+ if(idea.length<20)throw Object.assign(Error('Describe the idea in a few sentences: who it is for and what it does'),{status:400});
+ const meta=builder.loadMeta(id);
+ // Only in a new project (nothing asked of the builder yet), so an app is never replaced by a landing page.
+ if(meta.launch||(meta.messages||[]).some(m=>m.role==='user'))throw Object.assign(Error('Start a launch in a new project, so your app is not replaced by a landing page'),{status:409});
+ for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+ visitors=launchVisitors(visitors);target=Math.max(1,Math.min(10000,Math.round(Number(target))||20));
+ const canReact=Boolean(browse&&require('./runtime-check').available());
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'launch',tier,credits:launchPrice(tier,canReact?visitors:0),charged:0,status:'queued',seq:0,created_at:new Date().toISOString()};
+ const update=patch=>{Object.assign(job,patch);job.seq++};
+ const pay=(n,label,ref)=>{if(v.kind==='customer'&&n>0){accounts.charge(v.account.id,n,label,'job:'+job.id+ref);job.charged+=n}};
+ const refund=(n,label,ref)=>{if(v.kind==='customer'&&n>0)try{accounts.grant(v.account.id,n,label,'refund:'+job.id+ref);job.charged-=n}catch{}};
+ const controller=new AbortController();controllers.set(job.id,controller);jobs.set(job.id,job);
+ setImmediate(async()=>{
+  const signal=controller.signal;let step='';
+  try{
+   // 1. The pitch and the launch posts.
+   step=':pitch';let price=cost({mode:'discuss',tier});pay(price,'Launch: the pitch',step);
+   update({status:'pitching',progress:'Writing the pitch and launch posts'});
+   let p;try{p=await growth.pitch(idea,{callModel,tier,signal})}catch(e){refund(price,'Refund: pitch not written',step);throw e}
+   const m1=builder.loadMeta(id);m1.launch={idea:p.idea,pitch:p,target,at:new Date().toISOString()};if(!m1.name||m1.name==='Untitled app')m1.name=p.name;builder.saveMeta(m1);
+   // 2. The landing page with a waitlist.
+   step=':page';price=cost({mode:'build',tier});pay(price,'Launch: landing page',step);
+   let r;
+   try{r=await builder.edit(id,growth.landingRequest(p),{callModel,checkRuntime,inspect,tier,signal,displayText:'Build a landing page with a waitlist for: '+p.name,onProgress:st=>update({status:st,progress:'Building the landing page',stream:null}),onStream:text=>update({stream:streamSnapshot(text,'build')})})}
+   catch(e){refund(price,'Refund: landing page not built',step);throw e}
+   if(payWhenWorks()&&((r.runtime_errors||[]).length||(r.check_failures||[]).length))refund(price,'Free: the landing page shows errors',step);
+   const m2=builder.loadMeta(id);m2.launch.version=r.version;builder.saveMeta(m2);
+   // 3. AI customers react to the pitch.
+   if(canReact){
+    step=':react';price=syntheticPrice(visitors,tier);pay(price,'Launch: '+visitors+' AI customers react',step);
+    try{
+     const test={audience:p.audience||'People this idea is for',goal:REACT_GOAL,count:visitors,path:''};
+     const rr=await synthetic.run(id,builder.previewUrl(builder.loadMeta(id)),test,{callModel,browse,tier,signal,onProgress:x=>update({status:x.status,progress:'AI customers react to the pitch: '+x.text})});
+     const saved=synthetic.save(id,{at:new Date().toISOString(),version:r.version,target:{kind:'app'},tier,credits:price,test,launch:true,...rr});
+     const m3=builder.loadMeta(id);m3.launch.report_id=saved.id;m3.launch.reaction={joined:saved.numbers.completed,visitors:saved.numbers.visitors,rate:saved.numbers.completion_rate,headline:saved.summary.headline,objections:saved.summary.issues.slice(0,4).map(x=>({title:x.title,quote:x.quote}))};builder.saveMeta(m3);
+    }catch(e){refund(price,'Refund: AI customers did not finish',step);if(signal.aborted)throw e}
+   }
+   job.result={launch:launchView(builder.loadMeta(id))};
+   update({status:'complete',progress:null});
+  }catch(e){update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)})}
+  controllers.delete(job.id);job.finished_at=new Date().toISOString();
+  setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+ });
+ return job;
+}
+function launchView(meta){
+ const growth=require('./growth'),l=meta.launch;if(!l)return null;
+ const st=growth.status(meta);
+ return{idea:l.idea,pitch:{...l.pitch,posts:undefined},posts:growth.postsWithLink(l.pitch.posts,st.link),target:l.target,version:l.version||null,report_id:l.report_id||null,reaction:l.reaction||null,status:st,at:l.at};
+}
+// Growth watch: weekly AI customers on the live app, real visitors and signups, a plain brief.
+function appCollections(meta){try{return Object.keys(JSON.parse(builder.loadFiles(meta.id,meta.published?meta.published.version:meta.current_version)['src/backend.json']||'{}').collections||{})}catch{return[]}}
+function watchVisitors(n){return Math.max(1,Math.min(25,Math.round(Number(n))||5))}
+function watchConfig(meta,b){
+ const w={...(meta.watch||{})};
+ if(b.enabled!==undefined)w.enabled=Boolean(b.enabled);
+ for(const [k,n] of [['audience',600],['goal',400]])if(b[k]!==undefined)w[k]=String(b[k]).trim().slice(0,n);
+ if(b.count!==undefined)w.count=watchVisitors(b.count);
+ if(b.collection!==undefined){const c=String(b.collection);if(c&&!appCollections(meta).includes(c))throw Object.assign(Error('That collection is not in the app'),{status:400});w.collection=c}
+ if(b.every_days!==undefined)w.every_days=Math.max(1,Math.min(30,Math.round(Number(b.every_days))||7));
+ if(b.tier!==undefined){cost({mode:'discuss',tier:String(b.tier)});w.tier=String(b.tier)}
+ if(w.enabled&&(!w.audience||w.audience.length<3||!w.goal||w.goal.length<3))throw Object.assign(Error('Describe your customers and what they come to do'),{status:400});
+ w.count=w.count||5;w.every_days=w.every_days||7;w.tier=w.tier||'standard';
+ if(!w.collection){const cols=appCollections(meta);w.collection=cols.includes('waitlist')?'waitlist':cols[0]||''}
+ return w;
+}
+// One watch run, for the editor ("Run now") or the weekly scheduler. The project owner pays the
+// AI customers' visits; a run that fails is refunded.
+async function runWatch(id,{callModel,browse,signal,onProgress=()=>{},send}){
+ const growth=require('./growth'),synthetic=require('./synthetic-customers');
+ let meta=builder.loadMeta(id);const w=meta.watch;
+ if(!w||!meta.published)throw Object.assign(Error('Publish the app and turn on the growth watch first'),{status:409});
+ const price=syntheticPrice(w.count,w.tier),ref='watch:'+id+':'+Date.now();
+ const customer=meta.owner&&meta.owner!=='owner';
+ if(customer&&price>0)accounts.charge(meta.owner,price,'Growth watch: '+w.count+' AI customers',ref);
+ try{
+  const test={audience:w.audience,goal:w.goal,count:w.count,path:''};
+  const r=await synthetic.run(id,builder.previewUrl(meta,meta.published.version),test,{callModel,browse,tier:w.tier,signal,onProgress});
+  const saved=synthetic.save(id,{at:new Date().toISOString(),version:meta.published.version,target:{kind:'app'},tier:w.tier,credits:price,test,watch:true,...r});
+  const numbers=growth.weekNumbers(id,w.collection||'');
+  onProgress({status:'reporting',text:'Writing the weekly brief'});
+  const b=await growth.brief({numbers,report:saved,goal:w.collection||'signups'},{callModel,tier:w.tier,signal});
+  const entry={at:new Date().toISOString(),version:meta.published.version,numbers,ai:{completed:saved.numbers.completed,visitors:saved.numbers.visitors,completion_rate:saved.numbers.completion_rate},report_id:saved.id,brief:b,credits:price};
+  meta=builder.loadMeta(id);meta.watch={...meta.watch,last_at:entry.at,history:[entry,...((meta.watch&&meta.watch.history)||[])].slice(0,12)};delete meta.watch.paused;builder.saveMeta(meta);
+  const extras=require('./react-backend-extras'),to=extras.ownerEmail(meta);
+  if(to)try{await (send||extras.deliver)(to,meta.name+': your weekly growth brief',growth.emailText(meta,entry))}catch{}
+  return entry;
+ }catch(e){
+  if(customer&&price>0)try{accounts.grant(meta.owner,price,'Refund: growth watch did not finish','refund-'+ref)}catch{}
+  throw e;
+ }
+}
+function startWatch(v,id,deps){
+ for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+ if(!deps.browse||!require('./runtime-check').available())throw Object.assign(Error('The growth watch needs a browser (Chromium) on this server'),{status:409});
+ const meta=builder.loadMeta(id);if(!meta.watch||!meta.published)throw Object.assign(Error('Publish the app and set up the growth watch first'),{status:409});
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'watch',tier:meta.watch.tier||'standard',credits:syntheticPrice(meta.watch.count||5,meta.watch.tier||'standard'),status:'queued',seq:0,created_at:new Date().toISOString()};
+ const update=patch=>{Object.assign(job,patch);job.seq++};
+ const controller=new AbortController();controllers.set(job.id,controller);jobs.set(job.id,job);
+ setImmediate(async()=>{
+  try{update({status:'watching'});const entry=await runWatch(id,{...deps,signal:controller.signal,onProgress:p=>update({status:p.status,progress:p.text})});job.result={watch:entry};update({status:'complete',progress:null})}
+  catch(e){update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)})}
+  controllers.delete(job.id);job.finished_at=new Date().toISOString();
+  setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+ });
+ return job;
+}
+// The weekly scheduler: every published app with the watch on and a run due. An owner without
+// enough credits is skipped (and told once) until they top up.
+async function watchAll({callModel,browse,send}={}){
+ const growth=require('./growth'),out=[];
+ if(!browse||!require('./runtime-check').available())return out;
+ for(const p of builder.list()){
+  let meta;try{meta=builder.loadMeta(p.id)}catch{continue}
+  if(!growth.watchDue(meta))continue;
+  if([...jobs.values()].some(j=>j.projectId===p.id&&ACTIVE.has(j.status)))continue;
+  try{await runWatch(p.id,{callModel,browse,send});out.push({id:p.id,ok:true})}
+  catch(e){
+   const m=builder.loadMeta(p.id);m.watch={...m.watch,last_at:new Date().toISOString(),last_error:String(e.message||e).slice(0,300)};
+   if(e.status===402&&!m.watch.paused){m.watch.paused=true;const to=require('./react-backend-extras').ownerEmail(m);if(to)try{await (send||require('./react-backend-extras').deliver)(to,m.name+': growth watch paused','Your weekly growth watch for '+m.name+' did not run because the account is out of credits. Top up in Kairoq and it continues next week.')}catch{}}
+   builder.saveMeta(m);out.push({id:p.id,ok:false,error:e.message});
+  }
+ }
+ return out;
 }
 // The person who started a job, or anyone with at least `need` access to its project.
 function canSeeJob(v,job,need){if(job.owner===v.owner)return true;try{const r=roleFor(v,builder.loadMeta(job.projectId));return Boolean(r)&&RANK[r]>=RANK[need]}catch{return false}}
@@ -640,7 +816,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
-  if(action==='/chat'&&method==='POST'){const b=await readJson(req,16000000);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',images:parseImages(b.images)},deps))}),true}
+  if(action==='/chat'&&method==='POST'){const b=await readJson(req,16000000);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',images:parseImages(b.images),fix:b.fix===true},deps))}),true}
   if(action==='/assets'&&method==='GET')return send(res,200,{assets:require('./react-assets').list(id)}),true;
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}
@@ -680,6 +856,19 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: explanation not written','refund-'+ref)}catch{}
     throw Object.assign(Error('Could not explain that: '+String(e.message||e).slice(0,300)),{status:e.status||502});
    }
+  }
+  if(action==='/launch'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{launch:launchView(meta),browser:Boolean(browse&&require('./runtime-check').available()),price:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,launchPrice(t.id,launchVisitors(8))])),price_parts:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,{pitch:cost({mode:'discuss',tier:t.id}),page:cost({mode:'build',tier:t.id}),per_visitor:syntheticPrice(1,t.id)}]))}),true}
+  if(action==='/launch'&&method==='POST'){
+   const b=await readJson(req,8000);
+   if(b.target!==undefined&&!b.idea){const meta=builder.loadMeta(id);if(!meta.launch)throw Object.assign(Error('Start a launch first'),{status:400});meta.launch.target=Math.max(1,Math.min(10000,Math.round(Number(b.target))||20));builder.saveMeta(meta);return send(res,200,{launch:launchView(meta)}),true}
+   return send(res,202,{job:publicJob(startLaunch(v,id,{idea:b.idea,target:b.target,visitors:b.visitors,tier:b.tier||'standard'},{callModel,checkRuntime,inspect,browse}))}),true;
+  }
+  if(action==='/watch'&&method==='GET'){const meta=builder.loadMeta(id),w=meta.watch||null;return send(res,200,{watch:w?{...w,history:undefined}:null,history:(w&&w.history)||[],collections:appCollections(meta),published:Boolean(meta.published),price_per_visitor:Object.fromEntries(tiers().filter(t=>t.enabled).map(t=>[t.id,syntheticPrice(1,t.id)]))}),true}
+  if(action==='/watch'&&method==='POST'){
+   const b=await readJson(req,8000);
+   if(b.run)return send(res,202,{job:publicJob(startWatch(v,id,{callModel,browse}))}),true;
+   const meta=builder.loadMeta(id);meta.watch=watchConfig(meta,b);builder.saveMeta(meta);
+   return send(res,200,{watch:{...meta.watch,history:undefined},history:meta.watch.history||[]}),true;
   }
   if(action==='/synthetic'&&method==='GET'){
    const rid=new URL(req.url,'http://x').searchParams.get('report'),synthetic=require('./synthetic-customers');
@@ -910,7 +1099,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const known=meta.versions.find(x=>x.n===meta.current_version)?.runtime_errors||[];
    const errors=[...new Set([...reported,...known])];
    if(!errors.length)throw Object.assign(Error('No errors to fix right now'),{status:400});
-   return send(res,202,{job:publicJob(startJob(v,id,{message:'Fix these errors from the running app:\n'+errors.join('\n'),tier:b.tier||'standard'},deps))}),true;
+   return send(res,202,{job:publicJob(startJob(v,id,{message:'Fix these errors from the running app:\n'+errors.join('\n'),tier:b.tier||'standard',fix:true},deps))}),true;
   }
   if(action==='/file'&&method==='GET'){const name=new URL(req.url,'http://x').searchParams.get('path')||'';return send(res,200,{path:name,content:builder.readFile(id,name)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
@@ -929,8 +1118,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  }catch(e){
   const status=Number.isInteger(e.status)?e.status:422;
   if(status>=500||!e.status)console.warn('[create-api]',String(e.message||e).slice(0,300));
-  return send(res,status,{error:String(e.message||e)}),true;
+  return send(res,status,{error:String(e.message||e),...(e.stuck?{stuck:true}:{})}),true;
  }
 }
 
-module.exports={handle,jobs,streamSnapshot,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor};
+module.exports={handle,jobs,streamSnapshot,watchAll,runWatch,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor};
