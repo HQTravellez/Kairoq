@@ -8,6 +8,7 @@ process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_FREE_CREDITS='40';
 process.env.KAIROQ_DESIGN_BRIEF='off';
+process.env.KAIROQ_EXTERNAL_ALLOW_LOCAL='1';
 const builder=require('../react-builder'),createApi=require('../create-api'),backend=require('../react-backend'),runtime=require('../runtime-check');
 const synthetic=require('../synthetic-customers');
 
@@ -227,4 +228,50 @@ test('fix and retest: the confirmed problem is fixed, replayed, locked in as a c
  assert.equal(res.failed.length,1);void v;
  // Viewers cannot start it; unknown reports are refused.
  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/synthetic',{headers:{cookie},body:{repair:'00000000-0000-0000-0000-000000000000'}})).status,404);
+});
+
+// Another website: the same booking form, hosted elsewhere. Its sends must never reach it.
+const OTHER=`<!doctype html><html><head><title>Mira elsewhere</title></head><body>
+<form id="f"><h1>Yoga with Mira</h1><label>Your name<input id="n"></label><button type="submit">Book a class</button></form>
+<script>document.getElementById('f').onsubmit=async e=>{e.preventDefault();const name=document.getElementById('n').value;await fetch('/book',{method:'POST',body:JSON.stringify({name})});document.body.innerHTML='<p>Thank you, '+name+'</p>'}</script></body></html>`;
+test('other websites: the browser proxy only connects to public addresses on port 443',async()=>{
+ const port=await runtime.startProxy(),net=require('net');
+ const ask=target=>new Promise(resolve=>{const c=net.connect(port,'127.0.0.1',()=>c.write('CONNECT '+target+' HTTP/1.1\r\nHost: '+target+'\r\n\r\n'));let d='';c.on('data',x=>{d+=x;c.destroy();resolve(d.split('\r\n')[0])});c.on('error',()=>resolve('error'))});
+ for(const t of ['127.0.0.1:443','localhost:443','10.0.0.5:443','169.254.169.254:443','example.com:80','example.com:22','[::1]:443'])assert.match(await ask(t),/403/,t);
+});
+test('other websites: links are checked before any visit',async()=>{
+ for(const bad of ['http://example.com','https://10.0.0.1/','https://localhost/','https://intranet/','https://a:b@example.com/','https://example.com:8443/','ftp://example.com','not a link'])
+  await assert.rejects(runtime.checkSite(bad),e=>e.status===400,bad);
+});
+test('compare: the same customers visit this app and another website; nothing is sent to the other site',{skip:!runtime.available()&&'no browser'},async()=>{
+ let posts=0;
+ const other=http.createServer((req,res)=>{if(req.method!=='GET'){posts++;res.writeHead(500);return res.end()}res.writeHead(200,{'Content-Type':'text/html'});res.end(OTHER)});
+ await new Promise(r=>other.listen(0,'127.0.0.1',r));
+ const link='http://127.0.0.1:'+other.address().port+'/';
+ try{
+  const cookie=await signup('compare@example.com');
+  const id=(await request(server,'POST','/api/create/projects',{headers:{cookie},body:{name:'Mira Compare'}})).json.project.id;
+  await builder.saveSource(id,FILES,{summary:'Booking form'});
+  const body={audience:'Busy adults who want to try yoga',goal:'Book a class',count:3,compare:link};
+  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/synthetic',{headers:{cookie},body})).status,400,'permission must be confirmed');
+  const before=await credits(cookie);
+  const start=await request(server,'POST','/api/create/projects/'+id+'/synthetic',{headers:{cookie},body:{...body,permission:true}});
+  assert.equal(start.status,202,start.text);assert.equal(start.json.job.credits,6,'3 visitors on each of 2 sites');
+  const job=await waitJob(cookie,start.json.job);assert.equal(job.status,'complete',job.error);
+  assert.equal(await credits(cookie),before-6);
+  const c=job.result.comparison;
+  assert.deepEqual(c.sites.map(x=>[x.label,x.numbers.completed,x.numbers.visitors]),[['this app',2,3],['127.0.0.1',2,3]]);
+  assert.equal(c.fair,false,'an app on a test copy and a site with sends answered locally');
+  assert.equal(posts,0,'the booking was answered by Kairoq, never sent to the other site');
+  const site=(await request(server,'GET','/api/create/projects/'+id+'/synthetic?report='+c.sites[1].report_id,{headers:{cookie}})).json.report;
+  assert.equal(site.target.kind,'site');assert.equal(site.target.url,link);assert.equal(site.permission_confirmed,true);
+  const ana=site.visits.find(v=>v.persona.name==='Ana');
+  assert.deepEqual(ana.steps.map(s=>s.action),['fill','click','done']);assert.equal(ana.steps[1].sent,true,'the visitor sent the form');
+  assert.equal(site.numbers.sent_form,2);
+  assert.deepEqual(site.visits.map(v=>v.persona.name).sort(),job.result.comparison&&(await request(server,'GET','/api/create/projects/'+id+'/synthetic?report='+c.sites[0].report_id,{headers:{cookie}})).json.report.visits.map(v=>v.persona.name).sort(),'the same customers');
+  assert.equal(site.comparison.id,c.id);
+  assert.ok(!site.explanations,'no code cards for a site whose code Kairoq does not have');
+  // Fix and retest is for apps built here.
+  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/synthetic',{headers:{cookie},body:{repair:site.id}})).status,400);
+ }finally{other.close()}
 });

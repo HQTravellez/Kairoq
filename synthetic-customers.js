@@ -51,7 +51,7 @@ Respond with ONLY JSON: {"thought":"what you think right now, first person, one 
 Use "done" only when your goal is truly complete on screen. Use "give_up" when a real person like you would leave (confusing, too slow, asks too much, cannot find it). Type realistic details; use test-<name>@example.com for emails and never real card numbers.`;
 function describePersona(p){return p.name+', '+p.age+', '+(p.about||'')+' Uses a '+p.device+'. Patience: '+p.patience+'. Tech comfort: '+p.tech+'.'+(p.wants?' Wants: '+p.wants:'')}
 function describePage(o){
- return 'Page: '+(o.title||'(no title)')+' — '+o.path+'\nVisible text:\n'+String(o.text||'').slice(0,2000)+'\n\nInteractive elements:\n'+(o.elements.length?o.elements.map(e=>'['+e.id+'] '+e.kind+': '+(e.label||'(no label)')+(e.options?' options: '+e.options.join(' | '):'')+(e.value?' (current: '+e.value+')':'')).join('\n'):'(none)');
+ return(o.sent?'(You just sent a form. This is a test, so nothing was really sent or saved: no emails, bookings or payments. Judge by what the screen shows.)\n':'')+'Page: '+(o.title||'(no title)')+' — '+o.path+'\nVisible text:\n'+String(o.text||'').slice(0,2000)+'\n\nInteractive elements:\n'+(o.elements.length?o.elements.map(e=>'['+e.id+'] '+e.kind+': '+(e.label||'(no label)')+(e.options?' options: '+e.options.join(' | '):'')+(e.value?' (current: '+e.value+')':'')).join('\n'):'(none)');
 }
 function cleanAction(a,o){
  const action=ACTIONS.has(a&&a.action)?a.action:'give_up';
@@ -60,15 +60,17 @@ function cleanAction(a,o){
  if(needs&&!o.elements.some(e=>e.id===target))return{action:'give_up',thought:'I could not find what I was looking for.',feeling:'frustrated'};
  return{action,...(needs?{target}:{}),value:clip(a&&a.value,200),thought:clip(a&&a.thought,300),feeling:FEELINGS.has(a&&a.feeling)?a.feeling:'unsure'};
 }
-async function visit({url,persona,goal,callModel,tier,browse,sandbox,signal}){
+// site: another website (no test copy of its data; sends are answered locally, see runtime-check.js).
+async function visit({url,persona,goal,callModel,tier,browse,sandbox,site=false,signal}){
  const steps=[];let outcome='stuck',error=null;
- const s=await browse(url,{sandbox,viewport:persona.device});
+ const s=await browse(url,site?{site:true,viewport:persona.device}:{sandbox,viewport:persona.device});
  if(!s)return{persona,outcome:'skipped',steps};
  try{
   for(let i=0;i<MAX_STEPS();i++){
    if(signal&&signal.aborted)throw Error('Stopped.');
    const o=await s.observe();
-   const history=steps.slice(-6).map(x=>'- on '+x.path+': '+x.action+(x.label?' "'+x.label+'"':'')+(x.value?' "'+x.value+'"':'')+(x.error?' (did not work: '+x.error+')':'')).join('\n');
+   if(o.sent&&steps.length)steps.at(-1).sent=true;
+   const history=steps.slice(-6).map(x=>'- on '+x.path+': '+x.action+(x.label?' "'+x.label+'"':'')+(x.value?' "'+x.value+'"':'')+(x.error?' (did not work: '+x.error+')':'')+(x.sent?' (sent)':'')).join('\n');
    const messages=[{role:'system',content:VISIT_PROMPT},{role:'user',content:'You are: '+describePersona(persona)+'\nYour goal: '+clip(goal,400)+'\nStep '+(i+1)+' of at most '+MAX_STEPS()+'.'+(history?'\nWhat you did so far:\n'+history:'')+'\n\n'+describePage(o)}];
    const a=cleanAction(await callModel({messages,temperature:0.7,maxOutputTokens:400,signal,tier},json),o);
    const el=o.elements.find(e=>e.id===a.target);
@@ -106,7 +108,8 @@ function funnel(visits){
   median_steps:done.length?done[Math.floor(done.length/2)]:null,
   drop_off:Object.entries(left).map(([path,n])=>({path,visitors:n})).sort((a,b)=>b.visitors-a.visitors).slice(0,8),
   by_device:by,
-  frustrated:real.filter(v=>v.steps.some(s=>s.feeling==='frustrated')).length
+  frustrated:real.filter(v=>v.steps.some(s=>s.feeling==='frustrated')).length,
+  sent_form:real.filter(v=>v.steps.some(s=>s.sent)).length
  };
 }
 const SUMMARY_PROMPT=`You analyse a usability test where AI personas tried to reach a goal in a web app. You get each visit: who it was, the outcome, and their step-by-step thoughts.
@@ -132,15 +135,17 @@ async function summarize(visits,goal,{callModel,tier,signal}){
 // test: {audience, goal, count, path}. url is the version's preview URL (a path), browse() comes from
 // the caller; each visit gets its own test copy of the app's data.
 // people: the personas of an earlier test, to rerun the same customers after a fix.
-async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgress=()=>{},people:given=null}){
+// site: test another website at `url` (a full link) instead of the app's preview path.
+async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgress=()=>{},people:given=null,site=false,browseSite=(u,o)=>require('./runtime-check').session(u,o)}){
+ if(site)browse=browseSite;
  if(!browse)throw Object.assign(Error('Synthetic customers need a browser on the server'),{status:409});
  onProgress({status:'personas',text:given?'Bringing back the same '+given.length+' customers':'Creating '+(Number(test.count)||10)+' personas'});
  const people=given?given.map(normalizePersona):await personas({...test,callModel,tier,signal});
- const start=url+(test.path?String(test.path).replace(/^\//,''):'');
+ const start=site?url:url+(test.path?String(test.path).replace(/^\//,''):'');
  let done=0;
  const sandbox=require('./react-sandbox');
  const visits=await pool(people,CONCURRENCY(),async persona=>{
-  const r=await sandbox.withSandbox(id,box=>visit({url:start,persona,goal:test.goal,callModel,tier,browse,sandbox:box.token,signal}));
+  const r=site?await visit({url:start,persona,goal:test.goal,callModel,tier,browse,site:true,signal}):await sandbox.withSandbox(id,box=>visit({url:start,persona,goal:test.goal,callModel,tier,browse,sandbox:box.token,signal}));
   done++;onProgress({status:'visiting',text:done+' of '+people.length+' visitors finished'});
   return r;
  });
@@ -150,7 +155,7 @@ async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgre
  const summary=numbers.visitors?await summarize(visits,test.goal,{callModel,tier,signal}):{headline:'',issues:[],fixes:[]};
  // Replaying what the visitors who did not finish did (no model, free) confirms which problems are real.
  onProgress({status:'reproducing',text:'Replaying what visitors did to confirm the problems'});
- const problems=numbers.visitors?await require('./synthetic-repair').reproduce(id,{visits},{browse,startUrl:start,signal}).catch(()=>[]):[];
+ const problems=numbers.visitors?await require('./synthetic-repair').reproduce(id,{visits},{browse,startUrl:start,signal,site}).catch(()=>[]):[];
  return{numbers,summary,visits,problems};
 }
 
@@ -162,7 +167,7 @@ function save(id,report){
  const full={...report,id:rid};
  fs.writeFileSync(path.join(dir(id),rid+'.json'),JSON.stringify(full));
  const meta=builder.loadMeta(id);
- meta.synthetic=[{id:rid,at:full.at,version:full.version,audience:clip(full.test.audience,200),goal:clip(full.test.goal,200),visitors:full.numbers.visitors,completion_rate:full.numbers.completion_rate,headline:full.summary.headline},...(meta.synthetic||[]).filter(x=>x.id!==rid)].slice(0,20);
+ meta.synthetic=[{id:rid,at:full.at,version:full.version,...(full.target&&full.target.kind==='site'?{site:full.target.url}:{}),...(full.compare_id?{compare_id:full.compare_id}:{}),audience:clip(full.test.audience,200),goal:clip(full.test.goal,200),visitors:full.numbers.visitors,completion_rate:full.numbers.completion_rate,headline:full.summary.headline},...(meta.synthetic||[]).filter(x=>x.id!==rid)].slice(0,20);
  // Old full reports beyond the kept list are removed.
  const keep=new Set(meta.synthetic.map(x=>x.id));
  for(const f of fs.readdirSync(dir(id)))if(f.endsWith('.json')&&!keep.has(f.slice(0,-5)))fs.rmSync(path.join(dir(id),f),{force:true});

@@ -355,6 +355,20 @@ Test an app on AI customers before real ones arrive. Open **Customers** in the e
 - **Price:** each visitor costs a Discuss message on the chosen tier, paid up front. Credits come back only if the run fails before a report exists.
 - Synthetic visitors show likely friction (unclear copy, hidden buttons, long forms). They are not a prediction of real sales.
 
+### Other websites, and comparing two sites
+
+The same customers can visit any public website the person has permission to test, for example the same app built with another tool. Open **Test another website, or compare with one** in the Customers dialog. Either put in a link to test instead of this app, or a link to compare with it.
+- **Same customers:** in a comparison, the personas are created once and visit both sites, so the numbers compare like for like. Each site gets its own report, and both are linked to the comparison.
+- **For the fairest comparison, test two published links.** For example, the Kairoq app's published link against the other tool's. Both sites then have their sends answered the same way.
+- **Nothing is really sent:** on another website, every request that would change something (POST, PUT, PATCH, DELETE) is answered by Kairoq and never reaches the site. So nothing is booked, emailed or paid. The visitor is told the form was sent, and the report counts how many visitors sent one (`sent_form`). Links to other sites do nothing, so the visitor stays on the site being tested.
+- **Safe browsing:** Chromium reaches other websites only through a local proxy (`runtime-check.js`). The proxy looks up each name itself and connects only to public addresses on port 443. Links, redirects and DNS tricks therefore cannot reach internal hosts or cloud metadata. Links must be https, use a public name (not an IP address), and have no password or unusual port.
+- **Limits:**
+  - The person must confirm they own the site or have permission to test it. This is recorded in the report.
+  - At most `KAIROQ_SYNTHETIC_SITE_MAX` (25) visitors per site.
+  - At most `KAIROQ_SYNTHETIC_SITE_PER_HOUR` (6) such tests per account per hour.
+- **What another website does not get:** plain-English code cards and Fix and retest, because Kairoq doesn't have that site's code. Replays still confirm problems.
+- **Price:** each visitor on each site costs the same as a normal test.
+
 ### Fix and retest
 
 A report is the start; the repair loop (`synthetic-repair.js`) goes on to **reproduce → fix → retest → lock in**:
@@ -410,7 +424,7 @@ AI assistants that support MCP (Claude, ChatGPT, Cursor and others) can use Kair
 - **The MCP server:** `POST /mcp` speaks MCP over Streamable HTTP with JSON responses (`kairoq-mcp.js`, protocol versions 2025-06-18, 2025-03-26 and 2024-11-05). Send the header `Authorization: Bearer kq_…`.
 - **Tools:**
   - `list_projects` lists the projects the account can open.
-  - `run_synthetic_test` sends synthetic customers through a project (editor access, charges credits). It returns a job id.
+  - `run_synthetic_test` sends synthetic customers through a project (editor access, charges credits). With `site` it tests another public website instead. With `compare_with`, the same customers visit both and you get both scores. Both need `permission: true`. It returns a job id.
   - `get_synthetic_test` returns the progress of a job, or a finished report with its fix request and which problems the replays confirmed.
   - `fix_and_retest` fixes what a report confirmed, replays the same steps, saves checks and can rerun the same customers (editor access, charges per round). It returns a job id.
   - `list_synthetic_reports` lists a project's reports.

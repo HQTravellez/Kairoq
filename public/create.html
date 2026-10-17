@@ -330,10 +330,18 @@
       <label>Visitors<select id="cust-count"><option>5</option><option selected>10</option><option>25</option><option>50</option></select></label>
       <label>Start page (optional)<input id="cust-path" maxlength="200" placeholder="#/pricing"></label>
     </div>
+    <details id="cust-sites"><summary>Test another website, or compare with one</summary>
+      <p class="muted small">Send the same customers to any public website, for example the same app built with another tool. On other websites nothing is really sent: forms, bookings and payments are answered by Kairoq and never reach the site. A site can be tested with up to <span id="cust-site-max">25</span> visitors.</p>
+      <label>Test this website instead of the app (optional)<input id="cust-site" type="url" maxlength="500" placeholder="https://my-site.com"></label>
+      <label>Compare with this website (optional)<input id="cust-compare" type="url" maxlength="500" placeholder="https://the-same-app.lovable.app"></label>
+      <label class="check"><input type="checkbox" id="cust-permission"> I own these websites or have permission to test them</label>
+    </details>
     <p class="muted small" id="cust-cost"></p>
     <div class="row"><button class="primary" id="cust-run" type="button">Run the test</button></div>
     <p class="error" id="cust-error" role="alert"></p>
     <div id="cust-report" class="hidden">
+      <p class="muted small" id="cust-target"></p>
+      <div id="cust-comparison" class="notice hidden"><h4>Same customers, two sites</h4><div id="cust-comparison-body" class="small"></div></div>
       <h3 id="cust-headline"></h3>
       <p class="cust-stats"><b id="cust-rate"></b> <span id="cust-numbers" class="muted"></span></p>
       <h4>Where the others left</h4><ul class="small" id="cust-drop"></ul>

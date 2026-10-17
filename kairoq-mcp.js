@@ -10,7 +10,7 @@ const MAX_BODY=1024*1024;
 const TOOLS=[
  {name:'list_projects',title:'List projects',description:'Lists the Kairoq projects this account can open, with their id, name and your role.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true}},
  {name:'run_synthetic_test',title:'Test with synthetic customers',description:'Sends AI personas through the current version of a Kairoq app in a real browser (on a test copy of its data). Each persona tries to reach the goal and thinks out loud. Costs credits per visitor. Returns a job id: call get_synthetic_test with it until the status is complete.',
-  inputSchema:{type:'object',properties:{project_id:{type:'string',description:'Project id from list_projects'},audience:{type:'string',description:'Who the customers are, e.g. "busy parents booking swimming lessons, mostly on phones"'},goal:{type:'string',description:'What they come to do, e.g. "book a trial lesson for Saturday"'},visitors:{type:'integer',minimum:1,maximum:100,description:'How many personas (default 10)'},start_path:{type:'string',description:'Optional page to start on, e.g. #/pricing'},tier:{type:'string',enum:['standard','pro','max'],description:'Model tier (default standard)'}},required:['project_id','audience','goal'],additionalProperties:false}},
+  inputSchema:{type:'object',properties:{project_id:{type:'string',description:'Project id from list_projects'},audience:{type:'string',description:'Who the customers are, e.g. "busy parents booking swimming lessons, mostly on phones"'},goal:{type:'string',description:'What they come to do, e.g. "book a trial lesson for Saturday"'},visitors:{type:'integer',minimum:1,maximum:100,description:'How many personas (default 10)'},start_path:{type:'string',description:'Optional page to start on, e.g. #/pricing'},tier:{type:'string',enum:['standard','pro','max'],description:'Model tier (default standard)'},site:{type:'string',description:'Optional https link to test another public website instead of the app'},compare_with:{type:'string',description:'Optional https link of another website (e.g. the same app built elsewhere): the same customers visit both and you get both scores'},permission:{type:'boolean',description:'Required with site or compare_with: the user owns that website or has permission to test it'}},required:['project_id','audience','goal'],additionalProperties:false}},
  {name:'get_synthetic_test',title:'Get a synthetic test',description:'Status of a running test (by job_id), or a finished report (by project_id and report_id): completion rate, where visitors dropped off, the main issues with quotes, suggested fixes.',
   inputSchema:{type:'object',properties:{job_id:{type:'string'},project_id:{type:'string'},report_id:{type:'string'}},additionalProperties:false},annotations:{readOnlyHint:true}},
  {name:'fix_and_retest',title:'Fix and retest',description:'Takes a finished synthetic test, sends the problems it confirmed (by replaying the visitors\' exact steps) to the Kairoq builder, replays the same steps on the new version, and repeats for up to `rounds` rounds. Fixed problems are saved as checks so they cannot come back. With rerun, the same customers then use the new version for a before-and-after. Costs a chat edit per round, plus the test price for a rerun. Returns a job id for get_synthetic_test.',
@@ -29,6 +29,9 @@ function reportText(r){
   s.fixes.length?'Suggested fixes:\n'+s.fixes.map(f=>'- '+f).join('\n'):'',
   (r.explanations||[]).length?'In plain English:\n'+r.explanations.map(c=>'- '+c.what+(c.where?' Where: '+c.where+(c.file?' ('+c.file+' line '+c.line+')':'')+'.':'')+(c.why?' Why: '+c.why:'')+(c.fix?' Fix: '+c.fix:'')).join('\n'):''].filter(Boolean).join('\n\n');
 }
+function compareText(c){
+ return'Same customers on both sites:\n'+c.sites.map(x=>'- '+x.label+': '+x.numbers.completed+' of '+x.numbers.visitors+' reached the goal ('+x.numbers.completion_rate+'%), report '+x.report_id).join('\n')+(c.fair?'':'\nNote: this app was tested on a test copy of its data, the other site with sends answered locally, so conditions differ slightly. For the fairest comparison, test two published links.');
+}
 function repairText(r){
  if(r.nothing)return'The test found nothing to fix.';
  const word={fixed:'fixed',still:'still there',changed:'could not replay the same steps (judge it by the rerun)',confirmed:'not retested',not_reproduced:'not reproduced, left alone',experience:'visitor experience',not_checked:'not checked'};
@@ -44,7 +47,7 @@ async function callTool(name,args,v,deps){
  if(name==='list_projects'){const projects=api.listFor(v).map(p=>({id:p.id,name:p.name,role:p.role,updated_at:p.updated_at}));return text({projects},projects.length?projects.map(p=>p.id+'  '+p.name+' ('+p.role+')').join('\n'):'No projects yet.')}
  if(name==='run_synthetic_test'){
   project(args.project_id,'editor');
-  let job;try{job=api.startSynthetic(v,args.project_id,{audience:args.audience,goal:args.goal,count:args.visitors,path:args.start_path,tier:args.tier||'standard'},deps)}catch(e){throw fail(e.message)}
+  let job;try{job=await api.startSynthetic(v,args.project_id,{audience:args.audience,goal:args.goal,count:args.visitors,path:args.start_path,tier:args.tier||'standard',site:args.site,compare:args.compare_with,permission:args.permission},deps)}catch(e){throw fail(e.message)}
   return text({job_id:job.id,status:job.status,credits:job.credits},'Started a test with '+(Number(args.visitors)||10)+' synthetic visitors ('+job.credits+' credits). Job id: '+job.id+'. Call get_synthetic_test with this job_id until it is complete; it usually takes a few minutes.');
  }
  if(name==='fix_and_retest'){
@@ -62,7 +65,7 @@ async function callTool(name,args,v,deps){
     if(job.status!=='complete')return text({status:job.status,progress:job.progress||null},'Still running: '+(job.progress||job.status)+'.');
     return text({status:'complete',project_id:job.projectId,repair:job.result.repair},repairText(job.result.repair));
    }
-   if(job.status==='complete'){const report=synthetic.load(job.projectId,job.result.synthetic.id);return text({status:'complete',project_id:job.projectId,report_id:report.id,numbers:report.numbers,summary:report.summary,explanations:report.explanations||[],fix_message:synthetic.fixMessage(report)},reportText(report))}
+   if(job.status==='complete'){const report=synthetic.load(job.projectId,job.result.synthetic.id);const c=job.result.comparison;return text({status:'complete',project_id:job.projectId,report_id:report.id,numbers:report.numbers,summary:report.summary,explanations:report.explanations||[],fix_message:synthetic.fixMessage(report),...(c?{comparison:c}:{})},(c?compareText(c)+'\n\n':'')+reportText(report))}
    if(job.status==='failed')return text({status:'failed',error:job.error},'The test failed: '+job.error);
    return text({status:job.status,progress:job.progress||null},'Still running: '+(job.progress||job.status)+'.');
   }
