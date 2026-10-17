@@ -899,7 +899,9 @@ function renderLanding(){
  text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. A request that fails before anything is saved is not charged. Not happy with a change? Contact support.');
 }
 $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
-for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent;$('landing-prompt').focus()};
+for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent.trim();$('landing-prompt').focus()};
+// Template gallery tabs: filter the cards by their category.
+for(const t of document.querySelectorAll('.show-tabs .tab'))t.onclick=()=>{for(const x of document.querySelectorAll('.show-tabs .tab'))x.setAttribute('aria-pressed',String(x===t));const cat=t.dataset.cat||'';for(const card of $('landing-templates').children){const c=(card.querySelector('.cat')?.textContent||'').toLowerCase();card.hidden=Boolean(cat)&&c!==cat}};
 $('nav-signin').onclick=()=>{setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
 $('nav-start').onclick=()=>{$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
 // Landing motion: a typing placeholder, reveal-on-scroll and a cursor glow on the tiles. Nothing here is needed to use the page.
