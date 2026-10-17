@@ -898,6 +898,9 @@ function renderLanding(){
  text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. A request that fails before anything is saved is not charged. Not happy with a change? Contact support.');
 }
 $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent;$('landing-prompt').focus()};
+$('nav-signin').onclick=()=>{setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+$('nav-start').onclick=()=>{$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
 $('plans-open').onclick=()=>{
  text($('plans-error'),'');
  const account=state.me.viewer?.account||{};
