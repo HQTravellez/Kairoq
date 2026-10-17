@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/create.css?v=20261017">
 <link rel="stylesheet" href="/landing.css?v=20261017">
+<link rel="stylesheet" href="/workspace.css?v=20261017">
 </head>
 <body>
 <header class="bar">
@@ -279,19 +280,24 @@
       <div class="attachments hidden" id="attachments"></div>
       <textarea id="chat-input" rows="3" placeholder="Ask for a change: add a pricing section, make the header sticky…" required></textarea>
       <div class="composer-bar">
+        <details class="menu up" id="menu-plus">
+          <summary aria-label="Add to your message" title="Images, Figma, a reference site, or a design polish">+</summary>
+          <div class="menu-panel">
+            <button type="button" id="attach"><b>Image</b><span>Attach or paste a screenshot</span></button>
+            <button type="button" id="figma-open"><b>Figma</b><span>Build a Figma frame</span></button>
+            <button type="button" id="ref-open"><b>Reference</b><span>Your own version of a site, repo or screenshots</span></button>
+            <button type="button" id="polish"><b>Polish the design</b><span>Screenshot the app and fix what looks off</span></button>
+          </div>
+        </details>
         <div class="seg" role="group" aria-label="Mode">
           <button type="button" id="mode-build" aria-pressed="true">Build</button>
           <button type="button" id="mode-discuss" aria-pressed="false">Discuss</button>
           <button type="button" id="mode-agent" aria-pressed="false" title="Works in steps: writes code, tests it in a browser, reads logs and fixes problems until done">Agent</button>
         </div>
         <select id="tier" aria-label="Model"></select>
-        <button type="button" class="ghost icon" id="attach" aria-label="Attach images" title="Attach images (or paste a screenshot)">＋ Image</button>
-        <button type="button" class="ghost icon" id="figma-open" title="Build a Figma frame">Figma</button>
-        <button type="button" class="ghost icon" id="ref-open" title="Study a website, GitHub repository or screenshots and build your own version">Reference</button>
-        <button type="button" class="ghost icon" id="polish" title="Screenshot the app on desktop and phone and let the AI fix what looks off (uses the chosen model)">✨ Polish</button>
         <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
         <span class="muted small" id="cost-hint"></span>
-        <button class="primary" id="send" type="submit">Send</button>
+        <button class="primary send" id="send" type="submit" aria-label="Send"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
       </div>
     </form>
     <p class="error" id="chat-error" role="alert"></p>
@@ -308,17 +314,28 @@
         <button type="button" id="mobile" aria-pressed="false">Mobile</button>
       </div>
       <select id="versions" aria-label="Version"></select>
-      <button class="ghost" id="restore" type="button">Restore</button>
       <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits">✎ Edit</button>
-      <a class="ghost link" id="open" target="_blank" rel="noopener">Open ↗</a>
-      <button class="ghost" id="security-open" type="button">Security</button>
-      <button class="ghost" id="team-open" type="button">Share</button>
-      <button class="ghost" id="checks-open" type="button" title="Saved checks: flows re-tested after every change, before publishing and daily on the live app">Checks</button>
-      <button class="ghost" id="customers-open" type="button" title="Test the app on AI customers: who reaches the goal, where the others leave and why">Customers</button>
-      <button class="ghost" id="launch-open" type="button" title="Customers before code: test an idea with a landing page and waitlist, then watch how the live app grows">Launch</button>
-      <button class="ghost" id="design-open" type="button" title="Design direction, colours, fonts, design skills and images">Design</button>
-      <button class="ghost" id="mobile-open" type="button" title="Phone app: install on iPhone and Android, native iOS/Android project">App</button>
-      <button class="ghost" id="settings-open" type="button">Settings</button>
+      <a class="ghost link" id="open" target="_blank" rel="noopener" title="Open the preview in a new tab" aria-label="Open in a new tab">↗</a>
+      <span class="bar-spacer"></span>
+      <details class="menu" id="menu-test">
+        <summary>Test <i class="caret"></i></summary>
+        <div class="menu-panel">
+          <button type="button" id="checks-open"><b>Checks</b><span>Saved flows, re-run after every change</span></button>
+          <button type="button" id="customers-open"><b>Customers</b><span>AI customers use the app and report back</span></button>
+          <button type="button" id="launch-open"><b>Launch</b><span>Test the idea with a waitlist, then watch growth</span></button>
+          <button type="button" id="security-open"><b>Security</b><span>Scan for exposed secrets and open data</span></button>
+        </div>
+      </details>
+      <details class="menu" id="menu-project">
+        <summary>Project <i class="caret"></i></summary>
+        <div class="menu-panel">
+          <button type="button" id="restore"><b>Restore this version</b><span>Make the version shown in the preview the current one</span></button>
+          <button type="button" id="design-open"><b>Design</b><span>Colours, fonts, skills and images</span></button>
+          <button type="button" id="mobile-open"><b>Phone app</b><span>Install on iPhone and Android</span></button>
+          <button type="button" id="team-open"><b>Share</b><span>Invite your team or share a preview</span></button>
+          <button type="button" id="settings-open"><b>Settings</b><span>Knowledge, secrets, GitHub, API keys</span></button>
+        </div>
+      </details>
       <button class="primary" id="publish-open" type="button">Publish</button>
     </div>
     <div class="errors hidden" id="errors" role="status">
