@@ -250,7 +250,27 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
   else throw Error('Unknown action');
   await settle();
  }
- return{observe,act,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
+ // Plain facts about the page for the website check: phone layout, basic SEO, images, speed.
+ async function audit(){
+  return page.evaluate(()=>{
+   const nav=performance.getEntriesByType('navigation')[0];
+   const imgs=[...document.images].filter(i=>{const r=i.getBoundingClientRect();return r.width>40&&r.height>40});
+   return{
+    viewport:Boolean(document.querySelector('meta[name=viewport]')),
+    description:(document.querySelector('meta[name=description]')||{}).content||'',
+    title:document.title||'',
+    h1:document.querySelectorAll('h1').length,
+    lang:document.documentElement.lang||'',
+    overflow:Math.max(0,document.documentElement.scrollWidth-window.innerWidth),
+    images:imgs.length,
+    images_no_alt:imgs.filter(i=>!String(i.getAttribute('alt')||'').trim()).length,
+    load_ms:nav?Math.round(nav.loadEventEnd||nav.domContentLoadedEventEnd||0):null,
+    forms:document.forms.length,
+    small_text:[...document.querySelectorAll('p,li,a,span,label')].slice(0,400).filter(e=>{const r=e.getBoundingClientRect();if(!r.width||!e.innerText.trim())return false;return parseFloat(getComputedStyle(e).fontSize)<12}).length
+   };
+  }).catch(()=>null);
+ }
+ return{observe,act,audit,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
 }
 // Renders a small HTML document offline (no network) to PNG, e.g. app icons.
 async function renderHtml(html,{width,height}){

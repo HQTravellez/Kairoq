@@ -184,6 +184,8 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
   return job;
  }
  const before=builder.loadMeta(id),fixing=Boolean(fix)&&mode!=='discuss',sig=fixing?problemSignature(before,before.current_version):'';
+ // The learning loop counts "it still doesn't work" messages as a sign builds are not landing.
+ if(mode!=='discuss'&&!hooks&&require('./build-lessons').isComplaint(message))require('./build-lessons').recordComplaint(id);
  if(fixing&&sig&&before.loop&&before.loop.sig===sig&&before.loop.count>=loopLimit())throw stuckError(before);
  if(mode==='polish'&&!designShots)throw Object.assign(Error('The design review needs screenshots, which are not available on this server.'),{status:503});
  // The fix of a change that did not work is on Kairoq, once per problem.
@@ -280,11 +282,14 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
     // Any change that leaves the app without errors or failing checks resets the guard.
     const m=builder.loadMeta(id);if(m.loop&&!problemSignature(m,m.current_version)){delete m.loop;builder.saveMeta(m)}
    }
+   // The learning loop: what this build ran into on the way, and how it ended.
+   if(mode!=='discuss'&&job.result)try{require('./build-lessons').recordBuild(id,{mode,result:job.result})}catch{}
    // The finished message shows what it cost (0 when refunded or on us).
    try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;if(job.on_us)m.on_us=true;if(job.fix_on_us)m.fix_on_us=true;builder.saveMeta(meta)}}catch{}
    update({status:'complete'});
   }catch(e){
    update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
+   if(mode!=='discuss'&&!controller.signal.aborted&&e.status===422)try{require('./build-lessons').recordBuild(id,{mode,result:null,error:e.message})}catch{}
    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund for failed '+(mode==='discuss'?'message':'edit'),'refund:'+job.id)}catch{}
   }
   controllers.delete(job.id);
@@ -711,12 +716,45 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,await accounts.stripeWebhook(raw,req.headers['stripe-signature'])),true;
   }
   if(route==='/templates'&&method==='GET')return send(res,200,{templates:require('./create-templates').list()}),true;
+  // ----- free website check (no account needed) -----
+  if(route==='/site-check'&&method==='POST'){
+   limited(req,'site-check',6,600000);
+   const b=await readJson(req,8000);let o='';try{o=origin(req)}catch{}
+   const r=await require('./site-check').start({url:b.url,email:b.email,goal:b.goal,ip:require('./client-ip').clientIp(req)},{callModel,browseSite,origin:o,mail:accounts.mailReady()?(to,subject,body)=>require('./react-backend-extras').deliver(to,subject,body):null});
+   return send(res,202,r),true;
+  }
+  const scm=/^\/site-check\/([a-f0-9]{24})(\/shot)?$/.exec(route);
+  if(scm&&method==='GET'){
+   const sc=require('./site-check');
+   if(scm[2]){
+    const f=sc.shotFile(scm[1],new URL(req.url,'http://x').searchParams.get('name'));
+    if(!fs.existsSync(f))throw Object.assign(Error('No screenshot'),{status:404});
+    res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400'});res.end(fs.readFileSync(f));return true;
+   }
+   return send(res,200,{check:sc.view(scm[1])}),true;
+  }
   const sm=/^\/share\/([a-f0-9]{24})$/.exec(route);
   if(sm&&method==='GET'){
    const meta=findShare(sm[1]);if(!meta)throw Object.assign(Error('This share link is no longer active'),{status:404});
    return send(res,200,{share:{name:meta.name,preview_url:builder.previewUrl(meta),remix:!!meta.share.remix,versions:meta.versions.length,updated_at:meta.updated_at}}),true;
   }
   const v=requireViewer(req,isOwner);
+  // ----- the learning loop (owner only) -----
+  if(route==='/learning'){
+   if(v.kind!=='owner')throw Object.assign(Error('Only the Kairoq owner can manage what Kairoq learns'),{status:403});
+   const L=require('./build-lessons');
+   if(method==='GET')return send(res,200,{learning:L.overview()}),true;
+   if(method==='POST'){
+    const b=await readJson(req,4000);
+    if(b.action==='run'){const r=await L.run({callModel,force:true});return send(res,200,{result:r,learning:L.overview()}),true}
+    L.decide(String(b.id||''),String(b.action||''),{rule:b.rule});
+    return send(res,200,{learning:L.overview()}),true;
+   }
+  }
+  if(route==='/site-checks'&&method==='GET'){
+   if(v.kind!=='owner')throw Object.assign(Error('Only the Kairoq owner can see website check leads'),{status:403});
+   return send(res,200,{checks:require('./site-check').adminList(200)}),true;
+  }
   if(route==='/remix'&&method==='POST'){
    const b=await readJson(req,2000),src=findShare(b.token);
    if(!src||!src.share.remix)throw Object.assign(Error('This app cannot be remixed'),{status:404});
