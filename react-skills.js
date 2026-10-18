@@ -47,13 +47,41 @@ function library(owner){
  return[...builtin(),...custom(owner)].map(s=>({...s,always:on.has(s.id)||Boolean(s.defaultOn&&!on.has('!'+s.id))}));
 }
 function find(owner,id){return library(owner).find(s=>s.id===id)||null}
+// A skill's text goes straight into the builder's instructions, so text from GitHub (or pasted)
+// is checked first: hidden characters are removed; instructions aimed at the AI itself
+// (ignore your rules, reveal secrets, send data somewhere) block the import; risky code
+// patterns in its examples are reported as warnings.
+const HIDDEN=/[​-‏‪-‮⁠-⁤⁦-⁩﻿­]/g;
+const BLOCK=[
+ [/\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|other|system)\b[^.\n]{0,30}\b(instructions?|rules?|prompts?|messages?)/i,'tells the AI to ignore its other instructions'],
+ [/\b(reveal|print|output|show|repeat|leak|send|post|upload)\b[^.\n]{0,50}\b(system prompt|instructions you were given|api[_ -]?keys?|secrets?|tokens?|passwords?|credentials|env(ironment)? variables?|process\.env)/i,'asks the AI to reveal or send secrets'],
+ [/\byou are (now|no longer)\b|\bnew (system )?instructions?:|\bact as (an? )?(unrestricted|jailbroken|dan)\b/i,'tries to change who the AI is'],
+ [/\b(secrets\.get|process\.env|document\.cookie|localStorage\.getItem\(['"]?(kairoq|token|session))/i,'reads secrets, cookies or sessions'],
+ [/(fetch|axios|XMLHttpRequest|navigator\.sendBeacon|new Image\(\)\.src)\s*\(?[^)\n]{0,80}(webhook\.site|requestbin|ngrok|pipedream|burpcollaborator|interact\.sh)/i,'sends data to a capture service'],
+ [/[A-Za-z0-9+/]{300,}={0,2}/,'contains a long encoded blob']
+];
+const WARN=[
+ [/\beval\s*\(|new Function\s*\(/,'uses eval or new Function'],
+ [/<script[^>]+src=["']?https?:/i,'loads scripts from another site'],
+ [/\bfetch\s*\(\s*["'`]https?:\/\/(?!fonts\.|images\.unsplash)/i,'calls other websites from the browser'],
+ [/dangerouslySetInnerHTML/,'injects raw HTML']
+];
+function scan(text){
+ const t=String(text||'');
+ const hidden=(t.match(HIDDEN)||[]).length;
+ const clean=t.replace(HIDDEN,'');
+ return{clean,hidden,blocked:BLOCK.filter(([re])=>re.test(clean)).map(([,why])=>why),warnings:WARN.filter(([re])=>re.test(clean)).map(([,why])=>why)};
+}
 function add(owner,{name,description,body,source='custom',url=null}){
+ const check=scan(body);
+ if(check.blocked.length)throw Object.assign(Error('This skill was not added because it '+check.blocked.join(' and ')+'. Skills should only describe design rules.'),{status:422,blocked:check.blocked});
+ body=check.clean;
  const parsed=parse(body);
  const skill={id:'u-'+crypto.randomBytes(5).toString('hex'),name:String(name||parsed.name).trim().slice(0,80)||'Untitled skill',description:String(description||parsed.description).trim().slice(0,300),body:parsed.body,source,url};
  if(skill.body.length<40)throw Object.assign(Error('The skill text is too short. Describe the design rules the AI should follow.'),{status:400});
  if(custom(owner).length>=MAX_CUSTOM)throw Object.assign(Error('You can keep up to '+MAX_CUSTOM+' skills. Remove one first.'),{status:400});
  db().prepare('INSERT INTO design_skills(id,owner,name,description,body,source,url,created_at) VALUES(?,?,?,?,?,?,?,?)').run(skill.id,String(owner),skill.name,skill.description||skill.name,skill.body,source,url,new Date().toISOString());
- return{...skill,always:false};
+ return{...skill,always:false,...(check.warnings.length||check.hidden?{warnings:[...check.warnings,...(check.hidden?['had '+check.hidden+' hidden characters (removed)']:[])]}:{})};
 }
 function remove(owner,id){
  const r=db().prepare('DELETE FROM design_skills WHERE owner=? AND id=?').run(String(owner),String(id));
@@ -144,4 +172,4 @@ async function importFromGithub(owner,input,{fetchImpl=fetch,choose}={}){
  return{choices:found.map(p=>({path:p,name:p.split('/').slice(-2,-1)[0]||p}))};
 }
 
-module.exports={parse,builtin,library,find,add,remove,setDefault,active,setProject,promptNote,parseGithubUrl,importFromGithub,MAX_BODY};
+module.exports={scan,parse,builtin,library,find,add,remove,setDefault,active,setProject,promptNote,parseGithubUrl,importFromGithub,MAX_BODY};

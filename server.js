@@ -6552,12 +6552,14 @@ function parseDeveloperResponse(content,model="coding model"){
 }
 async function callDeveloperCodingModel(opts={}){return callBuilderModel(opts,parseDeveloperResponse)}
 // AI used inside generated apps (ai.chat). Own model setting and monthly cap (purpose app-ai).
-async function callAppAi({system,messages,maxTokens=1000,onToken}){
+async function callAppAi({system,messages,maxTokens=1000,onToken,vision=false}){
   if(!process.env.OPENROUTER_API_KEY)throw Object.assign(Error("AI is not configured on this server"),{status:503});
   const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const cap=Number(process.env.KAIROQ_APP_AI_MONTHLY_LIMIT_USD??20);
   const overCap=cap>0&&(await usageTotals({purpose:"app-ai"})).monthly>=cap;
-  const models=(paid&&!overCap?String(process.env.KAIROQ_APP_AI_MODEL||"deepseek/deepseek-v3.2").split(",").map(m=>m.trim()).filter(Boolean):[]).concat(["openrouter/free"]);
+  // Images (ai.extract on a photo) need a model that can see; there is no free fallback for those.
+  if(vision&&!(paid&&!overCap))throw Object.assign(Error("Reading images needs a paid vision model on this server (KAIROQ_BUILDER_PAID_APPROVED and app AI budget)."),{status:503});
+  const models=vision?String(process.env.KAIROQ_APP_AI_VISION_MODEL||"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):(paid&&!overCap?String(process.env.KAIROQ_APP_AI_MODEL||"deepseek/deepseek-v3.2").split(",").map(m=>m.trim()).filter(Boolean):[]).concat(["openrouter/free"]);
   const errors=[];
   for(const model of models){
     const free=model.endsWith(":free")||model==="openrouter/free";

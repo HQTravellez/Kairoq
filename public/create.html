@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261028">
+<link rel="stylesheet" href="/create.css?v=20261029">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261025">
 </head>
@@ -313,7 +313,7 @@
         </div>
         <div class="cr-actions"><button class="ghost" id="cr-copy" type="button">Copy link</button><button class="primary" id="cr-rebuild" type="button">Rebuild it with Kairoq</button></div>
       </header>
-      <section class="cr-headline"><p id="cr-headline"></p><p class="cr-numbers" id="cr-numbers"></p></section>
+      <section class="cr-headline"><p id="cr-headline"></p><p class="cr-numbers" id="cr-numbers"></p><ul class="recall hidden" id="cr-recall"></ul></section>
       <section class="cr-shots" id="cr-shots"></section>
       <section class="cr-block"><h2>Why visitors gave up</h2><ol class="cr-issues" id="cr-issues"></ol></section>
       <section class="cr-block"><h2>What to fix first</h2><ol class="cr-fixes" id="cr-fixes"></ol></section>
@@ -485,6 +485,12 @@
       <div class="data hidden" id="data">
         <p class="muted small">Saved data and sign-ups from this app. Preview and published versions share one database.</p>
         <p class="small" id="data-features"></p>
+        <form class="ask-data" id="ask-data">
+          <label>Ask your data <span class="muted small">in plain words, e.g. “bookings next week by room” or “which dish sold most this month”</span>
+            <div class="row"><input id="ask-data-q" maxlength="500" placeholder="How many bookings did we get this month?"><button class="ghost" type="submit" id="ask-data-go">Ask</button></div>
+          </label>
+          <div class="ask-data-result hidden" id="ask-data-result" aria-live="polite"></div>
+        </form>
         <div class="data-grid">
           <div><h3>Collections</h3><ul class="file-list" id="collections"></ul><h3>Users <span class="muted" id="user-count"></span></h3><ul class="users" id="users"></ul></div>
           <div><h3 id="records-title">Records</h3><ul class="records" id="records"></ul></div>
@@ -501,6 +507,17 @@
             <div class="row"><button class="ghost" type="submit" id="assistant-add">Add</button><span class="error small" id="assistant-error" role="alert"></span></div>
           </form>
           <ul class="assistant-docs" id="assistant-docs"></ul>
+          <div class="assistant-questions hidden" id="assistant-questions-box">
+            <h4>Questions it could not answer <span class="muted small" id="assistant-questions-count"></span></h4>
+            <p class="muted small">What visitors asked that your documents do not cover, or answers they marked as not helpful. Add the answer once and the assistant knows it from then on.</p>
+            <ul class="assistant-questions-list" id="assistant-questions"></ul>
+          </div>
+          <form id="assistant-change" class="assistant-change">
+            <label>Something changed? <span class="muted small">Kairoq finds every place in your app and documents that still says the old thing.</span>
+              <div class="row"><input id="assistant-change-text" maxlength="500" placeholder="We now close at 9pm instead of 8pm"><button class="ghost" type="submit" id="assistant-change-run">Find outdated info</button></div>
+            </label>
+            <div id="assistant-findings" class="assistant-findings hidden"></div>
+          </form>
           <form id="assistant-test" class="assistant-test">
             <label>Try a question<div class="row"><input id="assistant-question" placeholder="Do you have parking?" maxlength="500"><button class="ghost" type="submit">Ask</button></div></label>
             <div class="assistant-answer hidden" id="assistant-answer" aria-live="polite"></div>
@@ -785,6 +802,7 @@
       <div id="cust-comparison" class="notice hidden"><h4>Same customers, two sites</h4><div id="cust-comparison-body" class="small"></div></div>
       <h3 id="cust-headline"></h3>
       <p class="cust-stats"><b id="cust-rate"></b> <span id="cust-numbers" class="muted"></span></p>
+      <ul class="recall hidden" id="cust-recall"></ul>
       <h4>Where the others left</h4><ul class="small" id="cust-drop"></ul>
       <h4>What is going wrong, in plain English</h4><div id="cust-cards"></div>
       <h4 id="cust-issues-title">Issues</h4><ul class="small" id="cust-issues"></ul>
@@ -1027,6 +1045,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261028"></script>
+<script src="/create.js?v=20261029"></script>
 </body>
 </html>
