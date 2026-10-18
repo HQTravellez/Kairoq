@@ -27,6 +27,9 @@ const TOOLS=[
   inputSchema:{type:'object',properties:{job_id:{type:'string'},project_id:{type:'string'},report_id:{type:'string'}},additionalProperties:false},annotations:{readOnlyHint:true}},
  {name:'fix_and_retest',title:'Fix and retest',description:'Takes a finished synthetic test, sends the problems it confirmed (by replaying the visitors\' exact steps) to the Kairoq builder, replays the same steps on the new version, and repeats for up to `rounds` rounds. Fixed problems are saved as checks so they cannot come back. With rerun, the same customers then use the new version for a before-and-after. Costs a chat edit per round, plus the test price for a rerun. Returns a job id for get_synthetic_test.',
   inputSchema:{type:'object',properties:{project_id:{type:'string'},report_id:{type:'string'},rounds:{type:'integer',minimum:1,maximum:5,description:'Fix rounds at most (default 2)'},rerun:{type:'boolean',description:'Rerun the same customers afterwards (default false)'},tier:{type:'string',enum:['standard','pro','max']}},required:['project_id','report_id'],additionalProperties:false}},
+ {name:'browse_website',title:'Web agent: find something on a website',description:'An AI opens a public website in a real browser, clicks through it like a person and answers the task (prices, availability, opening hours, menus, what a competitor offers). Read-only: it never sends forms, books, pays or signs in. Optionally repeat it every day or week and get an email when the answer changes. Costs credits per run. Returns a run id: call get_web_task with it until the status is complete.',
+  inputSchema:{type:'object',properties:{url:{type:'string',description:'https link to start from'},task:{type:'string',description:'What to find or check, e.g. "the price of a double room next Saturday and whether breakfast is included"'},every:{type:'string',enum:['day','week'],description:'Also save it as a watch that repeats and emails changes'}},required:['url','task'],additionalProperties:false}},
+ {name:'get_web_task',title:'Get a web agent run',description:'Status of a web agent run, and its answer with the steps it took when complete.',inputSchema:{type:'object',properties:{run_id:{type:'string'}},required:['run_id'],additionalProperties:false},annotations:{readOnlyHint:true}},
  {name:'list_synthetic_reports',title:'List synthetic test reports',description:'The synthetic-customer reports kept for a project, newest first.',inputSchema:{type:'object',properties:{project_id:{type:'string'}},required:['project_id'],additionalProperties:false},annotations:{readOnlyHint:true}}
 ];
 
@@ -108,6 +111,17 @@ async function callTool(name,args,v,deps){
   project(args.project_id,'editor');
   let job;try{job=api.startRepair(v,String(args.project_id),{report:args.report_id,rounds:args.rounds,rerun:args.rerun,tier:args.tier||'standard'},deps)}catch(e){throw fail(e.message)}
   return text({job_id:job.id,status:job.status,max_credits:job.credits},'Started fix and retest (at most '+job.credits+' credits). Job id: '+job.id+'. Call get_synthetic_test with this job_id until it is complete.');
+ }
+ if(name==='browse_website'){
+  let run;try{run=await require('./web-tasks').start(v.owner,{url:args.url,task:args.task,every:args.every},{callModel:deps.callModel,browseSite:deps.browseSite})}catch(e){throw fail(e.message)}
+  return text({run_id:run.id,status:run.status},'Started the web agent on '+run.url+'. Run id: '+run.id+'. Call get_web_task until it is complete.');
+ }
+ if(name==='get_web_task'){
+  let run;try{run=require('./web-tasks').get(v.owner,String(args.run_id||''))}catch(e){throw fail(e.message)}
+  if(run.status==='needs_you')return text({status:'needs_you',need:run.need},'Waiting for a person: '+run.need+' Open Kairoq → Web agent to take over the browser, then hand back.');
+  if(run.status==='running')return text({status:'running',progress:run.progress||null},'Still working: '+(run.progress||'running')+'.');
+  if(run.status==='failed')return text({status:'failed',error:run.error},'The web agent failed: '+run.error);
+  return text({status:'complete',outcome:run.outcome,answer:run.answer,steps:run.steps.length,...(run.verdict?{check:run.verdict}:{})},({completed:'',gave_up:'It could not do it. ',stuck:'It did not finish. ',blocked:'The website blocked the agent. ',error:'Something went wrong. '}[run.outcome]||'')+(run.answer||'(no answer)')+(run.verdict&&!run.verdict.ok?'\n(Double-check: '+run.verdict.reason+')':''));
  }
  if(name==='get_synthetic_test'){
   if(args.job_id){
