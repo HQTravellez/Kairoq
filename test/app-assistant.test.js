@@ -59,7 +59,7 @@ test('the owner adds documents; the app answers from them with sources, and stre
  let r=await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{title:'Bakery info',text:MENU}});
  assert.equal(r.status,201,r.text);assert.equal(r.json.assistant.docs.length,1);assert.equal(r.json.assistant.ai_enabled,true);
  r=await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{file:{name:'menu.pdf',mime:'application/pdf',data:Buffer.from('%PDF-1.4').toString('base64')}}});
- assert.equal(r.status,415);assert.match(r.json.error,/copy its text/);
+ assert.equal(r.status,422);assert.match(r.json.error,/could not be read/);
  r=await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{file:{name:'cakes.md',mime:'text/markdown',data:Buffer.from('# Cakes\n\nCarrot cake and lemon drizzle are baked every morning; whole cakes need 48 hours notice.').toString('base64')}}});
  assert.equal(r.status,201);assert.equal(r.json.assistant.docs.length,2);
 
@@ -141,4 +141,28 @@ test('the AI templates start with sample documents in the assistant, not in the 
  const id=builder.list().find(p=>p.name==='AI front desk').id;
  const r=await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'Is breakfast included?'}});
  assert.match(r.json.text,/Breakfast/i);
+});
+
+test('PDF and Word (.docx) files are read into the assistant; scanned or broken files get a clear message',async()=>{
+ const f=require('./doc-fixtures');
+ const a=await signup('files@example.com'),id=await app(a.cookie);
+ const add=file=>request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{file}});
+ let r=await add({name:'spa-menu.pdf',mime:'application/pdf',data:f.pdf([['Spa menu','','Hot stone massage, 60 minutes, costs 95 euros.'],['Spa hours','','The spa is open from 9am to 8pm every day.']]).toString('base64')});
+ assert.equal(r.status,201,r.text);assert.equal(r.json.added.title,'spa-menu');
+ assert.match(r.json.assistant.docs[0].source,/spa-menu\.pdf \(2 pages\)/);
+ r=await add({name:'handbook.docx',mime:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',data:f.docx(f.para('Guest handbook','Title')+f.para('Late checkout','Heading1')+f.para('Late checkout until 2pm costs 30 euros &amp; must be booked the day before.')).toString('base64')});
+ assert.equal(r.status,201,r.text);assert.equal(r.json.added.title,'Guest handbook');
+ r=await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'How much is the hot stone massage?'}});
+ assert.match(r.json.text,/95 euros/);assert.equal(r.json.sources[0].title,'spa-menu');
+ r=await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'Can I check out late?'}});
+ assert.match(r.json.text,/2pm costs 30 euros & must be booked/);
+ // Scanned PDFs (no text), broken files, and old .doc files.
+ r=await add({name:'scan.pdf',mime:'application/pdf',data:f.pdf([[' ']]).toString('base64')});
+ assert.equal(r.status,422);assert.match(r.json.error,/scanned/);
+ r=await add({name:'broken.pdf',mime:'application/pdf',data:Buffer.from('%PDF-1.4 nothing here').toString('base64')});
+ assert.equal(r.status,422);
+ r=await add({name:'fake.pdf',mime:'application/pdf',data:Buffer.from('hello').toString('base64')});
+ assert.equal(r.status,415);
+ r=await add({name:'old.doc',mime:'application/msword',data:Buffer.from('xx').toString('base64')});
+ assert.equal(r.status,415);assert.match(r.json.error,/\.docx or PDF/);
 });

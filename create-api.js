@@ -953,14 +953,14 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(method==='GET')return send(res,200,{assistant:view()}),true;
    if(method==='DELETE'){const b=await readJson(req,2000);A.remove(db,b.id);return send(res,200,{assistant:view()}),true}
    if(method==='POST'){
-    const b=await readJson(req,3000000);
+    const b=await readJson(req,15000000);
     if(b.action==='test'){
      limitedKey('assistant-test:'+id,30,600000);
      const meta=builder.loadMeta(id);
      return send(res,200,{answer:await A.ask(db,{question:b.question},o=>backend.appAi(meta,db,o))}),true;
     }
     limitedKey('assistant-add:'+id,60,600000);
-    const added=b.url?await A.addUrl(db,b.url):b.file?A.addFile(db,b.file):A.addText(db,{title:b.title,text:b.text});
+    const added=b.url?await A.addUrl(db,b.url):b.file?await A.addFile(db,b.file):A.addText(db,{title:b.title,text:b.text});
     return send(res,201,{added,assistant:view()}),true;
    }
   }

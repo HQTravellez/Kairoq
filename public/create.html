@@ -496,7 +496,7 @@
           <form id="assistant-form" class="assistant-form">
             <div data-pane="text"><input id="assistant-title" placeholder="Title, e.g. Menu and prices" maxlength="120"><textarea id="assistant-text" rows="5" placeholder="Paste the text your assistant should know"></textarea></div>
             <div data-pane="url" class="hidden"><input id="assistant-url" type="url" placeholder="https://yourbusiness.com/faq"></div>
-            <div data-pane="file" class="hidden"><input id="assistant-file" type="file" accept=".txt,.md,.csv,.html,.htm,.json,text/plain,text/markdown,text/csv,text/html,application/json"><p class="muted small">Text, Markdown, CSV, HTML or JSON, up to 2 MB. For a PDF, copy its text into "Paste text".</p></div>
+            <div data-pane="file" class="hidden"><input id="assistant-file" type="file" accept=".pdf,.docx,.txt,.md,.csv,.html,.htm,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv,text/html,application/json"><p class="muted small">PDF or Word (.docx) up to 10 MB, or a text, Markdown, CSV, HTML or JSON file. Scanned PDFs (pictures of pages) have no text to read.</p></div>
             <div class="row"><button class="ghost" type="submit" id="assistant-add">Add</button><span class="error small" id="assistant-error" role="alert"></span></div>
           </form>
           <ul class="assistant-docs" id="assistant-docs"></ul>
