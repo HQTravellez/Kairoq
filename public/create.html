@@ -8,28 +8,43 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261017">
-<link rel="stylesheet" href="/landing.css?v=20261019">
-<link rel="stylesheet" href="/workspace.css?v=20261017">
+<link rel="stylesheet" href="/create.css?v=20261020">
+<link rel="stylesheet" href="/landing.css?v=20261020">
+<link rel="stylesheet" href="/workspace.css?v=20261020">
 </head>
 <body>
-<header class="bar">
+<header class="bar" id="top-bar">
+  <button class="ghost icon-btn hidden" id="side-open-btn" type="button" aria-label="Menu"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <a class="brand" href="/create">Kairoq <span>Create</span></a>
-  <div class="bar-project hidden" id="bar-project">
-    <button class="ghost" id="back" type="button" aria-label="All projects">←</button>
-    <input id="project-name" aria-label="Project name" maxlength="80">
-  </div>
   <nav class="bar-nav" id="landing-nav" aria-label="Site"><a href="#how">How it works</a><a href="#features">What it does</a><a href="#showcase">Templates</a><a href="#pricing">Pricing</a></nav>
   <div class="bar-right">
     <button class="ghost" id="nav-signin" type="button">Sign in</button>
     <button class="primary" id="nav-start" type="button">Start building</button>
-    <span class="credits hidden" id="credits"></span>
-    <button class="ghost hidden" id="plans-open" type="button">Plans</button>
-    <button class="ghost hidden" id="buy" type="button">Buy credits</button>
-    <span class="who" id="who"></span>
-    <button class="ghost hidden" id="logout" type="button">Sign out</button>
   </div>
 </header>
+
+<!-- Signed-in shell: sidebar with recents and the account -->
+<div class="shell" id="shell">
+<aside class="side hidden" id="side" aria-label="Workspace">
+  <a class="side-brand" href="/create" aria-label="Kairoq home"><span class="mark" aria-hidden="true"></span></a>
+  <div class="ws" id="ws"><span class="avatar" id="ws-avatar" aria-hidden="true">K</span><span class="ws-name" id="ws-name">Kairoq</span></div>
+  <nav class="side-nav" aria-label="Workspace">
+    <button type="button" id="side-new"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>New</button>
+    <button type="button" id="side-projects"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Projects</button>
+    <button type="button" id="side-templates"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 9h16M9 9v12"/></svg>Templates</button>
+    <button type="button" id="side-docs"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.7-2.5 2-2.5 3.5M12 17h.01"/></svg>Help</button>
+  </nav>
+  <p class="side-label">Recents</p>
+  <ul class="recents" id="recents"></ul>
+  <div class="side-foot">
+    <div class="side-card" id="credits-card">
+      <span class="credits" id="credits"></span>
+      <div class="side-actions"><button class="ghost hidden" id="buy" type="button">Buy credits</button><button class="ghost hidden" id="plans-open" type="button">Plans</button></div>
+    </div>
+    <div class="side-user"><span class="who" id="who"></span><button class="ghost hidden" id="logout" type="button">Sign out</button></div>
+  </div>
+</aside>
+<div class="shell-main" id="shell-main">
 
 <!-- Sign in / sign up -->
 <section class="screen hidden" id="auth">
@@ -258,29 +273,47 @@
 <!-- Project list / new project -->
 <section class="screen hidden" id="home">
   <div class="home">
-    <h1>What do you want to build?</h1>
-    <form id="new-form" class="prompt-box">
-      <textarea id="new-prompt" rows="3" placeholder="A booking page for my yoga studio with class times, prices and a sign-up form" required></textarea>
-      <button class="primary" type="submit" id="new-submit">Build it</button>
-    </form>
-    <div class="examples">
-      <button type="button" class="example">A restaurant site with menu, opening hours and reservations</button>
-      <button type="button" class="example">A CRM to track leads, deals and follow-ups</button>
-      <button type="button" class="example">A hotel guest portal with Wi-Fi, check-out time and local tips</button>
-      <button type="button" class="example">A habit tracker with streaks and a weekly chart</button>
+    <div class="home-hero">
+      <h1 id="home-title">Got an idea?</h1>
+      <form id="new-form" class="prompt-box">
+        <textarea id="new-prompt" rows="2" placeholder="Ask Kairoq to build a booking page for my yoga studio with class times, prices and a sign-up form" required></textarea>
+        <div class="prompt-bar">
+          <button type="button" class="round" id="new-template" aria-label="Start from a template" title="Start from a template">+</button>
+          <span class="prompt-note">Every change is tested in a real browser before you pay for it.</span>
+          <button class="primary send" type="submit" id="new-submit" aria-label="Build it" title="Build it"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+        </div>
+      </form>
+      <div class="examples">
+        <button type="button" class="example">A restaurant site with menu, opening hours and reservations</button>
+        <button type="button" class="example">A CRM to track leads, deals and follow-ups</button>
+        <button type="button" class="example">A hotel guest portal with Wi-Fi, check-out time and local tips</button>
+        <button type="button" class="example">A habit tracker with streaks and a weekly chart</button>
+      </div>
+      <p class="error" id="home-error" role="alert"></p>
     </div>
-    <p class="error" id="home-error" role="alert"></p>
-    <h2>Start from a template</h2>
-    <div class="templates" id="home-templates"></div>
-    <h2>Your projects</h2>
-    <ul class="projects" id="projects"></ul>
-    <p class="notice hidden" id="verify-notice">Please confirm your email address. <button class="ghost link-btn" id="verify-resend" type="button">Send the link again</button></p>
+    <div class="browser" id="browser">
+      <div class="browser-tabs" role="tablist" aria-label="Your workspace">
+        <button type="button" role="tab" id="tab-projects" aria-selected="true">My projects</button>
+        <button type="button" role="tab" id="tab-templates" aria-selected="false">Templates</button>
+        <span class="muted small" id="project-count"></span>
+      </div>
+      <p class="notice hidden" id="verify-notice">Please confirm your email address. <button class="ghost link-btn" id="verify-resend" type="button">Send the link again</button></p>
+      <ul class="projects cards" id="projects"></ul>
+      <div class="templates gallery hidden" id="home-templates"></div>
+    </div>
   </div>
 </section>
 
 <!-- Editor: chat + preview -->
 <section class="screen hidden" id="editor">
   <aside class="chat">
+    <div class="chat-head">
+      <button class="ghost icon-btn" id="side-toggle" type="button" aria-label="Show or hide the sidebar" title="Sidebar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg></button>
+      <div class="bar-project hidden" id="bar-project">
+        <button class="ghost icon-btn" id="back" type="button" aria-label="All projects" title="All projects"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+        <input id="project-name" aria-label="Project name" maxlength="80">
+      </div>
+    </div>
     <ol class="messages" id="messages" aria-live="polite"></ol>
     <div class="progress hidden" id="progress"><span class="dot"></span><span id="progress-text">Working…</span><button type="button" class="ghost link-btn" id="stop-job">Stop</button></div>
     <form id="visual-panel" class="composer visual hidden" aria-label="Visual edit">
@@ -328,19 +361,20 @@
   </aside>
   <main class="stage">
     <div class="stage-bar">
-      <div class="seg" role="group" aria-label="View">
-        <button type="button" id="view-preview" aria-pressed="true">Preview</button>
-        <button type="button" id="view-code" aria-pressed="false">Code</button>
-        <button type="button" id="view-data" aria-pressed="false">Data</button>
+      <div class="seg tabs-seg" role="group" aria-label="View">
+        <button type="button" id="view-preview" aria-pressed="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="lbl">Preview</span></button>
+        <button type="button" id="view-code" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg><span class="lbl">Code</span></button>
+        <button type="button" id="view-data" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span class="lbl">Data</span></button>
       </div>
-      <div class="seg" role="group" aria-label="Device">
-        <button type="button" id="desktop" aria-pressed="true">Desktop</button>
-        <button type="button" id="mobile" aria-pressed="false">Mobile</button>
+      <div class="seg icons" role="group" aria-label="Device">
+        <button type="button" id="desktop" aria-pressed="true" aria-label="Desktop" title="Desktop"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
+        <button type="button" id="mobile" aria-pressed="false" aria-label="Phone" title="Phone"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg></button>
       </div>
+      <button class="ghost icon-btn" id="refresh" type="button" aria-label="Reload the preview" title="Reload the preview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
       <select id="versions" aria-label="Version"></select>
-      <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits">✎ Edit</button>
-      <a class="ghost link" id="open" target="_blank" rel="noopener" title="Open the preview in a new tab" aria-label="Open in a new tab">↗</a>
+      <a class="ghost icon-btn link" id="open" target="_blank" rel="noopener" title="Open the preview in a new tab" aria-label="Open in a new tab"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>
       <span class="bar-spacer"></span>
+      <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits" aria-label="Edit text and images in the preview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span class="lbl">Edit</span></button>
       <details class="menu" id="menu-test">
         <summary>Test <i class="caret"></i></summary>
         <div class="menu-panel">
@@ -351,7 +385,7 @@
         </div>
       </details>
       <details class="menu" id="menu-project">
-        <summary>Project <i class="caret"></i></summary>
+        <summary aria-label="Project menu" title="Project: restore, design, phone app, share, settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></summary>
         <div class="menu-panel">
           <button type="button" id="restore"><b>Restore this version</b><span>Make the version shown in the preview the current one</span></button>
           <button type="button" id="design-open"><b>Design</b><span>Colours, fonts, skills and images</span></button>
@@ -360,7 +394,8 @@
           <button type="button" id="settings-open"><b>Settings</b><span>Knowledge, secrets, GitHub, API keys</span></button>
         </div>
       </details>
-      <button class="primary" id="publish-open" type="button">Publish</button>
+      <button class="ghost" id="share-open" type="button">Share</button>
+      <button class="primary" id="publish-open" type="button"><i class="live-dot" aria-hidden="true"></i>Publish</button>
     </div>
     <div class="errors hidden" id="errors" role="status">
       <details><summary id="errors-count"></summary><ul id="errors-list"></ul></details>
@@ -414,6 +449,8 @@
     </div>
   </main>
 </section>
+</div><!-- /shell-main -->
+</div><!-- /shell -->
 
 <dialog id="publish-dialog">
   <form method="dialog" class="dialog">
@@ -774,6 +811,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261019"></script>
+<script src="/create.js?v=20261020"></script>
 </body>
 </html>

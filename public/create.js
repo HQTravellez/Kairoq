@@ -9,7 +9,19 @@ async function api(path,{method='GET',body}={}){
  if(!r.ok)throw Object.assign(new Error(data.error||'Request failed ('+r.status+')'),{status:r.status,data});
  return data;
 }
-function show(screen){for(const id of ['auth','home','editor','share-screen'])$(id).classList.toggle('hidden',id!==screen);$('bar-project').classList.toggle('hidden',screen!=='editor')}
+function show(screen){
+ for(const id of ['auth','home','editor','share-screen'])$(id).classList.toggle('hidden',id!==screen);
+ $('bar-project').classList.toggle('hidden',screen!=='editor');
+ const app=screen==='home'||screen==='editor';
+ document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
+ $('side').classList.toggle('hidden',!app);
+ if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.toggle('side-open',window.innerWidth>=1600)}
+ if(window.innerWidth<=820)document.body.classList.remove('side-open');
+ $('side-open-btn').classList.toggle('hidden',!app);
+ for(const b of ['side-new','side-projects','side-templates'])$(b).removeAttribute('aria-current');
+ if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
+}
+const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
 function text(el,value){el.textContent=value==null?'':String(value)}
 function when(iso){try{return new Date(iso).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}catch{return''}}
 
@@ -18,6 +30,9 @@ async function loadMe(){
  state.me=await api('/me');
  const v=state.me.viewer;
  text($('who'),v?(v.kind==='owner'?'Owner':v.account.email):'');
+ const name=v?(v.kind==='owner'?'':v.account.email.split('@')[0].replace(/\d+$/,'').replace(/[._-]+/g,' ').trim().slice(0,24)):'';
+ text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
+ text($('home-title'),name?'Got an idea, '+cap(name.split(' ')[0])+'?':'Got an idea?');
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
  text($('free-note'),state.me.free_credits?'New accounts get '+state.me.free_credits+' free credits. One credit = one change.':'');
@@ -25,7 +40,7 @@ async function loadMe(){
 }
 function renderCredits(account){
  const customer=Boolean(account);
- $('credits').classList.toggle('hidden',!customer);
+ $('credits').classList.toggle('hidden',!customer);$('credits-card').classList.toggle('hidden',!customer);
  $('buy').classList.toggle('hidden',!customer||!state.me?.purchases);
  $('plans-open').classList.toggle('hidden',!customer||!state.me?.subscriptions);
  if(customer)text($('credits'),account.credits+' credit'+(account.credits===1?'':'s')+(account.plan?' · '+planName(account.plan):''));
@@ -56,19 +71,53 @@ async function loadHome(){
  const acct=state.me.viewer?.account;
  $('verify-notice').classList.toggle('hidden',!(acct&&!acct.email_verified&&state.me.email_ready));
  renderTemplates($('home-templates'),id=>startFromTemplate(id));
+ homeTab(state.homeTab||'projects');
  const {projects}=await api('/projects');
+ renderProjects(projects);
+}
+function initials(name){const w=String(name||'').trim().split(/\s+/).filter(Boolean);return ((w[0]||'K')[0]+(w[1]?w[1][0]:'')).toUpperCase()}
+function renderProjects(projects){
+ state.projects=projects;
+ text($('project-count'),projects.length?projects.length+' project'+(projects.length===1?'':'s'):'');
  const list=$('projects');list.replaceChildren();
- if(!projects.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects yet. Describe one above.';list.append(li);return}
+ if(!projects.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects yet. Describe one above, or start from a template.';list.append(li)}
  for(const p of projects){
-  const li=document.createElement('li'),open=document.createElement('button'),meta=document.createElement('span');
+  const li=document.createElement('li'),thumb=el('div','thumb',initials(p.name)),open=document.createElement('button'),meta=document.createElement('span');
+  thumb.setAttribute('aria-hidden','true');
   open.type='button';open.className='open';open.textContent=p.name;open.onclick=()=>openProject(p.id);
   meta.className='meta';meta.textContent='v'+p.current_version+' · '+when(p.updated_at);
-  li.append(open,meta);
+  li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
   if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
   if(p.published){const b=document.createElement('span');b.className='badge live';b.textContent='Live';li.append(b)}
   list.append(li);
  }
+ renderRecents(projects);
 }
+function renderRecents(projects){
+ const list=$('recents');list.replaceChildren();
+ if(!projects.length){list.append(el('li','empty','Your projects will show up here.'));return}
+ for(const p of projects.slice(0,14)){
+  const li=document.createElement('li'),b=document.createElement('button');
+  li.dataset.id=p.id;if(p.published)li.classList.add('live');if(state.project&&state.project.id===p.id)li.classList.add('active');
+  b.type='button';b.append(el('i','diamond'),el('span',null,p.name));b.title=p.name;b.onclick=()=>openProject(p.id);
+  li.append(b);list.append(li);
+ }
+}
+function markRecent(id){for(const li of $('recents').children)li.classList.toggle('active',li.dataset.id===id)}
+function homeTab(which){
+ state.homeTab=which;
+ $('tab-projects').setAttribute('aria-selected',String(which==='projects'));$('tab-templates').setAttribute('aria-selected',String(which==='templates'));
+ $('projects').classList.toggle('hidden',which!=='projects');$('home-templates').classList.toggle('hidden',which!=='templates');
+ if(!$('home').classList.contains('hidden')){$('side-projects').toggleAttribute('aria-current',which==='projects');$('side-templates').toggleAttribute('aria-current',which==='templates')}
+}
+$('tab-projects').onclick=()=>homeTab('projects');$('tab-templates').onclick=()=>homeTab('templates');
+$('new-template').onclick=()=>{homeTab('templates');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
+$('side-new').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();else homeTab('projects');$('home').scrollTo({top:0,behavior:'smooth'});$('new-prompt').focus()};
+$('side-projects').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();homeTab('projects');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
+$('side-templates').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();homeTab('templates');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
+$('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
+$('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
+$('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
 for(const b of document.querySelectorAll('.example'))b.onclick=()=>{$('new-prompt').value=b.textContent;$('new-prompt').focus()};
 $('new-form').onsubmit=async e=>{
  e.preventDefault();text($('home-error'),'');$('new-submit').disabled=true;
@@ -89,6 +138,7 @@ async function openProject(id,{pendingText,job}={}){
  show('editor');history.replaceState(null,'','/create?project='+id);
  applyRole();
  $('project-name').value=project.name;
+ if(!state.projects)api('/projects').then(r=>renderRecents(r.projects)).catch(()=>{});else markRecent(id);
  renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
  renderVersions();
@@ -160,6 +210,8 @@ $('back').onclick=()=>{closeDetail();state.project=null;loadHome()};
 $('project-name').onchange=async()=>{try{const {project}=await api('/projects/'+state.project.id,{method:'PATCH',body:{name:$('project-name').value}});state.project.name=project.name}catch{}};
 function device(mobile){$('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile))}
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
+$('refresh').onclick=()=>{const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
+$('share-open').onclick=()=>$('team-open').click();
 function view(mode){
  state.code=mode==='code';state.data=mode==='data';
  for(const m of ['preview','code','data'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
