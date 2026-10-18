@@ -110,7 +110,9 @@ test('changes, voice notes, photos and commands from the chat',async()=>{
  assert.equal(builder.loadMeta(id).messages.at(-2).images.length,1);
  r=await say(phone,'undo');assert.match(r[0],/Back to version 4/);
  assert.equal(builder.loadMeta(id).current_version,4);
- r=await say(phone,'publish');assert.match(r[0],/Live: https:\/\/kairoq\.example\/sites\/[a-z0-9-]+\/[\s\S]*Hosting: 5 credits for 30 days/);
+ r=await say(phone,'publish');assert.match(r[0],/Live: https:\/\/kairoq\.example\/sites\/[a-z0-9-]+\//);
+ // Publishing on the Kairoq address is free (hosting is charged only for an own domain).
+ assert.doesNotMatch(r[0],/Hosting:/);
  r=await say(phone,'new: a menu site for my cafe in Dubai');
  assert.match(r[0],/Building \*a menu site for my cafe/);assert.match(r[1],/Preview/);
  r=await say(phone,'projects');assert.match(r[0],/1\. a menu site for my cafe in Dubai  ← current\n2\. A booking page/);
