@@ -184,7 +184,9 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 
 ### AI assistant (answers from your documents)
 
-The owner adds what the assistant should know in **Data → AI assistant**: pasted text, a file (.txt, .md, .csv, .html, .json, up to 2 MB) or a public web page (robots.txt is respected; private addresses are refused). PDFs and Word files are not read yet: paste their text.
+The owner adds what the assistant should know in **Data → AI assistant**: pasted text, a PDF or Word (.docx) file up to 10 MB, a text file (.txt, .md, .csv, .html, .json, up to 2 MB) or a public web page (robots.txt is respected; private addresses are refused).
+
+- PDFs are read with pdf.js (`pdfjs-dist`, Apache-2.0) with script evaluation off, in a worker thread stopped after `KAIROQ_DOC_TEXT_TIMEOUT_MS` (20 s); up to 300 pages. Scanned PDFs (pictures of pages) have no text and are refused with a clear message. Word files: headings, lists and tables are kept. Old .doc, .pages, .odt and .rtf files: save as .docx or PDF first.
 
 - In the app: `const { text, sources } = await ai.ask(question, { history, system, onToken })`. `sources` lists the documents cited with `[n]` markers in `text`. Server functions: `await ai.ask(question)`.
 - How it works: documents are split into passages under their headings and indexed with SQLite full-text search in the app's own `data.sqlite` (tables `assistant_docs` and `assistant_chunks`). Each question sends the 6 best passages to the model with rules: answer only from the sources, cite them, say "I don't know" instead of guessing, and treat sources and questions as information, not instructions. No embeddings service, no extra cost beyond the normal app AI call.

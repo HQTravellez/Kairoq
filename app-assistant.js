@@ -74,19 +74,30 @@ function addText(db,{title,text,source='',kind='text'}){
  return{id,title:name,kind,chars:body.length};
 }
 const TEXT_TYPES=/^(text\/(plain|markdown|csv|html|x-markdown)|application\/(json|xhtml\+xml))/i;
-function addFile(db,{name,mime,data}){
+const MAX_FILE=10*1024*1024;
+// Text files are read as they are; PDF and Word (.docx) files are converted to text first.
+async function addFile(db,{name,mime,data}){
  const fname=String(name||'document').slice(0,120),buf=Buffer.from(String(data||''),'base64');
  if(!buf.length)throw fail(400,'The file is empty.');
- if(buf.length>2*1024*1024)throw fail(413,'Files can be up to 2 MB.');
- const ext=(/\.([a-z0-9]+)$/i.exec(fname)||[])[1]?.toLowerCase();
- if(ext==='pdf'||/pdf/i.test(mime||''))throw fail(415,'PDF files cannot be read yet. Open the PDF, copy its text and paste it here.');
- if(ext==='docx'||ext==='doc'||ext==='pages')throw fail(415,'Word files cannot be read yet. Copy the text and paste it here, or save it as a .txt file.');
- if(!TEXT_TYPES.test(mime||'')&&!['txt','md','markdown','csv','html','htm','json'].includes(ext))throw fail(415,'Add a .txt, .md, .csv, .html or .json file, or paste the text.');
+ if(buf.length>MAX_FILE)throw fail(413,'Files can be up to 10 MB.');
+ const ext=(/\.([a-z0-9]+)$/i.exec(fname)||[])[1]?.toLowerCase(),type=String(mime||'');
+ const base=fname.replace(/\.[a-z0-9]+$/i,'');
+ if(ext==='pdf'||/pdf/i.test(type)){
+  const {text,pages}=await require('./doc-text').extract('pdf',buf);
+  return addText(db,{title:base,text:text.slice(0,MAX_DOC_CHARS),source:fname+' ('+pages+' page'+(pages===1?'':'s')+')',kind:'file'});
+ }
+ if(ext==='docx'||/officedocument\.wordprocessingml/i.test(type)){
+  const {text}=await require('./doc-text').extract('docx',buf);
+  return addText(db,{title:(/^#\s+(.+)$/m.exec(text)||[])[1]||base,text:text.slice(0,MAX_DOC_CHARS),source:fname,kind:'file'});
+ }
+ if(ext==='doc'||ext==='pages'||ext==='odt'||ext==='rtf')throw fail(415,'This file type cannot be read. Save it as .docx or PDF, or paste the text.');
+ if(buf.length>2*1024*1024)throw fail(413,'Text files can be up to 2 MB.');
+ if(!TEXT_TYPES.test(type)&&!['txt','md','markdown','csv','html','htm','json'].includes(ext))throw fail(415,'Add a PDF, Word (.docx), .txt, .md, .csv, .html or .json file, or paste the text.');
  let text=buf.toString('utf8');
  if(text.includes('\u0000'))throw fail(415,'This does not look like a text file.');
- if(ext==='html'||ext==='htm'||/html/i.test(mime||''))text=htmlToText(text);
+ if(ext==='html'||ext==='htm'||/html/i.test(type))text=htmlToText(text);
  const heading=(/^#\s+(.+)$/m.exec(text)||[])[1];
- return addText(db,{title:(heading||fname.replace(/\.[a-z0-9]+$/i,'')).trim(),text,source:fname,kind:'file'});
+ return addText(db,{title:(heading||base).trim(),text,source:fname,kind:'file'});
 }
 async function addUrl(db,url,{fetchImpl=fetch}={}){
  let u;try{u=new URL(String(url||'').trim())}catch{throw fail(400,'Enter a full web address, like https://example.com/faq')}
