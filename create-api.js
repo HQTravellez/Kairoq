@@ -786,6 +786,17 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(method==='GET')return send(res,200,{memory:mem.view(v.owner)}),true;
    if(method==='POST'){const b=await readJson(req,4000);return send(res,200,{memory:mem.edit(v.owner,b,{isOwner:v.kind==='owner'})}),true}
   }
+  // ----- web agent: tasks on other websites and watches that repeat them -----
+  if(route==='/web-agent'||route.startsWith('/web-agent/')){
+   const W=require('./web-tasks'),wm=/^\/web-agent\/watches(?:\/([a-f0-9]{8}))?$/.exec(route),rm=/^\/web-agent\/([0-9a-f-]{36})$/.exec(route);
+   if(route==='/web-agent'&&method==='GET')return send(res,200,W.list(v.owner)),true;
+   if(route==='/web-agent'&&method==='POST'){limited(req,'web-agent',20,600000);const b=await readJson(req,4000);return send(res,202,{run:await W.start(v.owner,{url:b.url,task:b.task,every:b.every==='day'||b.every==='week'?b.every:undefined},{callModel,browseSite})}),true}
+   if(rm&&method==='GET')return send(res,200,{run:W.get(v.owner,rm[1])}),true;
+   if(wm&&!wm[1]&&method==='POST'){const b=await readJson(req,4000);return send(res,201,{watch:await W.createWatch(v.owner,{url:b.url,task:b.task,every:b.every})}),true}
+   if(wm&&wm[1]&&method==='PATCH'){const b=await readJson(req,1000);return send(res,200,{watch:W.updateWatch(v.owner,wm[1],b)}),true}
+   if(wm&&wm[1]&&method==='DELETE')return send(res,200,W.removeWatch(v.owner,wm[1])),true;
+   return send(res,404,{error:'Route not found'}),true;
+  }
   // ----- the learning loop (owner only) -----
   if(route==='/learning'){
    if(v.kind!=='owner')throw Object.assign(Error('Only the Kairoq owner can manage what Kairoq learns'),{status:403});

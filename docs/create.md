@@ -571,6 +571,25 @@ A launch only starts in a new project, so an existing app is never replaced by a
 - **Price:** the owner's account pays the AI customers' visits each week. A run that fails is refunded. An owner who is out of credits is skipped and told once; the watch continues after they top up.
 - **Run now** runs it straight away.
 
+## The browser agent
+
+Synthetic customers, the free website check and the web agent all use one browser agent (`browser-agent.js`) on the guarded browser session in `runtime-check.js`. It re-implements ideas from [browser-use](https://github.com/browser-use/browser-use) (MIT) in Kairoq's own Node code, with Kairoq's guards kept: public sites only, nothing ever really sent, apps on a test copy of their data, Kairoq's model budgets.
+
+- **What it sees** (`runtime-check.js` `SCAN`): native controls, ARIA roles, click handlers (also React `onClick`), `tabindex`, `contenteditable` and pointer-cursor elements, inside open shadow roots too. Elements covered by something else (a cookie banner, a modal) are left out, as a person could not click them. Numbers stay the same while an element is on the page; new elements are marked `*[n]`; off-screen ones `(below)`/`(above)`. Password values are never read.
+- **How it acts:** click (with a direct-click fallback), fill (optionally pressing Enter), select, scroll (or to an element), back, key (Enter, Escape, Tab, arrows, PageDown), hover, wait, find_text, go_to (same site), and in task mode `read` (the full page text).
+- **The loop:** each step the model reports how its last action went, keeps short notes, and takes up to 3 actions; a batch stops when the page or its elements change. Repeating an action on a screen that does not change, and failures in a row, are noticed and the model is told to try another way; 5 failures end the run. A screenshot is added (vision tier) after an action that changed nothing, a failure or every 4th step, and dropped when no image model is available.
+- **"Done" is checked:** a second model looks at the final screen (and screenshot) sceptically; a rejected "done" does not count as reaching the goal. `KAIROQ_BROWSER_JUDGE=off` turns this off.
+- **Bot walls:** a captcha, "access denied" or similar ends a visit as `blocked`. Blocked visitors are left out of completion rates; when every website-check visitor is blocked, the score covers the technical basics only.
+
+## Web agent (for owners)
+
+**Web agent** in the sidebar (and the `browse_website` / `get_web_task` MCP tools): give a public website and a task ("the price of a double room next weekend and whether breakfast is included"); the browser agent works through the site and answers, with the steps it took.
+
+- Read-only: it never sends forms, books, pays or signs in.
+- Each run costs `KAIROQ_WEB_TASK_CREDITS` (2) credits, given back when it finds nothing or fails; the Kairoq owner's runs are free. At most `KAIROQ_WEB_TASKS_PER_DAY` (20) runs a day and 2 at once; `KAIROQ_WEB_TASK_STEPS` (15) steps each.
+- **Watches:** "every day" or "every week" saves the task; an hourly job runs due watches, compares the answer with the last one (a model decides whether facts changed, not wording) and emails the owner what changed. Up to `KAIROQ_WEB_WATCHES` (5) per account; a watch pauses (with one email) when credits run out.
+- Results and watches are kept per account under `KAIROQ_WEB_TASKS_DIR` (the last 30 runs).
+
 ## Web research and browsing
 
 The AI can use the web the way a person does before building: search, open any public website in a real browser (JavaScript runs), read it and click through it.

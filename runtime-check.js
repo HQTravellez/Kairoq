@@ -200,6 +200,97 @@ async function guardSite(context,url,{onSent}={}){
  });
 }
 
+// What a browsing agent sees of the page (runs inside the page). Interactive elements are
+// found the way people find them: native controls, ARIA roles, click handlers (also React's
+// onClick, which is not an attribute), tabindex, contenteditable and a pointer cursor; open
+// shadow roots are searched too. Elements covered by something else (a cookie banner, a modal)
+// are left out, because a person could not click them either. Each element keeps its number
+// for as long as it stays on the page; elements that appeared since the last look are marked
+// new. Password values are never read.
+const MAX_ELEMENTS=120;
+function SCAN({max}){
+ const ROLES=new Set(['button','link','tab','checkbox','radio','switch','menuitem','menuitemcheckbox','menuitemradio','option','combobox','textbox','searchbox','slider','spinbutton','treeitem','gridcell']);
+ const NATIVE=new Set(['a','button','input','select','textarea','summary']);
+ const vw=innerWidth,vh=innerHeight;
+ const all=[];
+ (function walk(root){for(const e of root.querySelectorAll('*')){if(all.length>6000)return;all.push(e);if(e.shadowRoot)walk(e.shadowRoot)}})(document);
+ const style=new Map(),css=e=>{let v=style.get(e);if(!v){v=getComputedStyle(e);style.set(e,v)}return v};
+ const reactClick=e=>{for(const k in e){if(k.startsWith('__reactProps$')){const p=e[k];return Boolean(p&&(p.onClick||p.onMouseDown||p.onPointerDown||p.onTouchStart))}}return false};
+ const parentOf=e=>e.parentElement||(e.getRootNode()&&e.getRootNode().host)||null;
+ function interactive(e){
+  const tag=e.tagName.toLowerCase();
+  if(tag==='input'&&e.type==='hidden')return false;
+  if(tag==='a')return e.hasAttribute('href')||reactClick(e);
+  if(NATIVE.has(tag))return true;
+  const role=e.getAttribute('role');
+  if(role&&ROLES.has(role))return true;
+  if(e.isContentEditable&&!(parentOf(e)&&parentOf(e).isContentEditable))return true;
+  if(e.hasAttribute('onclick')||reactClick(e))return true;
+  const ti=e.getAttribute('tabindex');if(ti!==null&&Number(ti)>=0&&tag!=='div'&&tag!=='section'&&tag!=='main')return true;
+  // A pointer cursor marks something clickable; only the outermost element with it counts.
+  if(css(e).cursor==='pointer'){const p=parentOf(e);return!(p&&p.nodeType===1&&css(p).cursor==='pointer')}
+  return false;
+ }
+ function visible(e){
+  const r=e.getBoundingClientRect();if(r.width<2||r.height<2)return null;
+  const s=css(e);if(s.visibility==='hidden'||s.display==='none'||Number(s.opacity)<0.05)return null;
+  return r;
+ }
+ // Covered: the topmost thing at the element's centre is neither it, inside it, nor around it.
+ function covered(e,r){
+  const x=r.left+r.width/2,y=r.top+r.height/2;
+  if(x<0||y<0||x>vw||y>vh)return false;
+  const root=e.getRootNode();const hit=(root.elementFromPoint?root:document).elementFromPoint(x,y);
+  if(!hit)return false;
+  return!(hit===e||e.contains(hit)||hit.contains(e)||(hit.closest&&hit.closest('label')&&hit.closest('label').control===e));
+ }
+ const label=e=>{
+  const lab=e.id&&document.querySelector('label[for="'+CSS.escape(e.id)+'"]');
+  const by=e.getAttribute('aria-labelledby');const byText=by?by.split(/\s+/).map(i=>{const x=document.getElementById(i);return x?x.innerText:''}).join(' '):'';
+  return [e.getAttribute('aria-label'),byText,lab&&lab.innerText,e.closest('label')&&e.closest('label').innerText,e.placeholder,e.innerText,e.value&&(e.type==='submit'||e.type==='button')?e.value:'',e.getAttribute('alt'),e.title,(e.querySelector&&e.querySelector('img[alt]')||{}).alt,e.name].map(x=>String(x||'').trim()).find(Boolean)||'';
+ };
+ const first=!window.__kqSeen;window.__kqSeen=true;
+ window.__kqNext=window.__kqNext||0;
+ const found=[];
+ for(const e of all){
+  if(!interactive(e))continue;
+  const r=visible(e);if(!r)continue;
+  if(covered(e,r))continue;
+  found.push([e,r]);
+ }
+ // A clickable box inside another clickable box with the same text is the same target.
+ const set=new Set(found.map(x=>x[0]));
+ const kept=found.filter(([e])=>{if(NATIVE.has(e.tagName.toLowerCase()))return true;let p=parentOf(e);while(p&&p.nodeType===1){if(set.has(p)&&p.innerText===e.innerText)return false;p=parentOf(p)}return true});
+ // In view first, then nearest; the list stays in page order.
+ const dist=r=>r.bottom<0?-r.bottom:r.top>vh?r.top-vh:0;
+ const chosen=new Set(kept.slice().sort((a,b)=>dist(a[1])-dist(b[1])).slice(0,max).map(x=>x[0]));
+ const elements=[];
+ for(const [e,r] of kept){
+  if(!chosen.has(e))continue;
+  let id=Number(e.getAttribute('data-kq-id'));const isNew=!id;
+  if(!id){id=++window.__kqNext;e.setAttribute('data-kq-id',String(id))}
+  const tag=e.tagName.toLowerCase(),role=e.getAttribute('role'),at=e.closest('[data-kq]');
+  const kind=tag==='input'?'input:'+(e.type||'text'):tag==='a'?'link':role||(NATIVE.has(tag)?tag:e.isContentEditable?'textbox':'clickable');
+  elements.push({id,kind,label:label(e).replace(/\s+/g,' ').slice(0,80),
+   ...(at?{loc:at.getAttribute('data-kq')}:{}),
+   ...(e.placeholder?{ph:String(e.placeholder).slice(0,80)}:{}),
+   ...(tag==='select'?{options:[...e.options].map(o=>o.text).slice(0,12)}:{}),
+   ...(e.value&&tag!=='button'&&e.type!=='submit'&&e.type!=='button'?{value:e.type==='password'?'(filled)':String(e.value).slice(0,40)}:{}),
+   ...((e.type==='checkbox'||e.type==='radio')?{checked:e.checked}:{}),
+   ...(e.disabled||e.getAttribute('aria-disabled')==='true'?{disabled:true}:{}),
+   ...(e.getAttribute('aria-expanded')?{expanded:e.getAttribute('aria-expanded')==='true'}:{}),
+   ...(r.bottom<0?{where:'above'}:r.top>vh?{where:'below'}:{}),
+   ...(isNew&&!first?{new:true}:{})});
+ }
+ const de=document.documentElement;
+ return{
+  title:document.title,
+  text:(document.body?document.body.innerText:'').replace(/\n{2,}/g,'\n').slice(0,3000),
+  scroll:{y:Math.round(scrollY),height:Math.round(de.scrollHeight),view:vh},
+  dialog:Boolean(document.querySelector('dialog[open],[role=dialog]:not([aria-hidden=true]),[aria-modal=true]')),
+  elements
+ };
+}
 // A browsing session a synthetic customer drives step by step (see synthetic-customers.js):
 // observe() lists what is on screen with numbered interactive elements, act() clicks, types,
 // selects, scrolls or goes back. Same guard as inspect(): the browser stays inside the app.
@@ -217,23 +308,11 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
  else await guard(context,url,{sandbox});
  const root=new URL('./',url);
  const settle=async()=>{await page.waitForLoadState('networkidle',{timeout:3000}).catch(()=>{});await page.waitForTimeout(350)};
+ let status=0;page.on('response',r=>{if(r.request().isNavigationRequest()&&r.frame()===page.mainFrame())status=r.status()});
  try{await page.goto(url,{waitUntil:'load',timeout:timeoutMs});await settle()}
  catch(e){await context.close().catch(()=>{});throw Object.assign(Error('Page did not load: '+e.message),{status:502})}
  async function observe(){
-  const snap=await page.evaluate(()=>{
-   const vis=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'};
-   const label=e=>{
-    const lab=e.id&&document.querySelector('label[for="'+CSS.escape(e.id)+'"]');
-    return [e.getAttribute('aria-label'),lab&&lab.innerText,e.closest('label')&&e.closest('label').innerText,e.placeholder,e.innerText,e.value&&e.type==='submit'?e.value:'',e.title,e.name].map(x=>String(x||'').trim()).find(Boolean)||'';
-   };
-   document.querySelectorAll('[data-kq-id]').forEach(e=>e.removeAttribute('data-kq-id'));
-   const els=[...document.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[role=button],[role=link],[role=tab],[role=checkbox],[role=switch],summary')].filter(vis).slice(0,70);
-   return{
-    title:document.title,
-    text:(document.body?document.body.innerText:'').replace(/\n{2,}/g,'\n').slice(0,2500),
-    elements:els.map((e,i)=>{e.setAttribute('data-kq-id',String(i+1));const tag=e.tagName.toLowerCase();const at=e.closest('[data-kq]');return{id:i+1,kind:tag==='input'?'input:'+(e.type||'text'):tag==='a'?'link':e.getAttribute('role')||tag,label:label(e).replace(/\s+/g,' ').slice(0,80),...(at?{loc:at.getAttribute('data-kq')}:{}),...(e.placeholder?{ph:String(e.placeholder).slice(0,80)}:{}),...(tag==='select'?{options:[...e.options].map(o=>o.text).slice(0,12)}:{}),...(e.value&&tag!=='button'&&e.type!=='submit'?{value:e.type==='password'?'(filled)':String(e.value).slice(0,40)}:{})}})
-   };
-  }).catch(()=>({title:'',text:'',elements:[]}));
+  const snap=await page.evaluate(SCAN,{max:MAX_ELEMENTS}).catch(()=>({title:'',text:'',elements:[]}));
   const u=new URL(page.url());
   const out={path:(u.pathname.startsWith(root.pathname)?'/'+u.pathname.slice(root.pathname.length):u.pathname)+u.hash,...snap,errors:errors.slice()};
   if(site){out.sent=sent;sent=0}
@@ -242,11 +321,41 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
  async function act(a){
   lastAct=Date.now();
   const loc=n=>page.locator('[data-kq-id="'+Number(n)+'"]').first();
-  if(a.action==='click')await loc(a.target).click({timeout:4000});
-  else if(a.action==='fill')await loc(a.target).fill(String(a.value??'').slice(0,300),{timeout:4000});
+  if(a.action==='click'){
+   const el=loc(a.target);
+   // Something on top (an animation, a sticky bar) can swallow a real click; a direct click
+   // on the element is the fallback, as a person would tap again.
+   try{await el.click({timeout:4000})}catch(e){if(!/intercept|not visible|outside of the viewport|timeout/i.test(String(e.message)))throw e;await el.evaluate(x=>x.click(),null,{timeout:2000})}
+  }
+  else if(a.action==='fill'){
+   const el=loc(a.target);
+   await el.fill(String(a.value??'').slice(0,300),{timeout:4000}).catch(async e=>{if(!/not an <input>|contenteditable/i.test(String(e.message)))throw e;await el.click({timeout:2000});await page.keyboard.type(String(a.value??'').slice(0,300))});
+   if(a.submit)await el.press('Enter',{timeout:2000});
+  }
   else if(a.action==='select')await loc(a.target).selectOption({label:String(a.value??'')},{timeout:4000}).catch(()=>loc(a.target).selectOption(String(a.value??''),{timeout:4000}));
-  else if(a.action==='scroll')await page.mouse.wheel(0,a.value==='up'?-600:600);
+  else if(a.action==='scroll'){
+   if(a.target!==undefined&&a.target!==null&&a.target!=='')await loc(a.target).scrollIntoViewIfNeeded({timeout:3000});
+   else await page.mouse.wheel(0,a.value==='up'?-650:650);
+  }
   else if(a.action==='back')await page.goBack({timeout:timeoutMs}).catch(()=>{});
+  else if(a.action==='key'){
+   const key=String(a.value||'');
+   if(!/^(Enter|Escape|Tab|Shift\+Tab|Space|Backspace|Arrow(Up|Down|Left|Right)|PageUp|PageDown|Home|End)$/.test(key))throw Error('Unknown key (use Enter, Escape, Tab, Space, arrows, PageDown)');
+   if(a.target!==undefined&&a.target!==null&&a.target!=='')await loc(a.target).press(key==='Space'?' ':key,{timeout:3000});else await page.keyboard.press(key==='Space'?' ':key);
+  }
+  else if(a.action==='hover')await loc(a.target).hover({timeout:4000});
+  else if(a.action==='wait')await page.waitForTimeout(Math.min(3000,Math.max(300,Number(a.value)||1000)));
+  else if(a.action==='find_text'){
+   const hit=page.getByText(String(a.value||'').slice(0,100),{exact:false}).first();
+   if(!await hit.count())throw Error('That text is not on this page');
+   await hit.scrollIntoViewIfNeeded({timeout:3000});
+  }
+  else if(a.action==='go_to'){
+   // Same site only: a path or a full link on the site being visited.
+   const next=new URL(String(a.value||''),page.url());
+   if(next.origin!==new URL(url).origin||(!site&&!next.pathname.startsWith(root.pathname)))throw Error('go_to stays on this site');
+   await page.goto(next.href,{waitUntil:'load',timeout:timeoutMs});
+  }
   else throw Error('Unknown action');
   await settle();
  }
@@ -270,7 +379,9 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
    };
   }).catch(()=>null);
  }
- return{observe,act,audit,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
+ // Readable text of the whole page (not only what is in view), for reading prices or details.
+ async function read(max=20000){return page.evaluate(m=>(document.body?document.body.innerText:'').replace(/\n{3,}/g,'\n\n').slice(0,m),max).catch(()=>'')}
+ return{observe,act,audit,read,status:()=>status,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
 }
 // Renders a small HTML document offline (no network) to PNG, e.g. app icons.
 async function renderHtml(html,{width,height}){

@@ -1245,7 +1245,7 @@ function renderCheck(c){
  text($('cr-host'),c.host);text($('cr-business'),c.business||'');text($('cr-goal'),String(c.goal||'').replace(/\.$/,''));
  const n=c.numbers||{};
  text($('cr-headline'),c.summary&&c.summary.headline?c.summary.headline:n.completed===n.visitors?'Every visitor managed it.':'Some visitors did not manage it.');
- text($('cr-numbers'),(n.completed||0)+' of '+(n.visitors||0)+' AI customers managed it'+(n.by_device&&n.by_device.phone?' · on phones '+n.by_device.phone.completed+' of '+n.by_device.phone.visitors:'')+(n.median_steps?' · '+n.median_steps+' steps for those who did':''));
+ text($('cr-numbers'),c.blocked?'The site\'s bot protection turned our AI customers away, so this score covers the technical basics only.':(n.completed||0)+' of '+((n.visitors||0)-(n.blocked||0))+' AI customers managed it'+(n.blocked?' ('+n.blocked+' blocked by bot protection)':'')+(n.by_device&&n.by_device.phone?' · on phones '+n.by_device.phone.completed+' of '+n.by_device.phone.visitors:'')+(n.median_steps?' · '+n.median_steps+' steps for those who did':''));
  const shots=$('cr-shots');shots.replaceChildren();
  for(const name of c.shots||[]){const f=el('figure','cr-shot '+name),img=document.createElement('img');img.alt=c.host+' on '+(name==='phone'?'a phone':'a desktop');img.loading='lazy';img.src='/api/create/site-check/'+c.id+'/shot?name='+name;f.append(img,el('figcaption',null,name==='phone'?'Phone':'Desktop'));shots.append(f)}
  const iss=$('cr-issues');iss.replaceChildren();
@@ -1259,11 +1259,11 @@ function renderCheck(c){
  const tech=$('cr-tech');tech.replaceChildren();
  for(const t of c.technical||[]){const li=el('li',t.ok?'ok':'bad');li.append(icon(t.ok?'check':'note'),el('b',null,t.title),el('span',null,t.detail));tech.append(li)}
  const vs=$('cr-visits');vs.replaceChildren();
- const said={completed:'managed it',gave_up:'gave up',stuck:'got stuck',error:'hit an error'};
+ const said={completed:'managed it',gave_up:'gave up',stuck:'did not finish',error:'hit an error',blocked:'blocked by the site'};
  for(const v of c.visits||[]){
   const d=el('details','cr-visit'),s=el('summary');
   s.append(el('b',null,v.name+', '+v.age),el('span','muted',' · '+(v.device==='phone'?'phone':'desktop')+(v.about?' · '+v.about:'')),el('span','cr-outcome '+(v.outcome==='completed'?'ok':'bad'),said[v.outcome]||v.outcome));
-  const ol=el('ol');for(const st of v.steps||[]){const li=el('li','feel-'+(st.feeling||'unsure'));li.append(el('span',null,st.thought||''),el('span','muted small',' '+st.action+(st.label?' “'+st.label+'”':'')));ol.append(li)}
+  const ol=el('ol');if(v.judged)ol.append(el('li','muted small','Said it was done, but the check found: '+v.judged));for(const st of v.steps||[]){const li=el('li','feel-'+(st.feeling||'unsure'));li.append(el('span',null,st.thought||''),el('span','muted small',' '+st.action+(st.label?' “'+st.label+'”':'')));ol.append(li)}
   d.append(s,ol);vs.append(d);
  }
  for(const b of ['cr-rebuild','cr-rebuild-2'])$(b).onclick=()=>rebuildFromCheck(c).catch(err=>alert(err.message));
@@ -1326,6 +1326,57 @@ function renderMemory(mem){
  const sh=$('mem-shared');sh.replaceChildren();for(const r of mem.shared){const li=el('li');li.append(el('b',null,r.title),el('span','muted small',' · '+r.when));sh.append(li)}
 }
 $('side-memory').onclick=openMemory;
+// Web agent: tasks on other websites, and watches that repeat them and email changes.
+const webState={poll:null};
+function webRunItem(r){
+ const li=el('li'),t=el('div','skill-text');
+ const said={completed:'Done',gave_up:'Could not do it',stuck:'Did not finish',blocked:'Blocked by the site',error:'Error'};
+ t.append(el('b',null,r.task),el('span',null,(r.status==='running'?'Working… '+(r.progress||''):(said[r.outcome]||r.status)+' · '+when(r.at))+' · '+r.url));
+ li.append(t);
+ if(r.status!=='running')li.onclick=()=>showWebRun(r);
+ return li;
+}
+function showWebRun(r){
+ const box=$('web-result');box.classList.remove('hidden');box.replaceChildren();
+ if(r.status==='running'){box.append(el('p','muted','Working on it… '+(r.progress||'')));return}
+ if(r.status==='failed'){box.append(el('p','error',r.error||'It did not work.'));return}
+ const head={completed:'Answer',gave_up:'It could not do it',stuck:'It did not finish',blocked:'The website blocked the agent',error:'Something went wrong'}[r.outcome]||'Result';
+ box.append(el('h4',null,head),el('p','web-answer',r.answer||'(no answer)'));
+ if(r.verdict&&!r.verdict.ok)box.append(el('p','muted small','Double-check: '+r.verdict.reason));
+ if(r.change)box.append(el('p','small','Change: '+r.change));
+ if(r.steps&&r.steps.length){const d=el('details'),s=el('summary',null,'What it did ('+r.steps.length+' steps)'),ol=el('ol','small');for(const st of r.steps)ol.append(el('li',null,st.action+(st.label?' “'+st.label+'”':'')+(st.value?' '+st.value:'')+(st.error?' (failed)':'')+(st.thought?' — '+st.thought:'')));d.append(s,ol);box.append(d)}
+ if(r.charged)box.append(el('p','muted small',r.charged+' credits'));
+}
+async function renderWeb(){
+ const d=await api('/web-agent');
+ text($('web-price'),d.price?'Each run costs '+d.price+' credits.':'');
+ const runs=$('web-runs');runs.replaceChildren();
+ if(!d.runs.length)runs.append(el('li','muted small','Nothing yet.'));
+ for(const r of d.runs)runs.append(webRunItem(r));
+ $('web-watches-box').classList.toggle('hidden',!d.watches.length);
+ const ws=$('web-watches');ws.replaceChildren();
+ for(const w of d.watches){
+  const li=el('li'),t=el('div','skill-text');
+  t.append(el('b',null,w.task),el('span',null,w.url+' · every '+w.every+(w.paused?' · paused':w.last?' · last checked '+when(w.last):' · first check within the hour')));
+  const act=el('div','skill-actions');
+  const pause=el('button','ghost link-btn',w.paused?'Resume':'Pause');pause.type='button';pause.onclick=async()=>{await api('/web-agent/watches/'+w.id,{method:'PATCH',body:{paused:!w.paused}});renderWeb()};
+  const del=el('button','ghost link-btn','Remove');del.type='button';del.onclick=async()=>{if(!confirm('Remove this watch?'))return;await api('/web-agent/watches/'+w.id,{method:'DELETE'});renderWeb()};
+  act.append(pause,del);li.append(t,act);ws.append(li);
+ }
+ const live=d.runs.find(r=>r.status==='running');
+ clearTimeout(webState.poll);
+ if(live&&$('web-dialog').open)webState.poll=setTimeout(async()=>{try{const {run}=await api('/web-agent/'+live.id);if(run.status!=='running'){showWebRun(run);renderWeb()}else{showWebRun(run);renderWeb()}}catch{}},2500);
+}
+$('side-web').onclick=async()=>{text($('web-error'),'');$('web-dialog').showModal();try{await renderWeb()}catch(err){text($('web-error'),err.message)}};
+$('web-run').onclick=async()=>{
+ text($('web-error'),'');const btn=$('web-run');btn.disabled=true;
+ try{
+  const body={url:$('web-url').value.trim(),task:$('web-task').value.trim()};
+  const {run}=await api('/web-agent',{method:'POST',body:{...body,...($('web-every').value?{every:$('web-every').value}:{})}});
+  showWebRun(run);await renderWeb();
+ }catch(err){text($('web-error'),err.message)}
+ finally{btn.disabled=false}
+};
 $('mem-enabled').onchange=()=>memoryAction({action:'enabled',enabled:$('mem-enabled').checked});
 $('mem-add').onclick=()=>{const t=$('mem-new').value.trim();if(!t)return;$('mem-new').value='';memoryAction({action:'add_preference',text:t})};
 $('mem-new').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('mem-add').click()}});
@@ -1564,7 +1615,7 @@ function showCustReport(report,fix){
  renderComparison(report.comparison);
  text($('cust-headline'),s.headline||'Test from '+report.at.slice(0,16).replace('T',' '));
  text($('cust-rate'),n.completion_rate+'% reached the goal');
- text($('cust-numbers'),n.completed+' of '+n.visitors+' visitors · '+n.gave_up+' gave up · '+n.stuck+' ran out of steps'+(n.frustrated?' · '+n.frustrated+' got frustrated':'')+Object.entries(n.by_device||{}).map(([d,x])=>' · '+d+': '+x.completed+'/'+x.visitors).join(''));
+ text($('cust-numbers'),n.completed+' of '+n.visitors+' visitors · '+n.gave_up+' gave up · '+n.stuck+' did not finish'+(n.blocked?' · '+n.blocked+' blocked by bot protection':'')+(n.frustrated?' · '+n.frustrated+' got frustrated':'')+Object.entries(n.by_device||{}).map(([d,x])=>' · '+d+': '+x.completed+'/'+x.visitors).join(''));
  const drop=$('cust-drop');drop.replaceChildren();for(const d of n.drop_off)drop.append(li(d.path+' — '+d.visitors+' visitor'+(d.visitors===1?'':'s')));if(!n.drop_off.length)drop.append(li('Nobody left early.','muted'));
  const iss=$('cust-issues');iss.replaceChildren();for(const x of s.issues)iss.append(li(x.title+(x.why?': '+x.why:'')+(x.who?' ('+x.who+')':'')+(x.quote?' — “'+x.quote+'”':'')));if(!s.issues.length)iss.append(li('No issues found.','muted'));
  const cards=$('cust-cards');cards.replaceChildren();
@@ -1585,7 +1636,7 @@ function showCustReport(report,fix){
  const vis=$('cust-visits');vis.replaceChildren();
  for(const v of report.visits){
   const box=document.createElement('div');box.className='cust-visit';
-  const h=document.createElement('p');const p=v.persona;h.textContent=p.name+', '+p.age+' · '+p.device+' · patience '+p.patience+' · tech '+p.tech+' — '+({completed:'reached the goal',gave_up:'gave up',stuck:'ran out of steps',error:'error',skipped:'skipped'}[v.outcome]||v.outcome);h.className='small';box.append(h);
+  const h=document.createElement('p');const p=v.persona;h.textContent=p.name+', '+p.age+' · '+p.device+' · patience '+p.patience+' · tech '+p.tech+' — '+({completed:'reached the goal',gave_up:'gave up',stuck:'did not finish',blocked:'blocked by the site',error:'error',skipped:'skipped'}[v.outcome]||v.outcome)+(v.verdict&&!v.verdict.ok?' (said done; the check found: '+v.verdict.reason+')':'');h.className='small';box.append(h);
   const ol=document.createElement('ol');for(const st of v.steps)ol.append(li(st.path+' — “'+st.thought+'” → '+st.action+(st.label?' “'+st.label+'”':'')+(st.value?' “'+st.value+'”':''),st.feeling==='frustrated'?'error':''));box.append(ol);vis.append(box);
  }
  $('cust-report').classList.remove('hidden');

@@ -71,9 +71,12 @@ function technical(desktop,phone){
  return out;
 }
 // 0-100: mostly whether visitors reached their goal, then the technical basics.
+// When the site's bot protection turned every AI customer away, journeys could not be judged,
+// so the score comes from the technical basics only.
 function score(numbers,tech){
- const goal=numbers&&numbers.visitors?numbers.completion_rate:0;
  const passed=tech.length?tech.filter(t=>t.ok).length/tech.length:0;
+ if(numbers&&numbers.visitors&&numbers.blocked>=numbers.visitors)return Math.round(passed*100);
+ const goal=numbers&&numbers.visitors?numbers.completion_rate:0;
  return Math.round(goal*0.7+passed*30);
 }
 
@@ -129,10 +132,10 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   const tech=technical(desktop.facts,phone.facts);
   const report={
    id:state.id,url:state.url,host:state.host,at:new Date().toISOString(),...about,
-   score:score(r.numbers,tech),numbers:r.numbers,summary:r.summary,technical:tech,
+   score:score(r.numbers,tech),numbers:r.numbers,...(r.numbers.visitors&&r.numbers.blocked>=r.numbers.visitors?{blocked:true}:{}),summary:r.summary,technical:tech,
    problems:(r.problems||[]).filter(p=>p.status==='confirmed').slice(0,6).map(p=>({title:p.title,path:p.path,device:p.device,visitors:p.visitors.length})),
    // The visitors' own words, shortened: who they were, what happened and what they thought.
-   visits:r.visits.filter(v=>v.outcome!=='skipped').map(v=>({name:v.persona.name,age:v.persona.age,device:v.persona.device,about:v.persona.about,outcome:v.outcome,steps:v.steps.slice(0,14).map(s=>({path:s.path,thought:s.thought,feeling:s.feeling,action:s.action,label:s.label||''}))})),
+   visits:r.visits.filter(v=>v.outcome!=='skipped').map(v=>({name:v.persona.name,age:v.persona.age,device:v.persona.device,about:v.persona.about,outcome:v.outcome,...(v.verdict&&!v.verdict.ok?{judged:v.verdict.reason}:{}),steps:v.steps.slice(0,20).map(s=>({path:s.path,thought:s.thought,feeling:s.feeling,action:s.action,label:s.label||''}))})),
    shots:['desktop','phone'].filter(n=>fs.existsSync(shotFile(state.id,n)))
   };
   fs.writeFileSync(reportFile(state.id),JSON.stringify(report));

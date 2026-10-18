@@ -11,8 +11,6 @@ const builder=require('./react-builder');
 const MAX_PERSONAS=()=>Math.max(1,Math.min(100,Number(process.env.KAIROQ_SYNTHETIC_MAX||50)));
 const MAX_STEPS=()=>Math.max(3,Math.min(25,Number(process.env.KAIROQ_SYNTHETIC_STEPS||12)));
 const CONCURRENCY=()=>Math.max(1,Math.min(8,Number(process.env.KAIROQ_SYNTHETIC_CONCURRENCY||4)));
-const ACTIONS=new Set(['click','fill','select','scroll','back','done','give_up']);
-const FEELINGS=new Set(['confident','unsure','frustrated']);
 
 function clip(v,n){return String(v??'').replace(/\s+/g,' ').trim().slice(0,n)}
 function json(content){
@@ -45,48 +43,18 @@ async function personas({audience,goal,count,callModel,tier,signal}){
 }
 
 // ---------- one visit ----------
-const VISIT_PROMPT=`You are role-playing a real person using a website, not a tester. Stay in character: your age, patience, tech comfort and device decide what you notice, what you skip and when you give up. You only know what is on the screen.
-Each turn you see the page (text and numbered interactive elements) and choose ONE next action.
-Respond with ONLY JSON: {"thought":"what you think right now, first person, one or two short sentences","feeling":"confident"|"unsure"|"frustrated","action":"click"|"fill"|"select"|"scroll"|"back"|"done"|"give_up","target":<element number for click/fill/select>,"value":"text to type, option to choose, or up/down for scroll"}
-Use "done" only when your goal is truly complete on screen. Use "give_up" when a real person like you would leave (confusing, too slow, asks too much, cannot find it). Type realistic details; use test-<name>@example.com for emails and never real card numbers.`;
+// The visit itself is the browser agent (browser-agent.js) in persona mode: it plans a few
+// actions per step, keeps notes, notices when it repeats itself, looks at a screenshot when
+// stuck, and a second model checks a "done" before it counts as reaching the goal.
 function describePersona(p){return p.name+', '+p.age+', '+(p.about||'')+' Uses a '+p.device+'. Patience: '+p.patience+'. Tech comfort: '+p.tech+'.'+(p.wants?' Wants: '+p.wants:'')}
-function describePage(o){
- return(o.sent?'(You just sent a form. This is a test, so nothing was really sent or saved: no emails, bookings or payments. Judge by what the screen shows.)\n':'')+'Page: '+(o.title||'(no title)')+' — '+o.path+'\nVisible text:\n'+String(o.text||'').slice(0,2000)+'\n\nInteractive elements:\n'+(o.elements.length?o.elements.map(e=>'['+e.id+'] '+e.kind+': '+(e.label||'(no label)')+(e.options?' options: '+e.options.join(' | '):'')+(e.value?' (current: '+e.value+')':'')).join('\n'):'(none)');
-}
-function cleanAction(a,o){
- const action=ACTIONS.has(a&&a.action)?a.action:'give_up';
- const target=Number(a&&a.target);
- const needs=['click','fill','select'].includes(action);
- if(needs&&!o.elements.some(e=>e.id===target))return{action:'give_up',thought:'I could not find what I was looking for.',feeling:'frustrated'};
- return{action,...(needs?{target}:{}),value:clip(a&&a.value,200),thought:clip(a&&a.thought,300),feeling:FEELINGS.has(a&&a.feeling)?a.feeling:'unsure'};
-}
 // site: another website (no test copy of its data; sends are answered locally, see runtime-check.js).
 async function visit({url,persona,goal,callModel,tier,browse,sandbox,site=false,signal}){
- const steps=[];let outcome='stuck',error=null;
  const s=await browse(url,site?{site:true,viewport:persona.device}:{sandbox,viewport:persona.device});
- if(!s)return{persona,outcome:'skipped',steps};
+ if(!s)return{persona,outcome:'skipped',steps:[]};
  try{
-  for(let i=0;i<MAX_STEPS();i++){
-   if(signal&&signal.aborted)throw Error('Stopped.');
-   const o=await s.observe();
-   if(o.sent&&steps.length)steps.at(-1).sent=true;
-   const history=steps.slice(-6).map(x=>'- on '+x.path+': '+x.action+(x.label?' "'+x.label+'"':'')+(x.value?' "'+x.value+'"':'')+(x.error?' (did not work: '+x.error+')':'')+(x.sent?' (sent)':'')).join('\n');
-   const messages=[{role:'system',content:VISIT_PROMPT},{role:'user',content:'You are: '+describePersona(persona)+'\nYour goal: '+clip(goal,400)+'\nStep '+(i+1)+' of at most '+MAX_STEPS()+'.'+(history?'\nWhat you did so far:\n'+history:'')+'\n\n'+describePage(o)}];
-   const a=cleanAction(await callModel({messages,temperature:0.7,maxOutputTokens:400,signal,tier},json),o);
-   const el=o.elements.find(e=>e.id===a.target);
-   const step={n:i+1,path:o.path,thought:a.thought,feeling:a.feeling,action:a.action,...(el?{label:el.label,kind:el.kind,...(el.ph?{ph:el.ph}:{})}:{}),...(el&&el.loc?{loc:el.loc}:{}),...(a.value&&a.action!=='click'?{value:a.value}:{})};
-   // Where a visitor gave up or got stuck, the code behind what was on screen (for the explanations).
-   if(a.action==='give_up'||a.feeling==='frustrated'||i===MAX_STEPS()-1)step.screen=[...new Set(o.elements.map(e=>e.loc).filter(Boolean))].slice(0,12);
-   steps.push(step);
-   if(a.action==='done'){outcome='completed';break}
-   if(a.action==='give_up'){outcome='gave_up';break}
-   try{await s.act(a)}catch(e){step.error=clip(String(e.message||e).split('\n')[0],160)}
-  }
-  const end=await s.observe().catch(()=>null);
-  if(end&&end.errors.length)error=end.errors[0];
- }catch(e){outcome='error';error=clip(e.message||e,300)}
- finally{await s.close()}
- return{persona,outcome,steps,...(error?{error}:{})};
+  const r=await require('./browser-agent').run({session:s,goal,mode:'persona',persona:describePersona(persona),callModel,tier,maxSteps:MAX_STEPS(),signal});
+  return{persona,outcome:r.outcome,steps:r.steps,...(r.verdict&&r.verdict.checked?{verdict:{ok:r.verdict.ok,reason:r.verdict.reason}}:{}),...(r.error?{error:r.error}:{})};
+ }finally{await s.close()}
 }
 
 // ---------- the run ----------
@@ -99,12 +67,13 @@ async function pool(items,limit,fn){
 function funnel(visits){
  const real=visits.filter(v=>v.outcome!=='skipped');
  const count=o=>real.filter(v=>v.outcome===o).length;
- const left={};for(const v of real)if(v.outcome!=='completed'){const last=v.steps.at(-1);const where=last?last.path:'(start)';left[where]=(left[where]||0)+1}
+ const left={};for(const v of real)if(v.outcome!=='completed'&&v.outcome!=='blocked'){const last=v.steps.at(-1);const where=last?last.path:'(start)';left[where]=(left[where]||0)+1}
  const by={};for(const v of real){const d=v.persona.device;by[d]=by[d]||{visitors:0,completed:0};by[d].visitors++;if(v.outcome==='completed')by[d].completed++}
  const done=real.filter(v=>v.outcome==='completed').map(v=>v.steps.length).sort((a,b)=>a-b);
  return{
-  visitors:real.length,completed:count('completed'),gave_up:count('gave_up'),stuck:count('stuck'),errors:count('error'),
-  completion_rate:real.length?Math.round(count('completed')/real.length*100):0,
+  visitors:real.length,completed:count('completed'),gave_up:count('gave_up'),stuck:count('stuck'),errors:count('error'),blocked:count('blocked'),
+  // Visitors a site's bot protection turned away say nothing about the site's design.
+  completion_rate:real.length>count('blocked')?Math.round(count('completed')/(real.length-count('blocked'))*100):0,
   median_steps:done.length?done[Math.floor(done.length/2)]:null,
   drop_off:Object.entries(left).map(([path,n])=>({path,visitors:n})).sort((a,b)=>b.visitors-a.visitors).slice(0,8),
   by_device:by,
