@@ -403,10 +403,11 @@
       <div class="attachments hidden" id="attachments"></div>
       <textarea id="chat-input" rows="3" placeholder="Ask for a change: add a pricing section, make the header sticky…" required></textarea>
       <div class="composer-bar">
+        <button type="button" class="ghost icon-btn clip" id="attach-clip" title="Attach images or files: screenshots, PDF, Word, text, CSV" aria-label="Attach images or files"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/></svg></button>
         <details class="menu up" id="menu-plus">
           <summary aria-label="Add to your message" title="Images, Figma, a reference site, or a design polish">+</summary>
           <div class="menu-panel">
-            <button type="button" id="attach"><b>Image</b><span>Attach or paste a screenshot</span></button>
+            <button type="button" id="attach"><b>Files and images</b><span>Screenshots, PDF, Word, text or CSV for the AI to use</span></button>
             <button type="button" id="figma-open"><b>Figma</b><span>Build a Figma frame</span></button>
             <button type="button" id="ref-open"><b>Reference</b><span>Your own version of a site, repo or screenshots</span></button>
             <button type="button" id="integrations-open"><b>Integrations</b><span>Payments, booking, email and more from our partners</span></button>
@@ -419,7 +420,7 @@
           <button type="button" id="mode-agent" aria-pressed="false" title="Works in steps: writes code, tests it in a browser, reads logs and fixes problems until done">Agent</button>
         </div>
         <select id="tier" aria-label="Model"></select>
-        <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+        <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv,application/json,text/html" multiple hidden>
         <span class="muted small" id="cost-hint"></span>
         <button class="primary send" id="send" type="submit" aria-label="Send"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
       </div>
@@ -461,6 +462,7 @@
           <button type="button" id="settings-open"><b>Settings</b><span>Knowledge, secrets, GitHub, API keys</span></button>
         </div>
       </details>
+      <button class="ghost" id="connect-open" type="button" title="GitHub, payments, email, Figma, WhatsApp and more"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg><span class="lbl">Connectors</span></button>
       <button class="ghost" id="share-open" type="button">Share</button>
       <button class="primary" id="publish-open" type="button"><i class="live-dot" aria-hidden="true"></i>Publish</button>
     </div>
@@ -553,6 +555,14 @@
 </div><!-- /shell-main -->
 </div><!-- /shell -->
 
+<dialog id="connectors-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Connectors</h2>
+    <p class="muted small">Connect this app to the services it uses. Keys you enter are encrypted and never shown again.</p>
+    <ul class="connectors" id="connectors-list"></ul>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="publish-dialog">
   <form method="dialog" class="dialog">
     <h2>Publish</h2>
@@ -725,6 +735,14 @@
     <div class="row"><input id="secret-name" placeholder="NAME" spellcheck="false" style="max-width:160px"><input id="secret-value" type="password" autocomplete="off" placeholder="value"><button class="ghost" id="secret-add" type="button">Save</button></div>
     <h3>Code</h3>
     <div class="row"><a class="link" id="download" download>Download code (ZIP)</a></div>
+    <details class="howto" id="gh-howto"><summary>How to connect GitHub (2 minutes)</summary>
+     <ol class="small">
+      <li>On GitHub, create an empty repository (for example <code>my-app</code>).</li>
+      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token</a>.</li>
+      <li>Under <b>Repository access</b> choose <b>Only select repositories</b> and pick your repository. Under <b>Permissions → Contents</b> choose <b>Read and write</b>. Generate it and copy it.</li>
+      <li>Type the repository below as <code>your-name/my-app</code>, paste the token, and press <b>Push to GitHub</b>. The token is encrypted and never shown again.</li>
+      <li>Later: edit on GitHub (or with a developer) and press <b>Pull changes from GitHub</b> to bring the changes back as a new version.</li>
+     </ol></details>
     <label>GitHub repository<input id="gh-repo" placeholder="your-name/my-app" spellcheck="false"></label>
     <label>GitHub token <span class="muted small" id="gh-token-status"></span><input id="gh-token" type="password" autocomplete="off" placeholder="github_pat_… (Contents: read and write)"></label>
     <div class="row"><button class="primary" id="gh-push" type="button">Push to GitHub</button><button class="ghost" id="gh-pull" type="button">Pull changes from GitHub</button></div>

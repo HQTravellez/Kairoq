@@ -121,6 +121,17 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .attachments{display:flex;gap:8px;flex-wrap:wrap}
 .attachments figure{position:relative;margin:0}
 .attachments img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+.attachments .file-chip{display:flex;align-items:center;gap:6px;height:56px;max-width:190px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:var(--side);font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.attachments .file-chip::before{content:"";flex:none;width:14px;height:18px;border-radius:2px;background:linear-gradient(135deg,transparent 70%,var(--border) 70%),var(--panel);border:1px solid var(--muted)}
+
+.composer-bar .clip{width:30px;height:30px;padding:0;display:inline-grid;place-items:center;border-radius:10px}
+.connectors{list-style:none;padding:0;margin:12px 0;display:grid;gap:8px}
+.connector{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+.connector .skill-text{flex:1;min-width:0}.connector .skill-text b{display:block;font-size:14px}.connector .skill-text span{font-size:12.5px;color:var(--muted)}
+.connector-ico{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:15px;color:#fff;background:var(--grad)}
+.connector-ico[data-id=github]{background:#1f2328}.connector-ico[data-id=stripe]{background:#635bff}.connector-ico[data-id=email]{background:#0f766e}.connector-ico[data-id=figma]{background:#a259ff}.connector-ico[data-id=whatsapp]{background:#25d366}.connector-ico[data-id=domain]{background:#2f3a44}.connector-ico[data-id=secrets]{background:#7a3a10}
+.howto{margin:6px 0 10px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:var(--side)}
+.howto summary{cursor:pointer;font-weight:600;font-size:13px}.howto ol{margin:8px 0 2px;padding-left:18px;display:grid;gap:5px;line-height:1.45}
 .attachments button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;padding:0;border-radius:50%;line-height:1}
 .messages .discuss{border-style:dashed}
 .messages .user.discuss{background:var(--panel);color:var(--text);border:1px dashed var(--accent)}
