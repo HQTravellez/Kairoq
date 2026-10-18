@@ -205,7 +205,22 @@ function renderVersions(){
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
 function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
 // The preview reports "ready" once it has rendered; when nothing arrives, say so instead of showing a blank frame.
-function watchPreview(){state.previewReady=false;$('preview-notice').classList.add('hidden');clearTimeout(state.previewTimer);state.previewTimer=setTimeout(()=>{if(!state.previewReady&&!$('frame').classList.contains('hidden'))$('preview-notice').classList.remove('hidden')},9000)}
+function watchPreview(){state.previewReady=false;$('preview-notice').classList.add('hidden');text($('preview-diagnosis'),'');clearTimeout(state.previewTimer);state.previewTimer=setTimeout(()=>{if(!state.previewReady&&!$('frame').classList.contains('hidden')){$('preview-notice').classList.remove('hidden');diagnosePreview()}},9000)}
+// When the preview does not load, Kairoq opens it in its own browser on the server: either the
+// app itself breaks (the errors go to the Fix it bar) or it works there and the visitor's
+// browser is blocking it.
+async function diagnosePreview(){
+ if(!state.project||state.diagnosing)return;state.diagnosing=true;
+ const out=$('preview-diagnosis');text(out,'Checking the preview in Kairoq\'s own browser…');
+ try{
+  const r=await api('/projects/'+state.project.id+'/diagnose',{method:'POST',body:{version:previewVersion()}});
+  if(state.previewReady)return text(out,'');
+  if(r.skipped)text(out,'');
+  else if(!r.errors.length)text(out,'It works in Kairoq\'s own browser, so something in this browser is blocking it: try Open it in a new tab, turn off ad or script blockers for this site, or try another browser.');
+  else{text(out,'It fails in Kairoq\'s own browser too: '+r.errors[0].slice(0,220)+(r.errors.length>1?' (and '+(r.errors.length-1)+' more)':'')+'. Use Fix it above: the fix is on us.');for(const e of r.errors)if(!state.runtimeErrors.includes(e)&&state.runtimeErrors.length<10)state.runtimeErrors.push(e);renderErrors()}
+ }catch(err){text(out,'')}
+ finally{state.diagnosing=false}
+}
 $('preview-reload').onclick=()=>{const f=$('frame');const u=f.src;f.src='about:blank';setTimeout(()=>{f.src=u;watchPreview()},50)};
 // Builds the shown version again from its saved code on the server (free), then reloads it.
 async function rebuildPreview(){
