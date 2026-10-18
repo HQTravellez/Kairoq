@@ -74,11 +74,11 @@ body.app #top-bar{display:none}
 .projects.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:16px}
 .projects.cards li{display:grid;grid-template-rows:auto auto auto;gap:0;padding:0;border-radius:16px;overflow:hidden;border:1px solid color-mix(in srgb,var(--border) 85%,transparent);background:var(--panel);box-shadow:var(--shadow-sm);transition:transform .18s,box-shadow .18s;position:relative;cursor:pointer;align-items:start}
 .projects.cards li:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
-.projects.cards .thumb{height:128px;background:var(--thumb,linear-gradient(135deg,#f6d79a,#e9a93a));display:grid;place-items:center;font-family:"Instrument Serif",Georgia,serif;font-size:46px;color:rgba(255,255,255,.92);text-shadow:0 2px 12px rgba(0,0,0,.18);letter-spacing:-.02em}
-.projects.cards li:nth-child(5n+2){--thumb:linear-gradient(135deg,#e6e1d8,#c9c2b5)}
-.projects.cards li:nth-child(5n+3){--thumb:linear-gradient(135deg,#3a3835,#1f1e1c)}
-.projects.cards li:nth-child(5n+4){--thumb:linear-gradient(135deg,#f3e3cf,#e2bf8f)}
-.projects.cards li:nth-child(5n){--thumb:linear-gradient(135deg,#e3e6df,#b9c0ae)}
+.projects.cards .thumb{height:128px;background:var(--thumb,linear-gradient(135deg,#ffb27a,#f26207));display:grid;place-items:center;font-family:"Instrument Serif",Georgia,serif;font-size:46px;color:rgba(255,255,255,.92);text-shadow:0 2px 12px rgba(0,0,0,.18);letter-spacing:-.02em}
+.projects.cards li:nth-child(5n+2){--thumb:linear-gradient(135deg,#eceae6,#cfcbc4)}
+.projects.cards li:nth-child(5n+3){--thumb:linear-gradient(135deg,#2a2a2a,#0f0f0f)}
+.projects.cards li:nth-child(5n+4){--thumb:linear-gradient(135deg,#ffe3d0,#ffb98c)}
+.projects.cards li:nth-child(5n){--thumb:linear-gradient(135deg,#dfe3e8,#b8c1cc)}
 .projects.cards .open{padding:12px 14px 2px;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
 .projects.cards .meta{padding:0 14px 13px;font-size:12px;color:var(--muted)}
 .projects.cards .badge,.projects.cards .role-badge{position:absolute;top:10px;right:10px;background:color-mix(in srgb,var(--panel) 85%,transparent);backdrop-filter:blur(6px);font-size:11px;padding:3px 9px}
