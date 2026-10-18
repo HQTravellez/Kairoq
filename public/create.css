@@ -221,6 +221,7 @@ input[type=color]{padding:2px 4px;height:40px;width:72px;cursor:pointer}
 .skills{list-style:none;padding:0;margin:8px 0;display:grid;gap:6px}
 .skills li{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border);border-radius:10px}
 .skills li .skill-text{flex:1;min-width:0}
+.skills li.skill-group{border:0;padding:8px 2px 0;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .skills li .skill-text b{display:block;font-size:13px}
 .skills li .skill-text span{font-size:12px;color:var(--muted)}
 .skills li .skill-actions{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:12px;white-space:nowrap}

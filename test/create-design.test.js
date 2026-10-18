@@ -149,7 +149,9 @@ test('design dialog: edit colours and fonts, new direction from the AI, add the 
 });
 
 test('skills: built-in library, your own skills, always-on, and import from GitHub',async()=>{
- assert.deepEqual(skills.builtin().map(s=>s.id),['accessibility','brand-from-logo','dashboard','data-viz','ecommerce','editorial','framer-motion','frontend-design','human-crafted','illustration-icons','luxury-hospitality','marketplace','mobile-app','modern-css','modern-saas','remotion-video','scroll-story','three-3d']);
+ assert.deepEqual(skills.builtin().map(s=>s.id),['accessibility','app-onboarding','brand-from-logo','brutalist-style','dashboard','data-viz','digital-guide','ecommerce','editorial','email-newsletter','event-flyer','framer-motion','frontend-design','help-docs','human-crafted','illustration-icons','kanban-board','launch-deck','loyalty-rewards','luxury-hospitality','magazine-cover','marketplace','mobile-app','modern-css','modern-saas','monthly-report','pitch-deck','presentation-slides','pricing-page','printable-invoice','remotion-video','resume-portfolio','scroll-story','social-carousel','social-dashboard','social-share-card','soft-minimal-style','staff-onboarding','team-goals','three-3d','waitlist-page','weekly-update']);
+ // Page types adapted from html-anything carry a group; the styles do not.
+ assert.equal(skills.builtin().filter(s=>s.group==='Page types').length,24);
  for(const s of skills.builtin())assert.ok(s.name&&s.description.length>40&&s.body.length>1500,s.id);
  const cookie=await signup('skills@example.com');
  const add=await request(server,'POST','/api/create/skills',{headers:{cookie},body:{text:'---\nname: Our brand\ndescription: Navy and gold for all our apps\n---\n# Rules\n- Navy (#14213d) and gold (#fca311), serif headlines, pill buttons.'}});

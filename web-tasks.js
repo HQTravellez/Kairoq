@@ -1,7 +1,9 @@
 "use strict";
 // Web agent for business owners: "go to this website and find out …" in a real browser, and
 // watches that repeat a task on a schedule and email the owner when the answer changes
-// (competitor prices, a supplier's stock, opening hours, a listing).
+// (competitor prices, a supplier's stock, opening hours, a listing). After a watch's first
+// browser run it tries to learn the one public request that holds the answer; later checks
+// fetch only that request, free and without a browser (web-replay.js).
 //
 // It is the browser agent (browser-agent.js) in task mode on the guarded external browser:
 // public https sites only, never a form sent, no logins. Each run costs credits
@@ -22,7 +24,7 @@ function save(state){fs.mkdirSync(dir(),{recursive:true});const f=file(state.own
 function free(owner){return owner==='owner'||price()===0}
 
 const running=new Map();
-function publicRun(r){return{id:r.id,url:r.url,task:r.task,status:r.status,at:r.at,...(r.need?{need:r.need}:{}),...(r.watch?{watch:r.watch}:{}),...(r.progress?{progress:r.progress}:{}),...(r.outcome?{outcome:r.outcome,answer:r.answer,steps:(r.steps||[]).map(s=>({path:s.path,action:s.action,label:s.label||'',value:s.action==='fill'||s.action==='done'||s.action==='give_up'?'':s.value||'',thought:s.thought||'',...(s.error?{error:s.error}:{})})),...(r.verdict?{verdict:r.verdict}:{}),...(r.changed!==undefined?{changed:r.changed,change:r.change||''}:{})}:{}),...(r.error?{error:r.error}:{}),...(r.charged!==undefined?{charged:r.charged}:{})}}
+function publicRun(r){return{id:r.id,url:r.url,task:r.task,status:r.status,at:r.at,...(r.quick?{quick:true}:{}),...(r.need?{need:r.need}:{}),...(r.watch?{watch:r.watch}:{}),...(r.progress?{progress:r.progress}:{}),...(r.outcome?{outcome:r.outcome,answer:r.answer,steps:(r.steps||[]).map(s=>({path:s.path,action:s.action,label:s.label||'',value:s.action==='fill'||s.action==='done'||s.action==='give_up'?'':s.value||'',thought:s.thought||'',...(s.error?{error:s.error}:{})})),...(r.verdict?{verdict:r.verdict}:{}),...(r.changed!==undefined?{changed:r.changed,change:r.change||''}:{})}:{}),...(r.error?{error:r.error}:{}),...(r.charged!==undefined?{charged:r.charged}:{})}}
 
 // One run: opens the site, lets the agent work, keeps the result (last 30 runs per account).
 // interactive: someone is watching (a run they started), so the agent can hand the browser to
@@ -39,10 +41,10 @@ async function execute(owner,{url,task,watch=null,interactive=false},{callModel,
   catch(e){running.delete(run.id);throw e.status===402?fail(402,'The web agent costs '+price()+' credits a run, and this account does not have enough.'):e}
   run.charged=price();
  }
- let s=null;
+ let s=null,recipe=null;
  try{
   run.progress='Opening '+new URL(url).hostname;
-  s=await browseSite(url,{site:true,viewport:'desktop'});
+  s=await browseSite(url,{site:true,viewport:'desktop',record:Boolean(watch)});
   if(!s)throw fail(503,'The web agent needs a browser (Chromium) on this server');
   entry.session=s;
   const handoff=interactive&&s.control?reason=>waitForPerson(entry,reason):null;
@@ -50,6 +52,11 @@ async function execute(owner,{url,task,watch=null,interactive=false},{callModel,
   Object.assign(run,{status:'complete',outcome:r.outcome,answer:clip(r.answer||'',4000),steps:r.steps.slice(-30),...(r.verdict&&r.verdict.checked?{verdict:{ok:r.verdict.ok,reason:r.verdict.reason}}:{}),...(r.error?{error:r.error}:{})});
   // Nothing useful came back (an error, or no answer at all): the credits go back.
   if(run.charged&&(r.outcome==='error'||!run.answer)){require('./builder-accounts').grant(owner,run.charged,'Refund: web agent found nothing','refund:'+ref);run.charged=0}
+  // A watch learns where its answer comes from, so the next checks can skip the browser.
+  if(watch&&r.outcome==='completed'&&run.answer&&!(run.verdict&&!run.verdict.ok)&&s.responses){
+   run.progress='Learning a quick check';
+   recipe=await require('./web-replay').learn({answer:run.answer,responses:await s.responses()}).catch(()=>null);
+  }
  }catch(e){
   Object.assign(run,{status:'failed',error:clip(e.message||e,300)});
   if(run.charged){try{require('./builder-accounts').grant(owner,run.charged,'Refund: web agent failed','refund:'+ref)}catch{}run.charged=0}
@@ -59,7 +66,7 @@ async function execute(owner,{url,task,watch=null,interactive=false},{callModel,
   running.delete(run.id);
  }
  const st=load(owner);st.runs=[run,...st.runs.filter(x=>x.id!==run.id)].slice(0,30);save(st);
- return run;
+ return recipe?{...run,recipe}:run;
 }
 
 // Starts a run in the background and returns it at once (the caller polls get()).
@@ -83,7 +90,9 @@ function get(owner,id){
  const r=load(owner).runs.find(x=>x.id===id);if(!r)throw fail(404,'Unknown run');
  return publicRun(r);
 }
-function list(owner){const st=load(owner);return{runs:[...[...running.values()].filter(x=>x.owner===owner).map(x=>x.run),...st.runs].slice(0,30).map(publicRun),watches:st.watches,price:free(owner)?0:price()}}
+// A watch as the owner sees it: whether quick checks are on, not the recipe itself.
+function publicWatch(w){const {recipe,...rest}=w;return{...rest,quick:Boolean(recipe)}}
+function list(owner){const st=load(owner);return{runs:[...[...running.values()].filter(x=>x.owner===owner).map(x=>x.run),...st.runs].slice(0,30).map(publicRun),watches:st.watches.map(publicWatch),price:free(owner)?0:price()}}
 
 // ---------- watches ----------
 function addWatch(owner,{url,task,every='week',next=Date.now()}){
@@ -95,7 +104,7 @@ function addWatch(owner,{url,task,every='week',next=Date.now()}){
 }
 async function createWatch(owner,b){const url=await require('./runtime-check').checkSite(b.url);return addWatch(owner,{...b,url})}
 function removeWatch(owner,id){const st=load(owner);const n=st.watches.length;st.watches=st.watches.filter(w=>w.id!==id);if(st.watches.length===n)throw fail(404,'Unknown watch');save(st);return{removed:id}}
-function updateWatch(owner,id,patch){const st=load(owner),w=st.watches.find(x=>x.id===id);if(!w)throw fail(404,'Unknown watch');if(typeof patch.paused==='boolean'){w.paused=patch.paused;if(!patch.paused)w.next=new Date().toISOString()}save(st);return w}
+function updateWatch(owner,id,patch){const st=load(owner),w=st.watches.find(x=>x.id===id);if(!w)throw fail(404,'Unknown watch');if(typeof patch.paused==='boolean'){w.paused=patch.paused;if(!patch.paused)w.next=new Date().toISOString()}save(st);return publicWatch(w)}
 
 const COMPARE=`You compare two answers a web agent gave to the same question on different days, for a small-business owner.
 Respond with ONLY JSON: {"changed":true|false,"summary":"one or two sentences: what changed (old → new), or empty when nothing important changed"}
@@ -124,10 +133,37 @@ async function record(owner,id,run,{callModel,now=Date.now()}={}){
   const r=st.runs.find(x=>x.id===run.id);if(r){r.changed=c.changed;r.change=c.summary}
   if(c.changed){changed=true;await mail(owner,'Change spotted: '+clip(w.task,60),(c.summary||'The answer changed.')+'\n\nWebsite: '+w.url+'\nQuestion: '+w.task+'\n\nNow:\n'+run.answer+(w.last_answer?'\n\nBefore:\n'+w.last_answer:'')+'\n\nSee it in Kairoq: '+(process.env.KAIROQ_PUBLIC_URL||'')+'/create')}
   w.last_answer=run.answer;
+  // A new recipe from this run replaces the old one; a browser run without one keeps checking
+  // in the browser.
+  if(run.recipe)w.recipe=run.recipe;else delete w.recipe;
  }
  w.last_outcome=run.outcome||run.status;
  save(st);
  return{changed};
+}
+// A quick check: fetch the learned request and compare the values. Free: no browser, no
+// credits, and the AI only runs when a value moved. Returns null when the recipe no longer
+// fits (it is dropped and the browser agent takes over and learns again).
+async function quick(owner,id,{callModel,now=Date.now(),fetchImpl}={}){
+ const replay=require('./web-replay');
+ const w0=load(owner).watches.find(x=>x.id===id);if(!w0||!w0.recipe)return null;
+ let res;
+ try{res=await replay.check(w0.recipe,{fetchImpl})}
+ catch(e){
+  if(e.broken){const st=load(owner),w=st.watches.find(x=>x.id===id);if(w){delete w.recipe;save(st)}}
+  return null;
+ }
+ const run={id:crypto.randomUUID(),url:w0.url,task:w0.task,status:'complete',outcome:'completed',quick:true,at:new Date(now).toISOString(),answer:w0.last_answer||'',watch:id,changed:false,change:''};
+ if(res.moved.length){
+  const u=await replay.update({task:w0.task,previous:w0.last_answer||'',moved:res.moved},{callModel});
+  Object.assign(run,{answer:u.answer,changed:true,change:u.summary});
+  await mail(owner,'Change spotted: '+clip(w0.task,60),u.summary+'\n\nWebsite: '+w0.url+'\nQuestion: '+w0.task+'\n\nNow:\n'+u.answer+(w0.last_answer?'\n\nBefore:\n'+w0.last_answer:'')+'\n\nSee it in Kairoq: '+(process.env.KAIROQ_PUBLIC_URL||'')+'/create');
+ }
+ const st=load(owner),w=st.watches.find(x=>x.id===id);if(!w)return null;
+ w.last=run.at;w.next=new Date(now+(w.every==='day'?DAY:WEEK)).toISOString();w.last_outcome='quick check';
+ if(run.changed){w.last_answer=run.answer;if(w.recipe)w.recipe.values=res.values}
+ st.runs=[run,...st.runs].slice(0,30);save(st);
+ return{changed:run.changed,run};
 }
 // Runs every watch that is due, for every account (called hourly by the server).
 let ticking=false;
@@ -141,6 +177,11 @@ async function tick({callModel,browseSite,now=Date.now()}={}){
   let st;try{st=JSON.parse(fs.readFileSync(path.join(dir(),f),'utf8'))}catch{continue}
   for(const w of st.watches||[]){
    if(w.paused||Date.parse(w.next)>now)continue;
+   // Quick check first; when it no longer fits the site, the browser agent runs instead.
+   if(w.recipe){
+    try{const q=await quick(st.owner,w.id,{callModel,now});if(q){out.ran++;out.quick=(out.quick||0)+1;if(q.changed)out.changed++;continue}}
+    catch{}
+   }
    let run;
    try{run=await execute(st.owner,{url:w.url,task:w.task,watch:w.id},{callModel,browseSite})}
    catch(e){
@@ -177,4 +218,4 @@ async function frame(owner,id){const e=live(owner,id);if(!e.session||!e.session.
 async function input(owner,id,ev){const e=live(owner,id);if(!e.waiting)throw fail(409,'Take over first');e.waiting.until=Date.now()+idleLimit();await e.session.control.input(ev||{});return{ok:true}}
 function takeover(owner,id){const e=live(owner,id);if(!e.session||!e.session.control)throw fail(409,'The browser is not open yet');e.wants=true;return publicRun(e.run)}
 function handBack(owner,id,{cancel=false,note=''}={}){const e=live(owner,id);if(e.waiting)e.waiting.finish(!cancel,clip(note,200));else e.wants=false;return publicRun(e.run)}
-module.exports={frame,input,takeover,handBack,start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,compare,price};
+module.exports={frame,input,takeover,handBack,start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,quick,compare,price};
