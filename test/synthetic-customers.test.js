@@ -148,7 +148,7 @@ test('MCP: AI assistants use an API key to list projects, run a synthetic test a
  assert.equal(init.result.protocolVersion,'2025-06-18');assert.ok(init.result.capabilities.tools);
  assert.equal((await request(server,'POST','/mcp',{headers:{authorization:'Bearer '+key},body:{jsonrpc:'2.0',method:'notifications/initialized'}})).status,202);
  const tools=(await rpc('tools/list',{})).json.result.tools.map(t=>t.name);
- assert.deepEqual(tools,['list_projects','run_synthetic_test','get_synthetic_test','fix_and_retest','list_synthetic_reports']);
+ assert.deepEqual(tools,['create_project','build','get_job','get_project','publish','list_templates','list_projects','run_synthetic_test','get_synthetic_test','fix_and_retest','list_synthetic_reports']);
  const call=async(name,args,k)=>(await rpc('tools/call',{name,arguments:args},k)).json.result;
  assert.ok((await call('list_projects',{})).structuredContent.projects.some(p=>p.id===id));
  const started=await call('run_synthetic_test',{project_id:id,audience:'Busy adults who want to try yoga',goal:'Book a class',visitors:3});

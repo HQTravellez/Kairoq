@@ -489,13 +489,30 @@ AI assistants that support MCP (Claude, ChatGPT, Cursor and others) can use Kair
   - Create them in **Settings → API keys and MCP** (`GET/POST/DELETE /api/create/api-keys`).
   - A key (`kq_…`) is shown once. Only its hash is stored. An account can keep up to 10 keys.
 - **The MCP server:** `POST /mcp` speaks MCP over Streamable HTTP with JSON responses (`kairoq-mcp.js`, protocol versions 2025-06-18, 2025-03-26 and 2024-11-05). Send the header `Authorization: Bearer kq_…`.
-- **Tools:**
+- **Build tools** (what an agent platform needs to use Kairoq as its app builder):
+  - `list_templates` lists the working apps to start from.
+  - `create_project` creates an app from a prompt and/or a template; with a prompt it starts the first build and returns a `job_id`.
+  - `build` asks for a change (`mode` build) or a bigger task (`mode` agent); returns a `job_id`. `fix: true` marks a fix of a problem Kairoq reported (the first fix of a problem is free).
+  - `get_job` follows a job: progress, then the message, version, preview URL, browser errors, failing checks and sources.
+  - `get_project` returns the project's state: preview URL, published URLs, files, checks, automations, last messages.
+  - `publish` puts the current version live (saved checks run first; `force` overrides).
+- **Test tools:**
   - `list_projects` lists the projects the account can open.
   - `run_synthetic_test` sends synthetic customers through a project (editor access, charges credits). With `site` it tests another public website instead. With `compare_with`, the same customers visit both and you get both scores. Both need `permission: true`. It returns a job id.
   - `get_synthetic_test` returns the progress of a job, or a finished report with its fix request and which problems the replays confirmed.
   - `fix_and_retest` fixes what a report confirmed, replays the same steps, saves checks and can rerun the same customers (editor access, charges per round). It returns a job id.
   - `list_synthetic_reports` lists a project's reports.
 - **Access:** every call uses the account's own project roles and credits. A key from another account cannot see or test the project.
+
+### Using Kairoq from Paperclip and other agent platforms
+
+Platforms that run teams of AI agents (Paperclip, and any assistant or orchestrator that can connect an MCP server) can give their agents Kairoq as "the employee that builds, tests and publishes apps":
+
+1. In Kairoq, create an API key under **Settings → API keys and MCP**.
+2. In the platform, add an MCP server (Paperclip: **Apps & Connections → your own MCP server**) with the URL `https://<your Kairoq host>/mcp`, transport Streamable HTTP, and the header `Authorization: Bearer kq_…`. Set the actions you want gated (for example `publish` and `build` to "Ask first").
+3. Agents can then `create_project` → `get_job` → `get_project` → `publish`, run `run_synthetic_test` and `fix_and_retest` on the result, and read the plain-English reports, all against the key owner's credits and projects.
+
+The whole loop is covered by `test/mcp-build.test.js`.
 
 ## Build from a reference
 
