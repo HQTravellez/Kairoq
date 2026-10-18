@@ -373,3 +373,11 @@ body.in-editor.side-open .stage-bar .bar-spacer{min-width:4px}
 .form-grid .wide-field,.form-grid .check{grid-column:1/-1}
 .form-grid label{margin-top:8px}
 @media (max-width:820px){.form-grid{grid-template-columns:1fr}}
+
+/* WhatsApp */
+.hero-wa{display:inline-flex;align-items:center;gap:7px;margin:14px auto 0;font-size:13.5px;font-weight:600;color:#128c4a;text-decoration:none;border:1px solid color-mix(in srgb,#25d366 45%,var(--border));background:color-mix(in srgb,#25d366 9%,var(--panel));border-radius:999px;padding:7px 14px}
+.hero-wa .ico{width:15px;height:15px}
+.hero-wa:hover{background:color-mix(in srgb,#25d366 16%,var(--panel))}
+.wa-status{font-weight:600}
+.wa-steps{padding-left:18px;line-height:1.7}
+#wa-go{background:#25d366;border-color:#25d366;color:#06331a;border-radius:999px}

@@ -37,6 +37,7 @@ async function loadMe(){
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
  text($('home-title'),name?'Got an idea, '+cap(name.split(' ')[0])+'?':'Got an idea?');
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
+ const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
  text($('free-note'),state.me.free_credits?'New accounts get '+state.me.free_credits+' free credits. One credit = one change.':'');
@@ -1230,6 +1231,17 @@ $('landing-check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('landi
 $('check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('check-url').value.trim(),email:$('check-email').value.trim(),goal:$('check-goal').value.trim()},$('check-error'),$('check-go'))};
 $('cr-again').onclick=openCheckForm;$('check-retry').onclick=openCheckForm;$('side-check').onclick=openCheckForm;
 window.addEventListener('popstate',()=>{const m=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);if(m)openCheck(m[1])});
+
+// ---------- WhatsApp ----------
+async function openWhatsApp(){text($('wa-error'),'');$('wa-dialog').showModal();$('wa-code-line').classList.add('hidden');try{renderWhatsApp((await api('/whatsapp')).whatsapp)}catch(err){text($('wa-error'),err.message)}}
+function renderWhatsApp(w){
+ text($('wa-status'),w.connected?'✅ Your WhatsApp is connected. Message Kairoq any time.':'Not connected yet.');
+ $('wa-connect').classList.toggle('hidden',w.connected);$('wa-connected-row').classList.toggle('hidden',!w.connected);
+ if(w.start)$('wa-open').href=w.start;
+}
+$('wa-go').onclick=async()=>{text($('wa-error'),'');try{const r=await api('/whatsapp/code',{method:'POST'});text($('wa-code'),'link '+r.code);text($('wa-number'),r.number?'+'+r.number:'Kairoq');$('wa-code-line').classList.remove('hidden');if(r.link)window.open(r.link,'_blank','noopener')}catch(err){text($('wa-error'),err.message)}};
+$('wa-disconnect').onclick=async()=>{try{await api('/whatsapp/disconnect',{method:'POST'});renderWhatsApp({connected:false})}catch(err){text($('wa-error'),err.message)}};
+$('side-wa').onclick=openWhatsApp;
 
 // ---------- memory: preferences and recipes ----------
 async function openMemory(){text($('mem-error'),'');$('memory-dialog').showModal();try{renderMemory((await api('/memory')).memory)}catch(err){text($('mem-error'),err.message)}}

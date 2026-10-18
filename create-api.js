@@ -693,7 +693,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -711,6 +711,13 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     const s=accounts.googleLogin(profile);
     res.writeHead(302,{Location:'/create','Set-Cookie':accounts.cookie(s.token,secure),'Cache-Control':'no-store'});res.end();return true;
    }catch(e){res.writeHead(302,{Location:'/create?auth_error='+encodeURIComponent(String(e.message||e).slice(0,200)),'Cache-Control':'no-store'});res.end();return true}
+  }
+  // One-time sign-in link (sent on WhatsApp): opens the editor without a password.
+  if(route==='/auth/link'&&method==='GET'){
+   const q=new URL(req.url,'http://x').searchParams,project=/^[a-f0-9]{12}$/.test(q.get('project')||'')?q.get('project'):'';
+   try{const s=accounts.loginWithToken(q.get('token'));res.writeHead(302,{Location:'/create'+(project?'?project='+project:''),'Set-Cookie':accounts.cookie(s.token,secure),'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});res.end()}
+   catch(e){res.writeHead(302,{Location:'/create?auth_error='+encodeURIComponent('This sign-in link has expired. Send "open" on WhatsApp for a new one.'),'Cache-Control':'no-store'});res.end()}
+   return true;
   }
   if(route==='/verify'&&method==='POST'){const b=await readJson(req,2000);return send(res,200,{account:accounts.verifyEmail(b.token)}),true}
   if(route==='/password/forgot'&&method==='POST'){limited(req,'forgot',5);const b=await readJson(req,2000);return send(res,200,await accounts.requestReset(b.email,origin(req))),true}
@@ -759,6 +766,16 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,{share:{name:meta.name,preview_url:builder.previewUrl(meta),remix:!!meta.share.remix,versions:meta.versions.length,updated_at:meta.updated_at}}),true;
   }
   const v=requireViewer(req,isOwner);
+  // ----- WhatsApp -----
+  if(route==='/whatsapp'&&method==='GET'){const wa=require('./whatsapp');return send(res,200,{whatsapp:{enabled:wa.enabled(),connected:v.kind==='customer'?wa.connected(v.account.id):false,start:wa.chatLink('Hi Kairoq')}}),true}
+  if(route==='/whatsapp/code'&&method==='POST'){
+   const wa=require('./whatsapp');
+   if(!wa.enabled())throw Object.assign(Error('WhatsApp is not set up on this server'),{status:409});
+   if(v.kind!=='customer')throw Object.assign(Error('Connect WhatsApp from a customer account'),{status:400});
+   limited(req,'wa-code',10);
+   return send(res,200,wa.issueCode(v.account.id)),true;
+  }
+  if(route==='/whatsapp/disconnect'&&method==='POST'){if(v.kind==='customer')require('./whatsapp').disconnect(v.account.id);return send(res,200,{ok:true}),true}
   // ----- partner integrations -----
   if(route==='/partners'&&method==='GET')return send(res,200,{partners:require('./partners').publicPartners()}),true;
   const padd=/^\/partners\/([a-f0-9]{10})\/add$/.exec(route);

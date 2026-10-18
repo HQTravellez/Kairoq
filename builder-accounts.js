@@ -248,6 +248,11 @@ async function sendVerification(accountId,origin){
 }
 // Free credits once per account, for accounts that did not get them at sign-up.
 function giveFreeCredits(id){const n=freeCredits();if(!n||database().prepare("SELECT id FROM ledger WHERE account_id=? AND reason='Free credits'").get(id))return;grant(id,n,'Free credits','free:'+id)}
+// One-time sign-in links (sent on WhatsApp): open a browser session without a password.
+function loginToken(accountId,ttlMs=15*60000){if(!get(accountId))throw Object.assign(Error('Unknown account'),{status:404});return issueToken(accountId,'login',ttlMs)}
+function loginWithToken(token){return startSession(consumeToken(token,'login'))}
+// Accounts made from a verified phone number (WhatsApp) get their free credits at once.
+function grantFreeCredits(id){giveFreeCredits(id)}
 function verifyEmail(token){const id=consumeToken(token,'verify');database().prepare('UPDATE accounts SET email_verified=1 WHERE id=?').run(id);giveFreeCredits(id);return publicAccount(get(id))}
 // Always succeeds, so it never reveals whether an email has an account.
 async function requestReset(email,origin){
@@ -281,4 +286,4 @@ function googleLogin({sub,email,email_verified}){
  if(credits)d.prepare('INSERT INTO ledger(id,account_id,delta,reason,ref,at) VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),id,credits,'Free credits',null,at);
  return startSession(id);
 }
-module.exports={sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,get,publicAccount,createApiKey,listApiKeys,revokeApiKey,viewerForApiKey,COOKIE};
+module.exports={loginToken,loginWithToken,grantFreeCredits,sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,get,publicAccount,createApiKey,listApiKeys,revokeApiKey,viewerForApiKey,COOKIE};
