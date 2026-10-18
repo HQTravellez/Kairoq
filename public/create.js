@@ -179,6 +179,7 @@ function messageItem(m,last,index){
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
+ if(m.role==='assistant'&&m.memory){const bits=[...(m.memory.recipes||[]).map(t=>'Used your recipe: '+t),...(m.memory.recalled?['Looked at your project “'+m.memory.recalled+'”']:[]),...(m.memory.learned||[]).map(t=>'Remembered: '+t)];if(bits.length){const d=el('div','memory-chip');d.append(icon('think'),el('span',null,bits.join(' · ')));d.title='Open Memory to see or change this';d.onclick=()=>openMemory();li.append(d)}}
  if(m.role==='assistant'&&Array.isArray(m.sources)&&m.sources.length){const s=el('div','sources');s.append(el('span','sources-label','Sources'));for(const src of m.sources.slice(0,8)){const a=el('a','source',src.title&&src.title!==src.url?src.title.slice(0,60):src.url.replace(/^https?:\/\/(www\.)?/,'').slice(0,60));a.href=src.url;a.target='_blank';a.rel='noopener noreferrer';a.title=src.url;s.append(a)}li.append(s)}
  if(m.role==='assistant'&&!tl.length&&m.changed&&m.changed.length){const c=el('div','file-chips done');for(const f of m.changed.slice(0,12))c.append(fileChip(f));if(m.changed.length>12)c.append(el('span','chip more','+'+(m.changed.length-12)+' more'));li.append(c)}
  if(m.role==='assistant'&&(m.version||m.credits!=null)&&index!=null){
@@ -1219,6 +1220,39 @@ $('landing-check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('landi
 $('check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('check-url').value.trim(),email:$('check-email').value.trim(),goal:$('check-goal').value.trim()},$('check-error'),$('check-go'))};
 $('cr-again').onclick=openCheckForm;$('check-retry').onclick=openCheckForm;$('side-check').onclick=openCheckForm;
 window.addEventListener('popstate',()=>{const m=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);if(m)openCheck(m[1])});
+
+// ---------- memory: preferences and recipes ----------
+async function openMemory(){text($('mem-error'),'');$('memory-dialog').showModal();try{renderMemory((await api('/memory')).memory)}catch(err){text($('mem-error'),err.message)}}
+async function memoryAction(body){try{renderMemory((await api('/memory',{method:'POST',body})).memory)}catch(err){text($('mem-error'),err.message)}}
+function renderMemory(mem){
+ $('mem-enabled').checked=mem.enabled;$('mem-enabled').disabled=!mem.on;$('mem-off').classList.toggle('hidden',mem.on);
+ const prefs=$('mem-prefs');prefs.replaceChildren();
+ if(!mem.preferences.length)prefs.append(el('li','muted','Nothing yet. Say things like “never use purple” or “prices in euros” in a chat, or add them here.'));
+ for(const p of mem.preferences){const li=el('li');li.append(el('span',null,p.text),el('span','muted small',p.source==='you'?' · added by you':' · learned '+when(p.at)));const x=el('button','ghost small-btn','Forget');x.type='button';x.onclick=()=>memoryAction({action:'delete_preference',id:p.id});li.append(x);prefs.append(li)}
+ const rec=$('mem-recipes');rec.replaceChildren();
+ if(!mem.recipes.length)rec.append(el('li','muted','No recipes yet. Kairoq writes one when a feature needed a few tries to get right.'));
+ const owner=state.me&&state.me.viewer&&state.me.viewer.kind==='owner';
+ for(const r of mem.recipes){
+  const li=el('li','recipe '+r.status),d=el('details'),s=el('summary');
+  s.append(el('b',null,r.title),el('span','muted small',' · '+(r.status==='off'?'off':r.uses?r.uses+' use'+(r.uses===1?'':'s')+', '+r.success_rate+'% right first time':'not used yet')+(r.improved?' · improved '+r.improved+'×':'')+(r.shared?' · shared with everyone':'')));
+  const body=el('div','recipe-body');body.append(el('p','small',r.when));const ol=el('ol');for(const st of r.steps)ol.append(el('li',null,st));body.append(ol);
+  if(r.pitfalls.length){const ul=el('ul');for(const p of r.pitfalls)ul.append(el('li',null,'Watch for: '+p));body.append(ul)}
+  if(r.reason)body.append(el('p','muted small',r.reason));
+  d.append(s,body);li.append(d);
+  const row=el('div','row');
+  const act=(label,b)=>{const x=el('button','ghost small-btn',label);x.type='button';x.onclick=()=>memoryAction(b);row.append(x)};
+  act(r.status==='off'?'Turn on':'Switch off',{action:'recipe_status',id:r.id,status:r.status==='off'?'active':'off'});
+  if(owner)act(r.shared?'Stop sharing':'Share with all accounts',{action:'share',id:r.id,shared:!r.shared});
+  act('Delete',{action:'delete_recipe',id:r.id});
+  li.append(row);rec.append(li);
+ }
+ $('mem-shared-box').classList.toggle('hidden',!mem.shared.length);
+ const sh=$('mem-shared');sh.replaceChildren();for(const r of mem.shared){const li=el('li');li.append(el('b',null,r.title),el('span','muted small',' · '+r.when));sh.append(li)}
+}
+$('side-memory').onclick=openMemory;
+$('mem-enabled').onchange=()=>memoryAction({action:'enabled',enabled:$('mem-enabled').checked});
+$('mem-add').onclick=()=>{const t=$('mem-new').value.trim();if(!t)return;$('mem-new').value='';memoryAction({action:'add_preference',text:t})};
+$('mem-new').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('mem-add').click()}});
 
 // ---------- admin (owner only): what Kairoq is learning, and website check leads ----------
 async function openAdmin(){text($('admin-error'),'');text($('learn-status'),'');$('admin-dialog').showModal();await renderAdmin()}

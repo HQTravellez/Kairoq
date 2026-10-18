@@ -471,6 +471,17 @@ The owner sees all of it in **Admin** (sidebar, owner only): builds in the last 
 
 Review is the default because the error shapes come from user projects: a rule is only accepted when it is a short instruction about code (no links, nothing addressed to the model itself), and an owner's look adds a second check before it reaches every build.
 
+## Memory: preferences, recipes and recall
+
+Kairoq gets better at each person's work. Everything here is private to the account that owns the project; the person sees and edits it under **Memory** in the sidebar, and a note under each reply says what was used or learned ("Used your recipe: Room booking with availability · Remembered: Prefers prices in euros").
+
+- **Preferences.** A chat message that sounds like a lasting preference ("always", "never", "I prefer", "too colourful", "prices in euros", "British spelling"…) is checked by the model; real preferences are remembered and added to the builder's instructions for all of that account's projects (the current request still wins). Only messages with such a hint go to the model. People can add their own and forget any.
+- **Recipes from experience.** When a build that needed retries (or an agent task with five or more steps) finishes without errors and changed at least two files, the model writes a general recipe: title, when it applies, up to six steps and four pitfalls, no project-specific details. A later request whose words match a recipe gets it as context. After each use: right first time is counted; if it still needed retries, the model updates the recipe with what went wrong; after five uses under 40% right first time it switches itself off. Recipes can be switched off, turned back on (counts restart) or deleted.
+- **Recall.** "Like my Lotus Yoga site", "same as our other project": the account's project whose name or first request matches is found and its main files (App.jsx, backend.json, pages and components, up to 12 000 characters) are added as reference.
+- **Shared recipes.** The Kairoq owner's own recipes can be shared with every account from Memory; nothing a customer builds is ever shared.
+
+`KAIROQ_MEMORY=off` turns memory off on the server; each account can turn its own off. Memory is stored per account (hashed file name) in the `memory` folder next to the projects folder, or `KAIROQ_MEMORY_DIR`.
+
 ## Customers before code
 
 Lovable and Replit help you build an app. This helps you build a business: find out whether people want it before building it, then see every week what stops signups (`growth.js`). Open **Launch** in the editor.

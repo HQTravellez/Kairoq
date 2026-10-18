@@ -229,6 +229,14 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
     update({progress:null});
     if(research.context)context=[context,research.context].filter(Boolean).join('\n\n');
    }
+   // Memory: recipes from earlier work that match, and an earlier project the message refers to.
+   const mem=require('./account-memory'),memOwner=builder.loadMeta(id).owner;
+   let usedRecipes=[],recalled=null;
+   if(mode!=='polish'&&!referenceOnly){
+    if(mode!=='discuss'){usedRecipes=mem.matchRecipes(memOwner,message);if(usedRecipes.length)context=[context,mem.recipeNote(usedRecipes)].filter(Boolean).join('\n\n')}
+    try{recalled=mem.recall(memOwner,id,message)}catch{recalled=null}
+    if(recalled)context=[context,recalled.note].filter(Boolean).join('\n\n');
+   }
    if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
    else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
@@ -281,6 +289,15 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    }else if(mode!=='discuss'){
     // Any change that leaves the app without errors or failing checks resets the guard.
     const m=builder.loadMeta(id);if(m.loop&&!problemSignature(m,m.current_version)){delete m.loop;builder.saveMeta(m)}
+   }
+   // Memory: what was used and learned shows under the reply; recipes are written or improved after.
+   if(job.result&&mode!=='polish'){
+    const memory={};
+    if(usedRecipes.length)memory.recipes=usedRecipes.map(r=>r.title);
+    if(recalled)memory.recalled=recalled.name;
+    if(mode!=='discuss'&&!hooks){const learned=await mem.learnPreferences(memOwner,message,{callModel}).catch(()=>[]);if(learned.length)memory.learned=learned}
+    if(Object.keys(memory).length){job.result.memory=memory;try{const m=builder.loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.memory=memory;builder.saveMeta(m)}}catch{}}
+    if(mode!=='discuss'&&!hooks){const result=job.result;mem.track(usedRecipes.length?mem.useRecipes(memOwner,usedRecipes.map(r=>r.id),result,{callModel}):mem.writeRecipe(memOwner,{message,result,mode,projectId:id},{callModel}))}
    }
    // The learning loop: what this build ran into on the way, and how it ended.
    if(mode!=='discuss'&&job.result)try{require('./build-lessons').recordBuild(id,{mode,result:job.result})}catch{}
@@ -739,6 +756,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,{share:{name:meta.name,preview_url:builder.previewUrl(meta),remix:!!meta.share.remix,versions:meta.versions.length,updated_at:meta.updated_at}}),true;
   }
   const v=requireViewer(req,isOwner);
+  // ----- memory: preferences and recipes of this account -----
+  if(route==='/memory'){
+   const mem=require('./account-memory');
+   if(method==='GET')return send(res,200,{memory:mem.view(v.owner)}),true;
+   if(method==='POST'){const b=await readJson(req,4000);return send(res,200,{memory:mem.edit(v.owner,b,{isOwner:v.kind==='owner'})}),true}
+  }
   // ----- the learning loop (owner only) -----
   if(route==='/learning'){
    if(v.kind!=='owner')throw Object.assign(Error('Only the Kairoq owner can manage what Kairoq learns'),{status:403});
