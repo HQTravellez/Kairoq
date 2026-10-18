@@ -74,7 +74,7 @@ async function loadHome(){
  show('home');history.replaceState(null,'','/create');
  const acct=state.me.viewer?.account;
  $('verify-notice').classList.toggle('hidden',!(acct&&!acct.email_verified&&state.me.email_ready));
- renderTemplates($('home-templates'),id=>startFromTemplate(id));
+ renderTemplates($('home-templates'),id=>startFromTemplate(id),id=>startFromSponsored(id));
  homeTab(state.homeTab||'projects');
  const {projects}=await api('/projects');
  renderProjects(projects);
@@ -179,6 +179,7 @@ function messageItem(m,last,index){
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
+ if(m.role==='assistant'&&m.memory){const bits=[...(m.memory.recipes||[]).map(t=>'Used your recipe: '+t),...(m.memory.recalled?['Looked at your project “'+m.memory.recalled+'”']:[]),...(m.memory.learned||[]).map(t=>'Remembered: '+t)];if(bits.length){const d=el('div','memory-chip');d.append(icon('think'),el('span',null,bits.join(' · ')));d.title='Open Memory to see or change this';d.onclick=()=>openMemory();li.append(d)}}
  if(m.role==='assistant'&&Array.isArray(m.sources)&&m.sources.length){const s=el('div','sources');s.append(el('span','sources-label','Sources'));for(const src of m.sources.slice(0,8)){const a=el('a','source',src.title&&src.title!==src.url?src.title.slice(0,60):src.url.replace(/^https?:\/\/(www\.)?/,'').slice(0,60));a.href=src.url;a.target='_blank';a.rel='noopener noreferrer';a.title=src.url;s.append(a)}li.append(s)}
  if(m.role==='assistant'&&!tl.length&&m.changed&&m.changed.length){const c=el('div','file-chips done');for(const f of m.changed.slice(0,12))c.append(fileChip(f));if(m.changed.length>12)c.append(el('span','chip more','+'+(m.changed.length-12)+' more'));li.append(c)}
  if(m.role==='assistant'&&(m.version||m.credits!=null)&&index!=null){
@@ -946,14 +947,24 @@ function openBuy(){
 // ---------- landing, templates, plans ----------
 function setPending(p){try{sessionStorage.setItem('kairoq-pending',JSON.stringify(p))}catch{}state.pending=p}
 function takePending(){let p=state.pending;try{p=p||JSON.parse(sessionStorage.getItem('kairoq-pending')||'null');sessionStorage.removeItem('kairoq-pending')}catch{}state.pending=null;return p}
-async function renderTemplates(wrap,onPick){
- if(!state.templates)state.templates=(await api('/templates')).templates;
+async function renderTemplates(wrap,onPick,onSponsored){
+ if(!state.templates){const r=await api('/templates');state.templates=r.templates;state.sponsored=r.sponsored||[]}
  wrap.replaceChildren();
+ // Sponsored slots come first, clearly labelled with who pays for them.
+ for(const t of onSponsored?state.sponsored:[]){
+  const b=document.createElement('button');b.type='button';b.className='sponsored';
+  b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:'Sponsored · '+t.sponsor}),Object.assign(document.createElement('strong'),{textContent:t.title}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description||''}));
+  b.dataset.cat=t.category||'';b.onclick=()=>onSponsored(t.id);wrap.append(b);
+ }
  for(const t of state.templates){
   const b=document.createElement('button');b.type='button';
   b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:t.category}),Object.assign(document.createElement('strong'),{textContent:t.name}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description}));
   b.onclick=()=>onPick(t.id);wrap.append(b);
  }
+}
+async function startFromSponsored(id){
+ text($('home-error'),'');
+ try{const {project,job}=await api('/projects',{method:'POST',body:{sponsored:id}});await openProject(project.id,{job})}catch(err){text($('home-error'),err.message)}
 }
 async function startFromTemplate(id){
  text($('home-error'),'');
@@ -967,7 +978,7 @@ function planCard(title,price,lines,action){
  return card;
 }
 function renderLanding(){
- renderTemplates($('landing-templates'),id=>{setPending({template:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()}).catch(()=>{});
+ renderTemplates($('landing-templates'),id=>{setPending({template:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()},id=>{setPending({sponsored:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()}).catch(()=>{});
  const wrap=$('landing-plans');wrap.replaceChildren();
  const per=(state.me.tiers||[]).map(t=>t.label+' '+t.credits+' credit'+(t.credits===1?'':'s')).join(', ');
  wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a free URL','No card needed']));
@@ -978,7 +989,7 @@ function renderLanding(){
 $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
 for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent.trim();$('landing-prompt').focus()};
 // Template gallery tabs: filter the cards by their category.
-for(const t of document.querySelectorAll('.show-tabs .tab'))t.onclick=()=>{for(const x of document.querySelectorAll('.show-tabs .tab'))x.setAttribute('aria-pressed',String(x===t));const cat=t.dataset.cat||'';for(const card of $('landing-templates').children){const c=(card.querySelector('.cat')?.textContent||'').toLowerCase();card.hidden=Boolean(cat)&&c!==cat}};
+for(const t of document.querySelectorAll('.show-tabs .tab'))t.onclick=()=>{for(const x of document.querySelectorAll('.show-tabs .tab'))x.setAttribute('aria-pressed',String(x===t));const cat=t.dataset.cat||'';for(const card of $('landing-templates').children){const c=(card.dataset.cat||card.querySelector('.cat')?.textContent||'').toLowerCase();card.hidden=Boolean(cat)&&c!==cat}};
 $('nav-signin').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create#signup';return}setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
 $('nav-start').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create';return}$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
 // Landing motion: a typing placeholder, reveal-on-scroll and a cursor glow on the tiles. Nothing here is needed to use the page.
@@ -1220,8 +1231,110 @@ $('check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('check-url').v
 $('cr-again').onclick=openCheckForm;$('check-retry').onclick=openCheckForm;$('side-check').onclick=openCheckForm;
 window.addEventListener('popstate',()=>{const m=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);if(m)openCheck(m[1])});
 
+// ---------- memory: preferences and recipes ----------
+async function openMemory(){text($('mem-error'),'');$('memory-dialog').showModal();try{renderMemory((await api('/memory')).memory)}catch(err){text($('mem-error'),err.message)}}
+async function memoryAction(body){try{renderMemory((await api('/memory',{method:'POST',body})).memory)}catch(err){text($('mem-error'),err.message)}}
+function renderMemory(mem){
+ $('mem-enabled').checked=mem.enabled;$('mem-enabled').disabled=!mem.on;$('mem-off').classList.toggle('hidden',mem.on);
+ const prefs=$('mem-prefs');prefs.replaceChildren();
+ if(!mem.preferences.length)prefs.append(el('li','muted','Nothing yet. Say things like “never use purple” or “prices in euros” in a chat, or add them here.'));
+ for(const p of mem.preferences){const li=el('li');li.append(el('span',null,p.text),el('span','muted small',p.source==='you'?' · added by you':' · learned '+when(p.at)));const x=el('button','ghost small-btn','Forget');x.type='button';x.onclick=()=>memoryAction({action:'delete_preference',id:p.id});li.append(x);prefs.append(li)}
+ const rec=$('mem-recipes');rec.replaceChildren();
+ if(!mem.recipes.length)rec.append(el('li','muted','No recipes yet. Kairoq writes one when a feature needed a few tries to get right.'));
+ const owner=state.me&&state.me.viewer&&state.me.viewer.kind==='owner';
+ for(const r of mem.recipes){
+  const li=el('li','recipe '+r.status),d=el('details'),s=el('summary');
+  s.append(el('b',null,r.title),el('span','muted small',' · '+(r.status==='off'?'off':r.uses?r.uses+' use'+(r.uses===1?'':'s')+', '+r.success_rate+'% right first time':'not used yet')+(r.improved?' · improved '+r.improved+'×':'')+(r.shared?' · shared with everyone':'')));
+  const body=el('div','recipe-body');body.append(el('p','small',r.when));const ol=el('ol');for(const st of r.steps)ol.append(el('li',null,st));body.append(ol);
+  if(r.pitfalls.length){const ul=el('ul');for(const p of r.pitfalls)ul.append(el('li',null,'Watch for: '+p));body.append(ul)}
+  if(r.reason)body.append(el('p','muted small',r.reason));
+  d.append(s,body);li.append(d);
+  const row=el('div','row');
+  const act=(label,b)=>{const x=el('button','ghost small-btn',label);x.type='button';x.onclick=()=>memoryAction(b);row.append(x)};
+  act(r.status==='off'?'Turn on':'Switch off',{action:'recipe_status',id:r.id,status:r.status==='off'?'active':'off'});
+  if(owner)act(r.shared?'Stop sharing':'Share with all accounts',{action:'share',id:r.id,shared:!r.shared});
+  act('Delete',{action:'delete_recipe',id:r.id});
+  li.append(row);rec.append(li);
+ }
+ $('mem-shared-box').classList.toggle('hidden',!mem.shared.length);
+ const sh=$('mem-shared');sh.replaceChildren();for(const r of mem.shared){const li=el('li');li.append(el('b',null,r.title),el('span','muted small',' · '+r.when));sh.append(li)}
+}
+$('side-memory').onclick=openMemory;
+$('mem-enabled').onchange=()=>memoryAction({action:'enabled',enabled:$('mem-enabled').checked});
+$('mem-add').onclick=()=>{const t=$('mem-new').value.trim();if(!t)return;$('mem-new').value='';memoryAction({action:'add_preference',text:t})};
+$('mem-new').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('mem-add').click()}});
+
+// ---------- partner integrations ----------
+const CATEGORY_NAMES={payments:'Payments',booking:'Booking',email:'Email',domains:'Domains',hosting:'Hosting',analytics:'Analytics',marketing:'Marketing',other:'Other'};
+async function openIntegrations(){
+ text($('integrations-error'),'');$('integrations-dialog').showModal();
+ const grid=$('partner-grid');grid.replaceChildren(el('p','muted small','Loading…'));
+ try{
+  const {partners}=await api('/partners');grid.replaceChildren();
+  if(!partners.length){grid.append(el('p','muted','No integrations yet. You can still ask for any service in the chat, for example “add Stripe checkout”.'));return}
+  for(const p of partners){
+   const card=el('div','partner-card'+(p.sponsored?' sponsored':''));
+   const head=el('div','partner-head');head.append(el('span','partner-mark',p.name.slice(0,1).toUpperCase()),el('div'));
+   head.lastChild.append(el('b',null,p.name),el('span','muted small',CATEGORY_NAMES[p.category]||p.category));
+   head.append(el('span','badge '+(p.sponsored?'sponsored':'partner'),p.sponsored?'Sponsored':'Partner'));
+   card.append(head);if(p.description)card.append(el('p','small',p.description));
+   if(p.secrets.length)card.append(el('p','muted small','You will need: '+p.secrets.join(', ')+' (add it under Settings, then Secrets).'));
+   const row=el('div','row');
+   const add=el('button','primary','Add to my app');add.type='button';
+   add.onclick=async()=>{add.disabled=true;try{const r=await api('/partners/'+p.id+'/add',{method:'POST'});$('integrations-dialog').close();setChatMode('build');send(r.message,'build')}catch(err){text($('integrations-error'),err.message);add.disabled=false}};
+   row.append(add);
+   if(p.has_signup){const a=el('a','ghost link','Create an account ↗');a.href='/api/create/partners/'+p.id+'/go';a.target='_blank';a.rel='noopener noreferrer';row.append(a)}
+   card.append(row);grid.append(card);
+  }
+ }catch(err){grid.replaceChildren();text($('integrations-error'),err.message)}
+}
+$('integrations-open').onclick=()=>{$('menu-plus').open=false;if(state.project)openIntegrations()};
+
+// ---------- admin: partners and sponsored templates ----------
+let partnerAdmin=null;
+function fillPartnerForm(p={}){
+ $('pf-id').value=p.id||'';$('pf-name').value=p.name||'';$('pf-category').value=p.category||'payments';$('pf-description').value=p.description||'';$('pf-instructions').value=p.instructions||'';$('pf-secrets').value=(p.secrets||[]).join(', ');$('pf-signup').value=p.signup_url||'';$('pf-note').value=p.note||'';$('pf-sponsored').checked=Boolean(p.sponsored);$('pf-active').checked=p.active!==false;
+ text($('partner-form-title'),p.id?'Edit '+p.name:'Add a partner');
+}
+function fillSlotForm(s={}){
+ $('sf-id').value=s.id||'';$('sf-partner').value=s.partner_id||($('sf-partner').options[0]||{}).value||'';$('sf-title').value=s.title||'';$('sf-description').value=s.description||'';$('sf-template').value=s.template||'';$('sf-category').value=s.category||'';$('sf-prompt').value=s.prompt||'';$('sf-starts').value=s.starts||'';$('sf-ends').value=s.ends||'';$('sf-active').checked=s.active!==false;
+ text($('slot-form-title'),s.id?'Edit '+s.title:'Add a sponsored template');
+}
+function renderPartnerAdmin(d){
+ partnerAdmin=d;
+ const cat=$('pf-category');if(!cat.options.length)for(const c of d.categories)cat.append(new Option(CATEGORY_NAMES[c]||c,c));
+ const sp=$('sf-partner'),keep=sp.value;sp.replaceChildren();for(const p of d.partners)sp.append(new Option(p.name,p.id));if(keep)sp.value=keep;
+ const tp=$('sf-template');if(tp.options.length<2&&state.templates)for(const t of state.templates)tp.append(new Option(t.name,t.id));
+ text($('slot-help'),'A labelled card at the front of the template gallery, for set dates. At most '+d.max_slots+' run at once.');
+ const ul=$('partner-admin-list');ul.replaceChildren();
+ if(!d.partners.length)ul.append(el('li','muted','No partners yet.'));
+ for(const p of d.partners){
+  const li=el('li','rule'),head=el('div','rule-head');
+  head.append(el('span','badge '+(!p.active?'retired':p.sponsored?'sponsored':'partner'),!p.active?'Hidden':p.sponsored?'Sponsored':'Partner'),el('b',null,p.name),el('span','muted small',' · '+(CATEGORY_NAMES[p.category]||p.category)));li.append(head);
+  li.append(el('p','muted small','This month: '+(p.stats.this_month.clicks||0)+' clicks, '+(p.stats.this_month.adds||0)+' added to apps · all time: '+p.stats.clicks+' clicks, '+p.stats.adds+' adds'+(p.note?' · '+p.note:'')));
+  const row=el('div','row'),edit=el('button','ghost small-btn','Edit');edit.type='button';edit.onclick=()=>{fillPartnerForm(p);$('partner-form-box').open=true};
+  const del=el('button','ghost small-btn','Remove');del.type='button';del.onclick=()=>partnerAdminAction({action:'delete_partner',id:p.id});
+  row.append(edit,del);li.append(row);ul.append(li);
+ }
+ const sl=$('slot-admin-list');sl.replaceChildren();
+ if(!d.slots.length)sl.append(el('li','muted','No sponsored templates.'));
+ for(const s of d.slots){
+  const li=el('li','rule'),head=el('div','rule-head');
+  head.append(el('span','badge '+(s.running?'active':'retired'),s.running?'Running':'Not running'),el('b',null,s.title),el('span','muted small',' · by '+s.sponsor+(s.starts||s.ends?' · '+(s.starts||'…')+' to '+(s.ends||'…'):'')));li.append(head);
+  li.append(el('p','muted small','This month: '+(s.stats.this_month.impressions||0)+' views, '+(s.stats.this_month.starts||0)+' projects started · all time: '+s.stats.impressions+' views, '+s.stats.starts+' started'));
+  const row=el('div','row'),edit=el('button','ghost small-btn','Edit');edit.type='button';edit.onclick=()=>{fillSlotForm(s);$('slot-form-box').open=true};
+  const del=el('button','ghost small-btn','Remove');del.type='button';del.onclick=()=>partnerAdminAction({action:'delete_slot',id:s.id});
+  row.append(edit,del);li.append(row);sl.append(li);
+ }
+}
+async function partnerAdminAction(body){try{renderPartnerAdmin((await api('/admin/partners',{method:'POST',body})).partners);return true}catch(err){text($('admin-error'),err.message);return false}}
+$('pf-save').onclick=async()=>{text($('admin-error'),'');if(await partnerAdminAction({action:'save_partner',partner:{id:$('pf-id').value||undefined,name:$('pf-name').value,category:$('pf-category').value,description:$('pf-description').value,instructions:$('pf-instructions').value,secrets:$('pf-secrets').value,signup_url:$('pf-signup').value.trim(),note:$('pf-note').value,sponsored:$('pf-sponsored').checked,active:$('pf-active').checked}}))fillPartnerForm()};
+$('pf-clear').onclick=()=>fillPartnerForm();
+$('sf-save').onclick=async()=>{text($('admin-error'),'');if(await partnerAdminAction({action:'save_slot',slot:{id:$('sf-id').value||undefined,partner_id:$('sf-partner').value,title:$('sf-title').value,description:$('sf-description').value,template:$('sf-template').value,category:$('sf-category').value,prompt:$('sf-prompt').value,starts:$('sf-starts').value,ends:$('sf-ends').value,active:$('sf-active').checked}})){fillSlotForm();state.templates=null}};
+$('sf-clear').onclick=()=>fillSlotForm();
+
 // ---------- admin (owner only): what Kairoq is learning, and website check leads ----------
-async function openAdmin(){text($('admin-error'),'');text($('learn-status'),'');$('admin-dialog').showModal();await renderAdmin()}
+async function openAdmin(){text($('admin-error'),'');text($('learn-status'),'');$('admin-dialog').showModal();if(!state.templates)try{const r=await api('/templates');state.templates=r.templates;state.sponsored=r.sponsored||[]}catch{}try{renderPartnerAdmin((await api('/admin/partners')).partners)}catch(err){text($('admin-error'),err.message)}await renderAdmin()}
 function pctText(r){return r==null?'–':Math.round(r*1000)/10+'%'}
 async function renderAdmin(given){
  try{
@@ -1271,6 +1384,7 @@ async function start(){
  const pending=takePending();
  if(pending){
   if(pending.remix)return remix(pending.remix);
+  if(pending.sponsored){try{const {project,job}=await api('/projects',{method:'POST',body:{sponsored:pending.sponsored}});return openProject(project.id,{job})}catch(err){await loadHome();text($('home-error'),err.message);return}}
   if(pending.rebuild){try{return await rebuild(pending.rebuild)}catch(err){await loadHome();text($('home-error'),err.message);return}}
   try{const {project,job}=await api('/projects',{method:'POST',body:pending.template?{template:pending.template}:{prompt:pending.prompt}});return openProject(project.id,{pendingText:pending.prompt,job})}catch(err){await loadHome();text($('home-error'),err.message);return}
  }

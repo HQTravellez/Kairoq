@@ -471,6 +471,28 @@ The owner sees all of it in **Admin** (sidebar, owner only): builds in the last 
 
 Review is the default because the error shapes come from user projects: a rule is only accepted when it is a short instruction about code (no links, nothing addressed to the model itself), and an owner's look adds a second check before it reaches every build.
 
+## Memory: preferences, recipes and recall
+
+Kairoq gets better at each person's work. Everything here is private to the account that owns the project; the person sees and edits it under **Memory** in the sidebar, and a note under each reply says what was used or learned ("Used your recipe: Room booking with availability · Remembered: Prefers prices in euros").
+
+- **Preferences.** A chat message that sounds like a lasting preference ("always", "never", "I prefer", "too colourful", "prices in euros", "British spelling"…) is checked by the model; real preferences are remembered and added to the builder's instructions for all of that account's projects (the current request still wins). Only messages with such a hint go to the model. People can add their own and forget any.
+- **Recipes from experience.** When a build that needed retries (or an agent task with five or more steps) finishes without errors and changed at least two files, the model writes a general recipe: title, when it applies, up to six steps and four pitfalls, no project-specific details. A later request whose words match a recipe gets it as context. After each use: right first time is counted; if it still needed retries, the model updates the recipe with what went wrong; after five uses under 40% right first time it switches itself off. Recipes can be switched off, turned back on (counts restart) or deleted.
+- **Recall.** "Like my Lotus Yoga site", "same as our other project": the account's project whose name or first request matches is found and its main files (App.jsx, backend.json, pages and components, up to 12 000 characters) are added as reference.
+- **Shared recipes.** The Kairoq owner's own recipes can be shared with every account from Memory; nothing a customer builds is ever shared.
+
+`KAIROQ_MEMORY=off` turns memory off on the server; each account can turn its own off. Memory is stored per account (hashed file name) in the `memory` folder next to the projects folder, or `KAIROQ_MEMORY_DIR`.
+
+## Partners and sponsored templates
+
+How other companies pay to be on Kairoq without touching anyone's app or data. Both are managed by the owner in **Admin**.
+
+- **Partner integrations.** Each partner has a name, category (payments, booking, email, domains, hosting, analytics, marketing, other), a short description, **how Kairoq adds it to an app** (instructions for the builder), the secrets it needs, an optional sign-up link (with your referral code), a private note, and whether it is paid placement. People open **Integrations** from the **+** menu in the editor: cards labelled **Partner** or **Sponsored** (sponsored first), with "You will need: …" for secrets. **Add to my app** sends the instructions as a normal chat change (normal price), telling the builder to read secrets in a server function and never in the page. **Create an account** goes through `/api/create/partners/<id>/go`, which counts the click and redirects to the saved link (no referrer is sent). The dialog says that sponsored partners pay for their place and that Kairoq may earn a referral fee.
+- **Sponsored templates.** A slot at the front of the template gallery (home and landing), labelled **Sponsored · <partner>**, for set dates, that starts a project from a prompt or from one of Kairoq's templates. At most `KAIROQ_SPONSORED_MAX` (default 2) run at once; ended or future slots are not shown and cannot be started.
+- **Counting.** Per partner and per month: clicks and "added to an app"; per slot: views and projects started. Admin shows this month and all time, for invoicing.
+- **What partners never get.** Nothing about the person or their project: Kairoq only counts that someone clicked or added. Links must be https; only saved links are redirected to; a partner with a running slot cannot be removed until the slot ends.
+
+Data lives in the `partners` folder next to the projects folder (or `KAIROQ_PARTNERS_DIR`).
+
 ## Customers before code
 
 Lovable and Replit help you build an app. This helps you build a business: find out whether people want it before building it, then see every week what stops signups (`growth.js`). Open **Launch** in the editor.

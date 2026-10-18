@@ -229,6 +229,14 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
     update({progress:null});
     if(research.context)context=[context,research.context].filter(Boolean).join('\n\n');
    }
+   // Memory: recipes from earlier work that match, and an earlier project the message refers to.
+   const mem=require('./account-memory'),memOwner=builder.loadMeta(id).owner;
+   let usedRecipes=[],recalled=null;
+   if(mode!=='polish'&&!referenceOnly){
+    if(mode!=='discuss'){usedRecipes=mem.matchRecipes(memOwner,message);if(usedRecipes.length)context=[context,mem.recipeNote(usedRecipes)].filter(Boolean).join('\n\n')}
+    try{recalled=mem.recall(memOwner,id,message)}catch{recalled=null}
+    if(recalled)context=[context,recalled.note].filter(Boolean).join('\n\n');
+   }
    if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
    else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
@@ -281,6 +289,15 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    }else if(mode!=='discuss'){
     // Any change that leaves the app without errors or failing checks resets the guard.
     const m=builder.loadMeta(id);if(m.loop&&!problemSignature(m,m.current_version)){delete m.loop;builder.saveMeta(m)}
+   }
+   // Memory: what was used and learned shows under the reply; recipes are written or improved after.
+   if(job.result&&mode!=='polish'){
+    const memory={};
+    if(usedRecipes.length)memory.recipes=usedRecipes.map(r=>r.title);
+    if(recalled)memory.recalled=recalled.name;
+    if(mode!=='discuss'&&!hooks){const learned=await mem.learnPreferences(memOwner,message,{callModel}).catch(()=>[]);if(learned.length)memory.learned=learned}
+    if(Object.keys(memory).length){job.result.memory=memory;try{const m=builder.loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.memory=memory;builder.saveMeta(m)}}catch{}}
+    if(mode!=='discuss'&&!hooks){const result=job.result;mem.track(usedRecipes.length?mem.useRecipes(memOwner,usedRecipes.map(r=>r.id),result,{callModel}):mem.writeRecipe(memOwner,{message,result,mode,projectId:id},{callModel}))}
    }
    // The learning loop: what this build ran into on the way, and how it ended.
    if(mode!=='discuss'&&job.result)try{require('./build-lessons').recordBuild(id,{mode,result:job.result})}catch{}
@@ -715,7 +732,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const raw=await readRaw(req);
    return send(res,200,await accounts.stripeWebhook(raw,req.headers['stripe-signature'])),true;
   }
-  if(route==='/templates'&&method==='GET')return send(res,200,{templates:require('./create-templates').list()}),true;
+  if(route==='/templates'&&method==='GET')return send(res,200,{templates:require('./create-templates').list(),sponsored:require('./partners').gallerySlots()}),true;
+  // A partner's sign-up link, counted. Only links the owner saved are redirected to.
+  const pgo=/^\/partners\/([a-f0-9]{10})\/go$/.exec(route);
+  if(pgo&&method==='GET'){limited(req,'partner-go',30);res.writeHead(302,{Location:require('./partners').signupUrl(pgo[1]),'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});res.end();return true}
   // ----- free website check (no account needed) -----
   if(route==='/site-check'&&method==='POST'){
    limited(req,'site-check',6,600000);
@@ -739,6 +759,16 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,{share:{name:meta.name,preview_url:builder.previewUrl(meta),remix:!!meta.share.remix,versions:meta.versions.length,updated_at:meta.updated_at}}),true;
   }
   const v=requireViewer(req,isOwner);
+  // ----- partner integrations -----
+  if(route==='/partners'&&method==='GET')return send(res,200,{partners:require('./partners').publicPartners()}),true;
+  const padd=/^\/partners\/([a-f0-9]{10})\/add$/.exec(route);
+  if(padd&&method==='POST')return send(res,200,require('./partners').addMessage(padd[1])),true;
+  // ----- memory: preferences and recipes of this account -----
+  if(route==='/memory'){
+   const mem=require('./account-memory');
+   if(method==='GET')return send(res,200,{memory:mem.view(v.owner)}),true;
+   if(method==='POST'){const b=await readJson(req,4000);return send(res,200,{memory:mem.edit(v.owner,b,{isOwner:v.kind==='owner'})}),true}
+  }
   // ----- the learning loop (owner only) -----
   if(route==='/learning'){
    if(v.kind!=='owner')throw Object.assign(Error('Only the Kairoq owner can manage what Kairoq learns'),{status:403});
@@ -771,6 +801,11 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(route==='/admin/status'&&method==='GET'){
     const d=accounts.database();
     return send(res,200,{builds:builder.buildStats(),jobs:[...jobs.values()].filter(j=>ACTIVE.has(j.status)).length,projects:builder.list().length,accounts:d.prepare('SELECT COUNT(*) n FROM accounts').get().n,subscribers:d.prepare("SELECT COUNT(*) n FROM accounts WHERE plan IS NOT NULL AND plan_status='active'").get().n,last_backup:backups.latest()}),true;
+   }
+   if(route==='/admin/partners'){
+    const P=require('./partners');
+    if(method==='GET')return send(res,200,{partners:P.adminView()}),true;
+    if(method==='POST')return send(res,200,{partners:P.adminEdit(await readJson(req,20000))}),true;
    }
    if(route==='/admin/backup'&&method==='POST')return send(res,200,{backup:backups.run()}),true;
    // AI cost per tier and model over the last 30 days, next to what one message of that tier sells for.
@@ -840,7 +875,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
   if(route==='/projects'&&method==='POST'){
    const b=await readJson(req,16000000);
-   const {meta,job}=await createProject(v,{name:b.name,prompt:b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
+   // A sponsored template slot: what to start with comes from the slot, not the request.
+   const slot=b.sponsored?require('./partners').startFromSlot(String(b.sponsored)):null;
+   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
