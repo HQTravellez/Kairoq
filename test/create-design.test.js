@@ -8,6 +8,8 @@ process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_FREE_CREDITS='60';
 process.env.KAIROQ_BUILDER_PAID_APPROVED='true';
+process.env.KAIROQ_WEB_RESEARCH='off';
+process.env.KAIROQ_DESIGN_PANEL='off';
 const builder=require('../react-builder'),createApi=require('../create-api'),backend=require('../react-backend'),hosting=require('../react-hosting');
 const design=require('../react-design'),skills=require('../react-skills'),mobile=require('../react-mobile'),runtime=require('../runtime-check');
 
