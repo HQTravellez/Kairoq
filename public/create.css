@@ -608,3 +608,6 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 
 .scope-chip{display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 10px;border-radius:10px;font-size:13px;background:color-mix(in srgb,#d97706 12%,transparent);color:inherit}
 .scope-chip svg{flex:none;margin-top:2px}
+
+.preview-diagnosis{display:block;margin-top:6px;font-weight:500}
+.preview-diagnosis:empty{display:none}
