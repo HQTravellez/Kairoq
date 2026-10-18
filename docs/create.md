@@ -122,7 +122,7 @@ Enable these in `src/backend.json`. The model adds them when the app needs them.
   - In code: `payments.has('pro')` / `payments.purchases()`. Payments show in the Data tab.
 - **Scheduled jobs.** Add `"schedules":[…]` with `every` set to `hour`, `day` or `week`.
   - Actions: `delete_older_than` (with `days`) and `email_owner_summary`.
-  - The server checks for due jobs every 5 minutes.
+  - The server checks for due jobs every 5 minutes. For anything else that should run on its own, see **Automations** below.
 
 ### Server functions, webhooks and secrets
 
@@ -135,6 +135,26 @@ Enable these in `src/backend.json`. The model adds them when the app needs them.
 - Functions run in a QuickJS sandbox with no Node APIs, 16 MB of memory and `KAIROQ_FUNCTION_TIMEOUT_MS` (10 s), in `KAIROQ_FUNCTION_WORKERS` (4) worker threads, so a stuck function never blocks the server.
 - `fetch` allows only http/https on ports 80, 443, 8080 and 8443 and blocks private and metadata addresses, including after DNS lookup. Bodies are limited to 5 MB.
 - Each version runs its own functions. The preview runs the draft; the published site runs the published version.
+
+### Automations
+
+The app can do things on its own: reminders, digests, follow-up emails, cleanups, syncing with another service. An automation runs one of the app's server functions on a schedule or when a record changes. Declared in `src/backend.json`:
+
+```json
+"automations":[
+  {"name":"reminders","run":"send-reminders","every":"day","at":"09:00","tz":"Europe/London"},
+  {"name":"weekly","run":"weekly-report","every":"week","day":"mon","at":"08:00"},
+  {"name":"welcome","run":"welcome","on":"created","collection":"bookings"}
+]
+```
+
+- `run` names a file in `functions/`. `every` is `hour`, `day` (with `at`) or `week` (with `at` and `day`); `tz` is an IANA zone (default UTC). Or `on` is `created`, `updated` or `deleted` with a declared `collection`. Up to 10 per app; a missing function or collection is a build error.
+- The function receives a POST with `request.body = { automation, trigger, at, collection?, record? }` and `user = null`, plus the usual `db`, `sql`, `email`, `secrets`, `fetch`, `ai` and `log`. Scheduled ones run on the published version (the draft when nothing is published); record-triggered ones run on whichever version made the change, so the preview's draft and the live site each run their own.
+- The server checks schedules every minute, so `09:00` means 09:00. A new schedule waits for its next time; one that was missed (the server was down) runs once when it comes back.
+- **No loops:** a change made by an automation never starts another automation.
+- **Test copy:** when a saved check, the agent or synthetic customers create records, the matching automations run on the test copy, so their effects are visible in the test and never in real data. The agent has a `run_automation` tool to run one on the test copy and read its logs; the editor's Data tab has **Run now**.
+- **Kept honest:** every run is logged under Data → Server logs with its result; the Data tab shows each automation's last run, next run and counts. After three failures in a row the owner gets one email (not one per failure), and the counter resets on the next success.
+- API: `GET /api/create/projects/<id>/automations` and `POST …/automations {name}` (run now, editors; 30 per 10 minutes).
 
 ### SQL tables
 

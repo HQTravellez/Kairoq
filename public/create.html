@@ -396,6 +396,11 @@
             <div id="sql-result"></div>
           </form>
         </section>
+        <section class="auto-section hidden" id="auto-section">
+          <h3>Automations <button class="ghost link-btn" id="automations-refresh" type="button">Refresh</button></h3>
+          <p class="muted small">Server functions that run on their own: on a schedule, or when a record is created, updated or deleted. Each run is logged below; after three failures in a row the owner gets one email.</p>
+          <ol class="skills" id="automations"></ol>
+        </section>
         <section class="logs-section">
           <h3>Server logs <button class="ghost link-btn" id="logs-refresh" type="button">Refresh</button></h3>
           <ol class="logs" id="logs"></ol>

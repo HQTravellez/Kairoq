@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/records':'viewer','DELETE:/records':'editor',
+const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -985,6 +985,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,{version:n,previous:prevN||null,files}),true;
   }
   if(action==='/logs'&&method==='GET')return send(res,200,{logs:require('./react-logs').list(id)}),true;
+  if(action==='/automations'&&method==='GET')return send(res,200,{automations:require('./react-automations').status(id)}),true;
+  if(action==='/automations'&&method==='POST'){const b=await readJson(req);if(limited(req,'automation-run',30))throw Object.assign(Error('Too many runs. Wait a few minutes.'),{status:429});const r=await require('./react-automations').runNow(id,String(b.name||''));return send(res,200,{run:r,automations:require('./react-automations').status(id)}),true}
   if(action==='/security'&&method==='GET'){
    const meta=builder.loadMeta(id),files=builder.loadFiles(id,meta.current_version);
    let cfg={collections:{}};try{cfg=backend.parseConfig(files)}catch{}

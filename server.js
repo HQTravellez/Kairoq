@@ -7017,6 +7017,8 @@ if (process.env.NODE_ENV !== "test") {
   setTimeout(() => schedulerTick().catch(()=>{}), 5_000);
   setInterval(() => schedulerTick().catch(()=>{}), 60_000);
   setInterval(() => reactBackend.runAllSchedules().catch(e=>console.warn("[create-schedules]",e.message)), 5*60_000).unref();
+  // Automations in generated apps: checked every minute so "at 09:00" means 09:00.
+  setInterval(() => reactBackend.runAllAutomations().catch(e=>console.warn("[create-automations]",e.message)), 60_000).unref();
   const runBackup=()=>{try{const b=require("./create-backups").run();if(b.errors.length)console.warn("[create-backups]",b.errors.join("; "))}catch(e){console.warn("[create-backups]",e.message)}};
   setTimeout(runBackup,10*60_000).unref();setInterval(runBackup,24*3600_000).unref();
   // Live-app monitor: re-runs saved checks on every published app (KAIROQ_MONITOR_HOURS, 0 = off).

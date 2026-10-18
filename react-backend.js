@@ -30,7 +30,10 @@ function normalizeConfig(cfg){
  if(Object.keys(collections).length>30)throw Error('src/backend.json can declare up to 30 collections.');
  return{collections,...require('./react-backend-extras').normalizeExtras(cfg,collections)};
 }
-function configErrors(files){try{parseConfig(files);return[]}catch(e){return[e.message]}}
+function configErrors(files){
+ try{const cfg=parseConfig(files);for(const a of cfg.automations||[])if(!files['functions/'+a.run+'.js'])throw Error('Automation "'+a.name+'" runs "'+a.run+'", but there is no functions/'+a.run+'.js.');return[]}
+ catch(e){return[e.message]}
+}
 
 // ---------- storage ----------
 function database(id){return openFile(path.join(builder.projectDir(id),'data.sqlite'))}
@@ -154,7 +157,7 @@ function create(db,access,collection,user,data){
  const id=crypto.randomUUID(),at=new Date().toISOString();
  db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id,collection,user?user.id:null,cleanData(data),at,at);
  const created=record(db.prepare('SELECT * FROM records WHERE id=?').get(id));
- publish(db.__projectId,collection,'created',created,user?user.id:null);
+ publish(db,collection,'created',created,user?user.id:null);
  return created;
 }
 function ownRecord(db,collection,user,id){
@@ -169,10 +172,10 @@ function update(db,collection,user,id,data){
  const merged={...JSON.parse(r.data),...JSON.parse(cleanData(data))};
  db.prepare('UPDATE records SET data=?,updated_at=? WHERE id=?').run(cleanData(merged),new Date().toISOString(),id);
  const updated=record(db.prepare('SELECT * FROM records WHERE id=?').get(id));
- publish(db.__projectId,collection,'updated',updated,r.owner_id);
+ publish(db,collection,'updated',updated,r.owner_id);
  return updated;
 }
-function remove(db,collection,user,id){const r=ownRecord(db,collection,user,id);db.prepare('DELETE FROM records WHERE id=?').run(id);publish(db.__projectId,collection,'deleted',{id},r.owner_id);return{deleted:id}}
+function remove(db,collection,user,id){const r=ownRecord(db,collection,user,id);db.prepare('DELETE FROM records WHERE id=?').run(id);publish(db,collection,'deleted',{id},r.owner_id);return{deleted:id}}
 
 // ---------- HTTP: /api/apps/<id>/... ----------
 const hits=new Map();
@@ -259,14 +262,14 @@ function functionDb(db,cfg,op,a,user){
   if(db.prepare('SELECT COUNT(*) n FROM records WHERE collection=?').get(name).n>=MAX_RECORDS)throw fail(403,'This collection is full');
   const rid=crypto.randomUUID(),at=new Date().toISOString();
   db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(rid,name,user?user.id:null,cleanData(a.data),at,at);
-  const created=record(row(rid));publish(db.__projectId,name,'created',created,user?user.id:null);return created;
+  const created=record(row(rid));publish(db,name,'created',created,user?user.id:null);return created;
  }
  if(op==='update'){
   const r=row(a.id),merged={...JSON.parse(r.data),...JSON.parse(cleanData(a.data))};
   db.prepare('UPDATE records SET data=?,updated_at=? WHERE id=?').run(cleanData(merged),new Date().toISOString(),r.id);
-  const updated=record(row(r.id));publish(db.__projectId,name,'updated',updated,r.owner_id);return updated;
+  const updated=record(row(r.id));publish(db,name,'updated',updated,r.owner_id);return updated;
  }
- if(op==='remove'){const r=row(a.id);db.prepare('DELETE FROM records WHERE id=?').run(r.id);publish(db.__projectId,name,'deleted',{id:r.id},r.owner_id);return{deleted:r.id}}
+ if(op==='remove'){const r=row(a.id);db.prepare('DELETE FROM records WHERE id=?').run(r.id);publish(db,name,'deleted',{id:r.id},r.owner_id);return{deleted:r.id}}
  throw fail(400,'Unknown database operation');
 }
 // ---------- real-time ----------
@@ -279,8 +282,11 @@ function visibleTo(sub,ownerId){
  if(sub.access==='shared')return Boolean(sub.userId);
  return true;
 }
-function publish(projectId,collection,type,item,ownerId){
+function publish(db,collection,type,item,ownerId){
+ const projectId=db&&db.__projectId;
  if(!projectId)return;
+ // Automations that listen to this collection run after the change (never for changes an automation made).
+ try{require('./react-automations').onRecord(db,collection,type,item)}catch{}
  const subs=channels.get(projectId+':'+collection);if(!subs)return;
  const line='event: '+type+'\ndata: '+JSON.stringify({type,item})+'\n\n';
  for(const sub of subs)if(visibleTo(sub,ownerId))try{sub.res.write(line)}catch{}
@@ -320,7 +326,7 @@ async function handle(req,res,{onlyProject}={}){
   const sb=req.headers['x-kairoq-sandbox']?require('./react-sandbox').lookup(id,req.headers['x-kairoq-sandbox']):null;
   if(req.headers['x-kairoq-sandbox']&&!sb)throw fail(410,'This test run has ended');
   const db=sb?openFile(path.join(sb.dir,'data.sqlite')):database(id),user=currentUser(db,req);
-  db.__projectId=sb?id+'~test':id;if(sb){db.__filesDir=path.join(sb.dir,'files');db.__sandbox=true}
+  db.__projectId=sb?id+'~test':id;if(sb){db.__filesDir=path.join(sb.dir,'files');db.__sandbox=true;db.__sandboxToken=req.headers['x-kairoq-sandbox']}
   const version=requestVersion(meta,req);
   if(route==='/auth/signup'&&req.method==='POST')return send(res,201,await signUp(db,await readJson(req))),true;
   if(route==='/auth/signin'&&req.method==='POST')return send(res,200,await signIn(db,await readJson(req))),true;
@@ -360,30 +366,11 @@ async function handle(req,res,{onlyProject}={}){
   const cfg=version?parseConfig(builder.loadFiles(id,version)):{collections:{}};
   const fnm=/^\/functions\/([a-z][a-z0-9-]{0,39})$/.exec(route);
   if(fnm){
-   const files=version?builder.loadFiles(id,version):{},source=files['functions/'+fnm[1]+'.js'];
-   if(!source)throw fail(404,'Function "'+fnm[1]+'" does not exist');
    const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>1024*1024)throw fail(413,'Request too large');chunks.push(c)}
    const rawBody=Buffer.concat(chunks).toString('utf8');
    let body=rawBody;if(/json/i.test(String(req.headers['content-type']||''))&&rawBody)try{body=JSON.parse(rawBody)}catch{throw fail(400,'Invalid JSON')}
    const headers={};for(const [k,v] of Object.entries(req.headers))if(!/^(cookie|authorization|x-forwarded-|x-real-ip|forwarded)/i.test(k))headers[k]=String(v).slice(0,2000);
-   const host={
-    secret:async name=>require('./project-secrets').get(id,'app_'+String(name).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
-    db:async(op,a,u)=>functionDb(db,cfg,op,a,u),
-    ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');limitedAi(req,id);return appAi(meta,db,a)},
-    sql:(q,p)=>require('./react-sql').run.query(sb?sb.dir:builder.projectDir(id),q,p),
-    sqlBatch:steps=>require('./react-sql').run.batch(sb?sb.dir:builder.projectDir(id),steps),
-    email:async(a,u)=>sb?{sent:true,test:true}:extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
-   };
-   const applog=require('./react-logs');
-   // Each app may run a few functions at once, so one busy app cannot starve the others.
-   const running=fnRunning.get(id)||0;
-   if(running>=Math.max(1,Number(process.env.KAIROQ_FUNCTION_CONCURRENCY_PER_APP||3)))throw fail(429,'This app is busy. Try again in a moment.');
-   fnRunning.set(id,running+1);
-   let out;
-   try{out=await require('./react-functions').invoke({source,request:{method:req.method,path:route,query:q0,headers,body,rawBody},user:publicUser(user),host})}
-   catch(e){applog.add(id,{level:'error',source:'functions/'+fnm[1]+'.js',message:req.method+' '+route+': '+(e.message||e)});throw e}
-   finally{const n=(fnRunning.get(id)||1)-1;if(n>0)fnRunning.set(id,n);else fnRunning.delete(id)}
-   for(const line of out.logs||[])applog.add(id,{level:'log',source:'functions/'+fnm[1]+'.js',message:line});
+   const out=await runFunction(id,fnm[1],{meta,version,cfg,db,sb,user,req,request:{method:req.method,path:route,query:q0,headers,body,rawBody}});
    require('./react-functions').respond(res,out.result,CORS,{externalRedirects:Boolean(onlyProject)});
    return true;
   }
@@ -426,12 +413,42 @@ async function handle(req,res,{onlyProject}={}){
  }
 }
 
+// Runs one of the app's server functions: from its HTTP route, or from an automation
+// (automation: true, user null, no request to rate-limit AI by; a function started this way
+// cannot start another automation).
+async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=null,request,automation=false}){
+ const files=version?builder.loadFiles(id,version):{},source=files['functions/'+name+'.js'];
+ if(!source)throw fail(404,'Function "'+name+'" does not exist');
+ const extras=require('./react-backend-extras');
+ let fdb=db;
+ if(automation){fdb=Object.create(db);fdb.prepare=db.prepare.bind(db);fdb.exec=db.exec.bind(db);fdb.__automation=true}
+ const host={
+  secret:async n=>require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
+  db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
+  ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},
+  sql:(q,p)=>require('./react-sql').run.query(sb?sb.dir:builder.projectDir(id),q,p),
+  sqlBatch:steps=>require('./react-sql').run.batch(sb?sb.dir:builder.projectDir(id),steps),
+  email:async(a,u)=>sb?{sent:true,test:true}:extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
+ };
+ const applog=require('./react-logs');
+ // Each app may run a few functions at once, so one busy app cannot starve the others.
+ const running=fnRunning.get(id)||0;
+ if(running>=Math.max(1,Number(process.env.KAIROQ_FUNCTION_CONCURRENCY_PER_APP||3)))throw fail(429,'This app is busy. Try again in a moment.');
+ fnRunning.set(id,running+1);
+ let out;
+ try{out=await require('./react-functions').invoke({source,request,user:publicUser(user),host})}
+ catch(e){applog.add(id,{level:'error',source:'functions/'+name+'.js',message:request.method+' '+request.path+': '+(e.message||e)});throw e}
+ finally{const n=(fnRunning.get(id)||1)-1;if(n>0)fnRunning.set(id,n);else fnRunning.delete(id)}
+ for(const line of out.logs||[])applog.add(id,{level:'log',source:'functions/'+name+'.js',message:line});
+ return out;
+}
+
 // ---------- owner view (Create "Data" tab) ----------
 function overview(id){
  const meta=builder.loadMeta(id),cfg=liveConfig(meta),db=database(id);
  const counts=Object.fromEntries(db.prepare('SELECT collection,COUNT(*) n FROM records GROUP BY collection').all().map(r=>[r.collection,r.n]));
  return{
-  features:{storage:cfg.storage||null,email:!!cfg.email,payments:cfg.payments?Object.keys(cfg.payments.products):[],schedules:(cfg.schedules||[]).map(s=>({...s,...(db.prepare('SELECT last_run,last_result FROM schedule_runs WHERE name=?').get(s.name)||{})}))},
+  features:{storage:cfg.storage||null,email:!!cfg.email,payments:cfg.payments?Object.keys(cfg.payments.products):[],schedules:(cfg.schedules||[]).map(s=>({...s,...(db.prepare('SELECT last_run,last_result FROM schedule_runs WHERE name=?').get(s.name)||{})})),automations:(cfg.automations||[]).length},
   files:db.prepare('SELECT COUNT(*) n,COALESCE(SUM(size),0) bytes FROM files').get(),
   payments:db.prepare('SELECT p.product,p.mode,p.status,p.amount,p.currency,p.created_at,u.email FROM payments p LEFT JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC LIMIT 50').all(),
   collections:Object.entries(cfg.collections).map(([name,def])=>({name,access:def.access,count:counts[name]||0})),
@@ -568,4 +585,6 @@ async function runAllSchedules(options){
  }
  return out;
 }
-module.exports={functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+// Every due automation on every app (called every minute by the server).
+function runAllAutomations(options){return require('./react-automations').tick(options)}
+module.exports={functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};

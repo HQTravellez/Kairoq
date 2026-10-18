@@ -182,7 +182,7 @@ async function renderData(){
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
  text($('records-title'),state.collection?'Records in '+state.collection:'Records');
- renderSql().catch(()=>{});renderLogs().catch(()=>{});
+ renderSql().catch(()=>{});renderLogs().catch(()=>{});renderAutomations().catch(()=>{});
  if(!state.collection)return;
  const {items}=await api('/projects/'+state.project.id+'/records?collection='+encodeURIComponent(state.collection));
  if(!items.length){const li=document.createElement('li');li.className='muted small';li.textContent='No records yet.';records.append(li)}
@@ -193,6 +193,23 @@ async function renderData(){
   li.append(pre,del);records.append(li);
  }
 }
+// Automations (src/backend.json "automations"): what runs when, the last result, and Run now.
+async function renderAutomations(){
+ const {automations}=await api('/projects/'+state.project.id+'/automations');
+ $('auto-section').classList.toggle('hidden',!automations.length);
+ const ol=$('automations');ol.replaceChildren();
+ const editor=state.project.role!=='viewer';
+ for(const a of automations){
+  const li=document.createElement('li');
+  const badge=el('span','state '+(a.ok===null?'':a.ok?'ok':'bad'),a.ok===null?'never run':a.ok?'ok':'failed');
+  const t=el('div','skill-text');t.append(el('b',null,a.text),el('span',null,(a.last_run?'Last: '+when(a.last_run)+' · '+(a.last_result||''):'Not run yet')+(a.next?' · Next: '+when(a.next):'')+(a.runs?' · '+a.runs+' run'+(a.runs===1?'':'s')+(a.failures?', '+a.failures+' failed':''):'')));
+  const act=el('div','skill-actions');
+  const run=document.createElement('button');run.type='button';run.className='ghost link-btn';run.textContent='Run now';run.disabled=!editor;
+  run.onclick=async()=>{run.disabled=true;try{await api('/projects/'+state.project.id+'/automations',{method:'POST',body:{name:a.name}});await renderAutomations();renderLogs().catch(()=>{})}catch(err){text($('chat-error'),err.message)}finally{run.disabled=!editor}};
+  act.append(run);li.append(badge,t,act);ol.append(li);
+ }
+}
+$('automations-refresh').onclick=()=>renderAutomations().catch(err=>text($('chat-error'),err.message));
 // SQL tables (sql/ migrations) and recent server logs, shown under the Data tab.
 function sqlTable(rows){
  const table=document.createElement('table');table.className='sql-table';
