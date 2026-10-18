@@ -747,7 +747,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const raw=await readRaw(req);
    return send(res,200,await accounts.stripeWebhook(raw,req.headers['stripe-signature'])),true;
   }
-  if(route==='/templates'&&method==='GET')return send(res,200,{templates:require('./create-templates').list(),sponsored:require('./partners').gallerySlots()}),true;
+  if(route==='/templates'&&method==='GET'){const T=require('./create-templates'),thumbs=require('./template-thumbs');return send(res,200,{templates:T.list().map(t=>({...t,thumb:thumbs.url(T.get(t.id))})),sponsored:require('./partners').gallerySlots()}),true}
+  // A template's picture for the gallery (see template-thumbs.js); the ?v= in its link changes with the template.
+  const tth=/^\/templates\/([a-z0-9-]{1,60})\/thumb\.jpg$/.exec(route);
+  if(tth&&method==='GET'){const jpg=require('./template-thumbs').read(tth[1]);if(!jpg)return send(res,404,{error:'No picture yet'}),true;res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'});res.end(jpg);return true}
   // A partner's sign-up link, counted. Only links the owner saved are redirected to.
   const pgo=/^\/partners\/([a-f0-9]{10})\/go$/.exec(route);
   if(pgo&&method==='GET'){limited(req,'partner-go',30);res.writeHead(302,{Location:require('./partners').signupUrl(pgo[1]),'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});res.end();return true}

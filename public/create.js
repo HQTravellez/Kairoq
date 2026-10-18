@@ -1083,11 +1083,34 @@ async function renderTemplates(wrap,onPick,onSponsored){
   b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:'Sponsored · '+t.sponsor}),Object.assign(document.createElement('strong'),{textContent:t.title}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description||''}));
   b.dataset.cat=t.category||'';b.onclick=()=>onSponsored(t.id);wrap.append(b);
  }
- for(const t of state.templates){
-  const b=document.createElement('button');b.type='button';
-  b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:t.category}),Object.assign(document.createElement('strong'),{textContent:t.name}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description}));
-  b.onclick=()=>onPick(t.id);wrap.append(b);
- }
+ for(const t of state.templates)wrap.append(templateCard(t,onPick));
+}
+// A template card: a picture of the real app (taken by the server) in a browser or phone frame,
+// or, until that exists, a drawn page with the template's own name.
+const TPL_TINT={hospitality:'sand',travel:'slate',ai:'ember',health:'moss',marketing:'iris',business:'slate',services:'sea',personal:'rose'};
+function templateCard(t,onPick){
+ const mk=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e};
+ const b=mk('button','tpl');b.type='button';b.dataset.tint=TPL_TINT[String(t.category||'').toLowerCase()]||'sand';
+ b.setAttribute('aria-label','Start from the '+t.name+' template');
+ const shot=mk('div','tpl-shot'+(t.mobile?' phone':''));
+ const frame=mk('div',t.mobile?'tpl-device':'tpl-window');
+ if(!t.mobile){const bar=mk('div','tpl-bar');bar.append(mk('i'),mk('i'),mk('i'),mk('span',null,t.name.toLowerCase().replace(/[^a-z0-9]+/g,'')+'.kairoq.app'));frame.append(bar)}
+ const view=mk('div','tpl-view');
+ if(t.thumb){const img=mk('img');img.src=t.thumb;img.alt='';img.loading='lazy';img.decoding='async';img.onerror=()=>{img.remove();view.append(drawnPage(t,mk))};view.append(img)}
+ else view.append(drawnPage(t,mk));
+ frame.append(view);shot.append(frame);
+ const body=mk('div','tpl-body');
+ body.append(mk('span','cat',t.category),mk('strong',null,t.name),mk('span','desc',t.description),mk('span','tpl-use','Use template'));
+ b.append(shot,body);b.onclick=()=>onPick(t.id);
+ return b;
+}
+function drawnPage(t,mk){
+ const d=mk('div','tpl-drawn');
+ const nav=mk('div','d-nav');nav.append(mk('b',null,t.name),mk('span'),mk('span'),mk('em'));
+ const hero=mk('div','d-hero');hero.append(mk('small',null,t.category),mk('h4',null,t.description.split(/[.:]/)[0]),mk('div','d-btns'));
+ hero.lastChild.append(mk('i'),mk('i'));
+ const cards=mk('div','d-cards');for(let i=0;i<3;i++){const c=mk('div');c.append(mk('i'),mk('span'),mk('span'));cards.append(c)}
+ d.append(nav,hero,cards);return d;
 }
 async function startFromSponsored(id){
  text($('home-error'),'');
