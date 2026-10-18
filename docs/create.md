@@ -272,10 +272,10 @@ The most common complaints about AI app builders are changes that break what use
   - Owners can describe a check in plain English. The AI writes the steps (priced like a Discuss message), and the check is kept only if it passes now, unless the owner chooses **Save it anyway**.
   - Up to 15 checks per project. Each can be switched on or off in the **Checks** dialog.
 - **After every change.** In Build, Agent and Polish, after the build and the browser test, Kairoq replays the enabled checks. If one fails, the AI is told exactly which step broke and must fix it before the version is saved. This takes up to three attempts.
-- **Pay only when it works** (`KAIROQ_PAY_WHEN_WORKS`, on by default; `off` charges every completed change).
-  - A change is charged only when it builds, opens without errors in the browser and keeps the saved checks passing.
-  - A change that still shows errors or breaks a check after the automatic fixes, or that changes nothing, is saved but free, and the chat says so.
-  - A request that fails before anything is saved (an error, a model outage or Stop) is refunded as before.
+- **The fix is on us** (`KAIROQ_PAY_WHEN_WORKS`, default `fix`).
+  - A change is charged when it completes. If it still shows errors or breaks a saved check after the automatic fixes, the chat says so and the **next Fix of that problem costs nothing** (one free fix per problem; the project remembers it until a change leaves the app working). A free fix that still leaves the same problem is followed by one paid fix, then the loop guard stops.
+  - A change that changes nothing is free. A request that fails before anything is saved (an error, a model outage or Stop) is refunded as before.
+  - `refund`: the old rule, where the broken change itself is refunded. `off`: every completed change is charged and nothing is free.
   - For a build from a reference, only browser errors make it free, because its new journeys are written from the plan and may never have passed.
 - **Loop guard** (`KAIROQ_LOOP_LIMIT`, default 2).
   - Fix requests are the **Fix it** buttons, **Fix these** and **Fix this** on explanation cards, and the security fix.
@@ -402,7 +402,7 @@ A report is the start; the repair loop (`synthetic-repair.js`) goes on to **repr
 - Each fix round costs a chat edit on the chosen tier. The rerun costs the test's price.
 - Each is charged when it starts, so rounds that are never needed are never charged. The editor shows the most it can cost.
 - A round or rerun that fails is refunded.
-- **Pay only when it works:** a fix round that fixes none of the confirmed problems, or that leaves errors or a broken check, is free.
+- **Fix rounds:** a round that fixes none of the confirmed problems is free. A round that fixes some problems but leaves errors is charged (refunded only in `KAIROQ_PAY_WHEN_WORKS=refund`).
 
 **MCP:** the `fix_and_retest` tool does the same for AI assistants. `get_synthetic_test` follows the job.
 
