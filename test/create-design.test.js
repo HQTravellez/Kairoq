@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('fs'),os=require('os'),path=require('path'),http=require('http');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-design-'));
 process.env.NODE_ENV='test';
+process.env.KAIROQ_WEB_RESEARCH='off';
 process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_FREE_CREDITS='60';
