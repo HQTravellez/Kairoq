@@ -792,6 +792,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(route==='/web-agent'&&method==='GET')return send(res,200,W.list(v.owner)),true;
    if(route==='/web-agent'&&method==='POST'){limited(req,'web-agent',20,600000);const b=await readJson(req,4000);return send(res,202,{run:await W.start(v.owner,{url:b.url,task:b.task,every:b.every==='day'||b.every==='week'?b.every:undefined},{callModel,browseSite})}),true}
    if(rm&&method==='GET')return send(res,200,{run:W.get(v.owner,rm[1])}),true;
+   // Taking over the browser: the live view, the person's own input, and handing back.
+   const cm2=/^\/web-agent\/([0-9a-f-]{36})\/(frame|input|takeover|handback)$/.exec(route);
+   if(cm2&&cm2[2]==='frame'&&method==='GET'){const jpg=await W.frame(v.owner,cm2[1]);if(!jpg)throw Object.assign(Error('No picture yet'),{status:409});res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(jpg);return true}
+   if(cm2&&cm2[2]==='input'&&method==='POST'){limitedKey('web-input:'+v.owner,900,60000);return send(res,200,await W.input(v.owner,cm2[1],await readJson(req,2000))),true}
+   if(cm2&&cm2[2]==='takeover'&&method==='POST')return send(res,200,{run:W.takeover(v.owner,cm2[1])}),true;
+   if(cm2&&cm2[2]==='handback'&&method==='POST'){const b=await readJson(req,2000);return send(res,200,{run:W.handBack(v.owner,cm2[1],{cancel:b.cancel===true,note:b.note})}),true}
    if(wm&&!wm[1]&&method==='POST'){const b=await readJson(req,4000);return send(res,201,{watch:await W.createWatch(v.owner,{url:b.url,task:b.task,every:b.every})}),true}
    if(wm&&wm[1]&&method==='PATCH'){const b=await readJson(req,1000);return send(res,200,{watch:W.updateWatch(v.owner,wm[1],b)}),true}
    if(wm&&wm[1]&&method==='DELETE')return send(res,200,W.removeWatch(v.owner,wm[1])),true;

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261027">
+<link rel="stylesheet" href="/create.css?v=20261028">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261025">
 </head>
@@ -617,6 +617,21 @@
     <label>What should it find or check?<textarea id="web-task" rows="2" maxlength="1000" placeholder="The price of a double room for two nights next weekend, and whether breakfast is included"></textarea></label>
     <div class="row"><button class="primary" id="web-run" type="button">Run now</button><select id="web-every" aria-label="How often to repeat"><option value="">Once</option><option value="day">Every day</option><option value="week">Every week</option></select><span class="error small" id="web-error" role="alert"></span></div>
     <p class="muted small">Repeating it saves a watch: Kairoq runs it on schedule and emails you when the answer changes.</p>
+    <div id="web-live" class="web-live hidden">
+      <p class="web-live-head"><b id="web-live-title">Watching the agent work</b> <span class="muted small" id="web-live-need"></span></p>
+      <img id="web-live-img" alt="The agent's browser, live" tabindex="0">
+      <div class="row web-live-controls hidden" id="web-live-controls">
+        <input id="web-live-text" placeholder="Type here, then press Type" maxlength="500" autocomplete="off">
+        <button class="ghost" type="button" id="web-live-type">Type</button>
+        <button class="ghost" type="button" data-key="Enter">Enter</button>
+        <button class="ghost" type="button" data-key="Tab">Tab</button>
+        <button class="ghost" type="button" data-key="Backspace">⌫</button>
+        <button class="ghost" type="button" data-scroll="-500">▲</button>
+        <button class="ghost" type="button" data-scroll="500">▼</button>
+      </div>
+      <p class="muted small hidden" id="web-live-help">Click on the picture to click in the browser. You can also click the picture and type on your keyboard. What you do here is really sent, like in your own browser. When you are done, hand back and the agent carries on (read-only again).</p>
+      <div class="row"><button class="ghost" type="button" id="web-takeover">Take over</button><button class="primary hidden" type="button" id="web-handback">Done, hand back</button><button class="ghost hidden" type="button" id="web-stop">Stop the run</button></div>
+    </div>
     <div id="web-result" class="web-result hidden" aria-live="polite"></div>
     <div id="web-watches-box" class="hidden"><h3>Watches</h3><ul class="mem-list" id="web-watches"></ul></div>
     <h3>Recent runs</h3>
@@ -1012,6 +1027,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261027"></script>
+<script src="/create.js?v=20261028"></script>
 </body>
 </html>

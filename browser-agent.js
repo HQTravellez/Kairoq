@@ -18,7 +18,7 @@
 const crypto=require('crypto');
 
 const TARGETED=new Set(['click','fill','select','hover']);
-const ACTIONS=new Set(['click','fill','select','scroll','back','key','hover','wait','find_text','go_to','read','done','give_up']);
+const ACTIONS=new Set(['click','fill','select','scroll','back','key','hover','wait','find_text','go_to','read','ask_human','done','give_up']);
 const FEELINGS=new Set(['confident','unsure','frustrated']);
 const BLOCKED=/captcha|verify (that )?you(?:'| a)re (a )?human|are you a robot|unusual traffic|access denied|attention required|checking your browser|request (was )?blocked|bot protection|cf-chl|ddos protection/i;
 
@@ -62,8 +62,8 @@ function systemPrompt(mode){
  return(persona?PERSONA:TASK)+SCHEMA
   .replace('%THOUGHT%',persona?'what you think right now, first person, one or two short sentences':'short reasoning')
   .replace('%FEELING%',persona?'"feeling":"confident"|"unsure"|"frustrated",':'')
-  .replace('%READ%',persona?'':'|"read"')
-  .replace('%READHELP%',persona?'':'; read = get the full text of the page (for long lists, prices, details)')
+  .replace('%READ%',persona?'':'|"read"|"ask_human"')
+  .replace('%READHELP%',persona?'':'; read = get the full text of the page (for long lists, prices, details); ask_human value = what the person must do (only for a captcha, a sign-in or a code only they can enter; they take over the browser, then hand it back)')
   .replace('%DONEVALUE%',persona?'what you achieved':'the full answer for the owner');
 }
 
@@ -73,7 +73,7 @@ function plan(reply,o,mode){
  const out=[],notes=[];
  for(const a of raw.slice(0,3)){
   const action=String(a&&a.action||'');
-  if(!ACTIONS.has(action)||(action==='read'&&mode==='persona')){notes.push('"'+clip(action,20)+'" is not an action');continue}
+  if(!ACTIONS.has(action)||((action==='read'||action==='ask_human')&&mode==='persona')){notes.push('"'+clip(action,20)+'" is not an action');continue}
   const target=Number(a.target);
   if(TARGETED.has(action)&&!o.elements.some(e=>e.id===target)){notes.push(action+' ['+clip(a.target,6)+']: there is no element with that number');continue}
   if((action==='scroll'||action==='key')&&a.target!==undefined&&a.target!==null&&a.target!==''&&!o.elements.some(e=>e.id===target)){notes.push(action+': no element ['+clip(a.target,6)+']');continue}
@@ -105,15 +105,29 @@ async function judge({goal,claim,steps,o,shot,mode,callModel,tier,signal}){
 // opts: {session, goal, mode:'persona'|'task', persona (text), callModel, tier, maxSteps,
 // signal, vision:'auto'|'off', judge:true, onStep}
 // Returns {outcome:'completed'|'gave_up'|'stuck'|'blocked'|'error', steps, answer, memory, verdict, error}.
-async function run({session:s,goal,mode='task',persona='',callModel,tier='standard',maxSteps=12,signal,vision='auto',judge:useJudge=process.env.KAIROQ_BROWSER_JUDGE!=='off',onStep=()=>{}}){
+// handoff(reason): optional; a person takes over the browser (captcha, sign-in) and resolves
+// {ok:true} when they hand it back, {ok:false} when they cancel or do not come. wantsHandoff():
+// true when the person asked to take over; the agent pauses before its next step.
+async function run({session:s,goal,mode='task',persona='',callModel,tier='standard',maxSteps=12,signal,vision='auto',judge:useJudge=process.env.KAIROQ_BROWSER_JUDGE!=='off',onStep=()=>{},handoff=null,wantsHandoff=()=>false}){
  const steps=[];let memory='',outcome='stuck',answer='',verdict=null,error=null,failures=0,nudge='',extra='',visionOn=vision!=='off';
- const seen=new Map();
+ const seen=new Map();let handoffs=0;
  let o=await s.observe();
  try{
   for(let turn=0;turn<maxSteps;turn++){
    if(signal&&signal.aborted)throw Error('Stopped.');
    if(o.sent&&steps.length)steps.at(-1).sent=true;
-   if(blockedPage(o,s.status?s.status():0)){outcome='blocked';answer='The site showed a bot check or blocked access.';break}
+   // A person can step in: when the site shows a bot check, or when they ask to take over.
+   const wall=blockedPage(o,s.status?s.status():0);
+   if((wall||wantsHandoff())&&handoff&&handoffs<3){
+    handoffs++;
+    const reason=wall?'The site wants to check that a person is there (a captcha or similar). Solve it, then hand back.':'You asked to take over.';
+    const h=await handoff(reason);
+    steps.push({n:steps.length+1,path:o.path,action:'handoff',value:reason,ok:h.ok});
+    if(!h.ok){outcome=wall?'blocked':'stuck';answer=wall?'The site showed a bot check and nobody solved it.':'Stopped when you took over.';break}
+    o=await s.observe();nudge='A person just used the browser'+(h.note?' ('+clip(h.note,200)+')':'')+'. Look at the page again and carry on with the task.';
+    turn--;continue;
+   }
+   if(wall){outcome='blocked';answer='The site showed a bot check or blocked access.';break}
    const last=steps.at(-1);
    const wantShot=visionOn&&s.screenshot&&turn>0&&(last&&(last.no_change||last.error)||turn%4===3);
    const shot=wantShot?await s.screenshot():null;
@@ -155,6 +169,16 @@ async function run({session:s,goal,mode='task',persona='',callModel,tier='standa
      finished=true;break;
     }
     if(a.action==='give_up'){answer=a.value;outcome='gave_up';finished=true;break}
+    if(a.action==='ask_human'){
+     if(!handoff){answer=a.value||'It needs a person (a captcha or a sign-in).';outcome='blocked';finished=true;break}
+     if(handoffs>=3){answer=a.value||'It needs a person.';outcome='stuck';finished=true;break}
+     handoffs++;
+     const h=await handoff(clip(a.value,300)||'The agent needs you to do something in the browser.');
+     step.ok=h.ok;
+     if(!h.ok){answer='Stopped: '+(a.value||'it needed a person');outcome='stuck';finished=true;break}
+     o=await s.observe();nudge='The person finished in the browser'+(h.note?' ('+clip(h.note,200)+')':'')+'. Look at the page again and carry on.';
+     break;
+    }
     if(a.action==='read'){extra=String(s.read?await s.read(12000):o.text).slice(0,12000);continue}
     const before=fingerprint(o),layout=o.path+'|'+o.elements.map(e=>e.id).join(',');
     try{await s.act(a);failures=0}

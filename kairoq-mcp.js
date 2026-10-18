@@ -118,6 +118,7 @@ async function callTool(name,args,v,deps){
  }
  if(name==='get_web_task'){
   let run;try{run=require('./web-tasks').get(v.owner,String(args.run_id||''))}catch(e){throw fail(e.message)}
+  if(run.status==='needs_you')return text({status:'needs_you',need:run.need},'Waiting for a person: '+run.need+' Open Kairoq → Web agent to take over the browser, then hand back.');
   if(run.status==='running')return text({status:'running',progress:run.progress||null},'Still working: '+(run.progress||'running')+'.');
   if(run.status==='failed')return text({status:'failed',error:run.error},'The web agent failed: '+run.error);
   return text({status:'complete',outcome:run.outcome,answer:run.answer,steps:run.steps.length,...(run.verdict?{check:run.verdict}:{})},({completed:'',gave_up:'It could not do it. ',stuck:'It did not finish. ',blocked:'The website blocked the agent. ',error:'Something went wrong. '}[run.outcome]||'')+(run.answer||'(no answer)')+(run.verdict&&!run.verdict.ok?'\n(Double-check: '+run.verdict.reason+')':''));

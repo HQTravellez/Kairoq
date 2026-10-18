@@ -10,6 +10,7 @@ process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_WEB_TASKS_DIR=path.join(tmp,'web');
 process.env.KAIROQ_FREE_CREDITS='10';
+process.env.KAIROQ_EXTERNAL_ALLOW_LOCAL='1';
 const runtime=require('../runtime-check'),agent=require('../browser-agent'),W=require('../web-tasks'),accounts=require('../builder-accounts');
 
 const PAGE=`<!doctype html><html><head><meta charset="utf-8"><title>Shop</title><style>
@@ -36,7 +37,19 @@ const r=document.createElement('div');r.textContent='React card';r['__reactProps
 document.getElementById('fern').addEventListener('click',()=>{const b=document.createElement('button');b.textContent='Add fern';document.body.appendChild(b)});</script>
 </body></html>`;
 let server;
-test.before(async()=>{server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/html'});res.end(req.url.includes('blocked')?'<title>Attention Required</title><p>Please verify you are a human (captcha)</p>':PAGE)});await new Promise(r=>server.listen(0,'127.0.0.1',r))});
+// A pretend captcha: the "I am human" button sends a POST, and only a real POST unlocks the page.
+let solved=false;
+const CAPTCHA=`<!doctype html><html><head><meta charset="utf-8"><title>Just a moment</title></head><body style="margin:0">
+<p id="msg">Please verify you are human to continue (captcha).</p>
+<button id="human" style="position:absolute;left:20px;top:60px;width:200px;height:50px" onclick="fetch('verify',{method:'POST'}).then(r=>r.text()).then(t=>{if(t==='ok')location.reload()})">I am human</button>
+</body></html>`;
+const OPEN='<!doctype html><html><head><meta charset="utf-8"><title>Rooms</title></head><body><h1>Rooms</h1><p>Double room: 140 euros a night.</p></body></html>';
+test.before(async()=>{server=http.createServer((req,res)=>{
+ if(req.url.startsWith('/gate/')){
+  if(req.method==='POST'&&req.url.endsWith('/verify')){solved=true;res.writeHead(200,{'Content-Type':'text/plain'});return res.end('ok')}
+  res.writeHead(200,{'Content-Type':'text/html'});return res.end(solved?OPEN:CAPTCHA);
+ }
+ res.writeHead(200,{'Content-Type':'text/html'});res.end(req.url.includes('blocked')?'<title>Attention Required</title><p>Please verify you are a human (captcha)</p>':PAGE)});await new Promise(r=>server.listen(0,'127.0.0.1',r))});
 test.after(async()=>{server.close();await runtime.close();fs.rmSync(tmp,{recursive:true,force:true})});
 const url=p=>'http://127.0.0.1:'+server.address().port+'/app/'+(p||'');
 
@@ -181,7 +194,7 @@ test('web agent: a run costs credits (given back when nothing is found), watches
  acc.charge(id,acc.get(id).credits,'spend all');
  t=await W.tick({callModel,browseSite,now:Date.now()+16*86400000});
  assert.equal(t.paused,1);assert.equal(W.list(id).watches.find(x=>x.id===w.id).paused,true);
- await assert.rejects(W.start(id,{url:'http://127.0.0.1/',task:'read the admin page'},{callModel,browseSite}),/https|public/i);
+ await assert.rejects(W.start(id,{url:'http://10.0.0.1/',task:'read the admin page'},{callModel,browseSite}),/https|public/i);
 });
 
 test('the website check scores a site that blocks every AI customer on the technical basics only',()=>{
@@ -191,4 +204,53 @@ test('the website check scores a site that blocks every AI customer on the techn
  assert.equal(sc.score({visitors:5,blocked:1,completion_rate:50},tech),Math.round(35+22.5));
  const f=require('../synthetic-customers').funnel([{persona:{device:'phone'},outcome:'blocked',steps:[]},{persona:{device:'phone'},outcome:'completed',steps:[{path:'/'}]},{persona:{device:'desktop'},outcome:'gave_up',steps:[{path:'/'}]}]);
  assert.equal(f.blocked,1);assert.equal(f.completion_rate,50);
+});
+
+test('a person can take over: a captcha pauses the agent, the person solves it in the live view, the agent finishes',{skip:!runtime.available()&&'no Chromium'},async()=>{
+ const id=(()=>{const m=accounts.signup('gate@example.com','password1');return(m.account||m).id})();
+ const callModel=async(opts,parse)=>{
+  const sys=opts.messages[0].content,user=typeof opts.messages[1].content==='string'?opts.messages[1].content:opts.messages[1].content[0].text;
+  if(/You check whether/.test(sys))return parse('{"verdict":true,"reason":"price on screen","blocked":false}');
+  if(/Double room: 140 euros/.test(user))return parse(JSON.stringify({memory:'found it',actions:[{action:'done',value:'A double room costs 140 euros a night.'}]}));
+  return parse(JSON.stringify({actions:[{action:'scroll',value:'down'}]}));
+ };
+ const run=await W.start(id,{url:'http://127.0.0.1:'+server.address().port+'/gate/',task:'the price of a double room'},{callModel});
+ let r;
+ for(let i=0;i<100;i++){r=W.get(id,run.id);if(r.status==='needs_you'||r.status!=='running')break;await new Promise(z=>setTimeout(z,100))}
+ assert.equal(r.status,'needs_you');assert.match(r.need,/captcha/);
+ // The live view, and input only while it is the person's turn.
+ const jpg=await W.frame(id,run.id);assert.equal(jpg[0],0xff);assert.equal(jpg[1],0xd8);
+ await assert.rejects(W.input('someone-else',run.id,{type:'click',x:1,y:1}),/not running/);
+ await assert.rejects(W.input(id,run.id,{type:'click',x:99999,y:1}),/Outside/);
+ // The person's click really sends the POST (the agent alone could not).
+ await W.input(id,run.id,{type:'click',x:120,y:85});
+ for(let i=0;i<30&&!solved;i++)await new Promise(z=>setTimeout(z,100));
+ assert.equal(solved,true);
+ W.handBack(id,run.id);
+ for(let i=0;i<150;i++){r=W.get(id,run.id);if(r.status!=='running'&&r.status!=='needs_you')break;await new Promise(z=>setTimeout(z,100))}
+ assert.equal(r.outcome,'completed',JSON.stringify(r));assert.match(r.answer,/140 euros/);
+ assert.ok(r.steps.some(x=>x.action==='handoff'));
+ // Once the run has closed its browser there is nothing left to see or control.
+ for(let i=0;i<50;i++){try{await W.frame(id,run.id)}catch{break}await new Promise(z=>setTimeout(z,100))}
+ await assert.rejects(W.frame(id,run.id),/not running/);
+});
+
+test('handing over: ask_human and "take over" pause the agent; without a person it ends as blocked',async()=>{
+ // ask_human: the person does it, the agent carries on.
+ let s=fakeSession(),asked=[];
+ let m=model((sys,user)=>/You check whether/.test(sys)?{verdict:true,reason:'ok',blocked:false}:/Thanks, we will call you/.test(user)?{actions:[{action:'done',value:'sent'}]}:{actions:[{action:'ask_human',value:'Please sign in'}]});
+ let r=await agent.run({session:s,goal:'x',mode:'task',callModel:m,maxSteps:5,handoff:async reason=>{asked.push(reason);s.st.name='Ana';s.st.sent=true;return{ok:true}}});
+ assert.deepEqual(asked,['Please sign in']);assert.equal(r.outcome,'completed');
+ assert.match(m.seen.at(-2).user,/The person finished in the browser/);
+ // Without anyone to hand to, ask_human ends the run as blocked.
+ r=await agent.run({session:fakeSession(),goal:'x',mode:'task',callModel:model(()=>({actions:[{action:'ask_human',value:'needs a code'}]})),maxSteps:3});
+ assert.equal(r.outcome,'blocked');
+ // "Take over" from the person: the agent pauses before its next step.
+ let want=true;asked=[];
+ r=await agent.run({session:fakeSession(),goal:'x',mode:'task',callModel:model(()=>({actions:[{action:'give_up',value:'done here'}]})),maxSteps:3,wantsHandoff:()=>want,handoff:async reason=>{asked.push(reason);want=false;return{ok:true}}});
+ assert.deepEqual(asked,['You asked to take over.']);assert.equal(r.outcome,'gave_up');
+ // A captcha nobody solves: blocked; personas never ask for a person.
+ r=await agent.run({session:fakeSession({blocked:true}),goal:'x',mode:'task',callModel:model(()=>{throw Error('no')}),maxSteps:3,handoff:async()=>({ok:false})});
+ assert.equal(r.outcome,'blocked');
+ assert.ok(!agent.systemPrompt('persona').includes('ask_human'));
 });

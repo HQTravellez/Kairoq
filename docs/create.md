@@ -589,6 +589,7 @@ Synthetic customers, the free website check and the web agent all use one browse
 - Each run costs `KAIROQ_WEB_TASK_CREDITS` (2) credits, given back when it finds nothing or fails; the Kairoq owner's runs are free. At most `KAIROQ_WEB_TASKS_PER_DAY` (20) runs a day and 2 at once; `KAIROQ_WEB_TASK_STEPS` (15) steps each.
 - **Watches:** "every day" or "every week" saves the task; an hourly job runs due watches, compares the answer with the last one (a model decides whether facts changed, not wording) and emails the owner what changed. Up to `KAIROQ_WEB_WATCHES` (5) per account; a watch pauses (with one email) when credits run out.
 - Results and watches are kept per account under `KAIROQ_WEB_TASKS_DIR` (the last 30 runs).
+- **Take over the browser:** while a run works, the dialog shows a live view of its browser. When the site asks for a captcha, a sign-in or a code (the agent sees a bot check, or asks with `ask_human`), or when the owner presses **Take over**, the run pauses ("Your turn") and the owner clicks on the picture, types and scrolls in that browser. While the person is in control their own actions really go through (the captcha check, a sign-in page on another site); when they press **Done, hand back**, the agent continues read-only again. Each input gives `KAIROQ_TAKEOVER_MINUTES` (5) more minutes; after that the run carries on without them. At most 3 hand-overs per run. Watches run unattended, so a captcha there ends the run as blocked. Kairoq never solves captchas itself.
 
 ## Web research and browsing
 

@@ -1331,13 +1331,57 @@ const webState={poll:null};
 function webRunItem(r){
  const li=el('li'),t=el('div','skill-text');
  const said={completed:'Done',gave_up:'Could not do it',stuck:'Did not finish',blocked:'Blocked by the site',error:'Error'};
- t.append(el('b',null,r.task),el('span',null,(r.status==='running'?'Working… '+(r.progress||''):(said[r.outcome]||r.status)+' · '+when(r.at))+' · '+r.url));
+ t.append(el('b',null,r.task),el('span',null,(r.status==='needs_you'?'Needs you: '+(r.need||''):r.status==='running'?'Working… '+(r.progress||''):(said[r.outcome]||r.status)+' · '+when(r.at))+' · '+r.url));
  li.append(t);
- if(r.status!=='running')li.onclick=()=>showWebRun(r);
+ li.onclick=()=>showWebRun(r);
  return li;
 }
+// The live view: a picture of the agent's browser, refreshed while a run works. When it needs
+// you (a captcha, a sign-in) or you take over, your clicks and typing go to that browser.
+const live={id:null,timer:null,busy:false};
+function liveFrame(){
+ if(!live.id||!$('web-dialog').open){clearInterval(live.timer);live.timer=null;return}
+ const img=$('web-live-img');if(live.busy)return;live.busy=true;
+ const next=new Image();next.onload=()=>{img.src=next.src;live.busy=false};next.onerror=()=>{live.busy=false};
+ next.src='/api/create/web-agent/'+live.id+'/frame?t='+Date.now();
+}
+function showLive(r){
+ const box=$('web-live'),mine=r.status==='needs_you';
+ if(r.status!=='running'&&!mine){box.classList.add('hidden');live.id=null;clearInterval(live.timer);live.timer=null;return}
+ box.classList.remove('hidden');
+ if(live.id!==r.id){live.id=r.id;clearInterval(live.timer);live.timer=setInterval(liveFrame,800);liveFrame()}
+ text($('web-live-title'),mine?'Your turn':'Watching the agent work');
+ text($('web-live-need'),mine?r.need||'':r.progress||'');
+ for(const id of ['web-live-controls','web-live-help','web-handback','web-stop'])$(id).classList.toggle('hidden',!mine);
+ $('web-takeover').classList.toggle('hidden',mine);
+ box.classList.toggle('yours',mine);
+}
+async function liveInput(ev){
+ if(!live.id)return;
+ try{await api('/web-agent/'+live.id+'/input',{method:'POST',body:ev});liveFrame()}catch(err){text($('web-error'),err.message)}
+}
+$('web-live-img').onclick=e=>{
+ const img=e.currentTarget,r=img.getBoundingClientRect();
+ if(!img.naturalWidth)return;
+ liveInput({type:'click',x:Math.round((e.clientX-r.left)*img.naturalWidth/r.width),y:Math.round((e.clientY-r.top)*img.naturalHeight/r.height)});
+};
+$('web-live-img').onkeydown=e=>{
+ if(e.ctrlKey||e.metaKey||e.altKey)return;
+ const keys={Enter:1,Tab:1,Backspace:1,Delete:1,Escape:1,ArrowUp:1,ArrowDown:1,ArrowLeft:1,ArrowRight:1,PageUp:1,PageDown:1,Home:1,End:1};
+ if(keys[e.key]){e.preventDefault();liveInput({type:'key',key:e.key})}
+ else if(e.key.length===1){e.preventDefault();liveInput({type:'type',text:e.key})}
+};
+$('web-live-img').addEventListener('wheel',e=>{if(!$('web-live').classList.contains('yours'))return;e.preventDefault();liveInput({type:'scroll',dy:Math.round(e.deltaY)})},{passive:false});
+$('web-live-type').onclick=()=>{const t=$('web-live-text').value;if(t){liveInput({type:'type',text:t});$('web-live-text').value=''}};
+for(const b of document.querySelectorAll('#web-live-controls [data-key]'))b.onclick=()=>liveInput({type:'key',key:b.dataset.key});
+for(const b of document.querySelectorAll('#web-live-controls [data-scroll]'))b.onclick=()=>liveInput({type:'scroll',dy:Number(b.dataset.scroll)});
+$('web-takeover').onclick=async()=>{if(!live.id)return;try{const {run}=await api('/web-agent/'+live.id+'/takeover',{method:'POST'});text($('web-live-need'),'Pausing the agent…');showLive(run)}catch(err){text($('web-error'),err.message)}};
+$('web-handback').onclick=async()=>{if(!live.id)return;try{const {run}=await api('/web-agent/'+live.id+'/handback',{method:'POST',body:{}});showLive(run);renderWeb()}catch(err){text($('web-error'),err.message)}};
+$('web-stop').onclick=async()=>{if(!live.id)return;try{const {run}=await api('/web-agent/'+live.id+'/handback',{method:'POST',body:{cancel:true}});showLive(run);renderWeb()}catch(err){text($('web-error'),err.message)}};
 function showWebRun(r){
  const box=$('web-result');box.classList.remove('hidden');box.replaceChildren();
+ showLive(r);
+ if(r.status==='needs_you'){box.append(el('p',null,'The agent needs you: '+(r.need||'')));return}
  if(r.status==='running'){box.append(el('p','muted','Working on it… '+(r.progress||'')));return}
  if(r.status==='failed'){box.append(el('p','error',r.error||'It did not work.'));return}
  const head={completed:'Answer',gave_up:'It could not do it',stuck:'It did not finish',blocked:'The website blocked the agent',error:'Something went wrong'}[r.outcome]||'Result';
@@ -1363,9 +1407,9 @@ async function renderWeb(){
   const del=el('button','ghost link-btn','Remove');del.type='button';del.onclick=async()=>{if(!confirm('Remove this watch?'))return;await api('/web-agent/watches/'+w.id,{method:'DELETE'});renderWeb()};
   act.append(pause,del);li.append(t,act);ws.append(li);
  }
- const live=d.runs.find(r=>r.status==='running');
+ const active=d.runs.find(r=>r.status==='running'||r.status==='needs_you');
  clearTimeout(webState.poll);
- if(live&&$('web-dialog').open)webState.poll=setTimeout(async()=>{try{const {run}=await api('/web-agent/'+live.id);if(run.status!=='running'){showWebRun(run);renderWeb()}else{showWebRun(run);renderWeb()}}catch{}},2500);
+ if(active&&$('web-dialog').open)webState.poll=setTimeout(async()=>{try{const {run}=await api('/web-agent/'+active.id);showWebRun(run);renderWeb()}catch{}},1500);
 }
 $('side-web').onclick=async()=>{text($('web-error'),'');$('web-dialog').showModal();try{await renderWeb()}catch(err){text($('web-error'),err.message)}};
 $('web-run').onclick=async()=>{

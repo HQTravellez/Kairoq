@@ -184,15 +184,17 @@ async function checkSite(raw){
  u.hash=u.hash||'';
  return u.href.slice(0,500);
 }
-async function guardSite(context,url,{onSent}={}){
+// human(): true while a person has taken over the browser (see session().control): their own
+// clicks may send forms and leave the site (a captcha check, a sign-in page), like in their own browser.
+async function guardSite(context,url,{onSent,human=()=>false}={}){
  const origin=new URL(url).origin,local=KAIROQ_TEST_LOCAL();
  await context.route('**/*',r=>{
   const req=r.request();let u;try{u=new URL(req.url())}catch{return r.abort()}
   if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
   if(!(u.protocol==='https:'||(local&&u.origin===origin)))return r.abort();
   // The visitor stays on the site: links to other sites do nothing.
-  if(req.isNavigationRequest()&&req.frame()===req.frame().page().mainFrame()&&u.origin!==origin)return r.abort();
-  if(!['GET','HEAD','OPTIONS'].includes(req.method())){
+  if(req.isNavigationRequest()&&req.frame()===req.frame().page().mainFrame()&&u.origin!==origin&&!human())return r.abort();
+  if(!['GET','HEAD','OPTIONS'].includes(req.method())&&!human()){
    if(onSent)onSent(req);
    return req.resourceType()==='document'?r.fulfill({status:204,body:''}):r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{}'});
   }
@@ -304,7 +306,8 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
  // Sends right after a visitor's click or typing count as the visitor sending a form (not
  // analytics pings, which happen on their own).
  let lastAct=0,sent=0;
- if(site)await guardSite(context,url,{onSent:req=>{if(Date.now()-lastAct<4000&&['document','xhr','fetch'].includes(req.resourceType()))sent++}});
+ let human=false;
+ if(site)await guardSite(context,url,{human:()=>human,onSent:req=>{if(Date.now()-lastAct<4000&&['document','xhr','fetch'].includes(req.resourceType()))sent++}});
  else await guard(context,url,{sandbox});
  const root=new URL('./',url);
  const settle=async()=>{await page.waitForLoadState('networkidle',{timeout:3000}).catch(()=>{});await page.waitForTimeout(350)};
@@ -381,7 +384,27 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
  }
  // Readable text of the whole page (not only what is in view), for reading prices or details.
  async function read(max=20000){return page.evaluate(m=>(document.body?document.body.innerText:'').replace(/\n{3,}/g,'\n\n').slice(0,m),max).catch(()=>'')}
- return{observe,act,audit,read,status:()=>status,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
+ // A person takes over (a captcha, a sign-in): they see live frames and send their own
+ // clicks, typing, keys and scrolling. While they are in control their actions really go
+ // through; when they hand back, the browser is read-only again.
+ const control={
+  start(){human=true},
+  stop(){human=false},
+  get active(){return human},
+  frame:()=>page.screenshot({type:'jpeg',quality:55}).catch(()=>null),
+  async input(ev){
+   if(!human)throw Object.assign(Error('Take over first'),{status:409});
+   const vp=page.viewportSize()||{width:1280,height:800};
+   if(ev.type==='click'){const x=Number(ev.x),y=Number(ev.y);if(!(x>=0&&y>=0&&x<=vp.width&&y<=vp.height))throw Object.assign(Error('Outside the page'),{status:400});await page.mouse.click(x,y)}
+   else if(ev.type==='type')await page.keyboard.type(String(ev.text||'').slice(0,500),{delay:20});
+   else if(ev.type==='key'){const k=String(ev.key||'');if(!/^(Enter|Escape|Tab|Backspace|Delete|Space|Arrow(Up|Down|Left|Right)|PageUp|PageDown|Home|End)$/.test(k))throw Object.assign(Error('Unknown key'),{status:400});await page.keyboard.press(k==='Space'?' ':k)}
+   else if(ev.type==='scroll')await page.mouse.wheel(0,Math.max(-2000,Math.min(2000,Number(ev.dy)||0)));
+   else if(ev.type==='back')await page.goBack({timeout:timeoutMs}).catch(()=>{});
+   else throw Object.assign(Error('Unknown input'),{status:400});
+   await page.waitForTimeout(150);
+  }
+ };
+ return{observe,act,audit,read,control,status:()=>status,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
 }
 // Renders a small HTML document offline (no network) to PNG, e.g. app icons.
 async function renderHtml(html,{width,height}){

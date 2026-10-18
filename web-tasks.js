@@ -22,14 +22,17 @@ function save(state){fs.mkdirSync(dir(),{recursive:true});const f=file(state.own
 function free(owner){return owner==='owner'||price()===0}
 
 const running=new Map();
-function publicRun(r){return{id:r.id,url:r.url,task:r.task,status:r.status,at:r.at,...(r.watch?{watch:r.watch}:{}),...(r.progress?{progress:r.progress}:{}),...(r.outcome?{outcome:r.outcome,answer:r.answer,steps:(r.steps||[]).map(s=>({path:s.path,action:s.action,label:s.label||'',value:s.action==='fill'||s.action==='done'||s.action==='give_up'?'':s.value||'',thought:s.thought||'',...(s.error?{error:s.error}:{})})),...(r.verdict?{verdict:r.verdict}:{}),...(r.changed!==undefined?{changed:r.changed,change:r.change||''}:{})}:{}),...(r.error?{error:r.error}:{}),...(r.charged!==undefined?{charged:r.charged}:{})}}
+function publicRun(r){return{id:r.id,url:r.url,task:r.task,status:r.status,at:r.at,...(r.need?{need:r.need}:{}),...(r.watch?{watch:r.watch}:{}),...(r.progress?{progress:r.progress}:{}),...(r.outcome?{outcome:r.outcome,answer:r.answer,steps:(r.steps||[]).map(s=>({path:s.path,action:s.action,label:s.label||'',value:s.action==='fill'||s.action==='done'||s.action==='give_up'?'':s.value||'',thought:s.thought||'',...(s.error?{error:s.error}:{})})),...(r.verdict?{verdict:r.verdict}:{}),...(r.changed!==undefined?{changed:r.changed,change:r.change||''}:{})}:{}),...(r.error?{error:r.error}:{}),...(r.charged!==undefined?{charged:r.charged}:{})}}
 
 // One run: opens the site, lets the agent work, keeps the result (last 30 runs per account).
-async function execute(owner,{url,task,watch=null},{callModel,browseSite,tier,signal}={}){
+// interactive: someone is watching (a run they started), so the agent can hand the browser to
+// them for a captcha or a sign-in. Watches run unattended and end as "blocked" instead.
+async function execute(owner,{url,task,watch=null,interactive=false},{callModel,browseSite,tier,signal}={}){
  const runtime=require('./runtime-check');
  browseSite=browseSite||((u,o)=>runtime.session(u,o));
  const run={id:crypto.randomUUID(),url,task,status:'running',at:new Date().toISOString(),...(watch?{watch}:{})};
- running.set(run.id,{owner,run});
+ const entry={owner,run,session:null,wants:false,waiting:null};
+ running.set(run.id,entry);
  const ref='web-task:'+run.id;
  if(!free(owner)){
   try{require('./builder-accounts').charge(owner,price(),'Web agent: '+clip(task,60),ref)}
@@ -41,7 +44,9 @@ async function execute(owner,{url,task,watch=null},{callModel,browseSite,tier,si
   run.progress='Opening '+new URL(url).hostname;
   s=await browseSite(url,{site:true,viewport:'desktop'});
   if(!s)throw fail(503,'The web agent needs a browser (Chromium) on this server');
-  const r=await require('./browser-agent').run({session:s,goal:task,mode:'task',callModel,tier,maxSteps:maxSteps(),signal,onStep:st=>{run.progress=(st.action==='done'?'Checking the answer':st.thought||st.action)}});
+  entry.session=s;
+  const handoff=interactive&&s.control?reason=>waitForPerson(entry,reason):null;
+  const r=await require('./browser-agent').run({session:s,goal:task,mode:'task',callModel,tier,maxSteps:maxSteps(),signal,handoff,wantsHandoff:()=>entry.wants,onStep:st=>{run.progress=(st.action==='done'?'Checking the answer':st.thought||st.action)}});
   Object.assign(run,{status:'complete',outcome:r.outcome,answer:clip(r.answer||'',4000),steps:r.steps.slice(-30),...(r.verdict&&r.verdict.checked?{verdict:{ok:r.verdict.ok,reason:r.verdict.reason}}:{}),...(r.error?{error:r.error}:{})});
   // Nothing useful came back (an error, or no answer at all): the credits go back.
   if(run.charged&&(r.outcome==='error'||!run.answer)){require('./builder-accounts').grant(owner,run.charged,'Refund: web agent found nothing','refund:'+ref);run.charged=0}
@@ -66,7 +71,7 @@ async function start(owner,{url,task,every},deps){
  if(today>=intEnv('KAIROQ_WEB_TASKS_PER_DAY',20,1,1000))throw fail(429,'That is today\'s limit for the web agent. Try again tomorrow.');
  if([...running.values()].filter(x=>x.owner===owner).length>=2)throw fail(429,'Two web agent runs are already working. Wait for one to finish.');
  const w=every?addWatch(owner,{url:u,task:t,every,next:Date.now()+(every==='day'?DAY:WEEK)}):null;
- const p=execute(owner,{url:u,task:t,watch:w&&w.id},deps).then(run=>w?record(owner,w.id,run,deps).then(()=>run):run);
+ const p=execute(owner,{url:u,task:t,watch:w&&w.id,interactive:true},deps).then(run=>w?record(owner,w.id,run,deps).then(()=>run):run);
  p.catch(()=>{});
  await new Promise(r=>setImmediate(r));
  const live=[...running.values()].find(x=>x.owner===owner&&x.run.url===u&&x.run.task===t);
@@ -151,4 +156,25 @@ async function tick({callModel,browseSite,now=Date.now()}={}){
  return out;
  }finally{ticking=false}
 }
-module.exports={start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,compare,price};
+// ---------- a person takes over the browser ----------
+// The run waits (status "needs_you") while the person uses the live view. Every input gives
+// them KAIROQ_TAKEOVER_MINUTES (5) more; then the run carries on without them.
+function idleLimit(){return intEnv('KAIROQ_TAKEOVER_MINUTES',5,1,30)*60000}
+function waitForPerson(entry,reason){
+ const {run,session:s}=entry;
+ entry.wants=false;
+ s.control.start();
+ run.status='needs_you';run.need=clip(reason,300);
+ return new Promise(resolve=>{
+  const w={until:Date.now()+idleLimit(),finish:(ok,note)=>{clearInterval(w.timer);entry.waiting=null;s.control.stop();run.status='running';delete run.need;resolve({ok,note})}};
+  w.timer=setInterval(()=>{if(Date.now()>w.until)w.finish(false)},2000);w.timer.unref?.();
+  entry.waiting=w;
+ });
+}
+function live(owner,id){const e=running.get(id);if(!e||e.owner!==owner)throw fail(404,'This run is not running');return e}
+// A JPEG of the browser right now (the live view), while a run is working or waiting for you.
+async function frame(owner,id){const e=live(owner,id);if(!e.session||!e.session.control)throw fail(409,'The browser is not open yet');return e.session.control.frame()}
+async function input(owner,id,ev){const e=live(owner,id);if(!e.waiting)throw fail(409,'Take over first');e.waiting.until=Date.now()+idleLimit();await e.session.control.input(ev||{});return{ok:true}}
+function takeover(owner,id){const e=live(owner,id);if(!e.session||!e.session.control)throw fail(409,'The browser is not open yet');e.wants=true;return publicRun(e.run)}
+function handBack(owner,id,{cancel=false,note=''}={}){const e=live(owner,id);if(e.waiting)e.waiting.finish(!cancel,clip(note,200));else e.wants=false;return publicRun(e.run)}
+module.exports={frame,input,takeover,handBack,start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,compare,price};
