@@ -12,6 +12,8 @@ process.env.KAIROQ_MEMORY_DIR=path.join(tmp,'memory');
 process.env.KAIROQ_LEARNING_DIR=path.join(tmp,'learning');
 process.env.KAIROQ_FREE_CREDITS='60';
 process.env.KAIROQ_HOSTING_CREDITS='50';
+// These tests cover the charge-on-publish mode; the default (charge only for own domains) has its own test below.
+process.env.KAIROQ_HOSTING_CHARGE='publish';
 process.env.KAIROQ_RUNTIME_CHECK='off';
 process.env.KAIROQ_DESIGN_BRIEF='off';
 process.env.KAIROQ_WEB_RESEARCH='off';
@@ -111,4 +113,29 @@ test('sites live before billing get 30 free days; the Kairoq owner and a zero pr
  assert.equal(credits(b.id),59);
  r=await billing.tick(Date.now()+100*DAY);assert.deepEqual(r,{renewed:[],warned:[],paused:[],resumed:[],started:[]});
  process.env.KAIROQ_HOSTING_CREDITS='50';
+});
+
+test('default mode: publishing on the Kairoq address is free; connecting an own domain starts the monthly charge',async()=>{
+ process.env.KAIROQ_HOSTING_CHARGE='';
+ try{
+  const a=await signup('free-publish@example.com'),id=await builtProject(a.cookie,'Free Shop');
+  const before=credits(a.id);
+  const pub=await req('POST','/api/create/projects/'+id+'/publish',{slug:'free-shop'},a.cookie);
+  assert.equal(pub.status,200,pub.text);assert.equal(credits(a.id),before);
+  assert.equal(pub.json.project.hosting.price,0);assert.equal(pub.json.project.hosting.domain_price,50);
+  assert.equal((await req('GET','/sites/free-shop/')).status,200);
+  // The hourly renewal leaves a free site alone, now and a year later.
+  await billing.tick(Date.now()+365*DAY);
+  assert.equal(credits(a.id),before);assert.equal((await req('GET','/sites/free-shop/')).status,200);
+  // Connecting the business's own domain is real hosting: 30 days are charged.
+  const dom=await req('POST','/api/create/projects/'+id+'/domains',{hostname:'www.free-shop-example.com'},a.cookie);
+  assert.equal(dom.status,200,dom.text);assert.equal(credits(a.id),before-50);
+  assert.equal(dom.json.project.hosting.price,50);
+  // Without enough credits the domain is refused and nothing is charged; the free address keeps working.
+  const b=await signup('poor@example.com'),id2=await builtProject(b.cookie,'Poor Shop');
+  accounts.charge(b.id,credits(b.id)-5,'spend');
+  const no=await req('POST','/api/create/projects/'+id2+'/domains',{hostname:'www.poor-shop-example.com'},b.cookie);
+  assert.equal(no.status,402);assert.match(no.json.error,/own domain costs 50 credits a month/);
+  assert.equal(credits(b.id),5);assert.deepEqual(builder.loadMeta(id2).domains||[],[]);
+ }finally{process.env.KAIROQ_HOSTING_CHARGE='publish'}
 });

@@ -960,7 +960,7 @@ function renderPublish(){
  $('unpublish').classList.toggle('hidden',!p.published);
  // Live hosting: what it costs and when it renews (owner projects show nothing).
  const h=p.hosting||{},note=$('hosting-note');
- note.classList.toggle('hidden',!h.price);note.classList.toggle('warn',Boolean(h.paused||h.failing_since));
+ note.classList.toggle('hidden',!h.price&&!h.domain_price);if(!h.price&&h.domain_price)text(note,'Publishing on your Kairoq address is free. Hosting on your own domain costs '+h.domain_price+' credits a month, from when you connect it.');note.classList.toggle('warn',Boolean(h.paused||h.failing_since));
  if(h.price){
   const until=h.paid_until?new Date(h.paid_until).toLocaleDateString([], {dateStyle:'medium'}):null,paid=h.paid_until&&Date.parse(h.paid_until)>Date.now()&&!h.paused;
   text(note,h.paused?'This site is paused: its monthly '+h.price+' credits could not be charged. Add credits and it comes back within the hour.':h.failing_since?'The monthly '+h.price+' credits could not be charged. Add credits soon: the site pauses '+h.grace_days+' days after the first try.':paid?'Live hosting is paid until '+until+'. It renews for '+h.price+' credits a month.':'Live hosting: '+h.price+' credits a month, charged when you publish.');

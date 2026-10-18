@@ -1335,7 +1335,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot});
    return send(res,200,{project:projectView(id)}),true}
   if(action==='/unpublish'&&method==='POST'){hosting.unpublish(id);return send(res,200,{project:projectView(id)}),true}
-  if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);await hosting.addDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
+  if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);const billing=require('./hosting-billing'),paid=billing.beforeDomain(id);try{await hosting.addDomain(id,b.hostname)}catch(e){billing.refund(id,paid);throw e}return send(res,200,{project:projectView(id)}),true}
   if(action==='/verify'&&method==='POST'){const b=await readJson(req,2000);const r=await hosting.verifyDomain(id,b.hostname);return send(res,200,{verified:r.verified,error:r.error,project:projectView(id)}),true}
   if(action==='/domains'&&method==='DELETE'){const b=await readJson(req,2000);await hosting.removeDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
   return send(res,404,{error:'Route not found'}),true;
