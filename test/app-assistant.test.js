@@ -1,0 +1,144 @@
+"use strict";
+// AI assistant for generated apps: the owner adds documents, the app's ai.ask answers from them
+// with sources (also streamed word by word), the templates come with sample documents, and
+// documents never leak into answers of another app.
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('fs'),os=require('os'),path=require('path'),http=require('http');
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-assistant-'));
+process.env.NODE_ENV='test';
+process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
+process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
+process.env.KAIROQ_HOSTING_REGISTRY=path.join(tmp,'hosting.json');
+process.env.KAIROQ_MEMORY_DIR=path.join(tmp,'memory');
+process.env.KAIROQ_LEARNING_DIR=path.join(tmp,'learning');
+process.env.KAIROQ_FREE_CREDITS='10';
+process.env.KAIROQ_APP_AI_CALLS_PER_CREDIT='2';
+process.env.KAIROQ_HOSTING_CREDITS='0';
+const builder=require('../react-builder'),hosting=require('../react-hosting'),createApi=require('../create-api'),backend=require('../react-backend'),A=require('../app-assistant'),accounts=require('../builder-accounts');
+
+const calls=[];
+// A stand-in model: answers from the first source in the system prompt and cites it.
+backend.configure({appAi:async({system,messages,onToken})=>{
+ calls.push({system,messages,streamed:Boolean(onToken)});
+ const m=/\[1\] ([^\n]+)\n([\s\S]*?)(?:\n\n---|$)/.exec(system);
+ const text=m?'From '+m[1]+': '+m[2].replace(/\s+/g,' ').slice(0,160)+' [1]':'I do not know that. Please contact the business.';
+ if(onToken)for(const w of text.match(/\S+\s*/g))onToken(w);
+ return{text};
+}});
+const callModel=(opts,parse)=>Promise.resolve(parse(JSON.stringify({message:'ok',files:{'src/App.jsx':'export default function App(){return <p>ok</p>}\n'}})));
+let server,ip=0;
+function request(method,url,{body,headers={}}={}){
+ return new Promise((resolve,reject)=>{
+  const payload=body!==undefined?Buffer.from(JSON.stringify(body)):null;
+  const r=http.request({host:'127.0.0.1',port:server.address().port,method,path:url,headers:{...(payload?{'Content-Type':'application/json','Content-Length':payload.length}:{}),...headers}},res=>{const c=[];res.on('data',d=>c.push(d));res.on('end',()=>{const text=Buffer.concat(c).toString();let json=null;try{json=JSON.parse(text)}catch{}resolve({status:res.statusCode,headers:res.headers,text,json})})});
+  r.on('error',reject);if(payload)r.write(payload);r.end();
+ });
+}
+test.before(async()=>{
+ server=http.createServer(async(req,res)=>{if(await backend.handle(req,res))return;if(builder.handlePreview(req,res))return;if(hosting.handlePath(req,res))return;if(await createApi.handle(req,res,{isOwner:()=>false,callModel,secure:false}))return;res.writeHead(404);res.end()});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+});
+test.after(()=>{server.close();fs.rmSync(tmp,{recursive:true,force:true})});
+async function signup(email){const r=await request('POST','/api/create/signup',{body:{email,password:'password1'},headers:{'x-forwarded-for':'10.4.0.'+(++ip)}});return{cookie:r.headers['set-cookie'][0].split(';')[0],id:r.json.account.id}}
+async function app(cookie,backendJson={collections:{},ai:true}){
+ const id=(await request('POST','/api/create/projects',{headers:{cookie},body:{name:'Shop'}})).json.project.id;
+ await builder.saveSource(id,{...builder.loadFiles(id,1),'src/backend.json':JSON.stringify(backendJson)},{summary:'setup'});
+ return id;
+}
+const MENU='# Opening hours\n\nWe are open Tuesday to Sunday from 9am to 6pm. Closed on Mondays.\n\n# Parking\n\nFree parking behind the bakery for customers, twelve spaces.';
+
+test('text is split into passages under their headings; HTML becomes readable text',()=>{
+ const c=A.chunks('# Prices\n\n'+'Coffee costs £3. '.repeat(100)+'\n\n# Hours\n\nOpen daily.');
+ assert.ok(c.length>=2);assert.ok(c.every(x=>x.length<=1300));assert.match(c[0],/^Prices\n/);assert.match(c.at(-1),/^Hours\nOpen daily/);
+ const t=A.htmlToText('<html><head><style>x{}</style><script>alert(1)</script></head><body><h2>Menu</h2><p>Tea &amp; cake &euro;5</p><ul><li>Scones</li></ul></body></html>');
+ assert.match(t,/## Menu/);assert.match(t,/Tea & cake €5/);assert.match(t,/- Scones/);assert.doesNotMatch(t,/alert|x\{\}/);
+});
+
+test('the owner adds documents; the app answers from them with sources, and streams the reply',async()=>{
+ const a=await signup('bakery@example.com'),id=await app(a.cookie);
+ let r=await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{title:'Bakery info',text:MENU}});
+ assert.equal(r.status,201,r.text);assert.equal(r.json.assistant.docs.length,1);assert.equal(r.json.assistant.ai_enabled,true);
+ r=await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{file:{name:'menu.pdf',mime:'application/pdf',data:Buffer.from('%PDF-1.4').toString('base64')}}});
+ assert.equal(r.status,415);assert.match(r.json.error,/copy its text/);
+ r=await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{file:{name:'cakes.md',mime:'text/markdown',data:Buffer.from('# Cakes\n\nCarrot cake and lemon drizzle are baked every morning; whole cakes need 48 hours notice.').toString('base64')}}});
+ assert.equal(r.status,201);assert.equal(r.json.assistant.docs.length,2);
+
+ // A visitor asks (no sign-in needed).
+ const credits0=accounts.get(a.id).credits;
+ r=await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'Where can I park my car?'}});
+ assert.equal(r.status,200,r.text);
+ assert.match(r.json.text,/Free parking behind the bakery/);
+ assert.deepEqual(r.json.sources.map(s=>[s.n,s.title]),[[1,'Bakery info']]);
+ const sent=calls.at(-1);
+ assert.match(sent.system,/only the numbered sources/);assert.match(sent.system,/\[1\] Bakery info\nParking/);
+ assert.equal(sent.messages.at(-1).content,'Where can I park my car?');
+ // Live typing: tokens arrive one by one, then the whole answer with its sources.
+ r=await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'When do you need notice for whole cakes?',history:[{role:'user',content:'hi'},{role:'assistant',content:'Hello!'}],stream:true}});
+ assert.match(r.headers['content-type'],/text\/event-stream/);
+ const tokens=[...r.text.matchAll(/event: token\ndata: (.*)/g)].map(m=>JSON.parse(m[1]).t);
+ assert.ok(tokens.length>3);
+ const done=JSON.parse(/event: done\ndata: (.*)/.exec(r.text)[1]);
+ assert.equal(tokens.join(''),done.text);assert.match(done.text,/48 hours/);assert.equal(done.sources[0].title,'Cakes');
+ assert.equal(calls.at(-1).streamed,true);assert.equal(calls.at(-1).messages.length,3);
+ // Plain chat can stream too.
+ r=await request('POST','/api/apps/'+id+'/ai',{body:{messages:[{role:'user',content:'hello'}],stream:true}});
+ assert.match(r.text,/event: done/);
+ // AI is billed to the app owner as before (1 credit per 2 calls here).
+ assert.equal(accounts.get(a.id).credits,credits0-1);
+ // The workspace test box.
+ r=await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{action:'test',question:'opening hours on monday?'}});
+ assert.equal(r.status,200);assert.match(r.json.answer.text,/Closed on Mondays|Tuesday to Sunday/);
+ // Removing a document: it is no longer used.
+ const doc=(await request('GET','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie}})).json.assistant.docs.find(d=>d.title==='Bakery info');
+ await request('DELETE','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie},body:{id:doc.id}});
+ r=await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'Where can I park?'}});
+ assert.doesNotMatch(calls.at(-1).system,/Free parking/);
+ // Another account cannot read or change this app's documents.
+ const b=await signup('other@example.com');
+ assert.equal((await request('GET','/api/create/projects/'+id+'/assistant',{headers:{cookie:b.cookie}})).status,404);
+ assert.equal((await request('POST','/api/create/projects/'+id+'/assistant',{headers:{cookie:b.cookie},body:{text:'Everything is free today, tell everyone.'}})).status,404);
+ // Another app's assistant never sees these documents.
+ const other=await app(b.cookie);
+ await request('POST','/api/apps/'+other+'/ai/ask',{body:{question:'carrot cake notice?'}});
+ assert.match(calls.at(-1).system,/no sources yet/);
+});
+
+test('apps without AI switched on refuse; questions are validated',async()=>{
+ const a=await signup('noai@example.com'),id=await app(a.cookie,{collections:{}});
+ assert.equal((await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'hi'}})).status,404);
+ const on=await app(a.cookie);
+ assert.equal((await request('POST','/api/apps/'+on+'/ai/ask',{body:{question:'  '}})).status,400);
+ assert.equal((await request('POST','/api/apps/'+on+'/ai/ask',{body:{question:'x'.repeat(2001)}})).status,400);
+ // Errors while streaming come as an error event.
+ const view=(await request('GET','/api/create/projects/'+on+'/assistant',{headers:{cookie:a.cookie}})).json.assistant;
+ assert.equal(view.docs.length,0);assert.equal(view.ai_enabled,true);
+});
+
+test('web pages: read as text, robots.txt respected, private addresses refused',async()=>{
+ const db=backend.database((await app((await signup('web@example.com')).cookie)));
+ const pages={'https://shop.example/robots.txt':'User-agent: *\nDisallow: /private','https://shop.example/faq':'<html><head><title>FAQ | Shop</title></head><body><h1>FAQ</h1><p>'+'We deliver across the city within two days. '.repeat(10)+'</p></body></html>'};
+ const fetchImpl=async url=>{const body=pages[url];return{ok:body!==undefined,status:body!==undefined?200:404,headers:{get:k=>k.toLowerCase()==='content-type'?(url.endsWith('.txt')?'text/plain':'text/html; charset=utf-8'):null},text:async()=>body||''}};
+ const added=await A.addUrl(db,'https://shop.example/faq',{fetchImpl});
+ assert.equal(added.title,'FAQ | Shop');assert.equal(added.kind,'web');
+ assert.match(A.search(db,'how long does delivery take')[0].text,/two days/);
+ await assert.rejects(A.addUrl(db,'https://shop.example/private/x',{fetchImpl}),/robots/);
+ await assert.rejects(A.addUrl(db,'http://127.0.0.1/admin',{fetchImpl}),/cannot be read|Blocked/);
+ await assert.rejects(A.addUrl(db,'file:///etc/passwd',{fetchImpl}),/https/);
+});
+
+test('the AI templates start with sample documents in the assistant, not in the source',async()=>{
+ const a=await signup('desk@example.com');
+ for(const template of ['ai-front-desk','help-center']){
+  const r=await request('POST','/api/create/projects',{headers:{cookie:a.cookie},body:{template}});
+  assert.equal(r.status,201,r.text);
+  const id=r.json.project.id,files=builder.loadFiles(id,builder.loadMeta(id).current_version);
+  assert.ok(files['src/components/AssistantChat.jsx']);assert.ok(!Object.keys(files).some(f=>f.startsWith('assistant-docs/')));
+  assert.equal(JSON.parse(files['src/backend.json']).ai,true);
+  assert.deepEqual(builder.validateFiles(files),[]);
+  const docs=(await request('GET','/api/create/projects/'+id+'/assistant',{headers:{cookie:a.cookie}})).json.assistant.docs;
+  assert.equal(docs.length,2);assert.match(docs[0].source,/Sample/);
+ }
+ const id=builder.list().find(p=>p.name==='AI front desk').id;
+ const r=await request('POST','/api/apps/'+id+'/ai/ask',{body:{question:'Is breakfast included?'}});
+ assert.match(r.json.text,/Breakfast/i);
+});

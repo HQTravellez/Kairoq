@@ -183,6 +183,16 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .findings .sev.high{color:var(--error)}.findings .sev.medium{color:var(--accent)}.findings .sev.low{color:var(--muted)}
 .findings p{margin:6px 0 0;color:var(--muted);line-height:1.45}
 .sql-section,.logs-section{margin-top:18px}
+.assistant-section{margin:4px 0 18px;padding:14px 16px;border:1px solid var(--line,#e5e2dc);border-radius:14px;background:var(--panel,#fff)}
+.assistant-section h3{margin-top:0}
+.assistant-off{color:var(--accent,#f26207)}
+.assistant-tabs{margin:8px 0}
+.assistant-form input,.assistant-form textarea,.assistant-test input{width:100%;box-sizing:border-box;margin:4px 0}
+.assistant-test .row{display:flex;gap:8px;align-items:center}.assistant-test .row input{flex:1}
+.assistant-docs{list-style:none;padding:0;margin:10px 0}
+.assistant-docs li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line,#e5e2dc)}
+.assistant-docs .skill-text span{display:block;font-size:12px;color:var(--muted,#6b6b6b);word-break:break-all}
+.assistant-answer{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--soft,#f6f4f1);white-space:pre-wrap}
 .sql-section details{border:1px solid var(--line,#e5e2dc);border-radius:10px;padding:8px 10px;margin:6px 0}
 .sql-section summary{cursor:pointer;font-size:13px;font-family:ui-monospace,Menlo,monospace}
 .sql-scroll{overflow:auto;max-height:280px;margin-top:6px}

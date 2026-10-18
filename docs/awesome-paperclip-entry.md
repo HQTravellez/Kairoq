@@ -5,7 +5,7 @@ The community directory is https://github.com/gsxdsm/awesome-paperclip. To get l
 Suggested line:
 
 ```
-- [Kairoq](https://github.com/HQTravellez/Kairoq) - MCP server that builds, tests and publishes web apps from plain English: agents create a project, follow the build, send AI customers through it and go live on a free URL.
+- [Kairoq](https://github.com/HQTravellez/Kairoq) - MCP server that builds, tests and publishes web apps from plain English: agents create a project, follow the build, send AI customers through it and go live on a Kairoq URL.
 ```
 
 Suggested pull request title: `Add Kairoq (app builder MCP server)`

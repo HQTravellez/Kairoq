@@ -37,6 +37,7 @@ async function loadMe(){
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
  text($('home-title'),name?'Got an idea, '+cap(name.split(' ')[0])+'?':'Got an idea?');
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
+ const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
  text($('free-note'),state.me.free_credits?'New accounts get '+state.me.free_credits+' free credits. One credit = one change.':'');
@@ -242,7 +243,7 @@ async function renderData(){
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
  text($('records-title'),state.collection?'Records in '+state.collection:'Records');
- renderSql().catch(()=>{});renderLogs().catch(()=>{});renderAutomations().catch(()=>{});
+ renderSql().catch(()=>{});renderLogs().catch(()=>{});renderAutomations().catch(()=>{});renderAssistant().catch(()=>{});
  if(!state.collection)return;
  const {items}=await api('/projects/'+state.project.id+'/records?collection='+encodeURIComponent(state.collection));
  if(!items.length){const li=document.createElement('li');li.className='muted small';li.textContent='No records yet.';records.append(li)}
@@ -253,6 +254,53 @@ async function renderData(){
   li.append(pre,del);records.append(li);
  }
 }
+// AI assistant: the documents the app's AI answers from (ai.ask), and a test question.
+const assistantState={add:'text'};
+async function renderAssistant(){
+ const {assistant:a}=await api('/projects/'+state.project.id+'/assistant');
+ const editor=state.project.role!=='viewer';
+ $('assistant-off').classList.toggle('hidden',a.ai_enabled||!a.docs.length);
+ $('assistant-form').classList.toggle('hidden',!editor);$('assistant-test').classList.toggle('hidden',!a.docs.length||!editor);
+ document.querySelector('.assistant-tabs').classList.toggle('hidden',!editor);
+ text($('assistant-count'),a.docs.length?'('+a.docs.length+' document'+(a.docs.length===1?'':'s')+')':'');
+ const ul=$('assistant-docs');ul.replaceChildren();
+ for(const d of a.docs){
+  const li=el('li'),t=el('div','skill-text');
+  t.append(el('b',null,d.title),el('span',null,(d.kind==='web'?d.source:(d.kind==='file'?'File':'Text')+(d.source&&d.kind!=='file'?' · '+d.source:''))+' · '+d.chars.toLocaleString()+' characters · '+when(d.created_at)));
+  const del=el('button','ghost link-btn','Remove');del.type='button';del.disabled=!editor;
+  del.onclick=async()=>{if(!confirm('Remove "'+d.title+'"? The assistant stops using it.'))return;await api('/projects/'+state.project.id+'/assistant',{method:'DELETE',body:{id:d.id}});renderAssistant()};
+  li.append(t,del);ul.append(li);
+ }
+}
+for(const b of document.querySelectorAll('.assistant-tabs [data-add]'))b.onclick=()=>{
+ assistantState.add=b.dataset.add;
+ for(const x of document.querySelectorAll('.assistant-tabs [data-add]'))x.setAttribute('aria-pressed',String(x===b));
+ for(const p of document.querySelectorAll('#assistant-form [data-pane]'))p.classList.toggle('hidden',p.dataset.pane!==b.dataset.add);
+};
+function fileBase64(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]||'');r.onerror=()=>reject(Error('Could not read the file'));r.readAsDataURL(file)})}
+$('assistant-form').onsubmit=async e=>{
+ e.preventDefault();text($('assistant-error'),'');
+ const btn=$('assistant-add');btn.disabled=true;btn.textContent='Adding…';
+ try{
+  let body;
+  if(assistantState.add==='url')body={url:$('assistant-url').value};
+  else if(assistantState.add==='file'){const f=$('assistant-file').files[0];if(!f)throw Error('Choose a file');body={file:{name:f.name,mime:f.type,data:await fileBase64(f)}}}
+  else body={title:$('assistant-title').value,text:$('assistant-text').value};
+  await api('/projects/'+state.project.id+'/assistant',{method:'POST',body});
+  $('assistant-form').reset();await renderAssistant();
+ }catch(err){text($('assistant-error'),err.message)}
+ finally{btn.disabled=false;btn.textContent='Add'}
+};
+$('assistant-test').onsubmit=async e=>{
+ e.preventDefault();
+ const q=$('assistant-question').value.trim(),box=$('assistant-answer');if(!q)return;
+ box.classList.remove('hidden');box.replaceChildren(el('p','muted small','Thinking…'));
+ try{
+  const {answer}=await api('/projects/'+state.project.id+'/assistant',{method:'POST',body:{action:'test',question:q}});
+  box.replaceChildren(el('p',null,answer.text));
+  if(answer.sources.length){const s=el('p','muted small','Sources: '+answer.sources.map(x=>'['+x.n+'] '+x.title).join(' · '));box.append(s)}
+ }catch(err){box.replaceChildren(el('p','error small',err.message))}
+};
 // Automations (src/backend.json "automations"): what runs when, the last result, and Run now.
 async function renderAutomations(){
  const {automations}=await api('/projects/'+state.project.id+'/automations');
@@ -805,6 +853,13 @@ function renderPublish(){
  $('slug').value=p.published?.slug||slugFrom(p.name);
  text($('slug-preview'),location.origin+'/sites/'+($('slug').value||'…')+'/');
  $('unpublish').classList.toggle('hidden',!p.published);
+ // Live hosting: what it costs and when it renews (owner projects show nothing).
+ const h=p.hosting||{},note=$('hosting-note');
+ note.classList.toggle('hidden',!h.price);note.classList.toggle('warn',Boolean(h.paused||h.failing_since));
+ if(h.price){
+  const until=h.paid_until?new Date(h.paid_until).toLocaleDateString([], {dateStyle:'medium'}):null,paid=h.paid_until&&Date.parse(h.paid_until)>Date.now()&&!h.paused;
+  text(note,h.paused?'This site is paused: its monthly '+h.price+' credits could not be charged. Add credits and it comes back within the hour.':h.failing_since?'The monthly '+h.price+' credits could not be charged. Add credits soon: the site pauses '+h.grace_days+' days after the first try.':paid?'Live hosting is paid until '+until+'. It renews for '+h.price+' credits a month.':'Live hosting: '+h.price+' credits a month, charged when you publish.');
+ }
  text($('publish').firstChild,p.published?'Update to current version (v'+p.current_version+')':'Publish current version');
  const links=$('live-links');links.replaceChildren();
  if(p.urls){
@@ -981,7 +1036,7 @@ function renderLanding(){
  renderTemplates($('landing-templates'),id=>{setPending({template:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()},id=>{setPending({sponsored:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()}).catch(()=>{});
  const wrap=$('landing-plans');wrap.replaceChildren();
  const per=(state.me.tiers||[]).map(t=>t.label+' '+t.credits+' credit'+(t.credits===1?'':'s')).join(', ');
- wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a free URL','No card needed']));
+ wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a Kairoq URL','No card needed']));
  for(const p of state.me.plans||[])wrap.append(planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features]));
  for(const p of state.me.packs||[])wrap.append(planCard(p.name,p.label||p.credits+' credits',[p.credits+' credits, one-time','Never expire']));
  text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. If a change breaks your app, the next fix of that problem is on us. A request that fails before anything is saved is not charged.');
@@ -1230,6 +1285,17 @@ $('landing-check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('landi
 $('check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('check-url').value.trim(),email:$('check-email').value.trim(),goal:$('check-goal').value.trim()},$('check-error'),$('check-go'))};
 $('cr-again').onclick=openCheckForm;$('check-retry').onclick=openCheckForm;$('side-check').onclick=openCheckForm;
 window.addEventListener('popstate',()=>{const m=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);if(m)openCheck(m[1])});
+
+// ---------- WhatsApp ----------
+async function openWhatsApp(){text($('wa-error'),'');$('wa-dialog').showModal();$('wa-code-line').classList.add('hidden');try{renderWhatsApp((await api('/whatsapp')).whatsapp)}catch(err){text($('wa-error'),err.message)}}
+function renderWhatsApp(w){
+ text($('wa-status'),w.connected?'✅ Your WhatsApp is connected. Message Kairoq any time.':'Not connected yet.');
+ $('wa-connect').classList.toggle('hidden',w.connected);$('wa-connected-row').classList.toggle('hidden',!w.connected);
+ if(w.start)$('wa-open').href=w.start;
+}
+$('wa-go').onclick=async()=>{text($('wa-error'),'');try{const r=await api('/whatsapp/code',{method:'POST'});text($('wa-code'),'link '+r.code);text($('wa-number'),r.number?'+'+r.number:'Kairoq');$('wa-code-line').classList.remove('hidden');if(r.link)window.open(r.link,'_blank','noopener')}catch(err){text($('wa-error'),err.message)}};
+$('wa-disconnect').onclick=async()=>{try{await api('/whatsapp/disconnect',{method:'POST'});renderWhatsApp({connected:false})}catch(err){text($('wa-error'),err.message)}};
+$('side-wa').onclick=openWhatsApp;
 
 // ---------- memory: preferences and recipes ----------
 async function openMemory(){text($('mem-error'),'');$('memory-dialog').showModal();try{renderMemory((await api('/memory')).memory)}catch(err){text($('mem-error'),err.message)}}

@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -77,7 +77,7 @@ function findShare(token){
  for(const p of builder.list()){const meta=builder.loadMeta(p.id);if(meta.share&&meta.share.token===token)return meta}
  return null;
 }
-function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
+function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],hosting:require('./hosting-billing').view(meta),urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','researching','watching']);
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
@@ -693,7 +693,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -711,6 +711,13 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     const s=accounts.googleLogin(profile);
     res.writeHead(302,{Location:'/create','Set-Cookie':accounts.cookie(s.token,secure),'Cache-Control':'no-store'});res.end();return true;
    }catch(e){res.writeHead(302,{Location:'/create?auth_error='+encodeURIComponent(String(e.message||e).slice(0,200)),'Cache-Control':'no-store'});res.end();return true}
+  }
+  // One-time sign-in link (sent on WhatsApp): opens the editor without a password.
+  if(route==='/auth/link'&&method==='GET'){
+   const q=new URL(req.url,'http://x').searchParams,project=/^[a-f0-9]{12}$/.test(q.get('project')||'')?q.get('project'):'';
+   try{const s=accounts.loginWithToken(q.get('token'));res.writeHead(302,{Location:'/create'+(project?'?project='+project:''),'Set-Cookie':accounts.cookie(s.token,secure),'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});res.end()}
+   catch(e){res.writeHead(302,{Location:'/create?auth_error='+encodeURIComponent('This sign-in link has expired. Send "open" on WhatsApp for a new one.'),'Cache-Control':'no-store'});res.end()}
+   return true;
   }
   if(route==='/verify'&&method==='POST'){const b=await readJson(req,2000);return send(res,200,{account:accounts.verifyEmail(b.token)}),true}
   if(route==='/password/forgot'&&method==='POST'){limited(req,'forgot',5);const b=await readJson(req,2000);return send(res,200,await accounts.requestReset(b.email,origin(req))),true}
@@ -759,6 +766,16 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,{share:{name:meta.name,preview_url:builder.previewUrl(meta),remix:!!meta.share.remix,versions:meta.versions.length,updated_at:meta.updated_at}}),true;
   }
   const v=requireViewer(req,isOwner);
+  // ----- WhatsApp -----
+  if(route==='/whatsapp'&&method==='GET'){const wa=require('./whatsapp');return send(res,200,{whatsapp:{enabled:wa.enabled(),connected:v.kind==='customer'?wa.connected(v.account.id):false,start:wa.chatLink('Hi Kairoq')}}),true}
+  if(route==='/whatsapp/code'&&method==='POST'){
+   const wa=require('./whatsapp');
+   if(!wa.enabled())throw Object.assign(Error('WhatsApp is not set up on this server'),{status:409});
+   if(v.kind!=='customer')throw Object.assign(Error('Connect WhatsApp from a customer account'),{status:400});
+   limited(req,'wa-code',10);
+   return send(res,200,wa.issueCode(v.account.id)),true;
+  }
+  if(route==='/whatsapp/disconnect'&&method==='POST'){if(v.kind==='customer')require('./whatsapp').disconnect(v.account.id);return send(res,200,{ok:true}),true}
   // ----- partner integrations -----
   if(route==='/partners'&&method==='GET')return send(res,200,{partners:require('./partners').publicPartners()}),true;
   const padd=/^\/partners\/([a-f0-9]{10})\/add$/.exec(route);
@@ -929,6 +946,24 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
   if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
+  // The documents this app's AI answers from (ai.ask), and a test question from the workspace.
+  if(action==='/assistant'){
+   const A=require('./app-assistant'),db=backend.database(id);
+   const view=()=>({...A.list(db),ai_enabled:Boolean(backend.liveConfig(builder.loadMeta(id)).ai)});
+   if(method==='GET')return send(res,200,{assistant:view()}),true;
+   if(method==='DELETE'){const b=await readJson(req,2000);A.remove(db,b.id);return send(res,200,{assistant:view()}),true}
+   if(method==='POST'){
+    const b=await readJson(req,3000000);
+    if(b.action==='test'){
+     limitedKey('assistant-test:'+id,30,600000);
+     const meta=builder.loadMeta(id);
+     return send(res,200,{answer:await A.ask(db,{question:b.question},o=>backend.appAi(meta,db,o))}),true;
+    }
+    limitedKey('assistant-add:'+id,60,600000);
+    const added=b.url?await A.addUrl(db,b.url):b.file?A.addFile(db,b.file):A.addText(db,{title:b.title,text:b.text});
+    return send(res,201,{added,assistant:view()}),true;
+   }
+  }
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
   if(action==='/chat'&&method==='POST'){const b=await readJson(req,16000000);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',images:parseImages(b.images),fix:b.fix===true},deps))}),true}
@@ -1244,6 +1279,7 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[]}=
  const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:prompt.split(/[.\n]/)[0].slice(0,60))||'Untitled app',owner:v.owner});
  if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
  else await builder.initialize(meta);
+ if(tpl&&tpl.assistantDocs){const A=require('./app-assistant'),db=backend.database(meta.id);for(const d of tpl.assistantDocs)A.addText(db,{title:d.title,text:d.text,source:'Sample from the template: replace it with your own',kind:'text'})}
  // Mobile templates start with the mobile app setting on (phone preview, installable app).
  if(tpl&&tpl.mobile)require('./react-mobile').update(meta.id,{enabled:true,...tpl.mobile});
  const job=prompt?startJob(v,meta.id,{message:prompt,tier,images},deps):null;
@@ -1252,7 +1288,10 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[]}=
 // Publishing re-runs the saved checks on the version going live, unless the owner overrides.
 async function publishProject(id,{slug,version,force}={},{inspect,screenshot}={}){
  if(!force&&inspect){const meta=builder.loadMeta(id),n=Number(version)||meta.current_version;if(require('./react-checks').list(meta).some(c=>c.enabled!==false)&&meta.versions.some(x=>x.n===n)){const r=await require('./react-checks').run(id,builder.previewUrl(meta,n),{inspect,version:n});if(r.failed.length)throw Object.assign(Error('Saved checks fail on this version: '+r.failed.map(f=>f.name).join(', ')+'. Fix them, or publish with force to go live anyway.'),{status:409,failed:r.failed})}}
- const out=hosting.publish(id,{slug,version});
+ // Live hosting is paid monthly: the first 30 days are charged here (given back if publishing fails).
+ const billing=require('./hosting-billing'),paid=billing.beforePublish(id);
+ let out;try{out=hosting.publish(id,{slug,version})}catch(e){billing.refund(id,paid);throw e}
+ out.billing={charged:paid.charged,paid_until:paid.paid_until||null};
  // Social share image: a screenshot of the published version, taken in the background.
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;

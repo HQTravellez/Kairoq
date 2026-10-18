@@ -6552,7 +6552,7 @@ function parseDeveloperResponse(content,model="coding model"){
 }
 async function callDeveloperCodingModel(opts={}){return callBuilderModel(opts,parseDeveloperResponse)}
 // AI used inside generated apps (ai.chat). Own model setting and monthly cap (purpose app-ai).
-async function callAppAi({system,messages,maxTokens=1000}){
+async function callAppAi({system,messages,maxTokens=1000,onToken}){
   if(!process.env.OPENROUTER_API_KEY)throw Object.assign(Error("AI is not configured on this server"),{status:503});
   const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const cap=Number(process.env.KAIROQ_APP_AI_MONTHLY_LIMIT_USD??20);
@@ -6563,7 +6563,18 @@ async function callAppAi({system,messages,maxTokens=1000}){
     const free=model.endsWith(":free")||model==="openrouter/free";
     try{
       if(!free)await enforceBudget();
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(60000),body:JSON.stringify({model,max_tokens:maxTokens,messages:[...(system?[{role:"system",content:system}]:[]),...messages]})});
+      const body={model,max_tokens:maxTokens,messages:[...(system?[{role:"system",content:system}]:[]),...messages]};
+      // Live typing: stream the answer; once words have reached the visitor there is no fallback.
+      if(onToken){
+        let streamed=false;
+        try{
+          const out=await streamAppAi(body,onToken,()=>{streamed=true});
+          if(!free)await recordUsage({...out.usage,cost:Number(out.usage?.cost||0)},{purpose:"app-ai",model});
+          if(!out.text.trim())throw Error("Empty response");
+          return{text:out.text};
+        }catch(e){if(streamed)throw Object.assign(Error("The answer was interrupted. Try again."),{status:502,final:true});throw e}
+      }
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(60000),body:JSON.stringify(body)});
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
       const raw=data.choices?.[0]?.message?.content;
@@ -6571,9 +6582,29 @@ async function callAppAi({system,messages,maxTokens=1000}){
       if(!free)await recordUsage({...data.usage,cost:Number(data.usage?.cost||0)},{purpose:"app-ai",model});
       if(!text.trim())throw Error("Empty response");
       return{text};
-    }catch(e){errors.push(model+": "+String(e.message||e).slice(0,120))}
+    }catch(e){if(e.final)throw e;errors.push(model+": "+String(e.message||e).slice(0,120))}
   }
   throw Object.assign(Error("AI is unavailable right now. "+errors.join(" | ")),{status:503});
+}
+// One streamed OpenRouter chat call: calls onToken with each piece of text, returns {text,usage}.
+async function streamAppAi(body,onToken,onFirst){
+  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders({Accept:"text/event-stream"}),signal:AbortSignal.timeout(90000),body:JSON.stringify({...body,stream:true,usage:{include:true}})});
+  if(!response.ok||!response.body){const data=await response.json().catch(()=>({}));throw Error(data.error?.message||"Provider HTTP "+response.status)}
+  const decoder=new TextDecoder();let buf="",text="",usage=null;
+  for await(const chunk of response.body){
+    buf+=decoder.decode(chunk,{stream:true});let i;
+    while((i=buf.indexOf("\n"))>=0){
+      const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+      if(!line.startsWith("data:"))continue;
+      const raw=line.slice(5).trim();if(raw==="[DONE]")continue;
+      let d;try{d=JSON.parse(raw)}catch{continue}
+      if(d.error)throw Error(d.error.message||"Provider error");
+      if(d.usage)usage=d.usage;
+      const piece=d.choices?.[0]?.delta?.content;
+      if(typeof piece==="string"&&piece){if(!text)onFirst();text+=piece;onToken(piece)}
+    }
+  }
+  return{text,usage};
 }
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
@@ -6726,6 +6757,7 @@ const server = http.createServer(async (req, res) => {
   // Inbound channel webhooks are called by outside services and check their own secrets.
   if(!/^(GET|HEAD|OPTIONS)$/.test(req.method)&&url.startsWith("/api/")&&!url.startsWith("/api/create/")&&!url.startsWith("/api/channels/")&&crossSiteRequest(req))return json(res,403,{error:"Cross-site request refused"});
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
+  if(url==="/api/whatsapp/webhook"&&await require("./whatsapp").handle(req,res,{callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null}).catch(e=>{console.warn("[whatsapp]",e.message);if(!res.headersSent){res.writeHead(500);res.end()}}))return;
   if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24}|\/check\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
@@ -7021,6 +7053,8 @@ if (process.env.NODE_ENV !== "test") {
   setInterval(() => reactBackend.runAllAutomations().catch(e=>console.warn("[create-automations]",e.message)), 60_000).unref();
 // The learning loop: once a day, judge Kairoq's build rules and propose new ones from repeated failures.
 setInterval(() => { require("./build-lessons").run({ callModel: callBuilderModel }).catch(() => {}); }, 3_600_000).unref?.();
+// Live hosting: renew monthly charges, warn, pause after the grace period, bring paid sites back.
+setInterval(() => { require("./hosting-billing").tick().catch(e => console.warn("[hosting-billing]", e.message)); }, 3_600_000).unref?.();
   const runBackup=()=>{try{const b=require("./create-backups").run();if(b.errors.length)console.warn("[create-backups]",b.errors.join("; "))}catch(e){console.warn("[create-backups]",e.message)}};
   setTimeout(runBackup,10*60_000).unref();setInterval(runBackup,24*3600_000).unref();
   // Live-app monitor: re-runs saved checks on every published app (KAIROQ_MONITOR_HOURS, 0 = off).

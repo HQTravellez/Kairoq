@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('fs'),os=require('os'),path=require('path'),http=require('http'),crypto=require('crypto');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-tier3-'));
 process.env.NODE_ENV='test';
+process.env.KAIROQ_HOSTING_CREDITS='0'; // hosting billing has its own tests (hosting-billing.test.js)
 process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_FREE_CREDITS='10';
@@ -43,7 +44,7 @@ test('builds run in parallel worker threads',async()=>{
 test('every template is valid; projects can start from a template',async()=>{
  for(const t of templates.TEMPLATES)assert.deepEqual(builder.validateFiles(t.files),[],t.id);
  const list=(await request(server,'GET','/api/create/templates')).json.templates;
- assert.deepEqual(list.map(t=>t.id),['boutique-hotel','travellez','calorie-tracker','restaurant','guest-portal','saas-landing','crm','booking','portfolio']);
+ assert.deepEqual(list.map(t=>t.id),['boutique-hotel','travellez','ai-front-desk','help-center','calorie-tracker','restaurant','guest-portal','saas-landing','crm','booking','portfolio']);
  assert.equal(list[0].files,undefined);
  const {cookie}=await signup('tpl@example.com');
  const r=await request(server,'POST','/api/create/projects',{headers:{cookie},body:{template:'restaurant'}});

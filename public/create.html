@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261021">
+<link rel="stylesheet" href="/create.css?v=20261026">
 <link rel="stylesheet" href="/landing.css?v=20261021">
-<link rel="stylesheet" href="/workspace.css?v=20261024">
+<link rel="stylesheet" href="/workspace.css?v=20261025">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -33,6 +33,7 @@
     <button type="button" id="side-projects"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Projects</button>
     <button type="button" id="side-templates"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 9h16M9 9v12"/></svg>Templates</button>
     <button type="button" id="side-memory"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a3.5 3.5 0 0 0-3.4 4.3A3.5 3.5 0 0 0 4 13a3.5 3.5 0 0 0 3 5.5A3 3 0 0 0 12 20V5a2.5 2.5 0 0 0-2.5-2z"/><path d="M14.5 3a3.5 3.5 0 0 1 3.4 4.3A3.5 3.5 0 0 1 20 13a3.5 3.5 0 0 1-3 5.5A3 3 0 0 1 12 20"/></svg>Memory</button>
+    <button type="button" id="side-wa" class="hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.8 7L4 20l1.1-4A8 8 0 1 1 20 12z"/></svg>WhatsApp</button>
     <button type="button" id="side-check"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11l2 2 4-4"/></svg>Website check</button>
     <button type="button" id="side-admin" class="hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.4 3.4 8.3 8 9 4.6-.7 8-4.6 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Admin</button>
     <button type="button" id="side-docs"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.7-2.5 2-2.5 3.5M12 17h.01"/></svg>Help</button>
@@ -72,6 +73,7 @@
           <button type="button" class="hero-chip"><i class="ci ci-phone"></i>Habit tracker for iPhone</button>
           <button type="button" class="hero-chip"><i class="ci ci-crm"></i>CRM for a small agency</button>
         </div>
+        <a class="hero-wa hidden" id="landing-wa" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.8 7L4 20l1.1-4A8 8 0 1 1 20 12z"/></svg>No laptop? Build it from WhatsApp</a>
         <p class="hero-trust"><span>30 free credits</span><span>No card needed</span><span>Your code, your domain</span></p>
       </div>
     </section>
@@ -157,7 +159,7 @@
       <ol class="steps">
         <li><span class="num">1</span><h3>Describe it</h3><p>Say who it is for and what it does. Kairoq picks a design direction, writes the code and shows the preview as it streams in.</p></li>
         <li><span class="num">2</span><h3>Watch it get tested</h3><p>Every version opens in a real browser on a test copy of your data. Flows that work are saved as checks and re-run after each change.</p></li>
-        <li><span class="num">3</span><h3>Publish and keep improving</h3><p>Go live on a free URL or your own domain. AI customers keep visiting, and each week you get a plain-English note on what is stopping signups.</p></li>
+        <li><span class="num">3</span><h3>Publish and keep improving</h3><p>Go live on a Kairoq URL or your own domain. AI customers keep visiting, and each week you get a plain-English note on what is stopping signups.</p></li>
       </ol>
     </section>
 
@@ -486,6 +488,23 @@
           <div><h3>Collections</h3><ul class="file-list" id="collections"></ul><h3>Users <span class="muted" id="user-count"></span></h3><ul class="users" id="users"></ul></div>
           <div><h3 id="records-title">Records</h3><ul class="records" id="records"></ul></div>
         </div>
+        <section class="assistant-section" id="assistant-section">
+          <h3>AI assistant <span class="muted small" id="assistant-count"></span></h3>
+          <p class="muted small">Add your menu, prices, FAQ, policies or opening hours. Your app's AI answers visitors from these, with sources, and says when it does not know. Ask the builder for "a chat that answers questions about my business" to put it on your site. Visitors can see anything you add here, so leave out private details.</p>
+          <p class="assistant-off small hidden" id="assistant-off">AI is not switched on in this app yet. Ask the builder to add the AI assistant.</p>
+          <div class="seg assistant-tabs" role="group" aria-label="Add from"><button type="button" data-add="text" aria-pressed="true">Paste text</button><button type="button" data-add="url" aria-pressed="false">Web page</button><button type="button" data-add="file" aria-pressed="false">File</button></div>
+          <form id="assistant-form" class="assistant-form">
+            <div data-pane="text"><input id="assistant-title" placeholder="Title, e.g. Menu and prices" maxlength="120"><textarea id="assistant-text" rows="5" placeholder="Paste the text your assistant should know"></textarea></div>
+            <div data-pane="url" class="hidden"><input id="assistant-url" type="url" placeholder="https://yourbusiness.com/faq"></div>
+            <div data-pane="file" class="hidden"><input id="assistant-file" type="file" accept=".txt,.md,.csv,.html,.htm,.json,text/plain,text/markdown,text/csv,text/html,application/json"><p class="muted small">Text, Markdown, CSV, HTML or JSON, up to 2 MB. For a PDF, copy its text into "Paste text".</p></div>
+            <div class="row"><button class="ghost" type="submit" id="assistant-add">Add</button><span class="error small" id="assistant-error" role="alert"></span></div>
+          </form>
+          <ul class="assistant-docs" id="assistant-docs"></ul>
+          <form id="assistant-test" class="assistant-test">
+            <label>Try a question<div class="row"><input id="assistant-question" placeholder="Do you have parking?" maxlength="500"><button class="ghost" type="submit">Ask</button></div></label>
+            <div class="assistant-answer hidden" id="assistant-answer" aria-live="polite"></div>
+          </form>
+        </section>
         <section id="sql-section" class="sql-section hidden">
           <h3>SQL tables</h3>
           <p class="muted small" id="sql-migrations"></p>
@@ -521,6 +540,7 @@
     <h2>Publish</h2>
     <label>Site name<input id="slug" pattern="[a-z0-9-]{3,40}" placeholder="my-app"></label>
     <p class="muted small">Your app will be live at <code id="slug-preview"></code></p>
+    <p class="hosting-note small hidden" id="hosting-note"></p>
     <div class="row"><button class="primary" id="publish" type="button">Publish current version</button><button class="ghost hidden" id="unpublish" type="button">Unpublish</button></div>
     <div id="live-links"></div>
     <div id="analytics" class="analytics hidden">
@@ -539,6 +559,23 @@
     <div class="row"><input id="domain" placeholder="www.example.com"><button class="ghost" id="add-domain" type="button">Add</button></div>
     <ul class="domains" id="domains"></ul>
     <p class="error" id="publish-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="wa-dialog">
+  <form method="dialog" class="dialog">
+    <h2>Build from WhatsApp</h2>
+    <p class="muted small">Send Kairoq a message, a voice note or a photo and get your app built, with the link sent back. Works for all the apps in this account.</p>
+    <p class="wa-status" id="wa-status"></p>
+    <div id="wa-connect">
+      <ol class="small wa-steps"><li>Press <b>Connect</b> to get a code.</li><li>WhatsApp opens with the message ready: just press send.</li><li>Then describe what to build or change.</li></ol>
+      <div class="row"><button class="primary" id="wa-go" type="button">Connect WhatsApp</button></div>
+      <p class="small hidden" id="wa-code-line">Or send <b id="wa-code"></b> to <b id="wa-number"></b> on WhatsApp. The code works for 15 minutes.</p>
+    </div>
+    <div class="row hidden" id="wa-connected-row"><button class="ghost" id="wa-disconnect" type="button">Disconnect</button><a class="ghost link" id="wa-open" target="_blank" rel="noopener">Open the chat ↗</a></div>
+    <p class="muted small">Try: “a booking page for my salon with prices”, “make the buttons green”, “publish”, “undo”, “projects”, or send a photo of a design you like.</p>
+    <p class="error" id="wa-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
@@ -958,6 +995,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261024"></script>
+<script src="/create.js?v=20261026"></script>
 </body>
 </html>

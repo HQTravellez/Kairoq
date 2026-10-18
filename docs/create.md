@@ -180,6 +180,17 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 - Add `"ai": true` to `src/backend.json`. In code: `ai.chat({messages, system})`, also available to functions.
 - Calls use `KAIROQ_APP_AI_MODEL` while under `KAIROQ_APP_AI_MONTHLY_LIMIT_USD`, then the free router.
 - Every `KAIROQ_APP_AI_CALLS_PER_CREDIT` (10) calls cost the app owner 1 credit. When the owner has no credits, calls return 402. Each visitor is limited to `KAIROQ_APP_AI_PER_MINUTE` (20).
+- Live typing: `ai.chat({messages, onToken})` and `ai.ask(question, {onToken})` stream the reply (server-sent events over POST); `onToken` gets each piece, and the promise still resolves to the whole answer.
+
+### AI assistant (answers from your documents)
+
+The owner adds what the assistant should know in **Data → AI assistant**: pasted text, a file (.txt, .md, .csv, .html, .json, up to 2 MB) or a public web page (robots.txt is respected; private addresses are refused). PDFs and Word files are not read yet: paste their text.
+
+- In the app: `const { text, sources } = await ai.ask(question, { history, system, onToken })`. `sources` lists the documents cited with `[n]` markers in `text`. Server functions: `await ai.ask(question)`.
+- How it works: documents are split into passages under their headings and indexed with SQLite full-text search in the app's own `data.sqlite` (tables `assistant_docs` and `assistant_chunks`). Each question sends the 6 best passages to the model with rules: answer only from the sources, cite them, say "I don't know" instead of guessing, and treat sources and questions as information, not instructions. No embeddings service, no extra cost beyond the normal app AI call.
+- Limits: 50 documents, 200,000 characters each, 1,000,000 in total per app.
+- Documents are public to the app's visitors (answers quote them), so they should hold nothing private. They belong to one app: other apps, and other accounts, cannot read or change them. The workspace has a "Try a question" box (it is a normal app AI call).
+- Templates **AI front desk** (a guesthouse) and **AI help centre** (an online shop) include a ready chat component with live typing, sources and a hand-off to a contact form, and start with sample documents to replace.
 
 ### Sign-in options
 
@@ -492,6 +503,42 @@ How other companies pay to be on Kairoq without touching anyone's app or data. B
 - **What partners never get.** Nothing about the person or their project: Kairoq only counts that someone clicked or added. Links must be https; only saved links are redirected to; a partner with a running slot cannot be removed until the slot ends.
 
 Data lives in the `partners` folder next to the projects folder (or `KAIROQ_PARTNERS_DIR`).
+
+## Build from WhatsApp
+
+People message Kairoq's WhatsApp number and get their app built, with the link sent back. No laptop needed.
+
+**In the chat**
+- A first message from a new number asks for an email and creates the account (one per number, free credits at once because the number is verified by WhatsApp, a verification email is sent), then builds what they first asked for. An email that already has an account is never taken over: the reply says to connect from the web instead.
+- Any description builds the current app, or a new one if there is none. The reply comes when the build is done, with what changed and the preview link.
+- **Voice notes** are transcribed ("I heard: …") and treated as text. **Photos** with a caption ("make it look like this") are sent to the builder as a reference image.
+- Commands: `projects`, `switch 2`, `new` / `new: a menu site for my cafe`, `publish` (live link), `undo` (previous version), `fix it` (the fix is on us when it is the fix-on-us), `open` (a one-time link into the full editor, 15 minutes), `credits`, `help`.
+- Out of credits, a build still running, or a failed build: a plain reply; failed builds are refunded as on the web.
+
+**Connecting a web account:** sidebar → **WhatsApp** → **Connect**: WhatsApp opens with `link 123456` ready to send (the code works once, for 15 minutes). **Disconnect** removes the number. When WhatsApp is set up, the landing page shows "No laptop? Build it from WhatsApp", which opens a chat with Kairoq.
+
+**Safety:** every webhook call must carry Meta's signature (`X-Hub-Signature-256`, checked with the app secret); deliveries Meta retries are handled once; at most 20 messages per number in 10 minutes; phone numbers are stored only as hashes; photos up to 3 MB.
+
+**Setup** (WhatsApp Business Cloud API, in Meta for Developers):
+1. Create an app of type Business, add the **WhatsApp** product, and add or verify the phone number Kairoq will use.
+2. Create a permanent access token (System user with `whatsapp_business_messaging`) and copy the **Phone number ID**.
+3. In Railway, set `KAIROQ_WHATSAPP_TOKEN`, `KAIROQ_WHATSAPP_PHONE_ID`, `KAIROQ_WHATSAPP_APP_SECRET` (App settings → Basic), `KAIROQ_WHATSAPP_VERIFY_TOKEN` (any long random string), `KAIROQ_WHATSAPP_NUMBER` (international format) and `KAIROQ_PUBLIC_URL`.
+4. In WhatsApp → Configuration, set the webhook to `<KAIROQ_PUBLIC_URL>/api/whatsapp/webhook` with the same verify token, and subscribe to **messages**.
+5. For voice notes, set `GEMINI_API_KEY` (or `OPENAI_API_KEY` for Whisper). `KAIROQ_TRANSCRIBE_MODEL` picks the Gemini model (default `gemini-2.5-flash`).
+
+Replies are free-form messages inside WhatsApp's 24-hour window after the person writes, which covers a build finishing. Meta charges per conversation according to its WhatsApp pricing.
+
+## Live hosting (monthly)
+
+A published site costs **50 credits every 30 days** (`KAIROQ_HOSTING_CREDITS`; `0` turns hosting charges off). The Kairoq owner's own projects are never charged.
+
+- **Publishing** charges the first 30 days. Publishing again (a new version, another site name, or after unpublishing) is free while the 30 days last. Without enough credits, publishing is refused with a clear message and nothing is charged; if publishing fails after the charge (for example the site name is taken), the credits are given back.
+- **Renewal** runs every hour: a site whose 30 days are over is charged again (the project owner's account, also when an editor published it).
+- **Out of credits:** the owner gets an email and the site **stays live for 7 days** (`KAIROQ_HOSTING_GRACE_DAYS`). After that it shows a short "taking a break" page (HTTP 503) instead of the site; the app, its data and its domains are kept. When credits are added, the next hourly run charges them and the site is back.
+- **Sites already live when billing starts** get their first 30 days free.
+- The publish dialog shows the price and when hosting is paid until, and warns while a renewal is failing or the site is paused. Publishing from WhatsApp or the MCP server charges the same way and says so.
+
+`KAIROQ_HOSTING_DAYS` changes the 30-day period (for testing).
 
 ## Customers before code
 
