@@ -131,7 +131,7 @@ function messageItem(m,last,index){
   const f=el('div','msg-meta');
   if(m.version)f.append(el('span','ver','v'+m.version));
   if(m.duration_ms!=null){const t=el('span');t.append(icon('clock'),secs(m.duration_ms));f.append(t)}
-  if(m.credits!=null){const t=el('span');t.append(icon('coin'),String(m.credits));f.append(t)}
+  if(m.credits!=null){const t=el('span');t.append(icon('coin'),m.on_us?'on us':String(m.credits));f.append(t)}
   if(m.attempts>1)f.append(el('span',null,'Fixed '+(m.attempts-1)+' problem'+(m.attempts>2?'s':'')));
   const det=el('button','link-btn details-link','Details');det.type='button';det.onclick=()=>openDetail(index,'timeline');f.append(det);
   li.append(f);
@@ -182,7 +182,7 @@ async function renderData(){
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
  text($('records-title'),state.collection?'Records in '+state.collection:'Records');
- renderSql().catch(()=>{});renderLogs().catch(()=>{});
+ renderSql().catch(()=>{});renderLogs().catch(()=>{});renderAutomations().catch(()=>{});
  if(!state.collection)return;
  const {items}=await api('/projects/'+state.project.id+'/records?collection='+encodeURIComponent(state.collection));
  if(!items.length){const li=document.createElement('li');li.className='muted small';li.textContent='No records yet.';records.append(li)}
@@ -193,6 +193,23 @@ async function renderData(){
   li.append(pre,del);records.append(li);
  }
 }
+// Automations (src/backend.json "automations"): what runs when, the last result, and Run now.
+async function renderAutomations(){
+ const {automations}=await api('/projects/'+state.project.id+'/automations');
+ $('auto-section').classList.toggle('hidden',!automations.length);
+ const ol=$('automations');ol.replaceChildren();
+ const editor=state.project.role!=='viewer';
+ for(const a of automations){
+  const li=document.createElement('li');
+  const badge=el('span','state '+(a.ok===null?'':a.ok?'ok':'bad'),a.ok===null?'never run':a.ok?'ok':'failed');
+  const t=el('div','skill-text');t.append(el('b',null,a.text),el('span',null,(a.last_run?'Last: '+when(a.last_run)+' · '+(a.last_result||''):'Not run yet')+(a.next?' · Next: '+when(a.next):'')+(a.runs?' · '+a.runs+' run'+(a.runs===1?'':'s')+(a.failures?', '+a.failures+' failed':''):'')));
+  const act=el('div','skill-actions');
+  const run=document.createElement('button');run.type='button';run.className='ghost link-btn';run.textContent='Run now';run.disabled=!editor;
+  run.onclick=async()=>{run.disabled=true;try{await api('/projects/'+state.project.id+'/automations',{method:'POST',body:{name:a.name}});await renderAutomations();renderLogs().catch(()=>{})}catch(err){text($('chat-error'),err.message)}finally{run.disabled=!editor}};
+  act.append(run);li.append(badge,t,act);ol.append(li);
+ }
+}
+$('automations-refresh').onclick=()=>renderAutomations().catch(err=>text($('chat-error'),err.message));
 // SQL tables (sql/ migrations) and recent server logs, shown under the Data tab.
 function sqlTable(rows){
  const table=document.createElement('table');table.className='sql-table';
@@ -505,7 +522,7 @@ async function watch(job){
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
   if(done.mode!=='discuss')setPreview(project.preview_url);
-  if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')}));
+  if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')+(done.fix_on_us?' The fix is on us: the next Fix costs nothing.':'')}));
   else if(done.free)$('messages').append(messageItem({role:'assistant',text:done.free}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
@@ -896,7 +913,7 @@ function renderLanding(){
  wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a free URL','No card needed']));
  for(const p of state.me.plans||[])wrap.append(planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features]));
  for(const p of state.me.packs||[])wrap.append(planCard(p.name,p.label||p.credits+' credits',[p.credits+' credits, one-time','Never expire']));
- text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. A request that fails before anything is saved is not charged. Not happy with a change? Contact support.');
+ text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. If a change breaks your app, the next fix of that problem is on us. A request that fails before anything is saved is not charged.');
 }
 $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
 for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent.trim();$('landing-prompt').focus()};

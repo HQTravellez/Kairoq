@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/records':'viewer','DELETE:/records':'editor',
+const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -137,7 +137,11 @@ function streamSnapshot(text,mode){
 // Pay only when it works: a change is charged only when it builds, opens without errors in the
 // browser and keeps the saved checks passing. A change that still shows errors, breaks a check
 // or changes nothing is free (KAIROQ_PAY_WHEN_WORKS=off charges completed work as before).
-function payWhenWorks(){return process.env.KAIROQ_PAY_WHEN_WORKS!=='off'}
+// How a change that does not work is priced (KAIROQ_PAY_WHEN_WORKS):
+//  fix (default): the change is charged, and the next fix of that same problem is on Kairoq.
+//  refund: the change itself is free (refunded).  off: everything completed is charged.
+function payMode(){const v=String(process.env.KAIROQ_PAY_WHEN_WORKS||'fix').toLowerCase();return v==='off'?'off':v==='refund'||v==='on'?'refund':'fix'}
+function payWhenWorks(){return payMode()!=='off'}
 // What is wrong with a version, as one comparable string: its browser errors and failing checks.
 function problemSignature(meta,n){
  const ver=meta.versions.find(x=>x.n===n);if(!ver)return'';
@@ -156,8 +160,11 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
  const before=builder.loadMeta(id),fixing=Boolean(fix)&&mode!=='discuss',sig=fixing?problemSignature(before,before.current_version):'';
  if(fixing&&sig&&before.loop&&before.loop.sig===sig&&before.loop.count>=loopLimit())throw stuckError(before);
  if(mode==='polish'&&!designShots)throw Object.assign(Error('The design review needs screenshots, which are not available on this server.'),{status:503});
- const credits=cost({mode,tier,images:images.length>0})+extraCredits;
- const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString()};
+ // The fix of a change that did not work is on Kairoq, once per problem.
+ const onUs=fixing&&Boolean(sig)&&payMode()==='fix'&&Boolean(before.free_fix)&&before.free_fix.sig===sig;
+ if(before.free_fix&&(onUs||!fixing&&mode!=='discuss')){delete before.free_fix;builder.saveMeta(before)}
+ const credits=onUs?0:cost({mode,tier,images:images.length>0})+extraCredits;
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString(),...(onUs?{on_us:true}:{})};
  const update=patch=>{Object.assign(job,patch);job.seq++};
  // Customers pay up front, before anything is saved; credits are refunded if the job fails.
  if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,label?label+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''):mode==='discuss'?'Discuss message':(mode==='agent'?'Agent task':mode==='polish'?'Design review':'Chat edit')+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
@@ -226,9 +233,16 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    // A reference build's own new journeys may never have passed (they are written from the plan),
    // so there only browser errors make it free.
    const notWorking=hooks?problem==='errors':problem||(job.result&&job.result.unchanged);
-   if(mode!=='discuss'&&payWhenWorks()&&notWorking){
+   const unchanged=Boolean(job.result&&job.result.unchanged)&&!problem;
+   if(mode!=='discuss'&&payWhenWorks()&&notWorking&&(payMode()==='refund'||unchanged)){
+    // Refund mode (or a change that changed nothing): the change itself is free.
     job.free=problem==='checks'?'This change broke a saved check, so it was free.':problem==='errors'?'This change still shows errors in the browser, so it was free.':'Nothing changed, so it was free.';
     if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: the change did not work','refund:'+job.id);job.refunded=true}catch{}
+   }else if(mode!=='discuss'&&payMode()==='fix'&&problem){
+    // Fix mode: the change is charged, the next fix of this problem is not.
+    const m=builder.loadMeta(id),after=problemSignature(m,m.current_version);
+    // A fix that leaves the same problem does not earn another free fix (the loop guard takes over).
+    if(after&&!(fixing&&after===sig)){m.free_fix={sig:after,version:m.current_version,at:new Date().toISOString()};builder.saveMeta(m);job.fix_on_us=(problem==='checks'?'This change broke a saved check.':'This change still shows errors in the browser.')+' The fix is on us: the next Fix costs nothing.'}
    }
    // Loop guard: count fixes in a row that leave the same problem.
    if(fixing&&sig){
@@ -240,8 +254,8 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
     // Any change that leaves the app without errors or failing checks resets the guard.
     const m=builder.loadMeta(id);if(m.loop&&!problemSignature(m,m.current_version)){delete m.loop;builder.saveMeta(m)}
    }
-   // The finished message shows what it cost (0 when refunded).
-   try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;builder.saveMeta(meta)}}catch{}
+   // The finished message shows what it cost (0 when refunded or on us).
+   try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;if(job.on_us)m.on_us=true;if(job.fix_on_us)m.fix_on_us=true;builder.saveMeta(meta)}}catch{}
    update({status:'complete'});
   }catch(e){
    update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
@@ -413,7 +427,7 @@ function startRepair(v,id,{report:rid,rounds=2,rerun=false,tier='standard'},{cal
      const round={round:r,version,message:String(result.message||'').slice(0,400)};out.rounds.push(round);
      // A round that leaves errors or breaks a saved check is free, like any change that does not work.
      const broke=(result.check_failures||[]).length||(result.runtime_errors||[]).length;
-     if(payWhenWorks()&&broke){refund(price,'Free: the fix round did not work','free:'+job.id+ref);round.free=true}
+     if(payMode()==='refund'&&broke){refund(price,'Free: the fix round did not work','free:'+job.id+ref);round.free=true}
      if(!open.length)break;
      update({status:'retesting',progress:'Replaying the same steps on version '+version});
      let res;
@@ -504,7 +518,7 @@ function startLaunch(v,id,{idea,target,visitors,tier='standard'},{callModel,chec
    let r;
    try{r=await builder.edit(id,growth.landingRequest(p),{callModel,checkRuntime,inspect,tier,signal,displayText:'Build a landing page with a waitlist for: '+p.name,onProgress:st=>update({status:st,progress:'Building the landing page',stream:null}),onStream:text=>update({stream:streamSnapshot(text,'build')})})}
    catch(e){refund(price,'Refund: landing page not built',step);throw e}
-   if(payWhenWorks()&&((r.runtime_errors||[]).length||(r.check_failures||[]).length))refund(price,'Free: the landing page shows errors',step);
+   if(payMode()==='refund'&&((r.runtime_errors||[]).length||(r.check_failures||[]).length))refund(price,'Free: the landing page shows errors',step);
    const m2=builder.loadMeta(id);m2.launch.version=r.version;builder.saveMeta(m2);
    // 3. AI customers react to the pitch.
    if(canReact){
@@ -971,6 +985,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,{version:n,previous:prevN||null,files}),true;
   }
   if(action==='/logs'&&method==='GET')return send(res,200,{logs:require('./react-logs').list(id)}),true;
+  if(action==='/automations'&&method==='GET')return send(res,200,{automations:require('./react-automations').status(id)}),true;
+  if(action==='/automations'&&method==='POST'){const b=await readJson(req);if(limited(req,'automation-run',30))throw Object.assign(Error('Too many runs. Wait a few minutes.'),{status:429});const r=await require('./react-automations').runNow(id,String(b.name||''));return send(res,200,{run:r,automations:require('./react-automations').status(id)}),true}
   if(action==='/security'&&method==='GET'){
    const meta=builder.loadMeta(id),files=builder.loadFiles(id,meta.current_version);
    let cfg={collections:{}};try{cfg=backend.parseConfig(files)}catch{}

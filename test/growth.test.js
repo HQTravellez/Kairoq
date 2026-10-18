@@ -89,7 +89,7 @@ async function waitJob(cookie,job){for(let i=0;i<2400;i++){const j=(await reques
 const credits=async cookie=>(await request(server,'GET','/api/create/credits',{headers:{cookie}})).json.account.credits;
 async function project(cookie,name){return (await request(server,'POST','/api/create/projects',{headers:{cookie},body:{name}})).json.project.id}
 
-test('pay only when it works: a change that still shows errors is free; Kairoq stops after two fixes that change nothing',{skip:!runtime.available()&&'no browser'},async()=>{
+test('the fix is on us: a broken change is charged, its fix is free, and Kairoq stops after going in circles',{skip:!runtime.available()&&'no browser'},async()=>{
  const cookie=await signup('pay@example.com');
  const id=await project(cookie,'Pay');
  await builder.saveSource(id,{'src/main.jsx':MAIN,'src/App.jsx':OK},{summary:'Start'});
@@ -97,16 +97,21 @@ test('pay only when it works: a change that still shows errors is free; Kairoq s
  const ok=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{message:'Change the title'}})).json.job);
  assert.equal(ok.status,'complete');assert.ok(!ok.free);assert.equal(await credits(cookie),c0-1,'a change that works is charged');
  const bad=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{message:'Break it'}})).json.job);
- assert.equal(bad.status,'complete',bad.error);assert.equal(bad.problem,'errors',JSON.stringify(bad.result&&bad.result.runtime_errors));assert.equal(bad.refunded,true);assert.match(bad.free,/still shows errors/);
- assert.equal(await credits(cookie),c0-1,'a change that does not work is free');
- assert.equal(builder.loadMeta(id).messages.at(-1).credits,0,'the chat shows it cost nothing');
- // Two fixes that leave the same error: the third is refused instead of charged.
- for(const n of [1,2]){const f=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/fix',{headers:{cookie},body:{errors:[]}})).json.job);assert.equal(f.loop,n);assert.equal(f.refunded,true)}
+ assert.equal(bad.status,'complete',bad.error);assert.equal(bad.problem,'errors',JSON.stringify(bad.result&&bad.result.runtime_errors));assert.ok(!bad.refunded);assert.match(bad.fix_on_us,/The fix is on us/);
+ assert.equal(await credits(cookie),c0-2,'a change that does not work is still charged');
+ assert.ok(builder.loadMeta(id).free_fix,'the project remembers that the next fix is free');
+ // The first fix is on us; one more is charged; the third is refused instead of charged.
+ const f1=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/fix',{headers:{cookie},body:{errors:[]}})).json.job);
+ assert.equal(f1.loop,1);assert.equal(f1.on_us,true);assert.equal(f1.credits,0);assert.equal(await credits(cookie),c0-2,'the first fix costs nothing');
+ assert.equal(builder.loadMeta(id).messages.at(-1).on_us,true,'the chat shows the fix was on us');
+ const f2=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/fix',{headers:{cookie},body:{errors:[]}})).json.job);
+ assert.equal(f2.loop,2);assert.ok(!f2.on_us);assert.equal(await credits(cookie),c0-3,'a second fix of the same problem is charged');
+ assert.equal(builder.loadMeta(id).free_fix,undefined,'no new free fix while going in circles');
  const stuck=await request(server,'POST','/api/create/projects/'+id+'/fix',{headers:{cookie},body:{}});
  assert.equal(stuck.status,409);assert.equal(stuck.json.stuck,true);assert.match(stuck.json.error,/same problem is still there/);
  const viaChat=await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{message:'Fix it',fix:true}});
  assert.equal(viaChat.status,409,'the Fix buttons in the chat are guarded too');
- assert.equal(await credits(cookie),c0-1,'nothing was charged for going in circles');
+ assert.equal(await credits(cookie),c0-3,'nothing more was charged for going in circles');
  // Describing the problem in your own words still works; once it is fixed the guard resets.
  const own=await waitJob(cookie,(await request(server,'POST','/api/create/projects/'+id+'/chat',{headers:{cookie},body:{message:'Show a simple working page'}})).json.job);
  assert.equal(own.status,'complete');assert.ok(!own.problem);

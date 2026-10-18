@@ -5,6 +5,7 @@
 //   "payments": {"products":{"pro":{"price":"price_...","mode":"payment"|"subscription"}}}
 //   "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},
 //               {"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}]
+//   "automations": server functions on a schedule or on record changes (see react-automations.js)
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const builder=require('./react-builder');
 
@@ -46,6 +47,7 @@ function normalizeExtras(cfg,collections){
    return{name:s.name,every:s.every,action:s.action,collection:s.collection,...(s.action==='delete_older_than'?{days}:{})};
   });
  }
+ if(cfg.automations!==undefined)out.automations=require('./react-automations').normalize(cfg.automations,{collections});
  return out;
 }
 function migrate(db){

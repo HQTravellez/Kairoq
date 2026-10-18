@@ -116,7 +116,7 @@
       <div><b>Tested in a real browser</b><span>before anything is saved</span></div>
       <div><b>Checks re-run</b><span>after every change and before publishing</span></div>
       <div><b>AI customers</b><span>use your app and say where they got stuck</span></div>
-      <div><b>Free if it does not work</b><span>a change that still breaks your app costs nothing</span></div>
+      <div><b>The fix is on us</b><span>a change that breaks your app gets its fix free</span></div>
     </section>
 
     <section class="how" id="how" aria-labelledby="how-title">
@@ -146,8 +146,8 @@
           <div class="tile-ui before-after"><div><span>Before</span><b>6 of 10</b></div><div class="arrow">→</div><div><span>After</span><b class="good">9 of 10</b></div></div>
         </article>
         <article class="tile">
-          <div class="tile-text"><h3>Pay only when it works</h3><p>A change is charged only if it builds, opens without errors and keeps your checks passing. If the AI goes round in circles, Kairoq stops and tells you instead of charging again.</p></div>
-          <div class="tile-ui receipt"><div><span>Add Saturday class</span><b>1 credit</b></div><div><span>Fix checkout on phones</span><b>1 credit</b></div><div class="free"><span>Fix checkout (still broken)</span><b>free</b></div></div>
+          <div class="tile-text"><h3>Our mistakes are on us</h3><p>Every change is tested before you see it. If one still breaks something, the next fix of that problem costs nothing, and if the AI goes round in circles Kairoq stops instead of charging again.</p></div>
+          <div class="tile-ui receipt"><div><span>Add Saturday class</span><b>1 credit</b></div><div><span>Add checkout (broke a check)</span><b>1 credit</b></div><div class="free"><span>Fix the checkout</span><b>on us</b></div></div>
         </article>
         <article class="tile">
           <div class="tile-text"><h3>Customers before code</h3><p>Not sure anyone wants it? Kairoq writes the pitch, builds a landing page with a waitlist and the launch posts. Build the app when real people have signed up.</p></div>
@@ -176,7 +176,7 @@
           <tr><th scope="row">Opens every version in a real browser</th><td>Sometimes</td><td class="us">Always, before saving</td></tr>
           <tr><th scope="row">Flows saved as checks and re-run</th><td>—</td><td class="us">After every change, before publishing, daily</td></tr>
           <tr><th scope="row">AI customers use the app and report back</th><td>—</td><td class="us">Yes, with a fix-and-retest loop</td></tr>
-          <tr><th scope="row">A change that breaks the app</th><td>Charged</td><td class="us">Free</td></tr>
+          <tr><th scope="row">A change that breaks the app</th><td>Charged, and the fix is charged again</td><td class="us">The fix is free, and loops are stopped</td></tr>
           <tr><th scope="row">Tests run against</th><td>Your live data</td><td class="us">A test copy of your data</td></tr>
           <tr><th scope="row">Problems explained</th><td>Error messages</td><td class="us">Plain English, with the fix</td></tr>
         </tbody>
@@ -191,7 +191,7 @@
           <h3>How credits work</h3>
           <ul>
             <li><b>One message, one price.</b> A build or a fix costs the credits of the model you pick. Discussing and visual edits are cheaper or free.</li>
-            <li><b>Broken changes are free.</b> If a change fails to build, opens with errors or breaks a saved check, you are not charged.</li>
+            <li><b>Our mistakes are on us.</b> If a change opens with errors or breaks a saved check, the next fix of that problem costs nothing.</li>
             <li><b>No loops.</b> If the AI cannot fix something after a few tries, Kairoq stops and tells you instead of charging again.</li>
             <li><b>Never expire.</b> Credit packs stay until you use them. Subscriptions top up every month.</li>
           </ul>
@@ -395,6 +395,11 @@
             <div class="row"><button class="ghost" type="submit">Run</button><span class="error small" id="sql-error" role="alert"></span></div>
             <div id="sql-result"></div>
           </form>
+        </section>
+        <section class="auto-section hidden" id="auto-section">
+          <h3>Automations <button class="ghost link-btn" id="automations-refresh" type="button">Refresh</button></h3>
+          <p class="muted small">Server functions that run on their own: on a schedule, or when a record is created, updated or deleted. Each run is logged below; after three failures in a row the owner gets one email.</p>
+          <ol class="skills" id="automations"></ol>
         </section>
         <section class="logs-section">
           <h3>Server logs <button class="ghost link-btn" id="logs-refresh" type="button">Refresh</button></h3>

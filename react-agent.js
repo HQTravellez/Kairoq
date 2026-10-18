@@ -25,6 +25,7 @@ Tools (several per step are fine; they run in order):
   Tests run on a test copy of the app's data: nothing they create is real, and emails and payments are simulated. Add "save_as":"Book a room" to a test_ui or build_and_test whose steps prove a main flow works (ending with expect steps): when it passes it becomes a saved check that is re-run after every future change.
 - {"tool":"view_logs"}: server logs: console.log output and errors from server functions, failed backend requests.
 - {"tool":"query_db","sql":"SELECT * FROM rooms LIMIT 5"}: read the app's SQL tables (SELECT only; the same test copy your tests use).
+- {"tool":"run_automation","name":"reminders"}: run one of the app's automations (src/backend.json "automations") now on the test copy, after build_and_test, and see its result and log lines. Use it to prove scheduled and record-triggered functions work.
 ${images?`- {"tool":"generate_images","images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}]}: create up to 4 photos or illustrations (aspect 1:1, 4:3, 3:2, 16:9, 9:16, 3:4) saved as ./uploads/<name>; use the returned paths in the code. Use this tool instead of an "images" field.
 `:''}${web?`- {"tool":"web_search","query":"..."}: search the web; returns links.
 - {"tool":"web_open","url":"https://..."}: open a public website in a real browser (JavaScript runs) and read it: its text and a numbered list of links, buttons and fields${vision?', plus a screenshot':''}. Use it for docs, examples, prices, competitors and anything the user links.
@@ -65,6 +66,7 @@ function describe(a){
  if(t==='test_ui')return'Tested in the browser ('+(Array.isArray(a.steps)?a.steps.length:0)+' steps)';
  if(t==='view_logs')return'Checked server logs';
  if(t==='query_db')return'Queried the database';
+ if(t==='run_automation')return'Ran the automation "'+String(a.name||'').slice(0,40)+'"';
  if(t==='generate_images')return'Generated '+(Array.isArray(a.images)?a.images.length:0)+' image(s)';
  if(t==='web_search')return'Searched the web for "'+String(a.query||'').slice(0,60)+'"';
  if(t==='web_open')return'Opened '+String(a.url||'').slice(0,80);
@@ -196,6 +198,16 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const sql=require('./react-sql');
    if(!sql.exists(box.dir)&&!sql.exists(builder.projectDir(id)))return{text:'query_db: the app has no SQL tables yet.'};
    try{return{text:clip(JSON.stringify(await sql.run.query(box.dir,q,[])),8000)}}catch(e){return{text:'query_db failed: '+e.message}}
+  }
+  if(t==='run_automation'){
+   if(!built)return{text:'run_automation: nothing is built yet. Use build_and_test first.'};
+   const name=String(a.name||'').slice(0,40),since=new Date().toISOString();
+   tl.add({t:'note',icon:'logs',text:'Ran the automation "'+name+'" on the test copy'});
+   try{
+    const r=await require('./react-automations').runNow(id,name,{sb:{dir:box.dir,token:box.token},version:built.n});
+    const lines=require('./react-logs').list(id).filter(l=>l.at>=since&&!/^automation /.test(l.source)).slice(-20).map(l=>l.level+' '+l.source+': '+l.message);
+    return{text:'run_automation "'+name+'": '+r.result+(lines.length?'\nLog lines:\n'+lines.join('\n'):'\n(no log lines)')};
+   }catch(e){return{text:'run_automation failed: '+String(e.message||e).slice(0,300)}}
   }
   if(t==='generate_images'){
    if(!imageGen)return{text:'generate_images is not available on this server. Use https photo URLs (for example from images.unsplash.com) or uploaded images.'};
