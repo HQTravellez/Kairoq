@@ -6720,7 +6720,7 @@ const server = http.createServer(async (req, res) => {
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
   // MCP server for AI assistants (API-key authenticated; see kairoq-mcp.js).
-  if(url==="/mcp"||url.startsWith("/mcp?"))return void await require("./kairoq-mcp").handle(req,res,{callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o)}).catch(e=>{if(!res.headersSent)json(res,500,{error:String(e.message||e).slice(0,300)})});
+  if(url==="/mcp"||url.startsWith("/mcp?"))return void await require("./kairoq-mcp").handle(req,res,{callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),checkRuntime:u=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),generateImage:builderImagesEnabled()?generateBuilderImage:null}).catch(e=>{if(!res.headersSent)json(res,500,{error:String(e.message||e).slice(0,300)})});
   // Owner routes use a cookie, so state-changing requests must come from Kairoq's own pages
   // (a published app on a sibling subdomain could otherwise send them with the owner's cookie).
   // Inbound channel webhooks are called by outside services and check their own secrets.

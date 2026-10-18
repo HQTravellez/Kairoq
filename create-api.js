@@ -776,16 +776,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
   if(route==='/projects'&&method==='POST'){
    const b=await readJson(req,16000000);
-   if(builder.list(v.owner).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
-   const prompt=String(b.prompt||'').trim();
-   const tpl=b.template?require('./create-templates').get(String(b.template)):null;
-   if(b.template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
-   const meta=builder.create({name:b.name||(tpl&&!prompt?tpl.name:prompt.split(/[.\n]/)[0].slice(0,60))||'Untitled app',owner:v.owner});
-   if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
-   else await builder.initialize(meta);
-   // Mobile templates start with the mobile app setting on (phone preview, installable app).
-   if(tpl&&tpl.mobile)require('./react-mobile').update(meta.id,{enabled:true,...tpl.mobile});
-   const job=prompt?startJob(v,meta.id,{message:prompt,tier:b.tier||'standard',images:parseImages(b.images)},deps):null;
+   const {meta,job}=await createProject(v,{name:b.name,prompt:b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
@@ -1129,12 +1120,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/file'&&method==='GET'){const name=new URL(req.url,'http://x').searchParams.get('path')||'';return send(res,200,{path:name,content:builder.readFile(id,name)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
   if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);
-   // Publishing re-runs the saved checks on the version going live, unless the owner overrides.
-   if(!b.force&&inspect){const meta=builder.loadMeta(id),n=Number(b.version)||meta.current_version;if(require('./react-checks').list(meta).some(c=>c.enabled!==false)&&meta.versions.some(x=>x.n===n)){const r=await require('./react-checks').run(id,builder.previewUrl(meta,n),{inspect,version:n});if(r.failed.length)return send(res,409,{error:'Saved checks fail on this version: '+r.failed.map(f=>f.name).join(', ')+'. Fix them first, or publish anyway.',checks_failed:r.failed}),true}}
-   hosting.publish(id,{slug:b.slug,version:b.version});
-   // Social share image: a screenshot of the published version, taken in the background.
-   if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
-  return send(res,200,{project:projectView(id)}),true}
+   await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot});
+   return send(res,200,{project:projectView(id)}),true}
   if(action==='/unpublish'&&method==='POST'){hosting.unpublish(id);return send(res,200,{project:projectView(id)}),true}
   if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);await hosting.addDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
   if(action==='/verify'&&method==='POST'){const b=await readJson(req,2000);const r=await hosting.verifyDomain(id,b.hostname);return send(res,200,{verified:r.verified,error:r.error,project:projectView(id)}),true}
@@ -1147,4 +1134,26 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  }
 }
 
-module.exports={handle,jobs,streamSnapshot,watchAll,runWatch,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor};
+// A new project, started from a template and/or a first prompt (the editor and the MCP server).
+async function createProject(v,{name,prompt,template,tier='standard',images=[]}={},deps){
+ if(builder.list(v.owner).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
+ prompt=String(prompt||'').trim();
+ const tpl=template?require('./create-templates').get(String(template)):null;
+ if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
+ const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:prompt.split(/[.\n]/)[0].slice(0,60))||'Untitled app',owner:v.owner});
+ if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
+ else await builder.initialize(meta);
+ // Mobile templates start with the mobile app setting on (phone preview, installable app).
+ if(tpl&&tpl.mobile)require('./react-mobile').update(meta.id,{enabled:true,...tpl.mobile});
+ const job=prompt?startJob(v,meta.id,{message:prompt,tier,images},deps):null;
+ return{meta,job};
+}
+// Publishing re-runs the saved checks on the version going live, unless the owner overrides.
+async function publishProject(id,{slug,version,force}={},{inspect,screenshot}={}){
+ if(!force&&inspect){const meta=builder.loadMeta(id),n=Number(version)||meta.current_version;if(require('./react-checks').list(meta).some(c=>c.enabled!==false)&&meta.versions.some(x=>x.n===n)){const r=await require('./react-checks').run(id,builder.previewUrl(meta,n),{inspect,version:n});if(r.failed.length)throw Object.assign(Error('Saved checks fail on this version: '+r.failed.map(f=>f.name).join(', ')+'. Fix them, or publish with force to go live anyway.'),{status:409,failed:r.failed})}}
+ const out=hosting.publish(id,{slug,version});
+ // Social share image: a screenshot of the published version, taken in the background.
+ if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
+ return out;
+}
+module.exports={handle,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
