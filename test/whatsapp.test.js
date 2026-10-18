@@ -97,8 +97,12 @@ test('changes, voice notes, photos and commands from the chat',async()=>{
  const phone='971501112233';
  let r=await say(phone,'Add a gallery section');
  assert.match(r[0],/On it/);assert.match(r[1],/Built version 2[\s\S]*\/v\/3\//);
+ // A voice note is read back first; nothing is built until it is confirmed.
  r=await message(phone,{type:'audio',audio:{id:'VOICE1'}});
- assert.equal(r[0],'🎙️ I heard: "Make the buttons green please"');assert.match(r[2],/Built version 3[\s\S]*\/v\/4\//);
+ assert.equal(r.length,1);assert.match(r[0],/^🎙️ I heard: "Make the buttons green please"[\s\S]*Reply \*OK\*/);
+ r=await say(phone,'OK');
+ assert.match(r[0],/On it/);assert.match(r[1],/Built version 3[\s\S]*\/v\/4\//);
+ assert.match(builder.loadMeta(builder.list().find(p=>p.name.startsWith('A booking page')).id).messages.at(-2).text,/Make the buttons green please/);
  r=await message(phone,{type:'image',image:{id:'PHOTO1',caption:'Make it look like this'}});
  assert.match(r[1],/\/v\/5\//);
  const id=builder.list().find(p=>p.name.startsWith('A booking page')).id;

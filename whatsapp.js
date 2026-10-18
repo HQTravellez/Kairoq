@@ -88,7 +88,7 @@ async function onMessage(msg,deps){
   else if(msg.type==='audio'){
    const audio=await media(msg.audio.id,deps),heard=await (deps.transcribeImpl||transcribe)(audio,deps);
    if(!heard)return reply('I could not understand that voice note. Please send it as text.');
-   text=clip(heard,2000);await reply('🎙️ I heard: "'+clip(text,300)+'"');
+   text=clip(heard,2000);
   }else if(msg.type==='image'){
    const img=await media(msg.image.id,deps);
    if(!/^image\/(png|jpeg|webp)$/.test(img.mime))return reply('Please send the picture as a normal photo (JPG or PNG).');
@@ -128,9 +128,19 @@ async function onMessage(msg,deps){
    }
   }
   // The first thing they asked for is kept; later non-email replies do not replace it.
+  if(msg.type==='audio')await reply('🎙️ I heard: "'+clip(text,300)+'"');
   if(!email&&text.length>8&&!st.pending)st.pending=text;
   st.stage='email';save(d);
   return reply('👋 Hi! I am Kairoq. I build websites and apps from your messages, test them in a real browser and send you the link.\n\nTo start, reply with your *email address* (it is your account, so you can also open your apps on a computer).'+(st.pending?' I will build what you asked for right after.':''));
+ }
+  // A voice note is read back first: a misheard word should not cost a build.
+ if(msg.type==='audio'&&process.env.KAIROQ_WHATSAPP_CONFIRM_VOICE!=='off'){
+  st.heard={text,at:Date.now()};save(d);
+  return reply('🎙️ I heard: "'+clip(text,400)+'"\n\nReply *OK* and I will do that, or send a correction.');
+ }
+ if(st.heard){
+  const h=st.heard;delete st.heard;save(d);
+  if(Date.now()-h.at<1800000&&/^(ok(ay)?|yes|yep|yeah|go( ahead)?|do it|correct|right|👍|✅|s[ií]|oui|ja|haan)\b[\s.!]*$/iu.test(text.trim()))text=h.text;
  }
  return command(from,st,d,text,images,deps);
 }

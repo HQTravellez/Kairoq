@@ -182,6 +182,14 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 - Every `KAIROQ_APP_AI_CALLS_PER_CREDIT` (10) calls cost the app owner 1 credit. When the owner has no credits, calls return 402. Each visitor is limited to `KAIROQ_APP_AI_PER_MINUTE` (20).
 - Live typing: `ai.chat({messages, onToken})` and `ai.ask(question, {onToken})` stream the reply (server-sent events over POST); `onToken` gets each piece, and the promise still resolves to the whole answer.
 
+### Structured data from text and photos (ai.extract)
+
+`await ai.extract({ shape, text, images, instructions })` turns text or photos into data: a menu photo into items, a receipt into totals, a chat into a booking enquiry. The shape is plain JSON: `{"items":[{"name":"string","price":"number","vegan":"boolean?"}]}` (types string, number, integer, boolean, date, email, phone; `?` optional; `[shape]` a list; up to 4 levels, 60 fields). The answer is checked against the shape and tidied ("€6,50" → 6.5, "yes" → true); with problems it is asked once more with them listed. Returns `{data, missing, problems?}`: `missing` lists required fields that were not found. Photos (PNG, JPEG, WebP, GIF, up to 4 MB, at most 4) go to `KAIROQ_APP_AI_VISION_MODEL` (default `google/gemini-2.5-flash`), which needs paid models approved; there is no free fallback for images. Also in server functions (`ai.extract`). Each call counts as an app AI call. The **Event enquiry planner** template uses it to plan an enquiry in a chat.
+
+### Ask your data
+
+Data tab → **Ask your data**: the owner asks in plain words ("nights booked per room this month") and gets a sentence, the rows and how they were counted. The model writes one query; it must be a single `SELECT`/`WITH`, runs on a read-only connection to either the saved records (`data.sqlite`, JSON fields through `json_extract`) or the app's SQL tables (`app-sql.sqlite`), never touches visitors' passwords, sessions or tokens, and is cut at 200 rows. A failed query is retried once with the error. Two app AI calls per question (write, then answer); 30 questions per 10 minutes per app.
+
 ### AI assistant (answers from your documents)
 
 The owner adds what the assistant should know in **Data → AI assistant**: pasted text, a PDF or Word (.docx) file up to 10 MB, a text file (.txt, .md, .csv, .html, .json, up to 2 MB) or a public web page (robots.txt is respected; private addresses are refused).
@@ -305,6 +313,19 @@ When `OPENROUTER_API_KEY` and `KAIROQ_BUILDER_PAID_APPROVED=true` are set, the A
 
 A design skill's text goes into the builder's instructions, so skills imported from GitHub or pasted are checked first (`react-skills.js` `scan`): hidden characters are removed; text that tells the AI to ignore its instructions, reveal or send secrets, change who it is, read cookies or secrets, or send data to capture services, and long encoded blobs, block the import with the reason; risky code in examples (eval, remote scripts, outside fetch, raw HTML) is reported as a warning.
 
+
+### Two design reviewers (Pro and Max)
+
+The polish pass first asks two different models (the vision tier and the Pro tier) to review the desktop and phone screenshots on their own, then shows each the other's findings to UPHOLD or REJECT (`design-panel.js`). Only agreed problems go to the fix, as an explicit list; when they agree that nothing needs changing, the app is left as it is (unless the user asked for something). If either reviewer is unavailable, the single review runs as before. `KAIROQ_DESIGN_PANEL=off` turns it off.
+
+### Design skills that improve themselves
+
+`node scripts/improve-skill.js --skill <id> --url … --email … --password … --cases hotel,salon --holdout cafe --judge-model <vision model> [--rounds 3] --yes` (owner, offline): the built-in skill is scored by building the test briefs with it and judging the screenshots; a model diagnoses the most common problem, makes one change, and the change is kept only if the training score rises by 0.15 and the held-out score does not drop (`skill-lab.js`). Unsafe text is refused. The result is written to `design-skills/<id>/SKILL.proposed.md` for you to read and commit; nothing is overwritten. Each round costs the builds' credits; without `--yes` it only prints the plan.
+
+### Side-effect guard
+
+After a build or agent change, the edit is compared with the request (`scope-guard.js`). When a request about looks or text also changed saved data and bookings, payments or sign-in, the reply shows "Also changed sign-in (src/Login.jsx), which you did not ask about. If that was not intended, undo this version." Nothing is blocked.
+
 ## Saved checks (apps that don't break)
 
 The most common complaints about AI app builders are changes that break what used to work, paying for the AI's own mistakes, and tests that touch real data. Kairoq handles all three:
@@ -331,6 +352,9 @@ The most common complaints about AI app builders are changes that break what use
   - `query_db` in Agent mode reads the same copy. Copies are deleted after the run.
 - **Publish gate.** Publishing re-runs the checks on the version going live and asks before publishing a version that fails them.
 - **Live monitor.** Every `KAIROQ_MONITOR_HOURS` (default 24, `0` to turn off), the checks run on each published app's live version. The owner gets one email when a check starts failing, not one per day.
+
+
+**Checks that repair themselves:** when a run fails because a click, fill or select step can no longer find its button or field (it was renamed), Kairoq opens the page up to that step, tries the most similar elements of the same kind (up to 5) in its place and keeps the first one with which the whole check passes. The checks list then shows "Likely fix: the button “Book now” is now “Reserve a table”"; **Use it** updates the check. Steps that `expect` a text are never changed this way.
 
 ## AI costs and prompt caching
 
@@ -448,6 +472,10 @@ A report is the start; the repair loop (`synthetic-repair.js`) goes on to **repr
 
 **MCP:** the `fix_and_retest` tool does the same for AI assistants. `get_synthetic_test` follows the job.
 
+## What visitors remember
+
+After each test-customer visit (and in the free website check), the persona is asked, from its own notes and thoughts and without another look, what the price was, where the business is and how to book or get in touch. The report shows how many remembered each one ("Afterwards, visitors remembered: 3 of 5 the price · 1 of 5 where it is …"), which shows whether the site gets its message across, not only whether its buttons work. One extra model call per visitor; a failed quiz is simply left out.
+
 ## Free website check
 
 Anyone can check a website without an account, from the landing page or `/create` (signed in: **Website check** in the sidebar). They give the link and an email; Kairoq opens the site in a real browser on desktop and phone, works out what a visitor comes to do (or uses the goal they typed), sends a few AI customers through it and writes a report at a shareable link (`/create/check/<id>`):
@@ -538,6 +566,9 @@ People message Kairoq's WhatsApp number and get their app built, with the link s
 5. For voice notes, set `GEMINI_API_KEY` (or `OPENAI_API_KEY` for Whisper). `KAIROQ_TRANSCRIBE_MODEL` picks the Gemini model (default `gemini-2.5-flash`).
 
 Replies are free-form messages inside WhatsApp's 24-hour window after the person writes, which covers a build finishing. Meta charges per conversation according to its WhatsApp pricing.
+
+
+**Voice notes are read back first:** for a connected account, a voice note is answered with "🎙️ I heard: … Reply *OK* and I will do that, or send a correction". OK (yes, 👍, sí, oui, ja…) within 30 minutes builds what was heard; anything else is treated as the new instruction. `KAIROQ_WHATSAPP_CONFIRM_VOICE=off` builds straight away as before.
 
 ## Live hosting (monthly)
 

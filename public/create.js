@@ -180,6 +180,7 @@ function messageItem(m,last,index){
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
+ if(m.role==='assistant'&&m.scope&&m.scope.length){const d=el('div','scope-chip');d.append(icon('note'),el('span',null,'Also changed '+m.scope.map(f=>f.area).join(' and ')+' ('+[...new Set(m.scope.flatMap(f=>f.files))].slice(0,4).join(', ')+'), which you did not ask about. If that was not intended, undo this version.'));li.append(d)}
  if(m.role==='assistant'&&m.memory){const bits=[...(m.memory.recipes||[]).map(t=>'Used your recipe: '+t),...(m.memory.recalled?['Looked at your project “'+m.memory.recalled+'”']:[]),...(m.memory.learned||[]).map(t=>'Remembered: '+t)];if(bits.length){const d=el('div','memory-chip');d.append(icon('think'),el('span',null,bits.join(' · ')));d.title='Open Memory to see or change this';d.onclick=()=>openMemory();li.append(d)}}
  if(m.role==='assistant'&&Array.isArray(m.sources)&&m.sources.length){const s=el('div','sources');s.append(el('span','sources-label','Sources'));for(const src of m.sources.slice(0,8)){const a=el('a','source',src.title&&src.title!==src.url?src.title.slice(0,60):src.url.replace(/^https?:\/\/(www\.)?/,'').slice(0,60));a.href=src.url;a.target='_blank';a.rel='noopener noreferrer';a.title=src.url;s.append(a)}li.append(s)}
  if(m.role==='assistant'&&!tl.length&&m.changed&&m.changed.length){const c=el('div','file-chips done');for(const f of m.changed.slice(0,12))c.append(fileChip(f));if(m.changed.length>12)c.append(el('span','chip more','+'+(m.changed.length-12)+' more'));li.append(c)}
@@ -254,6 +255,18 @@ async function renderData(){
   li.append(pre,del);records.append(li);
  }
 }
+// Ask your data: an answer, the rows behind it and the query that found them.
+$('ask-data').onsubmit=async e=>{
+ e.preventDefault();
+ const q=$('ask-data-q').value.trim(),box=$('ask-data-result'),btn=$('ask-data-go');if(!q)return;
+ box.classList.remove('hidden');box.replaceChildren(el('p','muted small','Looking through your data…'));btn.disabled=true;
+ try{
+  const r=await api('/projects/'+state.project.id+'/askdata',{method:'POST',body:{question:q}});
+  box.replaceChildren(el('p','ask-data-answer',r.answer));
+  if(r.rows.length){const d=el('details'),s=el('summary',null,r.rows.length+' row'+(r.rows.length===1?'':'s')+(r.rows.length===200?' (first 200)':'')+' · how it was counted');d.append(s,el('p','muted small',r.note),sqlTable(r.rows),el('pre','small',r.sql));box.append(d)}
+ }catch(err){box.replaceChildren(el('p','error small',err.message))}
+ finally{btn.disabled=false}
+};
 // AI assistant: the documents the app's AI answers from (ai.ask), and a test question.
 const assistantState={add:'text'};
 async function renderAssistant(){
@@ -1295,6 +1308,13 @@ async function openCheck(id){
   renderCheck(check);
  }catch(err){$('check-running').classList.add('hidden');$('check-report').classList.add('hidden');$('check-failed').classList.remove('hidden');text($('check-failed-text'),err.message)}
 }
+// What visitors remembered afterwards (price, place, how to book), per question.
+function renderRecall(box,recall){
+ box.replaceChildren();box.classList.toggle('hidden',!(recall&&recall.length));
+ if(!recall||!recall.length)return;
+ box.append(el('li','recall-head','Afterwards, visitors remembered:'));
+ for(const r of recall){const li=el('li',r.remembered*2>=r.asked?'ok':'bad');li.append(el('b',null,r.remembered+' of '+r.asked),' '+r.question.replace(/\?$/,'').replace(/^What does it cost$/,'the price').replace(/^Where is it, or how do you get there$/,'where it is').replace(/^How do you book or get in touch$/,'how to book or get in touch'));box.append(li)}
+}
 function renderCheck(c){
  document.title=c.host+' website check · Kairoq Create';
  $('check-report').classList.remove('hidden');
@@ -1305,6 +1325,7 @@ function renderCheck(c){
  const n=c.numbers||{};
  text($('cr-headline'),c.summary&&c.summary.headline?c.summary.headline:n.completed===n.visitors?'Every visitor managed it.':'Some visitors did not manage it.');
  text($('cr-numbers'),c.blocked?'The site\'s bot protection turned our AI customers away, so this score covers the technical basics only.':(n.completed||0)+' of '+((n.visitors||0)-(n.blocked||0))+' AI customers managed it'+(n.blocked?' ('+n.blocked+' blocked by bot protection)':'')+(n.by_device&&n.by_device.phone?' · on phones '+n.by_device.phone.completed+' of '+n.by_device.phone.visitors:'')+(n.median_steps?' · '+n.median_steps+' steps for those who did':''));
+ renderRecall($('cr-recall'),n.recall);
  const shots=$('cr-shots');shots.replaceChildren();
  for(const name of c.shots||[]){const f=el('figure','cr-shot '+name),img=document.createElement('img');img.alt=c.host+' on '+(name==='phone'?'a phone':'a desktop');img.loading='lazy';img.src='/api/create/site-check/'+c.id+'/shot?name='+name;f.append(img,el('figcaption',null,name==='phone'?'Phone':'Desktop'));shots.append(f)}
  const iss=$('cr-issues');iss.replaceChildren();
@@ -1627,7 +1648,15 @@ async function renderChecks(){
   const act=document.createElement('div');act.className='skill-actions';
   const on=document.createElement('label'),cb=document.createElement('input');cb.type='checkbox';cb.checked=c.enabled!==false;cb.disabled=!editor;cb.onchange=async()=>{try{await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{id:c.id,enabled:cb.checked}})}catch(err){text($('checks-error'),err.message)}};on.append(cb,document.createTextNode(' on'));act.append(on);
   if(editor){const del=document.createElement('button');del.type='button';del.className='ghost link-btn';del.textContent='Remove';del.onclick=async()=>{if(!confirm('Remove the check "'+c.name+'"?'))return;try{await api('/projects/'+state.project.id+'/checks',{method:'DELETE',body:{id:c.id}});renderChecks()}catch(err){text($('checks-error'),err.message)}};act.append(del)}
-  li.append(st,t,act);list.append(li);
+  li.append(st,t,act);
+  // A renamed button or field: the check found the likely new one and proved the flow still works with it.
+  if(c.last&&!c.last.ok&&c.last.repair){
+   const fix=el('div','check-repair'),r=c.last.repair;
+   fix.append(el('span',null,'Likely fix: the '+(r.field==='text'?'button':'field')+' “'+r.from+'” is now “'+r.to+'”, and the check passes with it.'));
+   if(editor){const ap=el('button','ghost link-btn','Use it');ap.type='button';ap.onclick=async()=>{try{await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{repair:c.id}});text($('checks-status'),'Updated “'+c.name+'”.');renderChecks()}catch(err){text($('checks-error'),err.message)}};fix.append(ap)}
+   li.append(fix);
+  }
+  list.append(li);
  }
  for(const el of ['checks-run','checks-describe','checks-add'])$(el).disabled=!editor;
  $('checks-run').disabled=!editor||!d.checks.length;
@@ -1718,6 +1747,7 @@ function showCustReport(report,fix){
  renderComparison(report.comparison);
  text($('cust-headline'),s.headline||'Test from '+report.at.slice(0,16).replace('T',' '));
  text($('cust-rate'),n.completion_rate+'% reached the goal');
+ renderRecall($('cust-recall'),n.recall);
  text($('cust-numbers'),n.completed+' of '+n.visitors+' visitors · '+n.gave_up+' gave up · '+n.stuck+' did not finish'+(n.blocked?' · '+n.blocked+' blocked by bot protection':'')+(n.frustrated?' · '+n.frustrated+' got frustrated':'')+Object.entries(n.by_device||{}).map(([d,x])=>' · '+d+': '+x.completed+'/'+x.visitors).join(''));
  const drop=$('cust-drop');drop.replaceChildren();for(const d of n.drop_off)drop.append(li(d.path+' — '+d.visitors+' visitor'+(d.visitors===1?'':'s')));if(!n.drop_off.length)drop.append(li('Nobody left early.','muted'));
  const iss=$('cust-issues');iss.replaceChildren();for(const x of s.issues)iss.append(li(x.title+(x.why?': '+x.why:'')+(x.who?' ('+x.who+')':'')+(x.quote?' — “'+x.quote+'”':'')));if(!s.issues.length)iss.append(li('No issues found.','muted'));
@@ -1930,7 +1960,7 @@ $('apikey-create').onclick=async()=>{
 };
 $('checks-open').onclick=async()=>{text($('checks-error'),'');text($('checks-status'),'');$('checks-save-anyway').classList.add('hidden');try{await renderChecks();$('checks-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
 $('checks-run').onclick=async()=>{const btn=$('checks-run');btn.disabled=true;text($('checks-status'),'Running the checks on a test copy of your data…');text($('checks-error'),'');
- try{const {result}=await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{run:true}});text($('checks-status'),result.failed.length?result.failed.length+' of '+result.ran+' failed. Use Fix it in the chat, or describe what changed.':'All '+result.ran+' passed.');await renderChecks()}
+ try{const {result}=await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{run:true}});text($('checks-status'),result.failed.length?result.failed.length+' of '+result.ran+' failed.'+(result.repairs&&result.repairs.length?' '+result.repairs.length+' look like a renamed button or field: see “Likely fix” below.':' Use Fix it in the chat, or describe what changed.'):'All '+result.ran+' passed.');await renderChecks()}
  catch(err){text($('checks-status'),'');text($('checks-error'),err.message)}finally{btn.disabled=false}};
 let checkDraft=null;
 $('checks-add').onclick=async()=>{const btn=$('checks-add');btn.disabled=true;text($('checks-status'),'Writing the check and trying it…');text($('checks-error'),'');$('checks-save-anyway').classList.add('hidden');

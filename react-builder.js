@@ -54,6 +54,7 @@ Rules:
   - Payments: "payments":{"products":{"pro":{"price":"price_REPLACE_ME","mode":"payment"}}} (mode "subscription" for plans). import { payments } from 'kairoq'; await payments.checkout('pro') opens Stripe Checkout for the signed-in user; await payments.has('pro') checks a purchase. Tell the user to replace price ids with their Stripe price ids and connect Stripe in Settings.
   - AI in the app: "ai":true. import { ai } from 'kairoq'; const { text } = await ai.chat({ system, messages:[{role:'user',content}] }) (also ai.chat('prompt')). Use it for chatbots, summaries, suggestions and generators. Show a loading state; errors can include "out of AI credits".
     Live typing: pass onToken to show the reply as it arrives: await ai.chat({ messages, onToken: t => setReply(r => r + t) }).
+    Structured data from text or photos (a photo of a menu or price list into items, a receipt into totals, a chat into a booking enquiry, a business card into a contact): const { data, missing } = await ai.extract({ shape:{ items:[{ name:'string', price:'number', vegan:'boolean?' }] }, image: fileFromInput, text, instructions }). Types: string, number, integer, boolean, date, email, phone; "?" = optional; [shape] = list. missing lists required fields that were not found: ask the user for them. Show what was read and let the user correct it before saving. Images up to 4 MB (needs a vision model on the server; show its error message).
     Answers about the business (a website assistant, FAQ or help chat, "ask us anything", concierge): const { text, sources } = await ai.ask(question, { history, onToken }) answers only from documents the owner adds in the Data tab under "AI assistant" (menu, prices, FAQ, policies), and says when it does not know. history is the earlier [{role:'user'|'assistant',content}] of the chat; sources is [{n,title,excerpt}] for the [n] markers in text: show them under the answer. Render text with line breaks and turn [n] into small source chips; when the answer says it does not know, offer a contact form. Add a small "Not helpful?" link under each answer that calls ai.feedback(question, false): those questions reach the owner's "could not answer" list. Optional: fallback (the text shown when the documents do not cover a question, in the site's language). In server functions: await ai.ask(question). Tell the user to add their documents in Data → AI assistant.
   - Server functions (for API keys, calling other services, webhooks, logic that must not run in the browser): add functions/<name>.js (lowercase-name) with exactly one default export and no imports:
       export default async function (request, { user, db, secrets, fetch, ai, email, crypto, log }) { ...; return { status: 200, json: {...} }; }
@@ -497,7 +498,15 @@ async function polish(id,{shots,note='',...opts}){
  const pictures=shots?await shots(previewUrl(meta)):[];
  if(!pictures.length)throw Object.assign(Error('Screenshots are not available on this server, so the design review cannot run.'),{status:503});
  const extraNote=String(note||'').trim().slice(0,1000);
- return edit(id,POLISH_REQUEST+(extraNote?'\nThe user also asked for: '+extraNote:''),{...opts,images:pictures.map(p=>({...p,name:p.name+'.jpg'})),displayText:'Polish the design'+(extraNote?': '+extraNote:''),extra:{polish:true},design:true});
+ // Pro and Max: two reviewers agree on the problems first (design-panel.js); with nothing agreed
+ // the app is left as it is. Without a second model the single review below runs as before.
+ let agreed='';
+ if((opts.tier==='pro'||opts.tier==='max')&&opts.callModel&&process.env.KAIROQ_DESIGN_PANEL!=='off'){
+  const panel=await require('./design-panel').review({pictures,callModel:opts.callModel,signal:opts.signal}).catch(()=>null);
+  if(panel&&!panel.agreed.length&&!extraNote){const m=loadMeta(id);return{unchanged:true,version:m.current_version,preview_url:previewUrl(m),message:'Two design reviewers looked at the desktop and phone screenshots and agreed nothing needs changing.',panel}}
+  if(panel&&panel.agreed.length)agreed=require('./design-panel').note(panel.agreed);
+ }
+ return edit(id,POLISH_REQUEST+agreed+(extraNote?'\nThe user also asked for: '+extraNote:''),{...opts,images:pictures.map(p=>({...p,name:p.name+'.jpg'})),displayText:'Polish the design'+(extraNote?': '+extraNote:''),extra:{polish:true},design:true});
 }
 
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.

@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -223,6 +223,7 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    const signal=controller.signal;
    // Build and Discuss look things up first when the message asks for it (links, "search", "latest", docs...).
    let research={context:'',sources:[]};
+   const versionBefore=builder.loadMeta(id).current_version;
    if((mode==='build'||mode==='discuss')&&!referenceOnly&&process.env.KAIROQ_WEB_RESEARCH!=='off'){
     update({status:'researching'});
     research=await require('./web').gather(message,{callModel,tier:modelTier,signal,webSearch,onProgress:p=>update({status:'researching',progress:p})}).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
@@ -289,6 +290,13 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    }else if(mode!=='discuss'){
     // Any change that leaves the app without errors or failing checks resets the guard.
     const m=builder.loadMeta(id);if(m.loop&&!problemSignature(m,m.current_version)){delete m.loop;builder.saveMeta(m)}
+   }
+   // Side-effect guard: a change about looks that also touched data, payments or sign-in says so.
+   if(job.result&&!job.result.unchanged&&['build','agent'].includes(mode)&&!hooks&&versionBefore&&job.result.version&&job.result.version!==versionBefore){
+    try{
+     const found=require('./scope-guard').check(message,builder.loadFiles(id,versionBefore),builder.loadFiles(id,job.result.version));
+     if(found.length){job.result.scope=found;const m=builder.loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.scope=found;builder.saveMeta(m)}}
+    }catch{}
    }
    // Memory: what was used and learned shows under the reply; recipes are written or improved after.
    if(job.result&&mode!=='polish'){
@@ -963,6 +971,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
   if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
+  // Ask your data: a question in plain words, answered from the app's saved records or SQL tables.
+  if(action==='/askdata'&&method==='POST'){
+   limitedKey('askdata:'+id,30,600000);
+   const b=await readJson(req,4000),meta=builder.loadMeta(id),db=backend.database(id);
+   return send(res,200,await require('./data-ask').ask(id,b.question,o=>backend.appAi(meta,db,o))),true;
+  }
   // The documents this app's AI answers from (ai.ask), and a test question from the workspace.
   if(action==='/assistant'){
    const A=require('./app-assistant'),db=backend.database(id);
@@ -1205,7 +1219,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is being updated. Try again when it is done.'),{status:409});
    const meta=builder.loadMeta(id),url=builder.previewUrl(meta);
    if(!url)throw Object.assign(Error('Build the app first'),{status:400});
-   if(b.run){const r=await checks.run(id,url,{inspect,version:meta.current_version});if(r.skipped)throw Object.assign(Error('Checks need a browser on the server (Chromium), which is not available here.'),{status:503});return send(res,200,{result:r,checks:checks.list(builder.loadMeta(id))}),true}
+   if(b.repair){checks.applyRepair(id,String(b.repair));return send(res,200,{checks:checks.list(builder.loadMeta(id))}),true}
+   if(b.run){const r=await checks.run(id,url,{inspect,version:meta.current_version});if(!r.skipped&&r.failed.length)r.repairs=await checks.suggestRepairs(id,url,r,{inspect});if(r.skipped)throw Object.assign(Error('Checks need a browser on the server (Chromium), which is not available here.'),{status:503});return send(res,200,{result:r,checks:checks.list(builder.loadMeta(id))}),true}
    let draft;
    if(typeof b.describe==='string'&&b.describe.trim()){
     // The AI writes the steps (priced like a Discuss message); the check is kept only if it passes now.

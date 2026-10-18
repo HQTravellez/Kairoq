@@ -449,6 +449,7 @@ function withDocs(t){
 }
 TEMPLATES.splice(2,0,
  withDocs({id:'ai-front-desk',name:'AI front desk',category:'AI',description:'A guesthouse site with a front desk that answers guests any time from your own house guide and prices, types its replies live, shows its sources and passes unanswered questions to you.'}),
+ withDocs({id:'event-enquiry',name:'Event enquiry planner',category:'AI',description:'A venue site whose chat plans an event enquiry: it picks the date, guests and budget out of what people write, asks only for what is missing, and sends you a tidy summary. With a plain form for those who prefer it.'}),
  withDocs({id:'help-center',name:'AI help centre',category:'AI',description:'A help centre for any business: customers ask in their own words and get answers from your help articles with sources, plus popular topics and a contact form.'}));
 function list(){return TEMPLATES.map(({files,assistantDocs,...t})=>t)}
 function get(id){return TEMPLATES.find(t=>t.id===id)||null}

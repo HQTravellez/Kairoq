@@ -313,7 +313,7 @@
         </div>
         <div class="cr-actions"><button class="ghost" id="cr-copy" type="button">Copy link</button><button class="primary" id="cr-rebuild" type="button">Rebuild it with Kairoq</button></div>
       </header>
-      <section class="cr-headline"><p id="cr-headline"></p><p class="cr-numbers" id="cr-numbers"></p></section>
+      <section class="cr-headline"><p id="cr-headline"></p><p class="cr-numbers" id="cr-numbers"></p><ul class="recall hidden" id="cr-recall"></ul></section>
       <section class="cr-shots" id="cr-shots"></section>
       <section class="cr-block"><h2>Why visitors gave up</h2><ol class="cr-issues" id="cr-issues"></ol></section>
       <section class="cr-block"><h2>What to fix first</h2><ol class="cr-fixes" id="cr-fixes"></ol></section>
@@ -485,6 +485,12 @@
       <div class="data hidden" id="data">
         <p class="muted small">Saved data and sign-ups from this app. Preview and published versions share one database.</p>
         <p class="small" id="data-features"></p>
+        <form class="ask-data" id="ask-data">
+          <label>Ask your data <span class="muted small">in plain words, e.g. “bookings next week by room” or “which dish sold most this month”</span>
+            <div class="row"><input id="ask-data-q" maxlength="500" placeholder="How many bookings did we get this month?"><button class="ghost" type="submit" id="ask-data-go">Ask</button></div>
+          </label>
+          <div class="ask-data-result hidden" id="ask-data-result" aria-live="polite"></div>
+        </form>
         <div class="data-grid">
           <div><h3>Collections</h3><ul class="file-list" id="collections"></ul><h3>Users <span class="muted" id="user-count"></span></h3><ul class="users" id="users"></ul></div>
           <div><h3 id="records-title">Records</h3><ul class="records" id="records"></ul></div>
@@ -796,6 +802,7 @@
       <div id="cust-comparison" class="notice hidden"><h4>Same customers, two sites</h4><div id="cust-comparison-body" class="small"></div></div>
       <h3 id="cust-headline"></h3>
       <p class="cust-stats"><b id="cust-rate"></b> <span id="cust-numbers" class="muted"></span></p>
+      <ul class="recall hidden" id="cust-recall"></ul>
       <h4>Where the others left</h4><ul class="small" id="cust-drop"></ul>
       <h4>What is going wrong, in plain English</h4><div id="cust-cards"></div>
       <h4 id="cust-issues-title">Issues</h4><ul class="small" id="cust-issues"></ul>

@@ -313,4 +313,4 @@ async function main(){
  console.log('\nDone. Results in '+outDir+' (summary.md, scoring-sheet.csv'+(o.judge?', judge-notes.md':'')+', shots/).');
 }
 if(require.main===module)main().catch(e=>{console.error(e.message||e);process.exit(1)});
-module.exports={args,judgePrompt,parseJudge,judgeApp,runJudge,writeReports,lovableShots,AREAS};
+module.exports={args,judgePrompt,parseJudge,judgeApp,runJudge,writeReports,lovableShots,AREAS,Client,launch,browserCheck,loadCases};

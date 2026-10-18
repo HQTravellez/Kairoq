@@ -84,7 +84,8 @@ async function designShots(url,{timeoutMs=20000}={}){
  return shots;
 }
 // viewport 'phone' tests the page at 390x844 with touch, like a phone.
-async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,viewport}={}){
+// scan: also return what a browsing agent would see (the interactive elements), e.g. to repair a check.
+async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,viewport,scan=false}={}){
  if(!available())return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
  const phone=viewport==='phone';
  const context=await (await browser()).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
@@ -100,7 +101,7 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,vie
  page.on('response',r=>{if(r.status()>=400){if(own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url());else ext(r.url())}});
  const origin=new URL(url).origin,root=new URL('./',url).pathname;
  await guard(context,url,{sandbox});
- let text='',shot=null;
+ let text='',shot=null,scanned=null;
  try{
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
   await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
@@ -128,9 +129,10 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,vie
   if(blank)add('Blank page: nothing rendered inside #root.');
   if(phone&&await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2).catch(()=>false))add('Layout overflow: the page scrolls sideways on a 390px phone screen.');
   if(screenshot)shot=(await page.screenshot({type:'jpeg',quality:60})).toString('base64');
+  if(scan)scanned=(await page.evaluate(SCAN,{max:MAX_ELEMENTS}).catch(()=>null)||{}).elements||null;
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
- return{skipped:false,errors,external,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot};
+ return{skipped:false,errors,external,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot,...(scanned?{elements:scanned}:{})};
 }
 // ---------- other websites (synthetic customers on any public link) ----------
 // A public website someone has permission to test, e.g. the same app built elsewhere. Chromium

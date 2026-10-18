@@ -582,3 +582,17 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .assistant-findings-list .finding input{width:auto;margin-top:3px;flex:none}
 .assistant-findings-list .finding .skill-text{flex:1;min-width:0}
 .assistant-questions-list .skill-actions{display:flex;gap:14px}
+
+.recall{list-style:none;padding:0;margin:6px 0 10px;display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
+.recall .recall-head{flex-basis:100%;color:var(--muted,#6b6b6b)}
+.recall li.ok b{color:#1f7a4d}.recall li.bad b{color:#b4231a}
+
+.check-repair{flex-basis:100%;display:flex;gap:10px;align-items:center;font-size:13px;margin:4px 0 0 28px;padding:6px 10px;border-radius:8px;background:var(--soft,#f6f4f1)}
+
+.ask-data{margin:6px 0 14px;padding:12px 14px;border:1px solid var(--line,#e5e2dc);border-radius:14px}
+.ask-data .row{display:flex;gap:8px}.ask-data .row input{flex:1}
+.ask-data-result{margin-top:10px}.ask-data-answer{font-size:15px;margin:0 0 6px;white-space:pre-wrap}
+.ask-data-result pre{white-space:pre-wrap;background:var(--soft,#f6f4f1);padding:8px;border-radius:8px}
+
+.scope-chip{display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 10px;border-radius:10px;font-size:13px;background:color-mix(in srgb,#d97706 12%,transparent);color:inherit}
+.scope-chip svg{flex:none;margin-top:2px}

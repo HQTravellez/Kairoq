@@ -240,7 +240,10 @@ async function appAi(meta,db,args,{onToken}={}){
  const today=db.prepare('SELECT calls FROM app_ai_usage WHERE day=?').get(new Date().toISOString().slice(0,10));
  if(today&&today.calls>=Math.max(1,Number(process.env.KAIROQ_APP_AI_DAILY_LIMIT||2000)))throw fail(429,'This app has reached its daily AI limit');
  if(meta.owner!=='owner'){const owner=accounts.database().prepare('SELECT credits FROM accounts WHERE id=?').get(meta.owner);if(!owner||owner.credits<1)throw fail(402,'This app is out of AI credits')}
- const out=await appAiImpl({system,messages:clean,maxTokens,...(onToken?{onToken}:{})});
+ // Images (ai.extract): attached to the last message, for a model that can see them.
+ const imgs=Array.isArray(args&&args.images)?args.images.slice(0,4):[];
+ if(imgs.length)clean[clean.length-1]={role:'user',content:[{type:'text',text:clean[clean.length-1].content},...imgs.map(url=>({type:'image_url',image_url:{url}}))]};
+ const out=await appAiImpl({system,messages:clean,maxTokens,...(onToken?{onToken}:{}),...(imgs.length?{vision:true}:{})});
  const day=new Date().toISOString().slice(0,10);
  db.prepare('INSERT INTO app_ai_usage(day,calls) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET calls=calls+1').run(day);
  const per=Math.max(1,Number(process.env.KAIROQ_APP_AI_CALLS_PER_CREDIT||10));
@@ -393,6 +396,11 @@ async function handle(req,res,{onlyProject}={}){
    const b=await readJson(req,4000);
    return send(res,200,sb?{ok:true,test:true}:require('./app-assistant').feedback(db,{question:b.question,helpful:b.helpful})),true;
   }
+  if(route==='/ai/extract'&&req.method==='POST'){
+   if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
+   limitedAi(req,id);
+   return send(res,200,await require('./app-extract').extract(await readJson(req,20000000),o=>appAi(meta,db,o))),true;
+  }
   if((route==='/ai'||route==='/ai/ask')&&req.method==='POST'){
    if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
    limitedAi(req,id);
@@ -448,6 +456,7 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
   secret:async n=>require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
   db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
   ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},
+  extract:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-extract').extract(a,o=>appAi(meta,db,o))},
   ask:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-assistant').ask(db,a,o=>appAi(meta,db,o))},
   sql:(q,p)=>require('./react-sql').run.query(sb?sb.dir:builder.projectDir(id),q,p),
   sqlBatch:steps=>require('./react-sql').run.batch(sb?sb.dir:builder.projectDir(id),steps),
@@ -620,6 +629,15 @@ export const ai={
   async ask(question,{history,system,fallback,onToken}={}){
     const body={question,history,system,fallback};
     return onToken?streamed('/ai/ask',body,onToken):call('/ai/ask',{method:'POST',body});
+  },
+  // Structured data from text or photos: ai.extract({ shape:{name:'string',price:'number'}, text, images:[file or data URL], instructions })
+  // -> { data, missing:[fields not found], problems? }
+  async extract({shape,schema,text,image,images,instructions}={}){
+    const toUrl=f=>typeof f==='string'?Promise.resolve(f):new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('Could not read the image'));r.readAsDataURL(f)});
+    const list=await Promise.all([...(images||[]),...(image?[image]:[])].map(toUrl));
+    const r=await fetch(BASE+'/ai/extract',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:JSON.stringify({shape:shape||schema,text,images:list,instructions})});
+    const d=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(d.error||'Could not read it ('+r.status+')'),{status:r.status});
+    return d;
   },
   // A visitor's thumbs-down: the question goes on the owner's "could not answer" list.
   async feedback(question,helpful){return call('/ai/feedback',{method:'POST',body:{question,helpful}})}

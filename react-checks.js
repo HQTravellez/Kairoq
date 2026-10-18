@@ -59,7 +59,7 @@ async function run(id,versionUrl,{inspect,checks,record=true,version,viewport}={
   if(r.skipped)return{ran:0,passed:0,failed:[],skipped:true};
   const bad=r.steps.find(s=>!s.ok);
   const crash=r.errors.find(e=>/^(Uncaught error|Blank page|Page did not load|Layout overflow)/.test(e));
-results.push({id:c.id,name:c.name+(viewport==='phone'?' (phone)':''),ok:!bad&&!crash,step:bad?stepLabel(bad.step):'',error:bad?String(bad.error).replace(/^locator\.\w+: /,''):crash||''});
+results.push({id:c.id,name:c.name+(viewport==='phone'?' (phone)':''),ok:!bad&&!crash,step:bad?stepLabel(bad.step):'',...(bad?{index:r.steps.indexOf(bad)}:{}),error:bad?String(bad.error).replace(/^locator\.\w+: /,''):crash||''});
  }
  if(record&&viewport!=='phone'){
   const fresh=builder.loadMeta(id),at=new Date().toISOString();
@@ -112,4 +112,54 @@ async function monitorAll({inspect,send}={}){
  }
  return out;
 }
-module.exports={monitorAll,normalize,list,save,remove,setEnabled,run,failureText,promptNote,write,MAX_CHECKS};
+// ---------- checks that repair themselves ----------
+// When a click, fill or select step fails because its button or field was renamed, the page
+// is opened up to that step and the most similar element on screen is tried in its place. A
+// suggestion is kept only when the whole check then passes; the owner approves it. Steps that
+// expect a text are never changed this way: they are what proves the flow works.
+function words(t){return new Set(String(t||'').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[])}
+function similarity(a,b){
+ const A=words(a),B=words(b);if(!A.size||!B.size)return 0;
+ let both=0;for(const w of A)if(B.has(w))both++;
+ const tri=s=>{const x=String(s).toLowerCase().replace(/\s+/g,' '),o=new Set();for(let i=0;i<x.length-2;i++)o.add(x.slice(i,i+3));return o};
+ const ta=tri(a),tb=tri(b);let tt=0;for(const g of ta)if(tb.has(g))tt++;
+ return Math.max(both/(A.size+B.size-both),ta.size&&tb.size?tt/(ta.size+tb.size-tt):0);
+}
+async function repair(id,versionUrl,check,failure,{inspect}){
+ const i=failure.index,s=check.steps[i];
+ if(!(i>=0)||!s||!['click','fill','select'].includes(s.action))return null;
+ const field=['text','label','placeholder'].find(k=>s[k]);if(!field)return null;
+ const sandbox=require('./react-sandbox');
+ const seen=await sandbox.withSandbox(id,box=>inspect(versionUrl+(check.path||''),{steps:check.steps.slice(0,i),screenshot:false,scan:true,sandbox:box.token}));
+ const want=s.action==='click'?e=>!/^input|^textarea|^select/.test(e.kind):e=>/^input|^textarea|^select|textbox|combobox/.test(e.kind);
+ // Most similar first; a renamed button often shares no words ("Book now" → "Reserve a table"),
+ // so the top few of the right kind are all tried: only one that makes the whole check pass counts.
+ const ranked=(seen.elements||[]).filter(e=>e.label&&want(e)&&e.label!==s[field]&&!e.disabled).map((e,i)=>({e,i,score:similarity(s[field],e.label)+(e.ph?similarity(s[field],e.ph)*0.5:0)})).sort((a,b)=>b.score-a.score||a.i-b.i).slice(0,5);
+ for(const {e} of ranked){
+  const value=field==='placeholder'&&e.ph?e.ph:e.label;
+  const steps=check.steps.map((x,j)=>j===i?{...x,[field]:value}:x);
+  const r=await sandbox.withSandbox(id,box=>inspect(versionUrl+(check.path||''),{steps,screenshot:false,sandbox:box.token}));
+  if(!r.skipped&&r.steps.every(x=>x.ok))return{index:i,field,from:s[field],to:value};
+ }
+ return null;
+}
+// Applies the repair the owner approved (saved on the check by the last run).
+function applyRepair(id,checkId){
+ const meta=builder.loadMeta(id),c=list(meta).find(x=>x.id===checkId);
+ if(!c||!c.last||!c.last.repair)throw Object.assign(Error('There is no suggested fix for this check'),{status:404});
+ const r=c.last.repair,step=c.steps[r.index];
+ if(!step||step[r.field]!==r.from)throw Object.assign(Error('The check changed since the fix was suggested. Run the checks again.'),{status:409});
+ step[r.field]=r.to;c.updated_at=new Date().toISOString();c.last={...c.last,repaired:r};delete c.last.repair;
+ builder.saveMeta(meta);return c;
+}
+// After a run: a suggested fix for each check that failed on a renamed button or field.
+async function suggestRepairs(id,versionUrl,result,{inspect,limit=3}={}){
+ const meta=builder.loadMeta(id),out=[];
+ for(const f of result.failed.slice(0,limit)){
+  const c=list(meta).find(x=>x.id===f.id);if(!c||f.index===undefined)continue;
+  const r=await repair(id,versionUrl,c,f,{inspect}).catch(()=>null);
+  if(r){out.push({id:c.id,...r});const fresh=builder.loadMeta(id),fc=list(fresh).find(x=>x.id===c.id);if(fc&&fc.last){fc.last.repair=r;builder.saveMeta(fresh)}}
+ }
+ return out;
+}
+module.exports={repair,suggestRepairs,applyRepair,similarity,monitorAll,normalize,list,save,remove,setEnabled,run,failureText,promptNote,write,MAX_CHECKS};

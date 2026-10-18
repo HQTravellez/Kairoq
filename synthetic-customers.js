@@ -48,15 +48,31 @@ async function personas({audience,goal,count,callModel,tier,signal}){
 // stuck, and a second model checks a "done" before it counts as reaching the goal.
 function describePersona(p){return p.name+', '+p.age+', '+(p.about||'')+' Uses a '+p.device+'. Patience: '+p.patience+'. Tech comfort: '+p.tech+'.'+(p.wants?' Wants: '+p.wants:'')}
 // site: another website (no test copy of its data; sends are answered locally, see runtime-check.js).
-async function visit({url,persona,goal,callModel,tier,browse,sandbox,site=false,signal}){
+// After the visit, the persona is asked what they remember (price, place, how to book),
+// answering only from their own notes and thoughts, not from another look at the site. That
+// shows whether the site gets its message across, not only whether its buttons work.
+const RECALL_DEFAULT=['What does it cost?','Where is it, or how do you get there?','How do you book or get in touch?'];
+const RECALL=`You are the person below, right after leaving a website. Answer from memory only: what you noticed while visiting (your notes and thoughts are below). If you did not notice something, say you don't know.
+Respond with ONLY JSON: {"answers":[{"q":1,"answer":"short answer in your own words","remembered":true|false}]}`;
+async function recall({persona,goal,steps,memory,questions,callModel,tier,signal}){
+ try{
+  const notes=steps.map(s=>'- '+s.path+': '+(s.thought||s.action)).join('\n').slice(0,4000);
+  const v=await callModel({messages:[{role:'system',content:RECALL},{role:'user',content:'You are: '+describePersona(persona)+'\nYou came to: '+clip(goal,300)+'\nYour notes: '+clip(memory,600)+'\nYour thoughts while visiting:\n'+notes+'\n\nQuestions:\n'+questions.map((q,i)=>(i+1)+'. '+q).join('\n')}],temperature:0.3,maxOutputTokens:400,signal,tier},json);
+  return questions.map((q,i)=>{const a=(Array.isArray(v.answers)?v.answers:[]).find(x=>Number(x.q)===i+1)||{};return{q,answer:clip(a.answer,200),remembered:a.remembered===true}});
+ }catch{return null}
+}
+async function visit({url,persona,goal,callModel,tier,browse,sandbox,site=false,signal,questions=RECALL_DEFAULT}){
  const s=await browse(url,site?{site:true,viewport:persona.device}:{sandbox,viewport:persona.device});
  if(!s)return{persona,outcome:'skipped',steps:[]};
  try{
   const r=await require('./browser-agent').run({session:s,goal,mode:'persona',persona:describePersona(persona),callModel,tier,maxSteps:MAX_STEPS(),signal});
-  return{persona,outcome:r.outcome,steps:r.steps,...(r.verdict&&r.verdict.checked?{verdict:{ok:r.verdict.ok,reason:r.verdict.reason}}:{}),...(r.error?{error:r.error}:{})};
+  const memo=['completed','gave_up','stuck'].includes(r.outcome)&&questions.length?await recall({persona,goal,steps:r.steps,memory:r.memory,questions,callModel,tier,signal}):null;
+  return{persona,outcome:r.outcome,steps:r.steps,...(memo?{recall:memo}:{}),...(r.verdict&&r.verdict.checked?{verdict:{ok:r.verdict.ok,reason:r.verdict.reason}}:{}),...(r.error?{error:r.error}:{})};
  }finally{await s.close()}
 }
 
+// test.recall: up to 3 questions of the owner's own; [] turns the quiz off.
+function recallQuestions(test){if(Array.isArray(test.recall))return test.recall.map(q=>clip(q,150)).filter(Boolean).slice(0,3);return RECALL_DEFAULT}
 // ---------- the run ----------
 async function pool(items,limit,fn){
  const out=new Array(items.length);let next=0;
@@ -78,6 +94,8 @@ function funnel(visits){
   drop_off:Object.entries(left).map(([path,n])=>({path,visitors:n})).sort((a,b)=>b.visitors-a.visitors).slice(0,8),
   by_device:by,
   frustrated:real.filter(v=>v.steps.some(s=>s.feeling==='frustrated')).length,
+  // What visitors remembered afterwards, per question.
+  ...(real.some(v=>v.recall)?{recall:real.find(v=>v.recall).recall.map((x,i)=>({question:x.q,asked:real.filter(v=>v.recall&&v.recall[i]).length,remembered:real.filter(v=>v.recall&&v.recall[i]&&v.recall[i].remembered).length}))}:{}),
   sent_form:real.filter(v=>v.steps.some(s=>s.sent)).length
  };
 }
@@ -85,7 +103,7 @@ const SUMMARY_PROMPT=`You analyse a usability test where AI personas tried to re
 Respond with ONLY JSON: {"headline":"one sentence: the single most important finding","issues":[{"title":"short problem name","why":"what goes wrong and why, concretely (name the page, button or text)","who":"which kind of people it affects","visitors":<how many visits show it>,"quote":"one persona's exact words"}],"fixes":["specific change to make, most valuable first"]}
 Rank issues by how many visitors they lost. Be concrete and grounded only in what the visits show. At most 6 issues and 6 fixes.`;
 function digest(visits){
- return visits.filter(v=>v.outcome!=='skipped').map(v=>'## '+v.persona.name+' ('+v.persona.age+', '+v.persona.device+', patience '+v.persona.patience+', tech '+v.persona.tech+') — '+v.outcome+'\n'+v.steps.map(s=>s.n+'. '+s.path+' ['+s.feeling+'] '+s.thought+' → '+s.action+(s.label?' "'+s.label+'"':'')+(s.error?' (failed)':'')).join('\n')).join('\n\n').slice(0,60000);
+ return visits.filter(v=>v.outcome!=='skipped').map(v=>'## '+v.persona.name+' ('+v.persona.age+', '+v.persona.device+', patience '+v.persona.patience+', tech '+v.persona.tech+') — '+v.outcome+'\n'+v.steps.map(s=>s.n+'. '+s.path+' ['+s.feeling+'] '+s.thought+' → '+s.action+(s.label?' "'+s.label+'"':'')+(s.error?' (failed)':'')).join('\n')+(v.recall?'\nAfterwards remembered: '+v.recall.map(x=>x.q+' → '+(x.remembered?x.answer:'did not know')).join('; '):'')).join('\n\n').slice(0,60000);
 }
 async function summarize(visits,goal,{callModel,tier,signal}){
  try{
@@ -114,7 +132,7 @@ async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgre
  let done=0;
  const sandbox=require('./react-sandbox');
  const visits=await pool(people,CONCURRENCY(),async persona=>{
-  const r=site?await visit({url:start,persona,goal:test.goal,callModel,tier,browse,site:true,signal}):await sandbox.withSandbox(id,box=>visit({url:start,persona,goal:test.goal,callModel,tier,browse,sandbox:box.token,signal}));
+  const r=site?await visit({url:start,persona,goal:test.goal,callModel,tier,browse,site:true,signal,questions:recallQuestions(test)}):await sandbox.withSandbox(id,box=>visit({url:start,persona,goal:test.goal,callModel,tier,browse,sandbox:box.token,signal,questions:recallQuestions(test)}));
   done++;onProgress({status:'visiting',text:done+' of '+people.length+' visitors finished'});
   return r;
  });
@@ -158,4 +176,4 @@ function fixMessage(report){
   s.issues.map((x,i)=>(i+1)+'. '+x.title+(x.why?': '+x.why:'')+(x.quote?' (a visitor said: "'+x.quote+'")':'')+at(i)).join('\n')+
   (s.fixes.length?'\nSuggested changes:\n'+s.fixes.map(f=>'- '+f).join('\n'):'');
 }
-module.exports={personas,visit,run,funnel,summarize,save,update,list,load,fixMessage,normalizePersona,MAX_PERSONAS};
+module.exports={recall,recallQuestions,personas,visit,run,funnel,summarize,save,update,list,load,fixMessage,normalizePersona,MAX_PERSONAS};
