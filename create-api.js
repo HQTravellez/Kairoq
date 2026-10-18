@@ -1325,6 +1325,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,202,{job:publicJob(startJob(v,id,{message:'Fix these errors from the running app:\n'+errors.join('\n'),tier:b.tier||'standard',fix:true},deps))}),true;
   }
   if(action==='/file'&&method==='GET'){const name=new URL(req.url,'http://x').searchParams.get('path')||'';return send(res,200,{path:name,content:builder.readFile(id,name)}),true}
+  // Builds a version again from its saved code (a blank preview after the built files were lost). Free.
+  if(action==='/rebuild'&&method==='POST'){limitedKey('rebuild:'+id,6,600000);const b=await readJson(req,2000);const meta=builder.loadMeta(id);const n=Number(b.version)||meta.current_version;if(!meta.versions.some(x=>x.n===n))throw Object.assign(Error('Unknown version'),{status:404});if(!await builder.ensureBuilt(id,n,{force:true}))throw Object.assign(Error('This version could not be built. Ask Kairoq to fix it: describe what you see.'),{status:422});return send(res,200,{project:projectView(id),preview_url:builder.previewUrl(meta,n)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
   if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);
    await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot});

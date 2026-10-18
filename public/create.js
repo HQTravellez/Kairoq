@@ -207,6 +207,15 @@ function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();st
 // The preview reports "ready" once it has rendered; when nothing arrives, say so instead of showing a blank frame.
 function watchPreview(){state.previewReady=false;$('preview-notice').classList.add('hidden');clearTimeout(state.previewTimer);state.previewTimer=setTimeout(()=>{if(!state.previewReady&&!$('frame').classList.contains('hidden'))$('preview-notice').classList.remove('hidden')},9000)}
 $('preview-reload').onclick=()=>{const f=$('frame');const u=f.src;f.src='about:blank';setTimeout(()=>{f.src=u;watchPreview()},50)};
+// Builds the shown version again from its saved code on the server (free), then reloads it.
+async function rebuildPreview(){
+ if(!state.project)return;
+ const st=$('preview-rebuild-status'),btn=$('preview-rebuild');btn.disabled=true;text(st,'Rebuilding…');
+ try{const r=await api('/projects/'+state.project.id+'/rebuild',{method:'POST',body:{version:previewVersion()}});text(st,'');setPreview(r.preview_url)}
+ catch(err){text(st,err.message)}
+ finally{btn.disabled=false}
+}
+$('preview-rebuild').onclick=rebuildPreview;
 $('versions').onchange=()=>setPreview(previewFor($('versions').value));
 $('restore').onclick=async()=>{
  const n=Number($('versions').value);if(n===state.project.current_version)return;
@@ -217,7 +226,8 @@ $('back').onclick=()=>{closeDetail();state.project=null;loadHome()};
 $('project-name').onchange=async()=>{try{const {project}=await api('/projects/'+state.project.id,{method:'PATCH',body:{name:$('project-name').value}});state.project.name=project.name}catch{}};
 function device(mobile){$('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile))}
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
-$('refresh').onclick=()=>{const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
+// Reload; when the preview had not loaded, rebuild it first.
+$('refresh').onclick=()=>{if(!$('preview-notice').classList.contains('hidden'))return rebuildPreview();const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
 $('share-open').onclick=()=>$('team-open').click();
 function view(mode){
  state.code=mode==='code';state.data=mode==='data';
