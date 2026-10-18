@@ -154,9 +154,35 @@ function loopLimit(){return Math.max(1,intEnv('KAIROQ_LOOP_LIMIT',2))}
 function stuckError(meta){
  return Object.assign(Error('Kairoq tried to fix this '+meta.loop.count+' times and the same problem is still there, so it stopped instead of charging you for going in circles. Use Explain to see what is wrong in plain English, roll back to an earlier version, describe the problem in your own words, or contact support for a person to look at it.'),{status:409,stuck:true});
 }
+// "I can't see the website": a report about the preview, not a change request. Changing code
+// for it wastes credits and fixes nothing, so it gets a free answer with what to check.
+function supportQuestion(message){
+ const t=String(message||'').trim();
+ if(t.length>240||/https?:\/\//i.test(t)||/^(add|change|make|remove|update|create|build|replace|move|put|use|rename|delete|fix)\b/i.test(t))return false;
+ return /\b(can'?t|cannot|can not|don'?t|do not|not able to|unable to|couldn'?t)\s+(see|view|open|find|load|access)\b|\bwant to (see|view|open)\b|\b(blank|white|empty|black)\s+(page|screen|preview|site)\b|\b(page|screen|preview|site|website|app)\s+(is|looks|stays|went|goes)\s+(blank|white|empty|black)\b|\b(preview|website|web site|site|app|page|screen)\b[^.]{0,40}\b(not|isn'?t|doesn'?t|won'?t|never)\s+(showing|show|loading|load|opening|open|appear|appearing|visible|there|work|working)\b|\bnothing (shows|appears|loads|is showing)\b|\bwhere is (the|my) (website|site|app|preview)\b/i.test(t);
+}
+function supportAnswer(meta){
+ const n=meta.current_version,ver=meta.versions.find(x=>x.n===n),errors=(ver&&ver.runtime_errors)||[];
+ const url=builder.previewUrl(meta);
+ return[
+  errors.length?'The last build (version '+n+') shows errors in Kairoq\'s own browser, so the page may be blank. Use **Fix it** on the errors above: the fix is on us.':'Nothing is wrong with the code: the last build (version '+n+') opened without errors in Kairoq\'s own browser, so I did not change anything and this message cost nothing.',
+  'To see the app:',
+  '1. Make sure **Preview** is selected at the top of the editor, and the version menu shows v'+n+'.',
+  '2. Use the **↗** button next to the version menu to open the app in a new browser tab.',
+  '3. Reload the page once. On a phone, scroll: the preview sits above the chat.',
+  'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
+ ].join('\n');
+}
 function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&supportQuestion(message)){
+  const meta=builder.loadMeta(id),answer=supportAnswer(meta);
+  builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
+  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
+  jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+  return job;
+ }
  const before=builder.loadMeta(id),fixing=Boolean(fix)&&mode!=='discuss',sig=fixing?problemSignature(before,before.current_version):'';
  if(fixing&&sig&&before.loop&&before.loop.sig===sig&&before.loop.count>=loopLimit())throw stuckError(before);
  if(mode==='polish'&&!designShots)throw Object.assign(Error('The design review needs screenshots, which are not available on this server.'),{status:503});

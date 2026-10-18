@@ -146,7 +146,10 @@ function renderVersions(){
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
-function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url}
+function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
+// The preview reports "ready" once it has rendered; when nothing arrives, say so instead of showing a blank frame.
+function watchPreview(){state.previewReady=false;$('preview-notice').classList.add('hidden');clearTimeout(state.previewTimer);state.previewTimer=setTimeout(()=>{if(!state.previewReady&&!$('frame').classList.contains('hidden'))$('preview-notice').classList.remove('hidden')},9000)}
+$('preview-reload').onclick=()=>{const f=$('frame');const u=f.src;f.src='about:blank';setTimeout(()=>{f.src=u;watchPreview()},50)};
 $('versions').onchange=()=>setPreview(previewFor($('versions').value));
 $('restore').onclick=async()=>{
  const n=Number($('versions').value);if(n===state.project.current_version)return;
@@ -721,6 +724,7 @@ $('visual-panel').onsubmit=async e=>{
 window.addEventListener('message',e=>{
  if(e.source!==$('frame').contentWindow||!e.data||e.data.source!=='kairoq-app')return;
  if(e.data.type==='select'&&state.selecting){api('/projects/'+state.project.id+'/inspect',{method:'POST',body:{loc:e.data.loc,version:previewVersion()}}).then(({element})=>{state.selected={...element,loc:e.data.loc};renderVisual()}).catch(err=>{state.selected=null;renderVisual();text($('visual-error'),err.message)});return}
+ if(e.data.type==='ready'){state.previewReady=true;clearTimeout(state.previewTimer);$('preview-notice').classList.add('hidden')}
  if(e.data.type==='runtime-error'){const msg=String(e.data.message||'').slice(0,800);if(msg&&!state.runtimeErrors.includes(msg)&&state.runtimeErrors.length<10){state.runtimeErrors.push(msg);renderErrors()}}
 });
 function currentVersionErrors(){return state.project?.versions.find(v=>v.n===state.project.current_version)?.runtime_errors||[]}
