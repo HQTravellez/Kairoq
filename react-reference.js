@@ -460,4 +460,4 @@ function buildTask(plan,analysis){
 }
 // The analysis kept with the project: everything except the screenshots (saved as files).
 function stored(analysis){const {screenshots,files,...rest}=analysis;return{...rest,...(files?{files:Object.keys(files)}:{})}}
-module.exports={safeUrl,blockedHost,privateIp,parseRobots,robotsAllows,crawlSite,shape,designTokens,summarizeOpenApi,discoverOpenApi,parseRepo,licenseUse,analyzeRepo,readZip,reaAvailable,runRea,reaNetwork,analyzeApp,describe,planPrompt,normalizePlan,parsePlan,createPlan,buildTask,stored,integrations,rgbHex};
+module.exports={safeUrl,blockedHost,privateIp,publicFetch,robots,parseRobots,robotsAllows,crawlSite,shape,designTokens,summarizeOpenApi,discoverOpenApi,parseRepo,licenseUse,analyzeRepo,readZip,reaAvailable,runRea,reaNetwork,analyzeApp,describe,planPrompt,normalizePlan,parsePlan,createPlan,buildTask,stored,integrations,rgbHex};

@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -946,6 +946,24 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
   if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
+  // The documents this app's AI answers from (ai.ask), and a test question from the workspace.
+  if(action==='/assistant'){
+   const A=require('./app-assistant'),db=backend.database(id);
+   const view=()=>({...A.list(db),ai_enabled:Boolean(backend.liveConfig(builder.loadMeta(id)).ai)});
+   if(method==='GET')return send(res,200,{assistant:view()}),true;
+   if(method==='DELETE'){const b=await readJson(req,2000);A.remove(db,b.id);return send(res,200,{assistant:view()}),true}
+   if(method==='POST'){
+    const b=await readJson(req,3000000);
+    if(b.action==='test'){
+     limitedKey('assistant-test:'+id,30,600000);
+     const meta=builder.loadMeta(id);
+     return send(res,200,{answer:await A.ask(db,{question:b.question},o=>backend.appAi(meta,db,o))}),true;
+    }
+    limitedKey('assistant-add:'+id,60,600000);
+    const added=b.url?await A.addUrl(db,b.url):b.file?A.addFile(db,b.file):A.addText(db,{title:b.title,text:b.text});
+    return send(res,201,{added,assistant:view()}),true;
+   }
+  }
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
   if(action==='/chat'&&method==='POST'){const b=await readJson(req,16000000);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',images:parseImages(b.images),fix:b.fix===true},deps))}),true}
@@ -1261,6 +1279,7 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[]}=
  const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:prompt.split(/[.\n]/)[0].slice(0,60))||'Untitled app',owner:v.owner});
  if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
  else await builder.initialize(meta);
+ if(tpl&&tpl.assistantDocs){const A=require('./app-assistant'),db=backend.database(meta.id);for(const d of tpl.assistantDocs)A.addText(db,{title:d.title,text:d.text,source:'Sample from the template: replace it with your own',kind:'text'})}
  // Mobile templates start with the mobile app setting on (phone preview, installable app).
  if(tpl&&tpl.mobile)require('./react-mobile').update(meta.id,{enabled:true,...tpl.mobile});
  const job=prompt?startJob(v,meta.id,{message:prompt,tier,images},deps):null;

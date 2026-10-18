@@ -243,7 +243,7 @@ async function renderData(){
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
  text($('records-title'),state.collection?'Records in '+state.collection:'Records');
- renderSql().catch(()=>{});renderLogs().catch(()=>{});renderAutomations().catch(()=>{});
+ renderSql().catch(()=>{});renderLogs().catch(()=>{});renderAutomations().catch(()=>{});renderAssistant().catch(()=>{});
  if(!state.collection)return;
  const {items}=await api('/projects/'+state.project.id+'/records?collection='+encodeURIComponent(state.collection));
  if(!items.length){const li=document.createElement('li');li.className='muted small';li.textContent='No records yet.';records.append(li)}
@@ -254,6 +254,53 @@ async function renderData(){
   li.append(pre,del);records.append(li);
  }
 }
+// AI assistant: the documents the app's AI answers from (ai.ask), and a test question.
+const assistantState={add:'text'};
+async function renderAssistant(){
+ const {assistant:a}=await api('/projects/'+state.project.id+'/assistant');
+ const editor=state.project.role!=='viewer';
+ $('assistant-off').classList.toggle('hidden',a.ai_enabled||!a.docs.length);
+ $('assistant-form').classList.toggle('hidden',!editor);$('assistant-test').classList.toggle('hidden',!a.docs.length||!editor);
+ document.querySelector('.assistant-tabs').classList.toggle('hidden',!editor);
+ text($('assistant-count'),a.docs.length?'('+a.docs.length+' document'+(a.docs.length===1?'':'s')+')':'');
+ const ul=$('assistant-docs');ul.replaceChildren();
+ for(const d of a.docs){
+  const li=el('li'),t=el('div','skill-text');
+  t.append(el('b',null,d.title),el('span',null,(d.kind==='web'?d.source:(d.kind==='file'?'File':'Text')+(d.source&&d.kind!=='file'?' · '+d.source:''))+' · '+d.chars.toLocaleString()+' characters · '+when(d.created_at)));
+  const del=el('button','ghost link-btn','Remove');del.type='button';del.disabled=!editor;
+  del.onclick=async()=>{if(!confirm('Remove "'+d.title+'"? The assistant stops using it.'))return;await api('/projects/'+state.project.id+'/assistant',{method:'DELETE',body:{id:d.id}});renderAssistant()};
+  li.append(t,del);ul.append(li);
+ }
+}
+for(const b of document.querySelectorAll('.assistant-tabs [data-add]'))b.onclick=()=>{
+ assistantState.add=b.dataset.add;
+ for(const x of document.querySelectorAll('.assistant-tabs [data-add]'))x.setAttribute('aria-pressed',String(x===b));
+ for(const p of document.querySelectorAll('#assistant-form [data-pane]'))p.classList.toggle('hidden',p.dataset.pane!==b.dataset.add);
+};
+function fileBase64(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]||'');r.onerror=()=>reject(Error('Could not read the file'));r.readAsDataURL(file)})}
+$('assistant-form').onsubmit=async e=>{
+ e.preventDefault();text($('assistant-error'),'');
+ const btn=$('assistant-add');btn.disabled=true;btn.textContent='Adding…';
+ try{
+  let body;
+  if(assistantState.add==='url')body={url:$('assistant-url').value};
+  else if(assistantState.add==='file'){const f=$('assistant-file').files[0];if(!f)throw Error('Choose a file');body={file:{name:f.name,mime:f.type,data:await fileBase64(f)}}}
+  else body={title:$('assistant-title').value,text:$('assistant-text').value};
+  await api('/projects/'+state.project.id+'/assistant',{method:'POST',body});
+  $('assistant-form').reset();await renderAssistant();
+ }catch(err){text($('assistant-error'),err.message)}
+ finally{btn.disabled=false;btn.textContent='Add'}
+};
+$('assistant-test').onsubmit=async e=>{
+ e.preventDefault();
+ const q=$('assistant-question').value.trim(),box=$('assistant-answer');if(!q)return;
+ box.classList.remove('hidden');box.replaceChildren(el('p','muted small','Thinking…'));
+ try{
+  const {answer}=await api('/projects/'+state.project.id+'/assistant',{method:'POST',body:{action:'test',question:q}});
+  box.replaceChildren(el('p',null,answer.text));
+  if(answer.sources.length){const s=el('p','muted small','Sources: '+answer.sources.map(x=>'['+x.n+'] '+x.title).join(' · '));box.append(s)}
+ }catch(err){box.replaceChildren(el('p','error small',err.message))}
+};
 // Automations (src/backend.json "automations"): what runs when, the last result, and Run now.
 async function renderAutomations(){
  const {automations}=await api('/projects/'+state.project.id+'/automations');

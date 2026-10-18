@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261021">
+<link rel="stylesheet" href="/create.css?v=20261026">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261025">
 </head>
@@ -488,6 +488,23 @@
           <div><h3>Collections</h3><ul class="file-list" id="collections"></ul><h3>Users <span class="muted" id="user-count"></span></h3><ul class="users" id="users"></ul></div>
           <div><h3 id="records-title">Records</h3><ul class="records" id="records"></ul></div>
         </div>
+        <section class="assistant-section" id="assistant-section">
+          <h3>AI assistant <span class="muted small" id="assistant-count"></span></h3>
+          <p class="muted small">Add your menu, prices, FAQ, policies or opening hours. Your app's AI answers visitors from these, with sources, and says when it does not know. Ask the builder for "a chat that answers questions about my business" to put it on your site. Visitors can see anything you add here, so leave out private details.</p>
+          <p class="assistant-off small hidden" id="assistant-off">AI is not switched on in this app yet. Ask the builder to add the AI assistant.</p>
+          <div class="seg assistant-tabs" role="group" aria-label="Add from"><button type="button" data-add="text" aria-pressed="true">Paste text</button><button type="button" data-add="url" aria-pressed="false">Web page</button><button type="button" data-add="file" aria-pressed="false">File</button></div>
+          <form id="assistant-form" class="assistant-form">
+            <div data-pane="text"><input id="assistant-title" placeholder="Title, e.g. Menu and prices" maxlength="120"><textarea id="assistant-text" rows="5" placeholder="Paste the text your assistant should know"></textarea></div>
+            <div data-pane="url" class="hidden"><input id="assistant-url" type="url" placeholder="https://yourbusiness.com/faq"></div>
+            <div data-pane="file" class="hidden"><input id="assistant-file" type="file" accept=".txt,.md,.csv,.html,.htm,.json,text/plain,text/markdown,text/csv,text/html,application/json"><p class="muted small">Text, Markdown, CSV, HTML or JSON, up to 2 MB. For a PDF, copy its text into "Paste text".</p></div>
+            <div class="row"><button class="ghost" type="submit" id="assistant-add">Add</button><span class="error small" id="assistant-error" role="alert"></span></div>
+          </form>
+          <ul class="assistant-docs" id="assistant-docs"></ul>
+          <form id="assistant-test" class="assistant-test">
+            <label>Try a question<div class="row"><input id="assistant-question" placeholder="Do you have parking?" maxlength="500"><button class="ghost" type="submit">Ask</button></div></label>
+            <div class="assistant-answer hidden" id="assistant-answer" aria-live="polite"></div>
+          </form>
+        </section>
         <section id="sql-section" class="sql-section hidden">
           <h3>SQL tables</h3>
           <p class="muted small" id="sql-migrations"></p>
@@ -978,6 +995,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261025"></script>
+<script src="/create.js?v=20261026"></script>
 </body>
 </html>

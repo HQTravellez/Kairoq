@@ -180,6 +180,17 @@ The **Data** tab shows recent server logs for each app: `console.log` output fro
 - Add `"ai": true` to `src/backend.json`. In code: `ai.chat({messages, system})`, also available to functions.
 - Calls use `KAIROQ_APP_AI_MODEL` while under `KAIROQ_APP_AI_MONTHLY_LIMIT_USD`, then the free router.
 - Every `KAIROQ_APP_AI_CALLS_PER_CREDIT` (10) calls cost the app owner 1 credit. When the owner has no credits, calls return 402. Each visitor is limited to `KAIROQ_APP_AI_PER_MINUTE` (20).
+- Live typing: `ai.chat({messages, onToken})` and `ai.ask(question, {onToken})` stream the reply (server-sent events over POST); `onToken` gets each piece, and the promise still resolves to the whole answer.
+
+### AI assistant (answers from your documents)
+
+The owner adds what the assistant should know in **Data → AI assistant**: pasted text, a file (.txt, .md, .csv, .html, .json, up to 2 MB) or a public web page (robots.txt is respected; private addresses are refused). PDFs and Word files are not read yet: paste their text.
+
+- In the app: `const { text, sources } = await ai.ask(question, { history, system, onToken })`. `sources` lists the documents cited with `[n]` markers in `text`. Server functions: `await ai.ask(question)`.
+- How it works: documents are split into passages under their headings and indexed with SQLite full-text search in the app's own `data.sqlite` (tables `assistant_docs` and `assistant_chunks`). Each question sends the 6 best passages to the model with rules: answer only from the sources, cite them, say "I don't know" instead of guessing, and treat sources and questions as information, not instructions. No embeddings service, no extra cost beyond the normal app AI call.
+- Limits: 50 documents, 200,000 characters each, 1,000,000 in total per app.
+- Documents are public to the app's visitors (answers quote them), so they should hold nothing private. They belong to one app: other apps, and other accounts, cannot read or change them. The workspace has a "Try a question" box (it is a normal app AI call).
+- Templates **AI front desk** (a guesthouse) and **AI help centre** (an online shop) include a ready chat component with live typing, sources and a hand-off to a contact form, and start with sample documents to replace.
 
 ### Sign-in options
 

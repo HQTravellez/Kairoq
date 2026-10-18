@@ -6552,7 +6552,7 @@ function parseDeveloperResponse(content,model="coding model"){
 }
 async function callDeveloperCodingModel(opts={}){return callBuilderModel(opts,parseDeveloperResponse)}
 // AI used inside generated apps (ai.chat). Own model setting and monthly cap (purpose app-ai).
-async function callAppAi({system,messages,maxTokens=1000}){
+async function callAppAi({system,messages,maxTokens=1000,onToken}){
   if(!process.env.OPENROUTER_API_KEY)throw Object.assign(Error("AI is not configured on this server"),{status:503});
   const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const cap=Number(process.env.KAIROQ_APP_AI_MONTHLY_LIMIT_USD??20);
@@ -6563,7 +6563,18 @@ async function callAppAi({system,messages,maxTokens=1000}){
     const free=model.endsWith(":free")||model==="openrouter/free";
     try{
       if(!free)await enforceBudget();
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(60000),body:JSON.stringify({model,max_tokens:maxTokens,messages:[...(system?[{role:"system",content:system}]:[]),...messages]})});
+      const body={model,max_tokens:maxTokens,messages:[...(system?[{role:"system",content:system}]:[]),...messages]};
+      // Live typing: stream the answer; once words have reached the visitor there is no fallback.
+      if(onToken){
+        let streamed=false;
+        try{
+          const out=await streamAppAi(body,onToken,()=>{streamed=true});
+          if(!free)await recordUsage({...out.usage,cost:Number(out.usage?.cost||0)},{purpose:"app-ai",model});
+          if(!out.text.trim())throw Error("Empty response");
+          return{text:out.text};
+        }catch(e){if(streamed)throw Object.assign(Error("The answer was interrupted. Try again."),{status:502,final:true});throw e}
+      }
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(60000),body:JSON.stringify(body)});
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
       const raw=data.choices?.[0]?.message?.content;
@@ -6571,9 +6582,29 @@ async function callAppAi({system,messages,maxTokens=1000}){
       if(!free)await recordUsage({...data.usage,cost:Number(data.usage?.cost||0)},{purpose:"app-ai",model});
       if(!text.trim())throw Error("Empty response");
       return{text};
-    }catch(e){errors.push(model+": "+String(e.message||e).slice(0,120))}
+    }catch(e){if(e.final)throw e;errors.push(model+": "+String(e.message||e).slice(0,120))}
   }
   throw Object.assign(Error("AI is unavailable right now. "+errors.join(" | ")),{status:503});
+}
+// One streamed OpenRouter chat call: calls onToken with each piece of text, returns {text,usage}.
+async function streamAppAi(body,onToken,onFirst){
+  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders({Accept:"text/event-stream"}),signal:AbortSignal.timeout(90000),body:JSON.stringify({...body,stream:true,usage:{include:true}})});
+  if(!response.ok||!response.body){const data=await response.json().catch(()=>({}));throw Error(data.error?.message||"Provider HTTP "+response.status)}
+  const decoder=new TextDecoder();let buf="",text="",usage=null;
+  for await(const chunk of response.body){
+    buf+=decoder.decode(chunk,{stream:true});let i;
+    while((i=buf.indexOf("\n"))>=0){
+      const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+      if(!line.startsWith("data:"))continue;
+      const raw=line.slice(5).trim();if(raw==="[DONE]")continue;
+      let d;try{d=JSON.parse(raw)}catch{continue}
+      if(d.error)throw Error(d.error.message||"Provider error");
+      if(d.usage)usage=d.usage;
+      const piece=d.choices?.[0]?.delta?.content;
+      if(typeof piece==="string"&&piece){if(!text)onFirst();text+=piece;onToken(piece)}
+    }
+  }
+  return{text,usage};
 }
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse});

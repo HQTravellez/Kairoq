@@ -211,10 +211,23 @@ function requestVersion(meta,req){
  }
  return meta.published?.version||meta.current_version;
 }
+// Streams an AI answer as server-sent events: token {t}, then done {text,sources} or error {error}.
+async function streamAnswer(res,run){
+ res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store','X-Accel-Buffering':'no',...CORS});
+ const ev=(name,data)=>{try{res.write('event: '+name+'\ndata: '+JSON.stringify(data)+'\n\n')}catch{}};
+ let sent=false;
+ try{
+  const out=await run(t=>{if(t){sent=true;ev('token',{t:String(t)})}});
+  // A model that could not stream sends the whole answer at once.
+  if(!sent&&out.text)ev('token',{t:out.text});
+  ev('done',out);
+ }catch(e){ev('error',{error:String(e.message||e),status:Number.isInteger(e.status)?e.status:500})}
+ res.end();
+}
 let appAiImpl=null;
 function configure({appAi}={}){if(appAi!==undefined)appAiImpl=appAi}
 // AI for generated apps, billed to the app owner: one credit per KAIROQ_APP_AI_CALLS_PER_CREDIT calls.
-async function appAi(meta,db,args){
+async function appAi(meta,db,args,{onToken}={}){
  if(!appAiImpl)throw fail(503,'AI is not available on this server');
  const messages=Array.isArray(args&&args.messages)?args.messages:[{role:'user',content:String(args&&args.prompt||'')}];
  if(!messages.length||messages.length>40)throw fail(400,'Send 1 to 40 messages');
@@ -227,7 +240,7 @@ async function appAi(meta,db,args){
  const today=db.prepare('SELECT calls FROM app_ai_usage WHERE day=?').get(new Date().toISOString().slice(0,10));
  if(today&&today.calls>=Math.max(1,Number(process.env.KAIROQ_APP_AI_DAILY_LIMIT||2000)))throw fail(429,'This app has reached its daily AI limit');
  if(meta.owner!=='owner'){const owner=accounts.database().prepare('SELECT credits FROM accounts WHERE id=?').get(meta.owner);if(!owner||owner.credits<1)throw fail(402,'This app is out of AI credits')}
- const out=await appAiImpl({system,messages:clean,maxTokens});
+ const out=await appAiImpl({system,messages:clean,maxTokens,...(onToken?{onToken}:{})});
  const day=new Date().toISOString().slice(0,10);
  db.prepare('INSERT INTO app_ai_usage(day,calls) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET calls=calls+1').run(day);
  const per=Math.max(1,Number(process.env.KAIROQ_APP_AI_CALLS_PER_CREDIT||10));
@@ -374,10 +387,13 @@ async function handle(req,res,{onlyProject}={}){
    require('./react-functions').respond(res,out.result,CORS,{externalRedirects:Boolean(onlyProject)});
    return true;
   }
-  if(route==='/ai'&&req.method==='POST'){
+  if((route==='/ai'||route==='/ai/ask')&&req.method==='POST'){
    if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
    limitedAi(req,id);
-   return send(res,200,await appAi(meta,db,await readJson(req,200000))),true;
+   const b=await readJson(req,200000),run=onToken=>route==='/ai'?appAi(meta,db,b,{onToken}):require('./app-assistant').ask(db,b,(a,o)=>appAi(meta,db,a,o),{onToken});
+   if(b.stream!==true)return send(res,200,await run()),true;
+   await streamAnswer(res,run);
+   return true;
   }
   if(route==='/files'&&req.method==='POST')return send(res,201,{file:await extras.upload(req,{id,db,cfg,user,query:q0})}),true;
   const fm=/^\/files\/([a-f0-9-]{36})$/.exec(route);
@@ -426,6 +442,7 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
   secret:async n=>require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
   db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
   ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},
+  ask:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-assistant').ask(db,a,o=>appAi(meta,db,o))},
   sql:(q,p)=>require('./react-sql').run.query(sb?sb.dir:builder.projectDir(id),q,p),
   sqlBatch:steps=>require('./react-sql').run.batch(sb?sb.dir:builder.projectDir(id),steps),
   email:async(a,u)=>sb?{sent:true,test:true}:extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
@@ -568,9 +585,36 @@ export const functions={
   },
   url(name){return BASE+'/functions/'+encodeURIComponent(name)}
 };
+// Reads a streamed answer (server-sent events over POST), calling onToken with each piece.
+async function streamed(path,body,onToken){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json',Accept:'text/event-stream',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:JSON.stringify({...body,stream:true})});
+  if(!r.ok||!r.body){const d=await r.json().catch(()=>({}));throw Object.assign(new Error(d.error||('Request failed ('+r.status+')')),{status:r.status})}
+  const reader=r.body.getReader(),dec=new TextDecoder();let buf='',result=null;
+  for(;;){
+    const {value,done}=await reader.read();if(done)break;
+    buf+=dec.decode(value,{stream:true});let i;
+    while((i=buf.indexOf('\\n\\n'))>=0){
+      const block=buf.slice(0,i);buf=buf.slice(i+2);
+      const name=(/^event: (.*)$/m.exec(block)||[])[1],raw=(/^data: (.*)$/m.exec(block)||[])[1];if(!raw)continue;
+      const d=JSON.parse(raw);
+      if(name==='token')onToken(d.t);else if(name==='done')result=d;else if(name==='error')throw Object.assign(new Error(d.error),{status:d.status});
+    }
+  }
+  if(!result)throw new Error('The answer was cut off. Try again.');
+  return result;
+}
 export const ai={
-  // ai.chat({ messages:[{role:'user',content:'...'}], system, max_tokens }) -> { text }
-  async chat(options){return call('/ai',{method:'POST',body:typeof options==='string'?{messages:[{role:'user',content:options}]}:options})}
+  // ai.chat({ messages:[{role:'user',content:'...'}], system, max_tokens, onToken }) -> { text }
+  async chat(options){
+    const {onToken,...body}=typeof options==='string'?{messages:[{role:'user',content:options}]}:options;
+    return onToken?streamed('/ai',body,onToken):call('/ai',{method:'POST',body});
+  },
+  // Answers from the documents the owner added (Data tab → AI assistant), with the sources it used:
+  // ai.ask(question, { history, system, onToken }) -> { text, sources:[{n,title,excerpt}] }
+  async ask(question,{history,system,onToken}={}){
+    const body={question,history,system};
+    return onToken?streamed('/ai/ask',body,onToken):call('/ai/ask',{method:'POST',body});
+  }
 };
 export default{auth,collection,storage,email,payments,functions,ai};
 `;
