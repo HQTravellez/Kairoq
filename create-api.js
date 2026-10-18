@@ -966,11 +966,19 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // The documents this app's AI answers from (ai.ask), and a test question from the workspace.
   if(action==='/assistant'){
    const A=require('./app-assistant'),db=backend.database(id);
-   const view=()=>({...A.list(db),ai_enabled:Boolean(backend.liveConfig(builder.loadMeta(id)).ai)});
+   const view=()=>({...A.list(db),questions:A.questions(db),ai_enabled:Boolean(backend.liveConfig(builder.loadMeta(id)).ai)});
    if(method==='GET')return send(res,200,{assistant:view()}),true;
    if(method==='DELETE'){const b=await readJson(req,2000);A.remove(db,b.id);return send(res,200,{assistant:view()}),true}
    if(method==='POST'){
     const b=await readJson(req,15000000);
+    if(b.action==='answer'||b.action==='dismiss'){A.resolveQuestion(db,b.key,{answer:b.answer,dismiss:b.action==='dismiss'});return send(res,200,{assistant:view()}),true}
+    // Something changed: find outdated information in the documents and the app's text.
+    if(b.action==='outdated'){
+     limitedKey('assistant-outdated:'+id,20,600000);
+     const meta=builder.loadMeta(id);
+     return send(res,200,await A.outdated(db,{change:b.change,files:meta.current_version?builder.loadFiles(id,meta.current_version):{}},o=>backend.appAi(meta,db,o))),true;
+    }
+    if(b.action==='fix_docs')return send(res,200,{...A.applyDocFixes(db,b.fixes),assistant:view()}),true;
     if(b.action==='test'){
      limitedKey('assistant-test:'+id,30,600000);
      const meta=builder.loadMeta(id);

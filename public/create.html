@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261028">
+<link rel="stylesheet" href="/create.css?v=20261029">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261025">
 </head>
@@ -501,6 +501,17 @@
             <div class="row"><button class="ghost" type="submit" id="assistant-add">Add</button><span class="error small" id="assistant-error" role="alert"></span></div>
           </form>
           <ul class="assistant-docs" id="assistant-docs"></ul>
+          <div class="assistant-questions hidden" id="assistant-questions-box">
+            <h4>Questions it could not answer <span class="muted small" id="assistant-questions-count"></span></h4>
+            <p class="muted small">What visitors asked that your documents do not cover, or answers they marked as not helpful. Add the answer once and the assistant knows it from then on.</p>
+            <ul class="assistant-questions-list" id="assistant-questions"></ul>
+          </div>
+          <form id="assistant-change" class="assistant-change">
+            <label>Something changed? <span class="muted small">Kairoq finds every place in your app and documents that still says the old thing.</span>
+              <div class="row"><input id="assistant-change-text" maxlength="500" placeholder="We now close at 9pm instead of 8pm"><button class="ghost" type="submit" id="assistant-change-run">Find outdated info</button></div>
+            </label>
+            <div id="assistant-findings" class="assistant-findings hidden"></div>
+          </form>
           <form id="assistant-test" class="assistant-test">
             <label>Try a question<div class="row"><input id="assistant-question" placeholder="Do you have parking?" maxlength="500"><button class="ghost" type="submit">Ask</button></div></label>
             <div class="assistant-answer hidden" id="assistant-answer" aria-live="polite"></div>
@@ -1027,6 +1038,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261028"></script>
+<script src="/create.js?v=20261029"></script>
 </body>
 </html>

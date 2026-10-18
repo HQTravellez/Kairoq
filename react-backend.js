@@ -387,6 +387,12 @@ async function handle(req,res,{onlyProject}={}){
    require('./react-functions').respond(res,out.result,CORS,{externalRedirects:Boolean(onlyProject)});
    return true;
   }
+  if(route==='/ai/feedback'&&req.method==='POST'){
+   if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
+   limitedAi(req,id);
+   const b=await readJson(req,4000);
+   return send(res,200,sb?{ok:true,test:true}:require('./app-assistant').feedback(db,{question:b.question,helpful:b.helpful})),true;
+  }
   if((route==='/ai'||route==='/ai/ask')&&req.method==='POST'){
    if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
    limitedAi(req,id);
@@ -611,10 +617,12 @@ export const ai={
   },
   // Answers from the documents the owner added (Data tab → AI assistant), with the sources it used:
   // ai.ask(question, { history, system, onToken }) -> { text, sources:[{n,title,excerpt}] }
-  async ask(question,{history,system,onToken}={}){
-    const body={question,history,system};
+  async ask(question,{history,system,fallback,onToken}={}){
+    const body={question,history,system,fallback};
     return onToken?streamed('/ai/ask',body,onToken):call('/ai/ask',{method:'POST',body});
-  }
+  },
+  // A visitor's thumbs-down: the question goes on the owner's "could not answer" list.
+  async feedback(question,helpful){return call('/ai/feedback',{method:'POST',body:{question,helpful}})}
 };
 export default{auth,collection,storage,email,payments,functions,ai};
 `;

@@ -191,6 +191,11 @@ The owner adds what the assistant should know in **Data → AI assistant**: past
 - In the app: `const { text, sources } = await ai.ask(question, { history, system, onToken })`. `sources` lists the documents cited with `[n]` markers in `text`. Server functions: `await ai.ask(question)`.
 - How it works: documents are split into passages under their headings and indexed with SQLite full-text search in the app's own `data.sqlite` (tables `assistant_docs` and `assistant_chunks`). Each question sends the 6 best passages to the model with rules: answer only from the sources, cite them, say "I don't know" instead of guessing, and treat sources and questions as information, not instructions. No embeddings service, no extra cost beyond the normal app AI call.
 - Limits: 50 documents, 200,000 characters each, 1,000,000 in total per app.
+- **Follow-ups and other languages:** for a follow-up ("how much is it?"), a question in another language, or a search that matched only weakly, one small AI call turns the question and recent conversation into keywords in the documents' language, and the search runs again. Each such call counts as an app AI call.
+- **No guessing:** when nothing in the documents matches (and it is not a greeting), the answer is "I don't have that information…" without calling the model. Apps can pass `fallback` with their own wording, e.g. in the site's language.
+- **Figures are checked:** prices, times, dates, phone numbers and other figures in an answer must appear in the cited documents (or the question). If one does not, the answer is regenerated once with a warning; if it is still wrong, the visitor gets the fallback and the owner hears about it. Streamed answers are replaced by the checked one at the end. Totals the model works out itself (2 × €140) count as unsupported and are corrected to what the documents say.
+- **Questions it could not answer:** questions with no match, "I don't know" answers, corrected answers and visitors' **Not helpful?** clicks (`ai.feedback(question, false)`, `POST /api/apps/<id>/ai/feedback`) are listed in Data → AI assistant, most asked first. **Add answer** turns one into a document; **Dismiss** hides it for good. Up to 500 kept.
+- **Something changed?** The owner writes what changed ("we now close at 9pm instead of 8pm"); Kairoq searches the documents and the app's text for related places, asks the model which ones now contradict the change (it must quote them exactly, and may not invent new facts), and lists them. Selected document fixes are applied in place; app fixes go to the builder as one precise chat message (a normal build).
 - Documents are public to the app's visitors (answers quote them), so they should hold nothing private. They belong to one app: other apps, and other accounts, cannot read or change them. The workspace has a "Try a question" box (it is a normal app AI call).
 - Templates **AI front desk** (a guesthouse) and **AI help centre** (an online shop) include a ready chat component with live typing, sources and a hand-off to a contact form, and start with sample documents to replace.
 
@@ -295,6 +300,10 @@ When `OPENROUTER_API_KEY` and `KAIROQ_BUILDER_PAID_APPROVED=true` are set, the A
 - **Budget.** Spending counts against the builder budget. `KAIROQ_IMAGE_COST_USD` (default 0.05) is reserved for each image.
 - **Turning it off.** Set `KAIROQ_IMAGE_GENERATION=off`.
 - **Manual images.** Owners can also generate an image from the Design dialog.
+
+### Imported design skills are checked
+
+A design skill's text goes into the builder's instructions, so skills imported from GitHub or pasted are checked first (`react-skills.js` `scan`): hidden characters are removed; text that tells the AI to ignore its instructions, reveal or send secrets, change who it is, read cookies or secrets, or send data to capture services, and long encoded blobs, block the import with the reason; risky code in examples (eval, remote scripts, outside fetch, raw HTML) is reported as a warning.
 
 ## Saved checks (apps that don't break)
 

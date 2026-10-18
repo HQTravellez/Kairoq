@@ -263,6 +263,8 @@ async function renderAssistant(){
  $('assistant-form').classList.toggle('hidden',!editor);$('assistant-test').classList.toggle('hidden',!a.docs.length||!editor);
  document.querySelector('.assistant-tabs').classList.toggle('hidden',!editor);
  text($('assistant-count'),a.docs.length?'('+a.docs.length+' document'+(a.docs.length===1?'':'s')+')':'');
+ renderQuestions(a.questions||[],editor);
+ $('assistant-change').classList.toggle('hidden',!editor);
  const ul=$('assistant-docs');ul.replaceChildren();
  for(const d of a.docs){
   const li=el('li'),t=el('div','skill-text');
@@ -272,6 +274,63 @@ async function renderAssistant(){
   li.append(t,del);ul.append(li);
  }
 }
+// Questions visitors asked that the documents did not answer: add the answer, or dismiss.
+function renderQuestions(list,editor){
+ $('assistant-questions-box').classList.toggle('hidden',!list.length);
+ text($('assistant-questions-count'),list.length?'('+list.length+')':'');
+ const ul=$('assistant-questions');ul.replaceChildren();
+ for(const q of list){
+  const li=el('li'),head=el('div','skill-text');
+  head.append(el('b',null,q.question),el('span',null,(q.count>1?'Asked '+q.count+' times · ':'')+q.reason+' · '+when(q.last_at)));
+  const act=el('div','skill-actions');
+  const add=el('button','ghost link-btn','Add answer');add.type='button';add.disabled=!editor;
+  const skip=el('button','ghost link-btn','Dismiss');skip.type='button';skip.disabled=!editor;
+  skip.onclick=async()=>{await api('/projects/'+state.project.id+'/assistant',{method:'POST',body:{action:'dismiss',key:q.key}});renderAssistant()};
+  add.onclick=()=>{
+   if(li.querySelector('textarea'))return;
+   const ta=el('textarea');ta.rows=2;ta.placeholder='The answer, e.g. Yes, there is free parking behind the building.';
+   const save=el('button','ghost','Save answer');save.type='button';
+   save.onclick=async()=>{try{await api('/projects/'+state.project.id+'/assistant',{method:'POST',body:{action:'answer',key:q.key,answer:ta.value}});renderAssistant()}catch(err){text($('assistant-error'),err.message)}};
+   li.append(ta,save);ta.focus();
+  };
+  act.append(add,skip);li.append(head,act);ul.append(li);
+ }
+}
+// Something changed: find outdated information, fix it in the documents here and in the app through the builder.
+$('assistant-change').onsubmit=async e=>{
+ e.preventDefault();
+ const change=$('assistant-change-text').value.trim(),box=$('assistant-findings'),btn=$('assistant-change-run');
+ if(!change)return;
+ box.classList.remove('hidden');box.replaceChildren(el('p','muted small','Looking through your app and documents…'));btn.disabled=true;
+ try{
+  const r=await api('/projects/'+state.project.id+'/assistant',{method:'POST',body:{action:'outdated',change}});
+  box.replaceChildren();
+  if(!r.findings.length){box.append(el('p','small','Nothing outdated found in '+r.checked+' places that mention it.'));return}
+  box.append(el('p','small',r.findings.length===1?'1 place still says the old thing:':r.findings.length+' places still say the old thing:'));
+  const ul=el('ul','assistant-findings-list');
+  for(const f of r.findings){
+   const li=el('li'),cb=document.createElement('input');cb.type='checkbox';cb.checked=f.action!=='needs_info';cb.disabled=f.action==='needs_info';
+   const t=el('div','skill-text');
+   t.append(el('b',null,f.where==='doc'?'Document: '+f.title:f.file+' (line '+f.line+')'),el('span',null,f.action==='needs_info'?'Check this yourself: '+f.why:'“'+f.current+'” → '+(f.action==='delete'?'remove it':'“'+f.replacement+'”')));
+   const lab=el('div','finding');cb.setAttribute('aria-label','Fix this');t.onclick=()=>{if(!cb.disabled)cb.checked=!cb.checked};lab.append(cb,t);li.append(lab);li._f=f;li._cb=cb;ul.append(li);
+  }
+  const apply=el('button','primary','Fix the selected');apply.type='button';
+  apply.onclick=async()=>{
+   const picked=[...ul.children].filter(li=>li._cb.checked).map(li=>li._f);
+   const docs=picked.filter(f=>f.where==='doc').map(f=>({doc_id:f.doc_id,current:f.current,replacement:f.action==='delete'?'':f.replacement}));
+   const app=picked.filter(f=>f.where==='app');
+   apply.disabled=true;
+   try{
+    if(docs.length)await api('/projects/'+state.project.id+'/assistant',{method:'POST',body:{action:'fix_docs',fixes:docs}});
+    if(app.length)send('Update outdated information ('+change+'). Change only these places, nothing else:\n'+app.map(f=>'- '+f.file+' line '+f.line+': '+(f.action==='delete'?'remove “'+f.current+'”':'replace “'+f.current+'” with “'+f.replacement+'”')).join('\n'),'build');
+    box.replaceChildren(el('p','small',(docs.length?docs.length+' document fix'+(docs.length===1?'':'es')+' saved. ':'')+(app.length?'The builder is updating the app now (see the chat).':'')));
+    renderAssistant();
+   }catch(err){text($('assistant-error'),err.message);apply.disabled=false}
+  };
+  box.append(ul,apply);
+ }catch(err){box.replaceChildren(el('p','error small',err.message))}
+ finally{btn.disabled=false}
+};
 for(const b of document.querySelectorAll('.assistant-tabs [data-add]'))b.onclick=()=>{
  assistantState.add=b.dataset.add;
  for(const x of document.querySelectorAll('.assistant-tabs [data-add]'))x.setAttribute('aria-pressed',String(x===b));
@@ -1934,11 +1993,11 @@ async function importSkill(path){
  try{
   const r=await api('/skills',{method:'POST',body:{url:$('skill-url').value,path}});
   if(r.choices){text($('skill-status'),'This repository has '+r.choices.length+' skills. Pick one:');for(const c of r.choices){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.className='ghost';b.textContent=c.name;b.title=c.path;b.onclick=()=>importSkill(c.path);li.append(b);$('skill-choices').append(li)};return}
-  text($('skill-status'),'Added "'+r.skill.name+'". Tick it to use it in this project.');$('skill-url').value='';await renderDesign();
+  text($('skill-status'),'Added "'+r.skill.name+'". Tick it to use it in this project.'+(r.skill.warnings?' Checked it first and noticed: '+r.skill.warnings.join('; ')+'.':''));$('skill-url').value='';await renderDesign();
  }catch(err){text($('skill-status'),'');text($('design-error'),err.message)}
 }
 $('skill-import').onclick=()=>importSkill();
-$('skill-save').onclick=async()=>{text($('design-error'),'');try{const r=await api('/skills',{method:'POST',body:{text:$('skill-text').value}});$('skill-text').value='';text($('skill-status'),'Added "'+r.skill.name+'".');await renderDesign()}catch(err){text($('design-error'),err.message)}};
+$('skill-save').onclick=async()=>{text($('design-error'),'');try{const r=await api('/skills',{method:'POST',body:{text:$('skill-text').value}});$('skill-text').value='';text($('skill-status'),'Added "'+r.skill.name+'".'+(r.skill.warnings?' Noticed: '+r.skill.warnings.join('; ')+'.':''));await renderDesign()}catch(err){text($('design-error'),err.message)}};
 $('genimage-go').onclick=async()=>{
  const btn=$('genimage-go');btn.disabled=true;text($('genimage-status'),'Generating… (up to a minute)');text($('design-error'),'');
  try{const r=await api('/projects/'+state.project.id+'/images',{method:'POST',body:{prompt:$('genimage-prompt').value,aspect:$('genimage-aspect').value}});text($('genimage-status'),'Saved ./uploads/'+r.saved[0]+'. Ask the chat to use it, for example "use ./uploads/'+r.saved[0]+' as the hero image".');$('genimage-prompt').value='';refreshCredits()}

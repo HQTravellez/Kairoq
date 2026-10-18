@@ -42,11 +42,11 @@ export default function AssistantChat({ title = 'Ask us anything', intro, sugges
     if (!q || busy) return;
     setInput(''); setError(''); setBusy(true);
     const history = messages.map(m => ({ role: m.role, content: m.content }));
-    setMessages(m => [...m, { role: 'user', content: q }, { role: 'assistant', content: '', typing: true }]);
+    setMessages(m => [...m, { role: 'user', content: q }, { role: 'assistant', content: '', typing: true, q }]);
     const patch = fn => setMessages(m => { const copy = m.slice(); copy[copy.length - 1] = fn(copy[copy.length - 1]); return copy; });
     try {
       const { text, sources } = await ai.ask(q, { history, onToken: t => patch(last => ({ ...last, content: last.content + t })) });
-      patch(() => ({ role: 'assistant', content: text, sources }));
+      patch(() => ({ role: 'assistant', content: text, sources, q }));
     } catch (err) {
       setMessages(m => m.slice(0, -1));
       setError(err.status === 402 ? 'The assistant is resting right now. Please use the contact form.' : err.message);
@@ -85,6 +85,11 @@ export default function AssistantChat({ title = 'Ask us anything', intro, sugges
               {m.role === 'user' ? m.content : m.typing && !m.content
                 ? <span className="inline-flex gap-1 py-1" aria-label="Typing"><i className="dot" /><i className="dot" /><i className="dot" /></span>
                 : <Answer text={m.content} sources={m.sources} />}
+              {m.role === 'assistant' && !m.typing && m.q && (
+                m.rated
+                  ? <p className="mt-2 text-xs text-[color:var(--ink-soft)]">Thanks, we will look into it.</p>
+                  : <button type="button" className="mt-2 text-xs text-[color:var(--ink-soft)] underline underline-offset-2" onClick={() => { ai.feedback(m.q, false).catch(() => {}); setMessages(all => all.map((x, j) => j === i ? { ...x, rated: true } : x)); }}>Not helpful?</button>
+              )}
             </div>
           </div>
         ))}
