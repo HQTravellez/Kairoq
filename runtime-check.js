@@ -299,7 +299,9 @@ function SCAN({max}){
 // observe() lists what is on screen with numbered interactive elements, act() clicks, types,
 // selects, scrolls or goes back. Same guard as inspect(): the browser stays inside the app.
 // site: true for another website (see guardSite); observe() then counts the forms a visitor sent.
-async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
+// record: keep the page's own GET responses (pages and data requests, up to 40) so a web watch
+// can learn which request holds its answer (see web-replay.js).
+async function session(url,{sandbox,viewport,timeoutMs=15000,site=false,record=false}={}){
  if(!available())return null;
  const phone=viewport==='phone';
  const context=await (await (site?externalBrowser():browser())).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
@@ -314,6 +316,13 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
  const root=new URL('./',url);
  const settle=async()=>{await page.waitForLoadState('networkidle',{timeout:3000}).catch(()=>{});await page.waitForTimeout(350)};
  let status=0;page.on('response',r=>{if(r.request().isNavigationRequest()&&r.frame()===page.mainFrame())status=r.status()});
+ const recorded=[];let recordedBytes=0;
+ if(record)page.on('response',r=>{
+  const req=r.request();
+  if(recorded.length>=40||req.method()!=='GET'||r.status()!==200||!['document','xhr','fetch'].includes(req.resourceType()))return;
+  const type=String(r.headers()['content-type']||'');if(!/json|html|text\/plain/i.test(type))return;
+  recorded.push(r.text().then(body=>{if(body.length>2e6||recordedBytes+body.length>8e6)return null;recordedBytes+=body.length;return{url:r.url(),method:'GET',status:200,type,body}}).catch(()=>null));
+ });
  try{await page.goto(url,{waitUntil:'load',timeout:timeoutMs});await settle()}
  catch(e){await context.close().catch(()=>{});throw Object.assign(Error('Page did not load: '+e.message),{status:502})}
  async function observe(){
@@ -406,7 +415,7 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false}={}){
    await page.waitForTimeout(150);
   }
  };
- return{observe,act,audit,read,control,status:()=>status,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
+ return{observe,act,audit,read,control,responses:async()=>(await Promise.all(recorded)).filter(Boolean),status:()=>status,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
 }
 // Renders a small HTML document offline (no network) to PNG, e.g. app icons.
 async function renderHtml(html,{width,height}){

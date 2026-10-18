@@ -14,7 +14,7 @@ function parse(text){
  if(fm){for(const line of fm[1].split('\n')){const m=/^([a-zA-Z_-]+)\s*:\s*(.*)$/.exec(line);if(m)meta[m[1].toLowerCase()]=m[2].trim().replace(/^["']|["']$/g,'')}body=body.slice(fm[0].length).trim()}
  const heading=(/^#\s+(.+)$/m.exec(body)||[])[1];
  const firstPara=body.split(/\n\s*\n/).map(p=>p.trim()).find(p=>p&&!p.startsWith('#'))||'';
- return{...(meta.default==='on'?{defaultOn:true}:{}),name:String(meta.name||heading||'Untitled skill').slice(0,80),description:String(meta.description||firstPara).replace(/\s+/g,' ').slice(0,300),body:body.slice(0,MAX_BODY)};
+ return{...(meta.default==='on'?{defaultOn:true}:{}),...(meta.group?{group:String(meta.group).slice(0,40)}:{}),name:String(meta.name||heading||'Untitled skill').slice(0,80),description:String(meta.description||firstPara).replace(/\s+/g,' ').slice(0,300),body:body.slice(0,MAX_BODY)};
 }
 
 let builtinCache=null;

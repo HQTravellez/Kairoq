@@ -1411,7 +1411,7 @@ const webState={poll:null};
 function webRunItem(r){
  const li=el('li'),t=el('div','skill-text');
  const said={completed:'Done',gave_up:'Could not do it',stuck:'Did not finish',blocked:'Blocked by the site',error:'Error'};
- t.append(el('b',null,r.task),el('span',null,(r.status==='needs_you'?'Needs you: '+(r.need||''):r.status==='running'?'Working… '+(r.progress||''):(said[r.outcome]||r.status)+' · '+when(r.at))+' · '+r.url));
+ t.append(el('b',null,r.task),el('span',null,(r.status==='needs_you'?'Needs you: '+(r.need||''):r.status==='running'?'Working… '+(r.progress||''):(r.quick?'Quick check'+(r.changed?': changed':': no change'):said[r.outcome]||r.status)+' · '+when(r.at))+' · '+r.url));
  li.append(t);
  li.onclick=()=>showWebRun(r);
  return li;
@@ -1481,7 +1481,7 @@ async function renderWeb(){
  const ws=$('web-watches');ws.replaceChildren();
  for(const w of d.watches){
   const li=el('li'),t=el('div','skill-text');
-  t.append(el('b',null,w.task),el('span',null,w.url+' · every '+w.every+(w.paused?' · paused':w.last?' · last checked '+when(w.last):' · first check within the hour')));
+  t.append(el('b',null,w.task),el('span',null,w.url+' · every '+w.every+(w.paused?' · paused':w.last?' · last checked '+when(w.last):' · first check within the hour')+(w.quick?' · quick checks on':'')));
   const act=el('div','skill-actions');
   const pause=el('button','ghost link-btn',w.paused?'Resume':'Pause');pause.type='button';pause.onclick=async()=>{await api('/web-agent/watches/'+w.id,{method:'PATCH',body:{paused:!w.paused}});renderWeb()};
   const del=el('button','ghost link-btn','Remove');del.type='button';del.onclick=async()=>{if(!confirm('Remove this watch?'))return;await api('/web-agent/watches/'+w.id,{method:'DELETE'});renderWeb()};
@@ -1993,7 +1993,12 @@ async function renderDesign(){
 function renderSkills(){
  const d=state.designData,list=$('skills-list');list.replaceChildren();
  const on=new Set(d.skills),editor=state.project.role!=='viewer',owner=state.project.role==='owner';
- for(const sk of d.library){
+ // Built-in styles first, then built-in page types, then the account's own skills, each under a heading.
+ const groupOf=sk=>sk.source!=='builtin'?'Your skills':sk.group||'Styles',order=['Styles','Page types','Your skills'];
+ const rank=g=>{const i=order.indexOf(g);return i<0?1.5:i};
+ let heading=null;
+ for(const sk of [...d.library].sort((a,b)=>rank(groupOf(a))-rank(groupOf(b)))){
+  if(groupOf(sk)!==heading){heading=groupOf(sk);const h=document.createElement('li');h.className='skill-group';h.textContent=heading;list.append(h)}
   const li=document.createElement('li'),cb=document.createElement('input');cb.type='checkbox';cb.checked=on.has(sk.id)||sk.always;cb.disabled=!editor||sk.always;cb.title=sk.always?'On for all your projects':'Use in this project';
   cb.onchange=()=>saveDesign({skills:[...d.library.filter(x=>x.id===sk.id?cb.checked:on.has(x.id)).map(x=>x.id)]});
   const t=document.createElement('div');t.className='skill-text';const b=document.createElement('b');b.textContent=sk.name+(sk.source==='builtin'?'':sk.source==='github'?' · GitHub':' · yours');const sp=document.createElement('span');sp.textContent=sk.description;t.append(b,sp);
