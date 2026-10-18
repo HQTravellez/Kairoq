@@ -77,7 +77,7 @@ function findShare(token){
  for(const p of builder.list()){const meta=builder.loadMeta(p.id);if(meta.share&&meta.share.token===token)return meta}
  return null;
 }
-function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
+function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],hosting:require('./hosting-billing').view(meta),urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','researching','watching']);
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
@@ -1269,7 +1269,10 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[]}=
 // Publishing re-runs the saved checks on the version going live, unless the owner overrides.
 async function publishProject(id,{slug,version,force}={},{inspect,screenshot}={}){
  if(!force&&inspect){const meta=builder.loadMeta(id),n=Number(version)||meta.current_version;if(require('./react-checks').list(meta).some(c=>c.enabled!==false)&&meta.versions.some(x=>x.n===n)){const r=await require('./react-checks').run(id,builder.previewUrl(meta,n),{inspect,version:n});if(r.failed.length)throw Object.assign(Error('Saved checks fail on this version: '+r.failed.map(f=>f.name).join(', ')+'. Fix them, or publish with force to go live anyway.'),{status:409,failed:r.failed})}}
- const out=hosting.publish(id,{slug,version});
+ // Live hosting is paid monthly: the first 30 days are charged here (given back if publishing fails).
+ const billing=require('./hosting-billing'),paid=billing.beforePublish(id);
+ let out;try{out=hosting.publish(id,{slug,version})}catch(e){billing.refund(id,paid);throw e}
+ out.billing={charged:paid.charged,paid_until:paid.paid_until||null};
  // Social share image: a screenshot of the published version, taken in the background.
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;

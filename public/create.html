@@ -159,7 +159,7 @@
       <ol class="steps">
         <li><span class="num">1</span><h3>Describe it</h3><p>Say who it is for and what it does. Kairoq picks a design direction, writes the code and shows the preview as it streams in.</p></li>
         <li><span class="num">2</span><h3>Watch it get tested</h3><p>Every version opens in a real browser on a test copy of your data. Flows that work are saved as checks and re-run after each change.</p></li>
-        <li><span class="num">3</span><h3>Publish and keep improving</h3><p>Go live on a free URL or your own domain. AI customers keep visiting, and each week you get a plain-English note on what is stopping signups.</p></li>
+        <li><span class="num">3</span><h3>Publish and keep improving</h3><p>Go live on a Kairoq URL or your own domain. AI customers keep visiting, and each week you get a plain-English note on what is stopping signups.</p></li>
       </ol>
     </section>
 
@@ -523,6 +523,7 @@
     <h2>Publish</h2>
     <label>Site name<input id="slug" pattern="[a-z0-9-]{3,40}" placeholder="my-app"></label>
     <p class="muted small">Your app will be live at <code id="slug-preview"></code></p>
+    <p class="hosting-note small hidden" id="hosting-note"></p>
     <div class="row"><button class="primary" id="publish" type="button">Publish current version</button><button class="ghost hidden" id="unpublish" type="button">Unpublish</button></div>
     <div id="live-links"></div>
     <div id="analytics" class="analytics hidden">

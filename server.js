@@ -7022,6 +7022,8 @@ if (process.env.NODE_ENV !== "test") {
   setInterval(() => reactBackend.runAllAutomations().catch(e=>console.warn("[create-automations]",e.message)), 60_000).unref();
 // The learning loop: once a day, judge Kairoq's build rules and propose new ones from repeated failures.
 setInterval(() => { require("./build-lessons").run({ callModel: callBuilderModel }).catch(() => {}); }, 3_600_000).unref?.();
+// Live hosting: renew monthly charges, warn, pause after the grace period, bring paid sites back.
+setInterval(() => { require("./hosting-billing").tick().catch(e => console.warn("[hosting-billing]", e.message)); }, 3_600_000).unref?.();
   const runBackup=()=>{try{const b=require("./create-backups").run();if(b.errors.length)console.warn("[create-backups]",b.errors.join("; "))}catch(e){console.warn("[create-backups]",e.message)}};
   setTimeout(runBackup,10*60_000).unref();setInterval(runBackup,24*3600_000).unref();
   // Live-app monitor: re-runs saved checks on every published app (KAIROQ_MONITOR_HOURS, 0 = off).

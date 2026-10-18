@@ -134,6 +134,8 @@ function withPwa(html,meta){
 function serveProject(req,res,id,rest,sandbox,basePath='/'){
  let meta;try{meta=builder.loadMeta(id)}catch{return false}
  if(!meta.published)return false;
+ // Monthly hosting not paid after the grace period: a short "paused" page instead of the site.
+ if(require('./hosting-billing').paused(meta)){require('./hosting-billing').pausedPage(res);return true}
  const dist=path.join(builder.versionDir(id,meta.published.version),'dist');
  let decoded;try{decoded=decodeURIComponent(String(rest||'/').split('?')[0])}catch{res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Bad request');return true}
  const rel=decoded.replace(/^\/+/,'');

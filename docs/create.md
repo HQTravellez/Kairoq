@@ -517,6 +517,18 @@ People message Kairoq's WhatsApp number and get their app built, with the link s
 
 Replies are free-form messages inside WhatsApp's 24-hour window after the person writes, which covers a build finishing. Meta charges per conversation according to its WhatsApp pricing.
 
+## Live hosting (monthly)
+
+A published site costs **50 credits every 30 days** (`KAIROQ_HOSTING_CREDITS`; `0` turns hosting charges off). The Kairoq owner's own projects are never charged.
+
+- **Publishing** charges the first 30 days. Publishing again (a new version, another site name, or after unpublishing) is free while the 30 days last. Without enough credits, publishing is refused with a clear message and nothing is charged; if publishing fails after the charge (for example the site name is taken), the credits are given back.
+- **Renewal** runs every hour: a site whose 30 days are over is charged again (the project owner's account, also when an editor published it).
+- **Out of credits:** the owner gets an email and the site **stays live for 7 days** (`KAIROQ_HOSTING_GRACE_DAYS`). After that it shows a short "taking a break" page (HTTP 503) instead of the site; the app, its data and its domains are kept. When credits are added, the next hourly run charges them and the site is back.
+- **Sites already live when billing starts** get their first 30 days free.
+- The publish dialog shows the price and when hosting is paid until, and warns while a renewal is failing or the site is paused. Publishing from WhatsApp or the MCP server charges the same way and says so.
+
+`KAIROQ_HOSTING_DAYS` changes the 30-day period (for testing).
+
 ## Customers before code
 
 Lovable and Replit help you build an app. This helps you build a business: find out whether people want it before building it, then see every week what stops signups (`growth.js`). Open **Launch** in the editor.

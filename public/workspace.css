@@ -381,3 +381,5 @@ body.in-editor.side-open .stage-bar .bar-spacer{min-width:4px}
 .wa-status{font-weight:600}
 .wa-steps{padding-left:18px;line-height:1.7}
 #wa-go{background:#25d366;border-color:#25d366;color:#06331a;border-radius:999px}
+.hosting-note{margin:10px 0 0;padding:9px 12px;border-radius:10px;background:var(--side);border:1px solid var(--border);color:var(--muted)}
+.hosting-note.warn{background:color-mix(in srgb,var(--error) 8%,var(--panel));border-color:color-mix(in srgb,var(--error) 30%,var(--border));color:var(--text)}

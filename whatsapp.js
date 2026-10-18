@@ -160,7 +160,7 @@ async function command(from,st,d,text,images,deps){
  }
  if(!current&&/^(publish|undo)$/.test(lower))return reply('You have no app yet. Describe one and I will build it.');
  if(lower==='publish'){
-  try{const out=await api.publishProject(current,{},{inspect:deps.inspect,screenshot:deps.screenshot});return reply('🚀 Live: '+out.urls.path+'\nShare it anywhere. Every change you send from now on can be published again with *publish*.')}
+  try{const out=await api.publishProject(current,{},{inspect:deps.inspect,screenshot:deps.screenshot});return reply('🚀 Live: '+out.urls.path+'\nShare it anywhere. Every change you send from now on can be published again with *publish*.'+(out.billing&&out.billing.charged?'\nHosting: '+out.billing.charged+' credits for 30 days, renewed monthly.':''))}
   catch(e){return reply('I could not publish it: '+e.message)}
  }
  if(lower==='undo'){

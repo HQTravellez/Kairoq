@@ -806,6 +806,13 @@ function renderPublish(){
  $('slug').value=p.published?.slug||slugFrom(p.name);
  text($('slug-preview'),location.origin+'/sites/'+($('slug').value||'…')+'/');
  $('unpublish').classList.toggle('hidden',!p.published);
+ // Live hosting: what it costs and when it renews (owner projects show nothing).
+ const h=p.hosting||{},note=$('hosting-note');
+ note.classList.toggle('hidden',!h.price);note.classList.toggle('warn',Boolean(h.paused||h.failing_since));
+ if(h.price){
+  const until=h.paid_until?new Date(h.paid_until).toLocaleDateString([], {dateStyle:'medium'}):null,paid=h.paid_until&&Date.parse(h.paid_until)>Date.now()&&!h.paused;
+  text(note,h.paused?'This site is paused: its monthly '+h.price+' credits could not be charged. Add credits and it comes back within the hour.':h.failing_since?'The monthly '+h.price+' credits could not be charged. Add credits soon: the site pauses '+h.grace_days+' days after the first try.':paid?'Live hosting is paid until '+until+'. It renews for '+h.price+' credits a month.':'Live hosting: '+h.price+' credits a month, charged when you publish.');
+ }
  text($('publish').firstChild,p.published?'Update to current version (v'+p.current_version+')':'Publish current version');
  const links=$('live-links');links.replaceChildren();
  if(p.urls){
@@ -982,7 +989,7 @@ function renderLanding(){
  renderTemplates($('landing-templates'),id=>{setPending({template:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()},id=>{setPending({sponsored:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()}).catch(()=>{});
  const wrap=$('landing-plans');wrap.replaceChildren();
  const per=(state.me.tiers||[]).map(t=>t.label+' '+t.credits+' credit'+(t.credits===1?'':'s')).join(', ');
- wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a free URL','No card needed']));
+ wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a Kairoq URL','No card needed']));
  for(const p of state.me.plans||[])wrap.append(planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features]));
  for(const p of state.me.packs||[])wrap.append(planCard(p.name,p.label||p.credits+' credits',[p.credits+' credits, one-time','Never expire']));
  text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. If a change breaks your app, the next fix of that problem is on us. A request that fails before anything is saved is not charged.');

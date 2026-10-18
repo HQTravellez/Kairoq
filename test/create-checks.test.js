@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('fs'),os=require('os'),path=require('path'),http=require('http');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-checks-'));
 process.env.NODE_ENV='test';
+process.env.KAIROQ_HOSTING_CREDITS='0'; // hosting billing has its own tests (hosting-billing.test.js)
 process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
 process.env.KAIROQ_FREE_CREDITS='40';
