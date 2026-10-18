@@ -177,7 +177,7 @@ function messageItem(m,last,index){
    d.append(s,rail(acts.slice(0,30),{}));li.append(d);
   }
  }else{const body=el('div','msg-text');body.textContent=m.text;li.append(body)}
- if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Images: '+m.images.join(', ');li.append(s)}
+ if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Attached: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Design: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
  if(m.role==='assistant'&&m.scope&&m.scope.length){const d=el('div','scope-chip');d.append(icon('note'),el('span',null,'Also changed '+m.scope.map(f=>f.area).join(' and ')+' ('+[...new Set(m.scope.flatMap(f=>f.files))].slice(0,4).join(', ')+'), which you did not ask about. If that was not intended, undo this version.'));li.append(d)}
@@ -207,6 +207,15 @@ function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();st
 // The preview reports "ready" once it has rendered; when nothing arrives, say so instead of showing a blank frame.
 function watchPreview(){state.previewReady=false;$('preview-notice').classList.add('hidden');clearTimeout(state.previewTimer);state.previewTimer=setTimeout(()=>{if(!state.previewReady&&!$('frame').classList.contains('hidden'))$('preview-notice').classList.remove('hidden')},9000)}
 $('preview-reload').onclick=()=>{const f=$('frame');const u=f.src;f.src='about:blank';setTimeout(()=>{f.src=u;watchPreview()},50)};
+// Builds the shown version again from its saved code on the server (free), then reloads it.
+async function rebuildPreview(){
+ if(!state.project)return;
+ const st=$('preview-rebuild-status'),btn=$('preview-rebuild');btn.disabled=true;text(st,'Rebuilding…');
+ try{const r=await api('/projects/'+state.project.id+'/rebuild',{method:'POST',body:{version:previewVersion()}});text(st,'');setPreview(r.preview_url)}
+ catch(err){text(st,err.message)}
+ finally{btn.disabled=false}
+}
+$('preview-rebuild').onclick=rebuildPreview;
 $('versions').onchange=()=>setPreview(previewFor($('versions').value));
 $('restore').onclick=async()=>{
  const n=Number($('versions').value);if(n===state.project.current_version)return;
@@ -217,7 +226,8 @@ $('back').onclick=()=>{closeDetail();state.project=null;loadHome()};
 $('project-name').onchange=async()=>{try{const {project}=await api('/projects/'+state.project.id,{method:'PATCH',body:{name:$('project-name').value}});state.project.name=project.name}catch{}};
 function device(mobile){$('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile))}
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
-$('refresh').onclick=()=>{const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
+// Reload; when the preview had not loaded, rebuild it first.
+$('refresh').onclick=()=>{if(!$('preview-notice').classList.contains('hidden'))return rebuildPreview();const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
 $('share-open').onclick=()=>$('team-open').click();
 function view(mode){
  state.code=mode==='code';state.data=mode==='data';
@@ -452,39 +462,47 @@ function costHint(){
  if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');$('polish').title=base;return}
  const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
  const p=Math.max(t?t.credits:1,state.me.polish_credits||1);$('polish').title=base+' ('+p+' credit'+(p===1?'':'s')+')';
- const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.length?state.me.image_credits:0);
+ const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
  text($('cost-hint'),n+' credit'+(n===1?'':'s'));
 }
 // Attachments: button, paste or drop.
-$('attach').onclick=()=>$('attach-input').click();
+$('attach').onclick=()=>{$('menu-plus').open=false;$('attach-input').click()};
+$('attach-clip').onclick=()=>$('attach-input').click();
 $('attach-input').onchange=()=>{addFiles($('attach-input').files);$('attach-input').value=''};
-$('chat-input').addEventListener('paste',e=>{const files=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith('image/'));if(files.length){e.preventDefault();addFiles(files)}});
+$('chat-input').addEventListener('paste',e=>{const files=[...(e.clipboardData?.files||[])];if(files.length){e.preventDefault();addFiles(files)}});
 $('chat-form').addEventListener('dragover',e=>e.preventDefault());
 $('chat-form').addEventListener('drop',e=>{e.preventDefault();addFiles(e.dataTransfer.files)});
+// Attachments: images the AI looks at (up to 4, 3 MB each) and files whose text it reads
+// (PDF, Word, text, Markdown, CSV, JSON, HTML; up to 3, 10 MB each).
+const DOC_FILE=/\.(pdf|docx|txt|md|markdown|csv|json|html?)$/i;
 async function addFiles(files){
  text($('chat-error'),'');
  for(const f of [...files]){
-  if(state.attachments.length>=4){text($('chat-error'),'Attach up to 4 images.');break}
-  if(!/^image\/(png|jpeg|webp|gif)$/.test(f.type)){text($('chat-error'),f.name+': use PNG, JPEG, WebP or GIF.');continue}
-  if(f.size>3*1024*1024){text($('chat-error'),f.name+' is larger than 3 MB.');continue}
+  const image=/^image\/(png|jpeg|webp|gif)$/.test(f.type),doc=!image&&DOC_FILE.test(f.name||'');
+  if(!image&&!doc){text($('chat-error'),f.name+': attach images (PNG, JPEG, WebP, GIF) or files (PDF, Word .docx, text, Markdown, CSV, JSON, HTML).');continue}
+  const count=state.attachments.filter(a=>a.kind===(image?'image':'file')).length;
+  if(image&&count>=4){text($('chat-error'),'Attach up to 4 images.');continue}
+  if(doc&&count>=3){text($('chat-error'),'Attach up to 3 files.');continue}
+  if(f.size>(image?3:10)*1024*1024){text($('chat-error'),f.name+' is larger than '+(image?3:10)+' MB.');continue}
   const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
-  state.attachments.push({name:f.name||'pasted.png',dataUrl});
+  state.attachments.push({name:f.name||'pasted.png',dataUrl,kind:image?'image':'file'});
  }
  renderAttachments();
 }
 function renderAttachments(){
  const wrap=$('attachments');wrap.replaceChildren();
- state.attachments.forEach((a,i)=>{const fig=document.createElement('figure');const img=document.createElement('img');img.src=a.dataUrl;img.alt=a.name;const x=document.createElement('button');x.type='button';x.textContent='×';x.setAttribute('aria-label','Remove '+a.name);x.onclick=()=>{state.attachments.splice(i,1);renderAttachments()};fig.append(img,x);wrap.append(fig)});
+ state.attachments.forEach((a,i)=>{const fig=document.createElement('figure');let img;if(a.kind==='file'){fig.className='file';img=document.createElement('span');img.className='file-chip';img.textContent=a.name;img.title=a.name}else{img=document.createElement('img');img.src=a.dataUrl;img.alt=a.name}const x=document.createElement('button');x.type='button';x.textContent='×';x.setAttribute('aria-label','Remove '+a.name);x.onclick=()=>{state.attachments.splice(i,1);renderAttachments()};fig.append(img,x);wrap.append(fig)});
  wrap.classList.toggle('hidden',!state.attachments.length);costHint();
 }
 $('chat-form').onsubmit=e=>{e.preventDefault();const message=$('chat-input').value.trim();if(message)send(message,state.mode)};
 async function send(message,mode,path='/chat',extra={}){
  if(state.job)return;
  text($('chat-error'),'');
- const images=state.attachments.map(a=>({name:a.name,dataUrl:a.dataUrl}));
- $('messages').append(messageItem({role:'user',text:message,mode,images:images.map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
+ const images=state.attachments.filter(a=>a.kind!=='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
+ const files=state.attachments.filter(a=>a.kind==='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
+ $('messages').append(messageItem({role:'user',text:message,mode,images:[...images,...files].map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
  $('chat-input').value='';state.attachments=[];renderAttachments();
- try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,images:images.length?images:undefined,...extra}});watch(job)}
+ try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,images:images.length?images:undefined,files:files.length?files:undefined,...extra}});watch(job)}
  catch(err){
   $('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));
   if(err.status===402&&state.me.purchases)openBuy();
@@ -1083,11 +1101,34 @@ async function renderTemplates(wrap,onPick,onSponsored){
   b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:'Sponsored · '+t.sponsor}),Object.assign(document.createElement('strong'),{textContent:t.title}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description||''}));
   b.dataset.cat=t.category||'';b.onclick=()=>onSponsored(t.id);wrap.append(b);
  }
- for(const t of state.templates){
-  const b=document.createElement('button');b.type='button';
-  b.append(Object.assign(document.createElement('span'),{className:'cat',textContent:t.category}),Object.assign(document.createElement('strong'),{textContent:t.name}),Object.assign(document.createElement('span'),{className:'desc',textContent:t.description}));
-  b.onclick=()=>onPick(t.id);wrap.append(b);
- }
+ for(const t of state.templates)wrap.append(templateCard(t,onPick));
+}
+// A template card: a picture of the real app (taken by the server) in a browser or phone frame,
+// or, until that exists, a drawn page with the template's own name.
+const TPL_TINT={hospitality:'sand',travel:'slate',ai:'ember',health:'moss',marketing:'iris',business:'slate',services:'sea',personal:'rose'};
+function templateCard(t,onPick){
+ const mk=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e};
+ const b=mk('button','tpl');b.type='button';b.dataset.tint=TPL_TINT[String(t.category||'').toLowerCase()]||'sand';
+ b.setAttribute('aria-label','Start from the '+t.name+' template');
+ const shot=mk('div','tpl-shot'+(t.mobile?' phone':''));
+ const frame=mk('div',t.mobile?'tpl-device':'tpl-window');
+ if(!t.mobile){const bar=mk('div','tpl-bar');bar.append(mk('i'),mk('i'),mk('i'),mk('span',null,t.name.toLowerCase().replace(/[^a-z0-9]+/g,'')+'.kairoq.app'));frame.append(bar)}
+ const view=mk('div','tpl-view');
+ if(t.thumb){const img=mk('img');img.src=t.thumb;img.alt='';img.loading='lazy';img.decoding='async';img.onerror=()=>{img.remove();view.append(drawnPage(t,mk))};view.append(img)}
+ else view.append(drawnPage(t,mk));
+ frame.append(view);shot.append(frame);
+ const body=mk('div','tpl-body');
+ body.append(mk('span','cat',t.category),mk('strong',null,t.name),mk('span','desc',t.description),mk('span','tpl-use','Use template'));
+ b.append(shot,body);b.onclick=()=>onPick(t.id);
+ return b;
+}
+function drawnPage(t,mk){
+ const d=mk('div','tpl-drawn');
+ const nav=mk('div','d-nav');nav.append(mk('b',null,t.name),mk('span'),mk('span'),mk('em'));
+ const hero=mk('div','d-hero');hero.append(mk('small',null,t.category),mk('h4',null,t.description.split(/[.:]/)[0]),mk('div','d-btns'));
+ hero.lastChild.append(mk('i'),mk('i'));
+ const cards=mk('div','d-cards');for(let i=0;i<3;i++){const c=mk('div');c.append(mk('i'),mk('span'),mk('span'));cards.append(c)}
+ d.append(nav,hero,cards);return d;
 }
 async function startFromSponsored(id){
  text($('home-error'),'');
@@ -1529,6 +1570,38 @@ async function openIntegrations(){
   }
  }catch(err){grid.replaceChildren();text($('integrations-error'),err.message)}
 }
+// Connectors: every service this app can connect to, in one place. Each opens the panel
+// where it is set up.
+const CONNECTORS=[
+ {id:'github',name:'GitHub',desc:'Push the code to your repository and pull changes back.',open:()=>openSettingsAt('gh-howto')},
+ {id:'stripe',name:'Stripe payments',desc:'Take card payments and subscriptions with your own Stripe account.',open:()=>openSettingsAt('stripe-key')},
+ {id:'email',name:'Email',desc:'Booking confirmations, password resets and owner notifications.',open:()=>openSettingsAt('email-status')},
+ {id:'secrets',name:'API keys for your app',desc:'Keys for other services your server functions call (maps, SMS, AI…).',open:()=>openSettingsAt('secret-name')},
+ {id:'figma',name:'Figma',desc:'Build a screen from a Figma frame.',open:()=>$('figma-open').click()},
+ {id:'partners',name:'Integrations',desc:'Booking, payments, reviews and more from our partners.',open:()=>openIntegrations()},
+ {id:'whatsapp',name:'WhatsApp',desc:'Answer customers on WhatsApp with your app\'s assistant.',open:()=>openWhatsApp()},
+ {id:'domain',name:'Custom domain',desc:'Publish the app on your own domain, like www.yourhotel.com.',open:()=>$('publish-open').click()},
+ {id:'mcp',name:'MCP and API keys',desc:'Let AI tools such as Claude build and test apps in your account.',open:()=>openSettingsAt('mcp-url'),owner:true}
+];
+async function openSettingsAt(id){
+ $('connectors-dialog').close();
+ await $('settings-open').onclick();
+ const el=$(id);if(!el)return;
+ if(el.tagName==='DETAILS')el.open=true;
+ el.scrollIntoView({block:'center'});if(el.focus&&el.tagName!=='DETAILS')el.focus({preventScroll:true});
+}
+$('connect-open').onclick=()=>{
+ const ul=$('connectors-list');ul.replaceChildren();
+ for(const c of CONNECTORS){
+  if(c.owner&&state.project.role!=='owner')continue;
+  const li=el('li','connector'),ico=el('span','connector-ico',c.name.slice(0,1));ico.dataset.id=c.id;
+  const t=el('div','skill-text');t.append(el('b',null,c.name),el('span',null,c.desc));
+  const go=el('button','ghost',c.id==='github'?'Connect':'Open');go.type='button';
+  go.onclick=()=>{if(!['github','stripe','email','secrets','mcp'].includes(c.id))$('connectors-dialog').close();c.open()};
+  li.append(ico,t,go);ul.append(li);
+ }
+ $('connectors-dialog').showModal();
+};
 $('integrations-open').onclick=()=>{$('menu-plus').open=false;if(state.project)openIntegrations()};
 
 // ---------- admin: partners and sponsored templates ----------

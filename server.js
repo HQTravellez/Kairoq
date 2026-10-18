@@ -7068,6 +7068,8 @@ setInterval(() => { require("./web-tasks").tick({ callModel: callBuilderModel })
   // whose watch is due (KAIROQ_WATCH_CHECK_HOURS, 0 = off).
   const watchHours=Number(process.env.KAIROQ_WATCH_CHECK_HOURS??6);
   if(watchHours>0){const runWatch=()=>createApi.watchAll({callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[growth-watch]",e.message));setTimeout(runWatch,30*60_000).unref();setInterval(runWatch,watchHours*3600_000).unref();}
+  // Pictures of the starter templates for the gallery, taken once per template version.
+  setTimeout(()=>require("./template-thumbs").run({base:"http://127.0.0.1:"+PORT}).then(r=>{if(r.failed.length)console.warn("[template-thumbs]",r.failed.join("; "))}).catch(e=>console.warn("[template-thumbs]",e.message)),45_000).unref();
   require("./scripts/verify-builder-assets").startup().catch(e=>console.warn("[builder-assets] PROVIDER SMOKE ERROR "+e.message));
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);

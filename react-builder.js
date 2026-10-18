@@ -600,6 +600,23 @@ function serveDist(req,res,distDir,rest,{sandbox}){
 }
 function notFound(res){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Not found')}
 // /builder/p/<id>-<key>/v/<n>/<path>
+// A version whose built files are missing (a lost disk, an interrupted build) is built
+// again from its saved code. Returns true when the version can be served.
+const rebuilding=new Map();
+function ensureBuilt(id,n,{force=false}={}){
+ const dir=versionDir(id,n),dist=path.join(dir,'dist');
+ if(!force&&fs.existsSync(path.join(dist,'index.html')))return Promise.resolve(true);
+ const k=id+'/'+n;if(rebuilding.has(k))return rebuilding.get(k);
+ const p=(async()=>{
+  let files;try{files=JSON.parse(fs.readFileSync(path.join(dir,'files.json'),'utf8'))}catch{return false}
+  const tmp=dist+'.rebuild-'+process.pid;
+  fs.rmSync(tmp,{recursive:true,force:true});
+  try{await build(files,tmp,{projectId:id})}catch{fs.rmSync(tmp,{recursive:true,force:true});return false}
+  fs.rmSync(dist,{recursive:true,force:true});fs.renameSync(tmp,dist);
+  return true;
+ })().finally(()=>rebuilding.delete(k));
+ rebuilding.set(k,p);return p;
+}
 function handlePreview(req,res){
  const m=/^\/builder\/p\/([a-f0-9]{12})-([a-f0-9]{24})\/v\/(\d+)(\/.*)?$/.exec(String(req.url||'').split('?')[0]);
  if(!m)return false;
@@ -607,8 +624,10 @@ function handlePreview(req,res){
  const key=Buffer.from(m[2]),expected=Buffer.from(meta.preview_key);
  if(key.length!==expected.length||!crypto.timingSafeEqual(key,expected)){notFound(res);return true}
  if(!m[4]){res.writeHead(301,{Location:req.url.split('?')[0]+'/'});res.end();return true}
- serveDist(req,res,path.join(versionDir(m[1],m[3]),'dist'),m[4],{sandbox:true});
+ const dist=path.join(versionDir(m[1],m[3]),'dist');
+ if(fs.existsSync(path.join(dist,'index.html'))||!meta.versions.some(v=>v.n===Number(m[3]))){serveDist(req,res,dist,m[4],{sandbox:true});return true}
+ ensureBuilt(m[1],Number(m[3])).then(ok=>{if(ok)serveDist(req,res,dist,m[4],{sandbox:true});else{res.writeHead(503,{'Content-Type':'text/plain; charset=utf-8','Retry-After':'5'});res.end('This version could not be built. Ask Kairoq to fix it.')}}).catch(()=>{if(!res.headersSent){res.writeHead(500);res.end()}});
  return true;
 }
 
-module.exports={polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
