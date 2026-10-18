@@ -732,7 +732,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const raw=await readRaw(req);
    return send(res,200,await accounts.stripeWebhook(raw,req.headers['stripe-signature'])),true;
   }
-  if(route==='/templates'&&method==='GET')return send(res,200,{templates:require('./create-templates').list()}),true;
+  if(route==='/templates'&&method==='GET')return send(res,200,{templates:require('./create-templates').list(),sponsored:require('./partners').gallerySlots()}),true;
+  // A partner's sign-up link, counted. Only links the owner saved are redirected to.
+  const pgo=/^\/partners\/([a-f0-9]{10})\/go$/.exec(route);
+  if(pgo&&method==='GET'){limited(req,'partner-go',30);res.writeHead(302,{Location:require('./partners').signupUrl(pgo[1]),'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});res.end();return true}
   // ----- free website check (no account needed) -----
   if(route==='/site-check'&&method==='POST'){
    limited(req,'site-check',6,600000);
@@ -756,6 +759,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,{share:{name:meta.name,preview_url:builder.previewUrl(meta),remix:!!meta.share.remix,versions:meta.versions.length,updated_at:meta.updated_at}}),true;
   }
   const v=requireViewer(req,isOwner);
+  // ----- partner integrations -----
+  if(route==='/partners'&&method==='GET')return send(res,200,{partners:require('./partners').publicPartners()}),true;
+  const padd=/^\/partners\/([a-f0-9]{10})\/add$/.exec(route);
+  if(padd&&method==='POST')return send(res,200,require('./partners').addMessage(padd[1])),true;
   // ----- memory: preferences and recipes of this account -----
   if(route==='/memory'){
    const mem=require('./account-memory');
@@ -794,6 +801,11 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(route==='/admin/status'&&method==='GET'){
     const d=accounts.database();
     return send(res,200,{builds:builder.buildStats(),jobs:[...jobs.values()].filter(j=>ACTIVE.has(j.status)).length,projects:builder.list().length,accounts:d.prepare('SELECT COUNT(*) n FROM accounts').get().n,subscribers:d.prepare("SELECT COUNT(*) n FROM accounts WHERE plan IS NOT NULL AND plan_status='active'").get().n,last_backup:backups.latest()}),true;
+   }
+   if(route==='/admin/partners'){
+    const P=require('./partners');
+    if(method==='GET')return send(res,200,{partners:P.adminView()}),true;
+    if(method==='POST')return send(res,200,{partners:P.adminEdit(await readJson(req,20000))}),true;
    }
    if(route==='/admin/backup'&&method==='POST')return send(res,200,{backup:backups.run()}),true;
    // AI cost per tier and model over the last 30 days, next to what one message of that tier sells for.
@@ -863,7 +875,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
   if(route==='/projects'&&method==='POST'){
    const b=await readJson(req,16000000);
-   const {meta,job}=await createProject(v,{name:b.name,prompt:b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
+   // A sponsored template slot: what to start with comes from the slot, not the request.
+   const slot=b.sponsored?require('./partners').startFromSlot(String(b.sponsored)):null;
+   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);

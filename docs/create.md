@@ -482,6 +482,17 @@ Kairoq gets better at each person's work. Everything here is private to the acco
 
 `KAIROQ_MEMORY=off` turns memory off on the server; each account can turn its own off. Memory is stored per account (hashed file name) in the `memory` folder next to the projects folder, or `KAIROQ_MEMORY_DIR`.
 
+## Partners and sponsored templates
+
+How other companies pay to be on Kairoq without touching anyone's app or data. Both are managed by the owner in **Admin**.
+
+- **Partner integrations.** Each partner has a name, category (payments, booking, email, domains, hosting, analytics, marketing, other), a short description, **how Kairoq adds it to an app** (instructions for the builder), the secrets it needs, an optional sign-up link (with your referral code), a private note, and whether it is paid placement. People open **Integrations** from the **+** menu in the editor: cards labelled **Partner** or **Sponsored** (sponsored first), with "You will need: …" for secrets. **Add to my app** sends the instructions as a normal chat change (normal price), telling the builder to read secrets in a server function and never in the page. **Create an account** goes through `/api/create/partners/<id>/go`, which counts the click and redirects to the saved link (no referrer is sent). The dialog says that sponsored partners pay for their place and that Kairoq may earn a referral fee.
+- **Sponsored templates.** A slot at the front of the template gallery (home and landing), labelled **Sponsored · <partner>**, for set dates, that starts a project from a prompt or from one of Kairoq's templates. At most `KAIROQ_SPONSORED_MAX` (default 2) run at once; ended or future slots are not shown and cannot be started.
+- **Counting.** Per partner and per month: clicks and "added to an app"; per slot: views and projects started. Admin shows this month and all time, for invoicing.
+- **What partners never get.** Nothing about the person or their project: Kairoq only counts that someone clicked or added. Links must be https; only saved links are redirected to; a partner with a running slot cannot be removed until the slot ends.
+
+Data lives in the `partners` folder next to the projects folder (or `KAIROQ_PARTNERS_DIR`).
+
 ## Customers before code
 
 Lovable and Replit help you build an app. This helps you build a business: find out whether people want it before building it, then see every week what stops signups (`growth.js`). Open **Launch** in the editor.

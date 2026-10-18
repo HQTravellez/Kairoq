@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/create.css?v=20261021">
 <link rel="stylesheet" href="/landing.css?v=20261021">
-<link rel="stylesheet" href="/workspace.css?v=20261023">
+<link rel="stylesheet" href="/workspace.css?v=20261024">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -406,6 +406,7 @@
             <button type="button" id="attach"><b>Image</b><span>Attach or paste a screenshot</span></button>
             <button type="button" id="figma-open"><b>Figma</b><span>Build a Figma frame</span></button>
             <button type="button" id="ref-open"><b>Reference</b><span>Your own version of a site, repo or screenshots</span></button>
+            <button type="button" id="integrations-open"><b>Integrations</b><span>Payments, booking, email and more from our partners</span></button>
             <button type="button" id="polish"><b>Polish the design</b><span>Screenshot the app and fix what looks off</span></button>
           </div>
         </details>
@@ -542,6 +543,16 @@
   </form>
 </dialog>
 
+<dialog id="integrations-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Integrations</h2>
+    <p class="muted small">Services Kairoq knows how to add to your app. <b>Add to my app</b> asks Kairoq to build it in (a normal change). Partners marked Sponsored pay for their place here, and Kairoq may earn a referral fee when you create an account through these links. Your app and data are never shared with them.</p>
+    <div class="partner-grid" id="partner-grid"></div>
+    <p class="error" id="integrations-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
 <dialog id="memory-dialog" class="wide">
   <form method="dialog" class="dialog">
     <h2>Memory</h2>
@@ -572,6 +583,42 @@
     <ul class="learn-rules" id="learn-rules"></ul>
     <h3>Problems that keep coming back</h3>
     <ul class="learn-top" id="learn-top"></ul>
+    <h3>Partners</h3>
+    <p class="muted small">Services people can add from Integrations. Clicks and adds are counted per month so you can invoice partners.</p>
+    <ul class="learn-rules" id="partner-admin-list"></ul>
+    <details class="admin-form" id="partner-form-box"><summary id="partner-form-title">Add a partner</summary>
+      <div class="form-grid">
+        <input type="hidden" id="pf-id">
+        <label>Name<input id="pf-name" maxlength="60" placeholder="Cloudbeds"></label>
+        <label>Category<select id="pf-category"></select></label>
+        <label class="wide-field">What it does<input id="pf-description" maxlength="240" placeholder="Hotel booking engine with live availability"></label>
+        <label class="wide-field">How Kairoq adds it to an app<textarea id="pf-instructions" rows="3" maxlength="2000" placeholder="Add a booking widget page that loads availability from the Cloudbeds API in a server function using CLOUDBEDS_API_KEY…"></textarea></label>
+        <label>Secrets it needs<input id="pf-secrets" placeholder="CLOUDBEDS_API_KEY"></label>
+        <label>Sign-up link (with your referral code)<input id="pf-signup" type="url" placeholder="https://partner.com/signup?ref=kairoq"></label>
+        <label class="wide-field">Private note (the deal, the contact)<input id="pf-note" maxlength="300"></label>
+        <label class="check"><input type="checkbox" id="pf-sponsored"> Paid placement (shown first, labelled Sponsored)</label>
+        <label class="check"><input type="checkbox" id="pf-active" checked> Shown to people</label>
+      </div>
+      <div class="row"><button class="primary" id="pf-save" type="button">Save partner</button><button class="ghost" id="pf-clear" type="button">Clear</button></div>
+    </details>
+    <h3>Sponsored templates</h3>
+    <p class="muted small" id="slot-help"></p>
+    <ul class="learn-rules" id="slot-admin-list"></ul>
+    <details class="admin-form" id="slot-form-box"><summary id="slot-form-title">Add a sponsored template</summary>
+      <div class="form-grid">
+        <input type="hidden" id="sf-id">
+        <label>Sponsor<select id="sf-partner"></select></label>
+        <label>Title<input id="sf-title" maxlength="70" placeholder="Boutique hotel with Cloudbeds booking"></label>
+        <label class="wide-field">Short description<input id="sf-description" maxlength="200"></label>
+        <label>Start from template <span class="muted small">(optional)</span><select id="sf-template"><option value="">None: build from the prompt</option></select></label>
+        <label>Gallery category<input id="sf-category" maxlength="24" placeholder="hospitality"></label>
+        <label class="wide-field">What Kairoq builds<textarea id="sf-prompt" rows="3" maxlength="1500" placeholder="A boutique hotel website with rooms, photos and a booking page using Cloudbeds…"></textarea></label>
+        <label>Starts<input id="sf-starts" type="date"></label>
+        <label>Ends<input id="sf-ends" type="date"></label>
+        <label class="check"><input type="checkbox" id="sf-active" checked> Running</label>
+      </div>
+      <div class="row"><button class="primary" id="sf-save" type="button">Save sponsored template</button><button class="ghost" id="sf-clear" type="button">Clear</button></div>
+    </details>
     <h3>Website check leads</h3>
     <ul class="lead-list" id="lead-list"></ul>
     <p class="error" id="admin-error" role="alert"></p>
@@ -911,6 +958,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261023"></script>
+<script src="/create.js?v=20261024"></script>
 </body>
 </html>
