@@ -426,6 +426,51 @@ A report is the start; the repair loop (`synthetic-repair.js`) goes on to **repr
 
 **MCP:** the `fix_and_retest` tool does the same for AI assistants. `get_synthetic_test` follows the job.
 
+## Free website check
+
+Anyone can check a website without an account, from the landing page or `/create` (signed in: **Website check** in the sidebar). They give the link and an email; Kairoq opens the site in a real browser on desktop and phone, works out what a visitor comes to do (or uses the goal they typed), sends a few AI customers through it and writes a report at a shareable link (`/create/check/<id>`):
+
+- a score out of 100 (70% whether visitors reached the goal, 30% technical basics),
+- how many AI customers managed it, on phones and overall, and why the others gave up, in their own words,
+- what to fix first,
+- technical basics in plain English: load time, phone setup, sideways scrolling, small text, page title, search description, main heading, image descriptions,
+- desktop and phone screenshots,
+- **Rebuild it with Kairoq**: creates a project named after the site and opens Build from a reference with the link and the problems to fix filled in. Visitors without an account sign up first and land in the same place.
+
+The report goes to the email when email is configured (`KAIROQ_RESEND_API_KEY`, `KAIROQ_EMAIL_FROM`). Every request is kept as a lead, which the owner sees in **Admin**. The site is visited read-only: forms are answered locally and links to other sites do nothing, as with synthetic customers on other websites.
+
+Each check costs model calls, so it is limited:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `KAIROQ_SITE_CHECK` | `on` | `off` turns the free check off |
+| `KAIROQ_SITE_CHECK_VISITORS` | 5 | AI customers per check (2 to 10) |
+| `KAIROQ_SITE_CHECK_TIER` | `standard` | model tier used |
+| `KAIROQ_SITE_CHECK_PER_IP` | 3 | checks per IP address per day |
+| `KAIROQ_SITE_CHECK_PER_EMAIL` | 3 | checks per email per day |
+| `KAIROQ_SITE_CHECK_DAILY` | 40 | checks per day for the whole server |
+
+The same website checked again within a day (without a new goal) returns the saved report and costs nothing.
+
+## Learning from builds
+
+Kairoq learns from its own builds. After every build it records the problems it hit on the way (Vite build errors, errors the browser showed) and how the build ended: worked first time, recovered after retries, saved with errors or failed. Errors are reduced to their shape (quoted text, numbers, paths and links removed) so the same mistake in different projects counts once and nothing a user typed is stored; project ids are hashed. Messages like "it still doesn't work" are counted too.
+
+Once a day, a problem seen in at least three projects in the last 14 days becomes a short rule for the code writer, written by the model from the error's shape. Active rules are added to the builder's instructions for every project (Build, Discuss and Agent). Each rule remembers how often its problem happened before it went live; after 40 more builds, a rule that did not make its problem at least a fifth rarer is switched off by itself, and one that did is marked proven.
+
+The owner sees all of it in **Admin** (sidebar, owner only): builds in the last 14 days, how many worked first time, retries per build, builds saved with errors or failed, "still not working" messages, the rules with their before and after numbers, the problems that keep coming back, and website check leads. Rules can be approved, rejected, switched off or turned back on there, and **Look for new rules now** runs the daily pass at once.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `KAIROQ_LEARNING` | `review` | `review`: new rules wait for the owner's approval. `auto`: they go live at once (and are still switched off when they do not help). `off`: nothing is recorded or used |
+| `KAIROQ_LEARNING_MIN_PROJECTS` | 3 | projects a problem must appear in before it becomes a rule |
+| `KAIROQ_LEARNING_WINDOW_DAYS` | 14 | how far back to look |
+| `KAIROQ_LEARNING_JUDGE_BUILDS` | 40 | builds after going live before a rule is judged |
+| `KAIROQ_LEARNING_MAX_RULES` | 12 | active rules sent to the builder |
+| `KAIROQ_LEARNING_PER_RUN` | 3 | new rules proposed per daily pass |
+
+Review is the default because the error shapes come from user projects: a rule is only accepted when it is a short instruction about code (no links, nothing addressed to the model itself), and an owner's look adds a second check before it reaches every build.
+
 ## Customers before code
 
 Lovable and Replit help you build an app. This helps you build a business: find out whether people want it before building it, then see every week what stops signups (`growth.js`). Open **Launch** in the editor.

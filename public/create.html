@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/create.css?v=20261021">
 <link rel="stylesheet" href="/landing.css?v=20261021">
-<link rel="stylesheet" href="/workspace.css?v=20261021">
+<link rel="stylesheet" href="/workspace.css?v=20261022">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -32,6 +32,8 @@
     <button type="button" id="side-new"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>New</button>
     <button type="button" id="side-projects"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Projects</button>
     <button type="button" id="side-templates"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 9h16M9 9v12"/></svg>Templates</button>
+    <button type="button" id="side-check"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11l2 2 4-4"/></svg>Website check</button>
+    <button type="button" id="side-admin" class="hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.4 3.4 8.3 8 9 4.6-.7 8-4.6 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Admin</button>
     <button type="button" id="side-docs"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.7-2.5 2-2.5 3.5M12 17h.01"/></svg>Help</button>
   </nav>
   <p class="side-label">Recents</p>
@@ -71,6 +73,21 @@
         </div>
         <p class="hero-trust"><span>30 free credits</span><span>No card needed</span><span>Your code, your domain</span></p>
       </div>
+    </section>
+
+    <section class="site-check-band" id="website-check" aria-labelledby="sc-band-title">
+      <div class="scb-text">
+        <p class="kicker">Free website check</p>
+        <h2 id="sc-band-title">Is your website <em>losing customers?</em></h2>
+        <p>Paste your link. AI customers try to book, buy or get in touch on desktop and phone, and you get a score, where they gave up and what to fix. Free, in about two minutes.</p>
+      </div>
+      <form class="sc-form" id="landing-check-form">
+        <input id="landing-check-url" type="url" inputmode="url" placeholder="https://your-website.com" required aria-label="Your website">
+        <input id="landing-check-email" type="email" autocomplete="email" placeholder="you@business.com" required aria-label="Your email">
+        <button class="primary" type="submit" id="landing-check-go">Check my website</button>
+        <p class="muted small">We send the report to your email. Only check sites you own or have permission to test.</p>
+        <p class="error" id="landing-check-error" role="alert"></p>
+      </form>
     </section>
 
     <section class="showcase" id="showcase" aria-labelledby="show-title">
@@ -262,6 +279,51 @@
 </section>
 
 <!-- Public share page -->
+<section class="screen hidden" id="check-screen">
+  <div class="check-page">
+    <form class="sc-form start hidden" id="check-form">
+      <p class="kicker">Free website check</p>
+      <h1>Check any website</h1>
+      <p class="muted">AI customers try your site on desktop and phone. You get a score, where they gave up and what to fix.</p>
+      <input id="check-url" type="url" inputmode="url" placeholder="https://your-website.com" required aria-label="Website">
+      <input id="check-email" type="email" autocomplete="email" placeholder="you@business.com" required aria-label="Email for the report">
+      <input id="check-goal" maxlength="200" placeholder="Optional: what should visitors do? e.g. book a room for two nights" aria-label="What visitors should do">
+      <button class="primary" type="submit" id="check-go">Check the website</button>
+      <p class="muted small">Only check sites you own or have permission to test.</p>
+      <p class="error" id="check-error" role="alert"></p>
+    </form>
+    <div class="check-running hidden" id="check-running" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <h2 id="check-running-title">Checking your website</h2>
+      <p class="muted" id="check-progress">Opening the site…</p>
+      <p class="muted small">This takes about two minutes. You can leave this page: the report also goes to your email.</p>
+    </div>
+    <article class="check-report hidden" id="check-report">
+      <header class="cr-head">
+        <div class="cr-score" id="cr-score" aria-label="Score"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="bar" id="cr-ring"/></svg><b id="cr-score-n">0</b><span>/100</span></div>
+        <div class="cr-title">
+          <p class="kicker">Website check</p>
+          <h1 id="cr-host"></h1>
+          <p class="muted" id="cr-business"></p>
+          <p class="cr-goal"><span>Visitors came to</span> <b id="cr-goal"></b></p>
+        </div>
+        <div class="cr-actions"><button class="ghost" id="cr-copy" type="button">Copy link</button><button class="primary" id="cr-rebuild" type="button">Rebuild it with Kairoq</button></div>
+      </header>
+      <section class="cr-headline"><p id="cr-headline"></p><p class="cr-numbers" id="cr-numbers"></p></section>
+      <section class="cr-shots" id="cr-shots"></section>
+      <section class="cr-block"><h2>Why visitors gave up</h2><ol class="cr-issues" id="cr-issues"></ol></section>
+      <section class="cr-block"><h2>What to fix first</h2><ol class="cr-fixes" id="cr-fixes"></ol></section>
+      <section class="cr-block"><h2>Technical basics</h2><ul class="cr-tech" id="cr-tech"></ul></section>
+      <section class="cr-block"><h2>The visitors</h2><div class="cr-visits" id="cr-visits"></div></section>
+      <section class="cr-cta">
+        <div><h2>Get these fixed without hiring anyone</h2><p>Kairoq rebuilds the site as your own app with these problems fixed. Every change is tested in a real browser before you pay, and the same AI customers check it again.</p></div>
+        <div class="cr-cta-actions"><button class="primary" id="cr-rebuild-2" type="button">Rebuild it with Kairoq</button><button class="ghost" id="cr-again" type="button">Check another website</button></div>
+      </section>
+    </article>
+    <div class="check-failed hidden" id="check-failed"><h2>We could not check this site</h2><p class="muted" id="check-failed-text"></p><button class="primary" id="check-retry" type="button">Try another website</button></div>
+  </div>
+</section>
+
 <section class="screen hidden" id="share-screen">
   <div class="share-page">
     <div class="share-head"><div><p class="eyebrow">Shared app</p><h1 id="share-name"></h1></div><button class="primary" id="remix" type="button">Remix this app</button></div>
@@ -475,6 +537,25 @@
     <div class="row"><input id="domain" placeholder="www.example.com"><button class="ghost" id="add-domain" type="button">Add</button></div>
     <ul class="domains" id="domains"></ul>
     <p class="error" id="publish-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="admin-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Admin</h2>
+    <p class="muted small">Only you see this. What Kairoq is learning from its builds, and who asked for a website check.</p>
+    <h3>Learning from builds</h3>
+    <p class="small" id="learn-mode"></p>
+    <div class="tiles learn-tiles" id="learn-tiles"></div>
+    <div class="row"><button class="ghost" id="learn-run" type="button">Look for new rules now</button><span class="muted small" id="learn-status" role="status"></span></div>
+    <h3>Rules</h3>
+    <ul class="learn-rules" id="learn-rules"></ul>
+    <h3>Problems that keep coming back</h3>
+    <ul class="learn-top" id="learn-top"></ul>
+    <h3>Website check leads</h3>
+    <ul class="lead-list" id="lead-list"></ul>
+    <p class="error" id="admin-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
@@ -811,6 +892,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261021"></script>
+<script src="/create.js?v=20261022"></script>
 </body>
 </html>

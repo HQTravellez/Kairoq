@@ -10,15 +10,18 @@ async function api(path,{method='GET',body}={}){
  return data;
 }
 function show(screen){
- for(const id of ['auth','home','editor','share-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
- const app=screen==='home'||screen==='editor';
+ if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
+ $('landing-nav').classList.toggle('hidden',screen!=='auth');
+ const app=screen==='home'||screen==='editor'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  $('side').classList.toggle('hidden',!app);
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.toggle('side-open',window.innerWidth>=1600)}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check'])$(b).removeAttribute('aria-current');
+ if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
  if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -33,6 +36,7 @@ async function loadMe(){
  const name=v?(v.kind==='owner'?'':v.account.email.split('@')[0].replace(/\d+$/,'').replace(/[._-]+/g,' ').trim().slice(0,24)):'';
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
  text($('home-title'),name?'Got an idea, '+cap(name.split(' ')[0])+'?':'Got an idea?');
+ $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
  text($('free-note'),state.me.free_credits?'New accounts get '+state.me.free_credits+' free credits. One credit = one change.':'');
@@ -975,8 +979,8 @@ $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-
 for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent.trim();$('landing-prompt').focus()};
 // Template gallery tabs: filter the cards by their category.
 for(const t of document.querySelectorAll('.show-tabs .tab'))t.onclick=()=>{for(const x of document.querySelectorAll('.show-tabs .tab'))x.setAttribute('aria-pressed',String(x===t));const cat=t.dataset.cat||'';for(const card of $('landing-templates').children){const c=(card.querySelector('.cat')?.textContent||'').toLowerCase();card.hidden=Boolean(cat)&&c!==cat}};
-$('nav-signin').onclick=()=>{setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
-$('nav-start').onclick=()=>{$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
+$('nav-signin').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create#signup';return}setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+$('nav-start').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create';return}$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
 // Landing motion: a typing placeholder, reveal-on-scroll and a cursor glow on the tiles. Nothing here is needed to use the page.
 (function(){
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1135,6 +1139,124 @@ $('knowledge-save').onclick=async()=>{
  catch(err){text($('knowledge-status'),err.message)}
 };
 
+// ---------- free website check ----------
+const checkState={id:null,timer:null};
+function openCheckForm(){
+ show('check-screen');history.replaceState(null,'','/create');document.title='Website check · Kairoq Create';
+ for(const x of ['check-running','check-report','check-failed'])$(x).classList.add('hidden');
+ $('check-form').classList.remove('hidden');text($('check-error'),'');
+ const acct=state.me&&state.me.viewer&&state.me.viewer.account;if(acct&&!$('check-email').value)$('check-email').value=acct.email;
+ $('check-url').focus();
+}
+async function startCheck({url,email,goal},errEl,btn){
+ text(errEl,'');btn.disabled=true;
+ try{const r=await api('/site-check',{method:'POST',body:{url,email,goal}});history.pushState(null,'','/create/check/'+r.id);openCheck(r.id)}
+ catch(err){text(errEl,err.message)}
+ finally{btn.disabled=false}
+}
+async function openCheck(id){
+ show('check-screen');checkState.id=id;clearTimeout(checkState.timer);
+ $('check-form').classList.add('hidden');$('check-failed').classList.add('hidden');
+ try{
+  const {check}=await api('/site-check/'+id);
+  if(checkState.id!==id)return;
+  if(check.status==='running'){
+   $('check-report').classList.add('hidden');$('check-running').classList.remove('hidden');
+   text($('check-running-title'),'Checking '+(check.host||'your website'));text($('check-progress'),check.progress||'Working…');
+   checkState.timer=setTimeout(()=>openCheck(id),2500);return;
+  }
+  $('check-running').classList.add('hidden');
+  if(check.status==='failed'){$('check-report').classList.add('hidden');$('check-failed').classList.remove('hidden');text($('check-failed-text'),check.error||'');return}
+  renderCheck(check);
+ }catch(err){$('check-running').classList.add('hidden');$('check-report').classList.add('hidden');$('check-failed').classList.remove('hidden');text($('check-failed-text'),err.message)}
+}
+function renderCheck(c){
+ document.title=c.host+' website check · Kairoq Create';
+ $('check-report').classList.remove('hidden');
+ const sc=Math.max(0,Math.min(100,Number(c.score)||0)),ring=$('cr-ring'),C=2*Math.PI*52;
+ ring.style.strokeDasharray=String(C);ring.style.strokeDashoffset=String(C*(1-sc/100));
+ $('cr-score').className='cr-score '+(sc>=75?'good':sc>=50?'fair':'poor');text($('cr-score-n'),sc);
+ text($('cr-host'),c.host);text($('cr-business'),c.business||'');text($('cr-goal'),String(c.goal||'').replace(/\.$/,''));
+ const n=c.numbers||{};
+ text($('cr-headline'),c.summary&&c.summary.headline?c.summary.headline:n.completed===n.visitors?'Every visitor managed it.':'Some visitors did not manage it.');
+ text($('cr-numbers'),(n.completed||0)+' of '+(n.visitors||0)+' AI customers managed it'+(n.by_device&&n.by_device.phone?' · on phones '+n.by_device.phone.completed+' of '+n.by_device.phone.visitors:'')+(n.median_steps?' · '+n.median_steps+' steps for those who did':''));
+ const shots=$('cr-shots');shots.replaceChildren();
+ for(const name of c.shots||[]){const f=el('figure','cr-shot '+name),img=document.createElement('img');img.alt=c.host+' on '+(name==='phone'?'a phone':'a desktop');img.loading='lazy';img.src='/api/create/site-check/'+c.id+'/shot?name='+name;f.append(img,el('figcaption',null,name==='phone'?'Phone':'Desktop'));shots.append(f)}
+ const iss=$('cr-issues');iss.replaceChildren();
+ const issues=(c.summary&&c.summary.issues)||[];
+ if(!issues.length)iss.append(el('li','muted','No visitor gave up on the way.'));
+ for(const i of issues){const li=document.createElement('li');li.append(el('b',null,i.title));if(i.why)li.append(el('p',null,i.why));if(i.quote)li.append(el('blockquote',null,'“'+i.quote+'”'));const who=[i.who,i.visitors?i.visitors+' of '+(n.visitors||0)+' visitors':''].filter(Boolean).join(' · ');if(who)li.append(el('span','muted small',who));iss.append(li)}
+ const fx=$('cr-fixes');fx.replaceChildren();
+ const fixes=[...((c.summary&&c.summary.fixes)||[]),...(c.technical||[]).filter(t=>!t.ok).slice(0,3).map(t=>t.title+': '+t.detail)].slice(0,8);
+ if(!fixes.length)fx.append(el('li','muted','Nothing urgent. Keep an eye on it after each change.'));
+ for(const f of fixes)fx.append(el('li',null,f));
+ const tech=$('cr-tech');tech.replaceChildren();
+ for(const t of c.technical||[]){const li=el('li',t.ok?'ok':'bad');li.append(icon(t.ok?'check':'note'),el('b',null,t.title),el('span',null,t.detail));tech.append(li)}
+ const vs=$('cr-visits');vs.replaceChildren();
+ const said={completed:'managed it',gave_up:'gave up',stuck:'got stuck',error:'hit an error'};
+ for(const v of c.visits||[]){
+  const d=el('details','cr-visit'),s=el('summary');
+  s.append(el('b',null,v.name+', '+v.age),el('span','muted',' · '+(v.device==='phone'?'phone':'desktop')+(v.about?' · '+v.about:'')),el('span','cr-outcome '+(v.outcome==='completed'?'ok':'bad'),said[v.outcome]||v.outcome));
+  const ol=el('ol');for(const st of v.steps||[]){const li=el('li','feel-'+(st.feeling||'unsure'));li.append(el('span',null,st.thought||''),el('span','muted small',' '+st.action+(st.label?' “'+st.label+'”':'')));ol.append(li)}
+  d.append(s,ol);vs.append(d);
+ }
+ for(const b of ['cr-rebuild','cr-rebuild-2'])$(b).onclick=()=>rebuildFromCheck(c).catch(err=>alert(err.message));
+ $('cr-copy').onclick=()=>navigator.clipboard?.writeText(location.origin+'/create/check/'+c.id).then(()=>{text($('cr-copy'),'Copied');setTimeout(()=>text($('cr-copy'),'Copy link'),1500)}).catch(()=>{});
+}
+async function rebuildFromCheck(c){
+ const lines=[...((c.summary&&c.summary.issues)||[]).map(i=>'- '+i.title+(i.why?': '+i.why:'')),...(c.technical||[]).filter(t=>!t.ok).map(t=>'- '+t.title+': '+t.detail)];
+ const r={url:c.url,host:c.host,note:('My own, better version of this site. Fix what the website check found:\n'+lines.join('\n')).slice(0,1900)};
+ if(!(state.me&&state.me.viewer)){setPending({rebuild:r});location.href='/create#signup';return}
+ await rebuild(r);
+}
+async function rebuild(r){
+ const {project}=await api('/projects',{method:'POST',body:{name:r.host}});
+ await openProject(project.id);
+ await openReference();
+ $('ref-url').value=r.url;$('ref-note').value=r.note||'';
+}
+$('landing-check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('landing-check-url').value.trim(),email:$('landing-check-email').value.trim()},$('landing-check-error'),$('landing-check-go'))};
+$('check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('check-url').value.trim(),email:$('check-email').value.trim(),goal:$('check-goal').value.trim()},$('check-error'),$('check-go'))};
+$('cr-again').onclick=openCheckForm;$('check-retry').onclick=openCheckForm;$('side-check').onclick=openCheckForm;
+window.addEventListener('popstate',()=>{const m=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);if(m)openCheck(m[1])});
+
+// ---------- admin (owner only): what Kairoq is learning, and website check leads ----------
+async function openAdmin(){text($('admin-error'),'');text($('learn-status'),'');$('admin-dialog').showModal();await renderAdmin()}
+function pctText(r){return r==null?'–':Math.round(r*1000)/10+'%'}
+async function renderAdmin(given){
+ try{
+  const L=given||(await api('/learning')).learning;
+  text($('learn-mode'),L.mode==='auto'?'New rules go live by themselves, and are switched off again when they do not make their problem rarer.':L.mode==='off'?'Learning is switched off on this server (KAIROQ_LEARNING=off).':'New rules wait for your approval. Kairoq still switches off approved rules that do not help. Set KAIROQ_LEARNING=auto to skip the approval.');
+  const tiles=$('learn-tiles');tiles.replaceChildren();
+  for(const [v,l] of [[L.builds,'builds in '+L.window_days+' days'],[L.clean_rate==null?'–':L.clean_rate+'%','worked first time'],[L.retries_per_build==null?'–':L.retries_per_build,'retries per build'],[L.saved_with_errors+L.failed,'saved with errors or failed'],[L.complaints,'"still not working" messages']]){const d=el('div');d.append(el('span','tile-value',String(v)),el('span','muted small',l));tiles.append(d)}
+  const ul=$('learn-rules');ul.replaceChildren();
+  if(!L.lessons.length)ul.append(el('li','muted','No rules yet. Kairoq proposes one when the same problem shows up in several projects.'));
+  for(const r of L.lessons){
+   const li=el('li','rule '+r.status),head=el('div','rule-head');
+   head.append(el('span','badge '+r.status,r.status==='active'?(r.proven?'Live · proven':'Live'):r.status==='proposed'?'Waiting for you':'Off'),el('b',null,r.rule));li.append(head);
+   if(r.why)li.append(el('p','small',r.why));
+   const ev=r.evidence||{};
+   li.append(el('p','muted small','Seen in '+ev.projects+' projects, '+pctText(ev.rate)+' of builds. Error: '+r.shape+(r.baseline?' · before: '+pctText(r.baseline.rate):'')+(r.after?' · after: '+pctText(r.after.rate)+' over '+r.after.builds+' builds':'')+(r.reason?' · '+r.reason:'')));
+   const row=el('div','row');
+   const act=(label,action,cls)=>{const b=el('button',cls,label);b.type='button';b.onclick=async()=>{b.disabled=true;try{renderAdmin((await api('/learning',{method:'POST',body:{id:r.id,action}})).learning)}catch(err){text($('admin-error'),err.message);b.disabled=false}};row.append(b)};
+   if(r.status==='proposed')act('Approve','approve','primary');
+   if(r.status!=='retired')act(r.status==='proposed'?'Reject':'Switch off','retire','ghost');
+   if(r.status==='retired')act('Turn back on','approve','ghost');
+   li.append(row);ul.append(li);
+  }
+  const top=$('learn-top');top.replaceChildren();
+  if(!L.top_problems.length)top.append(el('li','muted','No repeated problems in this period.'));
+  for(const p of L.top_problems){const li=el('li');li.append(el('code',null,p.shape),el('span','muted small',' · '+(p.stage==='build'?'build':p.stage==='browser'?'browser':'failed')+' · '+p.builds+' builds in '+p.projects+' projects'));top.append(li)}
+ }catch(err){text($('admin-error'),err.message)}
+ try{
+  const {checks}=await api('/site-checks'),ul=$('lead-list');ul.replaceChildren();
+  if(!checks.length)ul.append(el('li','muted','No website checks yet.'));
+  for(const c of checks.slice(0,60)){const li=el('li'),a=el('a',null,c.url.replace(/^https?:\/\//,''));a.href='/create/check/'+c.id;a.target='_blank';a.rel='noopener';li.append(el('b',null,c.email),document.createTextNode(' · '),a,el('span','muted small',' · '+(c.score!=null?c.score+'/100':c.status)+' · '+when(c.at)+(c.cached?' · saved report':'')));ul.append(li)}
+ }catch{}
+}
+$('side-admin').onclick=openAdmin;
+$('learn-run').onclick=async()=>{const b=$('learn-run');b.disabled=true;text($('learn-status'),'Looking at recent builds…');try{const r=await api('/learning',{method:'POST',body:{action:'run'}});text($('learn-status'),r.result.proposed.length?'Proposed '+r.result.proposed.length+' new rule'+(r.result.proposed.length===1?'':'s')+'.':'No new repeated problems found.');renderAdmin(r.learning)}catch(err){text($('learn-status'),err.message)}finally{b.disabled=false}};
+
 async function start(){
  await handleLinks();
  const v=await loadMe();
@@ -1143,10 +1265,13 @@ async function start(){
  if(state.flash){text($('auth-error'),state.flash);text($('home-error'),state.flash);state.flash=null}
  const share=/^\/create\/share\/([a-f0-9]{24})\/?$/.exec(location.pathname);
  if(share)return openShare(share[1],v);
+ const ck=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);
+ if(ck){if(v)api('/projects').then(r=>renderRecents(r.projects)).catch(()=>{});return openCheck(ck[1])}
  if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}
  const pending=takePending();
  if(pending){
   if(pending.remix)return remix(pending.remix);
+  if(pending.rebuild){try{return await rebuild(pending.rebuild)}catch(err){await loadHome();text($('home-error'),err.message);return}}
   try{const {project,job}=await api('/projects',{method:'POST',body:pending.template?{template:pending.template}:{prompt:pending.prompt}});return openProject(project.id,{pendingText:pending.prompt,job})}catch(err){await loadHome();text($('home-error'),err.message);return}
  }
  if(new URLSearchParams(location.search).get('purchase')==='success')setTimeout(refreshCredits,3000);
