@@ -90,3 +90,38 @@ test('the journey adds a record with the form and reloads',{skip:!runtime.availa
   assert.equal(r.journey,undefined);
  }finally{server.close();await runtime.close().catch(()=>{})}
 });
+
+test('a fix for a browser error goes on top of the try it fixes, not the old version',async()=>{
+ const meta=builder.create({name:'Layer',owner:'owner'});await builder.initialize(meta);
+ const APP="import { collection } from 'kairoq';\nexport default function App(){return <main><h1>Invoices</h1></main>}\n";
+ const replies=[{message:'app',files:{'src/App.jsx':APP,'src/Extra.jsx':'export default function Extra(){return null}\n'}},{message:'declared',files:{'src/backend.json':JSON.stringify({collections:{invoices:{access:'private'}}})}}];
+ const prompts=[];let calls=0;
+ const r=await builder.edit(meta.id,'invoices',{callModel:(o,parse)=>{prompts.push(o.messages.at(-1).content);return Promise.resolve(parse(JSON.stringify(replies[calls++])))},checkRuntime:async()=>({errors:calls===1?['HTTP 404 from GET /api/apps/x/collections/invoices: Collection "invoices" is not declared in src/backend.json']:[]})});
+ assert.equal(r.attempts,2);
+ const files=builder.loadFiles(meta.id,r.version);
+ assert.equal(files['src/App.jsx'],APP,'the app from the first try is kept');
+ assert.ok(files['src/Extra.jsx'],'new files from the first try are kept');
+ assert.match(files['src/backend.json'],/invoices/);
+ assert.match(prompts[1],/previous change is kept/);
+});
+
+test('the journey opens "+ Add" dialogs, skips filled-in and blocked forms, and finds a single card',{skip:!runtime.available()&&'no Chromium'},async()=>{
+ const page=`<!doctype html><html><body><div id="root"><main>
+<form id="profile"><label>Your name <input name="name" value="Ana"></label><button>Save changes</button></form>
+<button id="fu">Add follow-up</button><button id="add" aria-label="Add contact">+</button>
+<section id="cards"></section><div id="host"></div></main></div><script>
+const saved=()=>JSON.parse(localStorage.getItem('c')||'[]');
+const draw=()=>{document.getElementById('cards').innerHTML=saved().map(n=>'<button class="card"><span>'+n+'</span></button>').join('')};draw();
+document.getElementById('profile').onsubmit=e=>{e.preventDefault();localStorage.setItem('profile','touched')};
+document.getElementById('fu').onclick=()=>{document.getElementById('host').innerHTML='<div role="dialog"><form id="f2"><label>Task <input name="t" required></label><label>Contact <select name="c" required><option value="">Choose</option></select></label><button>Save</button></form></div>'};
+document.getElementById('add').onclick=()=>{document.getElementById('host').innerHTML='<div role="dialog"><label>Full name <input id="n"></label><label>Check in <input type="date" id="a"></label><label>Check out <input type="date" id="b"></label><button type="button" id="save">Save contact</button></div>';
+ document.getElementById('save').onclick=()=>{const a=document.getElementById('a').value,b=document.getElementById('b').value;if(!a||b<=a||a<=new Date().toISOString().slice(0,10))return;localStorage.setItem('c',JSON.stringify([...saved(),document.getElementById('n').value]));document.getElementById('host').innerHTML='';draw()}};
+</script></body></html>`;
+ const server=http.createServer((q,r)=>{r.writeHead(200,{'Content-Type':'text/html'});r.end(page)});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{
+  const r=await runtime.check('http://127.0.0.1:'+server.address().port+'/',{journey:true});
+  assert.ok(r.journey,JSON.stringify(r));
+  assert.equal(r.journey.submitted,true);assert.equal(r.journey.shown,true,'the record in a single card counts');assert.equal(r.journey.reloaded,true);
+ }finally{server.close();await runtime.close().catch(()=>{})}
+});

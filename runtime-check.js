@@ -67,70 +67,125 @@ async function phoneFits(url,sandbox){
 // The button that sends a form: an explicit submit button, else the first plain button that is
 // not another way in (Google) or a switch between sign-in and sign-up.
 async function submitButton(form){
- for(const sel of ['button[type=submit],input[type=submit]','button:not([type])']){
+ // Last: a type="button" that says what it does, for fields that are not in a <form>.
+ for(const sel of ['button[type=submit],input[type=submit]','button:not([type])','button[type=button]']){
   for(const b of await form.locator(sel).all()){
    if(!(await b.isVisible().catch(()=>false)))continue;
    const t=(await b.innerText().catch(()=>'')||await b.getAttribute('value').catch(()=>'')||'').trim();
    if(/google|apple|facebook|github|microsoft/i.test(t))continue;
    if(sel!=='button[type=submit],input[type=submit]'&&/^(new|already|don.?t|no account)|account\?|instead/i.test(t))continue;
+   if(sel==='button[type=button]'&&!/^(save|add|create|submit|book|send|request|confirm|continue|next|reserve)\b/i.test(t))continue;
    return b;
   }
  }
  return null;
 }
+// Buttons that open a form to add something: "+ Add contact", "New task", "Book this walk"...
+const OPENS_FORM=/^\s*(\+\s*)?(add|new|create|book|request|reserve|arrange|schedule|log|share|plan|enquire|get a quote|send an? (enquiry|request))\b/i;
+const SIGN_IN=/^\s*([a-z]+ )?(sign ?in|log ?in|sign ?up|create (an |your )?account|register|get started)\s*$/i;
 async function savesData(context,url){
  const tab=await context.newPage(),visible=l=>l.isVisible().catch(()=>false);
  // The app's own API calls that fail while a customer signs up and adds a record (a save
- // the server refuses is the clearest sign the app keeps nothing).
+ // the server refuses is the clearest sign the app keeps nothing). "Sign in first" (401) and
+ // checkout are the app asking for more, not a failure.
  const apiErrors=[],calls=[];
- tab.on('response',r=>{let u;try{u=new URL(r.url())}catch{return}if(r.status()<400||!/^\/api\/apps\/[a-f0-9]{12}\//.test(u.pathname)||/\/auth\/(signin|user)$/.test(u.pathname))return;calls.push(r.text().then(t=>{let why='';try{why=JSON.parse(t).error||''}catch{}const line='HTTP '+r.status()+' from '+r.request().method()+' '+u.pathname+(why?': '+String(why).slice(0,200):'');if(!apiErrors.includes(line)&&apiErrors.length<6)apiErrors.push(line)},()=>{}))});
+ tab.on('response',r=>{let u;try{u=new URL(r.url())}catch{return}if(r.status()<400||r.status()===401||!/^\/api\/apps\/[a-f0-9]{12}\//.test(u.pathname)||/\/auth\/(signin|user)$|\/payments\//.test(u.pathname))return;calls.push(r.text().then(t=>{let why='';try{why=JSON.parse(t).error||''}catch{}const line='HTTP '+r.status()+' from '+r.request().method()+' '+u.pathname+(why?': '+String(why).slice(0,200):'');if(!apiErrors.includes(line)&&apiErrors.length<6)apiErrors.push(line)},()=>{}))});
  let signedUp=false,submitted=false;
  // Not seen in a list: the caller still looks for the record in the app's data (a booking or
  // order form shows a thank-you instead). Nothing to report when no form was sent.
  const failed=async()=>{await Promise.all(calls);if(apiErrors.length)return{token,shown:false,reloaded:false,signed_up:signedUp,api_errors:apiErrors};return submitted||signedUp?{token,shown:false,reloaded:false,signed_up:signedUp,submitted}:null};
  const token='Kq'+String(100000+Math.floor(Math.random()*900000));
- const today=new Date().toISOString().slice(0,10),password='Kq-test-'+token+'!';
+ const password='Kq-test-'+token+'!';
+ // Dates a week ahead (bookings refuse past days), each later field a day after the one
+ // before, so a check-out comes after its check-in.
+ const day=n=>new Date(Date.now()+(7+n)*86400000).toISOString().slice(0,10);
+ const settle=async(ms=900)=>{await tab.waitForLoadState('networkidle',{timeout:4000}).catch(()=>{});await tab.waitForTimeout(ms)};
+ const click=async l=>{try{await l.click({timeout:2500});return true}catch{return false}};
  async function fill(form,{record}){
-  let named=false;
+  let named=false,dates=0;
   for(const f of await form.locator('input,textarea,select').all()){
    if(!(await visible(f))||await f.isDisabled().catch(()=>true))continue;
    try{
-    const d=await f.evaluate(e=>({tag:e.tagName.toLowerCase(),type:(e.getAttribute('type')||'text').toLowerCase(),hint:[e.name,e.id,e.placeholder,e.getAttribute('aria-label'),e.labels&&e.labels[0]&&e.labels[0].innerText].join(' ').toLowerCase(),required:e.required}));
+    const d=await f.evaluate(e=>({tag:e.tagName.toLowerCase(),type:(e.getAttribute('type')||'text').toLowerCase(),hint:[e.name,e.id,e.placeholder,e.getAttribute('aria-label'),e.labels&&e.labels[0]&&e.labels[0].innerText].join(' ').toLowerCase(),required:e.required,value:e.value}));
     if(d.tag==='select'){const opts=await f.locator('option').evaluateAll(o=>o.filter(x=>x.value&&!x.disabled).map(x=>x.value));if(opts.length)await f.selectOption(opts[0]);continue}
     if(['hidden','submit','button','reset','file','image','range','color','search'].includes(d.type))continue;
     if(d.type==='checkbox'||d.type==='radio'){if(d.required)await f.check({timeout:1500});continue}
+    const date=['date','datetime-local','month'].includes(d.type)?day(dates++):'';
     const email=record?token.toLowerCase()+'@example.com':'owner'+token.slice(2)+'@example.com';
-    const v=d.type==='email'||/e-?mail/.test(d.hint)?email:d.type==='password'?password:d.type==='tel'||/phone|mobile/.test(d.hint)?'555010'+token.slice(-4):d.type==='number'?'3':d.type==='date'?today:d.type==='time'?'10:30':d.type==='datetime-local'?today+'T10:30':d.type==='month'?today.slice(0,7):d.type==='url'||/website|url/.test(d.hint)?'https://example.com':d.tag==='textarea'?(record?'Note '+token:'Test'):!record?'Test Owner':named?'Sample':(named=true,token+' Test');
+    const v=d.type==='email'||/e-?mail/.test(d.hint)?email:d.type==='password'?password:d.type==='tel'||/phone|mobile/.test(d.hint)?'555010'+token.slice(-4):d.type==='number'?'3':d.type==='date'?date:d.type==='time'?'10:30':d.type==='datetime-local'?date+'T10:30':d.type==='month'?date.slice(0,7):d.type==='url'||/website|url/.test(d.hint)?'https://example.com':d.tag==='textarea'?(record?'Note '+token:'Test'):!record?'Test Owner':named?'Sample':(named=true,token+' Test');
     await f.fill(v,{timeout:2000});
    }catch{}
   }
   const btn=await submitButton(form);
-  if(btn)await btn.click({timeout:2000});else await form.evaluate(e=>e.requestSubmit()).catch(()=>{});
-  await tab.waitForLoadState('networkidle',{timeout:4000}).catch(()=>{});await tab.waitForTimeout(900);
+  if(!(btn&&await click(btn)))await form.evaluate(e=>e.tagName==='FORM'&&e.requestSubmit()).catch(()=>{});
+  await settle();
+ }
+ // Creates a test account (switching the sign-in form to sign-up first). False when the app
+ // has no way to sign up or the account was not made.
+ async function signUp(){
+  const sb=await submitButton(tab.locator('form:has(input[type=password])').first());
+  const submitText=sb?await sb.innerText().catch(()=>''):'';
+  if(!/sign ?up|create|register|join|get started/i.test(submitText)){
+   const toggle=tab.locator('a,button,[role=tab]').filter({hasText:/^[^.!]{0,24}\b(sign ?up|create (an |your )?account|register|join now)\b[^.]{0,20}$/i}).first();
+   if(!(await visible(toggle))||!(await click(toggle)))return false;
+   await tab.waitForTimeout(500);
+  }
+  const signup=tab.locator('form:has(input[type=password])').first();
+  if(!(await visible(signup)))return false;
+  await fill(signup,{record:false});
+  if(await visible(tab.locator('input[type=password]').first()))return false;
+  return signedUp=true;
+ }
+ // The form a customer adds a record with: fields to type in, no password or search box, and
+ // not already filled in (a profile or settings form arrives with the user's details), and
+// nothing it needs is missing.
+ const isAddForm=el=>el.evaluate(e=>{
+  if(e.querySelector('input[type=password],input[type=search]')||e.closest('[role=search]'))return false;
+  const fields=[...e.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):not([type=file]),textarea')].filter(i=>i.offsetParent!==null&&!i.disabled&&!i.readOnly);
+  if(!fields.length)return false;
+  // A required choice with nothing to choose ("add a contact first") cannot be sent yet.
+  if([...e.querySelectorAll('select[required]')].some(x=>![...x.options].some(o=>o.value&&!o.disabled)))return false;
+  const typed=fields.filter(i=>['text','email','tel','textarea'].includes(i.tagName==='TEXTAREA'?'textarea':(i.getAttribute('type')||'text').toLowerCase()));
+  if(typed.length&&typed.every(i=>i.value))return false;
+  return !/search|newsletter|subscribe/i.test(e.innerText+' '+(e.getAttribute('aria-label')||'')+' '+fields.map(i=>i.placeholder).join(' '));
+ }).catch(()=>false);
+ // Forms first, then dialogs whose fields are not in a form (React apps often skip <form>).
+ const addForm=async()=>{for(const f of [...await tab.locator('form').all(),...await tab.locator('[role=dialog]:not(:has(form)),dialog[open]:not(:has(form))').all()])if(await visible(f)&&await isAddForm(f))return f;return null};
+ const signature=f=>f.evaluate(e=>[...e.querySelectorAll('input,textarea,select')].map(i=>i.name||i.id||i.placeholder).join('|')).catch(()=>'');
+ // No form on the page: the buttons that open one, by their accessible name ("+" icons included).
+ async function openForm(){
+  const tried=new Set();
+  for(const role of ['button','link'])for(const l of await tab.getByRole(role,{name:OPENS_FORM}).all()){
+   if(tried.size>=6)return null;
+   const name=(await l.innerText().catch(()=>'')||await l.getAttribute('aria-label').catch(()=>'')||'').trim();
+   if(tried.has(name)||/to (cart|bag|basket)/i.test(name)||!(await visible(l)))continue;
+   tried.add(name);
+   if(!(await click(l)))continue;
+   await settle(600);
+   const f=await addForm();if(f)return f;
+   await tab.keyboard.press('Escape').catch(()=>{});
+  }
+  return null;
  }
  try{
   await tab.goto(url,{waitUntil:'load',timeout:15000});
   await tab.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
-  // An app behind a sign-in: create a test account first (switching the form to sign-up).
-  if(await visible(tab.locator('input[type=password]').first())){
-   const sb=await submitButton(tab.locator('form:has(input[type=password])').first());
-   const submitText=sb?await sb.innerText().catch(()=>''):'';
-   if(!/sign ?up|create|register|join|get started/i.test(submitText)){
-    const toggle=tab.locator('a,button,[role=tab]').filter({hasText:/^[^.!]{0,24}\b(sign ?up|create (an |your )?account|register|join now)\b[^.]{0,20}$/i}).first();
-    if(!(await visible(toggle)))return null;
-    await toggle.click({timeout:2000});await tab.waitForTimeout(500);
-   }
-   const signup=tab.locator('form:has(input[type=password])').first();
-   if(!(await visible(signup)))return null;
-   await fill(signup,{record:false});
-   if(await visible(tab.locator('input[type=password]').first()))return failed();
-   signedUp=true;
+  // An app behind a sign-in: create a test account first.
+  if(await visible(tab.locator('input[type=password]').first())&&!(await signUp()))return failed();
+  let form=await addForm()||await openForm();
+  // Still nothing: the form may be behind a sign-in the visitor has to open ("Sign in", "Get started").
+  if(!form&&!signedUp){
+   const door=tab.getByRole('button',{name:SIGN_IN}).or(tab.getByRole('link',{name:SIGN_IN})).first();
+   if(await visible(door)&&await click(door)){await settle(600);if(await visible(tab.locator('input[type=password]').first())&&await signUp())form=await addForm()||await openForm()}
   }
-  const addForm=async()=>{for(const f of await tab.locator('form').all()){if(!(await visible(f)))continue;if(await f.evaluate(e=>!e.querySelector('input[type=password],input[type=search]')&&!e.closest('[role=search]')&&e.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]),textarea').length>=1&&!/search|newsletter|subscribe/i.test(e.innerText+' '+(e.getAttribute('aria-label')||'')+' '+[...e.querySelectorAll('input')].map(i=>i.placeholder).join(' '))))return f}return null};
-  let form=await addForm();
-  if(!form){const add=tab.locator('button,a,[role=button]').filter({hasText:/^\s*(\+\s*)?(add|new|create)\b/i}).first();if(await visible(add)){await add.click({timeout:2000});await tab.waitForTimeout(600);form=await addForm()}}
   if(!form)return failed();
-  await fill(form,{record:true});submitted=true;
+  // Forms in steps ("Continue"): each new step is filled in too, up to three.
+  for(let step=0;step<3&&form;step++){
+   const before=await signature(form);
+   await fill(form,{record:true});submitted=true;
+   const next=await addForm();
+   form=next&&await signature(next)!==before?next:null;
+  }
   // Shown as a record: in a list, table or a row of similar cards, not in a thank-you or status message.
   const shown=()=>tab.evaluate(t=>{
    const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
@@ -138,7 +193,7 @@ async function savesData(context,url){
     if(!n.nodeValue.toLowerCase().includes(t.toLowerCase()))continue;
     const el=n.parentElement;if(!el||el.closest('form,[role=alert],[role=status],[aria-live],dialog,[role=dialog]'))continue;
     if(/thank|received|success|confirm|booked|sent|welcome|see you/i.test((el.closest('p,div,section')||el).innerText.slice(0,300)))continue;
-    if(el.closest('li,tr,[role=row],[role=listitem],td'))return true;
+    if(el.closest('li,tr,[role=row],[role=listitem],td,article,button,a,[role=button]'))return true;
     for(let a=el,i=0;a&&a.parentElement&&i<5;a=a.parentElement,i++){const sib=[...a.parentElement.children].filter(c=>c.tagName===a.tagName&&c.className===a.className);if(sib.length>=2)return true}
    }
    return false;

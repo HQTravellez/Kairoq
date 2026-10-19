@@ -48,6 +48,7 @@ Rules:
   collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
   Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (guestbooks, public comments); "submit-only" = anyone can add but nobody can read them back, only the owner sees them in Kairoq (use this for contact, booking, reservation, order and waitlist forms; show a thank-you message after create). Only a record's creator can update or delete it.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
+  email.send() returns {sent:false, saved:true} when email is not set up on the server yet: treat that as done (the message is kept for the owner), never show it as an error to the customer.
   Invite a friend (only when the owner asks for referrals or invites): import { referrals } from 'kairoq'; const r = await referrals.mine() (signed-in users only) gives {link, code, joined, people:[{name, joined_at}]}. Show the link with a Copy button and a share button (navigator.share when available), how many friends joined, and the reward the owner chose. Visitors who open the link and then create an account are counted automatically; nothing else is needed.
   Apps that keep records (a CRM with leads, contacts and deals, bookings, orders, inventory, tasks, notes, follow-ups) save every record with collection() (or the SQL database), so it survives a reload and is the same on every device: never keep records only in React state, memory or localStorage, and never tell the user their data is "local to this session". Business data uses "private" or "shared" access behind a sign-in. Sample records may be created once when the collection is empty, clearly marked as examples the user can delete.
   Optional features (add them to src/backend.json only when the app needs them):
@@ -73,7 +74,8 @@ Rules:
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
 {"plan":["2 to 6 short steps you will take, written for the user, e.g. \"Add a booking form to the home page\""],"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
-Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.${require('./react-edits').PROMPT_NOTE}`;
+Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.
+When you add or change a flow a customer uses (sign up, book, order, add or edit a record, a form), also send "checks": up to 2 browser checks that prove it works, e.g. "checks":[{"name":"Add a contact","path":"","steps":[{"action":"click","text":"Add contact"},{"action":"fill","label":"Name","value":"Test Ana"},{"action":"click","text":"Save"},{"action":"expect","text":"Test Ana"}]}]. Steps: click/fill/select by the exact visible text, label or placeholder; "expect" a text that only appears when it worked; "goto" a "#/route" path when needed; test data like test-ana@example.com. When the flow needs an account, start with the steps that create one. Kairoq runs each check on a test copy of the data and keeps the ones that pass, so they protect the flow in every later change. No checks for purely visual changes.${require('./react-edits').PROMPT_NOTE}`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
 function projectDir(id){if(!/^[a-f0-9]{12}$/.test(String(id)))throw Object.assign(Error('Unknown project'),{status:404});return path.join(ROOT(),id)}
@@ -279,7 +281,7 @@ function parseEdit(content){
  if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
  const plan=(Array.isArray(value.plan)?value.plan:[]).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,6);
- return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
+ return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:value.files||{},edits,delete:del,images:imageRequests(value.images),checks:Array.isArray(value.checks)?value.checks.slice(0,2):[]};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
@@ -399,7 +401,7 @@ function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_ver
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
 // Also carries the design brief and the design skills switched on for the project.
-function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+require('./build-lessons').promptNote()+require('./account-memory').preferenceNote(meta.owner)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();let files={};try{files=meta.current_version?loadFiles(meta.id,meta.current_version):{}}catch{}return require('./project-memory').note(meta,files)+require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+require('./build-lessons').promptNote()+require('./account-memory').preferenceNote(meta.owner)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
@@ -408,6 +410,23 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
+// The checks the AI sent with a change: each is run on the new version (test copy of the data)
+// and saved only when it passes. Kairoq's own checks take at most 10 of the 15 places, and
+// replace an earlier Kairoq check with the same name, never one the owner made.
+const MAX_AI_CHECKS=10;
+async function adoptChecks(id,url,raw,{inspect,version}){
+ const checks=require('./react-checks'),out=[];
+ for(const r of raw){
+  let c;try{c=checks.normalize(r)}catch{continue}
+  const meta=loadMeta(id),all=checks.list(meta),same=all.find(x=>x.name.toLowerCase()===c.name.toLowerCase());
+  if(same&&same.source!=='kairoq')continue;
+  if(!same&&(all.length>=checks.MAX_CHECKS||all.filter(x=>x.source==='kairoq').length>=MAX_AI_CHECKS))break;
+  const result=await checks.run(id,url,{inspect,checks:[{...c,id:'new',enabled:true}],record:false,version}).catch(()=>null);
+  if(!result||!result.ran||result.failed.length)continue;
+  checks.save(id,c,{source:'kairoq'});out.push(c.name);
+ }
+ return out;
+}
 // Errors that mean the app does not show at all.
 function brokenError(e){return /^(Blank page|Page did not load)/.test(String(e))}
 // The browser check runs on a test copy of the app's data and adds a record the way a customer
@@ -426,6 +445,8 @@ async function runtimeProblems(id,url,checkRuntime){
   return{errors,verified};
  });
 }
+// Said with every build, migration or browser error: the try stays applied and the fix goes on top.
+const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
 async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
@@ -441,6 +462,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null;
+ // The files a fix applies to: the request's base, then the last try that built (a fix for a
+ // build or browser error changes that try; it does not start again from the base).
+ let work=base;
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
  let thinking='',thoughtMs=null,firstPlan=null;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
@@ -454,7 +478,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   tl.add({t:'think',ms:(firstToken||Date.now())-started,text:attempt===1?thinking:''});
   if(attempt===1&&reply.plan.length)tl.add({t:'plan',items:reply.plan});
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design});tl.add({t:'note',icon:'image',text:'Generated '+reply.images.length+' image'+(reply.images.length===1?'':'s')})}
-  let next={...base};
+  let next={...work};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;
   // Small changes arrive as find/replace edits (cheaper than rewriting whole files).
@@ -475,9 +499,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
-  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
+  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\n'+KEPT+' Fix the error and return corrected JSON.'});continue}
   tl.add({t:'build',ok:true});
-  try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\nMigrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
+  try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\n'+KEPT+' Migrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
   runtimeErrors=[];checkResult=null;verified=null;
   if(checkRuntime||inspect){
    onProgress('testing');
@@ -491,16 +515,16 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    if(checkResult&&checkResult.ran)tl.add({t:'check',ok:!checkResult.failed.length,text:checkResult.failed.length?'Broke '+checkResult.failed.length+' of '+checkResult.ran+' saved checks':'All '+checkResult.ran+' saved check'+(checkResult.ran===1?'':'s')+' passed',detail:checkResult.failed.length?require('./react-checks').failureText(checkResult.failed):''});
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
-    lastError=runtimeErrors.join('\n');
+    lastError=runtimeErrors.join('\n');work=next;
     tl.add({t:'fix',text:'Fixing the errors the browser showed'});
-    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
+    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\n'+KEPT+' Find the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
     continue;
    }
    if(checkResult&&checkResult.failed.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
-    lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);
+    lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);work=next;
     tl.add({t:'fix',text:'Fixing the saved checks this change broke'});
-    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\nFix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
+    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\n'+KEPT+' Fix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
     continue;
    }
   }
@@ -522,8 +546,11 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const now=new Date().toISOString();
   fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{})});
   saveMeta(fresh);
+  // Checks the AI wrote for the flows it built: kept only when they pass on the new version.
+  const adopted=!rollback&&inspect&&reply.checks.length&&!runtimeErrors.length?await adoptChecks(id,previewUrl(fresh,n),reply.checks,{inspect,version:n}).catch(()=>[]):[];
+  if(adopted.length){const m=loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.tests_added=adopted;saveMeta(m)}tl.add({t:'check',ok:true,text:'Saved '+adopted.length+' new check'+(adopted.length===1?'':'s')+' for later changes: '+adopted.join(', ')})}
   if(rollback)return{version:working.n,message,changed:[],attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:[],rolled_back:{tried:n,kept:working.n,errors:runtimeErrors},preview_url:previewUrl(fresh)};
-  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }
@@ -619,10 +646,29 @@ function remove(id){const dir=projectDir(id);loadMeta(id);require('./react-sql')
 const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8'};
 // sandbox=true runs the page in an opaque origin so generated code cannot use the Kairoq session.
 function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
+// Compression for built files: each is compressed once (brotli, else gzip) and kept next to
+// it, so apps' JavaScript and CSS travel about 3 times smaller.
+const zlib=require('zlib');
+const COMPRESSIBLE=new Set(['.js','.mjs','.css','.svg','.json','.html','.txt','.xml','.webmanifest']);
+function encodingFor(req){const a=String(req.headers['accept-encoding']||'');return/\bbr\b/.test(a)?'br':/\bgzip\b/.test(a)?'gzip':null}
+function compress(buf,enc){return enc==='br'?zlib.brotliCompressSync(buf,{params:{[zlib.constants.BROTLI_PARAM_QUALITY]:5}}):zlib.gzipSync(buf,{level:6})}
+function compressedFile(file,enc){
+ const out=file+(enc==='br'?'.kq.br':'.kq.gz');
+ try{if(fs.statSync(out).mtimeMs>=fs.statSync(file).mtimeMs)return out}catch{}
+ const buf=fs.readFileSync(file);if(buf.length<1024)return null;
+ try{const tmp=out+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,compress(buf,enc));fs.renameSync(tmp,out);return out}catch{return null}
+}
+// A page made on the fly (published HTML with its content), compressed when it is worth it.
+function sendText(req,res,status,headers,body){
+ const enc=body.length>=1024?encodingFor(req):null,out=enc?compress(Buffer.from(body),enc):body;
+ res.writeHead(status,{...headers,...(enc?{'Content-Encoding':enc,'Vary':'Accept-Encoding'}:{})});
+ res.end(req.method==='HEAD'?undefined:out);
+}
 function serveDist(req,res,distDir,rest,{sandbox}){
  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);return res.end()}
  let decoded;try{decoded=decodeURIComponent(String(rest||'').split('?')[0])}catch{res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Bad request');return true}
  let rel=decoded.replace(/^\/+/,'');
+ if(/\.kq\.(br|gz)$|\.tmp$/.test(rel))return notFound(res);
  if(!rel||rel.endsWith('/'))rel+='index.html';
  const file=path.resolve(distDir,rel);
  if(!file.startsWith(path.resolve(distDir)+path.sep)){res.writeHead(400);return res.end()}
@@ -637,9 +683,12 @@ function serveDist(req,res,distDir,rest,{sandbox}){
   // Other files opened directly (an SVG, say) must not run script on Kairoq's origin either.
   if(sandbox)headers['Content-Security-Policy']="sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:";
  }
+ let body=target;
+ const enc=COMPRESSIBLE.has(ext)?encodingFor(req):null,packed=enc?compressedFile(target,enc):null;
+ if(packed){body=packed;headers['Content-Encoding']=enc;headers.Vary='Accept-Encoding'}
  res.writeHead(200,headers);
  if(req.method==='HEAD')return res.end();
- fs.createReadStream(target).pipe(res);
+ fs.createReadStream(body).pipe(res);
 }
 function notFound(res){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Not found')}
 // /builder/p/<id>-<key>/v/<n>/<path>
@@ -673,4 +722,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

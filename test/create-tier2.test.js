@@ -90,7 +90,10 @@ test('email goes only to the app owner or the signed-in user, with limits',async
   assert.equal((await request(server,'POST',base+'/email',{body:{to:'owner',subject:'s',text:'t'}})).status,429,'anonymous senders are limited to 5 an hour');
   delete process.env.KAIROQ_RESEND_API_KEY;
   const tok=(await request(server,'POST',base+'/auth/signup',{body:{email:'cy@x.co',password:'password1'}})).json.token;
-  assert.equal((await request(server,'POST',base+'/email',{body:{to:'me',subject:'s',text:'t'},headers:{authorization:'Bearer '+tok}})).status,409,'not configured');
+  const kept=await request(server,'POST',base+'/email',{body:{to:'me',subject:'Your booking',text:'See you at 7'},headers:{authorization:'Bearer '+tok}});
+  assert.equal(kept.status,200,'email not set up does not fail the customer');assert.equal(kept.json.sent,false);assert.equal(kept.json.saved,true);
+  assert.equal(sent.length,5,'nothing is sent without the key');
+  const outbox=require('../react-backend').overview(id).outbox;assert.equal(outbox[0].subject,'Your booking');assert.equal(outbox[0].user_email,'cy@x.co');
  }finally{global.fetch=original;delete process.env.KAIROQ_EMAIL_FROM}
 });
 

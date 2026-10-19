@@ -252,14 +252,14 @@ function messageItem(m,last,index){
   const det=el('button','link-btn details-link','Details');det.type='button';det.onclick=()=>openDetail(index,'timeline');f.append(det);
   li.append(f);
  }
- if(m.role==='assistant'&&m.verified)li.append(verifiedCard(m.verified,m.checks));
+ if(m.role==='assistant'&&(m.verified||m.tests_added))li.append(verifiedCard(m.verified||{},m.checks,m.tests_added));
  if(m.checks&&!tl.some(e=>e.t==='check')){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
  if(m.steps&&m.steps.length&&!tl.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}
  return li;
 }
 // "Verified by Kairoq": what its browser tested on this build, like a customer would.
-function verifiedCard(v,checks){
+function verifiedCard(v,checks,added){
  const rows=[];
  const add=(ok,good,bad)=>{if(ok===null||ok===undefined)return;rows.push([ok,ok?good:bad])};
  add(v.opens,'Opens without errors','Shows errors when it opens');
@@ -268,6 +268,7 @@ function verifiedCard(v,checks){
  add(v.signup,'Sign-up works','Sign-up failed');
  add(v.saves,'Added a record and it was saved','A new record was not saved');
  if(checks&&checks.ran)add(!checks.failed.length,'All '+checks.ran+' saved check'+(checks.ran===1?'':'s')+' still pass',checks.failed.length+' saved check'+(checks.failed.length===1?'':'s')+' broke');
+ if(added&&added.length)add(true,'New check'+(added.length===1?'':'s')+' kept for every later change: '+added.join(', '),'');
  if(!rows.length)return document.createTextNode('');
  const all=rows.every(r=>r[0]);
  const box=el('div','verified '+(all?'ok':'bad'));
@@ -343,6 +344,9 @@ async function renderData(){
  if(d.features.payments.length)feats.push('Payments: '+d.payments.length+' purchase'+(d.payments.length===1?'':'s')+' of '+d.features.payments.join(', '));
  for(const sc of d.features.schedules)feats.push('Schedule "'+sc.name+'" every '+sc.every+(sc.last_result?' · last: '+sc.last_result:''));
  text($('data-features'),feats.join(' · '));
+ const outbox=d.outbox||[];$('outbox').hidden=!outbox.length;
+ text($('outbox-title'),outbox.length+' email'+(outbox.length===1?'':'s')+' kept because email is not set up yet');
+ $('outbox-list').replaceChildren(...outbox.map(m=>{const li=document.createElement('li'),pre=document.createElement('pre');pre.textContent=(m.to_kind==='me'&&m.user_email?'To '+m.user_email:'To you')+' · '+when(new Date(m.at).toISOString())+'\n'+m.subject+'\n\n'+m.text;li.append(pre);return li}));
  const users=$('users');users.replaceChildren();
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
@@ -535,8 +539,35 @@ async function renderFiles(){
  const files=state.project.files;
  if(!files.includes(state.file))state.file=files.includes('src/App.jsx')?'src/App.jsx':files[0];
  for(const f of files){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.textContent=f;b.setAttribute('aria-current',String(f===state.file));b.onclick=()=>{state.file=f;renderFiles()};li.append(b);list.append(li)}
- if(state.file){const {content}=await api('/projects/'+state.project.id+'/file?path='+encodeURIComponent(state.file));text($('file-view').firstChild,content)}
+ if(state.file){const {content}=await api('/projects/'+state.project.id+'/file?path='+encodeURIComponent(state.file));state.fileContent=content;text($('file-view').firstChild,content)}
+ text($('file-name'),state.file||'');setEditing(false);
+ const editor=state.project.role!=='viewer';$('file-edit').classList.toggle('hidden',!editor||!state.file);$('file-new').classList.toggle('hidden',!editor);
 }
+// Editing code by hand: Save checks, builds and keeps it as a new version (undo with the version menu).
+function setEditing(on){
+ $('file-view').classList.toggle('hidden',on);$('file-editor').classList.toggle('hidden',!on);
+ $('file-save').classList.toggle('hidden',!on);$('file-cancel').classList.toggle('hidden',!on);$('file-edit').classList.toggle('hidden',on);
+ if(on){$('file-editor').value=state.fileContent||'';$('file-editor').focus()}
+}
+$('file-edit').onclick=()=>{text($('file-status'),'');setEditing(true)};
+$('file-cancel').onclick=()=>{text($('file-status'),'');setEditing(false)};
+$('file-editor').addEventListener('keydown',e=>{
+ if(e.key==='Tab'&&!e.shiftKey){e.preventDefault();const t=e.target,a=t.selectionStart;t.setRangeText('  ',a,t.selectionEnd,'end')}
+ if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();$('file-save').click()}
+});
+async function saveSourceFile(body,done){
+ const save=$('file-save');save.disabled=true;text($('file-status'),'Checking and building…');
+ try{
+  const {project,result}=await api('/projects/'+state.project.id+'/source',{method:'POST',body});
+  state.project=project;renderVersions();renderMessages();setPreview(project.preview_url);
+  text($('file-status'),'Saved as v'+result.version+'. Undo it from the version menu.');done&&done();await renderFiles();
+ }catch(err){text($('file-status'),err.message)}finally{save.disabled=false}
+}
+$('file-save').onclick=()=>saveSourceFile({path:state.file,content:$('file-editor').value});
+$('file-new').onclick=()=>{
+ const name=prompt('New file path, for example src/components/Hero.jsx');if(!name)return;
+ saveSourceFile({path:name.trim(),content:name.endsWith('.css')?'/* '+name+' */\n':name.endsWith('.json')?'{}\n':'export default function Component(){\n  return null;\n}\n',create:true},()=>{state.file=name.trim()});
+};
 
 // ---------- chat ----------
 state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
@@ -1157,6 +1188,8 @@ $('settings-open').onclick=async()=>{
  $('support-section').classList.toggle('hidden',state.me?.viewer?.kind!=='owner');
  text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
  $('knowledge').value=state.project.knowledge||'';
+ $('memory-box').open=false;text($('memory-text'),'');
+ $('memory-box').ontoggle=async()=>{if(!$('memory-box').open||$('memory-text').textContent)return;try{const {memory}=await api('/projects/'+state.project.id+'/memory');text($('memory-text'),memory||'Nothing yet: it starts with your first request.')}catch(err){text($('memory-text'),err.message)}};
  renderSecrets().catch(err=>text($('settings-error'),err.message));
  $('download').href='/api/create/projects/'+state.project.id+'/download';
  try{
@@ -1907,7 +1940,7 @@ async function renderChecks(){
  if(!d.checks.length){const li=document.createElement('li');li.className='muted small';li.textContent='No checks yet. Agent mode saves the flows it tests, or describe one below, for example "a guest can book the Garden room".';list.append(li)}
  for(const c of d.checks){
   const li=document.createElement('li'),st=document.createElement('span');st.className='check-state '+(c.last?(c.last.ok?'ok':'bad'):'');st.textContent=c.last?(c.last.ok?'✓':'✗'):'•';
-  const t=document.createElement('div');t.className='skill-text';const b=document.createElement('b');b.textContent=c.name;const sp=document.createElement('span');sp.textContent=c.steps.length+' step'+(c.steps.length===1?'':'s')+' · '+({agent:'saved by the agent',ai:'written by the AI',user:'added by you'}[c.source]||c.source)+(c.last?' · last run '+when(c.last.at)+(c.last.version?' on v'+c.last.version:''):'')+(c.last&&!c.last.ok?' · failed: '+(c.last.step?c.last.step+(c.last.error?' ('+c.last.error+')':''):c.last.error):'');t.append(b,sp);
+  const t=document.createElement('div');t.className='skill-text';const b=document.createElement('b');b.textContent=c.name;const sp=document.createElement('span');sp.textContent=c.steps.length+' step'+(c.steps.length===1?'':'s')+' · '+({agent:'saved by the agent',ai:'written by the AI',kairoq:'written by Kairoq with the change that built this flow',user:'added by you'}[c.source]||c.source)+(c.last?' · last run '+when(c.last.at)+(c.last.version?' on v'+c.last.version:''):'')+(c.last&&!c.last.ok?' · failed: '+(c.last.step?c.last.step+(c.last.error?' ('+c.last.error+')':''):c.last.error):'');t.append(b,sp);
   const act=document.createElement('div');act.className='skill-actions';
   const on=document.createElement('label'),cb=document.createElement('input');cb.type='checkbox';cb.checked=c.enabled!==false;cb.disabled=!editor;cb.onchange=async()=>{try{await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{id:c.id,enabled:cb.checked}})}catch(err){text($('checks-error'),err.message)}};on.append(cb,document.createTextNode(' on'));act.append(on);
   if(editor){const del=document.createElement('button');del.type='button';del.className='ghost link-btn';del.textContent='Remove';del.onclick=async()=>{if(!confirm('Remove the check "'+c.name+'"?'))return;try{await api('/projects/'+state.project.id+'/checks',{method:'DELETE',body:{id:c.id}});renderChecks()}catch(err){text($('checks-error'),err.message)}};act.append(del)}

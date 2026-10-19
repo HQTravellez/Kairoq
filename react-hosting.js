@@ -144,7 +144,7 @@ function serveProject(req,res,id,rest,sandbox,basePath='/'){
  let decoded;try{decoded=decodeURIComponent(String(rest||'/').split('?')[0])}catch{res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Bad request');return true}
  const rel=decoded.replace(/^\/+/,'');
  const base=siteBase(req,basePath);
- const text=(type,body)=>{res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:body)};
+ const text=(type,body)=>builder.sendText(req,res,200,{'Content-Type':type,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'},body);
  if(require('./react-mobile').serveSiteFile(req,res,meta,rel))return true;
  if(rel==='robots.txt')return text('text/plain; charset=utf-8','User-agent: *\nAllow: /\nSitemap: '+base+'sitemap.xml\n'),true;
  // Every page the published site showed (site-search.js), so search engines find them all.
@@ -155,8 +155,7 @@ function serveProject(req,res,id,rest,sandbox,basePath='/'){
  if(page&&fs.existsSync(path.join(dist,'index.html'))&&(!rel||rel==='index.html'||!fs.existsSync(path.join(dist,rel)))){
   require('./react-analytics').record(id,req);
   const html=withPwa(withSeo(fs.readFileSync(path.join(dist,'index.html'),'utf8'),meta,base,rel),meta);
-  res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Content-Security-Policy':builder.contentPolicy(sandbox)});
-  res.end(req.method==='HEAD'?undefined:html);
+  builder.sendText(req,res,200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Content-Security-Policy':builder.contentPolicy(sandbox)},html);
   return true;
  }
  builder.serveDist(req,res,dist,rest,{sandbox});

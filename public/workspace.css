@@ -393,3 +393,9 @@ body.in-editor.side-open .stage-bar .bar-spacer{min-width:4px}
 .verified li{display:flex;gap:8px;align-items:baseline}
 .verified .vmark{font-weight:700;width:12px;flex:none}
 .verified li.ok .vmark{color:var(--ok)}.verified li.bad .vmark{color:var(--error)}
+
+.file-pane{display:flex;flex-direction:column;min-width:0;flex:1}
+.file-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.file-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-weight:600;margin-right:auto}
+.file-editor{flex:1;min-height:360px;width:100%;box-sizing:border-box;border:0;border-radius:0;padding:12px 14px;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);color:var(--text);resize:none;tab-size:2;white-space:pre;overflow:auto}
+.file-editor:focus{outline:2px solid color-mix(in srgb,var(--accent) 40%,transparent);outline-offset:-2px}

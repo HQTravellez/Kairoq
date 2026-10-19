@@ -488,7 +488,9 @@ function overview(id){
   payments:db.prepare('SELECT p.product,p.mode,p.status,p.amount,p.currency,p.created_at,u.email FROM payments p LEFT JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC LIMIT 50').all(),
   collections:Object.entries(cfg.collections).map(([name,def])=>({name,access:def.access,count:counts[name]||0})),
   users:db.prepare('SELECT id,email,name,created_at FROM users ORDER BY created_at DESC LIMIT 100').all(),
-  user_count:db.prepare('SELECT COUNT(*) n FROM users').get().n
+  user_count:db.prepare('SELECT COUNT(*) n FROM users').get().n,
+  // Emails the app could not send yet (email not set up on this server), kept for the owner.
+  outbox:db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='email_outbox'").get()?db.prepare('SELECT to_kind,subject,text,user_email,at FROM email_outbox ORDER BY at DESC LIMIT 50').all():[]
  };
 }
 function ownerRecords(id,collection){

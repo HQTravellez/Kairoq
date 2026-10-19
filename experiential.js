@@ -4,6 +4,8 @@ const key=()=>String(process.env.EXPLABS_API_KEY||process.env.EXPlabs_API_Key||'
 const configured=()=>Boolean(key());
 let queue=Promise.resolve();
 function callProject(opts,services){
+ // Small requests (the quick questions, suggestions) do not wait behind whole-app builds.
+ if(Number.isInteger(opts.maxOutputTokens)&&opts.maxOutputTokens<=2500)return run(opts,services);
  const task=queue.then(()=>run(opts,services));
  queue=task.catch(()=>{});
  return task;
@@ -19,7 +21,7 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
  if((daily>0&&totals.daily+reserve>daily)||(monthly>0&&totals.monthly+reserve>monthly))throw Error('Experiential builder budget insufficient');
  const response=await fetch('https://api.experientiallabs.ai/v1/chat/completions',{
   method:'POST',headers:{Authorization:'Bearer '+key(),'Content-Type':'application/json'},
-  signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(240000)]):AbortSignal.timeout(240000),body:JSON.stringify({model,messages:opts.messages,response_format:{type:'json_object'},max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'})
+  signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(480000)]):AbortSignal.timeout(480000),body:JSON.stringify({model,messages:opts.messages,response_format:{type:'json_object'},max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'})
  });
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw Error('Experiential '+response.status+': '+String(data.error?.message||data.error||'Request rejected').slice(0,220));

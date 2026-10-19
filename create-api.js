@@ -67,7 +67,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -992,6 +992,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   const {role}=ownedProject(v,id,NEED[method+':'+action]||'owner');
   const projectView=(pid,r=role)=>projectViewFor(pid,r);
   if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null}),true;
+  // What the AI always knows about this project (project-memory.js).
+  if(action==='/memory'&&method==='GET'){const meta=builder.loadMeta(id);let files={};try{files=meta.current_version?builder.loadFiles(id,meta.current_version):{}}catch{}return send(res,200,{memory:require('./project-memory').note(meta,files).trim()}),true}
   if(action==='/analytics'&&method==='GET')return send(res,200,{analytics:require('./react-analytics').summary(id,{days:30})}),true;
   if(action==='/seo'&&method==='POST'){
    const b=await readJson(req,4000),meta=builder.loadMeta(id);
@@ -1359,6 +1361,18 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/pull'&&method==='POST'){
    for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('Wait for the current change to finish'),{status:409});
    return send(res,200,{result:await require('./react-export').pull(id,{isOwner:v.kind==='owner'}),project:projectView(id)}),true;
+  }
+  // Code edited by hand: checked, built and saved as a new version like an AI change.
+  if(action==='/source'&&method==='POST'){
+   for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('Wait for the current change to finish'),{status:409});
+   const b=await readJson(req,400000),name=String(b.path||'');
+   const meta=builder.loadMeta(id),files={...builder.loadFiles(id,meta.current_version)};
+   if(b.delete){if(!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});if(name==='src/main.jsx'||name==='src/App.jsx')throw Object.assign(Error('This file is needed by every app'),{status:400});delete files[name]}
+   else{if(typeof b.content!=='string')throw Object.assign(Error('Send the file content'),{status:400});if(!b.create&&!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});if(b.create&&Object.hasOwn(files,name))throw Object.assign(Error('That file already exists'),{status:409});files[name]=b.content}
+   const problems=builder.checkProject(files);
+   if(problems.length)throw Object.assign(Error(problems.slice(0,5).join('\n')),{status:400});
+   const r=await builder.saveSource(id,files,{summary:(b.delete?'Deleted ':b.create?'Created ':'Edited ')+name+' by hand',changed:[name],extra:{manual:true}});
+   return send(res,200,{result:r,project:projectView(id)}),true;
   }
   if(action==='/inspect'&&method==='POST'){const b=await readJson(req,4000);return send(res,200,{element:builder.inspectElement(id,b)}),true}
   if(action==='/visual'&&method==='POST'){
