@@ -128,7 +128,7 @@ body.in-editor:not(.side-open) .side{display:none}
 .composer-bar select{flex:none;width:auto;max-width:160px;padding:6px 20px 6px 8px;font-size:12.5px;border-radius:999px;background:var(--side);border-color:transparent;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
 .composer-bar select{flex:0 1 auto;min-width:92px;padding-right:14px;background-position:right 4px center}
 .composer-bar .clip{flex:none;width:30px;height:30px}
-.composer-bar #cost-hint{display:none}
+.cost-line{margin:6px 6px 0;font-size:11.5px;line-height:1.4}.cost-line:empty{display:none}
 .composer-bar .send{margin-left:auto;width:36px;height:36px;padding:0;border-radius:50%;display:inline-grid;place-items:center;flex:none}
 .composer-bar .send .ico{width:16px;height:16px;stroke-width:2.2}
 .chat .error{padding:0 16px 10px}

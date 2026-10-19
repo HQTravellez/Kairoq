@@ -15,10 +15,14 @@ async function browser(){
  return b;
 }
 const IGNORED=/favicon\.ico|Download the React DevTools|net::ERR_ABORTED/;
-async function check(url,{timeoutMs=15000}={}){
+// sandbox: the app's data requests go to a test copy of its data (react-sandbox.js).
+// journey: also add a record the way a customer would (savesData below).
+async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
  if(!available())return{skipped:true,errors:[]};
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
+ if(sandbox){const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(new URL(url).pathname)||[])[1],origin=new URL(url).origin;await context.route('**/*',r=>{let u;try{u=new URL(r.request().url())}catch{return r.continue()}return appId&&u.origin===origin&&u.pathname.startsWith('/api/apps/'+appId+'/')?r.continue({headers:{...r.request().headers(),'x-kairoq-sandbox':sandbox}}):r.continue()})}
  const page=await context.newPage(),errors=[];
+ let saved=null;
  const add=e=>{const text=String(e).slice(0,500);if(!IGNORED.test(text)&&!errors.includes(text)&&errors.length<10)errors.push(text)};
  // Images or fonts from other sites that fail to load are not bugs in the app's code
  // (and can't be fixed by the AI), so they are not reported as problems here.
@@ -34,9 +38,78 @@ async function check(url,{timeoutMs=15000}={}){
   const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))});
   if(blank)add('Blank page: nothing rendered inside #root.');
   if(!blank&&process.env.KAIROQ_DEAD_CLICKS!=='off'){for(const d of await deadClicks(page,url).catch(()=>[]))add(d)}
+  if(!blank&&journey&&(sandbox||process.env.NODE_ENV==='test'))saved=await savesData(context,url).catch(()=>null);
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
- return{skipped:false,errors};
+ return{skipped:false,errors,...(saved?{journey:saved}:{})};
+}
+// The main journey of an app that keeps records (a CRM, bookings, tasks): sign up when the app
+// asks for it, add a record with its add form, then reload. Returns {token, shown, reloaded}:
+// whether the new record showed in a list on the page, and whether it was still there after the
+// reload. The caller checks the app's database for the token (react-builder.js). Runs only on a
+// test copy of the data, and returns null whenever it cannot tell: no add form, a form that
+// leads elsewhere, a thank-you message instead of a list.
+async function savesData(context,url){
+ const tab=await context.newPage(),visible=l=>l.isVisible().catch(()=>false);
+ const token='Kq'+String(100000+Math.floor(Math.random()*900000));
+ const today=new Date().toISOString().slice(0,10),password='Kq-test-'+token+'!';
+ async function fill(form,{record}){
+  let named=false;
+  for(const f of await form.locator('input,textarea,select').all()){
+   if(!(await visible(f))||await f.isDisabled().catch(()=>true))continue;
+   try{
+    const d=await f.evaluate(e=>({tag:e.tagName.toLowerCase(),type:(e.getAttribute('type')||'text').toLowerCase(),hint:[e.name,e.id,e.placeholder,e.getAttribute('aria-label'),e.labels&&e.labels[0]&&e.labels[0].innerText].join(' ').toLowerCase(),required:e.required}));
+    if(d.tag==='select'){const opts=await f.locator('option').evaluateAll(o=>o.filter(x=>x.value&&!x.disabled).map(x=>x.value));if(opts.length)await f.selectOption(opts[0]);continue}
+    if(['hidden','submit','button','reset','file','image','range','color','search'].includes(d.type))continue;
+    if(d.type==='checkbox'||d.type==='radio'){if(d.required)await f.check({timeout:1500});continue}
+    const email=record?token.toLowerCase()+'@example.com':'owner'+token.slice(2)+'@example.com';
+    const v=d.type==='email'||/e-?mail/.test(d.hint)?email:d.type==='password'?password:d.type==='tel'||/phone|mobile/.test(d.hint)?'555010'+token.slice(-4):d.type==='number'?'3':d.type==='date'?today:d.type==='time'?'10:30':d.type==='datetime-local'?today+'T10:30':d.type==='month'?today.slice(0,7):d.type==='url'||/website|url/.test(d.hint)?'https://example.com':d.tag==='textarea'?(record?'Note '+token:'Test'):!record?'Test Owner':named?'Sample':(named=true,token+' Test');
+    await f.fill(v,{timeout:2000});
+   }catch{}
+  }
+  const btn=form.locator('button[type=submit],input[type=submit],button:not([type])').last();
+  if(await visible(btn))await btn.click({timeout:2000});else await form.evaluate(e=>e.requestSubmit()).catch(()=>{});
+  await tab.waitForLoadState('networkidle',{timeout:4000}).catch(()=>{});await tab.waitForTimeout(900);
+ }
+ try{
+  await tab.goto(url,{waitUntil:'load',timeout:15000});
+  await tab.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
+  // An app behind a sign-in: create a test account first (switching the form to sign-up).
+  if(await visible(tab.locator('input[type=password]').first())){
+   const submitText=await tab.locator('form:has(input[type=password])').first().locator('button[type=submit],button:not([type])').last().innerText().catch(()=>'');
+   if(!/sign ?up|create|register|join|get started/i.test(submitText)){
+    const toggle=tab.locator('a,button,[role=tab]').filter({hasText:/^[^.!]{0,24}\b(sign ?up|create (an |your )?account|register|join now)\b[^.]{0,20}$/i}).first();
+    if(!(await visible(toggle)))return null;
+    await toggle.click({timeout:2000});await tab.waitForTimeout(500);
+   }
+   const signup=tab.locator('form:has(input[type=password])').first();
+   if(!(await visible(signup)))return null;
+   await fill(signup,{record:false});
+   if(await visible(tab.locator('input[type=password]').first()))return null;
+  }
+  const addForm=async()=>{for(const f of await tab.locator('form').all()){if(!(await visible(f)))continue;if(await f.evaluate(e=>!e.querySelector('input[type=password],input[type=search]')&&!e.closest('[role=search]')&&e.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]),textarea').length>=1&&!/search|newsletter|subscribe/i.test(e.innerText+' '+(e.getAttribute('aria-label')||'')+' '+[...e.querySelectorAll('input')].map(i=>i.placeholder).join(' '))))return f}return null};
+  let form=await addForm();
+  if(!form){const add=tab.locator('button,a,[role=button]').filter({hasText:/^\s*(\+\s*)?(add|new|create)\b/i}).first();if(await visible(add)){await add.click({timeout:2000});await tab.waitForTimeout(600);form=await addForm()}}
+  if(!form)return null;
+  await fill(form,{record:true});
+  // Shown as a record: in a list, table or a row of similar cards, not in a thank-you or status message.
+  const shown=()=>tab.evaluate(t=>{
+   const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+   for(let n;(n=w.nextNode());){
+    if(!n.nodeValue.toLowerCase().includes(t.toLowerCase()))continue;
+    const el=n.parentElement;if(!el||el.closest('form,[role=alert],[role=status],[aria-live],dialog,[role=dialog]'))continue;
+    if(/thank|received|success|confirm|booked|sent|welcome|see you/i.test((el.closest('p,div,section')||el).innerText.slice(0,300)))continue;
+    if(el.closest('li,tr,[role=row],[role=listitem],td'))return true;
+    for(let a=el,i=0;a&&a.parentElement&&i<5;a=a.parentElement,i++){const sib=[...a.parentElement.children].filter(c=>c.tagName===a.tagName&&c.className===a.className);if(sib.length>=2)return true}
+   }
+   return false;
+  },token).catch(()=>false);
+  if(!(await shown()))return null;
+  await tab.reload({waitUntil:'load',timeout:15000});
+  await tab.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});await tab.waitForTimeout(600);
+  return{token,shown:true,reloaded:await shown()};
+ }catch{return null}
+ finally{await tab.close().catch(()=>{})}
 }
 // Clicks the app's navigation (nav, header and sidebar links and buttons, tabs) and reports
 // the ones that change nothing a person could see: no new page, no dialog, no different
@@ -474,4 +547,4 @@ async function renderHtml(html,{width,height}){
  }finally{await context.close().catch(()=>{})}
 }
 async function close(){for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
-module.exports={deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
+module.exports={savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};

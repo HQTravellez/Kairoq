@@ -39,5 +39,25 @@ function destroy(token){
 }
 // Removes copies left behind by a crash or an abandoned run.
 function sweep(){for(const [t,b] of boxes)if(Date.now()-b.at>MAX_AGE_MS)destroy(t)}
+// Whether any saved record in a test copy (collections and SQL tables) contains the text.
+function contains(box,text){
+ const needle='%'+String(text).replace(/[%_\\]/g,'')+'%';
+ const data=path.join(box.dir,'data.sqlite');
+ if(fs.existsSync(data)){
+  const db=require('./react-backend').openFile(data);
+  try{if(db.prepare('SELECT 1 FROM records WHERE data LIKE ? LIMIT 1').get(needle))return true}catch{}
+ }
+ const sql=path.join(box.dir,'app-sql.sqlite');
+ if(fs.existsSync(sql)){
+  const db=new DatabaseSync(sql,{readOnly:true});
+  try{
+   for(const {name} of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_%' ESCAPE '\\'").all()){
+    const cols=db.prepare('SELECT name FROM pragma_table_info(?)').all(name).map(c=>'"'+c.name.replace(/"/g,'""')+'"');
+    if(cols.length&&db.prepare('SELECT 1 FROM "'+name.replace(/"/g,'""')+'" WHERE '+cols.map(c=>'CAST('+c+' AS TEXT) LIKE ?').join(' OR ')+' LIMIT 1').get(...cols.map(()=>needle)))return true;
+   }
+  }catch{}finally{db.close()}
+ }
+ return false;
+}
 async function withSandbox(id,fn){const box=create(id);try{return await fn(box)}finally{destroy(box.token)}}
-module.exports={create,lookup,destroy,withSandbox,sweep,HEADER:'x-kairoq-sandbox'};
+module.exports={contains,create,lookup,destroy,withSandbox,sweep,HEADER:'x-kairoq-sandbox'};

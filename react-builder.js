@@ -393,6 +393,19 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
+// Errors that mean the app does not show at all.
+function brokenError(e){return /^(Blank page|Page did not load)/.test(String(e))}
+// The browser check runs on a test copy of the app's data and adds a record the way a customer
+// would (runtime-check.js savesData). A record that showed on the page but is in none of the
+// app's tables was never saved, and is reported like any other error so the AI fixes it.
+async function runtimeProblems(id,url,checkRuntime){
+ const sandbox=require('./react-sandbox');
+ return sandbox.withSandbox(id,async box=>{
+  const r=await checkRuntime(url,{sandbox:box.token,journey:process.env.KAIROQ_JOURNEY!=='off'})||{},errors=[...(r.errors||[])],j=r.journey;
+  if(j&&j.shown&&!sandbox.contains(box,j.token))errors.push(j.reloaded?'Records are not saved in the database: a record added with the form ("'+j.token+' Test") stays only in this browser (localStorage), so other devices and staff never see it. Save records with collection(\'…\').create() (or the SQL database) and list them from there.':'Records are not saved: a record added with the form ("'+j.token+' Test") showed on the page but was gone after reloading. Save records with collection(\'…\').create() (or the SQL database) and load the list from there, so they stay after a reload.');
+  return errors;
+ });
+}
 async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
@@ -450,7 +463,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    onProgress('testing');
    markTesting(id,n,next);
    try{
-    if(checkRuntime){try{runtimeErrors=(await checkRuntime(previewUrl(meta,n))).errors||[]}catch(e){runtimeErrors=[]}}
+    if(checkRuntime){try{runtimeErrors=await runtimeProblems(id,previewUrl(meta,n),checkRuntime)}catch(e){runtimeErrors=[]}}
     // Saved checks: flows that worked before must still work (run on a test copy of the data).
     if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
    }finally{clearTesting(id,n)}
@@ -471,18 +484,25 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
     continue;
    }
   }
+  // Never leave the owner on a broken app: when the last try still shows a blank page (or the
+  // page does not load), the preview stays on the version that worked; the broken try is kept
+  // in the history, so it can still be opened. A first build over the bare starter page is
+  // kept as it is, with its errors, so Fix it can repair the owner's own app.
+  const working=meta.versions.find(v=>v.n===meta.current_version);
+  const rollback=process.env.KAIROQ_ROLLBACK!=='off'&&runtimeErrors.some(brokenError)&&Boolean(working)&&!working.broken&&!(working.runtime_errors||[]).some(brokenError)&&!(working.n===1&&working.summary==='Starter project');
   writeJson(path.join(dir,'files.json'),next);
   const prev=loadFiles(id,meta.current_version);
   const changed=Object.keys(next).filter(k=>prev[k]!==next[k]).concat(reply.delete.filter(k=>Object.hasOwn(base,k)&&!Object.hasOwn(next,k)));
   const fresh=loadMeta(id);
-  const message=reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
+  const message=rollback?'I could not get this change to work: after '+attempt+' tries the app still did not show (a blank page in Kairoq\'s browser). Your preview stays on version '+working.n+', which works, and this change was free. The broken try is saved as version '+n+' if you want to look at it. Try describing the change another way, or in smaller steps.':reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
   const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
-  fresh.current_version=n;
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{})});
+  if(!rollback)fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:n,changed,at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
   saveMeta(fresh);
+  if(rollback)return{version:working.n,message,changed:[],attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:[],rolled_back:{tried:n,kept:working.n,errors:runtimeErrors},preview_url:previewUrl(fresh)};
   return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
