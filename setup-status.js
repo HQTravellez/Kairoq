@@ -8,7 +8,9 @@ function items({env=process.env}={}){
  const list=[
   {id:'storage',label:'Data survives deploys',ok:require('./storage').status({env}).persistent,required:true,fix:'In Railway open the service, Settings, Volumes, Add volume with mount path /data, then redeploy.'},
   {id:'ai',label:'AI building',ok:ai,required:true,fix:'Add OPENROUTER_API_KEY in Railway (service, Variables) with a key from openrouter.ai.'},
-  {id:'paid',label:'Strong AI models (Pro, images)',ok:ai&&env.KAIROQ_BUILDER_PAID_APPROVED==='true',required:false,fix:'Set KAIROQ_BUILDER_PAID_APPROVED=true in Railway (service, Variables) to allow paid models.'},
+  // Free-first (the default) tries free models before the paid ones: slower builds, weaker
+  // results, and no fast lane for small edits.
+  {id:'paid',label:'Fast, strong AI models for every build',ok:ai&&env.KAIROQ_BUILDER_PAID_APPROVED==='true'&&['paid-first','premium'].includes(String(env.KAIROQ_BUILDER_MODE||'free-first').toLowerCase()),required:true,fix:'In Railway (service, Variables) set KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true. Without them builds try free models first: slower, weaker, and small edits do not use the fast lane.'},
   {id:'email',label:'Emails (password reset, sign-up)',ok:accounts.mailReady(),required:true,fix:'Add KAIROQ_RESEND_API_KEY (from resend.com) and KAIROQ_EMAIL_FROM (an address on your verified domain) in Railway (service, Variables).'},
   {id:'browser',label:'Kairoq tests every build in a browser',ok:require('./runtime-check').available(),required:true,fix:'Deploy with the Dockerfile in this repository, which installs Chromium.'},
   {id:'payments',label:'Customers can buy credits',ok:accounts.stripeReady(),required:false,fix:'Add KAIROQ_STRIPE_SECRET_KEY in Railway (service, Variables) to sell credits with Stripe.'},
