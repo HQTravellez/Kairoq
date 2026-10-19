@@ -8,6 +8,7 @@ function items({env=process.env}={}){
  const ai=Boolean(env.OPENROUTER_API_KEY)||experiential;
  const list=[
   {id:'storage',label:'Data survives deploys',ok:require('./storage').status({env}).persistent,required:true,fix:'In Railway open the service, Settings, Volumes, Add volume with mount path /data, then redeploy.'},
+  {id:'database',label:'Accounts and app data in Postgres',ok:Boolean(env.DATABASE_URL)&&env.KAIROQ_POSTGRES!=='off',required:false,fix:'In Railway add a PostgreSQL database to the project, then in the Kairoq service Variables add DATABASE_URL with the value ${{Postgres.DATABASE_URL}} and redeploy. Existing data is copied across on the first start.'},
   {id:'ai',label:'AI building',ok:ai,required:true,fix:'Add OPENROUTER_API_KEY in Railway (service, Variables) with a key from openrouter.ai.'},
   // Free-first (the default) tries free models before the paid ones: slower builds, weaker
   // results, and no fast lane for small edits.

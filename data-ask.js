@@ -11,11 +11,23 @@ function fail(status,message){return Object.assign(Error(message),{status})}
 function clip(v,n){return String(v??'').replace(/\s+/g,' ').trim().slice(0,n)}
 
 function openRO(file){return fs.existsSync(file)?new DatabaseSync(file,{readOnly:true}):null}
+// The records to ask about. With Postgres on they are copied into a SQLite database in memory
+// for the question, so the query language stays the same and nothing but records is there.
+function recordsDb(id){
+ if(!require('./pg-sync').enabled())return openRO(path.join(builder.projectDir(id),'data.sqlite'));
+ const mem=new DatabaseSync(':memory:');
+ mem.exec('CREATE TABLE records(id TEXT PRIMARY KEY,collection TEXT NOT NULL,owner_id TEXT,data TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)');
+ const ins=mem.prepare('INSERT INTO records VALUES(?,?,?,?,?,?)');
+ mem.exec('BEGIN');
+ for(const r of require('./react-backend').database(id).prepare('SELECT id,collection,owner_id,data,created_at,updated_at FROM records ORDER BY created_at DESC LIMIT 100000').all())ins.run(r.id,r.collection,r.owner_id,r.data,r.created_at,r.updated_at);
+ mem.exec('COMMIT');
+ return mem;
+}
 // What the model is told about the data: each collection with its fields, each SQL table with
 // its columns, a few values as examples.
 function describe(id){
  const dir=builder.projectDir(id),out={collections:[],tables:[]};
- const rec=openRO(path.join(dir,'data.sqlite'));
+ const rec=recordsDb(id);
  if(rec){try{
   for(const c of rec.prepare('SELECT collection,COUNT(*) n FROM records GROUP BY collection ORDER BY n DESC LIMIT 30').all()){
    const keys=new Map();
@@ -60,7 +72,7 @@ async function ask(id,question,aiCall,{now=new Date()}={}){
   const db=plan.db==='tables'?'tables':'records';
   try{
    const sql=safeSql(plan.sql,db);
-   const conn=openRO(path.join(builder.projectDir(id),db==='tables'?'app-sql.sqlite':'data.sqlite'));
+   const conn=db==='tables'?openRO(path.join(builder.projectDir(id),'app-sql.sqlite')):recordsDb(id);
    if(!conn)throw fail(404,'No '+(db==='tables'?'SQL tables':'saved records')+' yet');
    try{rows=conn.prepare('SELECT * FROM ('+sql+') LIMIT 200').all().map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,typeof v==='bigint'?Number(v):v])))}finally{conn.close()}
    plan={db,sql,note:clip(plan.note,200)};err='';break;

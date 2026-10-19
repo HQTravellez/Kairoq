@@ -37,9 +37,19 @@ function configErrors(files){
 
 // ---------- storage ----------
 function database(id){return openFile(path.join(builder.projectDir(id),'data.sqlite'))}
+// With Postgres on (pg-sync.js) each app's data is a schema of its own: app_<project id>, and a
+// test copy is sb_<token>. The first open copies an existing data.sqlite across once; the file
+// is then left as it was.
+function pgSchema(file){
+ const rel=path.relative(builder.ROOT(),file).split(path.sep);
+ if(rel.length===2&&/^[a-z0-9]{6,40}$/.test(rel[0])&&rel[1]==='data.sqlite')return'app_'+rel[0];
+ if(rel.length===4&&rel[1]==='sandboxes'&&/^[a-f0-9]{32}$/.test(rel[2])&&rel[3]==='data.sqlite')return'sb_'+rel[2];
+ return null;
+}
 function openFile(file){
  if(dbs.has(file))return dbs.get(file);
- const db=new DatabaseSync(file);
+ const pg=require('./pg-sync'),schemaName=pg.enabled()?pgSchema(file):null;
+ const db=schemaName?pg.open({schema:pg.schemaName(schemaName)}):new DatabaseSync(file);
  db.exec(`PRAGMA journal_mode=WAL;
   CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,name TEXT,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL);
@@ -48,8 +58,12 @@ function openFile(file){
   CREATE TABLE IF NOT EXISTS app_tokens(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL);`);
  try{db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT')}catch{}
  require('./react-backend-extras').migrate(db);
+ if(schemaName&&schemaName.startsWith('app_'))pg.copyFromSqlite(file,db,{key:'app-data'});
  dbs.set(file,db);
  return db;
+}
+function hasTable(db,name){
+ return db instanceof require('./pg-sync').Database?Boolean(db.prepare('SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name=?').get(name)):Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name));
 }
 function close(id){closeFile(path.join(builder.projectDir(id),'data.sqlite'))}
 function closeFile(file){const db=dbs.get(file);if(db){db.close();dbs.delete(file)}}
@@ -261,8 +275,18 @@ function functionDb(db,cfg,op,a,user){
   // where filters run in SQL, so a filtered list never loads the whole collection.
   const conds=[],params=[name];
   if(a.where&&typeof a.where==='object')for(const [k,v] of Object.entries(a.where).slice(0,10)){
-   if(k==='id'||k==='_owner'){conds.push((k==='id'?'id':'owner_id')+' IS ?');params.push(v==null?null:String(v));continue}
+   if(k==='id'||k==='_owner'){conds.push((k==='id'?'id':'owner_id')+' IS NOT DISTINCT FROM ?');params.push(v==null?null:String(v));continue}
    if(!/^[A-Za-z0-9_-]{1,64}$/.test(k))throw fail(400,'Invalid field name in where: '+String(k).slice(0,64));
+   if(db instanceof require('./pg-sync').Database){
+    // Postgres: the same tests on jsonb (k is checked above, so it can sit in the query).
+    const f="(data::jsonb->'"+k+"')",t='jsonb_typeof'+f;
+    if(v===null)conds.push(t+"='null'");
+    else if(typeof v==='boolean')conds.push(f+"='"+(v?'true':'false')+"'::jsonb");
+    else if(typeof v==='number'){conds.push(t+"='number' AND (data::jsonb->>'"+k+"')::numeric=?::numeric");params.push(v)}
+    else if(typeof v==='string'){conds.push(t+"='string' AND data::jsonb->>'"+k+"'=?");params.push(v)}
+    else{conds.push(t+" IN ('object','array') AND "+f+"=?::jsonb");params.push(JSON.stringify(v))}
+    continue;
+   }
    const p="'$.\""+k+"\"'";
    if(v===null)conds.push('json_type(data,'+p+")='null'");
    else if(typeof v==='boolean')conds.push('json_type(data,'+p+")='"+(v?'true':'false')+"'");
@@ -490,7 +514,7 @@ function overview(id){
   users:db.prepare('SELECT id,email,name,created_at FROM users ORDER BY created_at DESC LIMIT 100').all(),
   user_count:db.prepare('SELECT COUNT(*) n FROM users').get().n,
   // Emails the app could not send yet (email not set up on this server), kept for the owner.
-  outbox:db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='email_outbox'").get()?db.prepare('SELECT to_kind,subject,text,user_email,at FROM email_outbox ORDER BY at DESC LIMIT 50').all():[]
+  outbox:hasTable(db,'email_outbox')?db.prepare('SELECT to_kind,subject,text,user_email,at FROM email_outbox ORDER BY at DESC LIMIT 50').all():[]
  };
 }
 function ownerRecords(id,collection){
@@ -671,4 +695,4 @@ async function runAllSchedules(options){
 }
 // Every due automation on every app (called every minute by the server).
 function runAllAutomations(options){return require('./react-automations').tick(options)}
-module.exports={functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};

@@ -6,11 +6,20 @@ const {DatabaseSync}=require('node:sqlite');
 
 const SESSION_DAYS=30,COOKIE='kq_builder';
 let db,dbFile;
+const TABLES=['accounts','sessions','ledger','account_tokens','api_keys'];
+// With DATABASE_URL set the accounts live in Postgres (pg-sync.js); the first start copies the
+// SQLite file's rows across once, and the file is kept as it was.
 function database(){
  const file=process.env.KAIROQ_BUILDER_ACCOUNTS_DB||path.join(__dirname,'workspace','builder-accounts.sqlite');
- if(db&&dbFile===file)return db;
+ const pg=require('./pg-sync'),where=pg.enabled()?'postgres':file;
+ if(db&&dbFile===where)return db;
+ if(pg.enabled()){db=pg.open();dbFile=where;schema(db);pg.copyFromSqlite(file,db,{tables:TABLES,key:'builder-accounts'});return db}
  fs.mkdirSync(path.dirname(file),{recursive:true});
  db=new DatabaseSync(file);dbFile=file;
+ schema(db);
+ return db;
+}
+function schema(db){
  db.exec(`PRAGMA journal_mode=WAL;
   CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,credits INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,expires_at INTEGER NOT NULL);
@@ -18,7 +27,6 @@ function database(){
  db.exec('CREATE TABLE IF NOT EXISTS account_tokens(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,kind TEXT NOT NULL,expires_at INTEGER NOT NULL)');
  db.exec('CREATE TABLE IF NOT EXISTS api_keys(id TEXT PRIMARY KEY,account_id TEXT NOT NULL,name TEXT NOT NULL,key_hash TEXT UNIQUE NOT NULL,hint TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT)');
  for(const col of ['plan TEXT','plan_status TEXT','stripe_customer TEXT','subscription_id TEXT','plan_renews_at TEXT','email_verified INTEGER NOT NULL DEFAULT 0','google_sub TEXT']){try{db.exec('ALTER TABLE accounts ADD COLUMN '+col)}catch{}}
- return db;
 }
 // API keys let tools act for an account (the MCP server, scripts). The key is shown once; only
 // its hash is stored. account_id 'owner' is the server owner.
@@ -286,4 +294,4 @@ function googleLogin({sub,email,email_verified}){
  if(credits)d.prepare('INSERT INTO ledger(id,account_id,delta,reason,ref,at) VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),id,credits,'Free credits',null,at);
  return startSession(id);
 }
-module.exports={loginToken,loginWithToken,grantFreeCredits,sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,get,publicAccount,createApiKey,listApiKeys,revokeApiKey,viewerForApiKey,COOKIE};
+module.exports={loginToken,loginWithToken,grantFreeCredits,sendVerification,verifyEmail,requestReset,resetPassword,googleLogin,mailReady,plans,subscribe,billingPortal,stripeReady,email,signup,login,logout,fromRequest,cookie,charge,grant,history,packs,stripeConfigured,checkout,stripeWebhook,verifyStripeSignature,freeCredits,database,get,publicAccount,createApiKey,listApiKeys,revokeApiKey,viewerForApiKey,COOKIE,TABLES};

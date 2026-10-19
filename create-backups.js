@@ -7,14 +7,20 @@ const builder=require('./react-builder');
 
 function root(){return process.env.KAIROQ_BACKUP_DIR||path.join(path.dirname(builder.ROOT()),'backups')}
 function quote(p){return"'"+String(p).replace(/'/g,"''")+"'"}
-function snapshot(db,file){fs.mkdirSync(path.dirname(file),{recursive:true});if(fs.existsSync(file))fs.rmSync(file);db.exec('VACUUM INTO '+quote(file))}
+function snapshot(db,file,tables){
+ fs.mkdirSync(path.dirname(file),{recursive:true});if(fs.existsSync(file))fs.rmSync(file);
+ // Postgres (pg-sync.js): the rows are written to a SQLite file, so every backup restores the same way.
+ const pg=require('./pg-sync');
+ if(db instanceof pg.Database)return pg.exportToSqlite(db,file,tables);
+ db.exec('VACUUM INTO '+quote(file));
+}
 function run({now=new Date()}={}){
  const stamp=now.toISOString().slice(0,19).replace(/[:T]/g,'-'),dir=path.join(root(),stamp),started=Date.now();
  const done={dir,accounts:false,projects:0,errors:[]};
- try{snapshot(require('./builder-accounts').database(),path.join(dir,'builder-accounts.sqlite'));done.accounts=true}catch(e){done.errors.push('accounts: '+e.message)}
+ try{snapshot(require('./builder-accounts').database(),path.join(dir,'builder-accounts.sqlite'),require('./builder-accounts').TABLES);done.accounts=true}catch(e){done.errors.push('accounts: '+e.message)}
  for(const p of builder.list()){
   const src=path.join(builder.projectDir(p.id),'data.sqlite');
-  if(!fs.existsSync(src))continue;
+  if(!fs.existsSync(src)&&!require('./pg-sync').enabled())continue;
   try{snapshot(require('./react-backend').database(p.id),path.join(dir,'projects',p.id+'.sqlite'));done.projects++}catch(e){done.errors.push(p.id+': '+e.message)}
  }
  const hosting=path.join(builder.ROOT(),'hosting.json');
