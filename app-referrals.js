@@ -44,7 +44,7 @@ function stats(db){
  migrate(db);
  const joined=db.prepare('SELECT COUNT(*) n FROM referral_joins').get().n;
  const users=db.prepare('SELECT COUNT(*) n FROM users').get().n;
- const top=db.prepare('SELECT u.email,u.name,COUNT(*) n FROM referral_joins j JOIN users u ON u.id=j.referrer_id GROUP BY j.referrer_id ORDER BY n DESC LIMIT 5').all();
+ const top=db.prepare('SELECT u.email,u.name,COUNT(*) n FROM referral_joins j JOIN users u ON u.id=j.referrer_id GROUP BY u.id,u.email,u.name ORDER BY n DESC LIMIT 5').all();
  return{joined,users,top:top.map(t=>({email:t.email,name:t.name||'',invited:t.n}))};
 }
 module.exports={migrate,codeFor,claim,mine,stats,CLAIM_WINDOW_MS};

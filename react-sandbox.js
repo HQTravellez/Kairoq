@@ -34,7 +34,11 @@ function copySchema(db,to){
  const q=n=>'"'+n.replace(/"/g,'""')+'"';
  db.exec('DROP SCHEMA IF EXISTS '+q(to)+' CASCADE; CREATE SCHEMA '+q(to));
  for(const {table_name:t} of db.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'").all())
-  db.exec('CREATE TABLE '+q(to)+'.'+q(t)+' (LIKE '+q(t)+' INCLUDING ALL); INSERT INTO '+q(to)+'.'+q(t)+' SELECT * FROM '+q(t));
+{
+  // Generated columns (the search index) are computed again, not copied.
+  const cols=db.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? AND is_generated='NEVER' ORDER BY ordinal_position").all(t).map(c=>q(c.column_name)).join(',');
+  db.exec('CREATE TABLE '+q(to)+'.'+q(t)+' (LIKE '+q(t)+' INCLUDING ALL); INSERT INTO '+q(to)+'.'+q(t)+'('+cols+') SELECT '+cols+' FROM '+q(t));
+ }
 }
 // Every use keeps a copy alive; unused copies are removed after an hour.
 function lookup(id,token){const b=token&&boxes.get(String(token));if(!b||b.id!==id)return null;b.at=Date.now();return b}

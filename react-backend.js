@@ -58,7 +58,7 @@ function openFile(file){
   CREATE TABLE IF NOT EXISTS app_tokens(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL);`);
  try{db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT')}catch{}
  require('./react-backend-extras').migrate(db);
- if(schemaName&&schemaName.startsWith('app_'))pg.copyFromSqlite(file,db,{key:'app-data'});
+ if(schemaName&&schemaName.startsWith('app_')){require('./app-assistant').migrate(db);pg.copyFromSqlite(file,db,{key:'app-data'})}
  dbs.set(file,db);
  return db;
 }
@@ -259,7 +259,7 @@ async function appAi(meta,db,args,{onToken}={}){
  if(imgs.length)clean[clean.length-1]={role:'user',content:[{type:'text',text:clean[clean.length-1].content},...imgs.map(url=>({type:'image_url',image_url:{url}}))]};
  const out=await appAiImpl({system,messages:clean,maxTokens,...(onToken?{onToken}:{}),...(imgs.length?{vision:true}:{})});
  const day=new Date().toISOString().slice(0,10);
- db.prepare('INSERT INTO app_ai_usage(day,calls) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET calls=calls+1').run(day);
+ db.prepare('INSERT INTO app_ai_usage(day,calls) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET calls=app_ai_usage.calls+1').run(day);
  const per=Math.max(1,Number(process.env.KAIROQ_APP_AI_CALLS_PER_CREDIT||10));
  const total=db.prepare('SELECT SUM(calls) n FROM app_ai_usage').get().n;
  if(meta.owner!=='owner'&&total%per===0)try{accounts.charge(meta.owner,1,'AI used by '+meta.name)}catch{}

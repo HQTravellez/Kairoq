@@ -119,12 +119,17 @@ function copyFromSqlite(file,db,{tables,key}){
   try{
    db.exec('BEGIN');
    try{
-    const inFile=src.prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
+    // Full-text (FTS5) tables are copied by rows into the table the caller made for them; their
+    // internal tables (name_data, name_idx, ...) are not copied.
+    const all=src.prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
+    const virtual=all.filter(t=>/^CREATE VIRTUAL/i.test(t.sql||'')).map(t=>t.name);
+    const inFile=all.filter(t=>!virtual.some(v=>t.name.startsWith(v+'_')&&/^(data|idx|content|docsize|config)$/.test(t.name.slice(v.length+1))));
     for(const table of tables||inFile.map(t=>t.name)){
      const def=inFile.find(t=>t.name===table);
      if(!def)continue;
      const columns=()=>new Set(db.prepare('SELECT column_name FROM information_schema.columns WHERE table_name=? AND table_schema=current_schema()').all(table).map(r=>r.column_name));
      let target=columns();
+     if(!target.size&&virtual.includes(table))continue;
      if(!target.size&&def.sql){db.exec(def.sql.replace(/^CREATE TABLE\s+(?!IF)/i,'CREATE TABLE IF NOT EXISTS '));target=columns()}
      for(const row of src.prepare('SELECT * FROM "'+table+'"').all()){
       const cols=Object.keys(row).filter(c=>target.has(c));

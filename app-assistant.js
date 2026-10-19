@@ -10,9 +10,15 @@ const MAX_DOCS=50,MAX_DOC_CHARS=200000,MAX_TOTAL_CHARS=1000000,CHUNK=1200,TOP=6;
 const STOP=new Set('a an and are as at be but by can do does for from have how i if in is it me my of on or our so that the their them there this to us was we what when where which who why will with you your'.split(' '));
 function fail(status,message){return Object.assign(Error(message),{status})}
 
+function isPg(db){return db instanceof require('./pg-sync').Database}
 function migrate(db){
+ // Postgres has no FTS5: the passages get a tsvector (title weighted above text) and a GIN index.
+ if(isPg(db))db.exec(`CREATE TABLE IF NOT EXISTS assistant_chunks(rowid BIGSERIAL PRIMARY KEY,doc_id TEXT,title TEXT,text TEXT,alias TEXT,
+   tsv tsvector GENERATED ALWAYS AS (setweight(to_tsvector('simple',coalesce(title,'')),'A')||setweight(to_tsvector('simple',coalesce(text,'')),'B')||setweight(to_tsvector('simple',coalesce(alias,'')),'B')) STORED);
+  CREATE INDEX IF NOT EXISTS assistant_chunks_tsv ON assistant_chunks USING GIN(tsv);
+  CREATE INDEX IF NOT EXISTS assistant_chunks_doc ON assistant_chunks(doc_id);`);
+ else db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS assistant_chunks USING fts5(doc_id UNINDEXED,title,text,alias,tokenize='unicode61 remove_diacritics 2')");
  db.exec(`CREATE TABLE IF NOT EXISTS assistant_docs(id TEXT PRIMARY KEY,title TEXT NOT NULL,source TEXT,kind TEXT NOT NULL,chars INTEGER NOT NULL,created_at TEXT NOT NULL);
-  CREATE VIRTUAL TABLE IF NOT EXISTS assistant_chunks USING fts5(doc_id UNINDEXED,title,text,alias,tokenize='unicode61 remove_diacritics 2');
   CREATE TABLE IF NOT EXISTS assistant_questions(key TEXT PRIMARY KEY,question TEXT NOT NULL,count INTEGER NOT NULL,reason TEXT,status TEXT NOT NULL,last_at TEXT NOT NULL);`);
  // The whole text of each document, so a fact can be corrected in place (older rows rebuild it from their passages).
  try{db.exec('ALTER TABLE assistant_docs ADD COLUMN body TEXT')}catch{}
@@ -146,7 +152,12 @@ function search(db,question,k=TOP){
  if(words.length){
   // Word stems as prefixes, so "delivery" also finds "deliver" and "delivered" (any language).
   const match=[...new Set(words.map(w=>w.length>=5?w.slice(0,Math.max(4,w.length-3)):w))].map(w=>'"'+w.replace(/"/g,'')+'"'+(w.length>=3?'*':'')).join(' OR ');
-  try{rows=db.prepare('SELECT doc_id,title,text,bm25(assistant_chunks,0,2,1,1) score FROM assistant_chunks WHERE assistant_chunks MATCH ? ORDER BY score LIMIT ?').all(match,k)}catch{rows=[]}
+  if(isPg(db)){
+   // The same stems as prefixes, in Postgres's own search (words are letters and digits only).
+   const q=[...new Set(words.map(w=>w.length>=5?w.slice(0,Math.max(4,w.length-3)):w))].map(w=>w+(w.length>=3?':*':'')).join(' | ');
+   try{rows=db.prepare("SELECT doc_id,title,text FROM assistant_chunks WHERE tsv @@ to_tsquery('simple',?) ORDER BY ts_rank(tsv,to_tsquery('simple',?)) DESC,rowid LIMIT ?").all(q,q,k)}catch{rows=[]}
+  }
+  else try{rows=db.prepare('SELECT doc_id,title,text,bm25(assistant_chunks,0,2,1,1) score FROM assistant_chunks WHERE assistant_chunks MATCH ? ORDER BY score LIMIT ?').all(match,k)}catch{rows=[]}
  }
  return rows.map((r,i)=>({n:i+1,doc_id:r.doc_id,title:r.title,text:r.text}));
 }
@@ -199,7 +210,7 @@ function logUnanswered(db,question,reason){
   migrate(db);
   const key=clip(question,200).toLowerCase().replace(/[^\p{L}\p{N} ]/gu,'').trim();if(!key)return;
   const now=new Date().toISOString();
-  db.prepare("INSERT INTO assistant_questions(key,question,count,reason,status,last_at) VALUES(?,?,1,?,'open',?) ON CONFLICT(key) DO UPDATE SET count=count+1,reason=excluded.reason,last_at=excluded.last_at,status=CASE WHEN status='dismissed' THEN 'dismissed' ELSE 'open' END").run(key,clip(question,500),clip(reason,120),now);
+  db.prepare("INSERT INTO assistant_questions(key,question,count,reason,status,last_at) VALUES(?,?,1,?,'open',?) ON CONFLICT(key) DO UPDATE SET count=assistant_questions.count+1,reason=excluded.reason,last_at=excluded.last_at,status=CASE WHEN assistant_questions.status='dismissed' THEN 'dismissed' ELSE 'open' END").run(key,clip(question,500),clip(reason,120),now);
   db.prepare("DELETE FROM assistant_questions WHERE key IN (SELECT key FROM assistant_questions ORDER BY last_at DESC LIMIT -1 OFFSET 500)").run();
  }catch{}
 }
