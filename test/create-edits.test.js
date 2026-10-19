@@ -80,3 +80,15 @@ test('edits that fail twice escalate to whole files, and the prompt asks the mod
  assert.match(asks[2],/failed twice, so do not use "edits" this time: send every file you change whole/);
  assert.match(builder.SYSTEM_PROMPT,/leave no import unresolved[\s\S]*actually rendered/);
 });
+
+test('loose edits: typography and indentation are forgiven, JSON strings are read, misses quote the closest line',()=>{
+ const edits=require('../react-edits');
+ const f='function A(){\n    const s = "it\'s — fine";\n    return s;\n}\n';
+ const r=edits.applyOne(f,{find:'  const s = "it’s – fine";\n  return s;',replace:'  const s = "ok";\n  return s + 1;'});
+ assert.equal(r.text,'function A(){\n    const s = "ok";\n    return s + 1;\n}\n','re-indented to where it matched');
+ assert.equal(edits.applyOne('a\r\nb\n',{find:'b\r\n',replace:'c\n'}).text,'a\r\nc\n');
+ assert.deepEqual(edits.normalize(JSON.stringify({'src/a.js':[{find:'x',replace:'y'}]})),{'src/a.js':[{find:'x',replace:'y'}]});
+ assert.deepEqual(edits.normalize({'src/a.js':JSON.stringify([{find:'x',replace:'y'}])}),{'src/a.js':[{find:'x',replace:'y'}]});
+ const miss=edits.applyOne('export function Header({ title }) {\n  return <h1>{title}</h1>;\n}\n',{find:'export function Header({ name }) {',replace:''});
+ assert.match(miss.error,/closest line there is: "export function Header\(\{ title \}\) \{"/);
+});
