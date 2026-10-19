@@ -20,14 +20,29 @@ function fail(status,message){return Object.assign(Error(message),{status})}
 function timeoutMs(){return Math.min(30000,Math.max(1000,Number(process.env.KAIROQ_FUNCTION_TIMEOUT_MS||10000)))}
 
 // ---------- source rules ----------
-function functionName(file){const m=/^functions\/([a-z][a-z0-9-]{0,39})\.js$/.exec(file);return m&&m[1]}
+// A function is functions/<name>.js, .ts (TypeScript: the types are removed before it runs) or
+// .py (Python, run by python-functions.js).
+const KINDS=['js','ts','py'];
+function functionName(file){const m=/^functions\/([a-z][a-z0-9-]{0,39})\.(js|ts|py)$/.exec(file);return m&&m[1]}
+function functionFile(files,name){return KINDS.map(k=>'functions/'+name+'.'+k).find(f=>typeof files[f]==='string')||null}
+// The JavaScript that runs: TypeScript goes through esbuild (types stripped, nothing bundled).
+function runnable(file,code){
+ if(!file.endsWith('.ts'))return code;// .js runs as written; .py is Python source
+ // esbuild writes the default export as "export { name as default }"; the runner expects "export default".
+ try{return require('esbuild').transformSync(code,{loader:'ts',format:'esm',target:'es2022'}).code.replace(/^export\s*\{\s*([A-Za-z_$][\w$]*)\s+as\s+default\s*\};?\s*$/m,'export default $1;')}
+ catch(e){throw fail(500,file+': '+String(e.errors&&e.errors[0]&&e.errors[0].text||e.message).slice(0,300))}
+}
 function validate(files){
  const errors=[],names=Object.keys(files).filter(f=>f.startsWith('functions/'));
  if(names.length>MAX_FUNCTIONS)errors.push('Up to '+MAX_FUNCTIONS+' server functions are allowed.');
  for(const f of names){
   const code=files[f];
-  if(!functionName(f)){errors.push('Invalid function path: '+f+' (use functions/<lowercase-name>.js).');continue}
+  if(!functionName(f)){errors.push('Invalid function path: '+f+' (use functions/<lowercase-name>.js, .ts or .py).');continue}
   if(typeof code!=='string'||code.length>MAX_SOURCE){errors.push(f+' must be text under 50 KB.');continue}
+  const others=KINDS.map(k=>f.replace(/\.(js|ts|py)$/,'.'+k)).filter(o=>o!==f&&typeof files[o]==='string');
+  if(others.length&&KINDS.indexOf(f.split('.').pop())>KINDS.indexOf(others[0].split('.').pop())){errors.push(f+' and '+others[0]+' are the same function: keep one.');continue}
+  if(f.endsWith('.py')){errors.push(...require('./python-functions').validate(f,code));continue}
+  if(f.endsWith('.ts'))try{runnable(f,code)}catch(e){errors.push(e.message);continue}
   const defaults=(code.match(/\bexport\s+default\b/g)||[]).length;
   if(defaults!==1)errors.push(f+' must have exactly one "export default async function (request, ctx) { ... }".');
   if(/^\s*import\s|\bimport\s*\(|\brequire\s*\(/m.test(code))errors.push(f+': server functions cannot import modules. Use the ctx helpers: fetch, db, secrets, ai, email, crypto.');
@@ -35,7 +50,7 @@ function validate(files){
  }
  return errors;
 }
-function list(files){return Object.keys(files).map(functionName).filter(Boolean).sort()}
+function list(files){return[...new Set(Object.keys(files).map(functionName).filter(Boolean))].sort()}
 
 // ---------- guarded fetch ----------
 function privateAddress(ip){
@@ -206,7 +221,7 @@ function respond(res,result,cors,{externalRedirects=false}={}){
  else if(r.body!==undefined){body=String(r.body);headers['Content-Type']=extra['Content-Type']||'text/plain; charset=utf-8'}
  res.writeHead(status,headers);res.end(status===204?undefined:body);
 }
-module.exports={validate,list,run,respond,guardedFetch,guardedLookup,privateAddress,functionName};
+module.exports={validate,list,run,respond,guardedFetch,guardedLookup,privateAddress,functionName,functionFile,runnable};
 
 // ---------- worker pool (main thread) ----------
 // Functions run in worker threads so a slow or stuck function never blocks the

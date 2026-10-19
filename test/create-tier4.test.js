@@ -288,3 +288,24 @@ test('project knowledge reaches the model; the Max tier appears when configured'
   assert.equal((await request(server,'GET','/api/create/me',{headers:{cookie}})).json.viewer.account.credits,5,'max costs 15 credits');
  }finally{delete process.env.KAIROQ_BUILDER_PAID_APPROVED;delete process.env.KAIROQ_MAX_MODELS}
 });
+
+test('server functions can be TypeScript: types are removed, the rules stay the same',async()=>{
+ const TS='type Body={name:string};\ninterface Out{hello:string}\nexport default async function(request:{body:Body},{user}:any):Promise<{json:Out}>{\n const n:string=request.body.name;\n return {json:{hello:n.toUpperCase()}};\n}\n';
+ assert.deepEqual(functions.validate({'functions/greet.ts':TS}),[]);
+ assert.match(functions.validate({'functions/greet.ts':TS,'functions/greet.js':'export default async function(){}'}).join(),/same function/);
+ assert.match(functions.validate({'functions/bad.ts':"import fs from 'fs';export default async function(){}"}).join(),/cannot import/);
+ assert.match(functions.validate({'functions/broken.ts':'export default async function( {'}).join(),/broken\.ts/);
+ const {cookie}=await signup('ts@example.com');
+ const id=await appWith(cookie,{'functions/greet.ts':TS});
+ const r=await request(server,'POST','/api/apps/'+id+'/functions/greet',{body:{name:'ana'}});
+ assert.equal(r.status,200,r.text);assert.deepEqual(r.json,{hello:'ANA'});
+});
+
+test('server functions can be Python, called like any other',async()=>{
+ const PY="async def handler(request, ctx):\n    row = await ctx.db.collection('orders').create({'item': request['body']['item']})\n    return {'status': 201, 'json': {'item': row['item'], 'signed_in': ctx.user is not None}}\n";
+ const {cookie}=await signup('py@example.com');
+ const id=await appWith(cookie,{'src/backend.json':JSON.stringify({collections:{orders:{access:'public'}}}),'functions/order.py':PY});
+ const r=await request(server,'POST','/api/apps/'+id+'/functions/order',{body:{item:'tea'}});
+ assert.equal(r.status,201,r.text);assert.deepEqual(r.json,{item:'tea',signed_in:false});
+ require('../python-functions').shutdown();
+});
