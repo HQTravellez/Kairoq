@@ -14,7 +14,9 @@ process.env.KAIROQ_PUBLIC_URL='https://kairoq.example';
 const builder=require('../react-builder'),createApi=require('../create-api'),backend=require('../react-backend'),hosting=require('../react-hosting'),runtime=require('../runtime-check');
 
 const OK="export default function App() { return <h1>Acme Rooms</h1>; }\n";
-const BROKEN="export default function App() { throw new Error('boom'); }\n";
+// Shows the page but throws once it is open: a blank page instead would not be kept at all
+// (the preview stays on the working version, see test/rollback-journey.test.js).
+const BROKEN="import { useEffect } from 'react';\nexport default function App() { useEffect(() => { setTimeout(() => { throw new Error('boom'); }); }, []); return <h1>Broken</h1>; }\n";
 const prompts=[];
 const callModel=async(opts,parse)=>{
  const sys=opts.messages[0].content,last=opts.messages.at(-1).content,user=typeof last==='string'?last:last.map(p=>p.text||'').join('');
