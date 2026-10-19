@@ -20,7 +20,11 @@ function binary(){
  for(const dir of String(process.env.PATH||'').split(path.delimiter)){const f=path.join(dir,'opencode');try{fs.accessSync(f,fs.constants.X_OK);return f}catch{}}
  return null;
 }
-function enabled(){return String(process.env.KAIROQ_BUILD_ENGINE||'').toLowerCase()==='opencode'&&Boolean(binary())&&Boolean(model())}
+// Installed and with a model to use: projects can choose it (settings, "engine").
+function available(){return Boolean(binary())&&Boolean(model())}
+// KAIROQ_BUILD_ENGINE=opencode: every project uses it, unless the project chose Kairoq.
+function enabled(){return String(process.env.KAIROQ_BUILD_ENGINE||'').toLowerCase()==='opencode'&&available()}
+function chosenFor(meta){return meta&&meta.engine==='kairoq'?false:(meta&&meta.engine==='opencode'||String(process.env.KAIROQ_BUILD_ENGINE||'').toLowerCase()==='opencode')&&available()}
 // The model OpenCode uses: the builder's own provider (Experiential Labs or OpenRouter), both
 // OpenAI-compatible. KAIROQ_OPENCODE_MODEL / _BASE_URL override it.
 function model(){
@@ -113,4 +117,4 @@ function rules(systemPrompt,note=''){
  const cut=systemPrompt.indexOf('Respond with ONLY a JSON object');
  return['# Kairoq app rules','','You work in a React 18 + Vite + Tailwind CSS 3 project. Edit the files in this folder with your file tools (read, edit, write, glob, grep). There is no shell: you cannot run commands, install packages or start the app; Kairoq builds the app, opens it in a browser and tells you about any error.','When you are done, reply in one or two plain sentences for the app owner saying what you changed.','',cut>0?systemPrompt.slice(0,cut).trim():systemPrompt,note?'\n'+note.trim():''].join('\n');
 }
-module.exports={enabled,configure,binary,model,session,rules,sync,readTree,VERSION};
+module.exports={enabled,available,chosenFor,configure,binary,model,session,rules,sync,readTree,VERSION};

@@ -89,3 +89,23 @@ test('the real OpenCode program edits a file through the model',{skip:!process.e
   assert.ok(offered.includes('edit')&&!offered.includes('bash')&&!offered.includes('webfetch'),'no shell and no web: '+offered.join(','));
  }finally{s.close();server.close();for(const k of ['KAIROQ_OPENCODE_BIN','EXPLABS_API_KEY','KAIROQ_OPENCODE_BASE_URL','KAIROQ_OPENCODE_MODEL'])delete process.env[k]}
 });
+
+test('a project can choose OpenCode; when OpenCode fails, Kairoq\'s own engine finishes the change',async()=>{
+ const FAIL=path.join(tmp,'opencode-fails');
+ fs.writeFileSync(FAIL,'#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({type:"error",sessionID:"s",error:{message:"model does not support tools"}})+"\\n");process.exit(1);\n',{mode:0o755});
+ process.env.KAIROQ_OPENCODE_BIN=FAIL;process.env.EXPLABS_API_KEY='test-key';
+ try{
+  assert.equal(engine.available(),true);assert.equal(engine.enabled(),false,'not for every project');
+  const meta=builder.create({name:'Choice',owner:'owner'});await builder.initialize(meta);
+  assert.equal(engine.chosenFor(builder.loadMeta(meta.id)),false);
+  const m=builder.loadMeta(meta.id);m.engine='opencode';builder.saveMeta(m);
+  assert.equal(engine.chosenFor(builder.loadMeta(meta.id)),true);
+  let kairoqCalls=0;
+  const r=await builder.edit(meta.id,'add a heading',{callModel:(o,parse)=>{kairoqCalls++;return Promise.resolve(parse(JSON.stringify({message:'Added it.',files:{'src/App.jsx':'export default function App(){return <main><h1>By Kairoq</h1></main>}\n'}})))},checkRuntime:async()=>({errors:[]})});
+  assert.equal(kairoqCalls,1,'Kairoq took over');
+  assert.match(builder.loadFiles(meta.id,r.version)['src/App.jsx'],/By Kairoq/);
+  const v=builder.loadMeta(meta.id).versions.at(-1);
+  assert.equal(v.engine,undefined);assert.equal(v.engine_fallback,true);
+  assert.ok(r.timeline.some(e=>/OpenCode could not do this \(OpenCode stopped: model does not support tools\)/.test(e.text||'')),JSON.stringify(r.timeline));
+ }finally{delete process.env.KAIROQ_OPENCODE_BIN;delete process.env.EXPLABS_API_KEY}
+});

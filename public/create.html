@@ -797,6 +797,8 @@
     <div class="row"><button class="primary" id="settings-save" type="button">Save keys</button></div>
     <h3>Email</h3>
     <p class="muted small" id="email-status"></p>
+    <label class="hidden" id="engine-row">Build engine <select id="engine-select"><option value="kairoq">Kairoq</option><option value="opencode">OpenCode (beta)</option></select></label>
+    <p class="muted small hidden" id="engine-note">OpenCode edits your files step by step. If it cannot finish a change, Kairoq's own engine takes over, so a change never fails because of it.</p>
     <section id="apikeys-section">
       <h3>API keys and MCP</h3>
       <p class="muted small">Let AI assistants such as Claude, ChatGPT or Cursor use Kairoq for you through MCP: list your projects, run synthetic-customer tests and read the reports, with your access and credits. Add an MCP server with the URL <code id="mcp-url"></code> and the header <code>Authorization: Bearer &lt;your key&gt;</code>.</p>
