@@ -1374,6 +1374,7 @@ async function renderInsights(){
  const p=state.project;
  $('seo-title').value=p.seo?.title||'';$('seo-description').value=p.seo?.description||'';$('seo-image').value=p.seo?.image||'';text($('seo-status'),'');
  $('analytics').classList.toggle('hidden',!p.published);
+ loadGrow().catch(()=>{});
  if(!p.published)return;
  const {analytics:a}=await api('/projects/'+p.id+'/analytics');
  text($('an-views'),a.totals.views.toLocaleString());text($('an-visitors'),a.totals.visitors.toLocaleString());
@@ -1386,6 +1387,39 @@ async function renderInsights(){
  const refs=$('an-referrers');refs.replaceChildren();
  for(const r of a.referrers)refs.append(Object.assign(document.createElement('li'),{textContent:r.referrer+' · '+r.views}));
 }
+// ---------- grow: found on Google and in AI answers ----------
+const GROW_TYPES={LocalBusiness:'Local business',Restaurant:'Restaurant',CafeOrCoffeeShop:'Café',Bakery:'Bakery',Hotel:'Hotel',BedAndBreakfast:'Bed and breakfast',LodgingBusiness:'Guesthouse or rental',TouristTrip:'Tours',TravelAgency:'Travel agency',HealthAndBeautySalon:'Beauty salon',HairSalon:'Hair salon',DaySpa:'Spa',SportsActivityLocation:'Sports or yoga studio',ExerciseGym:'Gym',MedicalBusiness:'Clinic',Physiotherapy:'Physiotherapy',Dentist:'Dentist',Store:'Shop',ProfessionalService:'Professional service',RealEstateAgent:'Real estate',EducationalOrganization:'School or courses',Event:'Event',SoftwareApplication:'Software product',Organization:'Organization'};
+function faqText(list){return(list||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n')}
+function parseFaq(text){const out=[];let cur=null;for(const line of String(text||'').split('\n')){const q=/^\s*Q:\s*(.*)$/i.exec(line),a=/^\s*A:\s*(.*)$/i.exec(line);if(q){cur={q:q[1].trim(),a:''};out.push(cur)}else if(a&&cur)cur.a=a[1].trim();else if(cur&&cur.a&&line.trim())cur.a+=' '+line.trim()}return out.filter(f=>f.q&&f.a)}
+function fillGrowForm(b,faq){
+ b=b||{};
+ const sel=$('gb-type');if(!sel.options.length)for(const [v,l] of Object.entries(GROW_TYPES))sel.append(new Option(l,v));
+ $('gb-name').value=b.name||'';sel.value=b.type||'LocalBusiness';$('gb-description').value=b.description||'';$('gb-street').value=b.street||'';$('gb-city').value=b.city||'';$('gb-postal').value=b.postal||'';$('gb-country').value=b.country||'';$('gb-phone').value=b.phone||'';$('gb-email').value=b.email||'';$('gb-hours').value=(b.hours||[]).join('\n');$('gb-price').value=b.price_range||'';$('gb-faq').value=faqText(faq);
+}
+function renderGrow(g){
+ const ul=$('grow-items');ul.replaceChildren();
+ for(const i of g.items){const li=el('li',i.ok?'ok':'todo');li.append(el('span','vmark',i.ok?'✓':'○'),el('span',null,i.label));ul.append(li)}
+ text($('grow-pages'),g.pages.length?'Pages search engines can read: '+g.pages.map(p=>p.title||p.path).slice(0,8).join(' · ')+(g.pages.length>8?' and '+(g.pages.length-8)+' more':'')+(g.urls?' · Summary for AI: '+g.urls.path+'llms.txt':''):'Kairoq reads your live pages a minute after you publish.');
+}
+async function loadGrow(){
+ const p=state.project;$('grow').classList.toggle('hidden',!p.published);if(!p.published)return;
+ const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);text($('grow-status'),'');
+}
+$('grow-suggest').onclick=async()=>{
+ const b=$('grow-suggest');b.disabled=true;text($('grow-status'),'Reading your pages…');$('grow-details').open=true;
+ try{const {suggestion:s,credits}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{op:'suggest'}});fillGrowForm(s.business,s.faq);if(s.seo&&s.seo.title&&!$('seo-title').value)$('seo-title').value=s.seo.title;if(s.seo&&s.seo.description&&!$('seo-description').value)$('seo-description').value=s.seo.description;text($('grow-status'),'Filled in from what your pages say'+(credits?' ('+credits+' credit'+(credits===1?'':'s')+')':'')+'. Check it, add anything missing, then Save.')}
+ catch(err){text($('grow-status'),err.message)}finally{b.disabled=false}
+};
+$('grow-refresh').onclick=async()=>{
+ const b=$('grow-refresh');b.disabled=true;text($('grow-status'),'Reading the live pages…');
+ try{const {grow}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{op:'refresh'}});renderGrow(grow);text($('grow-status'),'Read '+grow.pages.length+' page'+(grow.pages.length===1?'':'s')+'.')}
+ catch(err){text($('grow-status'),err.message)}finally{b.disabled=false}
+};
+$('grow-save').onclick=async()=>{
+ const business={name:$('gb-name').value,type:$('gb-type').value,description:$('gb-description').value,street:$('gb-street').value,city:$('gb-city').value,postal:$('gb-postal').value,country:$('gb-country').value,phone:$('gb-phone').value,email:$('gb-email').value,hours:$('gb-hours').value.split('\n'),price_range:$('gb-price').value};
+ try{const {grow}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{business,faq:parseFaq($('gb-faq').value),seo:{title:$('seo-title').value,description:$('seo-description').value}}});renderGrow(grow);fillGrowForm(grow.business,grow.faq);text($('grow-status'),'Saved. Google and AI assistants see it on the live site right away.')}
+ catch(err){text($('grow-status'),err.message)}
+};
 $('seo-save').onclick=async()=>{
  try{const {project}=await api('/projects/'+state.project.id+'/seo',{method:'POST',body:{title:$('seo-title').value,description:$('seo-description').value,image:$('seo-image').value}});state.project=project;text($('seo-status'),'Saved. Applies to the live site right away.')}
  catch(err){text($('seo-status'),err.message)}

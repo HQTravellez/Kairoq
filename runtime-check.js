@@ -196,6 +196,33 @@ async function deadClicks(page,url){
  dead.checked=targets.length;
  return dead;
 }
+// The pages of a published site as an anonymous visitor sees them (site-search.js): starts at
+// url, follows the site's own links (not #hash ones) and returns up to max pages with their
+// rendered #root, text, title and description. Only GET requests are sent: nothing is saved.
+async function renderSite(url,{max=15,timeoutMs=20000}={}){
+ if(!available())return null;
+ const ctx=await (await browser()).newContext({viewport:{width:1280,height:900}});
+ const start=new URL(url),base=start.pathname.endsWith('/')?start.pathname:start.pathname+'/';
+ try{
+  await ctx.route('**/*',r=>['GET','HEAD'].includes(r.request().method())?r.continue():r.abort());
+  const page=await ctx.newPage(),queue=['/'],seen=new Set(['/']),pages=[];
+  while(queue.length&&pages.length<max){
+   const rel=queue.shift();
+   try{
+    await page.goto(start.origin+base+rel.replace(/^\//,''),{waitUntil:'load',timeout:timeoutMs});
+    await page.waitForLoadState('networkidle',{timeout:6000}).catch(()=>{});await page.waitForTimeout(500);
+    const d=await page.evaluate(base=>{
+     const r=document.getElementById('root');
+     const links=[...document.querySelectorAll('a[href]')].map(a=>{try{const u=new URL(a.getAttribute('href'),location.href);return u.origin===location.origin&&(u.pathname+'/').startsWith(base)?'/'+u.pathname.slice(base.length):null}catch{return null}}).filter(Boolean);
+     return{html:r?r.innerHTML:'',text:r?r.innerText:'',title:document.title,description:(document.querySelector('meta[name=description]')||{}).content||'',h1:(document.querySelector('h1')||{}).innerText||'',links};
+    },base);
+    if(String(d.text).replace(/\s+/g,'').length>=40)pages.push({path:rel,...d,links:undefined});
+    for(let l of d.links){l=l.replace(/index\.html$/,'').replace(/\/+$/,'')||'/';if(/\.[a-z0-9]{2,5}$/i.test(l)||seen.has(l))continue;seen.add(l);queue.push(l)}
+   }catch{}
+  }
+  return pages;
+ }finally{await ctx.close().catch(()=>{})}
+}
 // Saves a 1200x630 PNG of a page (used as the social share image).
 async function screenshot(url,file){
  if(!available())return false;
@@ -588,4 +615,4 @@ async function renderHtml(html,{width,height}){
  }finally{await context.close().catch(()=>{})}
 }
 async function close(){for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
-module.exports={savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
+module.exports={renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
