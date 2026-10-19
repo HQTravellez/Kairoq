@@ -13,7 +13,9 @@ const growth=require('../growth');
 
 const MAIN="import React from 'react';\nimport { createRoot } from 'react-dom/client';\nimport App from './App.jsx';\ncreateRoot(document.getElementById('root')).render(<App />);\n";
 const OK="export default function App() { return <h1>Working</h1>; }\n";
-const BROKEN="export default function App() { throw new Error('boom'); }\n";
+// Shows the page but throws once it is open: a blank page instead would not be kept at all
+// (the preview stays on the working version, see test/rollback-journey.test.js).
+const BROKEN="import { useEffect } from 'react';\nexport default function App() { useEffect(() => { setTimeout(() => { throw new Error('boom'); }); }, []); return <h1>Broken</h1>; }\n";
 const LANDING=`import React, { useState } from 'react';
 import { collection } from 'kairoq';
 export default function App() {
