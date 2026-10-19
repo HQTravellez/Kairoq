@@ -252,10 +252,29 @@ function messageItem(m,last,index){
   const det=el('button','link-btn details-link','Details');det.type='button';det.onclick=()=>openDetail(index,'timeline');f.append(det);
   li.append(f);
  }
+ if(m.role==='assistant'&&m.verified)li.append(verifiedCard(m.verified,m.checks));
  if(m.checks&&!tl.some(e=>e.t==='check')){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
  if(m.steps&&m.steps.length&&!tl.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}
  return li;
+}
+// "Verified by Kairoq": what its browser tested on this build, like a customer would.
+function verifiedCard(v,checks){
+ const rows=[];
+ const add=(ok,good,bad)=>{if(ok===null||ok===undefined)return;rows.push([ok,ok?good:bad])};
+ add(v.opens,'Opens without errors','Shows errors when it opens');
+ if(v.menus)add(!v.menus.dead,v.menus.checked+' menu item'+(v.menus.checked===1?'':'s')+' and buttons work',v.menus.dead+' of '+v.menus.checked+' menu items do nothing');
+ add(v.phone,'Fits a phone screen','Scrolls sideways on a phone');
+ add(v.signup,'Sign-up works','Sign-up failed');
+ add(v.saves,'Added a record and it was saved','A new record was not saved');
+ if(checks&&checks.ran)add(!checks.failed.length,'All '+checks.ran+' saved check'+(checks.ran===1?'':'s')+' still pass',checks.failed.length+' saved check'+(checks.failed.length===1?'':'s')+' broke');
+ if(!rows.length)return document.createTextNode('');
+ const all=rows.every(r=>r[0]);
+ const box=el('div','verified '+(all?'ok':'bad'));
+ box.append(el('div','verified-head',all?'Verified by Kairoq':'Kairoq found problems'));
+ const ul=el('ul');for(const [ok,t] of rows){const li=el('li',ok?'ok':'bad');li.append(el('span','vmark',ok?'✓':'✗'),el('span',null,t));ul.append(li)}
+ box.append(ul);box.title='Tested in a real browser on a test copy of your data, the way a customer would use it.';
+ return box;
 }
 function renderVersions(){
  const sel=$('versions');sel.replaceChildren();
@@ -1063,7 +1082,7 @@ function renderPublish(){
  text($('publish').firstChild,p.published?'Update to current version (v'+p.current_version+')':'Publish current version');
  const links=$('live-links');links.replaceChildren();
  if(p.urls){
-  const status=document.createElement('p');status.className='muted small';status.textContent='Live: version '+p.published.version+', published '+when(p.published.at);links.append(status);
+  const status=document.createElement('p');status.className='muted small';const lc=p.published.live_check;status.textContent='Live: version '+p.published.version+', published '+when(p.published.at)+(lc?(lc.ok?' · ✓ the live link opens without errors':' · ✗ the live link shows problems: '+lc.errors.join('; ')):'');links.append(status);
   for(const u of [p.urls.path,p.urls.subdomain,...p.urls.domains].filter(Boolean)){const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';a.textContent=u;links.append(a)}
  }
  const list=$('domains');list.replaceChildren();

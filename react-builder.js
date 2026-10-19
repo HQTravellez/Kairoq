@@ -412,13 +412,17 @@ function brokenError(e){return /^(Blank page|Page did not load)/.test(String(e))
 // The browser check runs on a test copy of the app's data and adds a record the way a customer
 // would (runtime-check.js savesData). A record that showed on the page but is in none of the
 // app's tables was never saved, and is reported like any other error so the AI fixes it.
+// Returns {errors, verified}: verified is what the owner sees under the build ("Verified by
+// Kairoq"): true passed, false failed, null not tested (the app has no such part).
 async function runtimeProblems(id,url,checkRuntime){
  const sandbox=require('./react-sandbox');
  return sandbox.withSandbox(id,async box=>{
-  const r=await checkRuntime(url,{sandbox:box.token,journey:process.env.KAIROQ_JOURNEY!=='off'})||{},errors=[...(r.errors||[])],j=r.journey;
+  const r=await checkRuntime(url,{sandbox:box.token,journey:process.env.KAIROQ_JOURNEY!=='off'})||{},errors=[...(r.errors||[])],j=r.journey,f=r.facts||{};
+  const inData=Boolean(j&&j.token&&sandbox.contains(box,j.token));
+  const verified={opens:f.opened===undefined?null:f.opened&&!errors.some(e=>/^(Uncaught error|Page did not load|Blank page)/.test(e)),menus:f.menus&&f.menus.checked?{checked:f.menus.checked,dead:f.menus.dead}:null,phone:f.phone===undefined?null:f.phone,signup:j&&j.signed_up?true:null,saves:j&&j.api_errors&&j.api_errors.length?false:inData?true:j&&j.shown?false:null};
   if(j&&j.api_errors&&j.api_errors.length)errors.push(...j.api_errors.map(e=>'Adding a record like a customer failed: '+e));
-  else if(j&&j.shown&&!sandbox.contains(box,j.token))errors.push(j.reloaded?'Records are not saved in the database: a record added with the form ("'+j.token+' Test") stays only in this browser (localStorage), so other devices and staff never see it. Save records with collection(\'…\').create() (or the SQL database) and list them from there.':'Records are not saved: a record added with the form ("'+j.token+' Test") showed on the page but was gone after reloading. Save records with collection(\'…\').create() (or the SQL database) and load the list from there, so they stay after a reload.');
-  return errors;
+  else if(j&&j.shown&&!inData)errors.push(j.reloaded?'Records are not saved in the database: a record added with the form ("'+j.token+' Test") stays only in this browser (localStorage), so other devices and staff never see it. Save records with collection(\'…\').create() (or the SQL database) and list them from there.':'Records are not saved: a record added with the form ("'+j.token+' Test") showed on the page but was gone after reloading. Save records with collection(\'…\').create() (or the SQL database) and load the list from there, so they stay after a reload.');
+  return{errors,verified};
  });
 }
 async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
@@ -435,7 +439,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
- let lastError='',runtimeErrors=[],checkResult=null,editFailures=0;
+ let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null;
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
  let thinking='',thoughtMs=null,firstPlan=null;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
@@ -473,12 +477,12 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
   tl.add({t:'build',ok:true});
   try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\nMigrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
-  runtimeErrors=[];checkResult=null;
+  runtimeErrors=[];checkResult=null;verified=null;
   if(checkRuntime||inspect){
    onProgress('testing');
    markTesting(id,n,next);
    try{
-    if(checkRuntime){try{runtimeErrors=await runtimeProblems(id,previewUrl(meta,n),checkRuntime)}catch(e){runtimeErrors=[]}}
+    if(checkRuntime){try{const r=await runtimeProblems(id,previewUrl(meta,n),checkRuntime);runtimeErrors=r.errors;verified=r.verified}catch(e){runtimeErrors=[];verified=null}}
     // Saved checks: flows that worked before must still work (run on a test copy of the data).
     if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
    }finally{clearTesting(id,n)}
@@ -512,13 +516,13 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const message=rollback?'I could not get this change to work: after '+attempt+' tries the app still did not show (a blank page in Kairoq\'s browser). Your preview stays on version '+working.n+', which works, and this change was free. The broken try is saved as version '+n+' if you want to look at it. Try describing the change another way, or in smaller steps.':reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
   const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{})});
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{})});
   if(!rollback)fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{})});
   saveMeta(fresh);
   if(rollback)return{version:working.n,message,changed:[],attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:[],rolled_back:{tried:n,kept:working.n,errors:runtimeErrors},preview_url:previewUrl(fresh)};
-  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }

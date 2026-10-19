@@ -1395,6 +1395,8 @@ async function publishProject(id,{slug,version,force}={},{inspect,screenshot}={}
  const billing=require('./hosting-billing'),paid=billing.beforePublish(id);
  let out;try{out=hosting.publish(id,{slug,version})}catch(e){billing.refund(id,paid);throw e}
  out.billing={charged:paid.charged,paid_until:paid.paid_until||null};
+ // The live link is opened once in a real browser, so "published" means it really loads.
+ if(inspect){try{const meta=builder.loadMeta(id),r=await inspect('/sites/'+meta.published.slug+'/',{screenshot:false});const errors=(r.errors||[]).filter(e=>/^(Uncaught error|Page did not load|Blank page|HTTP 5)/.test(e));if(!r.skipped){meta.published.live_check={ok:!errors.length,errors:errors.slice(0,5),at:new Date().toISOString()};builder.saveMeta(meta);out.live_check=meta.published.live_check}}catch{}}
  // Social share image: a screenshot of the published version, taken in the background.
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;
