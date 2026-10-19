@@ -59,10 +59,15 @@ Rules:
     Live typing: pass onToken to show the reply as it arrives: await ai.chat({ messages, onToken: t => setReply(r => r + t) }).
     Structured data from text or photos (a photo of a menu or price list into items, a receipt into totals, a chat into a booking enquiry, a business card into a contact): const { data, missing } = await ai.extract({ shape:{ items:[{ name:'string', price:'number', vegan:'boolean?' }] }, image: fileFromInput, text, instructions }). Types: string, number, integer, boolean, date, email, phone; "?" = optional; [shape] = list. missing lists required fields that were not found: ask the user for them. Show what was read and let the user correct it before saving. Images up to 4 MB (needs a vision model on the server; show its error message).
     Answers about the business (a website assistant, FAQ or help chat, "ask us anything", concierge): const { text, sources } = await ai.ask(question, { history, onToken }) answers only from documents the owner adds in the Data tab under "AI assistant" (menu, prices, FAQ, policies), and says when it does not know. history is the earlier [{role:'user'|'assistant',content}] of the chat; sources is [{n,title,excerpt}] for the [n] markers in text: show them under the answer. Render text with line breaks and turn [n] into small source chips; when the answer says it does not know, offer a contact form. Add a small "Not helpful?" link under each answer that calls ai.feedback(question, false): those questions reach the owner's "could not answer" list. Optional: fallback (the text shown when the documents do not cover a question, in the site's language). In server functions: await ai.ask(question). Tell the user to add their documents in Data → AI assistant.
-  - Server functions (for API keys, calling other services, webhooks, logic that must not run in the browser): add functions/<name>.js (lowercase-name) with exactly one default export and no imports:
+  - Server functions (for API keys, calling other services, webhooks, logic that must not run in the browser): add functions/<name>.js, or functions/<name>.ts for TypeScript (lowercase-name), with exactly one default export and no imports:
       export default async function (request, { user, db, secrets, fetch, ai, email, crypto, log }) { ...; return { status: 200, json: {...} }; }
     request = { method, query, headers, body (parsed JSON), rawBody }; user is the signed-in user or null. db.collection('name').list/get/create/update/remove run with full access, so check user and validate input yourself. secrets.get('STRIPE_KEY') reads secrets the owner adds in Settings (never put keys in src/). fetch can only reach public https/http hosts. crypto has hmacSha256Hex(key,msg), sha256Hex, timingSafeEqual, randomId. Return {status, json} or {status, body, headers:{'content-type':...}}.
     Call it from the app with: import { functions } from 'kairoq'; const data = await functions.invoke('name', body). Its public URL (for webhooks from other services) is functions.url('name'); verify webhook signatures with crypto.hmacSha256Hex over request.rawBody.
+    Python instead (when the owner asks for Python, or for data work that Python does best): functions/<name>.py with
+      async def handler(request, ctx):
+          rows = await ctx.db.collection('orders').list({'limit': 50})
+          return {'status': 200, 'json': {'count': len(rows)}}
+    request is a dict (method, query, headers, body, rawBody); ctx.user, ctx.db.collection(n).list/get/create/update/remove, await ctx.db.sql('SELECT ... WHERE id = ?', [id]), await ctx.secrets.get('KEY'), r = await ctx.fetch(url, method='POST', json={...}) then r.status, r.json(), r.text; await ctx.ai.chat(messages=[...]), await ctx.email.send(to='owner', subject=..., text=...), ctx.crypto.hmac_sha256_hex(key, msg), ctx.log(...). The standard library works (json, re, datetime, math, statistics, decimal, csv, hashlib, hmac, base64, urllib.parse); no pip packages, and never import js, pyodide or ctypes. It is called the same way from the app.
   - SQL database (relational data: tables, foreign keys, joins, reports, inventory, bookings with rooms and guests): write migrations sql/001_init.sql, sql/002_add_rooms.sql, ... (SQLite syntax: CREATE TABLE, indexes, REFERENCES, CHECK). Migrations run once, in order; never change one that already ran, add a new numbered file instead. Query only from server functions: const rows = await db.sql\`SELECT * FROM rooms WHERE price <= \${max}\` (tagged template, values become parameters) or db.sql('SELECT ... WHERE id = ?', [id]); writes return {changes,lastInsertRowid}; add RETURNING * to get rows back; db.batch([[sql, params], ...]) runs several statements in one transaction. Never build SQL by joining strings with user input. Check user before reads or writes of personal data. Use collections for simple per-user lists and SQL when the data has relations.
   - Automations (the app does things on its own): "automations":[{"name":"reminders","run":"send-reminders","every":"day","at":"09:00","tz":"Europe/London"},{"name":"welcome","run":"welcome","on":"created","collection":"bookings"}]. "run" names a file in functions/; "every" is hour, day (with "at") or week (with "at" and "day": mon..sun); or "on": created|updated|deleted with a "collection". The function gets request.body = { automation, trigger, at, collection?, record? } and user = null, and must work without a signed-in user. Use them for reminders, digests, follow-up emails, cleanups and syncing with other services; an automation cannot start another one. Simpler built-ins: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
@@ -88,7 +93,7 @@ function versionDir(id,n){return path.join(projectDir(id),'versions',String(Numb
 function loadFiles(id,n){const files=readJson(path.join(versionDir(id,n),'files.json'),null);if(!files)throw Object.assign(Error('Unknown version'),{status:404});return files}
 
 // ---------- validation ----------
-function validPath(p){return typeof p==='string'&&p.length<=120&&(/^src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.(?:jsx|js|tsx|ts|css|json)$/.test(p)||/^functions\/[a-z][a-z0-9-]{0,39}\.js$/.test(p)||/^sql\/\d{3}_[a-z0-9_]{1,40}\.sql$/.test(p))&&!p.split('/').some(seg=>seg==='..'||seg.startsWith('.'))}
+function validPath(p){return typeof p==='string'&&p.length<=120&&(/^src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.(?:jsx|js|tsx|ts|css|json)$/.test(p)||/^functions\/[a-z][a-z0-9-]{0,39}\.(js|ts|py)$/.test(p)||/^sql\/\d{3}_[a-z0-9_]{1,40}\.sql$/.test(p))&&!p.split('/').some(seg=>seg==='..'||seg.startsWith('.'))}
 function resolveRelative(from,spec,files){
  const base=path.posix.normalize(path.posix.join(path.posix.dirname(from),spec));
  if(!base.startsWith('src/'))return null;
@@ -106,7 +111,7 @@ function validateFiles(files){
  let total=0;
  for(const name of names){
   const code=files[name];
-  if(!validPath(name)){errors.push('Invalid file path: '+name+' (app files go under src/ with a .jsx/.js/.css/.json extension, server functions in functions/<name>.js, SQL migrations in sql/001_name.sql).');continue}
+  if(!validPath(name)){errors.push('Invalid file path: '+name+' (app files go under src/ with a .jsx/.js/.css/.json extension, server functions in functions/<name>.js, .ts or .py, SQL migrations in sql/001_name.sql).');continue}
   if(typeof code!=='string'){errors.push(name+' must be a string.');continue}
   total+=Buffer.byteLength(code);
   if(Buffer.byteLength(code)>MAX_FILE_BYTES)errors.push(name+' is larger than 200 KB.');
@@ -447,7 +452,7 @@ async function runtimeProblems(id,url,checkRuntime){
 }
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -465,13 +470,20 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // The files a fix applies to: the request's base, then the last try that built (a fix for a
  // build or browser error changes that try; it does not start again from the base).
  let work=base;
+ // OpenCode as the engine (opencode-engine.js, KAIROQ_BUILD_ENGINE=opencode): it edits the
+ // files in a folder of its own; everything else below stays the same. Requests with images
+ // and design reviews keep Kairoq's own model, which sees pictures.
+ const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').enabled()?require('./opencode-engine'):null);
+ const ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
+ const ocRequest=(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
+ try{
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
  let thinking='',thoughtMs=null,firstPlan=null;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
   const started=Date.now();let firstToken=null;
-  const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),
+  const reply=ocSession?await ocSession.reply({files:work,prompt:attempt===1?ocRequest:messages.at(-1).content,signal}):await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),
    onToken:onStream?(_d,all)=>{if(firstToken===null)firstToken=Date.now();onStream(all,attempt)}:undefined,
    onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},parseEdit);
   if(attempt===1){thoughtMs=(firstToken||Date.now())-started;firstPlan=reply.plan}
@@ -541,7 +553,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const message=rollback?'I could not get this change to work: after '+attempt+' tries the app still did not show (a blank page in Kairoq\'s browser). Your preview stays on version '+working.n+', which works, and this change was free. The broken try is saved as version '+n+' if you want to look at it. Try describing the change another way, or in smaller steps.':reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
   const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{})});
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(ocSession?{engine:'opencode'}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{})});
   if(!rollback)fresh.current_version=n;
   const now=new Date().toISOString();
   fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{})});
@@ -553,6 +565,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
+ }finally{if(ocSession)ocSession.close()}
 }
 
 // The design review: screenshots of the current version (desktop and phone) go to the

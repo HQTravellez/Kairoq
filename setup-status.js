@@ -18,6 +18,8 @@ function items({env=process.env}={}){
   {id:'payments',label:'Customers can buy credits',ok:accounts.stripeReady(),required:false,fix:'Add KAIROQ_STRIPE_SECRET_KEY in Railway (service, Variables) to sell credits with Stripe.'},
   {id:'google',label:'Sign in with Google',ok:require('./google-oauth').configured(),required:false,fix:'Add KAIROQ_GOOGLE_CLIENT_ID and KAIROQ_GOOGLE_CLIENT_SECRET in Railway (service, Variables).'},
  ];
+ // Only when the owner chose OpenCode as the build engine: whether it is installed and has a model.
+ if(String(env.KAIROQ_BUILD_ENGINE||'').toLowerCase()==='opencode')list.push({id:'engine',label:'OpenCode writes the apps',ok:require('./opencode-engine').enabled(),required:false,fix:'In Railway add the variable KAIROQ_OPENCODE=on (it installs OpenCode when the app is built) and redeploy; OpenCode uses the same AI key as the builder.'});
  return{items:list,done:list.filter(i=>i.ok).length,total:list.length,missing_required:list.filter(i=>i.required&&!i.ok).length};
 }
 module.exports={items};

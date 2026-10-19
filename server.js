@@ -6612,6 +6612,8 @@ async function streamAppAi(body,onToken,onFirst){
 // for now), else OpenRouter. KAIROQ_BUILDER_PROVIDER=openrouter switches to OpenRouter: builds
 // in parallel, models per tier, the fast lane for small edits and live progress (it needs
 // KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true to write whole apps).
+// OpenCode as the build engine (opencode-engine.js) counts its model calls against the same budget.
+require("./opencode-engine").configure({enforceBudget,recordUsage:u=>recordUsage(u,{purpose:"developer-build",model:u.model,provider:"opencode"})});
 function builderProvider(){
   const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
   if(chosen==="openrouter"&&process.env.OPENROUTER_API_KEY)return"openrouter";

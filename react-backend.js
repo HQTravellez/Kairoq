@@ -31,7 +31,7 @@ function normalizeConfig(cfg){
  return{collections,...require('./react-backend-extras').normalizeExtras(cfg,collections)};
 }
 function configErrors(files){
- try{const cfg=parseConfig(files);for(const a of cfg.automations||[])if(!files['functions/'+a.run+'.js'])throw Error('Automation "'+a.name+'" runs "'+a.run+'", but there is no functions/'+a.run+'.js.');return[]}
+ try{const cfg=parseConfig(files);for(const a of cfg.automations||[])if(!require('./react-functions').functionFile(files,a.run))throw Error('Automation "'+a.name+'" runs "'+a.run+'", but there is no functions/'+a.run+'.js.');return[]}
  catch(e){return[e.message]}
 }
 
@@ -474,7 +474,7 @@ async function handle(req,res,{onlyProject}={}){
 // (automation: true, user null, no request to rate-limit AI by; a function started this way
 // cannot start another automation).
 async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=null,request,automation=false}){
- const files=version?builder.loadFiles(id,version):{},source=files['functions/'+name+'.js'];
+ const files=version?builder.loadFiles(id,version):{},fnFile=require('./react-functions').functionFile(files,name),source=fnFile&&require('./react-functions').runnable(fnFile,files[fnFile]);
  if(!source)throw fail(404,'Function "'+name+'" does not exist');
  const extras=require('./react-backend-extras');
  let fdb=db;
@@ -495,10 +495,10 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
  if(running>=Math.max(1,Number(process.env.KAIROQ_FUNCTION_CONCURRENCY_PER_APP||3)))throw fail(429,'This app is busy. Try again in a moment.');
  fnRunning.set(id,running+1);
  let out;
- try{out=await require('./react-functions').invoke({source,request,user:publicUser(user),host})}
- catch(e){applog.add(id,{level:'error',source:'functions/'+name+'.js',message:request.method+' '+request.path+': '+(e.message||e)});throw e}
+ try{out=fnFile.endsWith('.py')?await require('./python-functions').invoke({key:id+(sb?':'+sb.dir:''),source,request,user:publicUser(user),host}):await require('./react-functions').invoke({source,request,user:publicUser(user),host})}
+ catch(e){applog.add(id,{level:'error',source:fnFile,message:request.method+' '+request.path+': '+(e.message||e)});throw e}
  finally{const n=(fnRunning.get(id)||1)-1;if(n>0)fnRunning.set(id,n);else fnRunning.delete(id)}
- for(const line of out.logs||[])applog.add(id,{level:'log',source:'functions/'+name+'.js',message:line});
+ for(const line of out.logs||[])applog.add(id,{level:'log',source:fnFile,message:line});
  return out;
 }
 
