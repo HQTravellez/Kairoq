@@ -34,3 +34,16 @@ test('a new project is named after the business, or after the first words withou
  const long=nameFromPrompt('Build a booking page for my yoga studio with class times, prices and a sign-up form');
  assert.ok(long.length<=48&&/studio$/.test(long),long);
 });
+
+test('only small, clear edits to an existing app take the fast lane',()=>{
+ const {quickEdit}=require('../create-api');
+ const built={current_version:3},fresh={current_version:1};
+ const yes=['Make the button blue','Change the phone number to 020 7946 0000','Rename Contact to Get in touch','Make the heading bigger','Replace the hero photo'];
+ const no=['Add a booking system with a calendar','Add a login page for staff','Save the leads in the database','Build a dashboard with charts','Make the contact form email me'];
+ for(const m of yes)assert.equal(quickEdit(built,m,{mode:'build'}),true,m);
+ for(const m of no)assert.equal(quickEdit(built,m,{mode:'build'}),false,m);
+ // A first build, an attached image or another mode is never a quick edit.
+ assert.equal(quickEdit(fresh,'Make the button blue',{mode:'build'}),false);
+ assert.equal(quickEdit(built,'Make the button blue',{mode:'build',images:[{}]}),false);
+ assert.equal(quickEdit(built,'Make the button blue',{mode:'agent'}),false);
+});

@@ -6628,7 +6628,10 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   // Design work (the design brief and the screenshot review) can go to a stronger model
   // (KAIROQ_DESIGN_MODELS, e.g. Fable) first, whatever tier wrote the code.
   const designFirst=opts.design&&allowPaid?String(process.env.KAIROQ_DESIGN_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean):[];
-  const models=[...designFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  // Small, clear edits on the Standard tier ("make the button blue") go to a fast model first
+  // (KAIROQ_FAST_MODELS); the usual models follow if it fails.
+  const fastFirst=opts.fast&&allowPaid&&(!opts.tier||opts.tier==="standard")?String(process.env.KAIROQ_FAST_MODELS??"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):[];
+  const models=[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";

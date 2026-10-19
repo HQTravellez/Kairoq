@@ -41,7 +41,7 @@ async function check(url,{timeoutMs=15000}={}){
 // Clicks the app's navigation (nav, header and sidebar links and buttons, tabs) and reports
 // the ones that change nothing a person could see: no new page, no dialog, no different
 // content. Each click starts from a fresh load of the page, so one click cannot hide another.
-const MAX_DEAD_PROBES=12;
+const MAX_DEAD_PROBES=8;
 async function deadClicks(page,url){
  const targets=await page.evaluate(max=>{
   const seen=new Set(),out=[];
@@ -62,20 +62,24 @@ async function deadClicks(page,url){
   }
   return out;
  },MAX_DEAD_PROBES);
- const state=()=>page.evaluate(()=>({url:location.href,text:(document.getElementById('root')||document.body).innerText.replace(/\s+/g,' ').slice(0,20000),dialogs:document.querySelectorAll('[role=dialog],dialog[open],[aria-modal=true]').length,scroll:Math.round(scrollY),look:document.documentElement.className+'|'+document.body.className+'|'+document.querySelectorAll('[aria-expanded=true],[data-state=open],[aria-pressed=true]').length+'|'+document.querySelectorAll('*').length}));
- const dead=[];
- for(const label of targets){
+ // Each click runs in its own fresh tab, four at a time, so the check stays quick.
+ const dead=[],ctx=page.context(),queue=targets.slice();
+ async function probe(label){
+  const tab=await ctx.newPage();
+  const state=()=>tab.evaluate(()=>({url:location.href,text:(document.getElementById('root')||document.body).innerText.replace(/\s+/g,' ').slice(0,20000),dialogs:document.querySelectorAll('[role=dialog],dialog[open],[aria-modal=true]').length,scroll:Math.round(scrollY),look:document.documentElement.className+'|'+document.body.className+'|'+document.querySelectorAll('[aria-expanded=true],[data-state=open],[aria-pressed=true]').length+'|'+document.querySelectorAll('*').length}));
   try{
-   await page.goto(url,{waitUntil:'load',timeout:10000});await page.waitForTimeout(250);
+   await tab.goto(url,{waitUntil:'domcontentloaded',timeout:10000});await tab.waitForFunction(()=>{const r=document.getElementById('root');return!r||r.childElementCount>0},null,{timeout:4000}).catch(()=>{});await tab.waitForTimeout(120);
    const before=await state();
-   const loc=page.getByText(label,{exact:true}).first();
-   if(!(await loc.isVisible().catch(()=>false)))continue;
-   await loc.click({timeout:2000});await page.waitForTimeout(600);
+   const loc=tab.getByText(label,{exact:true}).first();
+   if(!(await loc.isVisible().catch(()=>false)))return;
+   await loc.click({timeout:2000});await tab.waitForTimeout(450);
    const after=await state();
    if(after.url===before.url&&after.text===before.text&&after.dialogs===before.dialogs&&after.look===before.look&&Math.abs(after.scroll-before.scroll)<20)dead.push('Clicking "'+label+'" does nothing: nothing on the page changes. Make it open its page, panel or dialog, or remove it.');
-  }catch{}
+  }catch{}finally{await tab.close().catch(()=>{})}
  }
- if(targets.length)await page.goto(url,{waitUntil:'load',timeout:10000}).catch(()=>{});
+ await Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{while(queue.length)await probe(queue.shift())}));
+ // Reported in the order of the page, whichever tab finished first.
+ dead.sort((a,b)=>targets.findIndex(t=>a.includes('"'+t+'"'))-targets.findIndex(t=>b.includes('"'+t+'"')));
  return dead;
 }
 // Saves a 1200x630 PNG of a page (used as the social share image).
