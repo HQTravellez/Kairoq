@@ -1,6 +1,6 @@
 "use strict";
-// Which service writes the apps: OpenRouter whenever its key is set; Experiential Labs only when
-// chosen (KAIROQ_BUILDER_PROVIDER=experiential) or when it is the only key.
+// Which service writes the apps: Experiential Labs whenever its key is set; OpenRouter when chosen
+// (KAIROQ_BUILDER_PROVIDER=openrouter) or when it is the only key.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('fs'),os=require('os'),path=require('path');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-provider-'));
@@ -18,15 +18,11 @@ async function providerUsed(env){
  return urls.some(u=>u.includes('experientiallabs'))?'experiential':urls.some(u=>u.includes('openrouter'))?'openrouter':'none';
 }
 
-test('with both keys set and paid models allowed, builds go to OpenRouter',async()=>{
- assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:'test-only'}),'openrouter');
-});
-test('with only free OpenRouter models allowed, Experiential writes the apps when it is configured',async()=>{
- assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:'test-only',KAIROQ_BUILDER_MODE:'free-first'}),'experiential');
- assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:'test-only',KAIROQ_BUILDER_PAID_APPROVED:'false'}),'experiential');
- assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:'test-only',KAIROQ_BUILDER_MODE:'free-first',KAIROQ_BUILDER_PROVIDER:'openrouter'}),'openrouter','an explicit choice wins');
-});
-test('Experiential is used when chosen, or when it is the only key',async()=>{
- assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:'test-only',KAIROQ_BUILDER_PROVIDER:'experiential'}),'experiential');
+test('with the Experiential key set, it writes the apps (the default for now)',async()=>{
+ assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:'test-only'}),'experiential');
  assert.equal(await providerUsed({OPENROUTER_API_KEY:undefined,EXPLABS_API_KEY:'test-only'}),'experiential');
+});
+test('OpenRouter writes the apps when chosen, or when it is the only key',async()=>{
+ assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:'test-only',KAIROQ_BUILDER_PROVIDER:'openrouter'}),'openrouter');
+ assert.equal(await providerUsed({OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:undefined}),'openrouter');
 });
