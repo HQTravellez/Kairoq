@@ -6612,10 +6612,14 @@ async function streamAppAi(body,onToken,onFirst){
 // each tier gets its own models, small edits use the fast lane and progress streams live.
 // Experiential Labs (one request at a time for the whole server, one model) only when chosen
 // with KAIROQ_BUILDER_PROVIDER=experiential, or when it is the only key there is.
+// OpenRouter with only free models allowed (paid not approved, or the free-first mode) cannot
+// write whole apps reliably; then Experiential, when configured, writes them instead.
 function builderProvider(){
   const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
   if(chosen==="experiential"&&experiential.configured())return"experiential";
-  if(chosen==="openrouter"||process.env.OPENROUTER_API_KEY)return"openrouter";
+  if(chosen==="openrouter")return"openrouter";
+  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&["paid-first","premium"].includes(String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase());
+  if(process.env.OPENROUTER_API_KEY&&(paid||!experiential.configured()))return"openrouter";
   return experiential.configured()?"experiential":"openrouter";
 }
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
