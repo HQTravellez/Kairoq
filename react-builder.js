@@ -473,8 +473,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // OpenCode as the engine (opencode-engine.js, KAIROQ_BUILD_ENGINE=opencode): it edits the
  // files in a folder of its own; everything else below stays the same. Requests with images
  // and design reviews keep Kairoq's own model, which sees pictures.
- const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').enabled()?require('./opencode-engine'):null);
- const ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
+ const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
+ let usedOpenCode=false,usedFallback=false;
  const ocRequest=(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
@@ -483,7 +484,15 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   signal?.throwIfAborted();
   onProgress(attempt===1?'writing':'fixing');
   const started=Date.now();let firstToken=null;
-  const reply=ocSession?await ocSession.reply({files:work,prompt:attempt===1?ocRequest:messages.at(-1).content,signal}):await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),
+  // If OpenCode fails (an error, no change, a model that cannot use its tools), this try and the
+  // rest of the change go to Kairoq's own engine, so a build never fails because of OpenCode.
+  let reply=null;
+  if(ocSession){
+   try{reply=await ocSession.reply({files:work,prompt:attempt===1?ocRequest:messages.at(-1).content,signal});if(!Object.keys(reply.files).length&&!reply.delete.length)throw Error('OpenCode made no change')}
+   catch(e){signal?.throwIfAborted();tl.add({t:'note',icon:'code',text:'OpenCode could not do this ('+String(e.message||e).slice(0,160)+'); Kairoq\'s own engine takes over'});ocSession.close();ocSession=null;reply=null;usedFallback=true}
+  }
+  if(ocSession)usedOpenCode=true;
+  if(!reply)reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,...(design?{design:true}:{}),
    onToken:onStream?(_d,all)=>{if(firstToken===null)firstToken=Date.now();onStream(all,attempt)}:undefined,
    onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},parseEdit);
   if(attempt===1){thoughtMs=(firstToken||Date.now())-started;firstPlan=reply.plan}
@@ -553,7 +562,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const message=rollback?'I could not get this change to work: after '+attempt+' tries the app still did not show (a blank page in Kairoq\'s browser). Your preview stays on version '+working.n+', which works, and this change was free. The broken try is saved as version '+n+' if you want to look at it. Try describing the change another way, or in smaller steps.':reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
   const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(ocSession?{engine:'opencode'}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{})});
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(usedOpenCode?{engine:'opencode'}:{}),...(usedFallback?{engine_fallback:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{})});
   if(!rollback)fresh.current_version=n;
   const now=new Date().toISOString();
   fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{})});
@@ -562,7 +571,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const adopted=!rollback&&inspect&&reply.checks.length&&!runtimeErrors.length?await adoptChecks(id,previewUrl(fresh,n),reply.checks,{inspect,version:n}).catch(()=>[]):[];
   if(adopted.length){const m=loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.tests_added=adopted;saveMeta(m)}tl.add({t:'check',ok:true,text:'Saved '+adopted.length+' new check'+(adopted.length===1?'':'s')+' for later changes: '+adopted.join(', ')})}
   if(rollback)return{version:working.n,message,changed:[],attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:[],rolled_back:{tried:n,kept:working.n,errors:runtimeErrors},preview_url:previewUrl(fresh)};
-  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,engine:usedOpenCode?'opencode':'kairoq',...(usedFallback?{engine_fallback:true}:{}),plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
  }finally{if(ocSession)ocSession.close()}

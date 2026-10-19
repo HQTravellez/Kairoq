@@ -969,7 +969,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const b=await readJson(req,16000000);
    // A sponsored template slot: what to start with comes from the slot, not the request.
    const slot=b.sponsored?require('./partners').startFromSlot(String(b.sponsored)):null;
-   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.answers?require('./clarify').withAnswers(b.prompt,b.answers):b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
+   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.answers?require('./clarify').withAnswers(b.prompt,b.answers):b.prompt,template:b.template,tier:b.tier,engine:b.engine==='opencode'?'opencode':undefined,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
@@ -1338,7 +1338,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   }
   if(action==='/settings'&&method==='GET'){
    const secrets=require('./project-secrets');
-   return send(res,200,{settings:{secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM)}}),true;
+   return send(res,200,{settings:{secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;
   }
   if(action==='/settings'&&method==='POST'){
    const b=await readJson(req,8000),secrets=require('./project-secrets');
@@ -1349,7 +1349,14 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(value&&!re.test(value))throw Object.assign(Error('That '+name.replace(/_/g,' ')+' does not look right'),{status:400});
     secrets.set(id,name,value||null);
    }
-   return send(res,200,{settings:{secrets:secrets.status(id)}}),true;
+   // Which engine writes this app's changes: Kairoq's own, or OpenCode (beta) when it is installed.
+   if(b.engine!==undefined){
+    const engine=String(b.engine);
+    if(!['kairoq','opencode'].includes(engine))throw Object.assign(Error('Unknown build engine'),{status:400});
+    if(engine==='opencode'&&!require('./opencode-engine').available())throw Object.assign(Error('OpenCode is not installed on this server (Railway variable KAIROQ_OPENCODE=on).'),{status:409});
+    const m=builder.loadMeta(id);if(engine==='opencode')m.engine='opencode';else delete m.engine;builder.saveMeta(m);
+   }
+   return send(res,200,{settings:{secrets:secrets.status(id),engine:builder.loadMeta(id).engine||'kairoq'}}),true;
   }
   if(action==='/download'&&method==='GET'){
    const meta=builder.loadMeta(id),bytes=require('./react-export').zip(id);
@@ -1424,7 +1431,7 @@ function nameFromPrompt(prompt){
  return (sp>20?cut.slice(0,sp):cut).replace(/[\s,;-]+(a|an|the|and|or|with|for|of|to|in)$/i,'').replace(/[,;\s-]+$/,'');
 }
 // A new project, started from a template and/or a first prompt (the editor and the MCP server).
-async function createProject(v,{name,prompt,template,tier='standard',images=[]}={},deps){
+async function createProject(v,{name,prompt,template,tier='standard',images=[],engine}={},deps){
  if(builder.list(v.owner).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
  prompt=String(prompt||'').trim();
  const tpl=template?require('./create-templates').get(String(template)):null;
@@ -1435,6 +1442,8 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[]}=
  if(tpl&&tpl.assistantDocs){const A=require('./app-assistant'),db=backend.database(meta.id);for(const d of tpl.assistantDocs)A.addText(db,{title:d.title,text:d.text,source:'Sample from the template: replace it with your own',kind:'text'})}
  // Mobile templates start with the mobile app setting on (phone preview, installable app).
  if(tpl&&tpl.mobile)require('./react-mobile').update(meta.id,{enabled:true,...tpl.mobile});
+ // A new app can start on OpenCode (beta) when it is installed; the setting stays with the project.
+ if(engine==='opencode'&&require('./opencode-engine').available()){const m=builder.loadMeta(meta.id);m.engine='opencode';builder.saveMeta(m)}
  const job=prompt?startJob(v,meta.id,{message:prompt,tier,images},deps):null;
  return{meta,job};
 }

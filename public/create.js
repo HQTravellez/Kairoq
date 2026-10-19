@@ -1200,6 +1200,7 @@ $('settings-open').onclick=async()=>{
   text($('gh-token-status'),gh.token?'(saved '+gh.token.hint+')':gh.owner_fallback?'(using the server GITHUB_TOKEN)':'');
   text($('stripe-hook-url'),settings.stripe_webhook_url);text($('stripe-events'),settings.stripe_events.join(', '));
   text($('email-status'),settings.email?'Email is set up. Apps can notify you with email.send({to:"owner", …}).':'Email is not set up on this server yet (KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM).');
+  const engines=settings.engines||['kairoq'];$('engine-row').classList.toggle('hidden',engines.length<2);$('engine-note').classList.toggle('hidden',engines.length<2);$('engine-select').value=settings.engine||'kairoq';
   $('gh-repo').value=gh.github?.repo||'';
   if(gh.github?.last_push)text($('gh-status'),'Last push: version '+gh.github.last_push.version+' · '+when(gh.github.last_push.at));
   if(!settings.encryption)text($('settings-error'),'Saving keys needs APP_ENCRYPTION_KEY on the server.');
@@ -1215,6 +1216,10 @@ async function saveSecrets(fields){
 $('settings-save').onclick=async()=>{
  text($('settings-error'),'');
  try{await saveSecrets([['stripe-key','stripe_secret_key'],['stripe-hook','stripe_webhook_secret']]);$('settings-open').click()}catch(err){text($('settings-error'),err.message)}
+};
+$('engine-select').onchange=async e=>{
+ text($('settings-error'),'');
+ try{await api('/projects/'+state.project.id+'/settings',{method:'POST',body:{engine:e.target.value}})}catch(err){text($('settings-error'),err.message);e.target.value='kairoq'}
 };
 $('gh-push').onclick=async()=>{
  text($('settings-error'),'');text($('gh-status'),'Pushing…');$('gh-push').disabled=true;
