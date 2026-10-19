@@ -6608,14 +6608,13 @@ async function streamAppAi(body,onToken,onFirst){
   }
   return{text,usage};
 }
-// Which service writes the apps. OpenRouter whenever its key is set: builds run in parallel,
-// each tier gets its own models, small edits use the fast lane and progress streams live.
-// Experiential Labs (one request at a time for the whole server, one model) only when chosen
-// with KAIROQ_BUILDER_PROVIDER=experiential, or when it is the only key there is.
+// Which service writes the apps: Experiential Labs whenever its key is set (the owner's choice
+// for now), else OpenRouter. KAIROQ_BUILDER_PROVIDER=openrouter switches to OpenRouter: builds
+// in parallel, models per tier, the fast lane for small edits and live progress (it needs
+// KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true to write whole apps).
 function builderProvider(){
   const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
-  if(chosen==="experiential"&&experiential.configured())return"experiential";
-  if(chosen==="openrouter"||process.env.OPENROUTER_API_KEY)return"openrouter";
+  if(chosen==="openrouter"&&process.env.OPENROUTER_API_KEY)return"openrouter";
   return experiential.configured()?"experiential":"openrouter";
 }
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){

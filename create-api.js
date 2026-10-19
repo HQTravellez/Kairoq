@@ -80,6 +80,8 @@ function findShare(token){
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],hosting:require('./hosting-billing').view(meta),urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','researching','watching']);
+// Invite-a-friend totals for the Grow panel (app-referrals.js); null when nothing can be read.
+function referralStats(id){try{return require('./app-referrals').stats(backend.database(id))}catch{return null}}
 // This server's public address, for links customers use (launch posts, posters).
 function publicOrigin(req){const env=String(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||'').replace(/\/+$/,'');if(/^https?:\/\//.test(env))return env;const host=String(req.headers.host||'localhost');return(String(req.headers['x-forwarded-proto']||'').split(',')[0]||(/^(localhost|127\.)/.test(host)?'http':'https'))+'://'+host}
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
@@ -999,7 +1001,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    builder.saveMeta(meta);return send(res,200,{project:projectView(id)}),true;
   }
   // Grow: found on Google and in AI answers (site-search.js).
-  if(action==='/grow'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{grow:{...require('./site-search').status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null}}),true}
+  if(action==='/grow'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{grow:{...require('./site-search').status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null,referrals:referralStats(id)}}),true}
   if(action==='/poster'&&method==='GET'){
    const html=require('./launch-kit').poster(builder.loadMeta(id),{origin:publicOrigin(req)});
    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:"});res.end(html);return true;
@@ -1028,7 +1030,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(b.seo){const meta=builder.loadMeta(id);meta.seo={...(meta.seo||{}),title:String(b.seo.title||'').trim().slice(0,70),description:String(b.seo.description||'').trim().slice(0,200),image:(meta.seo&&meta.seo.image)||''};builder.saveMeta(meta)}
    }
    const meta=builder.loadMeta(id);
-   return send(res,200,{grow:{...search.status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null}}),true;
+   return send(res,200,{grow:{...search.status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null,referrals:referralStats(id)}}),true;
   }
   if(action==='/members'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{members:meta.members||[]}),true}
   if(action==='/members'&&method==='POST'){

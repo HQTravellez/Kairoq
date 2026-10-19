@@ -1396,7 +1396,17 @@ function fillGrowForm(b,faq){
  const sel=$('gb-type');if(!sel.options.length)for(const [v,l] of Object.entries(GROW_TYPES))sel.append(new Option(l,v));
  $('gb-name').value=b.name||'';sel.value=b.type||'LocalBusiness';$('gb-description').value=b.description||'';$('gb-street').value=b.street||'';$('gb-city').value=b.city||'';$('gb-postal').value=b.postal||'';$('gb-country').value=b.country||'';$('gb-phone').value=b.phone||'';$('gb-email').value=b.email||'';$('gb-hours').value=(b.hours||[]).join('\n');$('gb-price').value=b.price_range||'';$('gb-faq').value=faqText(faq);
 }
+function renderReferrals(r){
+ if(!r){text($('ref-stats'),'Every customer who signs up gets a personal invite link; friends who join through it are counted here.');return}
+ text($('ref-stats'),r.joined?r.joined+' of '+r.users+' accounts joined through an invite.'+(r.top.length?' Top inviters: '+r.top.map(t=>(t.name||t.email)+' ('+t.invited+')').join(', ')+'.':''):'No one has joined through an invite yet'+(r.users?' ('+r.users+' accounts so far)':'')+'.');
+}
+$('ref-add').onclick=()=>{
+ const reward=$('ref-reward').value.trim();
+ $('publish-dialog').close();
+ send('Add an "Invite a friend" section for signed-in users, using referrals from the kairoq module: show their personal invite link with Copy and Share buttons, how many friends joined through it'+(reward?', and this reward: '+reward:'')+'. Put it where signed-in users will see it (their account or dashboard page), and add a short line about it near the sign-up form.','build');
+};
 function renderGrow(g){
+ renderReferrals(g.referrals);
  const ul=$('grow-items');ul.replaceChildren();
  for(const i of g.items){const li=el('li',i.ok?'ok':'todo');li.append(el('span','vmark',i.ok?'✓':'○'),el('span',null,i.label));ul.append(li)}
  text($('grow-pages'),g.pages.length?'Pages search engines can read: '+g.pages.map(p=>p.title||p.path).slice(0,8).join(' · ')+(g.pages.length>8?' and '+(g.pages.length-8)+' more':'')+(g.urls?' · Summary for AI: '+g.urls.path+'llms.txt':''):'Kairoq reads your live pages a minute after you publish.');
