@@ -1,6 +1,9 @@
 "use strict";
-// Live hosting is paid monthly in credits, like a hosting plan:
-// - Publishing a site charges its first 30 days (KAIROQ_HOSTING_CREDITS, default 50). Publishing
+// Live hosting is paid monthly in credits, like a hosting plan. By default it is charged only
+// when a site is really hosted for a business: on its own domain. Publishing to the free Kairoq
+// address (for testing, sharing, showing a client) costs nothing. KAIROQ_HOSTING_CHARGE=publish
+// charges every published site instead.
+// - Hosting starts with its first 30 days (KAIROQ_HOSTING_CREDITS, default 50). Publishing
 //   again, a new version or after unpublishing, costs nothing while the 30 days last.
 // - Every 30 days the owner of the project is charged again. If they do not have the credits, they
 //   get an email and the site stays live for a grace period (KAIROQ_HOSTING_GRACE_DAYS, default 7);
@@ -12,7 +15,10 @@ function intEnv(k,d){const n=Number(process.env[k]);return Number.isFinite(n)&&n
 function price(){return intEnv('KAIROQ_HOSTING_CREDITS',50)}
 function period(){return Math.max(1,intEnv('KAIROQ_HOSTING_DAYS',30))*DAY}
 function grace(){return intEnv('KAIROQ_HOSTING_GRACE_DAYS',7)*DAY}
-function billable(meta){return price()>0&&Boolean(meta.owner)&&meta.owner!=='owner'}
+function chargesOnPublish(){return process.env.KAIROQ_HOSTING_CHARGE==='publish'}
+function payer(meta){return price()>0&&Boolean(meta.owner)&&meta.owner!=='owner'}
+function ownDomain(meta){return(meta.domains||[]).length>0}
+function billable(meta){return payer(meta)&&(chargesOnPublish()||ownDomain(meta))}
 function iso(t){return new Date(t).toISOString()}
 
 // Before a publish: pays for the first 30 days unless they are already paid. Returns what was
@@ -26,6 +32,20 @@ function beforePublish(id,now=Date.now()){
  const ref='hosting:'+id+':'+now;
  try{accounts.charge(meta.owner,price(),'Live site: '+meta.name+' (30 days)',ref)}
  catch(e){if(e.status===402)throw Object.assign(Error('Putting a site live costs '+price()+' credits a month, and this account does not have enough. Buy credits, then publish again.'),{status:402});throw e}
+ meta.hosting_billing={paid_until:iso(now+period()),last_charge:iso(now)};
+ builder.saveMeta(meta);
+ return{charged:price(),paid_until:meta.hosting_billing.paid_until,ref};
+}
+// Before connecting the site's own domain: the hosting charge starts here (in the default mode).
+function beforeDomain(id,now=Date.now()){
+ const builder=require('./react-builder'),accounts=require('./builder-accounts');
+ const meta=builder.loadMeta(id);
+ if(!payer(meta)||chargesOnPublish()||ownDomain(meta))return{charged:0};
+ const b=meta.hosting_billing||{};
+ if(b.paid_until&&Date.parse(b.paid_until)>now&&!b.paused)return{charged:0,paid_until:b.paid_until};
+ const ref='hosting:'+id+':'+now;
+ try{accounts.charge(meta.owner,price(),'Hosting on your domain: '+meta.name+' (30 days)',ref)}
+ catch(e){if(e.status===402)throw Object.assign(Error('Hosting a site on your own domain costs '+price()+' credits a month, and this account does not have enough. Buy credits, then add the domain again. Your free Kairoq address keeps working.'),{status:402});throw e}
  meta.hosting_billing={paid_until:iso(now+period()),last_charge:iso(now)};
  builder.saveMeta(meta);
  return{charged:price(),paid_until:meta.hosting_billing.paid_until,ref};
@@ -78,7 +98,7 @@ async function tick(now=Date.now()){
  }
  return out;
 }
-function paused(meta){return Boolean(meta&&meta.hosting_billing&&meta.hosting_billing.paused)}
+function paused(meta){return Boolean(meta&&meta.hosting_billing&&meta.hosting_billing.paused&&billable(meta))}
 // The page visitors see while a site is paused.
 function pausedPage(res){
  res.writeHead(503,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Retry-After':'3600'});
@@ -87,6 +107,6 @@ function pausedPage(res){
 // For the publish dialog and the API.
 function view(meta){
  const b=meta.hosting_billing||{};
- return{price:billable(meta)?price():0,paid_until:b.paid_until||null,failing_since:b.failed_since||null,paused:Boolean(b.paused),grace_days:Math.round(grace()/DAY)};
+ return{price:billable(meta)?price():0,domain_price:payer(meta)&&!chargesOnPublish()?price():0,paid_until:b.paid_until||null,failing_since:b.failed_since||null,paused:Boolean(b.paused),grace_days:Math.round(grace()/DAY)};
 }
-module.exports={beforePublish,refund,tick,paused,pausedPage,view,price,billable};
+module.exports={beforePublish,beforeDomain,refund,tick,paused,pausedPage,view,price,billable};

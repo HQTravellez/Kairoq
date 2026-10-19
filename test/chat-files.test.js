@@ -5,7 +5,7 @@ const fs=require('fs'),os=require('os'),path=require('path');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-chatfiles-'));
 process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
 process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
-const {parseFiles}=require('../create-api');
+const {parseFiles,nameFromPrompt}=require('../create-api');
 const url=(type,text)=>'data:'+type+';base64,'+Buffer.from(text).toString('base64');
 
 test('text, CSV and HTML files become context for the AI, marked as data',async()=>{
@@ -25,4 +25,12 @@ test('unsupported, empty, too many or broken files are refused with a clear mess
 test('long files are cut so the message stays a sensible size',async()=>{
  const c=await parseFiles([{name:'big.txt',dataUrl:url('text/plain','word '.repeat(10000))}]);
  assert.ok(c.length<21000);assert.match(c,/the rest of the file was left out/);
+});
+
+test('a new project is named after the business, or after the first words without cutting one',()=>{
+ assert.equal(nameFromPrompt('A one-page website for a small bakery called Rosa Bakery: hero, three breads with prices.'),'Rosa Bakery');
+ assert.equal(nameFromPrompt('Website for my hotel named Casa Azul in Lisbon'),'Casa Azul');
+ assert.equal(nameFromPrompt('A CRM to track leads, deals and follow-ups'),'A CRM to track leads, deals and follow-ups');
+ const long=nameFromPrompt('Build a booking page for my yoga studio with class times, prices and a sign-up form');
+ assert.ok(long.length<=48&&/studio$/.test(long),long);
 });

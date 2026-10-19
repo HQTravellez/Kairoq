@@ -33,9 +33,50 @@ async function check(url,{timeoutMs=15000}={}){
   await page.waitForTimeout(500);
   const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))});
   if(blank)add('Blank page: nothing rendered inside #root.');
+  if(!blank&&process.env.KAIROQ_DEAD_CLICKS!=='off'){for(const d of await deadClicks(page,url).catch(()=>[]))add(d)}
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
  return{skipped:false,errors};
+}
+// Clicks the app's navigation (nav, header and sidebar links and buttons, tabs) and reports
+// the ones that change nothing a person could see: no new page, no dialog, no different
+// content. Each click starts from a fresh load of the page, so one click cannot hide another.
+const MAX_DEAD_PROBES=12;
+async function deadClicks(page,url){
+ const targets=await page.evaluate(max=>{
+  const seen=new Set(),out=[];
+  const els=document.querySelectorAll('nav a, nav button, header a, header button, aside a, aside button, [role=tab], [role=tablist] button, [role=navigation] a, [role=navigation] button');
+  for(const e of els){
+   const r=e.getBoundingClientRect(),label=(e.innerText||e.getAttribute('aria-label')||'').replace(/\s+/g,' ').trim().slice(0,40);
+   if(r.width<4||r.height<4||!label||seen.has(label))continue;
+   const href=e.getAttribute('href')||'';
+   // Links to other sites, mail and phone are not part of the app.
+   if(/^(https?:|mailto:|tel:)/i.test(href)&&!href.startsWith(location.origin))continue;
+   // A link to the page already open (Home on the home page, the logo) rightly changes nothing;
+   // a bare "#" is a placeholder and is still checked.
+   if(href&&href!=='#'){try{const t=new URL(href,location.href),route=u=>u.pathname+(u.hash.replace(/^#\/?$/,'')||'');if(route(t)===route(location))continue}catch{}}
+   // Form buttons need the form filled in first (the browser asks for the missing fields).
+   if(e.closest('form')||e.type==='submit')continue;
+   if(e.disabled||e.getAttribute('aria-disabled')==='true'||e.getAttribute('aria-current')==='page'||e.getAttribute('aria-selected')==='true')continue;
+   seen.add(label);out.push(label);if(out.length>=max)break;
+  }
+  return out;
+ },MAX_DEAD_PROBES);
+ const state=()=>page.evaluate(()=>({url:location.href,text:(document.getElementById('root')||document.body).innerText.replace(/\s+/g,' ').slice(0,20000),dialogs:document.querySelectorAll('[role=dialog],dialog[open],[aria-modal=true]').length,scroll:Math.round(scrollY),look:document.documentElement.className+'|'+document.body.className+'|'+document.querySelectorAll('[aria-expanded=true],[data-state=open],[aria-pressed=true]').length+'|'+document.querySelectorAll('*').length}));
+ const dead=[];
+ for(const label of targets){
+  try{
+   await page.goto(url,{waitUntil:'load',timeout:10000});await page.waitForTimeout(250);
+   const before=await state();
+   const loc=page.getByText(label,{exact:true}).first();
+   if(!(await loc.isVisible().catch(()=>false)))continue;
+   await loc.click({timeout:2000});await page.waitForTimeout(600);
+   const after=await state();
+   if(after.url===before.url&&after.text===before.text&&after.dialogs===before.dialogs&&after.look===before.look&&Math.abs(after.scroll-before.scroll)<20)dead.push('Clicking "'+label+'" does nothing: nothing on the page changes. Make it open its page, panel or dialog, or remove it.');
+  }catch{}
+ }
+ if(targets.length)await page.goto(url,{waitUntil:'load',timeout:10000}).catch(()=>{});
+ return dead;
 }
 // Saves a 1200x630 PNG of a page (used as the social share image).
 async function screenshot(url,file){
@@ -429,4 +470,4 @@ async function renderHtml(html,{width,height}){
  }finally{await context.close().catch(()=>{})}
 }
 async function close(){for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
-module.exports={check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
+module.exports={deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};

@@ -1335,7 +1335,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot});
    return send(res,200,{project:projectView(id)}),true}
   if(action==='/unpublish'&&method==='POST'){hosting.unpublish(id);return send(res,200,{project:projectView(id)}),true}
-  if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);await hosting.addDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
+  if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);const billing=require('./hosting-billing'),paid=billing.beforeDomain(id);try{await hosting.addDomain(id,b.hostname)}catch(e){billing.refund(id,paid);throw e}return send(res,200,{project:projectView(id)}),true}
   if(action==='/verify'&&method==='POST'){const b=await readJson(req,2000);const r=await hosting.verifyDomain(id,b.hostname);return send(res,200,{verified:r.verified,error:r.error,project:projectView(id)}),true}
   if(action==='/domains'&&method==='DELETE'){const b=await readJson(req,2000);await hosting.removeDomain(id,b.hostname);return send(res,200,{project:projectView(id)}),true}
   return send(res,404,{error:'Route not found'}),true;
@@ -1346,13 +1346,25 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  }
 }
 
+// A short project name from the first prompt: the business's own name when the prompt gives one
+// ("… called Rosa Bakery", "… named Casa Lume", "… for Trattoria Lume:"), otherwise the first
+// words, cut at a word and never in the middle of one.
+function nameFromPrompt(prompt){
+ const t=String(prompt||'').replace(/\s+/g,' ').trim();if(!t)return'';
+ const named=/\b(?:called|named)\s+["“']?([A-Z0-9][\w'&.-]*(?:\s+[A-Z0-9&][\w'&.-]*){0,4})/.exec(t);
+ if(named)return named[1].replace(/[.,:;!?'"”]+$/,'').slice(0,60);
+ const first=t.split(/[.\n:!?]/)[0].trim();
+ if(first.length<=48)return first;
+ const cut=first.slice(0,48),sp=cut.lastIndexOf(' ');
+ return (sp>20?cut.slice(0,sp):cut).replace(/[\s,;-]+(a|an|the|and|or|with|for|of|to|in)$/i,'').replace(/[,;\s-]+$/,'');
+}
 // A new project, started from a template and/or a first prompt (the editor and the MCP server).
 async function createProject(v,{name,prompt,template,tier='standard',images=[]}={},deps){
  if(builder.list(v.owner).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
  prompt=String(prompt||'').trim();
  const tpl=template?require('./create-templates').get(String(template)):null;
  if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
- const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:prompt.split(/[.\n]/)[0].slice(0,60))||'Untitled app',owner:v.owner});
+ const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:nameFromPrompt(prompt))||'Untitled app',owner:v.owner});
  if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
  else await builder.initialize(meta);
  if(tpl&&tpl.assistantDocs){const A=require('./app-assistant'),db=backend.database(meta.id);for(const d of tpl.assistantDocs)A.addText(db,{title:d.title,text:d.text,source:'Sample from the template: replace it with your own',kind:'text'})}
@@ -1372,4 +1384,4 @@ async function publishProject(id,{slug,version,force}={},{inspect,screenshot}={}
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;
 }
-module.exports={handle,parseFiles,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
+module.exports={handle,parseFiles,nameFromPrompt,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
