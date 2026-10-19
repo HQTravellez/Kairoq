@@ -67,7 +67,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/grow':'editor','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -80,6 +80,8 @@ function findShare(token){
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],hosting:require('./hosting-billing').view(meta),urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','researching','watching']);
+// This server's public address, for links customers use (launch posts, posters).
+function publicOrigin(req){const env=String(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||'').replace(/\/+$/,'');if(/^https?:\/\//.test(env))return env;const host=String(req.headers.host||'localhost');return(String(req.headers['x-forwarded-proto']||'').split(',')[0]||(/^(localhost|127\.)/.test(host)?'http':'https'))+'://'+host}
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
@@ -997,7 +999,11 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    builder.saveMeta(meta);return send(res,200,{project:projectView(id)}),true;
   }
   // Grow: found on Google and in AI answers (site-search.js).
-  if(action==='/grow'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{grow:{...require('./site-search').status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null}}),true}
+  if(action==='/grow'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{grow:{...require('./site-search').status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null}}),true}
+  if(action==='/poster'&&method==='GET'){
+   const html=require('./launch-kit').poster(builder.loadMeta(id),{origin:publicOrigin(req)});
+   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:"});res.end(html);return true;
+  }
   if(action==='/grow'&&method==='POST'){
    const b=await readJson(req,40000),search=require('./site-search');
    if(b.op==='refresh'){
@@ -1005,6 +1011,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     const meta=builder.loadMeta(id);if(!meta.published)throw Object.assign(Error('Publish the app first.'),{status:409});
     if(!renderSite)throw Object.assign(Error('Reading the live pages needs a browser on this server.'),{status:503});
     await search.snapshot(id,{renderSite,base:'/sites/'+meta.published.slug+'/'});
+   }else if(b.op==='kit'){
+    limitedKey('grow-kit:'+id,10,3600000);
+    const price=intEnv('KAIROQ_DISCUSS_CREDITS',1),ref='kit:'+id+':'+Date.now();
+    if(v.kind==='customer'&&price>0)accounts.charge(v.account.id,price,'Launch kit','grow-'+ref);
+    try{return send(res,200,{kit:await require('./launch-kit').write(builder.loadMeta(id),{callModel,origin:publicOrigin(req)}),credits:v.kind==='customer'?price:0}),true}
+    catch(e){if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: launch kit failed','grow-refund-'+ref)}catch{}throw e}
    }else if(b.op==='suggest'){
     limitedKey('grow-suggest:'+id,10,3600000);
     const price=intEnv('KAIROQ_DISCUSS_CREDITS',1);
@@ -1016,7 +1028,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(b.seo){const meta=builder.loadMeta(id);meta.seo={...(meta.seo||{}),title:String(b.seo.title||'').trim().slice(0,70),description:String(b.seo.description||'').trim().slice(0,200),image:(meta.seo&&meta.seo.image)||''};builder.saveMeta(meta)}
    }
    const meta=builder.loadMeta(id);
-   return send(res,200,{grow:{...search.status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null}}),true;
+   return send(res,200,{grow:{...search.status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null}}),true;
   }
   if(action==='/members'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{members:meta.members||[]}),true}
   if(action==='/members'&&method==='POST'){

@@ -44,6 +44,8 @@ function withContent(html,meta,rel){
  return html.replace('<div id="root"></div>',()=>'<div id="root">'+page.html+'</div>');
 }
 function pages(meta){const s=read(meta);return s?s.pages.map(p=>p.path):[]}
+// The live pages' text, for writing about the business (suggestions, launch kit).
+function pageText(meta,max=9000){const s=read(meta);return s&&s.pages.length?s.pages.map(p=>'## '+(p.h1||p.title||p.path)+'\n'+p.text).join('\n\n').slice(0,max):''}
 
 // ---------- the business, described for search engines and AI assistants ----------
 const TYPES=['LocalBusiness','Restaurant','CafeOrCoffeeShop','Bakery','Hotel','BedAndBreakfast','LodgingBusiness','TouristTrip','TravelAgency','HealthAndBeautySalon','HairSalon','DaySpa','SportsActivityLocation','ExerciseGym','MedicalBusiness','Physiotherapy','Dentist','Store','ProfessionalService','RealEstateAgent','EducationalOrganization','Event','SoftwareApplication','Organization'];
@@ -106,8 +108,7 @@ Answers are 1 to 3 sentences, in the language of the site.
 Respond with ONLY JSON: {"seo":{"title":"…(max 60 characters)","description":"…(max 155 characters)"},"business":{"type":"","name":"","description":"","street":"","city":"","postal":"","country":"","phone":"","email":"","hours":[],"price_range":""},"faq":[{"q":"","a":""}]}`;
 // Suggestions from the site's own text; the owner reviews them before they are saved.
 async function suggest(meta,{callModel,tier='standard',signal}){
- const snap=read(meta);
- const text=snap&&snap.pages.length?snap.pages.map(p=>'## '+(p.h1||p.title||p.path)+'\n'+p.text).join('\n\n').slice(0,9000):'';
+ const text=pageText(meta);
  if(!text)throw Object.assign(Error('Publish the app first: the suggestions come from what the live pages show.'),{status:409});
  const v=await callModel({messages:[{role:'system',content:SUGGEST},{role:'user',content:'Site name: '+meta.name+'\n\n'+text}],tier,temperature:0.2,maxOutputTokens:1800,signal,purpose:'seo'},c=>{const t=String(c).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');return JSON.parse(t.slice(a,b+1))});
  return{seo:{title:clip(v&&v.seo&&v.seo.title,70),description:clip(v&&v.seo&&v.seo.description,200)},business:cleanBusiness(v&&v.business),faq:cleanFaq(v&&v.faq)};
@@ -119,4 +120,4 @@ function save(id,{business,faq}){
  builder.saveMeta(meta);
  return meta;
 }
-module.exports={snapshot,withContent,pages,jsonLd,llmsTxt,status,suggest,save,cleanBusiness,cleanFaq,cleanHtml,normalPath,TYPES};
+module.exports={snapshot,withContent,pages,pageText,jsonLd,llmsTxt,status,suggest,save,cleanBusiness,cleanFaq,cleanHtml,normalPath,TYPES};

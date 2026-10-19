@@ -1403,8 +1403,25 @@ function renderGrow(g){
 }
 async function loadGrow(){
  const p=state.project;$('grow').classList.toggle('hidden',!p.published);if(!p.published)return;
- const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);text($('grow-status'),'');
+ $('kit-poster').href='/api/create/projects/'+p.id+'/poster';
+ const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);renderKit(grow.kit);text($('grow-status'),'');text($('kit-status'),'');
 }
+// The launch kit: each text with a Copy button.
+function renderKit(kit){
+ const box=$('kit');box.replaceChildren();if(!kit)return;
+ const items=[['Instagram',kit.instagram],['Google Business',kit.google_business],['WhatsApp',kit.whatsapp],['Facebook',kit.facebook],['LinkedIn',kit.linkedin],['Email to your customers',kit.email&&kit.email.body?'Subject: '+kit.email.subject+'\n\n'+kit.email.body:'']];
+ for(const [name,body] of items){
+  if(!body)continue;
+  const card=el('div','kit-card'),head=el('div','kit-head');head.append(el('strong',null,name));
+  const copy=el('button','link-btn','Copy');copy.type='button';copy.onclick=async()=>{try{await navigator.clipboard.writeText(body);copy.textContent='Copied'}catch{copy.textContent='Select and copy'}setTimeout(()=>copy.textContent='Copy',1600)};
+  head.append(copy);card.append(head,el('pre','kit-text',body));box.append(card);
+ }
+}
+$('kit-write').onclick=async()=>{
+ const b=$('kit-write');b.disabled=true;text($('kit-status'),'Writing from your live pages…');
+ try{const {kit,credits}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{op:'kit'}});renderKit(kit);text($('kit-status'),'Ready'+(credits?' ('+credits+' credit'+(credits===1?'':'s')+')':'')+'. Check each text before posting.')}
+ catch(err){text($('kit-status'),err.message)}finally{b.disabled=false}
+};
 $('grow-suggest').onclick=async()=>{
  const b=$('grow-suggest');b.disabled=true;text($('grow-status'),'Reading your pages…');$('grow-details').open=true;
  try{const {suggestion:s,credits}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{op:'suggest'}});fillGrowForm(s.business,s.faq);if(s.seo&&s.seo.title&&!$('seo-title').value)$('seo-title').value=s.seo.title;if(s.seo&&s.seo.description&&!$('seo-description').value)$('seo-description').value=s.seo.description;text($('grow-status'),'Filled in from what your pages say'+(credits?' ('+credits+' credit'+(credits===1?'':'s')+')':'')+'. Check it, add anything missing, then Save.')}

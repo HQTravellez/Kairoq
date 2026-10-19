@@ -52,3 +52,18 @@ test('suggestions come only from the live pages and are cleaned',async()=>{
  assert.match(seen,/Fresh pasta every morning/);
  assert.equal(s.business.type,'LocalBusiness','an unknown type falls back');assert.deepEqual(s.business.hours,['Tu-Su 17:00-22:00']);assert.equal(s.faq.length,1);
 });
+
+test('the launch kit is written from the live pages, links to the live site, and the poster prints a QR code',async()=>{
+ const kit=require('../launch-kit');
+ const pub=builder.list('owner').find(m=>m.name==='Lume');
+ let prompt='';
+ const k=await kit.write(builder.loadMeta(pub.id),{origin:'https://kairoq.example',callModel:async(o,parse)=>{prompt=o.messages[1].content;return parse(JSON.stringify({instagram:'Fresh pasta {link} #porto',whatsapp:'New site',email:{subject:'Book online',body:'Hi {link}'},poster:{headline:'Book <your> table',line:'Scan'}}))}});
+ assert.match(prompt,/Fresh pasta every morning/,'written from the live pages');
+ assert.equal(k.instagram,'Fresh pasta https://kairoq.example/sites/lume-test/ #porto');
+ assert.equal(k.whatsapp,'New site\nhttps://kairoq.example/sites/lume-test/','a text without the link gets it added');
+ assert.deepEqual(builder.loadMeta(pub.id).launch_kit.poster,{headline:'Book <your> table',line:'Scan'});
+ const html=kit.poster(builder.loadMeta(pub.id),{origin:'https://kairoq.example'});
+ assert.match(html,/<svg/);assert.match(html,/Book &lt;your&gt; table/);assert.match(html,/kairoq\.example\/sites\/lume-test\//);
+ const draft=builder.create({name:'Draft',owner:'owner'});
+ assert.throws(()=>kit.poster(builder.loadMeta(draft.id)),/Publish the app first/);
+});
