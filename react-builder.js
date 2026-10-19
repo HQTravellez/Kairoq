@@ -432,6 +432,23 @@ async function adoptChecks(id,url,raw,{inspect,version}){
  }
  return out;
 }
+// OpenCode's kairoq_check: the folder's files built and opened in the browser the same way as
+// a finished change (a scratch version, removed afterwards; SQL migrations wait for the change).
+let selfChecks=0;
+async function selfCheck(id,meta,files,checkRuntime){
+ const errors=checkProject(files);
+ if(errors.length)return'These problems stop the build:\n- '+errors.slice(0,12).join('\n- ');
+ const n=900000+(++selfChecks),dir=versionDir(id,n);
+ try{
+  try{await build(files,path.join(dir,'dist'),{projectId:id})}catch(e){if(!e.build)throw e;return'The Vite build failed:\n'+String(e.message).slice(0,3000)}
+  if(!checkRuntime)return'The build passed. There is no browser test on this server.';
+  markTesting(id,n,files);
+  try{
+   const r=await runtimeProblems(id,previewUrl(meta,n),checkRuntime);
+   return r.errors.length?'The app built, but opening it in a browser showed these problems:\n- '+r.errors.join('\n- '):'All checks passed: the app builds and opens on desktop and phone'+(r.verified&&r.verified.saves?', and a record added like a customer was saved':'')+'.';
+  }finally{clearTesting(id,n)}
+ }finally{fs.rmSync(dir,{recursive:true,force:true})}
+}
 // Errors that mean the app does not show at all.
 function brokenError(e){return /^(Blank page|Page did not load)/.test(String(e))}
 // The browser check runs on a test copy of the app's data and adds a record the way a customer
@@ -474,7 +491,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // files in a folder of its own; everything else below stays the same. Requests with images
  // and design reviews keep Kairoq's own model, which sees pictures.
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
- let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),check:files=>selfCheck(id,meta,files,checkRuntime),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
  let usedOpenCode=false,usedFallback=false;
  const ocRequest=(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{

@@ -109,3 +109,63 @@ test('a project can choose OpenCode; when OpenCode fails, Kairoq\'s own engine f
   assert.ok(r.timeline.some(e=>/OpenCode could not do this \(OpenCode stopped: model does not support tools\)/.test(e.text||'')),JSON.stringify(r.timeline));
  }finally{delete process.env.KAIROQ_OPENCODE_BIN;delete process.env.EXPLABS_API_KEY}
 });
+
+// kairoq_check: OpenCode asks Kairoq to build and browser-test the folder while it works.
+test('kairoq_check builds and tests the files in progress, and OpenCode fixes what it reports',async()=>{
+ const route=http.createServer(async(q,r)=>{try{const report=await engine.runCheck(String(q.headers.authorization||'').replace(/^Bearer\s+/i,''));r.end(JSON.stringify({report}))}catch(e){r.statusCode=e.status||500;r.end(JSON.stringify({error:e.message}))}});
+ await new Promise(r=>route.listen(0,'127.0.0.1',r));
+ // The stand-in writes broken JSX, asks for a check, reads the report and fixes it.
+ const SELF=path.join(tmp,'opencode-selfcheck');
+ fs.writeFileSync(SELF,`#!/usr/bin/env node
+const fs=require('fs'),path=require('path');
+const a=process.argv.slice(2),dir=a[a.indexOf('--dir')+1],file=path.join(dir,'src/App.jsx');
+const out=o=>process.stdout.write(JSON.stringify({sessionID:'ses_self',...o})+'\\n');
+const check=async()=>{const r=await fetch(process.env.KAIROQ_CHECK_URL,{method:'POST',headers:{authorization:'Bearer '+process.env.KAIROQ_CHECK_TOKEN},body:'{}'});return (await r.json()).report};
+(async()=>{
+ fs.writeFileSync(file,'export default function App(){return <main><h1>Oops</main>}\\n');
+ const first=await check();
+ fs.appendFileSync(${JSON.stringify(path.join(tmp,'reports.txt'))},first+'\\n---\\n');
+ fs.writeFileSync(file,'export default function App(){return <main><h1>Checked by Kairoq</h1></main>}\\n');
+ const second=await check();
+ fs.appendFileSync(${JSON.stringify(path.join(tmp,'reports.txt'))},second+'\\n---\\n');
+ out({type:'tool_use',part:{tool:'kairoq_check',state:{status:'completed',input:{}}}});
+ out({type:'step_finish',part:{tokens:{input:500,output:100},cost:0}});
+ out({type:'text',part:{text:'Fixed the heading after the check.'}});
+})();
+`,{mode:0o755});
+ process.env.KAIROQ_OPENCODE_BIN=SELF;process.env.EXPLABS_API_KEY='test-key';
+ engine.configure({enforceBudget:null,recordUsage:null,checkUrl:'http://127.0.0.1:'+route.address().port+'/'});
+ try{
+  const meta=builder.create({name:'Self',owner:'owner'});await builder.initialize(meta);
+  const m=builder.loadMeta(meta.id);m.engine='opencode';builder.saveMeta(m);
+  const r=await builder.edit(meta.id,'add a heading',{callModel:()=>{throw Error('Kairoq model must not be called')},checkRuntime:async()=>({errors:[]})});
+  assert.equal(r.attempts,1,'fixed inside OpenCode, before handing back');assert.equal(r.engine,'opencode');
+  assert.match(builder.loadFiles(meta.id,r.version)['src/App.jsx'],/Checked by Kairoq/);
+  const [first,second]=fs.readFileSync(path.join(tmp,'reports.txt'),'utf8').split('\n---\n');
+  assert.match(first,/The Vite build failed/);
+  assert.match(second,/All checks passed/);
+  assert.ok(!fs.readdirSync(path.join(builder.projectDir(meta.id),'versions')).some(n=>Number(n)>=900000),'scratch builds are removed');
+  await assert.rejects(engine.runCheck('not-a-token'),/Unknown check/);
+ }finally{route.close();engine.configure({checkUrl:null});delete process.env.KAIROQ_OPENCODE_BIN;delete process.env.EXPLABS_API_KEY}
+});
+
+test('the real OpenCode program finds and calls kairoq_check',{skip:!process.env.KAIROQ_TEST_OPENCODE_BIN&&'set KAIROQ_TEST_OPENCODE_BIN to run OpenCode itself'},async()=>{
+ const offered=[];
+ const model=http.createServer((q,r)=>{let b='';q.on('data',c=>b+=c);q.on('end',()=>{
+  const j=JSON.parse(b||'{}'),tools=(j.tools||[]).map(t=>t.function&&t.function.name),result=(j.messages||[]).find(m=>m.role==='tool');if(tools.length)offered.push(tools);
+  r.writeHead(200,{'Content-Type':'text/event-stream'});const send=o=>r.write('data: '+JSON.stringify({id:'c',object:'chat.completion.chunk',created:1,model:j.model,...o})+'\n\n');
+  if(tools.includes('kairoq_check')&&!result)send({choices:[{index:0,delta:{role:'assistant',tool_calls:[{index:0,id:'call_k',type:'function',function:{name:'kairoq_check',arguments:'{}'}}]},finish_reason:'tool_calls'}],usage:{prompt_tokens:100,completion_tokens:5}});
+  else send({choices:[{index:0,delta:{role:'assistant',content:result?'The check said: '+String(typeof result.content==='string'?result.content:JSON.stringify(result.content)):'Title'},finish_reason:'stop'}],usage:{prompt_tokens:100,completion_tokens:5}});
+  r.end('data: [DONE]\n\n');
+ })});
+ const route=http.createServer(async(q,r)=>{try{r.end(JSON.stringify({report:await engine.runCheck(String(q.headers.authorization||'').replace(/^Bearer\s+/i,''))}))}catch(e){r.statusCode=404;r.end('{}')}});
+ await new Promise(r=>model.listen(0,'127.0.0.1',r));await new Promise(r=>route.listen(0,'127.0.0.1',r));
+ Object.assign(process.env,{KAIROQ_OPENCODE_BIN:process.env.KAIROQ_TEST_OPENCODE_BIN,EXPLABS_API_KEY:'test-key',KAIROQ_OPENCODE_BASE_URL:'http://127.0.0.1:'+model.address().port+'/v1',KAIROQ_OPENCODE_MODEL:'m1',NO_PROXY:'127.0.0.1,localhost'});
+ engine.configure({checkUrl:'http://127.0.0.1:'+route.address().port+'/'});
+ let checked=0;const s=engine.session({rules:engine.rules('Rules.'),check:async files=>{checked++;return 'REPORT-OK-123 for '+Object.keys(files).join(',')}});
+ try{
+  const r=await s.reply({files:{'src/App.jsx':'export default function App(){return null}\n'},prompt:'Check the app'});
+  assert.equal(checked,1);assert.ok(offered.some(t=>t.includes('kairoq_check')),'the tool is offered: '+JSON.stringify(offered[0]));
+  assert.match(r.message,/REPORT-OK-123 for src\/App\.jsx/);
+ }finally{s.close();model.close();route.close();engine.configure({checkUrl:null});for(const k of ['KAIROQ_OPENCODE_BIN','EXPLABS_API_KEY','KAIROQ_OPENCODE_BASE_URL','KAIROQ_OPENCODE_MODEL'])delete process.env[k]}
+});

@@ -41,7 +41,38 @@ function config(m){
 }
 // OpenCode's own home (its plugin library is installed there once): on the data volume when
 // there is one, so it survives deploys.
-function home(){const d=path.join(path.dirname(require('./react-builder').ROOT()),'opencode-home');fs.mkdirSync(d,{recursive:true});return d}
+function home(){const d=path.join(path.dirname(require('./react-builder').ROOT()),'opencode-home');fs.mkdirSync(d,{recursive:true});writeTools(d);return d}
+
+// ---------- Kairoq's tools inside OpenCode ----------
+// kairoq_check: OpenCode calls it while it works; Kairoq builds the folder's files and opens
+// the app in its browser (desktop and phone, a test copy of the data, adding a record like a
+// customer), and the tool returns what is wrong. OpenCode fixes that before it hands back.
+// The tool calls the Kairoq server on this machine with a secret that is valid for one change.
+const checks=new Map();// token -> async () => report text
+const crypto=require('crypto');
+function checkUrl(){return hooks.checkUrl||null}
+async function runCheck(token){const fn=checks.get(String(token||''));if(!fn)throw Object.assign(Error('Unknown check'),{status:404});return fn()}
+const TOOL=`// Written by Kairoq (opencode-engine.js). Builds and tests the app the way Kairoq will.
+export default {
+  description: "Build this app and test it in a real browser the way Kairoq will before the change is saved: desktop and phone, with test data, adding a record like a customer. Returns the problems to fix, or that everything passed. Call it after your changes, fix everything it reports, and call it again.",
+  args: {},
+  async execute() {
+    const url = process.env.KAIROQ_CHECK_URL, token = process.env.KAIROQ_CHECK_TOKEN
+    if (!url || !token) return "kairoq_check is not available here."
+    try {
+      const r = await fetch(url, { method: "POST", headers: { authorization: "Bearer " + token, "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(300000) })
+      const j = await r.json().catch(() => ({}))
+      return String(j.report || j.error || ("Check failed with HTTP " + r.status))
+    } catch (e) { return "kairoq_check could not run: " + String(e && e.message || e) }
+  },
+}
+`;
+function writeTools(h){
+ const dir=path.join(h,'config','opencode','tools');fs.mkdirSync(dir,{recursive:true});
+ const f=path.join(dir,'kairoq_check.js');
+ try{if(fs.readFileSync(f,'utf8')===TOOL)return}catch{}
+ fs.writeFileSync(f,TOOL);
+}
 
 // ---------- files ----------
 const SKIP=new Set(['node_modules','.git','.opencode','dist']);
@@ -63,10 +94,16 @@ function sync(dir,files){
 
 // ---------- one build ----------
 // A session for one Kairoq change: its folder and OpenCode session live until close().
-function session({rules,onEvent=()=>{}}={}){
+// check: async (files) => report text; given, OpenCode gets the kairoq_check tool for this session.
+function session({rules,onEvent=()=>{},check=null}={}){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-oc-'));
  fs.writeFileSync(path.join(dir,RULES),rules||'');
- let sessionId=null;
+ let sessionId=null,checksRun=0;
+ const token=check&&checkUrl()?crypto.randomBytes(24).toString('hex'):null;
+ if(token)checks.set(token,async()=>{
+  if(++checksRun>Number(process.env.KAIROQ_OPENCODE_MAX_CHECKS||5))return'You have run kairoq_check '+(checksRun-1)+' times for this change; finish now and Kairoq will test the result itself.';
+  return check(readTree(dir));
+ });
  async function reply({files,prompt,signal}){
   const m=model();if(!m)throw Object.assign(Error('OpenCode has no model: set EXPLABS_API_KEY, or OPENROUTER_API_KEY with KAIROQ_BUILDER_PAID_APPROVED=true.'),{status:503});
   const bin=binary();if(!bin)throw Object.assign(Error('OpenCode is not installed on this server.'),{status:503});
@@ -75,6 +112,7 @@ function session({rules,onEvent=()=>{}}={}){
   const h=home();
   const env={PATH:process.env.PATH||'/usr/local/bin:/usr/bin:/bin',HOME:h,XDG_CONFIG_HOME:path.join(h,'config'),XDG_DATA_HOME:path.join(h,'data'),XDG_CACHE_HOME:path.join(h,'cache'),XDG_STATE_HOME:path.join(h,'state'),
    KAIROQ_OPENCODE_KEY:m.key,OPENCODE_CONFIG_CONTENT:JSON.stringify(config(m)),
+   ...(token?{KAIROQ_CHECK_URL:checkUrl(),KAIROQ_CHECK_TOKEN:token}:{}),
    OPENCODE_DISABLE_AUTOUPDATE:'1',OPENCODE_DISABLE_MODELS_FETCH:'1',OPENCODE_DISABLE_LSP_DOWNLOAD:'1',OPENCODE_DISABLE_DEFAULT_PLUGINS:'1',OPENCODE_DISABLE_CLAUDE_CODE:'1',OPENCODE_DISABLE_EXTERNAL_SKILLS:'1',OPENCODE_DISABLE_SHARE:'1',OPENCODE_DISABLE_PROJECT_CONFIG:'1'};
   for(const k of ['HTTPS_PROXY','HTTP_PROXY','NO_PROXY','https_proxy','http_proxy','no_proxy','SSL_CERT_FILE','NODE_EXTRA_CA_CERTS'])if(process.env[k])env[k]=process.env[k];
   const args=['run','--format','json','--dir',dir,'-m','kairoq/'+m.id,...(sessionId?['--session',sessionId]:[]),prompt];
@@ -108,13 +146,13 @@ function session({rules,onEvent=()=>{}}={}){
   const removed=Object.keys(files).filter(f=>!Object.hasOwn(after,f));
   return{message:String(text||'Done.').trim().slice(0,2000),files:changed,edits:{},delete:removed,plan:[],images:[],checks:[],usage:{...tokens,cost:spent}};
  }
- function close(){try{fs.rmSync(dir,{recursive:true,force:true})}catch{}}
+ function close(){if(token)checks.delete(token);try{fs.rmSync(dir,{recursive:true,force:true})}catch{}}
  return{reply,close,get dir(){return dir}};
 }
 // The builder's rules for OpenCode: the same rules Kairoq's own model gets, without the JSON
 // reply format, and how to work in the folder instead.
 function rules(systemPrompt,note=''){
  const cut=systemPrompt.indexOf('Respond with ONLY a JSON object');
- return['# Kairoq app rules','','You work in a React 18 + Vite + Tailwind CSS 3 project. Edit the files in this folder with your file tools (read, edit, write, glob, grep). There is no shell: you cannot run commands, install packages or start the app; Kairoq builds the app, opens it in a browser and tells you about any error.','When you are done, reply in one or two plain sentences for the app owner saying what you changed.','',cut>0?systemPrompt.slice(0,cut).trim():systemPrompt,note?'\n'+note.trim():''].join('\n');
+ return['# Kairoq app rules','','You work in a React 18 + Vite + Tailwind CSS 3 project. Edit the files in this folder with your file tools (read, edit, write, glob, grep). There is no shell: you cannot run commands, install packages or start the app; Kairoq builds the app, opens it in a browser and tells you about any error.','Before you finish, call the kairoq_check tool when you have it: it builds the app and tests it in a browser the way Kairoq will. Fix everything it reports and call it again, until it passes.','When you are done, reply in one or two plain sentences for the app owner saying what you changed.','',cut>0?systemPrompt.slice(0,cut).trim():systemPrompt,note?'\n'+note.trim():''].join('\n');
 }
-module.exports={enabled,available,chosenFor,configure,binary,model,session,rules,sync,readTree,VERSION};
+module.exports={enabled,available,chosenFor,configure,runCheck,binary,model,session,rules,sync,readTree,VERSION};
