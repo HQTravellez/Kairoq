@@ -77,10 +77,31 @@ async function loadHome(){
  $('verify-notice').classList.toggle('hidden',!(acct&&!acct.email_verified&&state.me.email_ready));
  // The owner is warned when a deploy would wipe everything (no persistent volume).
  $('storage-warn').classList.toggle('hidden',!(state.me.storage&&state.me.storage.persistent===false));
+ renderSetup(state.me.setup);
+ // The first build's price, before typing (the questions before it are free).
+ const firstNote=document.querySelector('#new-form .prompt-note'),std=(state.me.tiers||[]).find(t=>t.id==='standard'&&t.enabled);
+ if(firstNote)firstNote.textContent='Every change is tested in a real browser before you pay for it.'+(acct&&std?' First build: '+std.credits+' credit'+(std.credits===1?'':'s')+'; the questions before it are free.':'');
  renderTemplates($('home-templates'),id=>startFromTemplate(id),id=>startFromSponsored(id));
  homeTab(state.homeTab||'projects');
  const {projects}=await api('/projects');
  renderProjects(projects);
+}
+// The owner's setup checklist: open while something required is missing, folded once all is set.
+function renderSetup(setup){
+ const card=$('setup-card');if(!card)return;
+ card.classList.toggle('hidden',!setup);if(!setup)return;
+ $('setup-title').textContent=setup.missing_required?'Finish setting up Kairoq':'Kairoq is set up';
+ $('setup-count').textContent=setup.done+' of '+setup.total;
+ card.open=setup.missing_required>0;
+ $('setup-list').replaceChildren(...setup.items.map(i=>{
+  const li=document.createElement('li');li.className=i.ok?'ok':i.required?'missing':'optional';
+  const head=document.createElement('div');head.className='setup-item';
+  const mark=document.createElement('span');mark.className='setup-mark';mark.textContent=i.ok?'✓':i.required?'!':'○';
+  const label=document.createElement('span');label.textContent=i.label+(i.required||i.ok?'':' (optional)');
+  head.append(mark,label);li.append(head);
+  if(!i.ok){const fix=document.createElement('p');fix.className='setup-fix';fix.textContent=i.fix;li.append(fix)}
+  return li;
+ }));
 }
 function initials(name){const w=String(name||'').trim().split(/\s+/).filter(Boolean);return ((w[0]||'K')[0]+(w[1]?w[1][0]:'')).toUpperCase()}
 function renderProjects(projects){
@@ -226,7 +247,7 @@ function messageItem(m,last,index){
   const f=el('div','msg-meta');
   if(m.version)f.append(el('span','ver','v'+m.version));
   if(m.duration_ms!=null){const t=el('span');t.append(icon('clock'),secs(m.duration_ms));f.append(t)}
-  if(m.credits!=null){const t=el('span');t.append(icon('coin'),m.on_us?'on us':String(m.credits));f.append(t)}
+  if(m.credits!=null){const t=el('span');t.append(icon('coin'),creditsLabel(m));t.title='What this change cost';f.append(t)}
   if(m.attempts>1)f.append(el('span',null,'Fixed '+(m.attempts-1)+' problem'+(m.attempts>2?'s':'')));
   const det=el('button','link-btn details-link','Details');det.type='button';det.onclick=()=>openDetail(index,'timeline');f.append(det);
   li.append(f);
@@ -238,7 +259,7 @@ function messageItem(m,last,index){
 }
 function renderVersions(){
  const sel=$('versions');sel.replaceChildren();
- for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
+ for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.broken?'⚠ did not load · ':'')+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
 function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
@@ -516,8 +537,13 @@ function costHint(){
  const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
  const p=Math.max(t?t.credits:1,state.me.polish_credits||1);$('polish').title=base+' ('+p+' credit'+(p===1?'':'s')+')';
  const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
- text($('cost-hint'),n+' credit'+(n===1?'':'s'));
+ // Before sending: what this message costs, and what could come on top.
+ const img=state.mode!=='discuss'&&state.me.image_generation?.enabled&&state.me.image_generation.credits;
+ text($('cost-hint'),'This message: '+n+' credit'+(n===1?'':'s')+(img?' (+'+img+' per AI image, if it makes any)':''));
+ $('cost-hint').title=state.mode==='discuss'?'Discuss answers questions and plans; it does not change the app.':'Charged when the change is saved. A change that fails or is not kept is free, and so is the fix of a problem it causes.';
 }
+// What a message cost, for the line under it.
+function creditsLabel(m){return m.on_us?'on us':m.credits===0?'free':m.credits+' credit'+(m.credits===1?'':'s')}
 // Attachments: button, paste or drop.
 $('attach').onclick=()=>{$('menu-plus').open=false;$('attach-input').click()};
 $('attach-clip').onclick=()=>$('attach-input').click();

@@ -340,6 +340,7 @@
 <section class="screen hidden" id="home">
   <div class="home">
     <div class="storage-warn hidden" id="storage-warn" role="alert"><b>Your data is not safe yet.</b> This server has no persistent volume, so every deploy deletes all accounts, projects and published sites. In Railway: open the service, Settings, Volumes, Add volume, mount path <code>/data</code>, then redeploy. Kairoq moves its data onto the volume by itself.</div>
+    <details class="setup-card hidden" id="setup-card"><summary><span id="setup-title">Setup</span><span class="setup-count" id="setup-count"></span></summary><ul id="setup-list"></ul><p class="setup-note">Settings are added in Railway (your service, Variables), never pasted into a chat. Kairoq picks them up after the redeploy.</p></details>
     <div class="home-hero">
       <h1 id="home-title">Got an idea?</h1>
       <form id="new-form" class="prompt-box">
@@ -423,9 +424,9 @@
         </div>
         <select id="tier" aria-label="Model"></select>
         <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv,application/json,text/html" multiple hidden>
-        <span class="muted small" id="cost-hint"></span>
         <button class="primary send" id="send" type="submit" aria-label="Send"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
       </div>
+      <p class="cost-line muted small" id="cost-hint"></p>
     </form>
     <p class="error" id="chat-error" role="alert"></p>
   </aside>

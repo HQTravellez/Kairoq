@@ -1,0 +1,69 @@
+"use strict";
+// A change that leaves the app blank is not kept: the preview stays on the version that worked.
+// And Kairoq's browser adds a record like a customer would, so records that are never saved
+// (kept only in the page) are found before the owner finds them.
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('fs'),os=require('os'),path=require('path'),http=require('http');
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-rollback-'));
+process.env.NODE_ENV='test';
+process.env.KAIROQ_DESIGN_BRIEF='off';
+process.env.KAIROQ_REACT_PROJECTS_DIR=path.join(tmp,'projects');
+process.env.KAIROQ_BUILDER_ACCOUNTS_DB=path.join(tmp,'accounts.sqlite');
+const builder=require('../react-builder'),runtime=require('../runtime-check'),sandbox=require('../react-sandbox'),backend=require('../react-backend');
+
+const GOOD='export default function App(){return <main><h1>Hello</h1></main>}\n';
+const reply=obj=>(_o,parse)=>Promise.resolve(parse(JSON.stringify(obj)));
+
+test('a change that still shows a blank page after every try is not kept',async()=>{
+ const meta=builder.create({name:'Keep',owner:'owner'});await builder.initialize(meta);
+ await builder.edit(meta.id,'hello',{callModel:reply({message:'v2',files:{'src/App.jsx':GOOD}}),checkRuntime:async()=>({errors:[]})});
+ assert.equal(builder.loadMeta(meta.id).current_version,2);
+ const r=await builder.edit(meta.id,'break it',{callModel:reply({message:'v3',files:{'src/App.jsx':GOOD.replace('Hello','Bye')}}),checkRuntime:async()=>({errors:['Blank page: nothing rendered inside #root.']})});
+ const m=builder.loadMeta(meta.id);
+ assert.equal(m.current_version,2,'the working version stays');
+ assert.deepEqual(r.rolled_back.kept,2);assert.equal(r.version,2);assert.deepEqual(r.runtime_errors,[]);
+ const tried=m.versions.find(v=>v.n===r.rolled_back.tried);
+ assert.equal(tried.broken,true,'the broken try is kept in the history');
+ assert.match(m.messages.at(-1).text,/stays on version 2/);
+ // Smaller problems (a dead button) do not roll back.
+ const r2=await builder.edit(meta.id,'tweak',{callModel:reply({message:'v',files:{'src/App.jsx':GOOD.replace('Hello','Hi')}}),checkRuntime:async()=>({errors:['Clicking "Reports" does nothing: nothing on the page changes.']})});
+ assert.equal(r2.rolled_back,undefined);assert.equal(builder.loadMeta(meta.id).current_version,r2.version);
+});
+
+test('the browser check runs on a test copy, and a record shown but never saved is an error',async()=>{
+ const meta=builder.create({name:'Crm',owner:'owner'});await builder.initialize(meta);
+ const seen=[];
+ const r=await builder.edit(meta.id,'crm',{callModel:reply({message:'v',files:{'src/App.jsx':GOOD}}),checkRuntime:async(url,o)=>{seen.push(o);return{errors:[],journey:seen.length<3?{token:'Kq123456',shown:true,reloaded:false}:{token:'Kq654321',shown:true,reloaded:false}}}});
+ assert.ok(seen[0].sandbox&&seen[0].journey,'sandbox and journey are passed');
+ assert.match(JSON.stringify(builder.loadMeta(meta.id).versions.at(-1).runtime_errors||r.runtime_errors),/gone after reloading/);
+ // When the record is in the app's data, nothing is reported.
+ const m2=builder.create({name:'Crm2',owner:'owner'});await builder.initialize(m2);
+ const r2=await builder.edit(m2.id,'crm',{callModel:reply({message:'v',files:{'src/App.jsx':GOOD}}),checkRuntime:async(url,o)=>{const box=sandbox.lookup(m2.id,o.sandbox);const db=backend.openFile(path.join(box.dir,'data.sqlite'));db.prepare("INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES('r1','contacts',NULL,?,'x','x')").run(JSON.stringify({name:'Kq777777 Test'}));return{errors:[],journey:{token:'Kq777777',shown:true,reloaded:true}}}});
+ assert.deepEqual(r2.runtime_errors,[]);
+});
+
+const FORM=save=>`<!doctype html><html><body><div id="root"><h1>Contacts</h1><form id="f"><input name="name" placeholder="Name" required><input type="email" name="email" placeholder="Email"><button>Add contact</button></form><ul id="list"></ul></div><script>
+const list=document.getElementById('list');
+function draw(items){list.innerHTML='';for(const i of items){const li=document.createElement('li');li.textContent=i.name+' · '+i.email;list.append(li)}}
+${save?"draw(JSON.parse(localStorage.getItem('c')||'[]'));":"draw([]);"}
+document.getElementById('f').onsubmit=e=>{e.preventDefault();const items=[...list.children].map(li=>({name:li.textContent.split(' · ')[0],email:li.textContent.split(' · ')[1]}));items.push({name:e.target.name.value,email:e.target.email.value});${save?"localStorage.setItem('c',JSON.stringify(items));":""}draw(items);e.target.reset()};
+</script></body></html>`;
+
+test('the journey adds a record with the form and reloads',{skip:!runtime.available()&&'no Chromium'},async()=>{
+ let page='';
+ const server=http.createServer((q,r)=>{r.writeHead(200,{'Content-Type':'text/html'});r.end(page)});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const url='http://127.0.0.1:'+server.address().port+'/';
+ try{
+  page=FORM(false);
+  let r=await runtime.check(url,{journey:true});
+  assert.ok(r.journey,JSON.stringify(r));assert.equal(r.journey.shown,true);assert.equal(r.journey.reloaded,false);assert.match(r.journey.token,/^Kq\d{6}$/);
+  page=FORM(true);
+  r=await runtime.check(url,{journey:true});
+  assert.equal(r.journey.shown,true);assert.equal(r.journey.reloaded,true);
+  // A page without an add form: nothing to tell.
+  page='<!doctype html><html><body><div id="root"><h1>About us</h1></div></body></html>';
+  r=await runtime.check(url,{journey:true});
+  assert.equal(r.journey,undefined);
+ }finally{server.close();await runtime.close().catch(()=>{})}
+});
