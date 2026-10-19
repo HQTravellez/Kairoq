@@ -960,7 +960,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- projects -----
   if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
   // Before a first build: a few quick questions when the request leaves something important open (free).
-  if(route==='/clarify'&&method==='POST'){limitedKey('clarify:'+v.owner,30,3600000);const b=await readJson(req,8000);return send(res,200,{questions:process.env.KAIROQ_CLARIFY==='off'?[]:await require('./clarify').questions(b.prompt,{callModel,tier:b.tier})}),true}
+  if(route==='/clarify'&&method==='POST'){limitedKey('clarify:'+v.owner,30,3600000);const b=await readJson(req,8000);return send(res,200,{questions:process.env.KAIROQ_CLARIFY==='off'?[]:await require('./clarify').questions(b.prompt,{callModel:(o,parse)=>callModel({...o,fast:true},parse),tier:b.tier})}),true}
   if(route==='/projects'&&method==='POST'){
    const b=await readJson(req,16000000);
    // A sponsored template slot: what to start with comes from the slot, not the request.

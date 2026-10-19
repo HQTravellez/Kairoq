@@ -30,7 +30,8 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
  page.on('pageerror',e=>add('Uncaught error: '+(e.stack||e.message||e)));
  page.on('console',m=>{if(m.type()==='error'){const at=m.location()?.url;if(/Failed to load resource/.test(m.text())&&at&&!own(at))return;add('Console error: '+m.text()+(at&&/Failed to load resource/.test(m.text())?' ('+at+')':''))}});
  page.on('requestfailed',r=>{if(own(r.url()))add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')')});
- page.on('response',r=>{if(r.status()>=400&&own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())});
+ const pending=[];
+ page.on('response',r=>{if(r.status()>=400&&own(r.url()))pending.push(r.text().then(t=>{let why='';try{why=JSON.parse(t).error||''}catch{}add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url()+(why?': '+String(why).slice(0,200):''))},()=>add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())))});
  try{
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
   await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
@@ -39,6 +40,7 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
   if(blank)add('Blank page: nothing rendered inside #root.');
   if(!blank&&process.env.KAIROQ_DEAD_CLICKS!=='off'){for(const d of await deadClicks(page,url).catch(()=>[]))add(d)}
   if(!blank&&journey&&(sandbox||process.env.NODE_ENV==='test'))saved=await savesData(context,url).catch(()=>null);
+  await Promise.all(pending);
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
  return{skipped:false,errors,...(saved?{journey:saved}:{})};
@@ -49,8 +51,27 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
 // reload. The caller checks the app's database for the token (react-builder.js). Runs only on a
 // test copy of the data, and returns null whenever it cannot tell: no add form, a form that
 // leads elsewhere, a thank-you message instead of a list.
+// The button that sends a form: an explicit submit button, else the first plain button that is
+// not another way in (Google) or a switch between sign-in and sign-up.
+async function submitButton(form){
+ for(const sel of ['button[type=submit],input[type=submit]','button:not([type])']){
+  for(const b of await form.locator(sel).all()){
+   if(!(await b.isVisible().catch(()=>false)))continue;
+   const t=(await b.innerText().catch(()=>'')||await b.getAttribute('value').catch(()=>'')||'').trim();
+   if(/google|apple|facebook|github|microsoft/i.test(t))continue;
+   if(sel!=='button[type=submit],input[type=submit]'&&/^(new|already|don.?t|no account)|account\?|instead/i.test(t))continue;
+   return b;
+  }
+ }
+ return null;
+}
 async function savesData(context,url){
  const tab=await context.newPage(),visible=l=>l.isVisible().catch(()=>false);
+ // The app's own API calls that fail while a customer signs up and adds a record (a save
+ // the server refuses is the clearest sign the app keeps nothing).
+ const apiErrors=[],calls=[];
+ tab.on('response',r=>{let u;try{u=new URL(r.url())}catch{return}if(r.status()<400||!/^\/api\/apps\/[a-f0-9]{12}\//.test(u.pathname)||/\/auth\/(signin|user)$/.test(u.pathname))return;calls.push(r.text().then(t=>{let why='';try{why=JSON.parse(t).error||''}catch{}const line='HTTP '+r.status()+' from '+r.request().method()+' '+u.pathname+(why?': '+String(why).slice(0,200):'');if(!apiErrors.includes(line)&&apiErrors.length<6)apiErrors.push(line)},()=>{}))});
+ const failed=async()=>{await Promise.all(calls);return apiErrors.length?{token,shown:false,reloaded:false,api_errors:apiErrors}:null};
  const token='Kq'+String(100000+Math.floor(Math.random()*900000));
  const today=new Date().toISOString().slice(0,10),password='Kq-test-'+token+'!';
  async function fill(form,{record}){
@@ -67,8 +88,8 @@ async function savesData(context,url){
     await f.fill(v,{timeout:2000});
    }catch{}
   }
-  const btn=form.locator('button[type=submit],input[type=submit],button:not([type])').last();
-  if(await visible(btn))await btn.click({timeout:2000});else await form.evaluate(e=>e.requestSubmit()).catch(()=>{});
+  const btn=await submitButton(form);
+  if(btn)await btn.click({timeout:2000});else await form.evaluate(e=>e.requestSubmit()).catch(()=>{});
   await tab.waitForLoadState('networkidle',{timeout:4000}).catch(()=>{});await tab.waitForTimeout(900);
  }
  try{
@@ -76,7 +97,8 @@ async function savesData(context,url){
   await tab.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
   // An app behind a sign-in: create a test account first (switching the form to sign-up).
   if(await visible(tab.locator('input[type=password]').first())){
-   const submitText=await tab.locator('form:has(input[type=password])').first().locator('button[type=submit],button:not([type])').last().innerText().catch(()=>'');
+   const sb=await submitButton(tab.locator('form:has(input[type=password])').first());
+   const submitText=sb?await sb.innerText().catch(()=>''):'';
    if(!/sign ?up|create|register|join|get started/i.test(submitText)){
     const toggle=tab.locator('a,button,[role=tab]').filter({hasText:/^[^.!]{0,24}\b(sign ?up|create (an |your )?account|register|join now)\b[^.]{0,20}$/i}).first();
     if(!(await visible(toggle)))return null;
@@ -85,12 +107,12 @@ async function savesData(context,url){
    const signup=tab.locator('form:has(input[type=password])').first();
    if(!(await visible(signup)))return null;
    await fill(signup,{record:false});
-   if(await visible(tab.locator('input[type=password]').first()))return null;
+   if(await visible(tab.locator('input[type=password]').first()))return failed();
   }
   const addForm=async()=>{for(const f of await tab.locator('form').all()){if(!(await visible(f)))continue;if(await f.evaluate(e=>!e.querySelector('input[type=password],input[type=search]')&&!e.closest('[role=search]')&&e.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]),textarea').length>=1&&!/search|newsletter|subscribe/i.test(e.innerText+' '+(e.getAttribute('aria-label')||'')+' '+[...e.querySelectorAll('input')].map(i=>i.placeholder).join(' '))))return f}return null};
   let form=await addForm();
   if(!form){const add=tab.locator('button,a,[role=button]').filter({hasText:/^\s*(\+\s*)?(add|new|create)\b/i}).first();if(await visible(add)){await add.click({timeout:2000});await tab.waitForTimeout(600);form=await addForm()}}
-  if(!form)return null;
+  if(!form)return failed();
   await fill(form,{record:true});
   // Shown as a record: in a list, table or a row of similar cards, not in a thank-you or status message.
   const shown=()=>tab.evaluate(t=>{
@@ -104,10 +126,11 @@ async function savesData(context,url){
    }
    return false;
   },token).catch(()=>false);
-  if(!(await shown()))return null;
+  if(!(await shown()))return failed();
   await tab.reload({waitUntil:'load',timeout:15000});
   await tab.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});await tab.waitForTimeout(600);
-  return{token,shown:true,reloaded:await shown()};
+  const reloaded=await shown();await Promise.all(calls);
+  return{token,shown:true,reloaded,...(apiErrors.length?{api_errors:apiErrors}:{})};
  }catch{return null}
  finally{await tab.close().catch(()=>{})}
 }

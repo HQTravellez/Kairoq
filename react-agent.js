@@ -130,7 +130,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   return{text:lines.join('\n\n'),image:r.screenshot};
  }
  async function buildAndTest(a){
-  const errors=builder.validateFiles(work);
+  const errors=builder.checkProject(work);
   if(errors.length)return{text:'build_and_test: the project has problems, nothing was built:\n'+errors.slice(0,15).join('\n')};
   const n=Math.max(0,...builder.loadMeta(id).versions.map(v=>v.n))+1,dir=builder.versionDir(id,n);
   if(built&&built.dir!==dir)fs.rmSync(built.dir,{recursive:true,force:true});
@@ -171,7 +171,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    for(const name of Array.isArray(a.delete)?a.delete:[])if(typeof name==='string'&&name!=='src/main.jsx'&&name!=='src/App.jsx'&&Object.hasOwn(work,name)){delete work[name];written.push('deleted '+name)}
    if(written.length)dirty=true;
    tl.edits(before,work);
-   const problems=builder.validateFiles(work);
+   const problems=builder.checkProject(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
   if(t==='edit_files'){
@@ -180,7 +180,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
    for(const f of r.changed)tl.add({t:'edit',file:f,kind:'edited'});
    work=r.files;if(r.changed.length)dirty=true;
-   const problems=builder.validateFiles(work);
+   const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
   if(t==='build_and_test')return buildAndTest(a);

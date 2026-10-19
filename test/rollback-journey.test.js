@@ -49,6 +49,22 @@ ${save?"draw(JSON.parse(localStorage.getItem('c')||'[]'));":"draw([]);"}
 document.getElementById('f').onsubmit=e=>{e.preventDefault();const items=[...list.children].map(li=>({name:li.textContent.split(' · ')[0],email:li.textContent.split(' · ')[1]}));items.push({name:e.target.name.value,email:e.target.email.value});${save?"localStorage.setItem('c',JSON.stringify(items));":""}draw(items);e.target.reset()};
 </script></body></html>`;
 
+test('a collection the code uses must be declared, or the change is sent back before it is built',async()=>{
+ const meta=builder.create({name:'Undeclared',owner:'owner'});await builder.initialize(meta);
+ const CRM="import { collection } from 'kairoq';\nexport default function App(){collection('contacts').list();return <h1>CRM</h1>}\n";
+ const seen=[];let call=0;
+ const r=await builder.edit(meta.id,'crm',{callModel:(o,parse)=>{seen.push(o.messages.at(-1).content);return Promise.resolve(parse(JSON.stringify(call++?{message:'v',files:{'src/App.jsx':CRM,'src/backend.json':'{"collections":{"contacts":{"access":"private"}}}'}}:{message:'v',files:{'src/App.jsx':CRM}})))}});
+ assert.equal(r.attempts,2);
+ assert.match(String(seen[1]),/src\/backend\.json is missing.*"contacts"/);
+ assert.deepEqual(builder.undeclaredCollections(builder.loadFiles(meta.id,r.version)),[]);
+});
+
+test('a save the server refuses while adding a record is an error',async()=>{
+ const meta=builder.create({name:'Refused',owner:'owner'});await builder.initialize(meta);
+ const r=await builder.edit(meta.id,'crm',{callModel:reply({message:'v',files:{'src/App.jsx':GOOD}}),checkRuntime:async()=>({errors:[],journey:{token:'Kq1',shown:false,reloaded:false,api_errors:['HTTP 404 from POST /api/apps/x/collections/tasks: Collection "tasks" is not declared in src/backend.json']}})});
+ assert.match(JSON.stringify(r.runtime_errors),/Adding a record like a customer failed: HTTP 404/);
+});
+
 test('the journey adds a record with the form and reloads',{skip:!runtime.available()&&'no Chromium'},async()=>{
  let page='';
  const server=http.createServer((q,r)=>{r.writeHead(200,{'Content-Type':'text/html'});r.end(page)});

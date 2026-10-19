@@ -134,6 +134,20 @@ function validateFiles(files){
 // projects can build at once without blocking the server; 0 builds inline, one at a time.
 const BUILD_TIMEOUT_MS=Number(process.env.KAIROQ_BUILD_TIMEOUT_MS||90000);
 const pool={workers:[],queue:[],seq:0};
+// Collections the app's code uses that src/backend.json does not declare. Every read and save
+// of them fails with 404 in the browser, so the app looks finished but keeps nothing.
+function undeclaredCollections(files){
+ const used=new Set();
+ for(const [name,code] of Object.entries(files))if(name.startsWith('src/')&&/\.(jsx?|tsx?)$/.test(name)&&typeof code==='string')for(const m of code.matchAll(/\bcollection\(\s*['"`]([A-Za-z0-9_-]{1,60})['"`]\s*\)/g))used.add(m[1]);
+ if(!used.size)return[];
+ let declared={};
+ try{declared=(JSON.parse(files['src/backend.json']||'{}')||{}).collections||{}}catch(e){return['src/backend.json is not valid JSON: '+e.message]}
+ const missing=[...used].filter(c=>!Object.hasOwn(declared,c));
+ if(!missing.length)return[];
+ return[(files['src/backend.json']?'src/backend.json does not declare':'src/backend.json is missing, so it does not declare')+' the collections the app uses: '+missing.map(c=>'"'+c+'"').join(', ')+'. Without them nothing is saved (every read and save fails with 404). Add each under "collections" with its access: "private" for a signed-in user\'s own records, "shared" for a signed-in team, "public-read", "public", or "submit-only" for public forms.'];
+}
+// Everything checked before a change is built: the files themselves and the backend they need.
+function checkProject(files){const errors=validateFiles(files);return errors.length?errors:undeclaredCollections(files)}
 function workerCount(){const n=Number(process.env.KAIROQ_BUILD_WORKERS??2);return Number.isInteger(n)&&n>=0?Math.min(n,8):2}
 let inlineQueue=Promise.resolve();
 function build(files,outDir,options={}){
@@ -402,7 +416,8 @@ async function runtimeProblems(id,url,checkRuntime){
  const sandbox=require('./react-sandbox');
  return sandbox.withSandbox(id,async box=>{
   const r=await checkRuntime(url,{sandbox:box.token,journey:process.env.KAIROQ_JOURNEY!=='off'})||{},errors=[...(r.errors||[])],j=r.journey;
-  if(j&&j.shown&&!sandbox.contains(box,j.token))errors.push(j.reloaded?'Records are not saved in the database: a record added with the form ("'+j.token+' Test") stays only in this browser (localStorage), so other devices and staff never see it. Save records with collection(\'…\').create() (or the SQL database) and list them from there.':'Records are not saved: a record added with the form ("'+j.token+' Test") showed on the page but was gone after reloading. Save records with collection(\'…\').create() (or the SQL database) and load the list from there, so they stay after a reload.');
+  if(j&&j.api_errors&&j.api_errors.length)errors.push(...j.api_errors.map(e=>'Adding a record like a customer failed: '+e));
+  else if(j&&j.shown&&!sandbox.contains(box,j.token))errors.push(j.reloaded?'Records are not saved in the database: a record added with the form ("'+j.token+' Test") stays only in this browser (localStorage), so other devices and staff never see it. Save records with collection(\'…\').create() (or the SQL database) and list them from there.':'Records are not saved: a record added with the form ("'+j.token+' Test") showed on the page but was gone after reloading. Save records with collection(\'…\').create() (or the SQL database) and load the list from there, so they stay after a reload.');
   return errors;
  });
 }
@@ -440,7 +455,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   // Small changes arrive as find/replace edits (cheaper than rewriting whole files).
   const both=Object.keys(reply.edits).filter(f=>Object.hasOwn(reply.files,f));
   const applied=require('./react-edits').apply(next,reply.edits);next=applied.files;
-  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:validateFiles(next))];
+  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:checkProject(next))];
   messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,edits:reply.edits,delete:reply.delete})});
   if(errors.length){
    lastError=errors.slice(0,12).join('\n');
@@ -653,4 +668,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
