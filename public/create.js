@@ -598,10 +598,37 @@ function workCard(){
   li=el('li','assistant work');li.id='stream';
   const status=el('button','status-line');status.type='button';status.append(el('span','status-text','Thinking'),icon('chev'));status.onclick=()=>openDetail('live');
   const head=el('div','work-head');head.append(status,el('span','work-time'));const stop=el('button','ghost work-stop','Stop');stop.type='button';stop.onclick=()=>$('stop-job').click();head.append(stop);
-  li.append(head,el('ol','rail live'),el('div','work-msg hidden'));
+  li.append(head,el('ol','stages'),el('p','work-think hidden'),el('ol','rail live'),el('div','work-msg hidden'));
   $('messages').append(li);$('messages').scrollTop=$('messages').scrollHeight;
  }
  return li;
+}
+// The stages of a build, shown as a checklist while it works (and over the preview on a first build).
+const STAGES=[['thinking','Understanding what you asked'],['designing','Choosing the design'],['writing','Writing the code'],['building','Building the preview'],['testing','Testing it in a browser']];
+function stageOf(p){return{designing:'designing',images:'designing',writing:'writing',fixing:'writing',building:'building',testing:'testing',checking:'testing',reviewing:'testing',verifying:'testing',repairing:'writing'}[p]||'thinking'}
+function stageList(j){
+ const p=phaseOf(j),cur=stageOf(p);work.seen=work.seen||new Set();work.seen.add(cur);
+ const shown=STAGES.filter(([id])=>id!=='designing'||work.seen.has('designing')),at=shown.findIndex(([id])=>id===cur);
+ const ol=el('ol','stages');
+ shown.forEach(([id,label],i)=>{
+  const li=el('li',i<at?'done':i===at?'now':'todo');
+  li.append(el('span','st-dot'),el('span','st-label',i===at&&p==='fixing'?'Fixing a problem the test found':label));
+  // The AI's plan, under "Writing the code", as soon as it has written it.
+  if(id==='writing'&&(work.plan||[]).length&&i<=at){const ul=el('ul','st-plan');for(const step of work.plan)ul.append(el('li',null,step));li.append(ul)}
+  ol.append(li);
+ });
+ return ol;
+}
+// The latest thought, in plain words, while the AI works out what to build.
+function thinkingLine(){const t=String(work.thinking||'').replace(/\s+/g,' ').trim();if(!t)return'';const parts=t.split(/(?<=[.!?])\s+/).filter(x=>x.length>12);return(parts.at(-1)||t).slice(-180)}
+function renderBuildOverlay(j){
+ const o=$('build-overlay');if(!o)return;
+ if(!j||j.mode==='discuss'){o.classList.add('hidden');return}
+ const p=state.project,fresh=p&&p.current_version<=1&&!(p.versions||[]).some(v=>v.n>1);
+ o.classList.toggle('first',Boolean(fresh));o.classList.remove('hidden');
+ const box=o.querySelector('.bo-card');box.replaceChildren();
+ if(fresh){box.append(el('p','bo-kicker','Building'),el('h3',null,p.name),stageList(j));const t=thinkingLine();if(t&&stageOf(phaseOf(j))==='thinking')box.append(el('p','bo-think',t))}
+ else box.append(el('span','bo-spin'),el('span',null,(PHASES[phaseOf(j)]||'Working')+'… the preview updates when it is ready'));
 }
 function liveStatus(j){
  const p=phaseOf(j);
@@ -612,7 +639,7 @@ function liveStatus(j){
 function liveEvents(j){
  const ev=(j.events||[]).slice();
  // The current thinking, before the model has answered.
- if(phaseOf(j)==='thinking'&&j.mode!=='discuss')ev.push({t:'think',live:true,ms:Date.now()-work.started,text:work.thinking});
+ // (While it thinks, the checklist and the thought line above show it.)
  // Files being written right now (from the streamed reply) in Build mode.
  if(j.mode!=='agent'&&phaseOf(j)==='writing')for(const f of work.files)if(!ev.some(e=>e.t==='edit'&&e.file===f))ev.push({t:'edit',file:f,kind:'edited'});
  return ev;
@@ -623,10 +650,14 @@ function renderWork(j){
  const li=workCard(),st=j.stream||null;
  if(st&&st.files)for(const f of st.files)if(!work.files.includes(f))work.files.push(f);
  if(st)work.current=st.current||null;
+ if(st&&st.plan&&st.plan.length)work.plan=st.plan;
  if(st&&st.message)work.message=st.message;
  if(st&&st.tail)work.tail=st.tail;
  if(j.thinking)work.thinking=j.thinking;
  text(li.querySelector('.status-text'),liveStatus(j));
+ li.querySelector('.stages').replaceWith(stageList(j));
+ const th=li.querySelector('.work-think'),thought=stageOf(phaseOf(j))==='thinking'?thinkingLine():'';th.classList.toggle('hidden',!thought);text(th,thought);
+ renderBuildOverlay(j);
  const r=li.querySelector('.rail.live');r.replaceChildren();
  for(const e of liveEvents(j).filter(e=>e.t!=='plan').slice(-6))r.append(eventRow(e,{live:true}));
  const msg=li.querySelector('.work-msg');
@@ -707,7 +738,7 @@ function renderDetail(){
 async function watch(job){
  state.job=job;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
- Object.assign(work,{started:Date.now(),files:[],current:null,message:'',tail:'',thinking:''});if(detailState.source!==null)closeDetail();
+ Object.assign(work,{started:Date.now(),files:[],current:null,message:'',tail:'',thinking:'',plan:[],seen:new Set()});if(detailState.source!==null)closeDetail();
  clearInterval(work.timer);work.timer=setInterval(tickWork,1000);
  const done=await new Promise(resolve=>{
   let finished=false;
@@ -725,7 +756,7 @@ async function watch(job){
    }
   }
  });
- clearInterval(work.timer);
+ clearInterval(work.timer);renderBuildOverlay(null);
  const wasLive=detailState.source==='live';
  $('stream')?.remove();
  if(done&&state.project&&state.project.id===id){
