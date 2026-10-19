@@ -22,7 +22,7 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
  if(sandbox){const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(new URL(url).pathname)||[])[1],origin=new URL(url).origin;await context.route('**/*',r=>{let u;try{u=new URL(r.request().url())}catch{return r.continue()}return appId&&u.origin===origin&&u.pathname.startsWith('/api/apps/'+appId+'/')?r.continue({headers:{...r.request().headers(),'x-kairoq-sandbox':sandbox}}):r.continue()})}
  const page=await context.newPage(),errors=[];
- let saved=null;
+ let saved=null;const facts={};
  const add=e=>{const text=String(e).slice(0,500);if(!IGNORED.test(text)&&!errors.includes(text)&&errors.length<10)errors.push(text)};
  // Images or fonts from other sites that fail to load are not bugs in the app's code
  // (and can't be fixed by the AI), so they are not reported as problems here.
@@ -30,18 +30,33 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
  page.on('pageerror',e=>add('Uncaught error: '+(e.stack||e.message||e)));
  page.on('console',m=>{if(m.type()==='error'){const at=m.location()?.url;if(/Failed to load resource/.test(m.text())&&at&&!own(at))return;add('Console error: '+m.text()+(at&&/Failed to load resource/.test(m.text())?' ('+at+')':''))}});
  page.on('requestfailed',r=>{if(own(r.url()))add('Request failed: '+r.method()+' '+r.url()+' ('+(r.failure()?.errorText||'failed')+')')});
- page.on('response',r=>{if(r.status()>=400&&own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())});
+ const pending=[];
+ page.on('response',r=>{if(r.status()>=400&&own(r.url()))pending.push(r.text().then(t=>{let why='';try{why=JSON.parse(t).error||''}catch{}add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url()+(why?': '+String(why).slice(0,200):''))},()=>add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())))});
  try{
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
   await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
   await page.waitForTimeout(500);
   const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))});
   if(blank)add('Blank page: nothing rendered inside #root.');
-  if(!blank&&process.env.KAIROQ_DEAD_CLICKS!=='off'){for(const d of await deadClicks(page,url).catch(()=>[]))add(d)}
+  facts.opened=!blank;
+  if(!blank&&process.env.KAIROQ_DEAD_CLICKS!=='off'){const dead=await deadClicks(page,url).catch(()=>[]);for(const d of dead)add(d);facts.menus={checked:dead.checked||0,dead:dead.length}}
+  // The full check after a build: the phone layout, and a customer adding a record.
+  if(!blank&&journey){facts.phone=await phoneFits(url,sandbox).catch(()=>null);if(facts.phone===false)add('Layout overflow: the page scrolls sideways on a 390px phone screen. Make every section fit the phone width.')}
   if(!blank&&journey&&(sandbox||process.env.NODE_ENV==='test'))saved=await savesData(context,url).catch(()=>null);
+  await Promise.all(pending);
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
- return{skipped:false,errors,...(saved?{journey:saved}:{})};
+ return{skipped:false,errors,facts,...(saved?{journey:saved}:{})};
+}
+// Whether the page fits a 390 px phone screen without scrolling sideways.
+async function phoneFits(url,sandbox){
+ const ctx=await (await browser()).newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+ try{
+  if(sandbox)await guard(ctx,url,{sandbox});
+  const p=await ctx.newPage();
+  await p.goto(url,{waitUntil:'load',timeout:15000});await p.waitForLoadState('networkidle',{timeout:4000}).catch(()=>{});await p.waitForTimeout(300);
+  return await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+8);
+ }finally{await ctx.close().catch(()=>{})}
 }
 // The main journey of an app that keeps records (a CRM, bookings, tasks): sign up when the app
 // asks for it, add a record with its add form, then reload. Returns {token, shown, reloaded}:
@@ -49,8 +64,30 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
 // reload. The caller checks the app's database for the token (react-builder.js). Runs only on a
 // test copy of the data, and returns null whenever it cannot tell: no add form, a form that
 // leads elsewhere, a thank-you message instead of a list.
+// The button that sends a form: an explicit submit button, else the first plain button that is
+// not another way in (Google) or a switch between sign-in and sign-up.
+async function submitButton(form){
+ for(const sel of ['button[type=submit],input[type=submit]','button:not([type])']){
+  for(const b of await form.locator(sel).all()){
+   if(!(await b.isVisible().catch(()=>false)))continue;
+   const t=(await b.innerText().catch(()=>'')||await b.getAttribute('value').catch(()=>'')||'').trim();
+   if(/google|apple|facebook|github|microsoft/i.test(t))continue;
+   if(sel!=='button[type=submit],input[type=submit]'&&/^(new|already|don.?t|no account)|account\?|instead/i.test(t))continue;
+   return b;
+  }
+ }
+ return null;
+}
 async function savesData(context,url){
  const tab=await context.newPage(),visible=l=>l.isVisible().catch(()=>false);
+ // The app's own API calls that fail while a customer signs up and adds a record (a save
+ // the server refuses is the clearest sign the app keeps nothing).
+ const apiErrors=[],calls=[];
+ tab.on('response',r=>{let u;try{u=new URL(r.url())}catch{return}if(r.status()<400||!/^\/api\/apps\/[a-f0-9]{12}\//.test(u.pathname)||/\/auth\/(signin|user)$/.test(u.pathname))return;calls.push(r.text().then(t=>{let why='';try{why=JSON.parse(t).error||''}catch{}const line='HTTP '+r.status()+' from '+r.request().method()+' '+u.pathname+(why?': '+String(why).slice(0,200):'');if(!apiErrors.includes(line)&&apiErrors.length<6)apiErrors.push(line)},()=>{}))});
+ let signedUp=false,submitted=false;
+ // Not seen in a list: the caller still looks for the record in the app's data (a booking or
+ // order form shows a thank-you instead). Nothing to report when no form was sent.
+ const failed=async()=>{await Promise.all(calls);if(apiErrors.length)return{token,shown:false,reloaded:false,signed_up:signedUp,api_errors:apiErrors};return submitted||signedUp?{token,shown:false,reloaded:false,signed_up:signedUp,submitted}:null};
  const token='Kq'+String(100000+Math.floor(Math.random()*900000));
  const today=new Date().toISOString().slice(0,10),password='Kq-test-'+token+'!';
  async function fill(form,{record}){
@@ -67,8 +104,8 @@ async function savesData(context,url){
     await f.fill(v,{timeout:2000});
    }catch{}
   }
-  const btn=form.locator('button[type=submit],input[type=submit],button:not([type])').last();
-  if(await visible(btn))await btn.click({timeout:2000});else await form.evaluate(e=>e.requestSubmit()).catch(()=>{});
+  const btn=await submitButton(form);
+  if(btn)await btn.click({timeout:2000});else await form.evaluate(e=>e.requestSubmit()).catch(()=>{});
   await tab.waitForLoadState('networkidle',{timeout:4000}).catch(()=>{});await tab.waitForTimeout(900);
  }
  try{
@@ -76,7 +113,8 @@ async function savesData(context,url){
   await tab.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
   // An app behind a sign-in: create a test account first (switching the form to sign-up).
   if(await visible(tab.locator('input[type=password]').first())){
-   const submitText=await tab.locator('form:has(input[type=password])').first().locator('button[type=submit],button:not([type])').last().innerText().catch(()=>'');
+   const sb=await submitButton(tab.locator('form:has(input[type=password])').first());
+   const submitText=sb?await sb.innerText().catch(()=>''):'';
    if(!/sign ?up|create|register|join|get started/i.test(submitText)){
     const toggle=tab.locator('a,button,[role=tab]').filter({hasText:/^[^.!]{0,24}\b(sign ?up|create (an |your )?account|register|join now)\b[^.]{0,20}$/i}).first();
     if(!(await visible(toggle)))return null;
@@ -85,13 +123,14 @@ async function savesData(context,url){
    const signup=tab.locator('form:has(input[type=password])').first();
    if(!(await visible(signup)))return null;
    await fill(signup,{record:false});
-   if(await visible(tab.locator('input[type=password]').first()))return null;
+   if(await visible(tab.locator('input[type=password]').first()))return failed();
+   signedUp=true;
   }
   const addForm=async()=>{for(const f of await tab.locator('form').all()){if(!(await visible(f)))continue;if(await f.evaluate(e=>!e.querySelector('input[type=password],input[type=search]')&&!e.closest('[role=search]')&&e.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]),textarea').length>=1&&!/search|newsletter|subscribe/i.test(e.innerText+' '+(e.getAttribute('aria-label')||'')+' '+[...e.querySelectorAll('input')].map(i=>i.placeholder).join(' '))))return f}return null};
   let form=await addForm();
   if(!form){const add=tab.locator('button,a,[role=button]').filter({hasText:/^\s*(\+\s*)?(add|new|create)\b/i}).first();if(await visible(add)){await add.click({timeout:2000});await tab.waitForTimeout(600);form=await addForm()}}
-  if(!form)return null;
-  await fill(form,{record:true});
+  if(!form)return failed();
+  await fill(form,{record:true});submitted=true;
   // Shown as a record: in a list, table or a row of similar cards, not in a thank-you or status message.
   const shown=()=>tab.evaluate(t=>{
    const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
@@ -104,10 +143,11 @@ async function savesData(context,url){
    }
    return false;
   },token).catch(()=>false);
-  if(!(await shown()))return null;
+  if(!(await shown()))return failed();
   await tab.reload({waitUntil:'load',timeout:15000});
   await tab.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});await tab.waitForTimeout(600);
-  return{token,shown:true,reloaded:await shown()};
+  const reloaded=await shown();await Promise.all(calls);
+  return{token,shown:true,reloaded,signed_up:signedUp,submitted,...(apiErrors.length?{api_errors:apiErrors}:{})};
  }catch{return null}
  finally{await tab.close().catch(()=>{})}
 }
@@ -153,6 +193,7 @@ async function deadClicks(page,url){
  await Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{while(queue.length)await probe(queue.shift())}));
  // Reported in the order of the page, whichever tab finished first.
  dead.sort((a,b)=>targets.findIndex(t=>a.includes('"'+t+'"'))-targets.findIndex(t=>b.includes('"'+t+'"')));
+ dead.checked=targets.length;
  return dead;
 }
 // Saves a 1200x630 PNG of a page (used as the social share image).

@@ -385,3 +385,11 @@ body.in-editor.side-open .stage-bar .bar-spacer{min-width:4px}
 #wa-go{background:#25d366;border-color:#25d366;color:#06331a;border-radius:999px}
 .hosting-note{margin:10px 0 0;padding:9px 12px;border-radius:10px;background:var(--side);border:1px solid var(--border);color:var(--muted)}
 .hosting-note.warn{background:color-mix(in srgb,var(--error) 8%,var(--panel));border-color:color-mix(in srgb,var(--error) 30%,var(--border));color:var(--text)}
+
+.verified{margin:10px 0 2px;padding:10px 12px;border-radius:12px;border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);background:color-mix(in srgb,var(--ok) 7%,var(--panel));font-size:12.5px}
+.verified.bad{border-color:color-mix(in srgb,var(--error) 35%,transparent);background:color-mix(in srgb,var(--error) 6%,var(--panel))}
+.verified-head{font-weight:600;margin-bottom:6px}
+.verified ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.verified li{display:flex;gap:8px;align-items:baseline}
+.verified .vmark{font-weight:700;width:12px;flex:none}
+.verified li.ok .vmark{color:var(--ok)}.verified li.bad .vmark{color:var(--error)}

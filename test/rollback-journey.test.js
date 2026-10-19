@@ -40,6 +40,12 @@ test('the browser check runs on a test copy, and a record shown but never saved 
  const m2=builder.create({name:'Crm2',owner:'owner'});await builder.initialize(m2);
  const r2=await builder.edit(m2.id,'crm',{callModel:reply({message:'v',files:{'src/App.jsx':GOOD}}),checkRuntime:async(url,o)=>{const box=sandbox.lookup(m2.id,o.sandbox);const db=backend.openFile(path.join(box.dir,'data.sqlite'));db.prepare("INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES('r1','contacts',NULL,?,'x','x')").run(JSON.stringify({name:'Kq777777 Test'}));return{errors:[],journey:{token:'Kq777777',shown:true,reloaded:true}}}});
  assert.deepEqual(r2.runtime_errors,[]);
+ // What the owner sees under the build.
+ assert.deepEqual(r2.verified,{opens:null,menus:null,phone:null,signup:null,saves:true});
+ const m3=builder.create({name:'Crm3',owner:'owner'});await builder.initialize(m3);
+ const r3=await builder.edit(m3.id,'crm',{callModel:reply({message:'v',files:{'src/App.jsx':GOOD}}),checkRuntime:async()=>({errors:[],facts:{opened:true,menus:{checked:5,dead:0},phone:true},journey:{token:'Kq0',signed_up:true,submitted:true,shown:false}})});
+ assert.deepEqual(r3.verified,{opens:true,menus:{checked:5,dead:0},phone:true,signup:true,saves:null},'a form that showed nothing and saved nothing is not claimed as saved');
+ assert.deepEqual(builder.loadMeta(m3.id).messages.at(-1).verified,r3.verified);
 });
 
 const FORM=save=>`<!doctype html><html><body><div id="root"><h1>Contacts</h1><form id="f"><input name="name" placeholder="Name" required><input type="email" name="email" placeholder="Email"><button>Add contact</button></form><ul id="list"></ul></div><script>
@@ -48,6 +54,22 @@ function draw(items){list.innerHTML='';for(const i of items){const li=document.c
 ${save?"draw(JSON.parse(localStorage.getItem('c')||'[]'));":"draw([]);"}
 document.getElementById('f').onsubmit=e=>{e.preventDefault();const items=[...list.children].map(li=>({name:li.textContent.split(' · ')[0],email:li.textContent.split(' · ')[1]}));items.push({name:e.target.name.value,email:e.target.email.value});${save?"localStorage.setItem('c',JSON.stringify(items));":""}draw(items);e.target.reset()};
 </script></body></html>`;
+
+test('a collection the code uses must be declared, or the change is sent back before it is built',async()=>{
+ const meta=builder.create({name:'Undeclared',owner:'owner'});await builder.initialize(meta);
+ const CRM="import { collection } from 'kairoq';\nexport default function App(){collection('contacts').list();return <h1>CRM</h1>}\n";
+ const seen=[];let call=0;
+ const r=await builder.edit(meta.id,'crm',{callModel:(o,parse)=>{seen.push(o.messages.at(-1).content);return Promise.resolve(parse(JSON.stringify(call++?{message:'v',files:{'src/App.jsx':CRM,'src/backend.json':'{"collections":{"contacts":{"access":"private"}}}'}}:{message:'v',files:{'src/App.jsx':CRM}})))}});
+ assert.equal(r.attempts,2);
+ assert.match(String(seen[1]),/src\/backend\.json is missing.*"contacts"/);
+ assert.deepEqual(builder.undeclaredCollections(builder.loadFiles(meta.id,r.version)),[]);
+});
+
+test('a save the server refuses while adding a record is an error',async()=>{
+ const meta=builder.create({name:'Refused',owner:'owner'});await builder.initialize(meta);
+ const r=await builder.edit(meta.id,'crm',{callModel:reply({message:'v',files:{'src/App.jsx':GOOD}}),checkRuntime:async()=>({errors:[],journey:{token:'Kq1',shown:false,reloaded:false,api_errors:['HTTP 404 from POST /api/apps/x/collections/tasks: Collection "tasks" is not declared in src/backend.json']}})});
+ assert.match(JSON.stringify(r.runtime_errors),/Adding a record like a customer failed: HTTP 404/);
+});
 
 test('the journey adds a record with the form and reloads',{skip:!runtime.available()&&'no Chromium'},async()=>{
  let page='';
@@ -61,6 +83,7 @@ test('the journey adds a record with the form and reloads',{skip:!runtime.availa
   page=FORM(true);
   r=await runtime.check(url,{journey:true});
   assert.equal(r.journey.shown,true);assert.equal(r.journey.reloaded,true);
+  assert.equal(r.facts.opened,true);assert.equal(r.facts.phone,true,'the page fits a phone');
   // A page without an add form: nothing to tell.
   page='<!doctype html><html><body><div id="root"><h1>About us</h1></div></body></html>';
   r=await runtime.check(url,{journey:true});
