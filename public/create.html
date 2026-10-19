@@ -765,6 +765,7 @@
     <p class="muted small">Standing instructions the AI follows on every change: brand, tone, audience, rules.</p>
     <textarea id="knowledge" rows="4" maxlength="8000" placeholder="Brand colours are teal and sand. Write in a warm, plain tone. Prices are in EUR. Never use stock photos of people."></textarea>
     <div class="row"><button class="ghost" id="knowledge-save" type="button">Save knowledge</button><span class="muted small" id="knowledge-status"></span></div>
+    <details class="memory" id="memory-box"><summary>What Kairoq remembers about this project</summary><p class="muted small">Sent with every request, so nothing is forgotten in long projects. Kept from your app's code and everything you asked for.</p><pre id="memory-text"></pre></details>
     <h3>Server secrets</h3>
     <p class="muted small">API keys your server functions read with secrets.get("NAME"). Values are encrypted and never shown again.</p>
     <ul class="domains" id="secrets-list"></ul>

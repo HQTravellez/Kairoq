@@ -1157,6 +1157,8 @@ $('settings-open').onclick=async()=>{
  $('support-section').classList.toggle('hidden',state.me?.viewer?.kind!=='owner');
  text($('settings-error'),'');text($('gh-status'),'');text($('knowledge-status'),'');
  $('knowledge').value=state.project.knowledge||'';
+ $('memory-box').open=false;text($('memory-text'),'');
+ $('memory-box').ontoggle=async()=>{if(!$('memory-box').open||$('memory-text').textContent)return;try{const {memory}=await api('/projects/'+state.project.id+'/memory');text($('memory-text'),memory||'Nothing yet: it starts with your first request.')}catch(err){text($('memory-text'),err.message)}};
  renderSecrets().catch(err=>text($('settings-error'),err.message));
  $('download').href='/api/create/projects/'+state.project.id+'/download';
  try{

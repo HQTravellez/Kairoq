@@ -399,7 +399,7 @@ function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_ver
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
 // Also carries the design brief and the design skills switched on for the project.
-function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();return require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+require('./build-lessons').promptNote()+require('./account-memory').preferenceNote(meta.owner)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();let files={};try{files=meta.current_version?loadFiles(meta.id,meta.current_version):{}}catch{}return require('./project-memory').note(meta,files)+require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+require('./build-lessons').promptNote()+require('./account-memory').preferenceNote(meta.owner)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];

@@ -679,3 +679,6 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .kit-text{white-space:pre-wrap;font:inherit;font-size:13px;margin:0;color:var(--text)}
 
 #ref-reward{flex:1;min-width:0}
+
+.memory{margin:10px 0 4px}.memory summary{cursor:pointer;font-size:13px;font-weight:600}
+.memory pre{white-space:pre-wrap;font:inherit;font-size:12px;max-height:260px;overflow:auto;background:var(--code);border:1px solid var(--border);border-radius:10px;padding:10px;margin:6px 0 0}
