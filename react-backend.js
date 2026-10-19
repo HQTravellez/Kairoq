@@ -344,7 +344,10 @@ async function handle(req,res,{onlyProject}={}){
   const db=sb?openFile(path.join(sb.dir,'data.sqlite')):database(id),user=currentUser(db,req);
   db.__projectId=sb?id+'~test':id;if(sb){db.__filesDir=path.join(sb.dir,'files');db.__sandbox=true;db.__sandboxToken=req.headers['x-kairoq-sandbox']}
   const version=requestVersion(meta,req);
-  if(route==='/auth/signup'&&req.method==='POST')return send(res,201,await signUp(db,await readJson(req))),true;
+  if(route==='/auth/signup'&&req.method==='POST'){const b=await readJson(req),out=await signUp(db,b);if(b.ref)try{require('./app-referrals').claim(db,out.user.id,b.ref)}catch{}return send(res,201,out),true}
+  // Invite a friend (app-referrals.js): the user's own code and who joined through it.
+  if(route==='/referrals/me'&&req.method==='GET'){if(!user)throw fail(401,'Sign in to see your invite link');return send(res,200,require('./app-referrals').mine(db,user.id)),true}
+  if(route==='/referrals/claim'&&req.method==='POST'){if(!user)throw fail(401,'Sign in first');return send(res,200,{claimed:require('./app-referrals').claim(db,user.id,(await readJson(req,1000)).code)}),true}
   if(route==='/auth/signin'&&req.method==='POST')return send(res,200,await signIn(db,await readJson(req))),true;
   if(route==='/auth/signout'&&req.method==='POST'){const t=/^Bearer (.+)$/.exec(String(req.headers.authorization||''));if(t)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(t[1]));return send(res,200,{ok:true}),true}
   if(route==='/auth/user'&&req.method==='GET')return send(res,200,{user:publicUser(user)}),true;
@@ -524,7 +527,12 @@ try{
   pendingReset=h.get('kairoq_reset');pendingCode=h.get('kairoq_code');
   if(pendingReset||pendingCode){h.delete('kairoq_reset');h.delete('kairoq_code');history.replaceState(null,'',location.pathname+location.search+(h.toString()?'#'+h:''))}
 }catch{}
-const ready=pendingCode?call('/auth/google/exchange',{method:'POST',body:{code:pendingCode}}).then(d=>{token=d.token;currentUser=d.user;save()}).catch(()=>{}):Promise.resolve();
+// Invite links (?ref=CODE): kept for 30 days, used once when this visitor creates an account.
+const REF_KEY='kairoq-ref-${projectId}';
+try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[a-z0-9]{6,16}$/i.test(r))localStorage.setItem(REF_KEY,JSON.stringify({code:r.toLowerCase(),at:Date.now()}))}catch{}
+function pendingRef(){try{const r=JSON.parse(localStorage.getItem(REF_KEY)||'null');return r&&Date.now()-r.at<30*86400000?r.code:undefined}catch{return undefined}}
+function clearRef(){try{localStorage.removeItem(REF_KEY)}catch{}}
+const ready=pendingCode?call('/auth/google/exchange',{method:'POST',body:{code:pendingCode}}).then(async d=>{token=d.token;currentUser=d.user;save();const ref=pendingRef();if(ref){await call('/referrals/claim',{method:'POST',body:{code:ref}}).catch(()=>{});clearRef()}}).catch(()=>{}):Promise.resolve();
 export const auth={
   ready(){return ready},
   async signInWithGoogle(){
@@ -536,7 +544,7 @@ export const auth={
   resetToken(){return pendingReset},
   async resetPassword(password,tokenValue=pendingReset){const d=await call('/auth/reset/complete',{method:'POST',body:{token:tokenValue,password}});pendingReset=null;token=d.token;currentUser=d.user;save();return d.user},
   user(){return currentUser},
-  async signUp(email,password,name){const d=await call('/auth/signup',{method:'POST',body:{email,password,name}});token=d.token;currentUser=d.user;save();return d.user},
+  async signUp(email,password,name){const d=await call('/auth/signup',{method:'POST',body:{email,password,name,ref:pendingRef()}});clearRef();token=d.token;currentUser=d.user;save();return d.user},
   async signIn(email,password){const d=await call('/auth/signin',{method:'POST',body:{email,password}});token=d.token;currentUser=d.user;save();return d.user},
   async signOut(){try{await call('/auth/signout',{method:'POST'})}catch{}token=null;currentUser=null;save()},
   onChange(fn){listeners.add(fn);return()=>listeners.delete(fn)}
@@ -577,6 +585,10 @@ export const storage={
   },
   url(id){return BASE+'/files/'+id},
   async remove(id){await call('/files/'+id,{method:'DELETE'})}
+};
+// Invite a friend: the signed-in user's invite link, and how many joined through it.
+export const referrals={
+  async mine(){const d=await call('/referrals/me');return{...d,link:(NATIVE&&APP_URL?APP_URL:location.origin+location.pathname)+'?ref='+d.code}}
 };
 export const email={
   async send({to='owner',subject,text}){return call('/email',{method:'POST',body:{to,subject,text}})}
