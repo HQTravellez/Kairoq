@@ -536,8 +536,35 @@ async function renderFiles(){
  const files=state.project.files;
  if(!files.includes(state.file))state.file=files.includes('src/App.jsx')?'src/App.jsx':files[0];
  for(const f of files){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.textContent=f;b.setAttribute('aria-current',String(f===state.file));b.onclick=()=>{state.file=f;renderFiles()};li.append(b);list.append(li)}
- if(state.file){const {content}=await api('/projects/'+state.project.id+'/file?path='+encodeURIComponent(state.file));text($('file-view').firstChild,content)}
+ if(state.file){const {content}=await api('/projects/'+state.project.id+'/file?path='+encodeURIComponent(state.file));state.fileContent=content;text($('file-view').firstChild,content)}
+ text($('file-name'),state.file||'');setEditing(false);
+ const editor=state.project.role!=='viewer';$('file-edit').classList.toggle('hidden',!editor||!state.file);$('file-new').classList.toggle('hidden',!editor);
 }
+// Editing code by hand: Save checks, builds and keeps it as a new version (undo with the version menu).
+function setEditing(on){
+ $('file-view').classList.toggle('hidden',on);$('file-editor').classList.toggle('hidden',!on);
+ $('file-save').classList.toggle('hidden',!on);$('file-cancel').classList.toggle('hidden',!on);$('file-edit').classList.toggle('hidden',on);
+ if(on){$('file-editor').value=state.fileContent||'';$('file-editor').focus()}
+}
+$('file-edit').onclick=()=>{text($('file-status'),'');setEditing(true)};
+$('file-cancel').onclick=()=>{text($('file-status'),'');setEditing(false)};
+$('file-editor').addEventListener('keydown',e=>{
+ if(e.key==='Tab'&&!e.shiftKey){e.preventDefault();const t=e.target,a=t.selectionStart;t.setRangeText('  ',a,t.selectionEnd,'end')}
+ if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();$('file-save').click()}
+});
+async function saveSourceFile(body,done){
+ const save=$('file-save');save.disabled=true;text($('file-status'),'Checking and building…');
+ try{
+  const {project,result}=await api('/projects/'+state.project.id+'/source',{method:'POST',body});
+  state.project=project;renderVersions();renderMessages();setPreview(project.preview_url);
+  text($('file-status'),'Saved as v'+result.version+'. Undo it from the version menu.');done&&done();await renderFiles();
+ }catch(err){text($('file-status'),err.message)}finally{save.disabled=false}
+}
+$('file-save').onclick=()=>saveSourceFile({path:state.file,content:$('file-editor').value});
+$('file-new').onclick=()=>{
+ const name=prompt('New file path, for example src/components/Hero.jsx');if(!name)return;
+ saveSourceFile({path:name.trim(),content:name.endsWith('.css')?'/* '+name+' */\n':name.endsWith('.json')?'{}\n':'export default function Component(){\n  return null;\n}\n',create:true},()=>{state.file=name.trim()});
+};
 
 // ---------- chat ----------
 state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];

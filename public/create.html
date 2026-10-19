@@ -551,7 +551,11 @@
       </div>
       <div class="code hidden" id="code">
         <ul class="file-list" id="file-list"></ul>
-        <pre id="file-view"><code></code></pre>
+        <div class="file-pane">
+          <div class="file-bar"><span class="file-name" id="file-name"></span><span class="muted small" id="file-status" role="status"></span><button class="ghost small-btn" id="file-new" type="button">New file</button><button class="ghost small-btn" id="file-edit" type="button">Edit</button><button class="primary small-btn hidden" id="file-save" type="button">Save</button><button class="ghost small-btn hidden" id="file-cancel" type="button">Cancel</button></div>
+          <pre id="file-view"><code></code></pre>
+          <textarea id="file-editor" class="file-editor hidden" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File content"></textarea>
+        </div>
       </div>
     </div>
   </main>
