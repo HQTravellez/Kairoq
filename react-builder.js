@@ -640,10 +640,29 @@ function remove(id){const dir=projectDir(id);loadMeta(id);require('./react-sql')
 const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8'};
 // sandbox=true runs the page in an opaque origin so generated code cannot use the Kairoq session.
 function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
+// Compression for built files: each is compressed once (brotli, else gzip) and kept next to
+// it, so apps' JavaScript and CSS travel about 3 times smaller.
+const zlib=require('zlib');
+const COMPRESSIBLE=new Set(['.js','.mjs','.css','.svg','.json','.html','.txt','.xml','.webmanifest']);
+function encodingFor(req){const a=String(req.headers['accept-encoding']||'');return/\bbr\b/.test(a)?'br':/\bgzip\b/.test(a)?'gzip':null}
+function compress(buf,enc){return enc==='br'?zlib.brotliCompressSync(buf,{params:{[zlib.constants.BROTLI_PARAM_QUALITY]:5}}):zlib.gzipSync(buf,{level:6})}
+function compressedFile(file,enc){
+ const out=file+(enc==='br'?'.kq.br':'.kq.gz');
+ try{if(fs.statSync(out).mtimeMs>=fs.statSync(file).mtimeMs)return out}catch{}
+ const buf=fs.readFileSync(file);if(buf.length<1024)return null;
+ try{const tmp=out+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,compress(buf,enc));fs.renameSync(tmp,out);return out}catch{return null}
+}
+// A page made on the fly (published HTML with its content), compressed when it is worth it.
+function sendText(req,res,status,headers,body){
+ const enc=body.length>=1024?encodingFor(req):null,out=enc?compress(Buffer.from(body),enc):body;
+ res.writeHead(status,{...headers,...(enc?{'Content-Encoding':enc,'Vary':'Accept-Encoding'}:{})});
+ res.end(req.method==='HEAD'?undefined:out);
+}
 function serveDist(req,res,distDir,rest,{sandbox}){
  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);return res.end()}
  let decoded;try{decoded=decodeURIComponent(String(rest||'').split('?')[0])}catch{res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Bad request');return true}
  let rel=decoded.replace(/^\/+/,'');
+ if(/\.kq\.(br|gz)$|\.tmp$/.test(rel))return notFound(res);
  if(!rel||rel.endsWith('/'))rel+='index.html';
  const file=path.resolve(distDir,rel);
  if(!file.startsWith(path.resolve(distDir)+path.sep)){res.writeHead(400);return res.end()}
@@ -658,9 +677,12 @@ function serveDist(req,res,distDir,rest,{sandbox}){
   // Other files opened directly (an SVG, say) must not run script on Kairoq's origin either.
   if(sandbox)headers['Content-Security-Policy']="sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:";
  }
+ let body=target;
+ const enc=COMPRESSIBLE.has(ext)?encodingFor(req):null,packed=enc?compressedFile(target,enc):null;
+ if(packed){body=packed;headers['Content-Encoding']=enc;headers.Vary='Accept-Encoding'}
  res.writeHead(200,headers);
  if(req.method==='HEAD')return res.end();
- fs.createReadStream(target).pipe(res);
+ fs.createReadStream(body).pipe(res);
 }
 function notFound(res){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});res.end('Not found')}
 // /builder/p/<id>-<key>/v/<n>/<path>
@@ -694,4 +716,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
