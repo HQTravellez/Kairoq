@@ -67,7 +67,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -80,6 +80,8 @@ function findShare(token){
 function projectViewFor(id,role='owner'){const d=builder.detail(id),meta=builder.loadMeta(id);return{...d,role,mobile:require('./react-mobile').settings(meta),members:role==='owner'?meta.members||[]:undefined,share:role==='owner'&&meta.share?{...meta.share,url:'/create/share/'+meta.share.token}:null,seo:meta.seo||null,knowledge:meta.knowledge||'',design:meta.design||null,skills:meta.skills||[],hosting:require('./hosting-billing').view(meta),urls:hosting.siteUrls(meta),domains:(meta.domains||[]).map(x=>({...x,dns:hosting.dnsInstructions(x.hostname,x.token,x),https:x.railway?(x.railway.certificate||'pending'):(require('./react-railway').configured()?null:'manual')}))}}
 
 const ACTIVE=new Set(['queued','writing','fixing','building','testing','thinking','working','designing','images','reviewing','checking','analyzing','planning','assets','verifying','repairing','comparing','publishing','personas','visiting','reporting','reproducing','retesting','locking','pitching','researching','watching']);
+// This server's public address, for links customers use (launch posts, posters).
+function publicOrigin(req){const env=String(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||'').replace(/\/+$/,'');if(/^https?:\/\//.test(env))return env;const host=String(req.headers.host||'localhost');return(String(req.headers['x-forwarded-proto']||'').split(',')[0]||(/^(localhost|127\.)/.test(host)?'http':'https'))+'://'+host}
 function intEnv(name,fallback){const raw=process.env[name];if(raw===undefined||String(raw).trim()==='')return fallback;const n=Number(raw);return Number.isInteger(n)&&n>=0?n:fallback}
 function tiers(){
  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true',max=Boolean(String(process.env.KAIROQ_MAX_MODELS||'').trim());
@@ -732,7 +734,7 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch}){
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite}){
  const deps={callModel,checkRuntime,inspect,webSearch,designShots,generateImage};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
@@ -995,6 +997,38 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(image&&!/^(https:\/\/|\.\/uploads\/[a-z0-9-]+\.(png|jpg|jpeg|webp|gif)$)/.test(image))throw Object.assign(Error('Share image must be an https URL or an uploaded image'),{status:400});
    meta.seo={title:String(b.title||'').trim().slice(0,70),description:String(b.description||'').trim().slice(0,200),image};
    builder.saveMeta(meta);return send(res,200,{project:projectView(id)}),true;
+  }
+  // Grow: found on Google and in AI answers (site-search.js).
+  if(action==='/grow'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{grow:{...require('./site-search').status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null}}),true}
+  if(action==='/poster'&&method==='GET'){
+   const html=require('./launch-kit').poster(builder.loadMeta(id),{origin:publicOrigin(req)});
+   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:"});res.end(html);return true;
+  }
+  if(action==='/grow'&&method==='POST'){
+   const b=await readJson(req,40000),search=require('./site-search');
+   if(b.op==='refresh'){
+    limitedKey('grow-refresh:'+id,6,3600000);
+    const meta=builder.loadMeta(id);if(!meta.published)throw Object.assign(Error('Publish the app first.'),{status:409});
+    if(!renderSite)throw Object.assign(Error('Reading the live pages needs a browser on this server.'),{status:503});
+    await search.snapshot(id,{renderSite,base:'/sites/'+meta.published.slug+'/'});
+   }else if(b.op==='kit'){
+    limitedKey('grow-kit:'+id,10,3600000);
+    const price=intEnv('KAIROQ_DISCUSS_CREDITS',1),ref='kit:'+id+':'+Date.now();
+    if(v.kind==='customer'&&price>0)accounts.charge(v.account.id,price,'Launch kit','grow-'+ref);
+    try{return send(res,200,{kit:await require('./launch-kit').write(builder.loadMeta(id),{callModel,origin:publicOrigin(req)}),credits:v.kind==='customer'?price:0}),true}
+    catch(e){if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: launch kit failed','grow-refund-'+ref)}catch{}throw e}
+   }else if(b.op==='suggest'){
+    limitedKey('grow-suggest:'+id,10,3600000);
+    const price=intEnv('KAIROQ_DISCUSS_CREDITS',1);
+    if(v.kind==='customer'&&price>0)accounts.charge(v.account.id,price,'Search and AI answers: suggestions','grow:'+id+':'+Date.now());
+    try{return send(res,200,{suggestion:await search.suggest(builder.loadMeta(id),{callModel}),credits:v.kind==='customer'?price:0}),true}
+    catch(e){if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: suggestions failed','grow-refund:'+id+':'+Date.now())}catch{}throw e}
+   }else{
+    search.save(id,{business:b.business,faq:b.faq});
+    if(b.seo){const meta=builder.loadMeta(id);meta.seo={...(meta.seo||{}),title:String(b.seo.title||'').trim().slice(0,70),description:String(b.seo.description||'').trim().slice(0,200),image:(meta.seo&&meta.seo.image)||''};builder.saveMeta(meta)}
+   }
+   const meta=builder.loadMeta(id);
+   return send(res,200,{grow:{...search.status(meta),business:meta.business||null,faq:meta.faq||[],seo:meta.seo||null,urls:meta.published?hosting.siteUrls(meta):null,kit:meta.launch_kit||null}}),true;
   }
   if(action==='/members'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{members:meta.members||[]}),true}
   if(action==='/members'&&method==='POST'){
@@ -1347,7 +1381,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/rebuild'&&method==='POST'){limitedKey('rebuild:'+id,6,600000);const b=await readJson(req,2000);const meta=builder.loadMeta(id);const n=Number(b.version)||meta.current_version;if(!meta.versions.some(x=>x.n===n))throw Object.assign(Error('Unknown version'),{status:404});if(!await builder.ensureBuilt(id,n,{force:true}))throw Object.assign(Error('This version could not be built. Ask Kairoq to fix it: describe what you see.'),{status:422});return send(res,200,{project:projectView(id),preview_url:builder.previewUrl(meta,n)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
   if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);
-   await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot});
+   await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot,renderSite});
    return send(res,200,{project:projectView(id)}),true}
   if(action==='/unpublish'&&method==='POST'){hosting.unpublish(id);return send(res,200,{project:projectView(id)}),true}
   if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);const billing=require('./hosting-billing'),paid=billing.beforeDomain(id);try{await hosting.addDomain(id,b.hostname)}catch(e){billing.refund(id,paid);throw e}return send(res,200,{project:projectView(id)}),true}
@@ -1389,12 +1423,14 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[]}=
  return{meta,job};
 }
 // Publishing re-runs the saved checks on the version going live, unless the owner overrides.
-async function publishProject(id,{slug,version,force}={},{inspect,screenshot}={}){
+async function publishProject(id,{slug,version,force}={},{inspect,screenshot,renderSite}={}){
  if(!force&&inspect){const meta=builder.loadMeta(id),n=Number(version)||meta.current_version;if(require('./react-checks').list(meta).some(c=>c.enabled!==false)&&meta.versions.some(x=>x.n===n)){const r=await require('./react-checks').run(id,builder.previewUrl(meta,n),{inspect,version:n});if(r.failed.length)throw Object.assign(Error('Saved checks fail on this version: '+r.failed.map(f=>f.name).join(', ')+'. Fix them, or publish with force to go live anyway.'),{status:409,failed:r.failed})}}
  // Live hosting is paid monthly: the first 30 days are charged here (given back if publishing fails).
  const billing=require('./hosting-billing'),paid=billing.beforePublish(id);
  let out;try{out=hosting.publish(id,{slug,version})}catch(e){billing.refund(id,paid);throw e}
  out.billing={charged:paid.charged,paid_until:paid.paid_until||null};
+ // Search engines and AI assistants: what each live page shows is kept, in the background (site-search.js).
+ if(renderSite&&process.env.KAIROQ_SITE_SNAPSHOT!=='off'){const meta=builder.loadMeta(id);require('./site-search').snapshot(id,{renderSite,base:'/sites/'+meta.published.slug+'/'}).catch(e=>console.warn('[site-search]',e.message))}
  // The live link is opened once in a real browser, so "published" means it really loads.
  if(inspect){try{const meta=builder.loadMeta(id),r=await inspect('/sites/'+meta.published.slug+'/',{screenshot:false});const errors=(r.errors||[]).filter(e=>/^(Uncaught error|Page did not load|Blank page|HTTP 5)/.test(e));if(!r.skipped){meta.published.live_check={ok:!errors.length,errors:errors.slice(0,5),at:new Date().toISOString()};builder.saveMeta(meta);out.live_check=meta.published.live_check}}catch{}}
  // Social share image: a screenshot of the published version, taken in the background.

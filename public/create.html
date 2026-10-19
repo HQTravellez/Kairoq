@@ -587,6 +587,35 @@
     <label>Description<textarea id="seo-description" rows="2" maxlength="200"></textarea></label>
     <label>Share image <span class="muted small">(empty: an automatic screenshot)</span><input id="seo-image" placeholder="https://… or ./uploads/…"></label>
     <div class="row"><button class="ghost" id="seo-save" type="button">Save</button><span class="muted small" id="seo-status"></span></div>
+    <section class="grow hidden" id="grow">
+      <h3>Found on Google and in AI answers</h3>
+      <p class="muted small">Kairoq reads every page of your live site, so Google, ChatGPT, Perplexity and Gemini can find and quote it.</p>
+      <ul class="grow-items" id="grow-items"></ul>
+      <p class="muted small" id="grow-pages"></p>
+      <div class="row"><button class="ghost" id="grow-suggest" type="button">Fill in with AI from your pages</button><button class="ghost" id="grow-refresh" type="button">Read the live pages again</button></div>
+      <details id="grow-details">
+        <summary>Business details and common questions</summary>
+        <div class="grow-form">
+          <label>Business name<input id="gb-name" maxlength="100"></label>
+          <label>Kind of business<select id="gb-type"></select></label>
+          <label class="wide">Short description<textarea id="gb-description" rows="2" maxlength="400"></textarea></label>
+          <label>Street<input id="gb-street" maxlength="120"></label>
+          <label>City<input id="gb-city" maxlength="80"></label>
+          <label>Postal code<input id="gb-postal" maxlength="20"></label>
+          <label>Country<input id="gb-country" maxlength="60"></label>
+          <label>Phone<input id="gb-phone" maxlength="40"></label>
+          <label>Email<input id="gb-email" type="email" maxlength="120"></label>
+          <label>Opening hours <span class="muted small">(one per line, e.g. Mo-Fr 08:00-18:00)</span><textarea id="gb-hours" rows="3"></textarea></label>
+          <label>Price range <span class="muted small">(e.g. €€ or €10–€40)</span><input id="gb-price" maxlength="20"></label>
+          <label class="wide">Common questions <span class="muted small">(a line starting with Q: then one with A:)</span><textarea id="gb-faq" rows="7"></textarea></label>
+        </div>
+        <div class="row"><button class="ghost" id="grow-save" type="button">Save</button><span class="muted small" id="grow-status" role="status"></span></div>
+      </details>
+      <h3>Launch kit</h3>
+      <p class="muted small">Posts for Instagram, Google, WhatsApp, Facebook and LinkedIn, an email to your customers and a QR poster for your counter or window, written from what your live pages say.</p>
+      <div class="row"><button class="ghost" id="kit-write" type="button">Write my launch posts</button><a class="ghost button-link" id="kit-poster" target="_blank" rel="noopener">Print a QR poster</a><span class="muted small" id="kit-status" role="status"></span></div>
+      <div class="kit" id="kit"></div>
+    </section>
     <h3>Custom domain</h3>
     <div class="row"><input id="domain" placeholder="www.example.com"><button class="ghost" id="add-domain" type="button">Add</button></div>
     <ul class="domains" id="domains"></ul>
