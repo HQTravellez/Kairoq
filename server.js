@@ -6608,8 +6608,18 @@ async function streamAppAi(body,onToken,onFirst){
   }
   return{text,usage};
 }
+// Which service writes the apps. OpenRouter whenever its key is set: builds run in parallel,
+// each tier gets its own models, small edits use the fast lane and progress streams live.
+// Experiential Labs (one request at a time for the whole server, one model) only when chosen
+// with KAIROQ_BUILDER_PROVIDER=experiential, or when it is the only key there is.
+function builderProvider(){
+  const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
+  if(chosen==="experiential"&&experiential.configured())return"experiential";
+  if(chosen==="openrouter"||process.env.OPENROUTER_API_KEY)return"openrouter";
+  return experiential.configured()?"experiential":"openrouter";
+}
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
-  if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
+  if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
@@ -6814,7 +6824,7 @@ const server = http.createServer(async (req, res) => {
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     let local=false;try{local=(await getLocalLlmModels()).length>0}catch{}
     const ai=local||Boolean(process.env.OPENROUTER_API_KEY)||experiential.configured();
-    return json(res,200,{experiential:experiential.configured(),builder_provider:experiential.configured()?"experiential":"openrouter",ai_generation:ai,local_model:local,openrouter:!!process.env.OPENROUTER_API_KEY,github_publishing:!!(process.env.GITHUB_TOKEN&&process.env.GITHUB_REPO),repository:process.env.GITHUB_REPO||null,chromium:!!process.env.CHROMIUM_PATH,starter_template:true});
+    return json(res,200,{experiential:experiential.configured(),builder_provider:builderProvider(),ai_generation:ai,local_model:local,openrouter:!!process.env.OPENROUTER_API_KEY,github_publishing:!!(process.env.GITHUB_TOKEN&&process.env.GITHUB_REPO),repository:process.env.GITHUB_REPO||null,chromium:!!process.env.CHROMIUM_PATH,starter_template:true});
   }
   if(url==="/api/developer/oauth/providers"&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{return json(res,200,{providers:require("./api-oauth").providers()})}catch(e){return json(res,422,{error:e.message})}}
   if(url==="/api/developer/oauth/start"&&req.method==="POST"){if(!authEnabled())return json(res,403,{error:"Set APP_PASSWORD before enabling shared OAuth connections."});if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{const body=await getBody(req,5000),flow=require("./api-oauth").start(String(body.provider||""));res.setHeader("Set-Cookie",flow.cookie);return json(res,200,{authorizationUrl:flow.url})}catch(e){return json(res,422,{error:e.message})}}
