@@ -339,6 +339,7 @@
 <!-- Project list / new project -->
 <section class="screen hidden" id="home">
   <div class="home">
+    <div class="storage-warn hidden" id="storage-warn" role="alert"><b>Your data is not safe yet.</b> This server has no persistent volume, so every deploy deletes all accounts, projects and published sites. In Railway: open the service, Settings, Volumes, Add volume, mount path <code>/data</code>, then redeploy. Kairoq moves its data onto the volume by itself.</div>
     <div class="home-hero">
       <h1 id="home-title">Got an idea?</h1>
       <form id="new-form" class="prompt-box">
@@ -349,6 +350,7 @@
           <button class="primary send" type="submit" id="new-submit" aria-label="Build it" title="Build it"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
         </div>
       </form>
+      <div class="clarify hidden" id="clarify" aria-live="polite"></div>
       <div class="examples">
         <button type="button" class="example">A restaurant site with menu, opening hours and reservations</button>
         <button type="button" class="example">A CRM to track leads, deals and follow-ups</button>

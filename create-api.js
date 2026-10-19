@@ -160,6 +160,16 @@ function streamSnapshot(text,mode){
  const plan=planBlock?[...planBlock[1].matchAll(/"((?:[^"\\]|\\.)*)("?)/g)].filter(m=>m[1].trim()).map(m=>m[1].replace(/\\"/g,'"').slice(0,140)).slice(0,6):[];
  return{chars:text.length,files,current:last?last[1]:null,plan,message:msg?msg[1].replace(/\\n/g,'\n').replace(/\\"/g,'"'):'',tail:code.slice(-1600)};
 }
+// A small, clear change to an app that already exists ("make the button blue", "change the phone
+// number", "rename Contact to Get in touch"): it goes to a fast model. New apps, new features,
+// pages, sign-in, data and payments keep the full model.
+function quickEdit(meta,message,{mode,images=[],context=''}={}){
+ if(process.env.KAIROQ_FAST_EDITS==='off'||mode!=='build'||images.length||context||!(meta.current_version>=2))return false;
+ const t=String(message||'').trim();
+ if(t.length<4||t.length>160||/\n/.test(t))return false;
+ if(/\b(page|pages|screen|login|log in|sign[- ]?(in|up)|account|database|save|data|payments?|checkout|stripe|dashboard|admin|api|integrat|whatsapp|booking|calendar|search|filter|feature|function|form|chart|upload|email (me|notification)|automat|ai)\b/i.test(t))return false;
+ return /\b(change|make|rename|replace|swap|move|hide|remove|delete|set|use|update|correct|fix the (typo|spelling|text)|bigger|smaller|larger|wider|narrower|bold|italic|colou?r|font|text|title|heading|button|logo|image|photo|link|phone|email address|address|price|hours?|wording|spacing|padding|margin)\b/i.test(t);
+}
 // hooks (build from a reference): before() runs first and returns extra context for the model;
 // after(result) runs after the agent and returns the final result.
 // Pay only when it works: a change is charged only when it builds, opens without errors in the
@@ -278,7 +288,8 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    }
    else{
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
-    job.result=await builder.edit(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    const fast=quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
+    job.result=await builder.edit(id,message,{callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // The first build of a new project on Pro or Max gets a free design review.
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
@@ -729,7 +740,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -946,11 +957,13 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   }
   // ----- projects -----
   if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
+  // Before a first build: a few quick questions when the request leaves something important open (free).
+  if(route==='/clarify'&&method==='POST'){limitedKey('clarify:'+v.owner,30,3600000);const b=await readJson(req,8000);return send(res,200,{questions:process.env.KAIROQ_CLARIFY==='off'?[]:await require('./clarify').questions(b.prompt,{callModel,tier:b.tier})}),true}
   if(route==='/projects'&&method==='POST'){
    const b=await readJson(req,16000000);
    // A sponsored template slot: what to start with comes from the slot, not the request.
    const slot=b.sponsored?require('./partners').startFromSlot(String(b.sponsored)):null;
-   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
+   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.answers?require('./clarify').withAnswers(b.prompt,b.answers):b.prompt,template:b.template,tier:b.tier,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
@@ -1384,4 +1397,4 @@ async function publishProject(id,{slug,version,force}={},{inspect,screenshot}={}
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;
 }
-module.exports={handle,parseFiles,nameFromPrompt,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
+module.exports={handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};

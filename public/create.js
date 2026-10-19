@@ -75,6 +75,8 @@ async function loadHome(){
  show('home');history.replaceState(null,'','/create');
  const acct=state.me.viewer?.account;
  $('verify-notice').classList.toggle('hidden',!(acct&&!acct.email_verified&&state.me.email_ready));
+ // The owner is warned when a deploy would wipe everything (no persistent volume).
+ $('storage-warn').classList.toggle('hidden',!(state.me.storage&&state.me.storage.persistent===false));
  renderTemplates($('home-templates'),id=>startFromTemplate(id),id=>startFromSponsored(id));
  homeTab(state.homeTab||'projects');
  const {projects}=await api('/projects');
@@ -124,13 +126,49 @@ $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/bl
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
 for(const b of document.querySelectorAll('.example'))b.onclick=()=>{$('new-prompt').value=b.textContent;$('new-prompt').focus()};
+// A new app: when the request leaves something important open, a few quick questions first
+// (tap an answer, or let Kairoq decide); then the build starts.
+async function startBuild(prompt,answers){
+ const {project,job}=await api('/projects',{method:'POST',body:{prompt,...(answers&&answers.length?{answers}:{})}});
+ $('new-prompt').value='';$('clarify').classList.add('hidden');
+ const shown=answers&&answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
+ await openProject(project.id,{pendingText:shown,job});
+}
+function renderClarify(prompt,questions){
+ const box=$('clarify');box.replaceChildren();
+ const picked=questions.map(()=>new Set());
+ box.append(el('p','cl-title','A few quick questions, so it is right the first time'));
+ questions.forEach((q,i)=>{
+  const row=el('div','cl-q');row.append(el('p','cl-text',q.q));
+  const opts=el('div','cl-opts');
+  for(const o of q.options){
+   const b=el('button','chip',o);b.type='button';b.setAttribute('aria-pressed','false');
+   b.onclick=()=>{if(!q.multi){picked[i].clear();for(const x of opts.children)x.setAttribute('aria-pressed','false')}
+    if(picked[i].has(o)){picked[i].delete(o);b.setAttribute('aria-pressed','false')}else{picked[i].add(o);b.setAttribute('aria-pressed','true')}};
+   opts.append(b);
+  }
+  row.append(opts);box.append(row);
+ });
+ const go=el('button','primary','Build it');go.type='button';
+ const skip=el('button','ghost','Decide for me');skip.type='button';
+ const run=async withAnswers=>{go.disabled=skip.disabled=true;text($('home-error'),'');
+  try{await startBuild(prompt,withAnswers?questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length):[])}
+  catch(err){text($('home-error'),err.message);go.disabled=skip.disabled=false}};
+ go.onclick=()=>run(true);skip.onclick=()=>run(false);
+ const actions=el('div','row cl-actions');actions.append(skip,go);box.append(actions);
+ box.classList.remove('hidden');box.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
 $('new-form').onsubmit=async e=>{
  e.preventDefault();text($('home-error'),'');$('new-submit').disabled=true;
  try{
   const prompt=$('new-prompt').value.trim();
-  const {project,job}=await api('/projects',{method:'POST',body:{prompt}});
-  $('new-prompt').value='';
-  await openProject(project.id,{pendingText:prompt,job});
+  // Answers already given for this exact request: build straight away.
+  if(!$('clarify').classList.contains('hidden')&&$('clarify').dataset.prompt===prompt)return $('clarify').querySelector('.primary')?.click();
+  const note=document.querySelector('#new-form .prompt-note'),was=note&&note.textContent;
+  if(note)note.textContent='Reading your request…';
+  const {questions}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]})).finally(()=>{if(note)note.textContent=was});
+  if(questions&&questions.length){$('clarify').dataset.prompt=prompt;renderClarify(prompt,questions);return}
+  await startBuild(prompt);
  }catch(err){text($('home-error'),err.message)}
  finally{$('new-submit').disabled=false}
 };
