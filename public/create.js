@@ -344,6 +344,9 @@ async function renderData(){
  if(d.features.payments.length)feats.push('Payments: '+d.payments.length+' purchase'+(d.payments.length===1?'':'s')+' of '+d.features.payments.join(', '));
  for(const sc of d.features.schedules)feats.push('Schedule "'+sc.name+'" every '+sc.every+(sc.last_result?' · last: '+sc.last_result:''));
  text($('data-features'),feats.join(' · '));
+ const outbox=d.outbox||[];$('outbox').hidden=!outbox.length;
+ text($('outbox-title'),outbox.length+' email'+(outbox.length===1?'':'s')+' kept because email is not set up yet');
+ $('outbox-list').replaceChildren(...outbox.map(m=>{const li=document.createElement('li'),pre=document.createElement('pre');pre.textContent=(m.to_kind==='me'&&m.user_email?'To '+m.user_email:'To you')+' · '+when(new Date(m.at).toISOString())+'\n'+m.subject+'\n\n'+m.text;li.append(pre);return li}));
  const users=$('users');users.replaceChildren();
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();

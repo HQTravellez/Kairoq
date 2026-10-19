@@ -48,6 +48,7 @@ Rules:
   collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
   Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (guestbooks, public comments); "submit-only" = anyone can add but nobody can read them back, only the owner sees them in Kairoq (use this for contact, booking, reservation, order and waitlist forms; show a thank-you message after create). Only a record's creator can update or delete it.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
+  email.send() returns {sent:false, saved:true} when email is not set up on the server yet: treat that as done (the message is kept for the owner), never show it as an error to the customer.
   Invite a friend (only when the owner asks for referrals or invites): import { referrals } from 'kairoq'; const r = await referrals.mine() (signed-in users only) gives {link, code, joined, people:[{name, joined_at}]}. Show the link with a Copy button and a share button (navigator.share when available), how many friends joined, and the reward the owner chose. Visitors who open the link and then create an account are counted automatically; nothing else is needed.
   Apps that keep records (a CRM with leads, contacts and deals, bookings, orders, inventory, tasks, notes, follow-ups) save every record with collection() (or the SQL database), so it survives a reload and is the same on every device: never keep records only in React state, memory or localStorage, and never tell the user their data is "local to this session". Business data uses "private" or "shared" access behind a sign-in. Sample records may be created once when the collection is empty, clearly marked as examples the user can delete.
   Optional features (add them to src/backend.json only when the app needs them):
@@ -444,6 +445,8 @@ async function runtimeProblems(id,url,checkRuntime){
   return{errors,verified};
  });
 }
+// Said with every build, migration or browser error: the try stays applied and the fix goes on top.
+const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
 async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
@@ -459,6 +462,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null;
+ // The files a fix applies to: the request's base, then the last try that built (a fix for a
+ // build or browser error changes that try; it does not start again from the base).
+ let work=base;
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
  let thinking='',thoughtMs=null,firstPlan=null;
  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
@@ -472,7 +478,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   tl.add({t:'think',ms:(firstToken||Date.now())-started,text:attempt===1?thinking:''});
   if(attempt===1&&reply.plan.length)tl.add({t:'plan',items:reply.plan});
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design});tl.add({t:'note',icon:'image',text:'Generated '+reply.images.length+' image'+(reply.images.length===1?'':'s')})}
-  let next={...base};
+  let next={...work};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
   for(const [name,code] of Object.entries(reply.files))next[name]=code;
   // Small changes arrive as find/replace edits (cheaper than rewriting whole files).
@@ -493,9 +499,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
-  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\nFix the error and return corrected JSON.'});continue}
+  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\n'+KEPT+' Fix the error and return corrected JSON.'});continue}
   tl.add({t:'build',ok:true});
-  try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\nMigrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
+  try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\n'+KEPT+' Migrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
   runtimeErrors=[];checkResult=null;verified=null;
   if(checkRuntime||inspect){
    onProgress('testing');
@@ -509,16 +515,16 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    if(checkResult&&checkResult.ran)tl.add({t:'check',ok:!checkResult.failed.length,text:checkResult.failed.length?'Broke '+checkResult.failed.length+' of '+checkResult.ran+' saved checks':'All '+checkResult.ran+' saved check'+(checkResult.ran===1?'':'s')+' passed',detail:checkResult.failed.length?require('./react-checks').failureText(checkResult.failed):''});
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
-    lastError=runtimeErrors.join('\n');
+    lastError=runtimeErrors.join('\n');work=next;
     tl.add({t:'fix',text:'Fixing the errors the browser showed'});
-    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\nFind the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
+    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\n'+KEPT+' Find the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
     continue;
    }
    if(checkResult&&checkResult.failed.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
-    lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);
+    lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);work=next;
     tl.add({t:'fix',text:'Fixing the saved checks this change broke'});
-    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\nFix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
+    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\n'+KEPT+' Fix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
     continue;
    }
   }

@@ -109,6 +109,16 @@ async function deliver(to,subject,text,replyTo){
 async function sendEmail(body,{meta,db,cfg,user}){
  if(!cfg.email)throw fail(404,'Email is not enabled. Add "email": true to src/backend.json.');
  const to=body.to==='owner'?ownerEmail(meta):body.to==='me'?(user&&user.email):null;
+ // Email not set up on this server (or the owner has no address yet): the customer's booking or
+ // order must not fail because of it. The message is kept for the owner instead of sent.
+ const notReady=!process.env.KAIROQ_RESEND_API_KEY||!process.env.KAIROQ_EMAIL_FROM||(body.to==='owner'&&!to);
+ if(notReady&&(body.to==='owner'||body.to==='me')){
+  const subject=String(body.subject||'').trim().slice(0,200),text=String(body.text||'').trim().slice(0,10000);
+  if(!subject||!text)throw fail(400,'Email needs a subject and text');
+  db.exec('CREATE TABLE IF NOT EXISTS email_outbox(id TEXT PRIMARY KEY,to_kind TEXT NOT NULL,subject TEXT NOT NULL,text TEXT NOT NULL,user_email TEXT,at INTEGER NOT NULL)');
+  if(db.prepare('SELECT COUNT(*) n FROM email_outbox WHERE at>?').get(Date.now()-86400000).n<200)db.prepare('INSERT INTO email_outbox(id,to_kind,subject,text,user_email,at) VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),body.to,subject,text,user?user.email:null,Date.now());
+  return{sent:false,saved:true,reason:'Email is not set up yet; the message was kept for the app owner.'};
+ }
  if(!to)throw fail(body.to==='me'?401:body.to==='owner'?409:400,body.to==='me'?'Sign in to email yourself':body.to==='owner'?'The app owner has no email address yet (server admin: set KAIROQ_OWNER_EMAIL)':'Send to "owner" (the app owner) or "me" (the signed-in user)');
  const subject=String(body.subject||'').trim().slice(0,200),text=String(body.text||'').trim().slice(0,10000);
  if(!subject||!text)throw fail(400,'Email needs a subject and text');
