@@ -22,11 +22,23 @@ function create(id){
  const token=crypto.randomBytes(16).toString('hex');
  const dir=path.join(builder.projectDir(id),'sandboxes',token);
  fs.mkdirSync(dir,{recursive:true});
- const backend=require('./react-backend');
- snapshot(path.join(builder.projectDir(id),'data.sqlite'),path.join(dir,'data.sqlite'),{conn:fs.existsSync(path.join(builder.projectDir(id),'data.sqlite'))?backend.database(id):null});
+ const backend=require('./react-backend'),pg=require('./pg-sync');
+ if(pg.enabled())copySchema(backend.database(id),pg.schemaName('sb_'+token));
+ else snapshot(path.join(builder.projectDir(id),'data.sqlite'),path.join(dir,'data.sqlite'),{conn:fs.existsSync(path.join(builder.projectDir(id),'data.sqlite'))?backend.database(id):null});
  snapshot(path.join(builder.projectDir(id),'app-sql.sqlite'),path.join(dir,'app-sql.sqlite'));
  boxes.set(token,{id,dir,at:Date.now()});
  return{token,dir};
+}
+// Postgres: the test copy is a schema with the same tables and rows as the app's.
+function copySchema(db,to){
+ const q=n=>'"'+n.replace(/"/g,'""')+'"';
+ db.exec('DROP SCHEMA IF EXISTS '+q(to)+' CASCADE; CREATE SCHEMA '+q(to));
+ for(const {table_name:t} of db.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'").all())
+{
+  // Generated columns (the search index) are computed again, not copied.
+  const cols=db.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? AND is_generated='NEVER' ORDER BY ordinal_position").all(t).map(c=>q(c.column_name)).join(',');
+  db.exec('CREATE TABLE '+q(to)+'.'+q(t)+' (LIKE '+q(t)+' INCLUDING ALL); INSERT INTO '+q(to)+'.'+q(t)+'('+cols+') SELECT '+cols+' FROM '+q(t));
+ }
 }
 // Every use keeps a copy alive; unused copies are removed after an hour.
 function lookup(id,token){const b=token&&boxes.get(String(token));if(!b||b.id!==id)return null;b.at=Date.now();return b}
@@ -34,6 +46,8 @@ function destroy(token){
  const b=boxes.get(token);if(!b)return;
  boxes.delete(token);
  try{require('./react-backend').closeFile(path.join(b.dir,'data.sqlite'))}catch{}
+ const pg=require('./pg-sync');
+ if(pg.enabled())try{require('./react-backend').database(b.id).exec('DROP SCHEMA IF EXISTS "'+pg.schemaName('sb_'+token)+'" CASCADE')}catch{}
  try{require('./react-sql').closeEverywhere(b.dir)}catch{}
  fs.rmSync(b.dir,{recursive:true,force:true});
 }
@@ -43,7 +57,7 @@ function sweep(){for(const [t,b] of boxes)if(Date.now()-b.at>MAX_AGE_MS)destroy(
 function contains(box,text){
  const needle='%'+String(text).replace(/[%_\\]/g,'')+'%';
  const data=path.join(box.dir,'data.sqlite');
- if(fs.existsSync(data)){
+ if(fs.existsSync(data)||require('./pg-sync').enabled()){
   const db=require('./react-backend').openFile(data);
   try{if(db.prepare('SELECT 1 FROM records WHERE data LIKE ? LIMIT 1').get(needle))return true}catch{}
  }
