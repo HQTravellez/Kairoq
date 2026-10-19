@@ -73,7 +73,8 @@ Rules:
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
 {"plan":["2 to 6 short steps you will take, written for the user, e.g. \"Add a booking form to the home page\""],"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
-Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.${require('./react-edits').PROMPT_NOTE}`;
+Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.
+When you add or change a flow a customer uses (sign up, book, order, add or edit a record, a form), also send "checks": up to 2 browser checks that prove it works, e.g. "checks":[{"name":"Add a contact","path":"","steps":[{"action":"click","text":"Add contact"},{"action":"fill","label":"Name","value":"Test Ana"},{"action":"click","text":"Save"},{"action":"expect","text":"Test Ana"}]}]. Steps: click/fill/select by the exact visible text, label or placeholder; "expect" a text that only appears when it worked; "goto" a "#/route" path when needed; test data like test-ana@example.com. When the flow needs an account, start with the steps that create one. Kairoq runs each check on a test copy of the data and keeps the ones that pass, so they protect the flow in every later change. No checks for purely visual changes.${require('./react-edits').PROMPT_NOTE}`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
 function projectDir(id){if(!/^[a-f0-9]{12}$/.test(String(id)))throw Object.assign(Error('Unknown project'),{status:404});return path.join(ROOT(),id)}
@@ -279,7 +280,7 @@ function parseEdit(content){
  if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
  const plan=(Array.isArray(value.plan)?value.plan:[]).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,6);
- return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:value.files||{},edits,delete:del,images:imageRequests(value.images)};
+ return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:value.files||{},edits,delete:del,images:imageRequests(value.images),checks:Array.isArray(value.checks)?value.checks.slice(0,2):[]};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
@@ -408,6 +409,23 @@ function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10)
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
+// The checks the AI sent with a change: each is run on the new version (test copy of the data)
+// and saved only when it passes. Kairoq's own checks take at most 10 of the 15 places, and
+// replace an earlier Kairoq check with the same name, never one the owner made.
+const MAX_AI_CHECKS=10;
+async function adoptChecks(id,url,raw,{inspect,version}){
+ const checks=require('./react-checks'),out=[];
+ for(const r of raw){
+  let c;try{c=checks.normalize(r)}catch{continue}
+  const meta=loadMeta(id),all=checks.list(meta),same=all.find(x=>x.name.toLowerCase()===c.name.toLowerCase());
+  if(same&&same.source!=='kairoq')continue;
+  if(!same&&(all.length>=checks.MAX_CHECKS||all.filter(x=>x.source==='kairoq').length>=MAX_AI_CHECKS))break;
+  const result=await checks.run(id,url,{inspect,checks:[{...c,id:'new',enabled:true}],record:false,version}).catch(()=>null);
+  if(!result||!result.ran||result.failed.length)continue;
+  checks.save(id,c,{source:'kairoq'});out.push(c.name);
+ }
+ return out;
+}
 // Errors that mean the app does not show at all.
 function brokenError(e){return /^(Blank page|Page did not load)/.test(String(e))}
 // The browser check runs on a test copy of the app's data and adds a record the way a customer
@@ -522,8 +540,11 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const now=new Date().toISOString();
   fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{})});
   saveMeta(fresh);
+  // Checks the AI wrote for the flows it built: kept only when they pass on the new version.
+  const adopted=!rollback&&inspect&&reply.checks.length&&!runtimeErrors.length?await adoptChecks(id,previewUrl(fresh,n),reply.checks,{inspect,version:n}).catch(()=>[]):[];
+  if(adopted.length){const m=loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.tests_added=adopted;saveMeta(m)}tl.add({t:'check',ok:true,text:'Saved '+adopted.length+' new check'+(adopted.length===1?'':'s')+' for later changes: '+adopted.join(', ')})}
   if(rollback)return{version:working.n,message,changed:[],attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:[],rolled_back:{tried:n,kept:working.n,errors:runtimeErrors},preview_url:previewUrl(fresh)};
-  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
 }
