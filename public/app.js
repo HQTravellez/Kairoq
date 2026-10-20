@@ -238,7 +238,7 @@ function applyShellMode(){
 
 function setMainView(view="command"){
   if(view==="command") document.body.classList.remove("history-focus");
-  mainView = ["chat","command","studio"].includes(view) ? view : "command";
+  mainView = ["chat","command","studio","build"].includes(view) ? view : "command";
   localStorage.setItem("pai-main-view", mainView);
   $(".main").dataset.view = mainView;
   document.body.classList.remove("nav-open");
@@ -250,15 +250,24 @@ function setMainView(view="command"){
   command?.classList.toggle("hidden", mainView !== "command");
   messages?.classList.toggle("hidden", mainView !== "chat");
   studio?.classList.toggle("hidden", mainView !== "studio");
+  $("#buildView")?.classList.toggle("hidden", mainView !== "build");
+  $("#buildNavBtn")?.classList.toggle("active", mainView === "build");
+  if(mainView!=="command") $("#commandCenter")?.classList.remove("show-work");
+  // On the home view the chat box sits under the headline; everywhere else it is docked at the bottom.
+  const shell=$(".composer-shell"), slot=$("#khComposerSlot");
+  if(shell && slot){
+    if(mainView==="command"){ if(shell.parentElement!==slot) slot.appendChild(shell); }
+    else if(shell.parentElement===slot) $(".main").appendChild(shell);
+  }
 
   $("#commandCenterBtn")?.classList.toggle("active", mainView === "command");
   $("#chatViewBtn")?.classList.toggle("active", mainView === "chat");
   $("#studioNavBtn")?.classList.toggle("active", mainView === "studio");
   $("#studioSideBtn")?.classList.toggle("active", mainView === "studio");
 
-  if($("#mainViewTitle")) $("#mainViewTitle").textContent = mainView === "command" ? "Today" : mainView === "studio" ? "Studio" : (getChat()?.title || "Ask Kairoq");
+  if($("#mainViewTitle")) $("#mainViewTitle").textContent = mainView === "build" ? "Build an app" : mainView === "command" ? "Home" : mainView === "studio" ? "Studio" : (getChat()?.title || "Ask Kairoq");
   if($("#mainViewSubtitle")) $("#mainViewSubtitle").textContent = mainView === "command"
-    ? "What needs to happen?"
+    ? ""
     : mainView === "studio" ? "Create images, videos, avatars, and UGC from one place."
     : `${AGENT_TEAM[selectedAgentType]?.name || "Kairoq"} · ${currentProject}`;
 
@@ -368,7 +377,7 @@ function renderOpenLoops(data){
   });
 
   if(!loops.length){
-    host.innerHTML=`<div class="cc-clear-state compact"><span>✓</span><strong>Nothing unresolved</strong><small>Ask “What am I forgetting?” and Kairoq will look for unfinished business.</small></div>`;
+    host.innerHTML=`<div class="cc-empty">Nothing open. Ask for something and Kairoq keeps track until it is done.</div>`;
   }
 }
 async function refreshOpenLoops(){
@@ -582,7 +591,7 @@ function renderCcPriority(cards=[], failures=[]){
       <span class="cc-priority-dot"></span>
       <span class="cc-priority-main">
         <strong>${escapeHTML(card.title||"Workflow")}</strong>
-        <small>${meta.glyph} ${escapeHTML(meta.name)} · ${escapeHTML(card.body||"")}</small>
+        <small>${escapeHTML(meta.name)} · ${escapeHTML(card.body||"")}</small>
       </span>
       <span class="cc-priority-status">${escapeHTML(card.status||"open")}</span>`;
     row.onclick=()=>{$("#workflowsBtn")?.click()};
@@ -590,7 +599,7 @@ function renderCcPriority(cards=[], failures=[]){
   });
 
   if(!host.children.length){
-    host.innerHTML=`<div class="cc-clear-state"><span>✓</span><strong>You're caught up</strong><small>No workflows currently need your attention.</small></div>`;
+    host.innerHTML=`<div class="cc-empty">You're caught up. Nothing needs you right now.</div>`;
   }
 }
 function renderCcActivity(cards=[]){
@@ -602,7 +611,6 @@ function renderCcActivity(cards=[]){
     const row=document.createElement("div");
     row.className="cc-activity-row";
     row.innerHTML=`
-      <span class="cc-activity-glyph">${meta.glyph}</span>
       <span class="cc-activity-copy">
         <strong>${escapeHTML(card.title||"Workflow update")}</strong>
         <small>${escapeHTML(meta.name)} · ${escapeHTML(card.status||"open")} · ${escapeHTML(prettyRelativeTime(card.created_at))}</small>
@@ -610,7 +618,7 @@ function renderCcActivity(cards=[]){
     host.appendChild(row);
   });
   if(!cards.length){
-    host.innerHTML=`<div class="cc-clear-state compact"><span>✦</span><strong>No activity yet</strong><small>Run an agent or create a scheduled bot to start building your activity feed.</small></div>`;
+    host.innerHTML=`<div class="cc-empty">Nothing yet today.</div>`;
   }
 }
 function renderAtlasChannels(data={}){
@@ -1661,6 +1669,7 @@ async function generateVideoFromPrompt(raw){
 }
 
 async function send(regenerateFrom=null){
+  if(regenerateFrom===null && appBuildMode) return startAppBuild(promptEl.value.trim());
   setMainView("chat");
   const raw=promptEl.value.trim();
   if(busy || (!raw && !attachments.length))return;
@@ -2401,11 +2410,8 @@ function renderTemplates(mode=currentVerticalMode()){
     card.style.setProperty("--agent-accent",c.accent);
     card.innerHTML=`
       <div class="template-head">
-        <div class="template-avatar"><img src="/assets/mascot-ghost.png" alt=""></div>
-        <div>
-          <div class="template-title">${escapeHTML(t.title)}</div>
-          <div class="template-meta">${meta.glyph} ${meta.name} · ${escapeHTML(t.cadence)}</div>
-        </div>
+        <div class="template-title">${escapeHTML(t.title)}</div>
+        <div class="template-meta">${escapeHTML(meta.name)} · ${escapeHTML(t.cadence)}</div>
       </div>
       <div class="template-desc">${escapeHTML(t.desc)}</div>
       <div class="template-actions">
@@ -2806,10 +2812,11 @@ $("#loginForm").onsubmit=async e=>{
   $("#loginOverlay").classList.add("hidden");$("#loginPassword").value="";$("#loginError").textContent="";loadModels();loadUsage();
 };
 
-$("#commandCenterBtn").onclick=()=>setMainView("command");
+$("#commandCenterBtn").onclick=()=>{setMainView("command");$("#commandCenter")?.classList.remove("show-work");$("#commandCenter")?.scrollTo({top:0})};
 $("#outcomesNavBtn").onclick=()=>{
   setMainView("command");
-  requestAnimationFrame(()=>$("#openLoopsList")?.closest(".open-loops-panel")?.scrollIntoView({behavior:"smooth",block:"start"}));
+  $("#commandCenter")?.classList.add("show-work");
+  requestAnimationFrame(()=>$("#khWork")?.scrollIntoView({behavior:"smooth",block:"start"}));
 };
 $("#historyNavBtn").onclick=()=>{
   setMainView("chat");
@@ -2846,6 +2853,69 @@ $("#imageModeBtn").onclick=()=>setImageMode(!imageMode);
 $("#videoModeBtn").onclick=()=>setVideoMode(!videoMode);
 $("#fileInput").onchange=e=>{handleFiles(e.target.files);e.target.value=""};
 $("#sendBtn").onclick=()=>send();
+
+// Build an app from the main page: pick Web app or Mobile app above the box, say what to build,
+// answer any quick questions here, then the builder opens inside this page with the request running.
+let appBuildMode=false;
+const APP_PLACEHOLDERS={web:"Describe your web app…",mobile:"Describe your mobile app…"};
+const chatPlaceholder=promptEl.placeholder;
+function setAppBuildMode(mode){
+  appBuildMode=mode==="web"||mode==="mobile"?mode:false;
+  $$(".kh-mode").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.mode===(appBuildMode||"ask"))));
+  $(".composer")?.classList.toggle("app-mode",!!appBuildMode);
+  promptEl.placeholder=appBuildMode?APP_PLACEHOLDERS[appBuildMode]:chatPlaceholder;
+  $(".kh-hero .kh-pills:not(.kh-app-ideas)")?.classList.toggle("hidden",!!appBuildMode);
+  $(".kh-app-ideas")?.classList.toggle("hidden",!appBuildMode);
+  if($("#khGreeting"))$("#khGreeting").innerHTML=appBuildMode?"What do you want to <em>build</em>?":"What should we <em>get done</em>?";
+  $(".kh-hero>p")?.classList.toggle("hidden",!!appBuildMode);
+}
+function openAppBuilder(mode="web"){
+  setMainView("command");
+  $("#commandCenter")?.classList.remove("show-work");
+  setAppBuildMode(mode);
+  promptEl.focus();
+}
+function openBuilder(url){
+  $("#buildFrame").src=url;
+  setMainView("build");
+}
+function launchAppBuild(prompt){
+  // The builder opens here and asks any quick questions inside its own chat before building.
+  const text=appBuildMode==="mobile"?"Build a mobile app: "+prompt:prompt;
+  try{sessionStorage.setItem("kairoq-pending",JSON.stringify({prompt:text,ask:true}))}catch{}
+  promptEl.value="";resizePrompt();
+  setAppBuildMode(false);
+  openBuilder("/create?embed=1");
+}
+async function loadHomeApps(){
+  const box=$("#khApps"),list=$("#khAppList");if(!box||!list)return;
+  try{
+    const r=await fetch("/api/create/projects",{credentials:"same-origin"});
+    const {projects=[]}=r.ok?await r.json():{};
+    list.replaceChildren(...projects.slice(0,6).map(p=>{
+      const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
+      const name=String(p.name||"Untitled app");
+      let hue=0;for(const ch of name)hue=(hue*31+ch.charCodeAt(0))%360;
+      const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--h",hue);thumb.setAttribute("aria-hidden","true");
+      thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+      const meta=document.createElement("span");meta.className="kh-app-meta";
+      const title=document.createElement("strong");title.textContent=name;
+      const when=document.createElement("small");when.textContent=p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"";
+      meta.append(title,when);b.append(thumb,meta);
+      b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
+      li.append(b);return li;
+    }));
+    box.classList.toggle("hidden",!projects.length);
+  }catch{box.classList.add("hidden")}
+}
+function startAppBuild(prompt){
+  if(!prompt){promptEl.focus();return}
+  launchAppBuild(prompt);
+}
+loadHomeApps();
+$$(".kh-mode").forEach(t=>t.onclick=()=>{setAppBuildMode(t.dataset.mode);promptEl.focus()});
+$$("[data-build-app]").forEach(b=>b.onclick=()=>openAppBuilder("web"));
+$$("[data-idea]").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent.trim();resizePrompt();promptEl.focus()});
 $("#stopBtn").onclick=()=>abortController?.abort();
 promptEl.addEventListener("input",resizePrompt);
 promptEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
@@ -3432,6 +3502,10 @@ $('#listingVideoBtn')?.addEventListener('click',()=>createListingVideoUI());
 $('#listingProposalBtn')?.addEventListener('click',()=>createListingProposalUI());
 
 // Calm workspace navigation; existing conversations and settings are preserved.
+// Clicking outside the open menu closes it.
+document.querySelector(".main")?.addEventListener("click", e => {
+ if(document.body.classList.contains("nav-open") && !e.target.closest("#sidebarToggle")){ document.body.classList.remove("nav-open"); $("#sidebarToggle")?.setAttribute("aria-expanded", "false"); }
+});
 $("#sidebarToggle")?.addEventListener("click", () => {
  const open = document.body.classList.toggle("nav-open");
  $("#sidebarToggle").setAttribute("aria-expanded", String(open));

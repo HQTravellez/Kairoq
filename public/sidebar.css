@@ -1,6 +1,10 @@
 /* Workspace sidebar: one icon set, compact rows, grouped sections, model settings tucked away.
    Loaded after styles.css and calm.css; scoped to .sidebar.kn so older rules do not leak in. */
-@media(min-width:761px){.app>.sidebar.kn{display:flex!important}}
+/* The sidebar is a drawer on every screen size: home stays one clean prompt, the menu button opens the rest. */
+.app{grid-template-columns:minmax(0,1fr)!important}
+.app>.sidebar.kn{display:none!important}
+.nav-open .app>.sidebar.kn{display:flex!important;position:fixed;inset:0 auto 0 0;width:264px;z-index:100;box-shadow:24px 0 60px #29251c26}
+.nav-open .main::after{content:"";position:fixed;inset:0;z-index:90;background:#29251c1f}
 .app>.sidebar.kn{flex-direction:column;gap:0!important;padding:18px 12px 12px!important;overflow-y:auto;scrollbar-width:thin}
 .sidebar.kn .brand{padding:2px 8px 16px!important;gap:10px;align-items:center}
 .sidebar.kn .brand-mark{width:32px;height:32px;font-size:15px;display:grid;place-items:center;flex:none}
@@ -70,3 +74,11 @@
 .sidebar.kn::after{display:none!important}
 .sidebar.kn .preset-add{border-style:dashed;color:var(--muted)}
 .simple-mode .sidebar.kn a[href="/build-studio.html"],.simple-mode .sidebar.kn a[href="/api-studio.html"],.simple-mode .sidebar.kn a[href="/apps/housing-enquiries/"]{display:none!important}
+/* Less-used tools fold away under More. */
+.sidebar.kn .kn-fold>summary{display:flex;align-items:center;gap:10px;min-height:32px;padding:0 10px;border-radius:8px;color:#4d4a43;font:500 13px/1.2 var(--font);cursor:pointer;list-style:none}
+.sidebar.kn .kn-fold>summary::-webkit-details-marker{display:none}
+.sidebar.kn .kn-fold>summary:hover{background:#e7e5dc;color:#292824}
+.sidebar.kn .kn-fold[open]>summary{color:#292824}
+.sidebar.kn .kn-fold .kn-project{padding:6px 2px 2px}
+.topbar .sidebar-toggle{display:grid!important;place-items:center;width:34px;height:34px;padding:0;border:0!important;border-radius:9px;background:transparent!important;color:#5d5951;font-size:16px}
+.topbar .sidebar-toggle:hover{background:#efece4!important}

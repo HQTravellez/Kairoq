@@ -1,7 +1,7 @@
 "use strict";
 (()=>{
 const $=id=>document.getElementById(id);
-const state={me:null,project:null,job:null,mode:'signup',file:null};
+const state={me:null,project:null,job:null,mode:'signup',file:null,model:(()=>{try{return localStorage.getItem('kairoq-model')||'auto'}catch{return'auto'}})()};
 
 async function api(path,{method='GET',body}={}){
  const r=await fetch('/api/create'+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});
@@ -90,9 +90,8 @@ async function loadHome(){
 function renderSetup(setup){
  const card=$('setup-card');if(!card)return;
  card.classList.toggle('hidden',!setup);if(!setup)return;
- $('setup-title').textContent=setup.missing_required?'Finish setting up Kairoq':'Kairoq is set up';
+ $('setup-title').textContent=setup.missing_required?'Finish setup: '+setup.missing_required+' needed':'Setup';
  $('setup-count').textContent=setup.done+' of '+setup.total;
- card.open=setup.missing_required>0;
  $('setup-list').replaceChildren(...setup.items.map(i=>{
   const li=document.createElement('li');li.className=i.ok?'ok':i.required?'missing':'optional';
   const head=document.createElement('div');head.className='setup-item';
@@ -194,6 +193,45 @@ $('new-form').onsubmit=async e=>{
  finally{$('new-submit').disabled=false}
 };
 
+// Started from the main Kairoq page: open the editor straight away and ask any quick questions
+// inside the chat, one at a time, before the first build starts.
+async function askThenBuild(prompt){
+ const name=prompt.replace(/^Build a mobile app:\s*/i,'').split(/\s+/).slice(0,6).join(' ').replace(/[.,;:]+$/,'');
+ const {project}=await api('/projects',{method:'POST',body:{name}});
+ await openProject(project.id);
+ const list=$('messages');list.replaceChildren();
+ const mine=messageItem({role:'user',text:prompt});list.append(mine);
+ const card=document.createElement('li');card.className='assistant ask-card';
+ card.append(el('p','ask-head','Reading your request…'));list.append(card);
+ const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
+ const build=answers=>{mine.remove();card.remove();
+  send(answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt,'build')};
+ if(!questions.length)return build([]);
+ const picked=questions.map(()=>new Set());let at=0;
+ const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length);
+ const draw=()=>{
+  const q=questions[at];card.replaceChildren();
+  const head=el('div','ask-top');head.append(el('span','ask-head','A few quick questions'));
+  const skip=el('button','ask-link','Skip');skip.type='button';skip.onclick=()=>build(answers());head.append(skip);
+  const opts=el('div','ask-opts');
+  (q.options||[]).forEach((o,i)=>{
+   const row=el('label','ask-opt');const input=document.createElement('input');
+   input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
+   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o)};
+   row.append(input,el('span',null,o));opts.append(row);
+  });
+  const foot=el('div','ask-foot');
+  foot.append(el('span','ask-count','Question '+(at+1)+' of '+questions.length));
+  const back=el('button','ask-link','Back');back.type='button';back.disabled=at===0;back.onclick=()=>{at--;draw()};
+  const auto=el('button','ghost','Decide for me');auto.type='button';auto.onclick=()=>build(answers());
+  const last=at===questions.length-1;
+  const next=el('button','primary',last?'Build it':'Next');next.type='button';next.onclick=()=>{if(last)build(answers());else{at++;draw()}};
+  foot.append(back,auto,next);
+  card.append(head,el('p','ask-q',q.q),opts,foot);
+  list.scrollTop=list.scrollHeight;
+ };
+ draw();
+}
 // ---------- editor ----------
 async function openProject(id,{pendingText,job}={}){
  const {project,account}=await api('/projects/'+id);
@@ -571,22 +609,45 @@ $('file-new').onclick=()=>{
 
 // ---------- chat ----------
 state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
+// The send button stays quiet until there is something to send.
+const syncSend=()=>$('send').classList.toggle('is-empty',!$('chat-input').value.trim());
+$('chat-input').addEventListener('input',syncSend);syncSend();
 $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('chat-form').requestSubmit()}});
 const PLACEHOLDERS={build:'Ask for a change, or paste a link: "add a pricing section like https://…"',discuss:'Ask a question, plan a feature, or ask me to look something up on the web. No code changes.',agent:'Give the agent a bigger task: "add room booking with availability, test the whole flow and fix any errors". It can open websites and read docs on the way.'};
-function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));$('chat-input').placeholder=PLACEHOLDERS[mode];$('send').setAttribute('aria-label',mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');$('send').title=$('send').getAttribute('aria-label');costHint()}
+function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));text($('mode-label'),{build:'Build',discuss:'Discuss',agent:'Agent'}[mode]);$('menu-mode').open=false;$('chat-input').placeholder=PLACEHOLDERS[mode];$('send').setAttribute('aria-label',mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');$('send').title=$('send').getAttribute('aria-label');costHint()}
 $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');$('mode-agent').onclick=()=>setChatMode('agent');
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
+ // The model menu: Auto (the default builder) or a model picked by name, each with what it is
+ // good at and what a message costs. A named model that cannot run falls back to Auto.
+ const models=state.me.models||[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true}];
+ if(!models.some(m=>m.id===state.model&&m.enabled))state.model='auto';
+ const panel=$('tier-panel');panel.replaceChildren(el('p','menu-note','Which AI model works on your next message'));
+ for(const m of models){
+  const b=document.createElement('button');b.type='button';b.disabled=!m.enabled;b.setAttribute('aria-pressed',String(m.id===state.model));
+  const name=el('b',null,m.label);
+  if(m.top)name.append(el('i','model-tag top','Top pick'));
+  const credits=m.credits?m.credits+' credit'+(m.credits===1?'':'s')+' a message':'';
+  const bits=[m.note,credits].filter(Boolean).join(' · ');
+  const line=el('span',null,bits+(m.enabled?'':' · needs OpenRouter and paid builds switched on'));
+  if(m.costlier&&m.enabled)line.append(el('i','model-tag cost','costlier'));
+  b.append(name,line);
+  b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
+  panel.append(b);
+ }
+ const cur=models.find(m=>m.id===state.model);text($('tier-label'),cur?cur.label:'Auto');
  costHint();
 }
 $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
 function costHint(){
  const base='Screenshot the app on desktop and phone and let the AI fix what looks off';
  if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');$('polish').title=base;return}
- const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
+ const tier=(state.me.tiers||[]).find(x=>x.id===state.tier),picked=(state.me.models||[]).find(m=>m.id===state.model&&m.credits);
+ // A model picked by name is priced at its own credits instead of the tier's.
+ const t=picked?{credits:picked.credits}:tier;
  const p=Math.max(t?t.credits:1,state.me.polish_credits||1);$('polish').title=base+' ('+p+' credit'+(p===1?'':'s')+')';
- const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
+ const n=(state.mode==='discuss'?((state.tier==='standard'&&!picked)||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
  // Before sending: what this message costs, and what could come on top.
  const img=state.mode!=='discuss'&&state.me.image_generation?.enabled&&state.me.image_generation.credits;
  text($('cost-hint'),'This message: '+n+' credit'+(n===1?'':'s')+(img?' (+'+img+' per AI image, if it makes any)':''));
@@ -631,7 +692,7 @@ async function send(message,mode,path='/chat',extra={}){
  const files=state.attachments.filter(a=>a.kind==='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
  $('messages').append(messageItem({role:'user',text:message,mode,images:[...images,...files].map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
  $('chat-input').value='';state.attachments=[];renderAttachments();
- try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,images:images.length?images:undefined,files:files.length?files:undefined,...extra}});watch(job)}
+ try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,...(state.model&&state.model!=='auto'?{model:state.model}:{}),images:images.length?images:undefined,files:files.length?files:undefined,...extra}});watch(job)}
  catch(err){
   $('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));
   if(err.status===402&&state.me.purchases)openBuy();
@@ -882,6 +943,7 @@ async function watch(job){
   if(done.mode!=='discuss')setPreview(project.preview_url);
   if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')+(done.fix_on_us?' The fix is on us: the next Fix costs nothing.':'')}));
   else if(done.free)$('messages').append(messageItem({role:'assistant',text:done.free}));
+  if(done.model_fallback)$('messages').append(messageItem({role:'assistant',text:done.model_fallback}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?(done.mode==='repair'?'\nRounds that did not finish were refunded.':'\nYour credits were refunded.'):''),failed:true}));
@@ -2040,6 +2102,8 @@ $('side-admin').onclick=openAdmin;
 $('learn-run').onclick=async()=>{const b=$('learn-run');b.disabled=true;text($('learn-status'),'Looking at recent builds…');try{const r=await api('/learning',{method:'POST',body:{action:'run'}});text($('learn-status'),r.result.proposed.length?'Proposed '+r.result.proposed.length+' new rule'+(r.result.proposed.length===1?'':'s')+'.':'No new repeated problems found.');renderAdmin(r.learning)}catch(err){text($('learn-status'),err.message)}finally{b.disabled=false}};
 
 async function start(){
+ // Opened inside the main Kairoq page: no second sidebar.
+ if(new URLSearchParams(location.search).get('embed')==='1'||window.self!==window.top)document.body.classList.add('embed');
  await handleLinks();
  const v=await loadMe();
  $('google-login').classList.toggle('hidden',!state.me.google);
@@ -2052,6 +2116,7 @@ async function start(){
  if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}
  const pending=takePending();
  if(pending){
+  if(pending.ask){try{return await askThenBuild(pending.prompt)}catch(err){await loadHome();text($('home-error'),err.message);return}}
   if(pending.remix)return remix(pending.remix);
   if(pending.sponsored){try{const {project,job}=await api('/projects',{method:'POST',body:{sponsored:pending.sponsored}});return openProject(project.id,{job})}catch(err){await loadHome();text($('home-error'),err.message);return}}
   if(pending.rebuild){try{return await rebuild(pending.rebuild)}catch(err){await loadHome();text($('home-error'),err.message);return}}
