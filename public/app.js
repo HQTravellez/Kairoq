@@ -1171,7 +1171,7 @@ function renderCustomPresets(){
     host.appendChild(b);
   });
   const add=document.createElement("button");
-  add.textContent="+ Preset";
+  add.textContent="+ Preset";add.type="button";add.className="preset preset-add";
   add.onclick=()=>$("#presetDialog").showModal();
   host.appendChild(add);
 }
