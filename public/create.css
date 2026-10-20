@@ -708,3 +708,38 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .lead-mail input,.lead-mail textarea{width:100%;margin:.25rem 0}
 /* Inside the main Kairoq page the builder has no sidebar of its own. */
 body.embed #side,body.embed #side-open-btn{display:none!important}
+/* Questions asked inside the chat before the first build */
+.messages li.ask-card{display:grid;gap:10px;max-width:100%;padding:14px 16px;border:1px solid var(--border);border-radius:16px;background:var(--panel);box-shadow:var(--shadow-sm)}
+.ask-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ask-head{margin:0;font-size:12.5px;font-weight:600;color:var(--accent)}
+.ask-q{margin:0;font-size:14.5px;font-weight:600;color:var(--text);line-height:1.35}
+.ask-opts{display:grid;gap:2px}
+.ask-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;font-size:13.5px;cursor:pointer}
+.ask-opt:hover{background:var(--hover)}
+.ask-opt input{width:16px;height:16px;margin:0;accent-color:var(--ink)}
+.ask-foot{display:flex;align-items:center;gap:8px}
+.ask-count{margin-right:auto;font-size:12px;color:var(--muted)}
+.ask-link{border:0;background:none;padding:4px 8px;border-radius:6px;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer}
+.ask-link:hover{background:var(--hover);color:var(--text)}
+.ask-link:disabled{opacity:.35;cursor:default;background:none}
+.ask-foot .primary,.ask-foot .ghost{height:32px;padding:0 14px;font-size:13px}
+.messages li.assistant.ask-card{background:var(--panel)!important;border:1px solid var(--border)!important;border-radius:16px!important;padding:14px 16px!important;box-shadow:0 1px 2px rgba(15,15,15,.04),0 8px 24px -16px rgba(15,15,15,.18)!important;margin:4px 0}
+.messages li.assistant.ask-card::before,.messages li.assistant.ask-card::after{display:none!important;content:none!important}
+.ask-card .ask-opt{border:1px solid var(--border);background:var(--bg);font-weight:500}
+.ask-card .ask-opt:has(input:checked){border-color:var(--ink);background:var(--panel)}
+.ask-card .ask-opts{gap:6px}
+.ask-foot .ask-link[disabled]{display:none}
+/* Chat box: + menu, Mode menu, Model menu, then send. Each choice opens a small menu with what it does. */
+.composer-bar{gap:6px;padding-top:4px}
+.composer-bar .clip{display:none}
+.menu.pick{position:relative}
+.menu.up.pick>summary,.menu.pick>summary{width:auto;justify-content:flex-start;line-height:1;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 12px;border-radius:999px;border:1px solid var(--border);background:var(--panel);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;list-style:none;white-space:nowrap}
+.menu.pick>summary::-webkit-details-marker{display:none}
+.menu.pick>summary::after{content:"";width:6px;height:6px;margin:0 2px 3px 2px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);opacity:.55;transition:transform .15s}
+.menu.pick[open]>summary::after{transform:rotate(-135deg);margin-bottom:-2px}
+.menu.up.pick>summary:hover,.menu.up.pick[open]>summary,.menu.pick>summary:hover{background:var(--hover)}
+.menu.pick .menu-panel{min-width:280px;max-width:min(320px,calc(100vw - 40px));padding:6px}
+.menu-note{margin:4px 10px 6px;font-size:11.5px;color:var(--muted)}
+.menu.pick .menu-panel button{position:relative;padding:9px 34px 9px 10px}
+.menu.pick .menu-panel button[aria-pressed=true]::after{content:"";position:absolute;right:14px;top:14px;width:5px;height:10px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(45deg)}
+.menu.pick .menu-panel button:disabled{opacity:.45;cursor:not-allowed}

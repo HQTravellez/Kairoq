@@ -300,3 +300,89 @@ body,button,input,select,textarea{font-family:var(--font)!important;font-feature
 .command-center-view.kh{background:transparent!important}
 .kh-composer-slot .attachment-tray:empty{display:none}
 .kh-composer-slot .attachment-tray{margin:8px 0 0}
+
+/* ---------- Depth: an ambient wash behind home, white surfaces on top ---------- */
+.main[data-view=command]{background:
+  radial-gradient(900px 480px at 18% -80px,#f7d9c6cc 0%,#f7d9c600 70%),
+  radial-gradient(900px 520px at 85% -60px,#dcdff5d9 0%,#dcdff500 70%),
+  radial-gradient(1400px 700px at 50% 0,#f3efe8 0%,#f6f5f2 60%),#f6f5f2!important}
+.main[data-view=chat],.main[data-view=build]{background:#f6f5f2!important}
+.kh-hero h1{color:#15140f}
+.kh-modes{background:#ffffff8c;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-color:#ffffffb3;box-shadow:0 -1px 0 #1c1b190a inset}
+.kh-composer-slot .composer{border-color:#e4e0d8!important;box-shadow:0 1px 2px #1c1b190a,0 24px 48px -20px #3a2a1a33!important}
+.kh-pill{background:#ffffffd9;border-color:#ffffff;box-shadow:0 1px 2px #1c1b190f,0 0 0 1px #1c1b190a}
+.kh-pill:hover{background:#fff;box-shadow:0 2px 6px #1c1b1914,0 0 0 1px #1c1b1912}
+
+/* Your apps as cards */
+.kh .kh-shell{max-width:1000px!important}
+.kh-hero{max-width:760px;margin:0 auto;width:100%}
+.kh-apps{max-width:1000px;width:100%;margin:56px auto 0}
+.kh-apps h2{margin:0 0 12px;font-size:13px;font-weight:600;color:var(--k-ink-2)}
+.kh-apps ul{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;border:0;background:none;border-radius:0;overflow:visible}
+.kh-apps li+li{border-top:0}
+.kh-apps .kh-app{display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;border-radius:14px;background:#fff;box-shadow:0 1px 2px #1c1b190d,0 0 0 1px #1c1b190f;overflow:hidden;transition:box-shadow .15s,transform .15s}
+.kh-apps .kh-app:hover{background:#fff;box-shadow:0 10px 24px -12px #1c1b1933,0 0 0 1px #1c1b191a;transform:translateY(-1px)}
+.kh-app-thumb{display:grid;place-items:center;aspect-ratio:16/9;background:linear-gradient(135deg,hsl(var(--h) 60% 92%),hsl(calc(var(--h) + 40) 55% 84%));color:hsl(var(--h) 35% 32%);font:600 22px/1 var(--font);letter-spacing:-.02em}
+.kh-app-meta{display:flex;flex-direction:column;gap:3px;padding:11px 14px 13px;text-align:left;min-width:0}
+.kh-app-meta strong{font-size:13.5px;font-weight:500;color:var(--k-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kh-app-meta small{font-size:12px;color:var(--k-ink-3)}
+@media(max-width:760px){.kh-apps ul{grid-template-columns:1fr 1fr;gap:10px}.kh-apps{margin-top:36px}.kh-app-thumb{font-size:18px}}
+.main[data-view=build] .topbar>div:first-of-type{visibility:hidden}
+.main[data-view=build] .topbar{min-height:56px!important;padding-top:10px!important;padding-bottom:10px!important}
+
+/* ---------- Life on the home page: drifting colour, a faint grid, icons ---------- */
+.command-center-view.kh{position:relative;isolation:isolate;overflow-x:hidden}
+.kh-sky{position:absolute;inset:0 0 auto 0;height:min(760px,100%);z-index:-1;pointer-events:none;overflow:hidden;
+  -webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.kh-sky::after{content:"";position:absolute;inset:0;background-image:linear-gradient(#1c1b190a 1px,transparent 1px),linear-gradient(90deg,#1c1b190a 1px,transparent 1px);background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(70% 60% at 50% 30%,#000,transparent);mask-image:radial-gradient(70% 60% at 50% 30%,#000,transparent)}
+.kh-sky i{position:absolute;width:520px;height:520px;border-radius:50%;filter:blur(70px);opacity:.55;animation:kh-drift 18s ease-in-out infinite alternate}
+.kh-sky i:nth-child(1){left:8%;top:-160px;background:#f4b493}
+.kh-sky i:nth-child(2){right:6%;top:-120px;background:#b9c2f5;animation-duration:22s;animation-delay:-6s}
+.kh-sky i:nth-child(3){left:38%;top:120px;width:420px;height:420px;background:#f7d48c;opacity:.35;animation-duration:26s;animation-delay:-12s}
+@keyframes kh-drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,30px) scale(1.08)}100%{transform:translate(-30px,50px) scale(.95)}}
+@media(prefers-reduced-motion:reduce){.kh-sky i{animation:none}}
+.main[data-view=command]{background:#f7f6f3!important}
+
+/* headline accent */
+.kh-hero h1 em{font-style:normal;background:linear-gradient(100deg,#c2512d 0%,#d9822b 45%,#6a5cd6 100%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.02em}
+
+/* tab icons */
+.kh-mode{display:inline-flex;align-items:center;gap:7px}
+.kh-mode svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* starter icons */
+.kh-pill{gap:8px;padding:0 14px 0 6px;height:34px}
+.kh-ic{width:22px;height:22px;display:grid;place-items:center;border-radius:7px;flex:none}
+.kh-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.kh-ic-amber{background:#fdebd3;color:#b45f06}
+.kh-ic-blue{background:#dde8fd;color:#2b5fd9}
+.kh-ic-green{background:#dcf3e2;color:#1f8a4c}
+.kh-ic-violet{background:#e9e3fd;color:#6a4fd6}
+
+/* apps grid never wider than the screen */
+.kh-apps,.kh-apps ul{box-sizing:border-box;min-width:0}
+.kh-apps li{min-width:0}
+
+/* The colour sits behind the whole main area on home, top bar included; other views stay plain. */
+.main>.kh-sky{position:absolute;inset:0 0 auto 0;z-index:0}
+.main:not([data-view=command])>.kh-sky{display:none}
+.main[data-view=command]>.topbar,.main[data-view=command]>.command-center-view{position:relative;z-index:1}
+.main[data-view=command]>.topbar{background:transparent!important}
+
+/* Spacing: a calm vertical rhythm from the headline down to your apps */
+.kh:not(.show-work) .kh-shell{justify-content:flex-start!important;padding-top:clamp(40px,11vh,120px)!important}
+.kh:not(.show-work) .kh-hero{padding:0 0 48px!important}
+.kh-hero h1{margin:0}
+.kh-hero>p{margin:16px auto 0;line-height:1.55}
+.kh-hero .kh-modes{margin-top:40px}
+.kh-hero .kh-pills{margin-top:22px;gap:10px}
+.kh-apps{margin-top:80px!important}
+.kh-apps h2{margin-bottom:16px}
+.kh-apps ul{gap:18px}
+@media(max-width:760px){
+ .kh:not(.show-work) .kh-shell{padding-top:28px!important}
+ .kh-hero .kh-modes{margin-top:28px}
+ .kh-apps{margin-top:48px!important}
+ .kh-apps ul{gap:12px}
+}

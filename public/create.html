@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261101">
+<link rel="stylesheet" href="/create.css?v=20261105">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261025">
 </head>
@@ -418,12 +418,20 @@
             <button type="button" id="polish"><b>Polish the design</b><span>Screenshot the app and fix what looks off</span></button>
           </div>
         </details>
-        <div class="seg" role="group" aria-label="Mode">
-          <button type="button" id="mode-build" aria-pressed="true">Build</button>
-          <button type="button" id="mode-discuss" aria-pressed="false">Discuss</button>
-          <button type="button" id="mode-agent" aria-pressed="false" title="Works in steps: writes code, tests it in a browser, reads logs and fixes problems until done">Agent</button>
-        </div>
-        <select id="tier" aria-label="Model"></select>
+        <details class="menu up pick" id="menu-mode">
+          <summary aria-label="Mode"><span id="mode-label">Build</span></summary>
+          <div class="menu-panel" role="menu">
+            <p class="menu-note">How Kairoq should work on your next message</p>
+            <button type="button" id="mode-build" aria-pressed="true"><b>Build</b><span>Makes the change now and tests it in a browser</span></button>
+            <button type="button" id="mode-discuss" aria-pressed="false"><b>Discuss</b><span>Talk it through and plan first. Nothing in the app changes</span></button>
+            <button type="button" id="mode-agent" aria-pressed="false"><b>Agent</b><span>Works in steps: writes code, tests it, reads logs and fixes until done</span></button>
+          </div>
+        </details>
+        <details class="menu up pick" id="menu-tier">
+          <summary aria-label="Model"><span id="tier-label">Standard</span></summary>
+          <div class="menu-panel" role="menu" id="tier-panel"></div>
+        </details>
+        <select id="tier" aria-label="Model" hidden></select>
         <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv,application/json,text/html" multiple hidden>
         <button class="primary send" id="send" type="submit" aria-label="Send"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
       </div>
@@ -1157,6 +1165,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261101"></script>
+<script src="/create.js?v=20261104"></script>
 </body>
 </html>

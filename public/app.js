@@ -2864,10 +2864,9 @@ function setAppBuildMode(mode){
   $$(".kh-mode").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.mode===(appBuildMode||"ask"))));
   $(".composer")?.classList.toggle("app-mode",!!appBuildMode);
   promptEl.placeholder=appBuildMode?APP_PLACEHOLDERS[appBuildMode]:chatPlaceholder;
-  $("#khClarify")?.classList.add("hidden");
   $(".kh-hero .kh-pills:not(.kh-app-ideas)")?.classList.toggle("hidden",!!appBuildMode);
   $(".kh-app-ideas")?.classList.toggle("hidden",!appBuildMode);
-  if($("#khGreeting"))$("#khGreeting").textContent=appBuildMode?"What do you want to build?":"What should we get done?";
+  if($("#khGreeting"))$("#khGreeting").innerHTML=appBuildMode?"What do you want to <em>build</em>?":"What should we <em>get done</em>?";
   $(".kh-hero>p")?.classList.toggle("hidden",!!appBuildMode);
 }
 function openAppBuilder(mode="web"){
@@ -2880,10 +2879,10 @@ function openBuilder(url){
   $("#buildFrame").src=url;
   setMainView("build");
 }
-function launchAppBuild(prompt,answers=[]){
-  let text=answers.length?prompt+"\n\nDetails from the owner:\n"+answers.map(x=>"- "+x.q+" "+x.a.join(", ")).join("\n"):prompt;
-  if(appBuildMode==="mobile")text="Build a mobile app: "+text;
-  try{sessionStorage.setItem("kairoq-pending",JSON.stringify({prompt:text}))}catch{}
+function launchAppBuild(prompt){
+  // The builder opens here and asks any quick questions inside its own chat before building.
+  const text=appBuildMode==="mobile"?"Build a mobile app: "+prompt:prompt;
+  try{sessionStorage.setItem("kairoq-pending",JSON.stringify({prompt:text,ask:true}))}catch{}
   promptEl.value="";resizePrompt();
   setAppBuildMode(false);
   openBuilder("/create?embed=1");
@@ -2894,64 +2893,29 @@ async function loadHomeApps(){
     const r=await fetch("/api/create/projects",{credentials:"same-origin"});
     const {projects=[]}=r.ok?await r.json():{};
     list.replaceChildren(...projects.slice(0,6).map(p=>{
-      const li=document.createElement("li");const b=document.createElement("button");b.type="button";
-      const name=document.createElement("strong");name.textContent=p.name||"Untitled app";
-      const when=document.createElement("small");when.textContent=p.updated_at?"Updated "+prettyRelativeTime(p.updated_at):"";
-      b.append(name,when);b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
+      const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
+      const name=String(p.name||"Untitled app");
+      let hue=0;for(const ch of name)hue=(hue*31+ch.charCodeAt(0))%360;
+      const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--h",hue);thumb.setAttribute("aria-hidden","true");
+      thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+      const meta=document.createElement("span");meta.className="kh-app-meta";
+      const title=document.createElement("strong");title.textContent=name;
+      const when=document.createElement("small");when.textContent=p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"";
+      meta.append(title,when);b.append(thumb,meta);
+      b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
       li.append(b);return li;
     }));
     box.classList.toggle("hidden",!projects.length);
   }catch{box.classList.add("hidden")}
 }
-function renderAppQuestions(prompt,questions){
-  // One question at a time, like a short form: pick, Next, or let Kairoq decide.
-  const box=$("#khClarify");
-  const picked=questions.map(()=>new Set());
-  let at=0;
-  const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length);
-  const draw=()=>{
-    const q=questions[at];box.replaceChildren();
-    const head=document.createElement("div");head.className="kh-cl-head";
-    const title=document.createElement("span");title.textContent="A few quick questions";
-    const close=document.createElement("button");close.type="button";close.className="kh-link";close.textContent="Skip";close.onclick=()=>launchAppBuild(prompt,answers());
-    head.append(title,close);
-    const ask=document.createElement("p");ask.className="kh-cl-title";ask.textContent=q.q;
-    const opts=document.createElement("div");opts.className="kh-cl-list";
-    for(const o of q.options||[]){
-      const id="khq"+at+"_"+opts.children.length;
-      const row=document.createElement("label");row.className="kh-cl-opt";row.htmlFor=id;
-      const input=document.createElement("input");input.type=q.multi?"checkbox":"radio";input.name="khq"+at;input.id=id;input.checked=picked[at].has(o);
-      input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o)};
-      const span=document.createElement("span");span.textContent=o;
-      row.append(input,span);opts.append(row);
-    }
-    const foot=document.createElement("div");foot.className="kh-cl-actions";
-    const count=document.createElement("span");count.className="kh-cl-count";count.textContent="Question "+(at+1)+" of "+questions.length;
-    const back=document.createElement("button");back.type="button";back.className="kh-link";back.textContent="Back";back.disabled=at===0;back.onclick=()=>{at--;draw()};
-    const auto=document.createElement("button");auto.type="button";auto.className="kh-btn";auto.textContent="Decide for me";auto.onclick=()=>launchAppBuild(prompt,answers());
-    const last=at===questions.length-1;
-    const next=document.createElement("button");next.type="button";next.className="kh-btn kh-btn-primary";next.textContent=last?"Build it":"Next";
-    next.onclick=()=>{if(last)launchAppBuild(prompt,answers());else{at++;draw()}};
-    foot.append(count,back,auto,next);
-    box.append(head,ask,opts,foot);
-  };
-  draw();box.classList.remove("hidden");
-}
-async function startAppBuild(prompt){
+function startAppBuild(prompt){
   if(!prompt){promptEl.focus();return}
-  sendBtn.disabled=true;setStatus("Reading your request…");
-  try{
-    const r=await fetch("/api/create/clarify",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({prompt})});
-    const data=r.ok?await r.json().catch(()=>({})):{};
-    if(Array.isArray(data.questions)&&data.questions.length)return renderAppQuestions(prompt,data.questions);
-    launchAppBuild(prompt);
-  }catch{launchAppBuild(prompt)}
-  finally{sendBtn.disabled=false;setStatus("")}
+  launchAppBuild(prompt);
 }
 loadHomeApps();
 $$(".kh-mode").forEach(t=>t.onclick=()=>{setAppBuildMode(t.dataset.mode);promptEl.focus()});
 $$("[data-build-app]").forEach(b=>b.onclick=()=>openAppBuilder("web"));
-$$("[data-idea]").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent;resizePrompt();promptEl.focus()});
+$$("[data-idea]").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent.trim();resizePrompt();promptEl.focus()});
 $("#stopBtn").onclick=()=>abortController?.abort();
 promptEl.addEventListener("input",resizePrompt);
 promptEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});

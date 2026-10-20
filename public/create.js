@@ -193,6 +193,45 @@ $('new-form').onsubmit=async e=>{
  finally{$('new-submit').disabled=false}
 };
 
+// Started from the main Kairoq page: open the editor straight away and ask any quick questions
+// inside the chat, one at a time, before the first build starts.
+async function askThenBuild(prompt){
+ const name=prompt.replace(/^Build a mobile app:\s*/i,'').split(/\s+/).slice(0,6).join(' ').replace(/[.,;:]+$/,'');
+ const {project}=await api('/projects',{method:'POST',body:{name}});
+ await openProject(project.id);
+ const list=$('messages');list.replaceChildren();
+ const mine=messageItem({role:'user',text:prompt});list.append(mine);
+ const card=document.createElement('li');card.className='assistant ask-card';
+ card.append(el('p','ask-head','Reading your request…'));list.append(card);
+ const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
+ const build=answers=>{mine.remove();card.remove();
+  send(answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt,'build')};
+ if(!questions.length)return build([]);
+ const picked=questions.map(()=>new Set());let at=0;
+ const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length);
+ const draw=()=>{
+  const q=questions[at];card.replaceChildren();
+  const head=el('div','ask-top');head.append(el('span','ask-head','A few quick questions'));
+  const skip=el('button','ask-link','Skip');skip.type='button';skip.onclick=()=>build(answers());head.append(skip);
+  const opts=el('div','ask-opts');
+  (q.options||[]).forEach((o,i)=>{
+   const row=el('label','ask-opt');const input=document.createElement('input');
+   input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
+   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o)};
+   row.append(input,el('span',null,o));opts.append(row);
+  });
+  const foot=el('div','ask-foot');
+  foot.append(el('span','ask-count','Question '+(at+1)+' of '+questions.length));
+  const back=el('button','ask-link','Back');back.type='button';back.disabled=at===0;back.onclick=()=>{at--;draw()};
+  const auto=el('button','ghost','Decide for me');auto.type='button';auto.onclick=()=>build(answers());
+  const last=at===questions.length-1;
+  const next=el('button','primary',last?'Build it':'Next');next.type='button';next.onclick=()=>{if(last)build(answers());else{at++;draw()}};
+  foot.append(back,auto,next);
+  card.append(head,el('p','ask-q',q.q),opts,foot);
+  list.scrollTop=list.scrollHeight;
+ };
+ draw();
+}
 // ---------- editor ----------
 async function openProject(id,{pendingText,job}={}){
  const {project,account}=await api('/projects/'+id);
@@ -572,11 +611,21 @@ $('file-new').onclick=()=>{
 state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
 $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('chat-form').requestSubmit()}});
 const PLACEHOLDERS={build:'Ask for a change, or paste a link: "add a pricing section like https://…"',discuss:'Ask a question, plan a feature, or ask me to look something up on the web. No code changes.',agent:'Give the agent a bigger task: "add room booking with availability, test the whole flow and fix any errors". It can open websites and read docs on the way.'};
-function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));$('chat-input').placeholder=PLACEHOLDERS[mode];$('send').setAttribute('aria-label',mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');$('send').title=$('send').getAttribute('aria-label');costHint()}
+function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));text($('mode-label'),{build:'Build',discuss:'Discuss',agent:'Agent'}[mode]);$('menu-mode').open=false;$('chat-input').placeholder=PLACEHOLDERS[mode];$('send').setAttribute('aria-label',mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');$('send').title=$('send').getAttribute('aria-label');costHint()}
 $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');$('mode-agent').onclick=()=>setChatMode('agent');
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
+ // The same choices as a menu: each model with what it is for and what a message costs.
+ const about={standard:'Fast and good for most changes',pro:'A stronger model for bigger changes',max:'The strongest model, for hard problems'};
+ const panel=$('tier-panel');panel.replaceChildren(el('p','menu-note','Which AI model writes the code'));
+ for(const t of state.me.tiers||[]){
+  const b=document.createElement('button');b.type='button';b.disabled=!t.enabled;b.setAttribute('aria-pressed',String(t.id===state.tier));
+  b.append(el('b',null,t.label),el('span',null,(about[t.id]||'')+' · '+t.credits+' credit'+(t.credits===1?'':'s')+' a message'+(t.enabled?'':' · not switched on')));
+  b.onclick=()=>{sel.value=t.id;sel.dispatchEvent(new Event('change'));$('menu-tier').open=false;renderTiers()};
+  panel.append(b);
+ }
+ const cur=(state.me.tiers||[]).find(t=>t.id===state.tier);text($('tier-label'),cur?cur.label:'Standard');
  costHint();
 }
 $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
@@ -2053,6 +2102,7 @@ async function start(){
  if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}
  const pending=takePending();
  if(pending){
+  if(pending.ask){try{return await askThenBuild(pending.prompt)}catch(err){await loadHome();text($('home-error'),err.message);return}}
   if(pending.remix)return remix(pending.remix);
   if(pending.sponsored){try{const {project,job}=await api('/projects',{method:'POST',body:{sponsored:pending.sponsored}});return openProject(project.id,{job})}catch(err){await loadHome();text($('home-error'),err.message);return}}
   if(pending.rebuild){try{return await rebuild(pending.rebuild)}catch(err){await loadHome();text($('home-error'),err.message);return}}
