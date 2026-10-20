@@ -308,7 +308,15 @@ function crossSiteRequest(req){
   if(origin===undefined)return false;
   try{return new URL(origin).host!==String(req.headers.host||"")}catch{return true}
 }
+// A temporary open door chosen by the owner: until KAIROQ_OPEN_ACCESS_UNTIL (a date or time,
+// at most 14 days ahead) every visitor is treated as the owner, without the password. It closes
+// on its own at that time; deleting the variable closes it at once.
+function openAccessUntil(now=Date.now()){
+  const t=Date.parse(String(process.env.KAIROQ_OPEN_ACCESS_UNTIL||""));
+  return Number.isFinite(t)&&t>now&&t-now<=14*86400000?t:0;
+}
 function isAuthenticated(req) {
+  if (openAccessUntil()) return true;
   if (!authEnabled()) return localRequest(req);
   const cookies = parseCookies(req);
   const received = cookies[SESSION_COOKIE] || "";
@@ -7099,7 +7107,7 @@ setInterval(() => { require("./web-tasks").tick({ callModel: callBuilderModel })
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);
     console.log(`Free Only defaults to ON.`);
-    console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
+    console.log(openAccessUntil() ? "Password protection: OPEN TO EVERYONE until "+new Date(openAccessUntil()).toISOString()+" (KAIROQ_OPEN_ACCESS_UNTIL)" : authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     {const sites=String(process.env.KAIROQ_SITES_DOMAIN||"").toLowerCase().replace(/^\.+|\.+$/g,"");let main="";try{main=new URL(process.env.KAIROQ_PUBLIC_URL||"").hostname}catch{}
      const parent=h=>h.split(".").slice(-2).join(".");
      if(sites&&main&&parent(sites)===parent(main))console.warn("WARNING: KAIROQ_SITES_DOMAIN ("+sites+") shares its parent domain with Kairoq ("+main+"). Use a separate domain for published apps; see docs/create.md.");}
@@ -7130,6 +7138,7 @@ setInterval(() => { require("./web-tasks").tick({ callModel: callBuilderModel })
 }
 
 module.exports = {
+  openAccessUntil, isAuthenticated,
   callDeveloperCodingModel, callBuilderModel, callAppAi, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };

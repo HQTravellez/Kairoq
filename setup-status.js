@@ -20,6 +20,9 @@ function items({env=process.env}={}){
   {id:'outreach',label:'Find customers can send approved emails',ok:Boolean(env.KAIROQ_OUTREACH_FROM)&&accounts.mailReady(),required:false,fix:'Verify a separate sending domain in Resend (for example mail.yourbrand.com, with SPF, DKIM and DMARC) and add KAIROQ_OUTREACH_FROM with an address on it in Railway (service, Variables). Cold email from your main domain can push your app\'s own emails into spam. Until then, owners copy approved emails into their own email.'},
   {id:'google',label:'Sign in with Google',ok:require('./google-oauth').configured(),required:false,fix:'Add KAIROQ_GOOGLE_CLIENT_ID and KAIROQ_GOOGLE_CLIENT_SECRET in Railway (service, Variables).'},
  ];
+ // The temporary open door (server.js openAccessUntil): shown while it lasts, as a reminder.
+ const open=Date.parse(String(env.KAIROQ_OPEN_ACCESS_UNTIL||''));
+ if(Number.isFinite(open)&&open>Date.now())list.unshift({id:'open',label:'The password is off until '+new Date(open).toISOString().slice(0,16).replace('T',' ')+' UTC: anyone with the link acts as the owner',ok:false,required:false,fix:'Delete KAIROQ_OPEN_ACCESS_UNTIL in Railway (service, Variables) to turn the password back on now; it also turns back on by itself at that time.'});
  // Only when the owner chose OpenCode as the build engine: whether it is installed and has a model.
  if(String(env.KAIROQ_BUILD_ENGINE||'').toLowerCase()==='opencode')list.push({id:'engine',label:'OpenCode writes the apps',ok:require('./opencode-engine').enabled(),required:false,fix:'In Railway add the variable KAIROQ_OPENCODE=on (it installs OpenCode when the app is built) and redeploy; OpenCode uses the same AI key as the builder.'});
  // Only when the owner switched on the fast browser lane: whether Lightpanda got installed.
