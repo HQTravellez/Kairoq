@@ -7084,7 +7084,11 @@ setInterval(() => { require("./web-tasks").tick({ callModel: callBuilderModel })
   setTimeout(runBackup,10*60_000).unref();setInterval(runBackup,24*3600_000).unref();
   // Live-app monitor: re-runs saved checks on every published app (KAIROQ_MONITOR_HOURS, 0 = off).
   const monitorHours=Number(process.env.KAIROQ_MONITOR_HOURS??24);
-  if(monitorHours>0){const runMonitor=()=>require("./react-checks").monitorAll({inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[create-monitor]",e.message));setTimeout(runMonitor,20*60_000).unref();setInterval(runMonitor,monitorHours*3600_000).unref();}
+  // The live guard (live-guard.js) replaces the daily monitor: hourly by default, and it repairs,
+  // rolls back or calls a person (KAIROQ_GUARD_HOURS, 0 = off; KAIROQ_LIVE_GUARD=off for the old monitor).
+  const guardHours=Number(process.env.KAIROQ_GUARD_HOURS??1);
+  if(process.env.KAIROQ_LIVE_GUARD!=='off'&&guardHours>0){const local=u=>"http://127.0.0.1:"+PORT+u,runGuard=()=>require("./live-guard").guardAll({callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check(local(u),o),inspect:(u,o)=>require("./runtime-check").inspect(local(u),o),busy:createApi.busy,exclusive:createApi.exclusive}).catch(e=>console.warn("[live-guard]",e.message));setTimeout(runGuard,15*60_000).unref();setInterval(runGuard,guardHours*3600_000).unref();}
+  else if(monitorHours>0){const runMonitor=()=>require("./react-checks").monitorAll({inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[create-monitor]",e.message));setTimeout(runMonitor,20*60_000).unref();setInterval(runMonitor,monitorHours*3600_000).unref();}
   // Growth watch: every few hours, runs the weekly AI-customer test and brief on published apps
   // whose watch is due (KAIROQ_WATCH_CHECK_HOURS, 0 = off).
   const watchHours=Number(process.env.KAIROQ_WATCH_CHECK_HOURS??6);
