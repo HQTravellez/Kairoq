@@ -102,13 +102,15 @@ function refundVideo(v){return(n,ref)=>{if(v.kind==='customer'&&n>0)accounts.gra
 // Agent tasks take many model calls, so they cost a multiple of the tier's price.
 function agentMultiplier(){const n=intEnv('KAIROQ_AGENT_MULTIPLIER',3);return n>=1?n:3}
 // Every mode checks the tier; Discuss on Pro or Max costs that tier's price.
-function cost({mode,tier,images}){
+// A model picked by name in the chat box (model-choices.js) is priced at its own credits.
+function cost({mode,tier,images,model=null}){
  const t=tiers().find(x=>x.id===tier);
  if(!t||!t.enabled)throw Object.assign(Error('That model tier is not available'),{status:400});
+ const base=model?model.credits:t.credits;
  const image=images?intEnv('KAIROQ_IMAGE_CREDITS',1):0;
- if(mode==='discuss')return(tier==='standard'?intEnv('KAIROQ_DISCUSS_CREDITS',1):Math.max(t.credits,intEnv('KAIROQ_DISCUSS_CREDITS',1)))+image;
- if(mode==='polish')return Math.max(t.credits,polishCredits())+image;
- return t.credits*(mode==='agent'?agentMultiplier():1)+image;
+ if(mode==='discuss')return(tier==='standard'&&!model?intEnv('KAIROQ_DISCUSS_CREDITS',1):Math.max(base,intEnv('KAIROQ_DISCUSS_CREDITS',1)))+image;
+ if(mode==='polish')return Math.max(base,polishCredits())+image;
+ return base*(mode==='agent'?agentMultiplier():1)+image;
 }
 const IMAGE_TYPES={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif'};
 // Files attached to a chat message (PDF, Word, text, Markdown, CSV, JSON, HTML): their text
@@ -217,7 +219,7 @@ function supportAnswer(meta){
   'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
  ].join('\n');
 }
-function startJob(v,id,{message,mode='build',tier='standard',images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
+function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
  if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&supportQuestion(message)){
@@ -235,11 +237,15 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
  // The fix of a change that did not work is on Kairoq, once per problem.
  const onUs=fixing&&Boolean(sig)&&payMode()==='fix'&&Boolean(before.free_fix)&&before.free_fix.sig===sig;
  if(before.free_fix&&(onUs||!fixing&&mode!=='discuss')){delete before.free_fix;builder.saveMeta(before)}
- const credits=onUs?0:cost({mode,tier,images:images.length>0})+extraCredits;
- const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString(),...(onUs?{on_us:true}:{})};
+ const chosen=require('./model-choices').pick(model);
+ const credits=onUs?0:cost({mode,tier,images:images.length>0,model:chosen})+extraCredits;
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString(),...(onUs?{on_us:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
  const update=patch=>{Object.assign(job,patch);job.seq++};
+ // Every model call for this message goes to the chosen model first; if it cannot run, the
+ // usual builder (Auto) does the work and the chat says so.
+ if(chosen){const base=callModel;callModel=(o,p)=>base({...o,model:chosen.id,onFallback:e=>{if(!job.model_fallback)job.model_fallback=chosen.label+' was not available ('+String(e&&e.message||e).slice(0,140)+'), so Auto was used.'}},p)}
  // Customers pay up front, before anything is saved; credits are refunded if the job fails.
- if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,label?label+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''):mode==='discuss'?'Discuss message':(mode==='agent'?'Agent task':mode==='polish'?'Design review':'Chat edit')+(tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
+ if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,(label?label:mode==='discuss'?'Discuss message':mode==='agent'?'Agent task':mode==='polish'?'Design review':'Chat edit')+(chosen?' ('+chosen.label+')':tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
  if(mode!=='discuss'&&mode!=='polish'&&images.length&&!referenceOnly){
   try{const names=require('./react-assets').save(id,images);images=images.map((img,i)=>({...img,name:names[i]}))}
   catch(e){if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: images not saved','refund:'+job.id)}catch{}throw e}
@@ -357,7 +363,7 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
    // The learning loop: what this build ran into on the way, and how it ended.
    if(mode!=='discuss'&&job.result)try{require('./build-lessons').recordBuild(id,{mode,result:job.result})}catch{}
    // The finished message shows what it cost (0 when refunded or on us).
-   try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;if(job.on_us)m.on_us=true;if(job.fix_on_us)m.fix_on_us=true;builder.saveMeta(meta)}}catch{}
+   try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;if(job.on_us)m.on_us=true;if(job.fix_on_us)m.fix_on_us=true;if(job.model_label)m.model=job.model_label;if(job.model_fallback)m.model_fallback=job.model_fallback;builder.saveMeta(meta)}}catch{}
    update({status:'complete'});
   }catch(e){
    update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
@@ -757,7 +763,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -1119,7 +1125,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   }
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
-  if(action==='/chat'&&method==='POST'){const b=await readJson(req,60000000);const context=await parseFiles(b.files);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',images:parseImages(b.images),context,fix:b.fix===true},deps))}),true}
+  if(action==='/chat'&&method==='POST'){const b=await readJson(req,60000000);const context=await parseFiles(b.files);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',model:typeof b.model==='string'?b.model:null,images:parseImages(b.images),context,fix:b.fix===true},deps))}),true}
   if(action==='/assets'&&method==='GET')return send(res,200,{assets:require('./react-assets').list(id)}),true;
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}

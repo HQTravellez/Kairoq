@@ -6628,7 +6628,23 @@ function builderProvider(){
   return experiential.configured()?"experiential":"openrouter";
 }
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
+  // A model the owner picked by name in the chat box (model-choices.js) goes through OpenRouter
+  // first; when it cannot run (no key, paid builds off, budget, provider error) Auto takes over.
+  if(opts.model){
+    const {model,onFallback,...rest}=opts;
+    try{
+      if(!process.env.OPENROUTER_API_KEY)throw Error("OpenRouter is not set up");
+      return await callOpenRouterBuilder({...rest,only:model},parse);
+    }catch(err){
+      if(err.name==="AbortError"||rest.signal?.aborted)throw err;
+      console.log("[builder] chosen model "+model+" failed, using Auto: "+String(err.message||err).slice(0,200));
+      onFallback?.(err);opts=rest;
+    }
+  }
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
+  return callOpenRouterBuilder(opts,parse);
+}
+async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
@@ -6636,6 +6652,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
   let allowPaid=(mode==="premium"||mode==="paid-first") && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
+  if(opts.only&&!allowPaid)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
   // Pro tier: stronger models first, then the standard paid chain; never free models.
   const proCandidates=String(process.env.KAIROQ_PRO_MODELS||"anthropic/claude-sonnet-4.5,openai/gpt-5").split(",").map(m=>m.trim()).filter(Boolean);
@@ -6650,7 +6667,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   // Small, clear edits on the Standard tier ("make the button blue") go to a fast model first
   // (KAIROQ_FAST_MODELS); the usual models follow if it fails.
   const fastFirst=opts.fast&&allowPaid&&(!opts.tier||opts.tier==="standard")?String(process.env.KAIROQ_FAST_MODELS??"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):[];
-  const models=[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  const models=opts.only?[opts.only]:[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";

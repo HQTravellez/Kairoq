@@ -1,7 +1,7 @@
 "use strict";
 (()=>{
 const $=id=>document.getElementById(id);
-const state={me:null,project:null,job:null,mode:'signup',file:null};
+const state={me:null,project:null,job:null,mode:'signup',file:null,model:(()=>{try{return localStorage.getItem('kairoq-model')||'auto'}catch{return'auto'}})()};
 
 async function api(path,{method='GET',body}={}){
  const r=await fetch('/api/create'+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});
@@ -619,25 +619,35 @@ $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>s
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
- // The same choices as a menu: each model with what it is for and what a message costs.
- const about={standard:'Fast and good for most changes',pro:'A stronger model for bigger changes',max:'The strongest model, for hard problems'};
- const panel=$('tier-panel');panel.replaceChildren(el('p','menu-note','Which AI model writes the code'));
- for(const t of state.me.tiers||[]){
-  const b=document.createElement('button');b.type='button';b.disabled=!t.enabled;b.setAttribute('aria-pressed',String(t.id===state.tier));
-  b.append(el('b',null,t.label),el('span',null,(about[t.id]||'')+' · '+t.credits+' credit'+(t.credits===1?'':'s')+' a message'+(t.enabled?'':' · not switched on')));
-  b.onclick=()=>{sel.value=t.id;sel.dispatchEvent(new Event('change'));$('menu-tier').open=false;renderTiers()};
+ // The model menu: Auto (the default builder) or a model picked by name, each with what it is
+ // good at and what a message costs. A named model that cannot run falls back to Auto.
+ const models=state.me.models||[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true}];
+ if(!models.some(m=>m.id===state.model&&m.enabled))state.model='auto';
+ const panel=$('tier-panel');panel.replaceChildren(el('p','menu-note','Which AI model works on your next message'));
+ for(const m of models){
+  const b=document.createElement('button');b.type='button';b.disabled=!m.enabled;b.setAttribute('aria-pressed',String(m.id===state.model));
+  const name=el('b',null,m.label);
+  if(m.top)name.append(el('i','model-tag top','Top pick'));
+  const credits=m.credits?m.credits+' credit'+(m.credits===1?'':'s')+' a message':'';
+  const bits=[m.note,credits].filter(Boolean).join(' · ');
+  const line=el('span',null,bits+(m.enabled?'':' · needs OpenRouter and paid builds switched on'));
+  if(m.costlier&&m.enabled)line.append(el('i','model-tag cost','costlier'));
+  b.append(name,line);
+  b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
   panel.append(b);
  }
- const cur=(state.me.tiers||[]).find(t=>t.id===state.tier);text($('tier-label'),cur?cur.label:'Standard');
+ const cur=models.find(m=>m.id===state.model);text($('tier-label'),cur?cur.label:'Auto');
  costHint();
 }
 $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
 function costHint(){
  const base='Screenshot the app on desktop and phone and let the AI fix what looks off';
  if(!state.me||!state.me.viewer||state.me.viewer.kind!=='customer'){text($('cost-hint'),'');$('polish').title=base;return}
- const t=(state.me.tiers||[]).find(x=>x.id===state.tier);
+ const tier=(state.me.tiers||[]).find(x=>x.id===state.tier),picked=(state.me.models||[]).find(m=>m.id===state.model&&m.credits);
+ // A model picked by name is priced at its own credits instead of the tier's.
+ const t=picked?{credits:picked.credits}:tier;
  const p=Math.max(t?t.credits:1,state.me.polish_credits||1);$('polish').title=base+' ('+p+' credit'+(p===1?'':'s')+')';
- const n=(state.mode==='discuss'?(state.tier==='standard'||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
+ const n=(state.mode==='discuss'?((state.tier==='standard'&&!picked)||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
  // Before sending: what this message costs, and what could come on top.
  const img=state.mode!=='discuss'&&state.me.image_generation?.enabled&&state.me.image_generation.credits;
  text($('cost-hint'),'This message: '+n+' credit'+(n===1?'':'s')+(img?' (+'+img+' per AI image, if it makes any)':''));
@@ -682,7 +692,7 @@ async function send(message,mode,path='/chat',extra={}){
  const files=state.attachments.filter(a=>a.kind==='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
  $('messages').append(messageItem({role:'user',text:message,mode,images:[...images,...files].map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
  $('chat-input').value='';state.attachments=[];renderAttachments();
- try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,images:images.length?images:undefined,files:files.length?files:undefined,...extra}});watch(job)}
+ try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,...(state.model&&state.model!=='auto'?{model:state.model}:{}),images:images.length?images:undefined,files:files.length?files:undefined,...extra}});watch(job)}
  catch(err){
   $('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));
   if(err.status===402&&state.me.purchases)openBuy();
@@ -933,6 +943,7 @@ async function watch(job){
   if(done.mode!=='discuss')setPreview(project.preview_url);
   if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')+(done.fix_on_us?' The fix is on us: the next Fix costs nothing.':'')}));
   else if(done.free)$('messages').append(messageItem({role:'assistant',text:done.free}));
+  if(done.model_fallback)$('messages').append(messageItem({role:'assistant',text:done.model_fallback}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?(done.mode==='repair'?'\nRounds that did not finish were refunded.':'\nYour credits were refunded.'):''),failed:true}));
