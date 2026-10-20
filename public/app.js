@@ -1171,7 +1171,7 @@ function renderCustomPresets(){
     host.appendChild(b);
   });
   const add=document.createElement("button");
-  add.textContent="+ Preset";
+  add.textContent="+ Preset";add.type="button";add.className="preset preset-add";
   add.onclick=()=>$("#presetDialog").showModal();
   host.appendChild(add);
 }
@@ -2858,7 +2858,7 @@ purposeSelect.value=ui.purpose||"general";
 
 function updateRouting(){
   routing={freeOnly:freeOnlyEl.checked,smartFallback:smartFallbackEl.checked,webSearch:webSearchEl.checked};
-  freePill.textContent=routing.freeOnly?"FREE ONLY":"PAID ALLOWED";
+  freePill.textContent=routing.freeOnly?"Free only":"Paid allowed";
   freePill.classList.toggle("off",!routing.freeOnly);
   saveAll();
 }
