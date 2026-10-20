@@ -267,3 +267,22 @@ test('design skills from GitHub or pasted are checked before they reach the buil
  const ok=S.add('acct-1',{body:'# Calm​ hotel\n\nUse generous whitespace, muted sand colours and serif headings. Examples may use eval(x) for demos.'});
  assert.ok(ok.warnings.some(w=>/eval/.test(w)));assert.ok(ok.warnings.some(w=>/hidden characters/.test(w)));
 });
+
+test('documents keep a one-line abstract and an overview; broad questions are answered from the overviews',async()=>{
+ const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');
+ A.addText(db,{title:'Lotus Spa guide',text:'# Treatments\nOur hot stone massage lasts 60 minutes and costs 80 EUR.\n\n# Opening hours\nWe are open Monday to Saturday from 10:00 to 19:00.\n\n# Parking\nThere is free parking behind the building.'});
+ const [doc]=A.list(db).docs;
+ assert.equal(doc.abstract,'Our hot stone massage lasts 60 minutes and costs 80 EUR.');
+ assert.match(A.catalogue(db)[0].overview,/- Opening hours: We are open Monday to Saturday/);
+ const seen=[];
+ const ai=async({system})=>{seen.push(system);const m=/\[1\] ([^\n]+)\n([\s\S]*?)(?:\n\n---|$)/.exec(system);return{text:m?'We offer: '+m[2].replace(/\s+/g,' ').slice(0,200)+' [1]':'I do not know.'}};
+ const r=await A.ask(db,{question:'What do you offer?'},ai);
+ assert.equal(r.answered,true,r.text);assert.match(seen.at(-1),/Overview of this document:[\s\S]*Treatments: Our hot stone massage/);
+ assert.match(seen.at(-1),/The business's documents \(what each is about[\s\S]*Lotus Spa guide — Our hot stone massage/);
+ // A specific question still gets the exact passage, not the overview.
+ await A.ask(db,{question:'Is there parking?'},ai);
+ assert.ok(!/Overview of this document/.test(seen.at(-1)));assert.match(seen.at(-1),/free parking behind the building/);
+ // A fixed fact updates the layers too.
+ const fixes=A.applyDocFixes(db,[{doc_id:doc.id,current:'80 EUR',replacement:'85 EUR'}]);
+ assert.ok(fixes);assert.match(A.list(db).docs[0].abstract,/85 EUR/);
+});
