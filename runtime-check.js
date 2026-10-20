@@ -378,7 +378,9 @@ async function designShots(url,{timeoutMs=20000}={}){
    await page.waitForTimeout(900);
    const full=await page.evaluate(()=>document.documentElement.scrollHeight).catch(()=>height);
    const buf=await page.screenshot({type:'jpeg',quality:62,fullPage:true,clip:{x:0,y:0,width,height:Math.max(height,Math.min(full,maxHeight))}});
-   shots.push({name,mime:'image/jpeg',data:buf.toString('base64')});
+   // Measured problems on the same page (design-dom.js, design-frame.js), for the design review.
+   let issues=[];try{issues=[...await require('./design-dom').inspect(page,name),...await require('./design-frame').frame(page,name)]}catch{}
+   shots.push({name,mime:'image/jpeg',data:buf.toString('base64'),issues});
   }catch{}finally{await context.close().catch(()=>{})}
  }
  return shots;

@@ -47,3 +47,27 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## taste-skill: art directions, design library, tells, page checks, app screens
+
+`design-library/` (directions, heroes, sections, motions, palettes, type systems and the app-screen styles, with the study's site references removed), the dated "tells" added to `design-slop.js`, the page-frame checks in `design-frame.js`, the look-and-fix polish rounds and the `app-screens` design skill are adapted from taste-skill by Leonxlnx, https://github.com/Leonxlnx/taste-skill (commit 63aba5f), licensed under the MIT License (full text in `design-library/LICENSE-taste-skill`). The `redesign` design skill is that author's redesign skill (MIT), as bundled in open-design.
+
+## open-design: style systems, craft rulebooks and skills
+
+`design-library/styles/` (59 generic style systems; the packages that copy real brands were left out), the `craft-*` design skills and the `faq-page` design skill are from open-design by nexu-io, https://github.com/nexu-io/open-design (commit 3b0df90), licensed under the Apache License 2.0 (full text in `design-library/LICENSE-open-design`). Its craft rulebooks are themselves adapted from refero_skill by Refero Design (MIT). Kairoq added front matter and a credit line to each skill.
+
+## Web Interface Guidelines
+
+`design-skills/web-interface-guidelines/SKILL.md` contains the Web Interface Guidelines by Vercel Labs, https://github.com/vercel-labs/web-interface-guidelines, licensed under the MIT License (full text in `licenses/web-interface-guidelines-LICENSE.txt`).
+
+## superpowers: builder habits
+
+`builder-method.js` (find the cause before fixing, honest claims about what was verified, checking review findings before applying them) is adapted from the systematic-debugging, verification-before-completion and receiving-code-review skills of superpowers by Jesse Vincent, https://github.com/obra/superpowers, licensed under the MIT License (full text in `licenses/superpowers-LICENSE.txt`).
+
+## Harvey: email gate and Find customers
+
+`email-gate.js` and the pipeline in `outreach.js` (listing businesses, reading their sites without AI, owner-confirmed signals, an outbox the owner approves, the bounce kill switch) follow Harvey by Ethan Rogers, https://github.com/ethanplusai/harvey, licensed under the MIT License (full text in `licenses/harvey-LICENSE.txt`). Kairoq's version is its own JavaScript implementation; Harvey's code, its subscription-based model calls, LinkedIn automation and "humanizer" are not used. Business listings come from OpenStreetMap (© OpenStreetMap contributors, ODbL), used through Nominatim and Overpass under their usage policies.
+
+## img2threejs: the 3D product method
+
+The `three-product` design skill follows the pass-by-pass method of img2threejs, https://github.com/img2threejs/img2threejs, licensed under the Apache License 2.0 (full text in `licenses/img2threejs-LICENSE.txt`). No code from it is included.

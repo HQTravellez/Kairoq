@@ -54,6 +54,8 @@ const FONTS={
  'Quicksand':['sans','400;500;600;700'],'Lexend':['sans','400;500;600;700'],'Atkinson Hyperlegible':['sans','400;700'],'Be Vietnam Pro':['sans','400;500;600;700'],'Noto Sans':['sans','400;500;600;700'],'Varela Round':['sans','400'],
  'Fredoka':['display','400;500;600;700'],'Abril Fatface':['display','400'],'Caveat':['display','400;700'],
  'Crimson Pro':['serif','400;500;600;700'],'Cormorant':['serif','400;500;600;700'],'Newsreader':['serif','400;500;600;700'],
+ // From the type systems in design-library/type.json (taste-skill, MIT).
+ 'Schibsted Grotesk':['sans','400;600;800'],'Hanken Grotesk':['sans','400;500'],'Libre Franklin':['sans','400;600;700'],'Source Serif 4':['serif','400;600'],'Anton':['display','400'],'Big Shoulders':['display','400;800'],'Barlow Condensed':['display','400;700'],'Barlow':['sans','400;500'],'TikTok Sans':['sans','400;500;800'],'Onest':['sans','400;500'],'Chivo':['sans','400;700;900'],'Epilogue':['sans','400;500;900'],'Red Hat Display':['sans','400;900'],'Red Hat Text':['sans','400;500'],'Jost':['sans','400;500;700'],'Stack Sans Headline':['sans','300;400'],'Stack Sans Text':['sans','400;500'],'Albert Sans':['sans','400;500;600'],'League Spartan':['sans','400;700'],'Bodoni Moda':['serif','400;500'],'Imbue':['serif','400'],'Literata':['serif','400;500;600'],'STIX Two Text':['serif','400;600'],'Young Serif':['serif','400'],'Zilla Slab':['serif','400;500;600'],'Besley':['serif','400;800'],'Rokkitt':['serif','400;800'],
  'JetBrains Mono':['mono','400;500;600;700'],'Space Mono':['mono','400;700']
 };
 const FALLBACK={sans:'ui-sans-serif, system-ui, sans-serif',display:'ui-sans-serif, system-ui, sans-serif',serif:'ui-serif, Georgia, serif',mono:'ui-monospace, monospace'};
@@ -235,13 +237,16 @@ function designNote(design){
  if(design.imagery)lines.push('Imagery: '+design.imagery);
  if(Array.isArray(design.details)&&design.details.length)lines.push('Details:\n'+design.details.map(d=>'- '+d).join('\n'));
  if(design.notes)lines.push('Owner notes: '+design.notes);
+ if(design.idea)lines.push('The idea: '+design.idea);
+ if(design.direction){const b=require('./design-directions').blueprint(design,{seed:design.created_at||''});if(b)lines.push(b)}
+ if(design.style){const t=require('./design-styles').text(design.style);if(t)lines.push(t)}
  return lines.join('\n');
 }
 
 // ---------- the design brief ----------
 const BRIEF_PROMPT=`You are the art director of an app builder like Lovable. Before any code is written, decide the visual direction for the app the user describes. Be specific and bold: pick a direction that suits the audience and brand (for example warm Mediterranean editorial for a boutique hotel, crisp dark technical for a developer tool, soft playful pastels for a kids' app), not a generic blue SaaS look.
 Respond with ONLY a JSON object, no markdown:
-{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"skill":"id of the best matching design skill below, or empty"}
+{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty"}
 Rules: background and foreground must have strong contrast; primary must stand out on the background; secondary is a quiet surface colour; muted is a subtle background tint; accent is a second highlight. radius is between 0rem and 1.5rem. Choose fonts only from this list: FONTS.`;
 function briefPrompt(skills){
  const list=Object.keys(FONTS).filter(n=>FONTS[n][0]!=='mono').map(n=>n+' ('+FONTS[n][0]+')').join(', ');
@@ -263,12 +268,20 @@ function normalize(v){
  const radius=/^(0|0?\.\d+|1(\.\d+)?)rem$/.test(String(v.radius||'').trim())?String(v.radius).trim():'0.75rem';
  return{name:cleanText(v.name,60)||'Custom',summary:cleanText(v.summary,600),palette,fonts:{display:font(v.fonts?.display),body:font(v.fonts?.body)},radius,
   layout:cleanText(v.layout,600),imagery:cleanText(v.imagery,400),details:(Array.isArray(v.details)?v.details:[]).map(d=>cleanText(d,200)).filter(Boolean).slice(0,10),
-  notes:cleanText(v.notes,1500),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):''};
+  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):''};
 }
-async function createBrief(request,{callModel,tier,signal,skills=[],projectName=''}){
- const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)}];
+// Three directions are dealt from the design library (design-directions.js); the brief picks one.
+async function createBrief(request,{callModel,tier,signal,skills=[],projectName='',avoid=[]}){
+ const directions=require('./design-directions'),dealt=directions.deal(projectName+' '+request,{seed:projectName,avoid});
+ const styles=require('./design-styles'),styleOptions=styles.options(request),named=styles.named(request);
+ const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)}];
  const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier,design:true},parseBrief);
  if(brief.skill&&!skills.some(s=>s.id===brief.skill))brief.skill='';
+ // The direction must be one of those dealt; otherwise the first one is used.
+ if(dealt.options.length){if(!dealt.options.some(o=>o.id===brief.direction))brief.direction=dealt.options[0].id;brief.sector=dealt.sector}
+ // A style the owner named is always used; otherwise only one of those offered.
+ if(named.length&&!named.some(s=>s.id===brief.style))brief.style=named[0].id;
+ else if(brief.style&&!styleOptions.some(s=>s.id===brief.style))delete brief.style;
  return{...brief,created_at:new Date().toISOString()};
 }
 

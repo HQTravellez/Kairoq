@@ -1845,6 +1845,58 @@ $('web-run').onclick=async()=>{
  }catch(err){text($('web-error'),err.message)}
  finally{btn.disabled=false}
 };
+// ----- Find customers (outreach.js): leads, drafts, an outbox the owner approves -----
+const LEAD_STATUS={new:'New',drafted:'Draft in outbox',contacted:'Emailed',replied:'Replied',not_interested:'Not interested',opted_out:'Asked not to be emailed',bounced:'Bounced',skipped:'Skipped'};
+async function leadsAction(fn){text($('leads-error'),'');try{const d=await fn();if(d&&d.leads)renderLeads(d);else await loadLeads()}catch(err){text($('leads-error'),err.message)}}
+async function loadLeads(){renderLeads(await api('/outreach'))}
+function renderLeads(d){
+ const s=d.settings||{};
+ $('leads-offer').value=s.offer||'';$('leads-customers').value=s.customers||'';$('leads-sender').value=s.sender||'';$('leads-business').value=s.sender_business||'';$('leads-address').value=s.address||'';$('leads-reply').value=s.reply_to||'';
+ text($('leads-missing'),d.missing.length?'Add '+d.missing.join(', ')+' before emails can be written.':'');
+ if(d.missing.length)$('leads-settings-box').open=true;
+ const sig=$('leads-signals');sig.textContent='';
+ for(const x of d.signals){const l=el('label','check small');const c=document.createElement('input');c.type='checkbox';c.value=x.code;c.checked=s.signals.includes(x.code);l.append(c,' '+x.label+' ',el('span','muted',x.why));sig.append(l)}
+ const kind=$('leads-kind');if(!kind.options.length)for(const k of d.kinds){const o=document.createElement('option');o.value=k;o.textContent=k.replace(/_/g,' ');kind.append(o)}
+ text($('leads-sending'),d.paused?'Sending is paused: '+d.paused.reason:!d.sending_ready?'Sending needs its own address (set up by the Kairoq admin); until then, copy approved emails into your own email.':d.stats.sent+' sent, '+d.stats.bounced+' bounced, up to '+d.daily+' a day');
+ text($('leads-attribution'),d.attribution);
+ const out=$('leads-outbox');out.textContent='';
+ const items=d.outbox.filter(o=>o.status!=='rejected');
+ if(!items.length)out.append(el('li','muted small','No emails yet. Write one from a lead below.'));
+ for(const o of items){
+  const li=el('li','lead-mail');const lead=d.leads.find(l=>l.id===o.lead);
+  li.append(el('p','small',(lead?lead.name+' · ':'')+o.to+' · '+({waiting:'Waiting for you',approved:'Approved',blocked:'Needs a fix',sent:'Sent'}[o.status]||o.status)));
+  const subj=document.createElement('input');subj.value=o.subject;subj.maxLength=120;subj.disabled=o.status==='sent';subj.setAttribute('aria-label','Subject');
+  const body=document.createElement('textarea');body.value=o.text;body.rows=8;body.disabled=o.status==='sent';body.setAttribute('aria-label','Email');
+  li.append(subj,body);
+  if(o.reasons&&o.reasons.length)li.append(el('p','error small',o.reasons.join(' ')));
+  if(o.status!=='sent'){
+   const row=el('div','row');
+   const save=el('button','ghost link-btn','Save changes');save.type='button';save.onclick=()=>leadsAction(()=>api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'edit',subject:subj.value,text:body.value}}));
+   const ok=el('button','primary',o.status==='approved'?'Send now':'Approve');ok.type='button';
+   ok.onclick=()=>leadsAction(async()=>{await api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'edit',subject:subj.value,text:body.value}});if(o.status==='approved'){if(!confirm('Send this email to '+o.to+' now?'))return;await api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'send'}})}else await api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'approve'}})});
+   const copy=el('button','ghost link-btn','Copy');copy.type='button';copy.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText('To: '+o.to+'\nSubject: '+subj.value+'\n\n'+body.value);
+   const no=el('button','ghost link-btn','Discard');no.type='button';no.onclick=()=>leadsAction(()=>api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'reject'}}));
+   row.append(ok,save,copy,no);li.append(row);
+  }
+  out.append(li);
+ }
+ const list=$('leads-list');list.textContent='';
+ if(!d.leads.length)list.append(el('li','muted small','No leads yet. Pick a kind of business and a place, then Find.'));
+ for(const l of d.leads){
+  const li=el('li');
+  const head=el('p','small');head.append(el('b',null,l.name),' · '+l.kind.replace(/_/g,' ')+(l.address?' · '+l.address:'')+' · score '+(l.score||0)+' · '+(LEAD_STATUS[l.status]||l.status));li.append(head);
+  const seen=(l.observations||[]).filter(o=>o.value).map(o=>(d.signals.find(x=>x.code===o.code)||{}).label).filter(Boolean);
+  li.append(el('p','muted small',[l.website||'No website',l.email?l.email+' ('+l.email_source+')':'No published email',l.phone,seen.join(', ')].filter(Boolean).join(' · ')));
+  const row=el('div','row');
+  if(l.website&&!l.profiled_at){const b=el('button','ghost link-btn','Read their website');b.type='button';b.onclick=()=>leadsAction(()=>api('/outreach/leads/'+l.id+'/profile',{method:'POST'}));row.append(b)}
+  if(l.email&&['new','skipped'].includes(l.status)){const b=el('button','ghost link-btn','Write an email');b.type='button';b.onclick=async()=>{b.disabled=true;text($('leads-status'),'Writing…');await leadsAction(()=>api('/outreach/leads/'+l.id+'/draft',{method:'POST'}));text($('leads-status'),'')};row.append(b)}
+  if(l.status==='contacted')for(const [st,label] of [['replied','They replied'],['not_interested','Not interested'],['opted_out','Asked to stop'],['bounced','Bounced']]){const b=el('button','ghost link-btn',label);b.type='button';b.onclick=()=>leadsAction(()=>api('/outreach/leads/'+l.id,{method:'POST',body:{status:st}}));row.append(b)}
+  li.append(row);list.append(li);
+ }
+}
+$('side-leads').onclick=async()=>{text($('leads-error'),'');$('leads-dialog').showModal();try{await loadLeads()}catch(err){text($('leads-error'),err.message)}};
+$('leads-save').onclick=()=>leadsAction(async()=>{const d=await api('/outreach/settings',{method:'POST',body:{offer:$('leads-offer').value,customers:$('leads-customers').value,sender:$('leads-sender').value,sender_business:$('leads-business').value,address:$('leads-address').value,reply_to:$('leads-reply').value.trim(),signals:[...$('leads-signals').querySelectorAll('input:checked')].map(c=>c.value)}});text($('leads-saved'),'Saved');setTimeout(()=>text($('leads-saved'),''),2000);return d});
+$('leads-search').onclick=async()=>{const b=$('leads-search');b.disabled=true;text($('leads-status'),'Looking on the map…');await leadsAction(async()=>{const d=await api('/outreach/search',{method:'POST',body:{kind:$('leads-kind').value,area:$('leads-area').value.trim()}});text($('leads-status'),'Found '+d.added+' new '+d.kind.replace(/_/g,' ')+' in '+d.area+'.');return d});b.disabled=false};
 $('mem-enabled').onchange=()=>memoryAction({action:'enabled',enabled:$('mem-enabled').checked});
 $('mem-add').onclick=()=>{const t=$('mem-new').value.trim();if(!t)return;$('mem-new').value='';memoryAction({action:'add_preference',text:t})};
 $('mem-new').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('mem-add').click()}});
@@ -2371,7 +2423,7 @@ function renderSkills(){
  const d=state.designData,list=$('skills-list');list.replaceChildren();
  const on=new Set(d.skills),editor=state.project.role!=='viewer',owner=state.project.role==='owner';
  // Built-in styles first, then built-in page types, then the account's own skills, each under a heading.
- const groupOf=sk=>sk.source!=='builtin'?'Your skills':sk.group||'Styles',order=['Styles','Page types','Your skills'];
+ const groupOf=sk=>sk.source!=='builtin'?'Your skills':sk.group||'Styles',order=['Styles','Page types','Craft','Your skills'];
  const rank=g=>{const i=order.indexOf(g);return i<0?1.5:i};
  let heading=null;
  for(const sk of [...d.library].sort((a,b)=>rank(groupOf(a))-rank(groupOf(b)))){

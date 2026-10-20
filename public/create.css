@@ -696,3 +696,6 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .guard-history{margin:6px 0 0;padding-left:18px}
 
 #publish-error{white-space:pre-line}
+.leads-signals{display:grid;gap:.25rem;margin:.25rem 0 .75rem}
+.leads-signals .muted{display:block;margin-left:1.6rem}
+.lead-mail input,.lead-mail textarea{width:100%;margin:.25rem 0}

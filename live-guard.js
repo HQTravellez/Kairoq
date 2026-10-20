@@ -61,7 +61,7 @@ async function tell(meta,subject,text,{send,alsoAlert=false}){
 
 // The AI repairs the published version; the result must pass everything before it goes live.
 async function repair(id,n,problem,{callModel,checkRuntime,inspect,exclusive}){
- const message='The published app is broken for customers. Kairoq\'s browser found:\n'+problem+'\nFix the cause so the page shows and every flow works again. Change only what is needed for that; keep everything else as it is.';
+ const message='The published app is broken for customers. Kairoq\'s browser found:\n'+problem+'\nFix the cause so the page shows and every flow works again. Change only what is needed for that; keep everything else as it is.\n'+require('./builder-method').DEBUG;
  const r=await exclusive(id,()=>builder.edit(id,message,{callModel,checkRuntime,inspect,tier:'standard',displayText:'Live guard: repair the published app',extra:{guard:true}}));
  if(!r||r.rolled_back||!r.version||r.version===n)return{ok:false,why:'the AI could not make a working version'};
  const after=await probe(id,r.version,{checkRuntime,inspect});

@@ -870,6 +870,25 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(wm&&wm[1]&&method==='DELETE')return send(res,200,W.removeWatch(v.owner,wm[1])),true;
    return send(res,404,{error:'Route not found'}),true;
   }
+  // ----- find customers: local businesses, drafts the owner approves, sent from its own address -----
+  if(route==='/outreach'||route.startsWith('/outreach/')){
+   const O=require('./outreach'),lm=/^\/outreach\/leads\/(osm-[a-z]+-\d+)(?:\/(draft|profile))?$/.exec(route),om=/^\/outreach\/outbox\/([0-9a-f-]{36})$/.exec(route);
+   if(route==='/outreach'&&method==='GET')return send(res,200,O.view(v.owner)),true;
+   if(route==='/outreach/settings'&&method==='POST')return send(res,200,O.settings(v.owner,await readJson(req,6000))),true;
+   if(route==='/outreach/search'&&method==='POST'){limited(req,'outreach-search',10,600000);const b=await readJson(req,2000);return send(res,200,await O.search(v.owner,{area:b.area,kind:b.kind})),true}
+   if(route==='/outreach/pause'&&method==='POST'){const b=await readJson(req,500);return send(res,200,O.pause(v.owner,b.paused!==false)),true}
+   if(lm&&lm[2]==='profile'&&method==='POST'){limitedKey('outreach-profile:'+v.owner,120,600000);return send(res,200,{lead:await O.profile(v.owner,lm[1])}),true}
+   if(lm&&lm[2]==='draft'&&method==='POST'){limitedKey('outreach-draft:'+v.owner,40,600000);return send(res,200,{email:await O.draft(v.owner,lm[1],{callModel})}),true}
+   if(lm&&!lm[2]&&method==='POST'){const b=await readJson(req,500);return send(res,200,O.mark(v.owner,lm[1],String(b.status||''))),true}
+   if(om&&method==='POST'){
+    const b=await readJson(req,8000);
+    if(b.action==='edit')return send(res,200,{email:O.edit(v.owner,om[1],b)}),true;
+    if(b.action==='approve'||b.action==='reject')return send(res,200,{email:O.decide(v.owner,om[1],b.action)}),true;
+    if(b.action==='send'){limitedKey('outreach-send:'+v.owner,60,3600000);return send(res,200,{email:await O.send(v.owner,om[1])}),true}
+    throw Object.assign(Error('Unknown action'),{status:400});
+   }
+   return send(res,404,{error:'Route not found'}),true;
+  }
   // ----- the learning loop (owner only) -----
   if(route==='/learning'){
    if(v.kind!=='owner')throw Object.assign(Error('Only the Kairoq owner can manage what Kairoq learns'),{status:403});
