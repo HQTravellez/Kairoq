@@ -21,12 +21,13 @@
 const fs=require('fs'),path=require('path');
 
 function args(argv){
- const o={tiers:'standard',modes:'build',cases:'',followups:true,out:'eval-results',yes:false,judge:false};
+ const o={tiers:'standard',modes:'build',engines:'kairoq',repeat:1,cases:'',followups:true,accept:true,out:'eval-results',yes:false,judge:false};
  for(let i=0;i<argv.length;i++){
   const a=argv[i],next=()=>argv[++i];
   if(a==='--url')o.url=next();else if(a==='--email')o.email=next();else if(a==='--password')o.password=next();
   else if(a==='--tiers')o.tiers=next();else if(a==='--modes')o.modes=next();else if(a==='--cases')o.cases=next();
   else if(a==='--out')o.out=next();else if(a==='--chromium')o.chromium=next();else if(a==='--timeout')o.timeout=Number(next());
+  else if(a==='--engines')o.engines=next();else if(a==='--repeat')o.repeat=Math.max(1,Math.min(5,Number(next())||1));else if(a==='--no-accept')o.accept=false;
   else if(a==='--no-followups')o.followups=false;else if(a==='--yes')o.yes=true;
   else if(a==='--judge')o.judge=true;else if(a==='--judge-model')o.judgeModel=next();else if(a==='--judge-only')o.judgeOnly=next();
   else if(a==='--lovable')o.lovable=next();else if(a==='--lovable-urls')o.lovableUrls=next();else if(a==='--openrouter-key')o.key=next();
@@ -42,6 +43,9 @@ const HELP=`Usage: node scripts/model-eval.js --url <kairoq url> --email <accoun
   --tiers standard,pro,max   model tiers to test (default standard)
   --modes build,agent        chat modes to test (default build)
   --cases hotel,crm          only these case ids (default all, see scripts/model-eval-prompts.json)
+  --engines kairoq,opencode  build engines to compare (default kairoq; opencode needs KAIROQ_OPENCODE=on)
+  --repeat <k>               build every case k times (1-5): a case passes only when all k runs pass
+  --no-accept                skip the acceptance flows (each is checked in Kairoq's browser, priced like a Discuss message)
   --no-followups             skip the follow-up edits
   --out <dir>                results folder (default eval-results)
   --chromium <path>          Chromium for preview checks and screenshots (default CHROMIUM_PATH or common paths)
@@ -182,7 +186,7 @@ async function runJudge(o,cases,results,shotsDir,outDir,browser,{fetchImpl}={}){
 const avg=xs=>{const v=xs.filter(x=>typeof x==='number');return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null};
 const fmt=n=>n===null||n===undefined?'-':String(n);
 function writeReports(outDir,results,meta,lovable={}){
- const cols=['case','name','category','tier','mode','first_status','first_seconds','followups','followup_seconds','total_seconds','credits_used','agent_steps','runtime_errors','preview_errors','expected_found','missing','security_high','security_medium','versions','first_error','followup_error','preview','screenshots'];
+ const cols=['case','name','category','engine','repeat','pass','tier','mode','first_status','first_seconds','followups','followup_seconds','total_seconds','credits_used','agent_steps','runtime_errors','preview_errors','expected_found','missing','accept','accept_failed','engine_fallback','security_high','security_medium','versions','first_error','followup_error','preview','screenshots'];
  const judged=results.some(r=>r.judge&&!r.judge.error);
  const judgeCols=judged?['judge_matches_request','judge_design','judge_mobile','judge_overall','judge_summary']:[];
  const scores=['score_matches_request','score_design','score_works','score_mobile','score_edits','notes','lovable_matches_request','lovable_design','lovable_works','lovable_mobile','lovable_edits','lovable_notes'];
@@ -190,9 +194,12 @@ function writeReports(outDir,results,meta,lovable={}){
  // Lovable judge scores pre-fill the Lovable columns; you can overwrite them.
  const lovCell=(r,k)=>{const j=lovable[r.case];if(!j||j.error)return'';return{lovable_matches_request:j.matches_request,lovable_design:j.design,lovable_mobile:j.mobile,lovable_notes:j.summary}[k]??''};
  fs.writeFileSync(path.join(outDir,'scoring-sheet.csv'),[cols.concat(judgeCols,scores).join(','),...results.map(r=>cols.map(k=>csvCell(r[k])).concat(judgeCols.map(k=>csvCell(judgeCell(r,k))),scores.map(k=>csvCell(k.startsWith('lovable_')?lovCell(r,k):''))).join(','))].join('\n')+'\n');
- const ok=results.filter(r=>r.first_status==='complete').length;
+ const ok=results.filter(r=>r.first_status==='complete').length,pk=passK(results);
  const lines=['# Kairoq real-model test, '+(meta.date||new Date().toISOString()).slice(0,16).replace('T',' ')+' UTC','',(meta.url||'')+' · tiers '+(meta.tiers||[]).join(', ')+' · modes '+(meta.modes||[]).join(', '),'',
   '**'+ok+'/'+results.length+'** first builds completed. Score each run 1-5 in `scoring-sheet.csv` (see docs/real-model-test-plan.md), and build the same prompts in Lovable for the comparison columns.','',
+  '## Pass rate by engine','','A case counts only when all of its '+(meta.repeat||1)+' run'+((meta.repeat||1)>1?'s':'')+' passed (built, follow-ups landed, expected text, no preview errors, no high-severity security finding, every acceptance flow worked in the browser).','',
+  '| Engine | Cases passed (pass^'+(meta.repeat||1)+') | Runs passed |','|---|---|---|',
+  ...Object.entries(pk).map(([e,v])=>'| '+e+' | '+v.all_passed+'/'+v.cases+' | '+v.runs_passed+'/'+v.runs+' |'),'',
   '| Case | Tier | Mode | First build | Seconds | Follow-ups | Credits | Expected text | Preview errors | Security high/med |','|---|---|---|---|---|---|---|---|---|---|',
   ...results.map(r=>'| '+[r.name,r.tier,r.mode,r.first_status+(r.first_error?': '+String(r.first_error).slice(0,60):''),r.first_seconds??'',r.followups||'-',r.credits_used??'',r.expected_found||'-',r.preview_errors??'-',(r.security_high??'-')+'/'+(r.security_medium??'-')].join(' | ')+' |')];
  const byTier={};for(const r of results){const k=r.tier+' / '+r.mode;(byTier[k]=byTier[k]||[]).push(r)}
@@ -229,6 +236,18 @@ function writeReports(outDir,results,meta,lovable={}){
  fs.writeFileSync(path.join(outDir,'summary.md'),lines.join('\n')+'\n');
 }
 
+// A run passes when the app was built, every follow-up landed, the preview showed the expected
+// text without errors, nothing high-severity was found and every acceptance flow worked.
+function passed(r,c){
+ const all=v=>{const m=/^(\d+)\/(\d+)$/.exec(v||'');return!m||m[1]===m[2]};
+ return r.first_status==='complete'&&all(r.followups)&&all(r.accept)&&all(r.expected_found)&&!(Number(r.preview_errors)>0)&&!(Number(r.security_high)>0);
+}
+// pass^k per engine: the share of cases where every repeat passed (a lucky single pass is not enough).
+function passK(results){
+ const out={};
+ for(const r of results){const e=r.engine||'kairoq',key=r.case+'|'+r.tier+'|'+r.mode;((out[e]=out[e]||{})[key]=out[e][key]||[]).push(r.pass==='yes')}
+ return Object.fromEntries(Object.entries(out).map(([e,byCase])=>{const v=Object.values(byCase),runs=v.flat();return[e,{cases:v.length,all_passed:v.filter(x=>x.every(Boolean)).length,runs:runs.length,runs_passed:runs.filter(Boolean).length}]}));
+}
 function loadCases(ids){
  const all=JSON.parse(fs.readFileSync(path.join(__dirname,'model-eval-prompts.json'),'utf8')).cases;
  const cases=ids?all.filter(c=>ids.includes(c.id)):all;
@@ -261,28 +280,31 @@ async function main(){
  const me=await client.call('GET','/me');
  const tierInfo=Object.fromEntries((me.tiers||[]).map(t=>[t.id,t]));
  for(const t of tiers){if(!tierInfo[t])throw Error('Unknown tier '+t);if(!tierInfo[t].enabled)throw Error('Tier '+t+' is not enabled on this server')}
- const runs=[];for(const c of cases)for(const tier of tiers)for(const mode of modes)runs.push({c,tier,mode});
- const messagesPer=c=>1+(o.followups?c.followups.length:0);
+ const engines=o.engines.split(',').map(s=>s.trim()).filter(Boolean);
+ for(const e of engines)if(!['kairoq','opencode'].includes(e))throw Error('Unknown engine '+e);
+ const runs=[];for(const c of cases)for(const engine of engines)for(const tier of tiers)for(const mode of modes)for(let k=1;k<=o.repeat;k++)runs.push({c,tier,mode,engine,k});
+ const messagesPer=c=>1+(o.followups?c.followups.length:0)+(o.accept?(c.accept||[]).length:0);
  const estimate=runs.reduce((n,r)=>n+messagesPer(r.c)*tierInfo[r.tier].credits*(r.mode==='agent'?(me.agent_multiplier||3):1),0);
  const balance=me.viewer&&me.viewer.account?me.viewer.account.credits:null;
- console.log(runs.length+' runs ('+cases.length+' cases × '+tiers.join('/')+' × '+modes.join('/')+'), '+runs.reduce((n,r)=>n+messagesPer(r.c),0)+' messages, up to '+estimate+' credits'+(balance!==null?' (balance '+balance+')':'')+'.');
+ console.log(runs.length+' runs ('+cases.length+' cases × '+engines.join('/')+' × '+tiers.join('/')+' × '+modes.join('/')+(o.repeat>1?' × '+o.repeat+' repeats':'')+'), '+runs.reduce((n,r)=>n+messagesPer(r.c),0)+' messages, up to '+estimate+' credits'+(balance!==null?' (balance '+balance+')':'')+'.');
  if(o.judge)console.log('Then '+o.judgeModel+' judges '+runs.length+' apps'+(o.lovable||o.lovableUrls?' plus the Lovable ones':'')+' (roughly $0.03-0.20 each on OpenRouter, depending on the model).');
  if(!o.yes){console.log('Add --yes to run.');return}
  if(balance!==null&&balance<estimate)console.warn('Warning: the balance may run out before the end.');
  const outDir=path.resolve(o.out,new Date().toISOString().replace(/[:.]/g,'-').slice(0,19));
  fs.mkdirSync(path.join(outDir,'shots'),{recursive:true});
- const meta={date:new Date().toISOString(),url:o.url,tiers,modes};
+ const meta={date:new Date().toISOString(),url:o.url,tiers,modes,engines,repeat:o.repeat};
  fs.writeFileSync(path.join(outDir,'meta.json'),JSON.stringify(meta,null,1));
  const browser=await launch(o);
  const timeout=(o.timeout||20)*60000,results=[];
- for(const [i,{c,tier,mode}] of runs.entries()){
-  const label=c.id+'-'+tier+'-'+mode,row={case:c.id,name:c.name,category:c.category,tier,mode};
+ for(const [i,{c,tier,mode,engine,k}] of runs.entries()){
+  const label=c.id+'-'+engine+'-'+tier+'-'+mode+(o.repeat>1?'-'+k:''),row={case:c.id,name:c.name,category:c.category,engine,repeat:k,tier,mode};
   process.stdout.write('['+(i+1)+'/'+runs.length+'] '+label+' … ');
   const started=Date.now();
   try{
    const before=(await client.call('GET','/me')).viewer?.account?.credits;
-   const id=(await client.call('POST','/projects',{name:'Eval '+c.name+' ('+tier+', '+mode+')'})).project.id;
+   const id=(await client.call('POST','/projects',{name:'Eval '+c.name+' ('+engine+', '+tier+', '+mode+(o.repeat>1?' #'+k:'')+')'})).project.id;
    row.project=id;
+   if(engine==='opencode')await client.call('POST','/projects/'+id+'/settings',{engine:'opencode'});
    if(c.mobile)await client.call('POST','/projects/'+id+'/mobile',{enabled:true});
    const first=await client.waitJob((await client.call('POST','/projects/'+id+'/chat',{message:c.prompt,mode,tier})).job,timeout);
    row.first_status=first.status;row.first_seconds=Math.round((Date.now()-started)/1000);
@@ -291,10 +313,17 @@ async function main(){
    let ok=0,done=0;const fstart=Date.now();
    if(o.followups&&first.status==='complete')for(const f of c.followups){done++;const j=await client.waitJob((await client.call('POST','/projects/'+id+'/chat',{message:f,mode,tier})).job,timeout);if(j.status==='complete')ok++;else row.followup_error=(j.error||'').slice(0,200)}
    row.followups=done?ok+'/'+done:'';row.followup_seconds=done?Math.round((Date.now()-fstart)/1000):'';
+   // Acceptance: each money-path flow is written as a browser check and must pass on the app.
+   if(o.accept&&first.status==='complete'&&(c.accept||[]).length){
+    let passed=0;const failed=[];
+    for(const flow of c.accept){try{const r=await client.call('POST','/projects/'+id+'/checks',{describe:flow,tier:'standard'});if(r.saved)passed++;else failed.push(flow.slice(0,60)+': '+String(r.failed&&(r.failed.step||r.failed.error)||'failed').slice(0,80))}catch(e){failed.push(flow.slice(0,60)+': '+String(e.message||e).slice(0,80))}}
+    row.accept=passed+'/'+c.accept.length;if(failed.length)row.accept_failed=failed.join(' | ');
+   }
    const sec=await client.call('GET','/projects/'+id+'/security').catch(()=>({findings:[]}));
    row.security_high=sec.findings.filter(f=>f.severity==='high').length;row.security_medium=sec.findings.filter(f=>f.severity==='medium').length;
    const project=(await client.call('GET','/projects/'+id)).project;
-   row.versions=project.versions.length;row.preview=project.preview_url?client.base+project.preview_url:'';
+   row.versions=project.versions.length;
+   if(engine==='opencode')row.engine_fallback=project.versions.some(v=>v.engine_fallback)?'yes':'no';row.preview=project.preview_url?client.base+project.preview_url:'';
    row.design_style=project.design?project.design.name:'';
    if(browser&&row.preview){const b=await browserCheck(browser,row.preview,c.expect,path.join(outDir,'shots',label));row.preview_errors=b.errors.length;row.expected_found=b.hits+'/'+c.expect.length;row.missing=b.missing.join(' | ');row.screenshots=b.shots.map(s=>path.relative(outDir,s)).join(' ')}
    const after=(await client.call('GET','/me')).viewer?.account?.credits;
@@ -302,6 +331,7 @@ async function main(){
    console.log(first.status+' in '+row.first_seconds+'s, follow-ups '+(row.followups||'-')+', credits '+row.credits_used);
   }catch(e){row.first_status=row.first_status||'error';row.first_error=String(e.message||e).slice(0,300);console.log('error: '+row.first_error)}
   row.total_seconds=Math.round((Date.now()-started)/1000);
+  row.pass=passed(row,c)?'yes':'no';
   results.push(row);
   fs.writeFileSync(path.join(outDir,'results.json'),JSON.stringify(results,null,1));
  }
@@ -313,4 +343,4 @@ async function main(){
  console.log('\nDone. Results in '+outDir+' (summary.md, scoring-sheet.csv'+(o.judge?', judge-notes.md':'')+', shots/).');
 }
 if(require.main===module)main().catch(e=>{console.error(e.message||e);process.exit(1)});
-module.exports={args,judgePrompt,parseJudge,judgeApp,runJudge,writeReports,lovableShots,AREAS,Client,launch,browserCheck,loadCases};
+module.exports={passed,passK,args,judgePrompt,parseJudge,judgeApp,runJudge,writeReports,lovableShots,AREAS,Client,launch,browserCheck,loadCases};

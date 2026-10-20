@@ -350,7 +350,7 @@ function contextFiles(files,budget=160000){
  const kitFiles=Object.keys(files).filter(n=>design.isKitFile(n,files[n])).sort();
  const order=Object.keys(files).filter(n=>!kitFiles.includes(n)).sort((a,b)=>(a==='src/App.jsx'?-1:b==='src/App.jsx'?1:a.localeCompare(b)));
  for(const name of order){const block='--- '+name+' ---\n'+files[name]+'\n';if(used+block.length>budget){omitted.push(name);continue}used+=block.length;parts.push(block)}
- const kitNote=kitFiles.length?'\n--- UI kit (unchanged starter files; import them, e.g. import { Button } from \'./components/ui/button.jsx\') ---\n'+kitFiles.map(n=>n+': '+(design.KIT_API[n]||'')).join('\n')+'\n':'';
+ const kitNote=kitFiles.length?'\n--- UI kit (unchanged starter files; import them, e.g. import { Button } from \'./components/ui/button.jsx\') ---\n'+require('./ui-kit-docs').note(kitFiles,design.KIT_API,Object.fromEntries(order.map(n=>[n,files[n]])))+'\n':'';
  return parts.join('\n')+kitNote+(omitted.length?'\n(Not shown to save space: '+omitted.join(', ')+'. Do not rewrite them unless needed.)\n':'');
 }
 
@@ -450,6 +450,14 @@ async function selfCheck(id,meta,files,checkRuntime){
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 }
 // Errors that mean the app does not show at all.
+// High-severity findings in the new code that the old code did not have.
+function newSecurityProblems(before,after){
+ const security=require('./react-security'),backend=require('./react-backend');
+ const run=f=>{let cfg={collections:{}};try{cfg=backend.parseConfig(f)}catch{}try{return security.scan(f,cfg).filter(x=>x.severity==='high'&&x.file!=='src/backend.json')}catch{return[]}};
+ const key=x=>x.title+'|'+(x.file||'');
+ const had=new Set(run(before||{}).map(key));
+ return run(after).filter(x=>!had.has(key(x))).map(x=>x.title+(x.file?' ('+x.file+(x.line?':'+x.line:'')+')':'')+': '+x.detail+' Fix: '+x.fix);
+}
 function brokenError(e){return /^(Blank page|Page did not load)/.test(String(e))}
 // The browser check runs on a test copy of the app's data and adds a record the way a customer
 // would (runtime-check.js savesData). A record that showed on the page but is in none of the
@@ -483,7 +491,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
- let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null;
+ let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null,securityTries=0;
  // The files a fix applies to: the request's base, then the last try that built (a fix for a
  // build or browser error changes that try; it does not start again from the base).
  let work=base;
@@ -532,6 +540,15 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    const how=editFailed&&editFailures>=2?'Your find/replace edits failed twice, so do not use "edits" this time: send every file you change whole in "files".':'Fix the edits that failed (copy "find" exactly, character for character, from the current files above) or send those files whole in "files".';
    tl.add({t:'fix',text:editFailed?'Some edits did not match the files, retrying':'The change had problems, retrying',detail:lastError});
    messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again. '+how});continue;
+  }
+  // Serious mistakes in code this change adds (a secret in the page, SQL built from strings) go
+  // back to the AI once, like a failed build. Who may read a collection can be a deliberate choice
+  // (a public guestbook), so that stays a finding in the security scan instead.
+  const unsafe=securityTries<1&&process.env.KAIROQ_SECURITY_GATE!=='off'?newSecurityProblems(base,next):[];
+  if(unsafe.length){
+   securityTries++;lastError=unsafe.join('\n');work=next;
+   tl.add({t:'fix',text:'Fixing a security problem in the change',detail:lastError});
+   messages.push({role:'user',content:'Kairoq\'s security scan found serious problems this change adds (nothing was applied):\n'+lastError+'\nFix them and return corrected JSON with all the changes again, keeping what the user asked for.'});continue;
   }
   tl.edits(base,next);
   onProgress('building');
@@ -598,6 +615,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
 // model, which fixes what looks off without changing behaviour. Saved as a new version.
 const POLISH_REQUEST=`Design review. The attached screenshots show the current app: first a desktop browser 1280 px wide, then a phone 390 px wide (long pages are cut off at the bottom). Look at them like a senior product designer and improve the visual design without changing what the app does.
 1. Find the 5 to 8 most visible problems, for example: weak hierarchy or a hero without a focal point, cramped or uneven spacing, misaligned elements, low contrast text, plain or empty-looking sections, missing or poor imagery, inconsistent buttons and cards, hard-coded colours that ignore the design tokens, a phone layout that is cramped, overflowing or not tappable, missing hover and focus states.
+   Also remove the generic "made by AI" template look wherever you see it:
+${require('./design-slop').list().replace(/^/gm,'   ')}
 2. Fix them in the code: spacing, type scale, design tokens in src/index.css, imagery, section backgrounds, cards, hover and focus states, motion, the phone layout.
 Keep every feature, page, route, text content, form, data call and server function working exactly as before, and do not remove sections. In "message", tell the user in one or two sentences what you improved.`;
 async function polish(id,{shots,note='',...opts}){

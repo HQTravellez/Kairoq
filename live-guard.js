@@ -30,7 +30,7 @@ async function probe(id,n,{checkRuntime,inspect,live=false}){
  await builder.ensureBuilt(id,n);
  const out={ok:true,page:[],checks:[],skipped:false};
  if(checkRuntime){
-  const r=await checkRuntime(live?liveSitePath(meta):builder.previewUrl(meta,n));
+  const r=await checkRuntime(live?liveSitePath(meta):builder.previewUrl(meta,n),live?{fast:true}:undefined);
   if(r.skipped)out.skipped=true;else out.page=serious(r.errors);
  }
  if(inspect){

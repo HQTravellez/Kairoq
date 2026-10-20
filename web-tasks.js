@@ -78,6 +78,8 @@ async function start(owner,{url,task,every},deps){
  if(today>=intEnv('KAIROQ_WEB_TASKS_PER_DAY',20,1,1000))throw fail(429,'That is today\'s limit for the web agent. Try again tomorrow.');
  if([...running.values()].filter(x=>x.owner===owner).length>=2)throw fail(429,'Two web agent runs are already working. Wait for one to finish.');
  const w=every?addWatch(owner,{url:u,task:t,every,next:Date.now()+(every==='day'?DAY:WEEK)}):null;
+ // A watch on an RSS or Atom feed is read directly: no browser and no credits.
+ if(w){const f=await feedCheck(owner,w.id,{fetchImpl:deps&&deps.fetchImpl}).catch(()=>null);if(f)return publicRun(f.run)}
  const p=execute(owner,{url:u,task:t,watch:w&&w.id,interactive:true},deps).then(run=>w?record(owner,w.id,run,deps).then(()=>run):run);
  p.catch(()=>{});
  await new Promise(r=>setImmediate(r));
@@ -165,6 +167,22 @@ async function quick(owner,id,{callModel,now=Date.now(),fetchImpl}={}){
  st.runs=[run,...st.runs].slice(0,30);save(st);
  return{changed:run.changed,run};
 }
+// A feed check (feed-watch.js): new items since the last look are mailed to the owner. Returns
+// null when the address is not a feed (the watch is then checked like any page from now on).
+async function feedCheck(owner,id,{now=Date.now(),fetchImpl}={}){
+ const feeds=require('./feed-watch');
+ const w0=load(owner).watches.find(x=>x.id===id);if(!w0||w0.feed===false)return null;
+ let feed;
+ try{feed=await feeds.fetchFeed(w0.url,{fetchImpl})}catch(e){if(w0.feed)throw e;feed=null}
+ const st=load(owner),w=st.watches.find(x=>x.id===id);if(!w)return null;
+ if(!feed){w.feed=false;save(st);return null}
+ const d=feeds.diff(feed,w.feed_seen||[]),answer=feeds.answerOf(feed);
+ const run={id:crypto.randomUUID(),url:w.url,task:w.task,status:'complete',outcome:'completed',quick:true,feed:true,at:new Date(now).toISOString(),answer,watch:id,changed:d.fresh.length>0,change:d.fresh.length?d.fresh.length+' new: '+d.fresh.slice(0,3).map(i=>i.title).join('; '):''};
+ if(d.fresh.length)await mail(owner,'New on '+(feed.title||new URL(w.url).hostname)+': '+clip(d.fresh[0].title,60)+(d.fresh.length>1?' and '+(d.fresh.length-1)+' more':''),d.fresh.slice(0,20).map(i=>'- '+i.title+(i.link?'\n  '+i.link:'')+(i.summary?'\n  '+i.summary:'')).join('\n')+'\n\nWatch: '+w.task+'\nFeed: '+w.url+'\n\nSee it in Kairoq: '+(process.env.KAIROQ_PUBLIC_URL||'')+'/create');
+ Object.assign(w,{feed:true,feed_seen:d.seen,last:run.at,last_answer:answer,last_outcome:'feed check',next:new Date(now+(w.every==='day'?DAY:WEEK)).toISOString()});
+ st.runs=[run,...st.runs].slice(0,30);save(st);
+ return{changed:run.changed,run};
+}
 // Runs every watch that is due, for every account (called hourly by the server).
 let ticking=false;
 async function tick({callModel,browseSite,now=Date.now()}={}){
@@ -177,6 +195,11 @@ async function tick({callModel,browseSite,now=Date.now()}={}){
   let st;try{st=JSON.parse(fs.readFileSync(path.join(dir(),f),'utf8'))}catch{continue}
   for(const w of st.watches||[]){
    if(w.paused||Date.parse(w.next)>now)continue;
+   // A feed is read directly; a page that is not a feed is never fetched this way again.
+   if(w.feed!==false){
+    try{const q=await feedCheck(st.owner,w.id,{now});if(q){out.ran++;out.feeds=(out.feeds||0)+1;if(q.changed)out.changed++;continue}}
+    catch{}
+   }
    // Quick check first; when it no longer fits the site, the browser agent runs instead.
    if(w.recipe){
     try{const q=await quick(st.owner,w.id,{callModel,now});if(q){out.ran++;out.quick=(out.quick||0)+1;if(q.changed)out.changed++;continue}}
@@ -218,4 +241,4 @@ async function frame(owner,id){const e=live(owner,id);if(!e.session||!e.session.
 async function input(owner,id,ev){const e=live(owner,id);if(!e.waiting)throw fail(409,'Take over first');e.waiting.until=Date.now()+idleLimit();await e.session.control.input(ev||{});return{ok:true}}
 function takeover(owner,id){const e=live(owner,id);if(!e.session||!e.session.control)throw fail(409,'The browser is not open yet');e.wants=true;return publicRun(e.run)}
 function handBack(owner,id,{cancel=false,note=''}={}){const e=live(owner,id);if(e.waiting)e.waiting.finish(!cancel,clip(note,200));else e.wants=false;return publicRun(e.run)}
-module.exports={frame,input,takeover,handBack,start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,quick,compare,price};
+module.exports={feedCheck,frame,input,takeover,handBack,start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,quick,compare,price};

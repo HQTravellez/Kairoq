@@ -18,3 +18,17 @@ test('Experiential small requests do not wait behind a running build',async()=>{
   assert.ok(quick);release();await build;await queued;
  }finally{global.fetch=prior;delete process.env.EXPLABS_API_KEY}
 });
+test('Experiential retries a busy gateway, waiting what it asks for, then gives up with the error',async()=>{
+ const prior=global.fetch;process.env.EXPLABS_API_KEY='test-secret';let calls=0;
+ const services={enforceBudget:async()=>({daily:0,monthly:0}),recordUsage:async()=>{},parse:c=>JSON.parse(c)};
+ const busy=status=>({ok:false,status,headers:{get:k=>k==='retry-after'?'0.01':null},json:async()=>({error:{message:'busy'}})});
+ try{
+  global.fetch=async()=>{calls++;return calls<3?busy(calls===1?429:503):{ok:true,status:200,headers:{get:()=>null},json:async()=>({choices:[{message:{content:'{"ok":1}'}}],usage:{cost:0}})}};
+  assert.deepEqual(await exp.callProject({messages:[],maxOutputTokens:800},services),{ok:1});assert.equal(calls,3);
+  calls=0;global.fetch=async()=>{calls++;return busy(429)};
+  await assert.rejects(exp.callProject({messages:[],maxOutputTokens:800},services),/Experiential 429: busy/);assert.equal(calls,4,'three retries, then the error');
+  calls=0;global.fetch=async()=>{calls++;return{ok:false,status:400,headers:{get:()=>null},json:async()=>({error:{message:'bad request'}})}};
+  await assert.rejects(exp.callProject({messages:[],maxOutputTokens:800},services),/400: bad request/);assert.equal(calls,1,'a real error is not retried');
+ }finally{global.fetch=prior;delete process.env.EXPLABS_API_KEY}
+ assert.equal(exp.retryWait('5',1),5000);assert.ok(exp.retryWait(null,3)<=30000&&exp.retryWait(null,3)>=6000);assert.equal(exp.retryWait('999',1),30000);
+});
