@@ -350,7 +350,7 @@ function contextFiles(files,budget=160000){
  const kitFiles=Object.keys(files).filter(n=>design.isKitFile(n,files[n])).sort();
  const order=Object.keys(files).filter(n=>!kitFiles.includes(n)).sort((a,b)=>(a==='src/App.jsx'?-1:b==='src/App.jsx'?1:a.localeCompare(b)));
  for(const name of order){const block='--- '+name+' ---\n'+files[name]+'\n';if(used+block.length>budget){omitted.push(name);continue}used+=block.length;parts.push(block)}
- const kitNote=kitFiles.length?'\n--- UI kit (unchanged starter files; import them, e.g. import { Button } from \'./components/ui/button.jsx\') ---\n'+kitFiles.map(n=>n+': '+(design.KIT_API[n]||'')).join('\n')+'\n':'';
+ const kitNote=kitFiles.length?'\n--- UI kit (unchanged starter files; import them, e.g. import { Button } from \'./components/ui/button.jsx\') ---\n'+require('./ui-kit-docs').note(kitFiles,design.KIT_API,Object.fromEntries(order.map(n=>[n,files[n]])))+'\n':'';
  return parts.join('\n')+kitNote+(omitted.length?'\n(Not shown to save space: '+omitted.join(', ')+'. Do not rewrite them unless needed.)\n':'');
 }
 
@@ -450,10 +450,10 @@ async function selfCheck(id,meta,files,checkRuntime){
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 }
 // Errors that mean the app does not show at all.
-// High-severity findings in the new files that the old files did not have.
+// High-severity findings in the new code that the old code did not have.
 function newSecurityProblems(before,after){
  const security=require('./react-security'),backend=require('./react-backend');
- const run=f=>{let cfg={collections:{}};try{cfg=backend.parseConfig(f)}catch{}try{return security.scan(f,cfg).filter(x=>x.severity==='high')}catch{return[]}};
+ const run=f=>{let cfg={collections:{}};try{cfg=backend.parseConfig(f)}catch{}try{return security.scan(f,cfg).filter(x=>x.severity==='high'&&x.file!=='src/backend.json')}catch{return[]}};
  const key=x=>x.title+'|'+(x.file||'');
  const had=new Set(run(before||{}).map(key));
  return run(after).filter(x=>!had.has(key(x))).map(x=>x.title+(x.file?' ('+x.file+(x.line?':'+x.line:'')+')':'')+': '+x.detail+' Fix: '+x.fix);
@@ -541,8 +541,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    tl.add({t:'fix',text:editFailed?'Some edits did not match the files, retrying':'The change had problems, retrying',detail:lastError});
    messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again. '+how});continue;
   }
-  // Serious security mistakes this change adds (a secret in the page, SQL built from strings,
-  // personal data anyone can read) go back to the AI once, like a failed build.
+  // Serious mistakes in code this change adds (a secret in the page, SQL built from strings) go
+  // back to the AI once, like a failed build. Who may read a collection can be a deliberate choice
+  // (a public guestbook), so that stays a finding in the security scan instead.
   const unsafe=securityTries<1&&process.env.KAIROQ_SECURITY_GATE!=='off'?newSecurityProblems(base,next):[];
   if(unsafe.length){
    securityTries++;lastError=unsafe.join('\n');work=next;

@@ -296,3 +296,14 @@ test('design presets: the brief starts from palettes and fonts for the kind of b
  assert.match(require('fs').readFileSync(require.resolve('../design-panel.js'),'utf8'),/design-slop/);
  assert.ok(require('../design-slop').list().includes('emoji used as icons'));
 });
+
+test('the AI gets docs for the UI kit: full for core and used components, one line for the rest',()=>{
+ const design=require('../react-design'),docs=require('../ui-kit-docs');
+ for(const n of Object.keys(design.kit()))assert.ok(docs.DOCS[n],'docs for '+n);
+ const files={...design.starterFiles('Doc test',{}),'src/App.jsx':"import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog.jsx';\nexport default function App(){return null}\n"};
+ const ctx=builder.contextFiles(files,60000);
+ assert.match(ctx,/button\.jsx: Button[\s\S]*Use for: Every clickable action/);
+ assert.match(ctx,/dialog\.jsx: [\s\S]*Avoid: A DialogContent without DialogTitle/,'a component the app imports gets its full docs');
+ assert.match(ctx,/accordion\.jsx: Accordion \{type: single\|multiple, collapsible\}[^\n]*\n(?!  Use for)/,'an unused one keeps its one line');
+ assert.match(ctx,/onValueChange, not onChange/);
+});
