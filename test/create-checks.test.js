@@ -113,7 +113,7 @@ test('saved checks run in a browser on a test copy, and a change that breaks one
  assert.equal(builder.loadMeta(id).free_fix.sig.length>0,true);
  // Publishing a version that breaks a check needs an explicit override.
  const pub=await request(server,'POST','/api/create/projects/'+id+'/publish',{headers:{cookie},body:{slug:'casa-checks'}});
- assert.equal(pub.status,409);assert.match(pub.json.error,/Saved checks fail on this version: Book a room/);
+ assert.equal(pub.status,409);assert.match(pub.json.error,/Before this goes live[\s\S]*Not working: Book a room/);assert.equal(pub.json.checks_failed,true);assert.equal(pub.json.gate.blockers[0].kind,'check');
  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/publish',{headers:{cookie},body:{slug:'casa-checks',force:true}})).status,200);
  // The daily monitor emails the owner once when the live app breaks.
  const sent=[];

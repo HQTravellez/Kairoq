@@ -1438,7 +1438,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/rebuild'&&method==='POST'){limitedKey('rebuild:'+id,6,600000);const b=await readJson(req,2000);const meta=builder.loadMeta(id);const n=Number(b.version)||meta.current_version;if(!meta.versions.some(x=>x.n===n))throw Object.assign(Error('Unknown version'),{status:404});if(!await builder.ensureBuilt(id,n,{force:true}))throw Object.assign(Error('This version could not be built. Ask Kairoq to fix it: describe what you see.'),{status:422});return send(res,200,{project:projectView(id),preview_url:builder.previewUrl(meta,n)}),true}
   if(action==='/restore'&&method==='POST'){const b=await readJson(req,2000);builder.restore(id,b.version);return send(res,200,{project:projectView(id)}),true}
   if(action==='/publish'&&method==='POST'){const b=await readJson(req,2000);
-   await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot,renderSite});
+   await publishProject(id,{slug:b.slug,version:b.version,force:b.force},{inspect,screenshot,renderSite,callModel});
    return send(res,200,{project:projectView(id)}),true}
   if(action==='/unpublish'&&method==='POST'){hosting.unpublish(id);return send(res,200,{project:projectView(id)}),true}
   if(action==='/domains'&&method==='POST'){const b=await readJson(req,2000);const billing=require('./hosting-billing'),paid=billing.beforeDomain(id);try{await hosting.addDomain(id,b.hostname)}catch(e){billing.refund(id,paid);throw e}return send(res,200,{project:projectView(id)}),true}
@@ -1448,7 +1448,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
  }catch(e){
   const status=Number.isInteger(e.status)?e.status:422;
   if(status>=500||!e.status)console.warn('[create-api]',String(e.message||e).slice(0,300));
-  return send(res,status,{error:String(e.message||e),...(e.stuck?{stuck:true}:{})}),true;
+  return send(res,status,{error:String(e.message||e),...(e.stuck?{stuck:true}:{}),...(e.data&&typeof e.data==='object'&&!Array.isArray(e.data)?e.data:{})}),true;
  }
 }
 
@@ -1482,8 +1482,9 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[],e
  return{meta,job};
 }
 // Publishing re-runs the saved checks on the version going live, unless the owner overrides.
-async function publishProject(id,{slug,version,force}={},{inspect,screenshot,renderSite}={}){
- if(!force&&inspect){const meta=builder.loadMeta(id),n=Number(version)||meta.current_version;if(require('./react-checks').list(meta).some(c=>c.enabled!==false)&&meta.versions.some(x=>x.n===n)){const r=await require('./react-checks').run(id,builder.previewUrl(meta,n),{inspect,version:n});if(r.failed.length)throw Object.assign(Error('Saved checks fail on this version: '+r.failed.map(f=>f.name).join(', ')+'. Fix them, or publish with force to go live anyway.'),{status:409,failed:r.failed})}}
+async function publishProject(id,{slug,version,force}={},{inspect,screenshot,renderSite,callModel}={}){
+ // The launch gate (launch-gate.js): the money flows must work in the browser before going live.
+ if(!force&&inspect){const meta=builder.loadMeta(id),gate=require('./launch-gate'),g=await gate.check(id,Number(version)||meta.current_version,{callModel,inspect});if(!g.ok)throw Object.assign(Error(gate.message(g)),{status:409,data:{gate:g,checks_failed:true}})}
  // Live hosting is paid monthly: the first 30 days are charged here (given back if publishing fails).
  const billing=require('./hosting-billing'),paid=billing.beforePublish(id);
  let out;try{out=hosting.publish(id,{slug,version})}catch(e){billing.refund(id,paid);throw e}

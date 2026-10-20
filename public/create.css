@@ -694,3 +694,5 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 
 #guard-status{white-space:pre-line}
 .guard-history{margin:6px 0 0;padding-left:18px}
+
+#publish-error{white-space:pre-line}

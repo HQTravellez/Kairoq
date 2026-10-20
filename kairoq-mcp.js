@@ -97,7 +97,7 @@ async function callTool(name,args,v,deps){
  }
  if(name==='publish'){
   const {meta}=project(args.project_id,'editor');
-  let r;try{r=await api.publishProject(meta.id,{slug:args.slug,force:Boolean(args.force)},{inspect:deps.inspect,screenshot:deps.screenshot,renderSite:deps.renderSite})}catch(e){throw fail(e.message)}
+  let r;try{r=await api.publishProject(meta.id,{slug:args.slug,force:Boolean(args.force)},{inspect:deps.inspect,screenshot:deps.screenshot,renderSite:deps.renderSite,callModel:deps.callModel})}catch(e){throw fail(e.message)}
   const urls=r.urls||{};
   return text({project_id:meta.id,version:r.published.version,urls},'Published version '+r.published.version+'. Live at '+(urls.domains&&urls.domains[0]||urls.subdomain||urls.path));
  }
