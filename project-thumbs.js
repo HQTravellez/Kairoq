@@ -44,10 +44,13 @@ async function shoot(id){
 }
 
 // Pictures are taken one at a time in the background; asking twice for the same project is fine.
+// Only the running server takes pictures (server.js calls start()); code that merely lists
+// projects, such as the tests, never opens a browser in the background.
 const queue=new Set(),failed=new Map();
-let running=false;
+let running=false,on=false;
+function start(){on=process.env.KAIROQ_PROJECT_THUMBS!=='off'}
 function later(id){
- if(!valid(id)||!require('./runtime-check').available())return;
+ if(!on||!valid(id)||!require('./runtime-check').available())return;
  const f=failed.get(id);if(f&&Date.now()-f<10*60*1000)return;
  queue.add(id);
  if(!running){running=true;setImmediate(drain)}
@@ -60,4 +63,4 @@ async function drain(){
   }
  }finally{running=false}
 }
-module.exports={url,read,later,shoot,file};
+module.exports={url,read,later,shoot,file,start};
