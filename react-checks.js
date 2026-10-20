@@ -85,8 +85,8 @@ function promptNote(meta){
 const WRITE_PROMPT=`You write automated browser checks for a web app. Given a description of a flow and the app's current source, return the steps a test browser should take, ending with "expect" steps that prove the flow worked.
 Respond with ONLY JSON: {"name":"short name","path":"#/optional-hash-route","steps":[...]}
 Steps: {"action":"click","text":"Book now"} {"action":"fill","label":"Email","value":"ana@example.com"} {"action":"select","label":"Room","value":"Suite"} {"action":"press","key":"Enter"} {"action":"expect","text":"Thank you"} {"action":"goto","path":"#/rooms"} {"action":"wait","ms":500}. Target elements by the exact visible text, label or placeholder in the source. Use realistic test data (test-<word>@example.com emails). At most 20 steps.`;
-async function write(id,description,{callModel,tier='standard',signal}){
- const meta=builder.loadMeta(id),files=builder.loadFiles(id,meta.current_version);
+async function write(id,description,{callModel,tier='standard',signal,version}){
+ const meta=builder.loadMeta(id),files=builder.loadFiles(id,version||meta.current_version);
  const messages=[{role:'system',content:WRITE_PROMPT},{role:'user',content:'App source:\n'+builder.contextFiles(files,60000)+'\n\nFlow to check: '+String(description).slice(0,1000)}];
  return callModel({messages,temperature:0,maxOutputTokens:2500,signal,tier},content=>{
   const t=String(content||'').trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');

@@ -98,3 +98,28 @@ test('unpublished changes or the owner\'s switch stop automatic repairs; a hiccu
   assert.match(r.why,/switched off/);assert.equal(edits,0);
  }finally{builder.edit=realEdit}
 });
+
+test('a working published app gets a check for each customer flow, once per version; only passing ones are kept',async()=>{
+ const meta=builder.create({name:'Trattoria',owner:'owner'});
+ await builder.initializeFrom(meta,{...app('Trattoria'),'src/App.jsx':'export default function App(){return <div><h1>Trattoria</h1><button>Book a table</button><button>Pay deposit</button></div>}\n'},'Start');
+ hosting.publish(meta.id,{slug:'trattoria-guard'});
+ const asked=[];
+ const callModel=async(o,parse)=>{
+  asked.push(o.purpose||'write');
+  if(o.purpose==='feature-checks'){assert.match(o.messages[1].content,/Book a table/);return parse(JSON.stringify({flows:[{name:'Book a table',description:'click "Book a table", expect "Booked"',money:true},{name:'Pay deposit',description:'click "Pay deposit", expect "Paid"',money:true}]}))}
+  const flow=/Flow to check: ([^:]+):/.exec(o.messages[1].content)[1];
+  return parse(JSON.stringify({name:flow,steps:[{action:'click',text:flow},{action:'expect',text:flow==='Book a table'?'Booked':'Paid'}]}));
+ };
+ // The test browser: booking works, the deposit (a payment page elsewhere) does not.
+ const inspect=async(url,o)=>({steps:o.steps.map(s=>({step:JSON.stringify(s),ok:!(s.action==='expect'&&s.text==='Paid'),error:s.text==='Paid'?'Text "Paid" not found':''})),errors:[]});
+ const r=await guard.guardOne(meta.id,deps(meta.id,{inspect,callModel}));
+ assert.equal(r.ok,true);
+ const m=builder.loadMeta(meta.id),cov=guard.view(m).coverage;
+ assert.deepEqual(m.checks.map(c=>[c.name,c.source]),[['Book a table','kairoq']]);
+ assert.deepEqual(cov.protected,['Book a table']);
+ const pay=cov.flows.find(f=>f.name==='Pay deposit');assert.equal(pay.covered,false);assert.match(pay.why,/did not pass/);
+ // The next hour: same version, so nothing is written again; the saved check is run.
+ asked.length=0;await guard.guardOne(meta.id,deps(meta.id,{inspect,callModel}));
+ assert.deepEqual(asked,[]);
+ assert.equal(builder.loadMeta(meta.id).checks[0].last.ok,true,'the guard ran the new check');
+});

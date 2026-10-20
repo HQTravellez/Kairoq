@@ -11,6 +11,8 @@
 //   3. a person: the owner (and KAIROQ_ALERT_EMAIL, when set) gets one email saying exactly what
 //      is broken and what Kairoq tried, and another when it works again.
 // The owner can switch the automatic repair off per app (meta.guard_settings.autofix=false).
+// A working app also gets a saved check for each of its customer flows (feature-checks.js), so
+// the guard protects everything the app offers.
 const builder=require('./react-builder');
 
 const HISTORY=30;
@@ -82,6 +84,8 @@ async function guardOne(id,deps){
   const was=g.incident;
   note(id,{at,ok:true,version:n,last_good:n,incident:null},was?{kind:'recovered',version:n}:null);
   if(was&&was.told){meta=builder.loadMeta(id);await tell(meta,meta.name+' works again','Kairoq\'s browser checked '+meta.name+' and everything works again (version '+n+').',{send,alsoAlert:true})}
+  // A working app gets a check for every customer flow, once per published version.
+  if(deps.callModel&&inspect&&!(deps.busy&&deps.busy(id)))try{await require('./feature-checks').ensure(id,{callModel:deps.callModel,inspect})}catch(e){console.warn('[feature-checks]',e.message)}
   return{ok:true};
  }
  const problem=describe(p);
@@ -150,7 +154,7 @@ async function guardAll(deps={}){
 }
 function view(meta){
  const g=meta.guard||{};
- return{checked_at:g.at||null,ok:g.ok??null,version:g.version||null,last_good:g.last_good||null,incident:g.incident?{since:g.incident.since,problem:g.incident.problem,told:Boolean(g.incident.told)}:null,history:(g.history||[]).slice(0,10),autofix:autofixOn(meta),hours:Number(process.env.KAIROQ_GUARD_HOURS??1)};
+ return{checked_at:g.at||null,ok:g.ok??null,version:g.version||null,last_good:g.last_good||null,incident:g.incident?{since:g.incident.since,problem:g.incident.problem,told:Boolean(g.incident.told)}:null,history:(g.history||[]).slice(0,10),autofix:autofixOn(meta),coverage:require('./feature-checks').view(meta),hours:Number(process.env.KAIROQ_GUARD_HOURS??1)};
 }
 function settings(id,{autofix}){const meta=builder.loadMeta(id);meta.guard_settings={...(meta.guard_settings||{}),autofix:Boolean(autofix)};builder.saveMeta(meta);return view(meta)}
 module.exports={guardAll,guardOne,probe,serious,view,settings};

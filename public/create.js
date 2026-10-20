@@ -1458,6 +1458,8 @@ function renderGuard(g){
   :g.incident?'Not working since '+when(g.incident.since)+':\n'+g.incident.problem+(g.incident.told?'\nWe emailed you; Kairoq keeps checking.':'')
   :'Working. Last checked '+when(g.checked_at)+' (version '+g.version+'). Checked every '+(g.hours===1?'hour':g.hours+' hours')+'.');
  const cb=$('guard-autofix');cb.checked=g.autofix;cb.disabled=state.project.role!=='owner';
+ const cov=g.coverage;
+ text($('guard-coverage'),cov?(cov.protected.length?'Protected flows: '+cov.protected.join(', ')+'.':'No flows are protected yet.')+(cov.flows.filter(f=>!f.covered).length?' Not yet checked: '+cov.flows.filter(f=>!f.covered).map(f=>f.name+' ('+f.why+')').join('; ')+'.':''):'');
  const ul=$('guard-history');ul.replaceChildren();
  for(const e of g.history.filter(e=>e.kind!=='broken'||!g.incident).slice(0,5))ul.append(el('li',null,when(e.at)+' · '+(GUARD_EVENTS[e.kind]||e.kind)+(e.version?' (version '+e.version+')':'')));
 }
