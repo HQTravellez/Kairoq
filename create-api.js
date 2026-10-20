@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -70,7 +70,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
-  .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
+  .map(p=>({...p,thumb:require('./project-thumbs').url(p),role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
 }
 function findShare(token){
  if(!/^[a-f0-9]{24}$/.test(String(token)))return null;
@@ -364,6 +364,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    if(mode!=='discuss'&&job.result)try{require('./build-lessons').recordBuild(id,{mode,result:job.result})}catch{}
    // The finished message shows what it cost (0 when refunded or on us).
    try{const meta=builder.loadMeta(id),m=meta.messages.at(-1);if(m&&m.role==='assistant'&&!m.credits){m.credits=job.refunded?0:credits;if(job.on_us)m.on_us=true;if(job.fix_on_us)m.fix_on_us=true;if(job.model_label)m.model=job.model_label;if(job.model_fallback)m.model_fallback=job.model_fallback;builder.saveMeta(meta)}}catch{}
+   // A fresh picture of the app for its card (project-thumbs.js), taken in the background.
+   if(mode!=='discuss')require('./project-thumbs').later(id);
    update({status:'complete'});
   }catch(e){
    update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
@@ -1028,6 +1030,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   const {role}=ownedProject(v,id,NEED[method+':'+action]||'owner');
   const projectView=(pid,r=role)=>projectViewFor(pid,r);
   if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null}),true;
+  // The app's picture for its card (project-thumbs.js).
+  if(action==='/thumb'&&method==='GET'){const jpg=require('./project-thumbs').read(id);if(!jpg)return send(res,404,{error:'No picture yet'}),true;res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'private, max-age=86400','X-Content-Type-Options':'nosniff'});res.end(jpg);return true}
   // What the AI always knows about this project (project-memory.js).
   if(action==='/memory'&&method==='GET'){const meta=builder.loadMeta(id);let files={};try{files=meta.current_version?builder.loadFiles(id,meta.current_version):{}}catch{}return send(res,200,{memory:require('./project-memory').note(meta,files).trim()}),true}
   if(action==='/analytics'&&method==='GET')return send(res,200,{analytics:require('./react-analytics').summary(id,{days:30})}),true;

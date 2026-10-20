@@ -71,7 +71,12 @@ $('auth-form').onsubmit=async e=>{
 $('logout').onclick=async()=>{await api('/logout',{method:'POST'}).catch(()=>{});location.href='/create'};
 
 // ---------- home ----------
+// Inside the main Kairoq page the builder has no start page of its own: going home (or a
+// build that could not start) goes back to Kairoq's Home, with the error and the request.
+const EMBED=new URLSearchParams(location.search).get('embed')==='1'||window.self!==window.top;
+function backToKairoq(extra={}){try{window.parent.postMessage({kairoq:'home',...extra},location.origin)}catch{}}
 async function loadHome(){
+ if(EMBED&&window.parent!==window){backToKairoq();return}
  show('home');history.replaceState(null,'','/create');
  const acct=state.me.viewer?.account;
  $('verify-notice').classList.toggle('hidden',!(acct&&!acct.email_verified&&state.me.email_ready));
@@ -111,6 +116,8 @@ function renderProjects(projects){
  for(const p of projects){
   const li=document.createElement('li'),thumb=el('div','thumb',initials(p.name)),open=document.createElement('button'),meta=document.createElement('span');
   thumb.setAttribute('aria-hidden','true');
+  // The app's own picture when there is one (project-thumbs.js); the initials stay underneath.
+  if(p.thumb){const img=document.createElement('img');img.src=p.thumb;img.alt='';img.loading='lazy';img.decoding='async';img.className='thumb-img';img.onerror=()=>img.remove();thumb.append(img)}
   open.type='button';open.className='open';open.textContent=p.name;open.onclick=()=>openProject(p.id);
   meta.className='meta';meta.textContent='v'+p.current_version+' · '+when(p.updated_at);
   li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
@@ -2116,7 +2123,7 @@ async function start(){
  if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}
  const pending=takePending();
  if(pending){
-  if(pending.ask){try{return await askThenBuild(pending.prompt)}catch(err){await loadHome();text($('home-error'),err.message);return}}
+  if(pending.ask){try{return await askThenBuild(pending.prompt)}catch(err){if(EMBED&&window.parent!==window)return backToKairoq({error:err.message,prompt:pending.prompt});await loadHome();text($('home-error'),err.message);return}}
   if(pending.remix)return remix(pending.remix);
   if(pending.sponsored){try{const {project,job}=await api('/projects',{method:'POST',body:{sponsored:pending.sponsored}});return openProject(project.id,{job})}catch(err){await loadHome();text($('home-error'),err.message);return}}
   if(pending.rebuild){try{return await rebuild(pending.rebuild)}catch(err){await loadHome();text($('home-error'),err.message);return}}
