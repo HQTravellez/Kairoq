@@ -35,6 +35,7 @@ const INDEX_HTML=`<!doctype html>
 // A new project: the starter page, the UI kit and default design tokens (see react-design.js).
 function template(name){return require('./react-design').starterFiles(name)}
 
+const METHOD=require('./builder-method');
 const SYSTEM_PROMPT=`You are the coding engine of an app builder like Lovable. You edit a React 18 + Vite + Tailwind CSS 3 project.
 Rules:
 - Source lives under src/. The entry is src/main.jsx, which renders src/App.jsx and imports src/index.css. index.html is fixed; set the page title with document.title in a useEffect.
@@ -76,6 +77,7 @@ Rules:
 - Kairoq builds, previews, tests and hosts the app itself. Never tell the user to run a command, start a server, run npm or Vite, install anything or deploy by hand; when they ask for the preview or to "start the server", the preview already runs in the Preview tab.
 - A message that reports a problem you cannot see in the code ("I can't see the website", "the preview is blank") when the project has no errors is not a change request: reply with files {} and a message that says the app builds and opens without errors and what to check (the Preview tab, the open-in-new-tab button, a reload), and change nothing. Never rewrite the entry point or add recovery screens for a problem you cannot reproduce.
 - Before you answer, check your own work: (1) if the request is already implemented exactly as asked, say so and change nothing; (2) every import resolves to a file you include or that already exists, or to an available package, so leave no import unresolved; (3) new pages and components are actually rendered: add routes and navigation links in App.jsx or the layout, or the user cannot see them; (4) the whole feature works, with no placeholders, TODOs or "rest of the code unchanged" comments. If not everything fits in one reply, finish the most important part completely and say in "message" what is left.
+${require('./builder-method').VERIFY}
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
 {"plan":["2 to 6 short steps you will take, written for the user, e.g. \"Add a booking form to the home page\""],"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
@@ -548,13 +550,13 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   if(unsafe.length){
    securityTries++;lastError=unsafe.join('\n');work=next;
    tl.add({t:'fix',text:'Fixing a security problem in the change',detail:lastError});
-   messages.push({role:'user',content:'Kairoq\'s security scan found serious problems this change adds (nothing was applied):\n'+lastError+'\nFix them and return corrected JSON with all the changes again, keeping what the user asked for.'});continue;
+   messages.push({role:'user',content:'Kairoq\'s security scan found serious problems this change adds (nothing was applied):\n'+lastError+'\nFix them and return corrected JSON with all the changes again, keeping what the user asked for. '+METHOD.REVIEW});continue;
   }
   tl.edits(base,next);
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
-  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\n'+KEPT+' Fix the error and return corrected JSON.'});continue}
+  catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\n'+KEPT+' Fix the error and return corrected JSON.\n'+METHOD.DEBUG});continue}
   tl.add({t:'build',ok:true});
   try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\n'+KEPT+' Migrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
   runtimeErrors=[];checkResult=null;verified=null;
@@ -572,14 +574,14 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
     fs.rmSync(dir,{recursive:true,force:true});
     lastError=runtimeErrors.join('\n');work=next;
     tl.add({t:'fix',text:'Fixing the errors the browser showed'});
-    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\n'+KEPT+' Find the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')});
+    messages.push({role:'user',content:'The app built, but opening it in a browser showed these problems:\n'+lastError+'\n'+KEPT+' Find the cause in the code and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: do not try a small variation of it; find the real cause and take a different approach.':'')+'\n'+METHOD.DEBUG});
     continue;
    }
    if(checkResult&&checkResult.failed.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
     lastError='Saved checks failed:\n'+require('./react-checks').failureText(checkResult.failed);work=next;
     tl.add({t:'fix',text:'Fixing the saved checks this change broke'});
-    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\n'+KEPT+' Fix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')});
+    messages.push({role:'user',content:'The app built, but this change broke saved checks (flows that worked before the change):\n'+require('./react-checks').failureText(checkResult.failed)+'\n'+KEPT+' Fix the cause so these flows work again, without removing what the user asked for, and return corrected JSON.'+(attempt>=2?' Your previous fix did not solve it: take a different approach rather than a small variation.':'')+'\n'+METHOD.DEBUG});
     continue;
    }
   }
@@ -619,22 +621,41 @@ const POLISH_REQUEST=`Design review. The attached screenshots show the current a
 ${require('./design-slop').list().replace(/^/gm,'   ')}
 2. Fix them in the code: spacing, type scale, design tokens in src/index.css, imagery, section backgrounds, cards, hover and focus states, motion, the phone layout.
 Keep every feature, page, route, text content, form, data call and server function working exactly as before, and do not remove sections. In "message", tell the user in one or two sentences what you improved.`;
+// Pro and Max: up to three rounds (KAIROQ_POLISH_ROUNDS): look at the screenshots, fix the
+// worst problems, look again. A later round runs only while the reviewers (or the browser
+// measurements in design-dom.js and design-frame.js) still find something. The look-and-fix loop
+// comes from taste-skill by Leonxlnx (MIT).
+function polishRounds(tier){const n=Number(process.env.KAIROQ_POLISH_ROUNDS??3);return tier==='pro'||tier==='max'?Math.max(1,Math.min(3,Number.isInteger(n)?n:3)):1}
 async function polish(id,{shots,note='',...opts}){
  const meta=loadMeta(id);
  if(!meta.current_version)throw Object.assign(Error('Build the app first'),{status:400});
- (opts.onProgress||(()=>{}))('reviewing');
- const pictures=shots?await shots(previewUrl(meta)):[];
- if(!pictures.length)throw Object.assign(Error('Screenshots are not available on this server, so the design review cannot run.'),{status:503});
- const extraNote=String(note||'').trim().slice(0,1000);
- // Pro and Max: two reviewers agree on the problems first (design-panel.js); with nothing agreed
- // the app is left as it is. Without a second model the single review below runs as before.
- let agreed='';
- if((opts.tier==='pro'||opts.tier==='max')&&opts.callModel&&process.env.KAIROQ_DESIGN_PANEL!=='off'){
-  const panel=await require('./design-panel').review({pictures,callModel:opts.callModel,signal:opts.signal}).catch(()=>null);
-  if(panel&&!panel.agreed.length&&!extraNote){const m=loadMeta(id);return{unchanged:true,version:m.current_version,preview_url:previewUrl(m),message:'Two design reviewers looked at the desktop and phone screenshots and agreed nothing needs changing.',panel}}
-  if(panel&&panel.agreed.length)agreed=require('./design-panel').note(panel.agreed);
+ const extraNote=String(note||'').trim().slice(0,1000),rounds=polishRounds(opts.tier),frame=require('./design-frame');
+ const usePanel=(opts.tier==='pro'||opts.tier==='max')&&opts.callModel&&process.env.KAIROQ_DESIGN_PANEL!=='off';
+ let result=null,done=0;
+ for(let round=1;round<=rounds;round++){
+  (opts.onProgress||(()=>{}))(round===1?'reviewing':'reviewing again');
+  const pictures=shots?await shots(previewUrl(loadMeta(id))):[];
+  if(!pictures.length){if(round===1)throw Object.assign(Error('Screenshots are not available on this server, so the design review cannot run.'),{status:503});break}
+  const measured=pictures.flatMap(p=>p.issues||[]),major=measured.filter(i=>i.severity==='major');
+  const asked=round===1&&extraNote;
+  // Pro and Max: two reviewers agree on the problems first (design-panel.js); with nothing agreed,
+  // nothing measured and nothing asked, the app is left as it is.
+  let agreed='';
+  if(usePanel){
+   const panel=await require('./design-panel').review({pictures,callModel:opts.callModel,signal:opts.signal}).catch(()=>null);
+   if(panel&&!panel.agreed.length&&!asked&&!major.length){
+    if(round===1){const m=loadMeta(id);return{unchanged:true,version:m.current_version,preview_url:previewUrl(m),message:'Two design reviewers looked at the desktop and phone screenshots and agreed nothing needs changing.',panel}}
+    break;
+   }
+   if(panel&&panel.agreed.length)agreed=require('./design-panel').note(panel.agreed)+'\n'+METHOD.REVIEW;
+  }else if(round>1&&!major.length)break;
+  const again=round>1?'\nReview round '+round+' of '+rounds+': the screenshots show the result of the previous round. Fix what is still wrong; keep the improvements already made.':'';
+  const r=await edit(id,POLISH_REQUEST+again+frame.note(measured)+agreed+(asked?'\nThe user also asked for: '+extraNote:''),{...opts,images:pictures.map(p=>({name:p.name+'.jpg',mime:p.mime,data:p.data})),displayText:'Polish the design'+(round>1?' (round '+round+')':'')+(asked?': '+extraNote:''),extra:{polish:true},design:true});
+  if(!r)break;
+  result=r;done=round;
+  if(r.rolled_back||r.unchanged)break;
  }
- return edit(id,POLISH_REQUEST+agreed+(extraNote?'\nThe user also asked for: '+extraNote:''),{...opts,images:pictures.map(p=>({...p,name:p.name+'.jpg'})),displayText:'Polish the design'+(extraNote?': '+extraNote:''),extra:{polish:true},design:true});
+ return result?{...result,...(done>1?{rounds:done}:{})}:{unchanged:true,version:loadMeta(id).current_version,preview_url:previewUrl(loadMeta(id))};
 }
 
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.

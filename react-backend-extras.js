@@ -100,8 +100,9 @@ function removeFile({id,db,user,fid}){
 }
 
 // ---------- email (Resend) ----------
-async function deliver(to,subject,text,replyTo){
- const key=process.env.KAIROQ_RESEND_API_KEY,from=process.env.KAIROQ_EMAIL_FROM;
+// opts.from: another sending address (Find customers sends from its own domain, outreach.js).
+async function deliver(to,subject,text,replyTo,opts={}){
+ const key=process.env.KAIROQ_RESEND_API_KEY,from=opts.from||process.env.KAIROQ_EMAIL_FROM;
  if(!key||!from)throw fail(409,'Email is not set up on this Kairoq server (KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM).');
  const r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,...(replyTo?{reply_to:replyTo}:{})}),signal:AbortSignal.timeout(15000)});
  if(!r.ok){const d=await r.json().catch(()=>({}));throw fail(502,'Email could not be sent: '+(d.message||r.status))}

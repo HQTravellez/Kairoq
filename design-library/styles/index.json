@@ -1,0 +1,415 @@
+[
+{
+"id": "agentic",
+"name": "Agentic",
+"category": "Themed & Unique",
+"description": "Conversational AI-first interface with minimal controls, clear outcomes, and delegated task flows for agentic workflows.",
+"size": 3034
+},
+{
+"id": "application",
+"name": "Application",
+"category": "Professional & Corporate",
+"description": "App dashboard with purple-themed aesthetic, top-bar navigation, card-based layouts, and developer-first workflows.",
+"size": 3110
+},
+{
+"id": "artistic",
+"name": "Artistic",
+"category": "Creative & Artistic",
+"description": "High-contrast, expressive style with creative typography and bold color choices for visually striking interfaces.",
+"size": 3044
+},
+{
+"id": "atelier-zero",
+"name": "Atelier Zero",
+"category": "Editorial · Studio",
+"description": "A magazine-grade, collage-driven visual system: warm paper canvas, surreal",
+"size": 13528
+},
+{
+"id": "bento",
+"name": "Bento",
+"category": "Layout & Structure",
+"description": "Modular grid layout with card-like blocks, clear hierarchy, soft spacing, and subtle visual contrast for organized, scannable interfaces.",
+"size": 3067
+},
+{
+"id": "bold",
+"name": "Bold",
+"category": "Bold & Expressive",
+"description": "Strong visual presence with heavyweight typography, high-contrast colors, and commanding layouts.",
+"size": 2981
+},
+{
+"id": "brutalism",
+"name": "Brutalism",
+"category": "Bold & Expressive",
+"description": "Raw, anti-design aesthetic inspired by concrete architecture with unadorned elements, jarring layouts, and functional minimalism.",
+"size": 3091
+},
+{
+"id": "cafe",
+"name": "Cafe",
+"category": "Creative & Artistic",
+"description": "Cozy cafe-inspired interface with warm tones, soft typography, and clean layouts for a relaxed browsing experience.",
+"size": 3046
+},
+{
+"id": "claymorphism",
+"name": "Claymorphism",
+"category": "Morphism & Effects",
+"description": "Soft, rounded 3D-like shapes mimicking malleable clay with playful, puffy elements and colorful surfaces.",
+"size": 3047
+},
+{
+"id": "clean",
+"name": "Clean",
+"category": "Modern & Minimal",
+"description": "Simplicity-focused design with ample whitespace, legible typography, and a limited color palette to reduce visual clutter.",
+"size": 3038
+},
+{
+"id": "colorful",
+"name": "Colorful",
+"category": "Bold & Expressive",
+"description": "Vibrant, high-contrast palettes and gradients for engaging, memorable, and modern user experiences.",
+"size": 3013
+},
+{
+"id": "contemporary",
+"name": "Contemporary",
+"category": "Modern & Minimal",
+"description": "Current-era minimalist design with bento grids, dark mode support, and high-performance accessible layouts.",
+"size": 3033
+},
+{
+"id": "corporate",
+"name": "Corporate",
+"category": "Professional & Corporate",
+"description": "Professional, brand-aligned design with structured grids, minimalist layouts, and consistent enterprise patterns.",
+"size": 3055
+},
+{
+"id": "cosmic",
+"name": "Cosmic",
+"category": "Creative & Artistic",
+"description": "Futuristic sci-fi aesthetic with dark themes, vibrant neon accents, and immersive spatial elements.",
+"size": 2964
+},
+{
+"id": "creative",
+"name": "Creative",
+"category": "Creative & Artistic",
+"description": "Playful, character-driven design with expressive typography and bold graphics for landing pages and creative projects.",
+"size": 3041
+},
+{
+"id": "dashboard",
+"name": "Dashboard",
+"category": "Professional & Corporate",
+"description": "Dark-themed cloud-platform aesthetic with modular grids, glass-like panels, and strong data hierarchy for productivity dashboards.",
+"size": 3221
+},
+{
+"id": "default",
+"name": "Neutral Modern",
+"category": "Starter",
+"description": "A clean, product-oriented default. Use when the brief doesn't call for a",
+"size": 2800
+},
+{
+"id": "dithered",
+"name": "Dithered",
+"category": "Retro & Nostalgic",
+"description": "Dot-pattern rendering technique that simulates shades with a limited palette for nostalgic, retro, high-contrast visuals.",
+"size": 3050
+},
+{
+"id": "doodle",
+"name": "Doodle",
+"category": "Creative & Artistic",
+"description": "Hand-drawn, sketch-like style with doodles, handwritten fonts, and imperfect lines for a playful, informal feel.",
+"size": 3048
+},
+{
+"id": "dramatic",
+"name": "Dramatic",
+"category": "Bold & Expressive",
+"description": "High-contrast, theatrical design with bold layouts, immersive visuals, and unconventional compositions that command attention.",
+"size": 3029
+},
+{
+"id": "editorial",
+"name": "Editorial",
+"category": "Creative & Artistic",
+"description": "Magazine-inspired editorial layout with refined serif typography, structured grids, and elegant reading experiences.",
+"size": 3031
+},
+{
+"id": "elegant",
+"name": "Elegant",
+"category": "Professional & Corporate",
+"description": "Graceful, refined aesthetic with delicate typography, minimal palettes, and polished layouts that exude sophistication.",
+"size": 3047
+},
+{
+"id": "energetic",
+"name": "Energetic",
+"category": "Bold & Expressive",
+"description": "Dynamic, vibrant style with thick borders, geometric shapes, high-contrast colors, and expressive typography conveying motion and vitality.",
+"size": 3123
+},
+{
+"id": "enterprise",
+"name": "Enterprise",
+"category": "Professional & Corporate",
+"description": "Clean, high-contrast enterprise design for data-driven workflows with intuitive drag-and-drop patterns and structured layouts.",
+"size": 3087
+},
+{
+"id": "expressive",
+"name": "Expressive",
+"category": "Bold & Expressive",
+"description": "Vibrant, personality-driven design with bold colors, playful graphics, and dynamic layouts that balance creativity with structure.",
+"size": 3085
+},
+{
+"id": "fantasy",
+"name": "Fantasy",
+"category": "Creative & Artistic",
+"description": "Game-inspired fantasy aesthetic with bold, premium visuals, rich color palettes, and immersive thematic elements.",
+"size": 3041
+},
+{
+"id": "flat",
+"name": "Flat",
+"category": "Modern & Minimal",
+"description": "Two-dimensional minimalist style with vibrant colors, clean typography, and no 3D effects for fast, user-friendly interfaces.",
+"size": 3046
+},
+{
+"id": "friendly",
+"name": "Friendly",
+"category": "Creative & Artistic",
+"description": "Approachable, intuitive design with rounded elements, ample whitespace, and soft pastel color palettes.",
+"size": 3024
+},
+{
+"id": "futuristic",
+"name": "Futuristic",
+"category": "Themed & Unique",
+"description": "Forward-looking design with tech-inspired typography, modern layouts, and a sleek, innovation-driven aesthetic.",
+"size": 3027
+},
+{
+"id": "glassmorphism",
+"name": "Glassmorphism",
+"category": "Morphism & Effects",
+"description": "Frosted glass effect with translucent layers, subtle blur, and luminous borders for depth and modern elegance.",
+"size": 3152
+},
+{
+"id": "gradient",
+"name": "Gradient",
+"category": "Morphism & Effects",
+"description": "Smooth color transitions and gradient-rich surfaces for modern, playful interfaces with visual depth.",
+"size": 3029
+},
+{
+"id": "hud",
+"name": "HUD Design System",
+"category": "Themed & Unique",
+"description": "Fighter jet / helicopter head-up display. Phosphor green on near-black, all-caps data overlays, angular geometry. Zero ambiguity at speed and altitude.",
+"size": 6794
+},
+{
+"id": "kami",
+"name": "kami (紙 / 纸)",
+"category": "Editorial & Print",
+"description": "Editorial paper system: warm parchment canvas, ink-blue accent, serif-led hierarchy. Built for resumes, one-pagers, white papers, portfolios, slide decks — anything that should feel like high-quality print rather than UI. Multilingual by de",
+"size": 21876
+},
+{
+"id": "levels",
+"name": "Levels",
+"category": "Layout & Structure",
+"description": "Conversion-focused design that removes friction and guides users toward action through clarity, trust, and speed.",
+"size": 3020
+},
+{
+"id": "luxury",
+"name": "Luxury",
+"category": "Professional & Corporate",
+"description": "High-end dark aesthetic with bold headings, monochromatic palette, and premium feel for luxury brand experiences.",
+"size": 3021
+},
+{
+"id": "minimal",
+"name": "Minimal",
+"category": "Modern & Minimal",
+"description": "Stripped-back design emphasizing whitespace, clean typography, and restrained color for maximum clarity and focus.",
+"size": 3042
+},
+{
+"id": "modern",
+"name": "Modern",
+"category": "Modern & Minimal",
+"description": "Contemporary editorial style with serif typography, minimal palettes, and clean layouts for polished digital products.",
+"size": 3042
+},
+{
+"id": "mono",
+"name": "Mono",
+"category": "Modern & Minimal",
+"description": "Monospace-driven, matrix-inspired design with high-contrast elements, compact density, and a hacker-chic aesthetic.",
+"size": 3089
+},
+{
+"id": "neobrutalism",
+"name": "Neobrutalism",
+"category": "Bold & Expressive",
+"description": "Modern take on brutalism with bold borders, vivid accent colors, and raw, high-contrast layouts on warm surfaces.",
+"size": 3040
+},
+{
+"id": "neon",
+"name": "Neon",
+"category": "Morphism & Effects",
+"description": "Electric neon glow effects with high-contrast color pairings for bold, attention-grabbing interfaces.",
+"size": 2980
+},
+{
+"id": "neumorphism",
+"name": "Neumorphism",
+"category": "Morphism & Effects",
+"description": "Soft, extruded UI elements with inner and outer shadows on monochromatic surfaces for a tactile, embedded look.",
+"size": 3090
+},
+{
+"id": "paper",
+"name": "Paper",
+"category": "Retro & Nostalgic",
+"description": "Paper-textured, print-inspired design with minimal colors, clean serif/sans typography, and tactile surface qualities.",
+"size": 3028
+},
+{
+"id": "perspective",
+"name": "Perspective",
+"category": "Layout & Structure",
+"description": "Spatial depth design with isometric views, vanishing points, and layered elements that guide attention through 3D-like realism.",
+"size": 3071
+},
+{
+"id": "premium",
+"name": "Premium",
+"category": "Professional & Corporate",
+"description": "Apple-inspired premium aesthetic with precise spacing, modern typography, and a refined, polished visual language.",
+"size": 3025
+},
+{
+"id": "professional",
+"name": "Professional",
+"category": "Professional & Corporate",
+"description": "Polished, business-ready design with modern typography, structured layouts, and a trustworthy visual identity.",
+"size": 3042
+},
+{
+"id": "publication",
+"name": "Publication",
+"category": "Creative & Artistic",
+"description": "Print-inspired visual language for books, magazines, and reports with editorial grids and expressive typography.",
+"size": 3043
+},
+{
+"id": "refined",
+"name": "Refined",
+"category": "Modern & Minimal",
+"description": "Carefully curated, modern minimal style with elegant serif typography and understated, sophisticated palettes.",
+"size": 3037
+},
+{
+"id": "retro",
+"name": "Retro",
+"category": "Retro & Nostalgic",
+"description": "Throwback design with vintage-inspired typography, high-contrast retro palettes, and nostalgic visual elements.",
+"size": 3038
+},
+{
+"id": "simple",
+"name": "Simple",
+"category": "Modern & Minimal",
+"description": "Straightforward, no-frills design with clean typography, neutral colors, and intuitive layouts that stay out of the way.",
+"size": 3033
+},
+{
+"id": "skeumorphism",
+"name": "Skeumorphism",
+"category": "Morphism & Effects",
+"description": "Real-world mimicry with textured surfaces, 3D effects, and familiar physical metaphors for intuitive digital interfaces.",
+"size": 3053
+},
+{
+"id": "sleek",
+"name": "Sleek",
+"category": "Modern & Minimal",
+"description": "Modern minimalist aesthetic with clean lines, intentional color palette, subtle interactions, and consistent spacing.",
+"size": 3049
+},
+{
+"id": "spacious",
+"name": "Spacious",
+"category": "Layout & Structure",
+"description": "Generous whitespace, consistent padding, and grid-based layouts for clean, readable, and breathing interfaces.",
+"size": 3030
+},
+{
+"id": "storytelling",
+"name": "Storytelling",
+"category": "Creative & Artistic",
+"description": "Narrative-driven design using visuals, copy, and interaction to guide users through engaging, emotionally resonant journeys.",
+"size": 3064
+},
+{
+"id": "trading-terminal",
+"name": "Trading Terminal Design System",
+"category": "Themed & Unique",
+"description": "Bloomberg-style financial trading terminal. Dark-only, data-dense, cyan/coral buy/sell signals. Everything readable at a glance from two meters away.",
+"size": 6508
+},
+{
+"id": "urdu",
+"name": "Urdu Modern (Indus Script System)",
+"category": "Editorial / Personal / Publication",
+"description": "**\"Digital Heritage\"** — A clean, spacious, and respectful aesthetic that bridges traditional Urdu calligraphy and contemporary minimal design.",
+"size": 26764
+},
+{
+"id": "vibrant",
+"name": "Vibrant",
+"category": "Bold & Expressive",
+"description": "Lively, colorful design with bold playful typography, warm accents, and dynamic visual energy.",
+"size": 2999
+},
+{
+"id": "vintage",
+"name": "Vintage",
+"category": "Retro & Nostalgic",
+"description": "1950s-1990s nostalgia with skeuomorphic touches, grainy textures, retro color palettes, and pixel-style typography.",
+"size": 3007
+},
+{
+"id": "warm-editorial",
+"name": "Warm Editorial",
+"category": "Starter",
+"description": "A serif-led magazine aesthetic. Terracotta accent on warm off-white paper —",
+"size": 3963
+},
+{
+"id": "mission-control",
+"name": "Mission Control Design System",
+"category": "Developer Tools",
+"description": "Space/aerospace mission monitoring. Dark command center, amber telemetry, monospace precision. Functional clarity above all else.",
+"size": 13040
+}
+]

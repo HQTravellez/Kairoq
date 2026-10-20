@@ -35,6 +35,7 @@
     <button type="button" id="side-memory"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a3.5 3.5 0 0 0-3.4 4.3A3.5 3.5 0 0 0 4 13a3.5 3.5 0 0 0 3 5.5A3 3 0 0 0 12 20V5a2.5 2.5 0 0 0-2.5-2z"/><path d="M14.5 3a3.5 3.5 0 0 1 3.4 4.3A3.5 3.5 0 0 1 20 13a3.5 3.5 0 0 1-3 5.5A3 3 0 0 1 12 20"/></svg>Memory</button>
     <button type="button" id="side-wa" class="hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.8 7L4 20l1.1-4A8 8 0 1 1 20 12z"/></svg>WhatsApp</button>
     <button type="button" id="side-web"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Web agent</button>
+    <button type="button" id="side-leads"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3 5.5"/></svg>Find customers</button>
     <button type="button" id="side-check"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11l2 2 4-4"/></svg>Website check</button>
     <button type="button" id="side-admin" class="hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.4 3.4 8.3 8 9 4.6-.7 8-4.6 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Admin</button>
     <button type="button" id="side-docs"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.7-2.5 2-2.5 3.5M12 17h.01"/></svg>Help</button>
@@ -719,6 +720,32 @@
     <div id="web-watches-box" class="hidden"><h3>Watches</h3><ul class="mem-list" id="web-watches"></ul></div>
     <h3>Recent runs</h3>
     <ul class="mem-list" id="web-runs"></ul>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="leads-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Find customers</h2>
+    <p class="muted small">For businesses that sell to other businesses. Kairoq lists local businesses of a kind (from OpenStreetMap), reads their own websites, and writes a short, honest first email for the ones worth contacting. <b>Nothing is sent until you approve it</b>, and every email is checked first: a real subject, no spam phrases, your name and postal address, and a way to say no.</p>
+    <details id="leads-settings-box"><summary><b>About you</b> <span class="muted small" id="leads-missing"></span></summary>
+      <label>What you sell<textarea id="leads-offer" rows="2" maxlength="600" placeholder="Weekly office lunches for teams of 10 to 50, delivered by 12:30"></textarea></label>
+      <label>Who you help<input id="leads-customers" maxlength="200" placeholder="Offices, studios and coworking spaces"></label>
+      <div class="row"><label>Your name<input id="leads-sender" maxlength="200"></label><label>Your business<input id="leads-business" maxlength="200"></label></div>
+      <label>Postal address (required in cold email)<textarea id="leads-address" rows="2" maxlength="300"></textarea></label>
+      <label>Replies go to<input id="leads-reply" type="email" maxlength="200"></label>
+      <p class="small"><b>What makes a good lead for you?</b> Only the signals you tick count in the score.</p>
+      <div id="leads-signals" class="leads-signals"></div>
+      <div class="row"><button class="primary" type="button" id="leads-save">Save</button><span class="muted small" id="leads-saved" role="status"></span></div>
+    </details>
+    <div class="row"><label>Kind of business<select id="leads-kind"></select></label><label>Where<input id="leads-area" maxlength="120" placeholder="Leeds"></label><button class="primary" type="button" id="leads-search">Find</button></div>
+    <p class="error small" id="leads-error" role="alert"></p>
+    <p class="muted small" id="leads-status" role="status"></p>
+    <h3>Outbox <span class="muted small" id="leads-sending"></span></h3>
+    <ul class="mem-list" id="leads-outbox"></ul>
+    <h3>Leads</h3>
+    <ul class="mem-list" id="leads-list"></ul>
+    <p class="muted small" id="leads-attribution"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>

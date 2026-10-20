@@ -17,6 +17,7 @@ function items({env=process.env}={}){
   {id:'browser',label:'Kairoq tests every build in a browser',ok:require('./runtime-check').available(),required:true,fix:'Deploy with the Dockerfile in this repository, which installs Chromium.'},
   {id:'payments',label:'Customers can buy credits',ok:accounts.stripeReady(),required:false,fix:'Add KAIROQ_STRIPE_SECRET_KEY in Railway (service, Variables) to sell credits with Stripe.'},
   {id:'videos',label:'Launch and hero videos from your photos',ok:require('./video-gen').configured(env),required:false,fix:'Add FAL_KEY in Railway (service, Variables) with a key from fal.ai. Videos are made with Wan 2.2; each clip costs KAIROQ_VIDEO_CREDITS credits (10 unless you set it).'},
+  {id:'outreach',label:'Find customers can send approved emails',ok:Boolean(env.KAIROQ_OUTREACH_FROM)&&accounts.mailReady(),required:false,fix:'Verify a separate sending domain in Resend (for example mail.yourbrand.com, with SPF, DKIM and DMARC) and add KAIROQ_OUTREACH_FROM with an address on it in Railway (service, Variables). Cold email from your main domain can push your app\'s own emails into spam. Until then, owners copy approved emails into their own email.'},
   {id:'google',label:'Sign in with Google',ok:require('./google-oauth').configured(),required:false,fix:'Add KAIROQ_GOOGLE_CLIENT_ID and KAIROQ_GOOGLE_CLIENT_SECRET in Railway (service, Variables).'},
  ];
  // Only when the owner chose OpenCode as the build engine: whether it is installed and has a model.
