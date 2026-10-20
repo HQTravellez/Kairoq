@@ -2858,7 +2858,7 @@ purposeSelect.value=ui.purpose||"general";
 
 function updateRouting(){
   routing={freeOnly:freeOnlyEl.checked,smartFallback:smartFallbackEl.checked,webSearch:webSearchEl.checked};
-  freePill.textContent=routing.freeOnly?"FREE ONLY":"PAID ALLOWED";
+  freePill.textContent=routing.freeOnly?"Free only":"Paid allowed";
   freePill.classList.toggle("off",!routing.freeOnly);
   saveAll();
 }

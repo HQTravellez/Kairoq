@@ -1,6 +1,7 @@
 /* Workspace sidebar: one icon set, compact rows, grouped sections, model settings tucked away.
    Loaded after styles.css and calm.css; scoped to .sidebar.kn so older rules do not leak in. */
-.app>.sidebar.kn{display:flex!important;flex-direction:column;gap:0!important;padding:18px 12px 12px!important;overflow-y:auto;scrollbar-width:thin}
+@media(min-width:761px){.app>.sidebar.kn{display:flex!important}}
+.app>.sidebar.kn{flex-direction:column;gap:0!important;padding:18px 12px 12px!important;overflow-y:auto;scrollbar-width:thin}
 .sidebar.kn .brand{padding:2px 8px 16px!important;gap:10px;align-items:center}
 .sidebar.kn .brand-mark{width:32px;height:32px;font-size:15px;display:grid;place-items:center;flex:none}
 .sidebar.kn .brand-title{font-size:21px!important;line-height:1.1}
