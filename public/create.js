@@ -1449,10 +1449,23 @@ function renderGrow(g){
  for(const i of g.items){const li=el('li',i.ok?'ok':'todo');li.append(el('span','vmark',i.ok?'✓':'○'),el('span',null,i.label));ul.append(li)}
  text($('grow-pages'),g.pages.length?'Pages search engines can read: '+g.pages.map(p=>p.title||p.path).slice(0,8).join(' · ')+(g.pages.length>8?' and '+(g.pages.length-8)+' more':'')+(g.urls?' · Summary for AI: '+g.urls.path+'llms.txt':''):'Kairoq reads your live pages a minute after you publish.');
 }
+// The live guard: when Kairoq last checked the live app, what it found and did, and the switch.
+const GUARD_EVENTS={broken:'Found a problem',recovered:'Working again',rolled_back:'Put back the version that worked',repaired:'Fixed it and published the fix',escalated:'Asked you to look'};
+function renderGuard(g){
+ $('guard-section').classList.remove('hidden');
+ const when=t=>t?new Date(t).toLocaleString():'';
+ text($('guard-status'),!g.checked_at?'Kairoq\'s browser checks your live app every '+(g.hours===1?'hour':g.hours+' hours')+': the page and every saved check. The first check runs soon after you publish.'
+  :g.incident?'Not working since '+when(g.incident.since)+':\n'+g.incident.problem+(g.incident.told?'\nWe emailed you; Kairoq keeps checking.':'')
+  :'Working. Last checked '+when(g.checked_at)+' (version '+g.version+'). Checked every '+(g.hours===1?'hour':g.hours+' hours')+'.');
+ const cb=$('guard-autofix');cb.checked=g.autofix;cb.disabled=state.project.role!=='owner';
+ const ul=$('guard-history');ul.replaceChildren();
+ for(const e of g.history.filter(e=>e.kind!=='broken'||!g.incident).slice(0,5))ul.append(el('li',null,when(e.at)+' · '+(GUARD_EVENTS[e.kind]||e.kind)+(e.version?' (version '+e.version+')':'')));
+}
+$('guard-autofix').onchange=async()=>{try{const {guard}=await api('/projects/'+state.project.id+'/guard',{method:'POST',body:{autofix:$('guard-autofix').checked}});renderGuard(guard)}catch(err){text($('guard-status'),err.message)}};
 async function loadGrow(){
- const p=state.project;$('grow').classList.toggle('hidden',!p.published);if(!p.published)return;
+ const p=state.project;$('grow').classList.toggle('hidden',!p.published);if(!p.published){$('guard-section').classList.add('hidden');return}
  $('kit-poster').href='/api/create/projects/'+p.id+'/poster';
- const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);renderKit(grow.kit);text($('grow-status'),'');text($('kit-status'),'');text($('clips-status'),'');loadVideos('launch').catch(err=>text($('clips-status'),err.message));
+ const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);renderKit(grow.kit);text($('grow-status'),'');text($('kit-status'),'');api('/projects/'+p.id+'/guard').then(r=>renderGuard(r.guard)).catch(()=>{});text($('clips-status'),'');loadVideos('launch').catch(err=>text($('clips-status'),err.message));
 }
 // The launch kit: each text with a Copy button.
 function renderKit(kit){

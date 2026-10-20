@@ -67,7 +67,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -371,6 +371,15 @@ function startJob(v,id,{message,mode='build',tier='standard',images=[],context='
  return job;
 }
 const controllers=new Map();
+// For work outside a request (the live guard): whether the project is being changed, and a way
+// to change it that blocks other changes meanwhile, like a chat job does.
+function busy(id){return[...jobs.values()].some(j=>j.projectId===id&&ACTIVE.has(j.status))}
+async function exclusive(id,fn){
+ if(busy(id))throw Object.assign(Error('This project is already being updated'),{status:409});
+ const meta=builder.loadMeta(id),job={id:crypto.randomUUID(),projectId:id,owner:meta.owner,mode:'build',tier:'standard',credits:0,status:'repairing',seq:1,guard:true,created_at:new Date().toISOString()};
+ jobs.set(job.id,job);
+ try{return await fn()}finally{job.status='complete';job.finished_at=new Date().toISOString();setTimeout(()=>jobs.delete(job.id),600000).unref?.()}
+}
 // Build from a reference: the build costs an agent task plus the browser tests, repairs and
 // design comparison that follow (KAIROQ_REFERENCE_CREDITS, default twice the tier price plus a design review).
 function referenceExtra(tier){const t=tiers().find(x=>x.id===tier);return intEnv('KAIROQ_REFERENCE_CREDITS',(t?t.credits:1)*2+polishCredits())}
@@ -1296,6 +1305,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const saved=require('./react-assets').save(id,[{name:stem+'.'+ext,mime:picture.mime,data:picture.data}],{maxBytes:6*1024*1024});
    return send(res,201,{saved,assets:require('./react-assets').list(id)}),true;
   }
+  // The live guard (live-guard.js): its state, and the owner's switch for automatic repairs.
+  if(action==='/guard'&&method==='GET')return send(res,200,{guard:require('./live-guard').view(builder.loadMeta(id))}),true;
+  if(action==='/guard'&&method==='POST'){const b=await readJson(req,1000);return send(res,200,{guard:require('./live-guard').settings(id,{autofix:b.autofix!==false})}),true}
   // Videos from the project's photos (video-gen.js): launch clips to post, a hero video for the site.
   if(action==='/videos'&&method==='GET'){
    const vg=require('./video-gen'),refund=refundVideo(v);
@@ -1484,4 +1496,4 @@ async function publishProject(id,{slug,version,force}={},{inspect,screenshot,ren
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;
 }
-module.exports={handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
+module.exports={busy,exclusive,handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
