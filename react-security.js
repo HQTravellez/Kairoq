@@ -19,6 +19,7 @@ function scan(files,cfg){
  const add=(severity,title,detail,fix,file,line)=>findings.push({severity,title,detail,fix,...(file?{file}:{}),...(line?{line}:{})});
  for(const [file,code] of Object.entries(files)){
   if(typeof code!=='string')continue;
+  require('./react-security-logic').scanFile(file,code,add);
   const client=file.startsWith('src/'),fn=file.startsWith('functions/');
   for(const [re,what] of SECRET_PATTERNS){
    const m=re.exec(code);if(!m)continue;

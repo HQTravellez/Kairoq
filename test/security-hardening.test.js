@@ -65,3 +65,18 @@ test('a change that adds a serious security mistake goes back to the AI once bef
  assert.equal(asks.length,2);assert.match(asks[1],/security scan found serious problems[\s\S]*Secret exposed in the app code/);
  assert.match(builder.loadFiles(meta.id,r.version)['src/App.jsx'],/safe/);
 });
+
+test('logic checks: another customer\'s record, staff-only functions, the last place, prices and AI instructions from the visitor',()=>{
+ const scan=require('../react-security').scan,titles=f=>scan(f,{collections:{}}).map(x=>x.title);
+ const fn=body=>"export default async function(request,{db,user,payments}){ if(!user) return {status:401}; "+body+" }";
+ assert.ok(titles({'functions/booking.js':fn("return {json:await db.collection('bookings').get(request.body.id)}")}).includes('Any signed-in user can open or change any record'));
+ assert.deepEqual(titles({'functions/booking.js':fn("const b=await db.collection('bookings').get(request.body.id); if(b.owner!==user.id) return {status:403}; return {json:b}")}),[]);
+ assert.ok(titles({'functions/admin-export.js':fn("return {json:await db.collection('orders').list()}")}).includes('Staff-only function open to every signed-in user'));
+ assert.deepEqual(titles({'functions/admin-export.js':fn("if(user.role!=='staff') return {status:403}; return {json:await db.collection('orders').list()}")}),[]);
+ assert.ok(titles({'functions/book.js':fn("const taken=await db.collection('bookings').list({where:{slot:request.body.slot}}); if(taken.length>=capacity) return {status:409}; await db.collection('bookings').create({slot:String(request.body.slot),owner:user.id}); return {json:{ok:true}}")}).includes('Two customers can take the last place at the same time'));
+ assert.ok(titles({'functions/checkout.js':fn("return {json:await payments.checkout({amount:request.body.amount})}")}).includes('The price comes from the visitor'));
+ assert.ok(titles({'src/Chat.jsx':'const r=await ai.chat({ system: `You are helpful. ${input}`, messages:[] })'}).includes('Visitor text is used as instructions for the AI'));
+ assert.deepEqual(titles({'src/Chat.jsx':"const r=await ai.chat({ system:'You answer about our bakery.', messages:[{role:'user',content:input}] })"}),[]);
+ assert.ok(titles({'src/Up.jsx':'await storage.upload(file)'}).includes('Uploads accept any kind of file'));
+ assert.deepEqual(titles({'src/Up.jsx':"if(!file.type.startsWith('image/')||file.size>5e6)return; await storage.upload(file)"}),[]);
+});

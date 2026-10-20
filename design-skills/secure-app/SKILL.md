@@ -5,7 +5,7 @@ default: on
 ---
 # Secure by default
 
-Kairoq's own checklist for small-business apps, drawing on the OWASP Top 10 and on defensive checklists in Anthropic-Cybersecurity-Skills by mukul975 (Apache License 2.0; a community project, not affiliated with Anthropic). Kairoq's security scan checks these rules after every change.
+Kairoq's own checklist for small-business apps, drawing on the OWASP Top 10, on defensive checklists in Anthropic-Cybersecurity-Skills by mukul975 (Apache License 2.0; a community project, not affiliated with Anthropic) and on the vulnerability playbooks in strix by usestrix (Apache License 2.0). Kairoq's security scan checks these rules after every change.
 
 ## Data: decide who may see and change it
 - Every collection gets the narrowest access that works. Bookings, orders, enquiries, applications, messages and anything with names, emails or phone numbers: "submit-only" (visitors can send, only the owner reads) or "private"/"shared" for signed-in users. "public" only for content everyone may read and nobody personal is in.
@@ -20,6 +20,19 @@ Kairoq's own checklist for small-business apps, drawing on the OWASP Top 10 and 
 - Codes, tokens, invite and reset links: crypto.randomId(), never Math.random(). Compare secrets with crypto.timingSafeEqual, not ===.
 - Errors: return a short, kind message ("We could not save your booking. Please try again."); keep stack traces and internal details in the logs.
 - Fetching other sites: only known hosts, URLs you build yourself, never a URL a visitor typed.
+
+## Who may do what (the mistakes scanners miss)
+- Every function that loads a record by an id from the request checks it belongs to the signed-in user (record.owner === user.id) or that the user has a staff role, before returning or changing it. Changing the id in a request must never open someone else's booking, order or invoice.
+- Staff and admin functions (exports, refunds, reports, deleting) check the role, not just that someone is signed in.
+- Limited places (time slots, seats, tickets, stock): check and book in one step (db.batch, a transaction, or a UNIQUE constraint on slot and date) so two customers cannot take the last one at the same moment.
+- Business rules hold on the server: quantities are positive whole numbers within a limit, a coupon is used once per customer, a booking cannot end before it starts, a cancelled order cannot be paid.
+
+## AI inside the app
+- The AI's system instructions are fixed text you wrote; what the visitor types goes only in a user message. Never put visitor text, documents or web pages into the system instructions.
+- Treat the AI's answer as untrusted text: never run it as code, put it into SQL, follow links it gives or change data because it says so without the normal checks.
+
+## Uploads
+- Accept only the types needed (accept="image/*", check file.type and file.size before uploading). Anyone with a file link can open it, so never upload private documents.
 
 ## Secrets
 - No keys, tokens or passwords in src/: everything there is sent to every visitor. Secrets live in Settings → Server secrets and are read with secrets.get() inside a server function.

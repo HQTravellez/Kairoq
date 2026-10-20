@@ -3,6 +3,19 @@
 const key=()=>String(process.env.EXPLABS_API_KEY||process.env.EXPlabs_API_Key||'').trim();
 const configured=()=>Boolean(key());
 let queue=Promise.resolve();
+const BASE_URL=()=>String(process.env.KAIROQ_EXPERIENTIAL_URL||'https://api.experientiallabs.ai/v1').replace(/\/+$/,'');
+const RETRY=new Set([429,502,503,504]),MAX_TRIES=Number(process.env.KAIROQ_EXPERIENTIAL_TRIES||4);
+const MAX_WAIT_MS=Number(process.env.KAIROQ_EXPERIENTIAL_MAX_WAIT_MS||30000),BASE_WAIT_MS=Number(process.env.KAIROQ_EXPERIENTIAL_BASE_WAIT_MS||2000);
+// While the gateway asked to slow down, every call (also the small ones) waits, so they do
+// not all hit it at once.
+let pauseUntil=0;
+function retryWait(header,attempt){
+ const secs=Number(header),at=Date.parse(header||'');
+ const asked=Number.isFinite(secs)&&secs>=0?secs*1000:Number.isFinite(at)?at-Date.now():NaN;
+ const backoff=BASE_WAIT_MS*2**(attempt-1)*(0.75+Math.random()*0.5);
+ return Math.max(0,Math.min(MAX_WAIT_MS,Number.isFinite(asked)&&asked>0?asked:backoff));
+}
+async function cooldown(signal){const ms=pauseUntil-Date.now();if(ms>0)await new Promise((resolve,reject)=>{const t=setTimeout(resolve,ms);signal?.addEventListener('abort',()=>{clearTimeout(t);reject(signal.reason||Error('Aborted'))},{once:true})})}
 function callProject(opts,services){
  // Small requests (the quick questions, suggestions) do not wait behind whole-app builds.
  if(Number.isInteger(opts.maxOutputTokens)&&opts.maxOutputTokens<=2500)return run(opts,services);
@@ -19,11 +32,22 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
  const totals=await enforceBudget();
  const daily=Number(process.env.DAILY_COST_LIMIT_USD||2),monthly=Number(process.env.MONTHLY_COST_LIMIT_USD||30);
  if((daily>0&&totals.daily+reserve>daily)||(monthly>0&&totals.monthly+reserve>monthly))throw Error('Experiential builder budget insufficient');
- const response=await fetch('https://api.experientiallabs.ai/v1/chat/completions',{
-  method:'POST',headers:{Authorization:'Bearer '+key(),'Content-Type':'application/json'},
-  signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(480000)]):AbortSignal.timeout(480000),body:JSON.stringify({model,messages:opts.messages,response_format:{type:'json_object'},max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'})
- });
- const data=await response.json().catch(()=>({}));
+ const body=JSON.stringify({model,messages:opts.messages,response_format:{type:'json_object'},max_completion_tokens:maxOutput,safety_identifier:'kairoq-builder'});
+ // A busy gateway (429, or 502/503/504 before any answer) is asked again a few times, waiting
+ // what it asks for (Retry-After) or longer each time, capped, instead of failing the build.
+ let response,data;
+ for(let attempt=1;;attempt++){
+  await cooldown(opts.signal);
+  response=await fetch(BASE_URL()+'/chat/completions',{
+   method:'POST',headers:{Authorization:'Bearer '+key(),'Content-Type':'application/json'},
+   signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(480000)]):AbortSignal.timeout(480000),body
+  });
+  data=await response.json().catch(()=>({}));
+  if(!RETRY.has(response.status)||attempt>=MAX_TRIES)break;
+  const wait=retryWait(response.headers.get('retry-after'),attempt);
+  pauseUntil=Math.max(pauseUntil,Date.now()+wait);
+  console.warn('[experiential-builder] '+response.status+', retrying in '+Math.round(wait/1000)+'s ('+attempt+'/'+(MAX_TRIES-1)+')');
+ }
  if(!response.ok)throw Error('Experiential '+response.status+': '+String(data.error?.message||data.error||'Request rejected').slice(0,220));
  // Record usage before parsing: invalid model output can still incur cost.
  const reported=Number(data.usage?.cost);
@@ -35,4 +59,4 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
  console.log('[experiential-builder] response '+JSON.stringify({model,cost,characters:text.length,finish:data.choices?.[0]?.finish_reason}));
  return parse(text,model);
 }
-module.exports={configured,callProject};
+module.exports={configured,callProject,retryWait};
