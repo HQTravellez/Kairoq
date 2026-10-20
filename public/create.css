@@ -636,8 +636,14 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .bo-spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);border-right-color:transparent;animation:st-spin .9s linear infinite;flex:none}
 @media (prefers-reduced-motion:reduce){.stages>li.now .st-dot,.bo-spin{animation:none}}
 
-.storage-warn{margin:0 auto 18px;max-width:760px;padding:12px 16px;border-radius:12px;border:1px solid color-mix(in srgb,var(--error) 45%,transparent);background:color-mix(in srgb,var(--error) 9%,var(--panel));color:var(--text);font-size:13.5px;line-height:1.5}
-.storage-warn b{color:var(--error)}
+/* Owner notices sit quietly under the prompt: one line each, details on click. */
+.storage-warn,.setup-card{margin:14px auto 0;max-width:760px;padding:0;border:0;background:none;font-size:13px;line-height:1.5;color:var(--muted)}
+.storage-warn summary,.setup-card summary{display:flex;justify-content:center;align-items:center;gap:8px;cursor:pointer;list-style:none}
+.storage-warn summary::-webkit-details-marker{display:none}
+.storage-warn b{color:var(--error);font-weight:600}
+.setup-how{text-decoration:underline;text-underline-offset:2px}
+.storage-warn[open],.setup-card[open]{padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:var(--panel);text-align:left}
+.storage-warn p{margin:8px 0 0}
 
 /* Quick questions before a first build */
 .clarify{margin:14px auto 0;max-width:760px;padding:18px 20px;border:1px solid var(--border);border-radius:18px;background:var(--panel);box-shadow:var(--shadow);text-align:left;display:grid;gap:14px}
@@ -649,10 +655,11 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .cl-actions{justify-content:flex-end;gap:8px}
 .clarify .chip{font-family:inherit;letter-spacing:0}.clarify .chip::before,.clarify .chip::after{display:none!important;content:none!important}
 
-.setup-card{margin:0 auto 18px;max-width:760px;padding:10px 16px;border-radius:12px;border:1px solid var(--border);background:var(--panel);font-size:13.5px;line-height:1.5}
-.setup-card summary{cursor:pointer;display:flex;justify-content:space-between;gap:12px;font-weight:600;list-style:none}
+.setup-card summary{font-weight:500}
+.setup-card[open] summary{justify-content:space-between;font-weight:600;color:var(--text)}
 .setup-card summary::-webkit-details-marker{display:none}
-.setup-count{color:var(--muted);font-weight:500}
+.setup-count{color:var(--muted);font-weight:400}
+.setup-card:not([open]) .setup-count::before{content:"· "}
 .setup-card ul{list-style:none;margin:10px 0 4px;padding:0;display:grid;gap:8px}
 .setup-item{display:flex;align-items:center;gap:10px}
 .setup-mark{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;flex:none;background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted)}
@@ -699,3 +706,5 @@ code.chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 
 .leads-signals{display:grid;gap:.25rem;margin:.25rem 0 .75rem}
 .leads-signals .muted{display:block;margin-left:1.6rem}
 .lead-mail input,.lead-mail textarea{width:100%;margin:.25rem 0}
+/* Inside the main Kairoq page the builder has no sidebar of its own. */
+body.embed #side,body.embed #side-open-btn{display:none!important}

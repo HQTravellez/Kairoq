@@ -47,3 +47,11 @@
 .topbar #settingsBtn:hover{background:#efece4!important;color:#292824}
 .topbar .kc-ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 @media(max-width:760px){.topbar #freePill,.topbar #studioNavBtn{display:none!important}.topbar .topbar-title{white-space:nowrap}}
+
+/* One row of essentials: attach, image, video, model, send. Reasoning level, purpose, favourite and agent picker
+   keep their defaults and stay reachable in Settings and the sidebar. */
+.composer #favoriteBtn,.composer .inline-select.compact-inline,.composer #agentQuickBtn,.composer #modelSearchBtn{display:none!important}
+
+/* Top bar: menu on the left, settings on the right, nothing else. */
+.topbar #studioNavBtn,.topbar #chatViewBtn,.topbar #shellModeBtn,.topbar #freePill,.topbar #zeroCostPill{display:none!important}
+.main[data-view=command] .topbar{background:transparent!important}

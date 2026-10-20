@@ -90,9 +90,8 @@ async function loadHome(){
 function renderSetup(setup){
  const card=$('setup-card');if(!card)return;
  card.classList.toggle('hidden',!setup);if(!setup)return;
- $('setup-title').textContent=setup.missing_required?'Finish setting up Kairoq':'Kairoq is set up';
+ $('setup-title').textContent=setup.missing_required?'Finish setup: '+setup.missing_required+' needed':'Setup';
  $('setup-count').textContent=setup.done+' of '+setup.total;
- card.open=setup.missing_required>0;
  $('setup-list').replaceChildren(...setup.items.map(i=>{
   const li=document.createElement('li');li.className=i.ok?'ok':i.required?'missing':'optional';
   const head=document.createElement('div');head.className='setup-item';
@@ -2040,6 +2039,8 @@ $('side-admin').onclick=openAdmin;
 $('learn-run').onclick=async()=>{const b=$('learn-run');b.disabled=true;text($('learn-status'),'Looking at recent builds…');try{const r=await api('/learning',{method:'POST',body:{action:'run'}});text($('learn-status'),r.result.proposed.length?'Proposed '+r.result.proposed.length+' new rule'+(r.result.proposed.length===1?'':'s')+'.':'No new repeated problems found.');renderAdmin(r.learning)}catch(err){text($('learn-status'),err.message)}finally{b.disabled=false}};
 
 async function start(){
+ // Opened inside the main Kairoq page: no second sidebar.
+ if(new URLSearchParams(location.search).get('embed')==='1'||window.self!==window.top)document.body.classList.add('embed');
  await handleLinks();
  const v=await loadMe();
  $('google-login').classList.toggle('hidden',!state.me.google);
