@@ -42,3 +42,26 @@ test('a server function cannot make unlimited host calls',async()=>{
  assert.equal(result.json.ok,200);assert.equal(result.json.limited,60);
 });
 test.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+
+test('the app security scan catches unsafe HTML, open redirects, trusting the request body and guessable codes',()=>{
+ const scan=require('../react-security').scan;
+ const titles=files=>scan(files,{collections:{}}).map(f=>f.title);
+ const bad=titles({'src/App.jsx':"box.innerHTML = note; window.location.href = new URLSearchParams(location.search).get('next'); window.addEventListener('message', e => run(e.data));",
+  'functions/order.js':"export default async function(request,{db,user,crypto}){ if(!user) return {status:401}; const code=Math.random().toString(36).slice(2); if(request.headers.signature !== secret) return {status:400}; await db.collection('orders').create(request.body); return {json:{code}} }",
+  'functions/report.py':'async def handler(r, ctx):\n    return await ctx.db.sql(f"SELECT * FROM orders WHERE id={r[\'body\'][\'id\']}")\n'});
+ for(const t of ['HTML is written into the page directly','The page sends visitors to an address taken from the link','Messages from other sites are trusted','Function saves whatever the visitor sends','Codes or tokens are made with Math.random','A secret is compared with ===','SQL built from strings'])assert.ok(bad.includes(t),t+' in '+bad.join(' | '));
+ const good=titles({'src/App.jsx':"export default function App(){return <a href='/menu' rel='noopener noreferrer'>Menu</a>}",
+  'functions/order.js':"export default async function(request,{db,user,crypto}){ if(!user) return {status:401}; const b=request.body; if(!crypto.timingSafeEqual(String(request.headers.signature),String(expected)))return {status:400}; await db.collection('orders').create({item:String(b.item).slice(0,80),qty:Math.max(1,Math.floor(Number(b.qty)||1)),owner:user.id}); return {json:{id:crypto.randomId()}} }"});
+ assert.deepEqual(good,[]);
+});
+
+test('a change that adds a serious security mistake goes back to the AI once before it is built',async()=>{
+ const meta=builder.create({name:'Gate',owner:'owner'});
+ await builder.initializeFrom(meta,{'src/main.jsx':MAIN,'src/App.jsx':'export default function App(){return <p>hi</p>}\n'},'Start');
+ const asks=[];
+ const replies=[{message:'v',files:{'src/App.jsx':"const KEY='sk_live_abcdefghijklmnop1234';export default function App(){return <p>{KEY.length}</p>}\n"}},{message:'v',files:{'src/App.jsx':'export default function App(){return <p>safe</p>}\n'}}];
+ const callModel=(o,parse)=>{asks.push(o.messages[o.messages.length-1].content);return Promise.resolve(parse(JSON.stringify(replies.shift())))};
+ const r=await builder.edit(meta.id,'show the key',{callModel});
+ assert.equal(asks.length,2);assert.match(asks[1],/security scan found serious problems[\s\S]*Secret exposed in the app code/);
+ assert.match(builder.loadFiles(meta.id,r.version)['src/App.jsx'],/safe/);
+});

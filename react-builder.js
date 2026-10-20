@@ -450,6 +450,14 @@ async function selfCheck(id,meta,files,checkRuntime){
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 }
 // Errors that mean the app does not show at all.
+// High-severity findings in the new files that the old files did not have.
+function newSecurityProblems(before,after){
+ const security=require('./react-security'),backend=require('./react-backend');
+ const run=f=>{let cfg={collections:{}};try{cfg=backend.parseConfig(f)}catch{}try{return security.scan(f,cfg).filter(x=>x.severity==='high')}catch{return[]}};
+ const key=x=>x.title+'|'+(x.file||'');
+ const had=new Set(run(before||{}).map(key));
+ return run(after).filter(x=>!had.has(key(x))).map(x=>x.title+(x.file?' ('+x.file+(x.line?':'+x.line:'')+')':'')+': '+x.detail+' Fix: '+x.fix);
+}
 function brokenError(e){return /^(Blank page|Page did not load)/.test(String(e))}
 // The browser check runs on a test copy of the app's data and adds a record the way a customer
 // would (runtime-check.js savesData). A record that showed on the page but is in none of the
@@ -483,7 +491,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
- let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null;
+ let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null,securityTries=0;
  // The files a fix applies to: the request's base, then the last try that built (a fix for a
  // build or browser error changes that try; it does not start again from the base).
  let work=base;
@@ -532,6 +540,14 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    const how=editFailed&&editFailures>=2?'Your find/replace edits failed twice, so do not use "edits" this time: send every file you change whole in "files".':'Fix the edits that failed (copy "find" exactly, character for character, from the current files above) or send those files whole in "files".';
    tl.add({t:'fix',text:editFailed?'Some edits did not match the files, retrying':'The change had problems, retrying',detail:lastError});
    messages.push({role:'user',content:'That change was rejected (nothing was applied):\n'+lastError+'\nReturn corrected JSON with all the changes again. '+how});continue;
+  }
+  // Serious security mistakes this change adds (a secret in the page, SQL built from strings,
+  // personal data anyone can read) go back to the AI once, like a failed build.
+  const unsafe=securityTries<1&&process.env.KAIROQ_SECURITY_GATE!=='off'?newSecurityProblems(base,next):[];
+  if(unsafe.length){
+   securityTries++;lastError=unsafe.join('\n');work=next;
+   tl.add({t:'fix',text:'Fixing a security problem in the change',detail:lastError});
+   messages.push({role:'user',content:'Kairoq\'s security scan found serious problems this change adds (nothing was applied):\n'+lastError+'\nFix them and return corrected JSON with all the changes again, keeping what the user asked for.'});continue;
   }
   tl.edits(base,next);
   onProgress('building');
