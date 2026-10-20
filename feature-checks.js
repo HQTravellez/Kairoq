@@ -27,11 +27,12 @@ async function listFlows(id,n,{callModel,signal}){
  const v=await callModel({messages:[{role:'system',content:LIST_PROMPT},{role:'user',content:have+memory+'\n\nApp source:\n'+builder.contextFiles(files,50000)}],temperature:0,maxOutputTokens:1500,signal,tier:'standard',purpose:'feature-checks'},parseJson);
  return(Array.isArray(v&&v.flows)?v.flows:[]).map(f=>({name:String(f&&f.name||'').replace(/\s+/g,' ').trim().slice(0,80),description:String(f&&f.description||'').trim().slice(0,600),money:Boolean(f&&f.money)})).filter(f=>f.name&&f.description).slice(0,MAX_FLOWS);
 }
-// Runs coverage for the published version once. Returns the coverage record.
-async function ensure(id,{callModel,inspect,signal,force=false}={}){
+// Runs coverage once per version: the published one (the live guard), or the one about to be
+// published (the launch gate). Returns the coverage record.
+async function ensure(id,{callModel,inspect,signal,force=false,version}={}){
  const checks=require('./react-checks');
  let meta=builder.loadMeta(id);
- const n=meta.published&&meta.published.version;
+ const n=Number(version)||(meta.published&&meta.published.version);
  if(!n||!enabled()||!callModel||!inspect)return null;
  if(!force&&meta.coverage&&meta.coverage.version===n)return meta.coverage;
  const flows=await listFlows(id,n,{callModel,signal});

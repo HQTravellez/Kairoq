@@ -1140,10 +1140,12 @@ $('slug').oninput=()=>text($('slug-preview'),location.origin+'/sites/'+(slugFrom
 $('slug').onblur=()=>{const v=slugFrom($('slug').value);if(v&&v!==$('slug').value)$('slug').value=v};
 async function publishAction(path,body){
  text($('publish-error'),'');
- try{const {project,error}=await api('/projects/'+state.project.id+path,{method:'POST',body});state.project=project;renderPublish();if(error)text($('publish-error'),error)}
+ // The launch gate checks the app's money flows in Kairoq's browser first (up to a minute or two).
+ if(path==='/publish'&&!body.force)text($('publish-error'),'Checking that bookings, orders and sign-ups work before it goes live…');
+ try{const {project,error}=await api('/projects/'+state.project.id+path,{method:'POST',body});state.project=project;renderPublish();text($('publish-error'),error||'')}
  catch(err){
   // Saved checks failed on the version going live: the owner decides.
-  if(err.status===409&&err.data&&err.data.checks_failed&&confirm(err.message+'\n\nPublish anyway?'))return publishAction(path,{...body,force:true});
+  if(err.status===409&&err.data&&err.data.checks_failed){text($('publish-error'),err.message);if(confirm(err.message+'\n\nPublish anyway?'))return publishAction(path,{...body,force:true});return}
   text($('publish-error'),err.message);
  }
 }
