@@ -67,7 +67,7 @@ const NEED={'GET:':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'vie
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -97,6 +97,8 @@ function tiers(){
 // as Fable does the review, else 1), so a Standard review by Fable is not sold at a loss.
 function polishCredits(){return intEnv('KAIROQ_POLISH_CREDITS',process.env.KAIROQ_DESIGN_MODELS?5:1)}
 function generatedImageCredits(){return intEnv('KAIROQ_GENERATED_IMAGE_CREDITS',2)}
+// Gives a failed video's credits back to the customer who paid for it.
+function refundVideo(v){return(n,ref)=>{if(v.kind==='customer'&&n>0)accounts.grant(v.account.id,n,'Refund: video not made','refund-'+ref)}}
 // Agent tasks take many model calls, so they cost a multiple of the tier's price.
 function agentMultiplier(){const n=intEnv('KAIROQ_AGENT_MULTIPLIER',3);return n>=1?n:3}
 // Every mode checks the tier; Discuss on Pro or Max costs that tier's price.
@@ -746,7 +748,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -1293,6 +1295,26 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const stem=req1.name.replace(/\.[a-z]+$/,''),ext={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[picture.mime]||'png';
    const saved=require('./react-assets').save(id,[{name:stem+'.'+ext,mime:picture.mime,data:picture.data}],{maxBytes:6*1024*1024});
    return send(res,201,{saved,assets:require('./react-assets').list(id)}),true;
+  }
+  // Videos from the project's photos (video-gen.js): launch clips to post, a hero video for the site.
+  if(action==='/videos'&&method==='GET'){
+   const vg=require('./video-gen'),refund=refundVideo(v);
+   vg.sweep(id,{refund});
+   return send(res,200,{videos:vg.list(id),enabled:vg.configured(),credits:vg.credits(),photos:require('./react-assets').list(id).filter(a=>/\.(png|jpe?g|webp)$/.test(a.name))}),true;
+  }
+  if(action==='/videos'&&method==='POST'){
+   const vg=require('./video-gen'),b=await readJson(req,4000);
+   limitedKey('videos:'+id,12,3600000);
+   const label=b.kind==='hero'?'Hero video':'Launch clip';
+   const made=vg.start(id,{kind:String(b.kind||''),photos:b.photos,note:String(b.note||''),
+    charge:(n,ref)=>{if(v.kind==='customer')accounts.charge(v.account.id,n,label+(n>vg.credits()?'s':''),ref)},refund:refundVideo(v)});
+   return send(res,202,{started:made,videos:vg.list(id),credits:v.kind==='customer'?vg.credits()*made.length:0}),true;
+  }
+  if(action==='/videos'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{videos:require('./video-gen').remove(id,String(b.id||''))}),true}
+  if(action==='/video'&&method==='GET'){
+   const q=new URL(req.url,'http://x').searchParams,vg=require('./video-gen'),name=q.get('name'),file=vg.read(id,name);
+   if(!file)throw Object.assign(Error('Unknown video'),{status:404});
+   vg.sendFile(req,res,file,{download:q.get('download')==='1'?name:null});return true;
   }
   // Saved checks: list, add (steps or a plain-English description), switch on/off, run now, remove.
   if(action==='/checks'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{checks:require('./react-checks').list(meta),monitor:meta.monitor||null}),true}

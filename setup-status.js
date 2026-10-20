@@ -16,6 +16,7 @@ function items({env=process.env}={}){
   {id:'email',label:'Emails (password reset, sign-up)',ok:accounts.mailReady(),required:true,fix:'Add KAIROQ_RESEND_API_KEY (from resend.com) and KAIROQ_EMAIL_FROM (an address on your verified domain) in Railway (service, Variables).'},
   {id:'browser',label:'Kairoq tests every build in a browser',ok:require('./runtime-check').available(),required:true,fix:'Deploy with the Dockerfile in this repository, which installs Chromium.'},
   {id:'payments',label:'Customers can buy credits',ok:accounts.stripeReady(),required:false,fix:'Add KAIROQ_STRIPE_SECRET_KEY in Railway (service, Variables) to sell credits with Stripe.'},
+  {id:'videos',label:'Launch and hero videos from your photos',ok:require('./video-gen').configured(env),required:false,fix:'Add FAL_KEY in Railway (service, Variables) with a key from fal.ai. Videos are made with Wan 2.2; each clip costs KAIROQ_VIDEO_CREDITS credits (10 unless you set it).'},
   {id:'google',label:'Sign in with Google',ok:require('./google-oauth').configured(),required:false,fix:'Add KAIROQ_GOOGLE_CLIENT_ID and KAIROQ_GOOGLE_CLIENT_SECRET in Railway (service, Variables).'},
  ];
  // Only when the owner chose OpenCode as the build engine: whether it is installed and has a model.

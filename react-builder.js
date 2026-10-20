@@ -205,7 +205,7 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
  try{
   fs.writeFileSync(path.join(work,'index.html'),INDEX_HTML);
   fs.copyFileSync(path.join(__dirname,'builder-runtime','kairoq-reporter.js'),path.join(work,'kairoq-reporter.js'));
-  if(projectId!=='000000000000')require('./react-assets').copyInto(projectId,path.join(work,'public'));
+  if(projectId!=='000000000000'){require('./react-assets').copyInto(projectId,path.join(work,'public'));require('./video-gen').copyInto(projectId,path.join(work,'public'))}
   for(const [name,code] of Object.entries(files)){const file=path.join(work,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,code)}
   // Packages resolve from Kairoq's own installed modules (validated imports only).
   fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(work,'node_modules'),'dir');
@@ -682,7 +682,7 @@ function rename(id,name){const meta=loadMeta(id);meta.name=String(name||meta.nam
 function remove(id){const dir=projectDir(id);loadMeta(id);require('./react-sql').closeEverywhere(dir);fs.rmSync(dir,{recursive:true,force:true});return{deleted:id}}
 
 // ---------- serving built files ----------
-const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8'};
+const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm'};
 // sandbox=true runs the page in an opaque origin so generated code cannot use the Kairoq session.
 function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
 // Compression for built files: each is compressed once (brotli, else gzip) and kept next to
@@ -725,6 +725,19 @@ function serveDist(req,res,distDir,rest,{sandbox}){
  let body=target;
  const enc=COMPRESSIBLE.has(ext)?encodingFor(req):null,packed=enc?compressedFile(target,enc):null;
  if(packed){body=packed;headers['Content-Encoding']=enc;headers.Vary='Accept-Encoding'}
+ // Videos are read in ranges (Safari will not play one otherwise).
+ if(!packed&&/^video\//.test(headers['Content-Type'])){
+  const size=fs.statSync(target).size,m=/^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range||''));
+  headers['Accept-Ranges']='bytes';
+  if(m&&(m[1]||m[2])){
+   let start=m[1]?Number(m[1]):Math.max(0,size-Number(m[2])),end=m[1]&&m[2]?Math.min(Number(m[2]),size-1):size-1;
+   if(start>=size||start>end){res.writeHead(416,{'Content-Range':'bytes */'+size});return res.end()}
+   res.writeHead(206,{...headers,'Content-Range':'bytes '+start+'-'+end+'/'+size,'Content-Length':end-start+1});
+   if(req.method==='HEAD')return res.end();
+   return fs.createReadStream(target,{start,end}).pipe(res);
+  }
+  headers['Content-Length']=size;
+ }
  res.writeHead(200,headers);
  if(req.method==='HEAD')return res.end();
  fs.createReadStream(body).pipe(res);
