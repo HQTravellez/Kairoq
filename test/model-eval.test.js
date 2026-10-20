@@ -71,3 +71,14 @@ test('judge options: model and key come from flags or the environment',()=>{
  }finally{delete process.env.KAIROQ_JUDGE_MODEL;delete process.env.OPENROUTER_API_KEY}
  assert.throws(()=>evalr.args(['--bogus']),/Unknown option/);
 });
+
+test('engine comparison: every case has an acceptance flow, and a case passes only when all its repeats pass',()=>{
+ for(const c of CASES)assert.ok(Array.isArray(c.accept)&&c.accept.length&&c.accept.every(f=>f.length>20),c.id);
+ assert.equal(evalr.args(['--engines','kairoq,opencode','--repeat','2']).engines,'kairoq,opencode');
+ assert.equal(evalr.args(['--repeat','9']).repeat,5);
+ const ok={first_status:'complete',followups:'2/2',accept:'1/1',expected_found:'4/4',preview_errors:0,security_high:0};
+ assert.equal(evalr.passed(ok),true);
+ for(const bad of [{accept:'0/1'},{followups:'1/2'},{security_high:1},{preview_errors:2},{first_status:'failed'}])assert.equal(evalr.passed({...ok,...bad}),false,JSON.stringify(bad));
+ const rows=[['a','kairoq','yes'],['a','kairoq','no'],['b','kairoq','yes'],['b','kairoq','yes'],['a','opencode','yes'],['a','opencode','yes']].map(([c,engine,pass])=>({case:c,engine,tier:'standard',mode:'build',pass}));
+ assert.deepEqual(evalr.passK(rows),{kairoq:{cases:2,all_passed:1,runs:4,runs_passed:3},opencode:{cases:1,all_passed:1,runs:2,runs_passed:2}});
+});
