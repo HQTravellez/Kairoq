@@ -2880,6 +2880,7 @@ function openBuilder(url){
   setMainView("build");
 }
 function launchAppBuild(prompt){
+  $("#khError")?.classList.add("hidden");
   // The builder opens here and asks any quick questions inside its own chat before building.
   const text=appBuildMode==="mobile"?"Build a mobile app: "+prompt:prompt;
   try{sessionStorage.setItem("kairoq-pending",JSON.stringify({prompt:text,ask:true}))}catch{}
@@ -2898,6 +2899,8 @@ async function loadHomeApps(){
       let hue=0;for(const ch of name)hue=(hue*31+ch.charCodeAt(0))%360;
       const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--h",hue);thumb.setAttribute("aria-hidden","true");
       thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+      // The app's own picture once Kairoq has taken one; the initials stay underneath.
+      if(p.thumb){const img=document.createElement("img");img.src=p.thumb;img.alt="";img.loading="lazy";img.decoding="async";img.onerror=()=>img.remove();thumb.append(img)}
       const meta=document.createElement("span");meta.className="kh-app-meta";
       const title=document.createElement("strong");title.textContent=name;
       const when=document.createElement("small");when.textContent=p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"";
@@ -2913,6 +2916,15 @@ function startAppBuild(prompt){
   launchAppBuild(prompt);
 }
 loadHomeApps();
+// The builder inside this page sends people back here instead of showing its own start page;
+// a build that could not start comes back with the error and the request to try again.
+window.addEventListener("message",e=>{
+  if(e.origin!==location.origin||!e.data||e.data.kairoq!=="home")return;
+  setMainView("command");$("#commandCenter")?.classList.remove("show-work");
+  if(e.data.prompt){setAppBuildMode(String(e.data.prompt).startsWith("Build a mobile app: ")?"mobile":"web");promptEl.value=String(e.data.prompt).replace(/^Build a mobile app: /,"");resizePrompt()}
+  const err=$("#khError");if(err){err.textContent=e.data.error?"The build could not start: "+String(e.data.error).slice(0,300).replace(/[.\s]*$/,".")+" Try again, or change the request.":"";err.classList.toggle("hidden",!e.data.error)}
+  loadHomeApps();
+});
 $$(".kh-mode").forEach(t=>t.onclick=()=>{setAppBuildMode(t.dataset.mode);promptEl.focus()});
 $$("[data-build-app]").forEach(b=>b.onclick=()=>openAppBuilder("web"));
 $$("[data-idea]").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent.trim();resizePrompt();promptEl.focus()});

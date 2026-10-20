@@ -203,7 +203,9 @@ function buildStats(){return{workers:pool.workers.length,busy:pool.workers.filte
 async function runBuild(files,outDir,{projectId='000000000000'}={}){
  const version=Number((/[\\/]versions[\\/](\d+)[\\/]dist$/.exec(outDir)||[])[1]||0);
  fs.mkdirSync(ROOT(),{recursive:true});
- const work=fs.mkdtempSync(path.join(ROOT(),'.build-'));
+ // The real path: on a persistent volume workspace/ is a symlink, and Vite mixes resolved and
+ // unresolved paths ("../../data/workspace/..." asset names) if the root goes through it.
+ const work=fs.realpathSync(fs.mkdtempSync(path.join(ROOT(),'.build-')));
  try{
   fs.writeFileSync(path.join(work,'index.html'),INDEX_HTML);
   fs.copyFileSync(path.join(__dirname,'builder-runtime','kairoq-reporter.js'),path.join(work,'kairoq-reporter.js'));

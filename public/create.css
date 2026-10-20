@@ -743,3 +743,6 @@ body.embed #side,body.embed #side-open-btn{display:none!important}
 .menu.pick .menu-panel button{position:relative;padding:9px 34px 9px 10px}
 .menu.pick .menu-panel button[aria-pressed=true]::after{content:"";position:absolute;right:14px;top:14px;width:5px;height:10px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(45deg)}
 .menu.pick .menu-panel button:disabled{opacity:.45;cursor:not-allowed}
+/* A project card shows its app's picture over the initials once one exists. */
+.projects .thumb{position:relative;overflow:hidden}
+.projects .thumb .thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center}
