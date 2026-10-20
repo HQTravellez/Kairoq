@@ -5,6 +5,8 @@
 // model's taste and fewer polish rounds are wasted.
 const REVIEW=`You review screenshots of a web app as a demanding senior product designer. The first images are desktop (1280 px), then phone (390 px).
 List only real problems a visitor would notice: unreadable or low-contrast text, broken or overflowing layout, cramped or uneven spacing, weak hierarchy, inconsistent buttons, tiny tap targets, misaligned elements, images that look broken.
+Also list the generic "made by AI" template look when you see it:
+${require('./design-slop').list()}
 Do not list brand or colour preferences, copy tone, missing features or things you cannot see.
 Respond with ONLY JSON: {"findings":[{"id":"%P1","severity":"major"|"minor","screen":"desktop"|"phone"|"both","issue":"what is wrong and where","fix":"the concrete change"}]} (at most 8, most important first; [] when the design is fine).`;
 const CROSS=`Another design reviewer looked at the same screenshots and listed the problems below. For each one, look at the screenshots yourself. UPHOLD it if it is a real, visible problem worth fixing; REJECT it if it is wrong, a matter of taste, or not visible.

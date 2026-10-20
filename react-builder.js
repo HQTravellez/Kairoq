@@ -614,6 +614,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
 // model, which fixes what looks off without changing behaviour. Saved as a new version.
 const POLISH_REQUEST=`Design review. The attached screenshots show the current app: first a desktop browser 1280 px wide, then a phone 390 px wide (long pages are cut off at the bottom). Look at them like a senior product designer and improve the visual design without changing what the app does.
 1. Find the 5 to 8 most visible problems, for example: weak hierarchy or a hero without a focal point, cramped or uneven spacing, misaligned elements, low contrast text, plain or empty-looking sections, missing or poor imagery, inconsistent buttons and cards, hard-coded colours that ignore the design tokens, a phone layout that is cramped, overflowing or not tappable, missing hover and focus states.
+   Also remove the generic "made by AI" template look wherever you see it:
+${require('./design-slop').list().replace(/^/gm,'   ')}
 2. Fix them in the code: spacing, type scale, design tokens in src/index.css, imagery, section backgrounds, cards, hover and focus states, motion, the phone layout.
 Keep every feature, page, route, text content, form, data call and server function working exactly as before, and do not remove sections. In "message", tell the user in one or two sentences what you improved.`;
 async function polish(id,{shots,note='',...opts}){

@@ -149,7 +149,7 @@ test('design dialog: edit colours and fonts, new direction from the AI, add the 
 });
 
 test('skills: built-in library, your own skills, always-on, and import from GitHub',async()=>{
- assert.deepEqual(skills.builtin().map(s=>s.id),['accessibility','app-onboarding','brand-from-logo','brutalist-style','dashboard','data-viz','diagrams','digital-guide','ecommerce','editorial','email-newsletter','event-flyer','framer-motion','frontend-design','help-docs','human-crafted','illustration-icons','kanban-board','launch-deck','loyalty-rewards','luxury-hospitality','magazine-cover','marketplace','mobile-app','modern-css','modern-saas','monthly-report','pitch-deck','presentation-slides','pricing-page','printable-invoice','remotion-video','resume-portfolio','scroll-story','secure-app','social-carousel','social-dashboard','social-share-card','soft-minimal-style','staff-onboarding','team-goals','three-3d','waitlist-page','weekly-update']);
+ assert.deepEqual(skills.builtin().map(s=>s.id),['accessibility','app-onboarding','brand-from-logo','brutalist-style','craft-floor','dashboard','data-viz','diagrams','digital-guide','ecommerce','editorial','email-newsletter','event-flyer','framer-motion','frontend-design','help-docs','human-crafted','illustration-icons','kanban-board','launch-deck','loyalty-rewards','luxury-hospitality','magazine-cover','marketplace','mobile-app','modern-css','modern-saas','monthly-report','pitch-deck','presentation-slides','pricing-page','printable-invoice','remotion-video','resume-portfolio','scroll-story','secure-app','social-carousel','social-dashboard','social-share-card','soft-minimal-style','staff-onboarding','team-goals','three-3d','waitlist-page','weekly-update']);
  // Page types adapted from html-anything carry a group; the styles do not.
  assert.equal(skills.builtin().filter(s=>s.group==='Page types').length,25);
  for(const s of skills.builtin())assert.ok(s.name&&s.description.length>40&&s.body.length>1500,s.id);
@@ -280,4 +280,19 @@ test('agent mode designs new projects first and can generate images',async()=>{
  assert.equal(meta.design.name,'Warm Lisbon editorial');
  assert.match(files['src/App.jsx'],/\.\/uploads\/lobby\.png/);
  assert.match(files['src/index.css'],/--primary: 18 62% 44%;/,'the brief\'s tokens are saved with the agent\'s version');
+});
+
+test('design presets: the brief starts from palettes and fonts for the kind of business; reviewers look for the template look',async()=>{
+ const presets=require('../design-presets'),design=require('../react-design');
+ assert.equal(presets.match('Website for my bakery with cakes').palettes[0].type,'Bakery/Cafe');
+ assert.equal(presets.match('Booking for my hair salon').palettes[0].type,'Beauty/Spa/Wellness Service');
+ assert.ok(presets.match('Dental clinic').palettes.some(p=>p.type==='Dental Practice'));
+ assert.equal(presets.note('xyzzy'),'');
+ for(const p of presets.data.palettes)for(const v of Object.values(p.palette))assert.match(v,/^#[0-9a-f]{6}$/,p.type);
+ for(const f of presets.data.fonts)assert.ok(design.FONTS[f.display]&&design.FONTS[f.body],f.name);
+ let sent='';
+ await design.createBrief('A website for Pão Quente, our family bakery',{projectName:'Pão Quente',callModel:async(o,parse)=>{sent=o.messages[1].content;return parse(JSON.stringify({name:'Warm',palette:{background:'#fef3c7',foreground:'#78350f',primary:'#92400e'},fonts:{display:'Fraunces',body:'Inter'}}))}});
+ assert.match(sent,/Palette for Bakery\/Cafe: background #fef3c7/);assert.match(sent,/do not fall back to a default indigo/);
+ assert.match(require('fs').readFileSync(require.resolve('../design-panel.js'),'utf8'),/design-slop/);
+ assert.ok(require('../design-slop').list().includes('emoji used as icons'));
 });

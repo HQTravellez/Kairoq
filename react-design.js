@@ -50,7 +50,11 @@ const FONTS={
  'Unbounded':['display','400;500;600;700'],'Bebas Neue':['display','400'],
  'Playfair Display':['serif','400;500;600;700'],'Cormorant Garamond':['serif','400;500;600;700'],'Fraunces':['serif','400;500;600;700'],'DM Serif Display':['serif','400'],
  'Lora':['serif','400;500;600;700'],'EB Garamond':['serif','400;500;600;700'],'Libre Baskerville':['serif','400;700'],'Instrument Serif':['serif','400'],'Merriweather':['serif','400;700'],
- 'JetBrains Mono':['mono','400;500;600;700']
+ 'Roboto':['sans','400;500;700'],'Open Sans':['sans','400;500;600;700'],'Montserrat':['sans','400;500;600;700'],'Raleway':['sans','400;500;600;700'],'Nunito Sans':['sans','400;600;700'],'Public Sans':['sans','400;500;600;700'],
+ 'Quicksand':['sans','400;500;600;700'],'Lexend':['sans','400;500;600;700'],'Atkinson Hyperlegible':['sans','400;700'],'Be Vietnam Pro':['sans','400;500;600;700'],'Noto Sans':['sans','400;500;600;700'],'Varela Round':['sans','400'],
+ 'Fredoka':['display','400;500;600;700'],'Abril Fatface':['display','400'],'Caveat':['display','400;700'],
+ 'Crimson Pro':['serif','400;500;600;700'],'Cormorant':['serif','400;500;600;700'],'Newsreader':['serif','400;500;600;700'],
+ 'JetBrains Mono':['mono','400;500;600;700'],'Space Mono':['mono','400;700']
 };
 const FALLBACK={sans:'ui-sans-serif, system-ui, sans-serif',display:'ui-sans-serif, system-ui, sans-serif',serif:'ui-serif, Georgia, serif',mono:'ui-monospace, monospace'};
 function fontStack(name){const f=FONTS[name];return"'"+name+"', "+FALLBACK[f?f[0]:'sans']}
@@ -262,7 +266,7 @@ function normalize(v){
   notes:cleanText(v.notes,1500),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):''};
 }
 async function createBrief(request,{callModel,tier,signal,skills=[],projectName=''}){
- const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)}];
+ const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)}];
  const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier,design:true},parseBrief);
  if(brief.skill&&!skills.some(s=>s.id===brief.skill))brief.skill='';
  return{...brief,created_at:new Date().toISOString()};

@@ -1,0 +1,2730 @@
+{
+ "about": "Starting palettes and font pairings by kind of business, adapted from ui-ux-pro-max-skill by Next Level Builder (MIT License, Copyright (c) 2024 Next Level Builder, github.com/nextlevelbuilder/ui-ux-pro-max-skill). Colours are mapped to Kairoq design tokens (their Muted is used for secondary and muted surfaces).",
+ "palettes": [
+  {
+   "type": "SaaS (General)",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e293b",
+    "primary": "#2563eb",
+    "secondary": "#e9eff8",
+    "accent": "#ea580c",
+    "muted": "#e9eff8",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Trust blue + orange CTA contrast"
+  },
+  {
+   "type": "Micro SaaS",
+   "palette": {
+    "background": "#f5f3ff",
+    "foreground": "#1e1b4b",
+    "primary": "#6366f1",
+    "secondary": "#ebeff9",
+    "accent": "#059669",
+    "muted": "#ebeff9",
+    "card": "#ffffff",
+    "border": "#e0e7ff"
+   },
+   "note": "Indigo primary + emerald CTA"
+  },
+  {
+   "type": "E-commerce",
+   "palette": {
+    "background": "#ecfdf5",
+    "foreground": "#064e3b",
+    "primary": "#059669",
+    "secondary": "#e8f1f3",
+    "accent": "#ea580c",
+    "muted": "#e8f1f3",
+    "card": "#ffffff",
+    "border": "#a7f3d0"
+   },
+   "note": "Success green + urgency orange"
+  },
+  {
+   "type": "E-commerce Luxury",
+   "palette": {
+    "background": "#fafaf9",
+    "foreground": "#0c0a09",
+    "primary": "#1c1917",
+    "secondary": "#e8ecf0",
+    "accent": "#a16207",
+    "muted": "#e8ecf0",
+    "card": "#ffffff",
+    "border": "#d6d3d1"
+   },
+   "note": "Premium dark + gold accent"
+  },
+  {
+   "type": "B2B Service",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#020617",
+    "primary": "#0f172a",
+    "secondary": "#e8ecf1",
+    "accent": "#0369a1",
+    "muted": "#e8ecf1",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Professional navy + blue CTA"
+  },
+  {
+   "type": "Financial Dashboard",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#22c55e",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Dark bg + green positive indicators"
+  },
+  {
+   "type": "Analytics Dashboard",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e3a8a",
+    "primary": "#1e40af",
+    "secondary": "#e9eef6",
+    "accent": "#d97706",
+    "muted": "#e9eef6",
+    "card": "#ffffff",
+    "border": "#dbeafe"
+   },
+   "note": "Blue data + amber highlights"
+  },
+  {
+   "type": "Healthcare App",
+   "palette": {
+    "background": "#ecfeff",
+    "foreground": "#164e63",
+    "primary": "#0891b2",
+    "secondary": "#e8f1f6",
+    "accent": "#059669",
+    "muted": "#e8f1f6",
+    "card": "#ffffff",
+    "border": "#a5f3fc"
+   },
+   "note": "Calm cyan + health green"
+  },
+  {
+   "type": "Educational App",
+   "palette": {
+    "background": "#eef2ff",
+    "foreground": "#1e1b4b",
+    "primary": "#4f46e5",
+    "secondary": "#ebeef8",
+    "accent": "#ea580c",
+    "muted": "#ebeef8",
+    "card": "#ffffff",
+    "border": "#c7d2fe"
+   },
+   "note": "Playful indigo + energetic orange"
+  },
+  {
+   "type": "Creative Agency",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#831843",
+    "primary": "#ec4899",
+    "secondary": "#f1eef5",
+    "accent": "#0891b2",
+    "muted": "#f1eef5",
+    "card": "#ffffff",
+    "border": "#fbcfe8"
+   },
+   "note": "Bold pink + cyan accent"
+  },
+  {
+   "type": "Portfolio/Personal",
+   "palette": {
+    "background": "#fafafa",
+    "foreground": "#09090b",
+    "primary": "#18181b",
+    "secondary": "#e8ecf0",
+    "accent": "#2563eb",
+    "muted": "#e8ecf0",
+    "card": "#ffffff",
+    "border": "#e4e4e7"
+   },
+   "note": "Monochrome + blue accent"
+  },
+  {
+   "type": "Gaming",
+   "palette": {
+    "background": "#0f0f23",
+    "foreground": "#e2e8f0",
+    "primary": "#7c3aed",
+    "secondary": "#27273b",
+    "accent": "#f43f5e",
+    "muted": "#27273b",
+    "card": "#1e1c35",
+    "border": "#4c1d95"
+   },
+   "note": "Neon purple + rose action"
+  },
+  {
+   "type": "Government/Public Service",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#020617",
+    "primary": "#0f172a",
+    "secondary": "#e8ecf1",
+    "accent": "#0369a1",
+    "muted": "#e8ecf1",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "High contrast navy + blue"
+  },
+  {
+   "type": "Fintech/Crypto",
+   "palette": {
+    "background": "#0f172a",
+    "foreground": "#f8fafc",
+    "primary": "#f59e0b",
+    "secondary": "#272f42",
+    "accent": "#8b5cf6",
+    "muted": "#272f42",
+    "card": "#222735",
+    "border": "#334155"
+   },
+   "note": "Gold trust + purple tech"
+  },
+  {
+   "type": "Social Media App",
+   "palette": {
+    "background": "#fff1f2",
+    "foreground": "#881337",
+    "primary": "#e11d48",
+    "secondary": "#f0ecf2",
+    "accent": "#2563eb",
+    "muted": "#f0ecf2",
+    "card": "#ffffff",
+    "border": "#fecdd3"
+   },
+   "note": "Vibrant rose + engagement blue"
+  },
+  {
+   "type": "Productivity Tool",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0d9488",
+    "secondary": "#e8f1f4",
+    "accent": "#ea580c",
+    "muted": "#e8f1f4",
+    "card": "#ffffff",
+    "border": "#99f6e4"
+   },
+   "note": "Teal focus + action orange"
+  },
+  {
+   "type": "Design System/Component Library",
+   "palette": {
+    "background": "#eef2ff",
+    "foreground": "#312e81",
+    "primary": "#4f46e5",
+    "secondary": "#ebeef8",
+    "accent": "#ea580c",
+    "muted": "#ebeef8",
+    "card": "#ffffff",
+    "border": "#c7d2fe"
+   },
+   "note": "Indigo brand + doc hierarchy"
+  },
+  {
+   "type": "AI/Chatbot Platform",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#1e1b4b",
+    "primary": "#7c3aed",
+    "secondary": "#eceef9",
+    "accent": "#0891b2",
+    "muted": "#eceef9",
+    "card": "#ffffff",
+    "border": "#ddd6fe"
+   },
+   "note": "AI purple + cyan interactions"
+  },
+  {
+   "type": "NFT/Web3 Platform",
+   "palette": {
+    "background": "#0f0f23",
+    "foreground": "#f8fafc",
+    "primary": "#8b5cf6",
+    "secondary": "#27273b",
+    "accent": "#fbbf24",
+    "muted": "#27273b",
+    "card": "#1e1d35",
+    "border": "#4c1d95"
+   },
+   "note": "Purple tech + gold value"
+  },
+  {
+   "type": "Creator Economy Platform",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#831843",
+    "primary": "#ec4899",
+    "secondary": "#f1eef5",
+    "accent": "#ea580c",
+    "muted": "#f1eef5",
+    "card": "#ffffff",
+    "border": "#fbcfe8"
+   },
+   "note": "Creator pink + engagement orange"
+  },
+  {
+   "type": "Remote Work/Collaboration Tool",
+   "palette": {
+    "background": "#f5f3ff",
+    "foreground": "#312e81",
+    "primary": "#6366f1",
+    "secondary": "#ebeff9",
+    "accent": "#059669",
+    "muted": "#ebeff9",
+    "card": "#ffffff",
+    "border": "#e0e7ff"
+   },
+   "note": "Calm indigo + success green"
+  },
+  {
+   "type": "Mental Health App",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#4c1d95",
+    "primary": "#8b5cf6",
+    "secondary": "#edeff9",
+    "accent": "#059669",
+    "muted": "#edeff9",
+    "card": "#ffffff",
+    "border": "#ede9fe"
+   },
+   "note": "Calming lavender + wellness green"
+  },
+  {
+   "type": "Pet Tech App",
+   "palette": {
+    "background": "#fff7ed",
+    "foreground": "#9a3412",
+    "primary": "#f97316",
+    "secondary": "#f1f0f0",
+    "accent": "#2563eb",
+    "muted": "#f1f0f0",
+    "card": "#ffffff",
+    "border": "#fed7aa"
+   },
+   "note": "Playful orange + trust blue"
+  },
+  {
+   "type": "Smart Home/IoT Dashboard",
+   "palette": {
+    "background": "#0f172a",
+    "foreground": "#f8fafc",
+    "primary": "#1e293b",
+    "secondary": "#272f42",
+    "accent": "#22c55e",
+    "muted": "#272f42",
+    "card": "#1b2336",
+    "border": "#475569"
+   },
+   "note": "Dark tech + status green"
+  },
+  {
+   "type": "EV/Charging Ecosystem",
+   "palette": {
+    "background": "#ecfeff",
+    "foreground": "#164e63",
+    "primary": "#0891b2",
+    "secondary": "#e8f1f6",
+    "accent": "#16a34a",
+    "muted": "#e8f1f6",
+    "card": "#ffffff",
+    "border": "#a5f3fc"
+   },
+   "note": "Electric cyan + eco green"
+  },
+  {
+   "type": "Subscription Box Service",
+   "palette": {
+    "background": "#fdf4ff",
+    "foreground": "#86198f",
+    "primary": "#d946ef",
+    "secondary": "#f0eef9",
+    "accent": "#ea580c",
+    "muted": "#f0eef9",
+    "card": "#ffffff",
+    "border": "#f5d0fe"
+   },
+   "note": "Excitement purple + urgency orange"
+  },
+  {
+   "type": "Podcast Platform",
+   "palette": {
+    "background": "#0f0f23",
+    "foreground": "#f8fafc",
+    "primary": "#1e1b4b",
+    "secondary": "#27273b",
+    "accent": "#f97316",
+    "muted": "#27273b",
+    "card": "#1b1b30",
+    "border": "#4338ca"
+   },
+   "note": "Dark audio + warm accent"
+  },
+  {
+   "type": "Dating App",
+   "palette": {
+    "background": "#fff1f2",
+    "foreground": "#881337",
+    "primary": "#e11d48",
+    "secondary": "#f0ecf2",
+    "accent": "#ea580c",
+    "muted": "#f0ecf2",
+    "card": "#ffffff",
+    "border": "#fecdd3"
+   },
+   "note": "Romantic rose + warm orange"
+  },
+  {
+   "type": "Micro-Credentials/Badges Platform",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0369a1",
+    "secondary": "#e7eff5",
+    "accent": "#a16207",
+    "muted": "#e7eff5",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "Trust blue + achievement gold"
+  },
+  {
+   "type": "Knowledge Base/Documentation",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e293b",
+    "primary": "#475569",
+    "secondary": "#eaeff3",
+    "accent": "#2563eb",
+    "muted": "#eaeff3",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Neutral grey + link blue"
+  },
+  {
+   "type": "Hyperlocal Services",
+   "palette": {
+    "background": "#ecfdf5",
+    "foreground": "#064e3b",
+    "primary": "#059669",
+    "secondary": "#e8f1f3",
+    "accent": "#ea580c",
+    "muted": "#e8f1f3",
+    "card": "#ffffff",
+    "border": "#a7f3d0"
+   },
+   "note": "Location green + action orange"
+  },
+  {
+   "type": "Beauty/Spa/Wellness Service",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#831843",
+    "primary": "#ec4899",
+    "secondary": "#f1eef5",
+    "accent": "#8b5cf6",
+    "muted": "#f1eef5",
+    "card": "#ffffff",
+    "border": "#fbcfe8"
+   },
+   "note": "Soft pink + lavender luxury"
+  },
+  {
+   "type": "Luxury/Premium Brand",
+   "palette": {
+    "background": "#fafaf9",
+    "foreground": "#0c0a09",
+    "primary": "#1c1917",
+    "secondary": "#e8ecf0",
+    "accent": "#a16207",
+    "muted": "#e8ecf0",
+    "card": "#ffffff",
+    "border": "#d6d3d1"
+   },
+   "note": "Premium black + gold accent"
+  },
+  {
+   "type": "Restaurant/Food Service",
+   "palette": {
+    "background": "#fef2f2",
+    "foreground": "#450a0a",
+    "primary": "#dc2626",
+    "secondary": "#f0edf1",
+    "accent": "#a16207",
+    "muted": "#f0edf1",
+    "card": "#ffffff",
+    "border": "#fecaca"
+   },
+   "note": "Appetizing red + warm gold"
+  },
+  {
+   "type": "Fitness/Gym App",
+   "palette": {
+    "background": "#1f2937",
+    "foreground": "#f8fafc",
+    "primary": "#f97316",
+    "secondary": "#37414f",
+    "accent": "#22c55e",
+    "muted": "#37414f",
+    "card": "#313742",
+    "border": "#374151"
+   },
+   "note": "Energy orange + success green"
+  },
+  {
+   "type": "Real Estate/Property",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0f766e",
+    "secondary": "#e8f0f3",
+    "accent": "#0369a1",
+    "muted": "#e8f0f3",
+    "card": "#ffffff",
+    "border": "#99f6e4"
+   },
+   "note": "Trust teal + professional blue"
+  },
+  {
+   "type": "Travel/Tourism Agency",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0ea5e9",
+    "secondary": "#e8f2f8",
+    "accent": "#ea580c",
+    "muted": "#e8f2f8",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "Sky blue + adventure orange"
+  },
+  {
+   "type": "Hotel/Hospitality",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e40af",
+    "primary": "#1e3a8a",
+    "secondary": "#e9eef5",
+    "accent": "#a16207",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#bfdbfe"
+   },
+   "note": "Luxury navy + gold service"
+  },
+  {
+   "type": "Wedding/Event Planning",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#831843",
+    "primary": "#db2777",
+    "secondary": "#f0edf4",
+    "accent": "#a16207",
+    "muted": "#f0edf4",
+    "card": "#ffffff",
+    "border": "#fbcfe8"
+   },
+   "note": "Romantic pink + elegant gold"
+  },
+  {
+   "type": "Legal Services",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a8a",
+    "secondary": "#e9eef5",
+    "accent": "#b45309",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#cbd5e1"
+   },
+   "note": "Authority navy + trust gold"
+  },
+  {
+   "type": "Insurance Platform",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0369a1",
+    "secondary": "#e7eff5",
+    "accent": "#16a34a",
+    "muted": "#e7eff5",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "Security blue + protected green"
+  },
+  {
+   "type": "Banking/Traditional Finance",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#020617",
+    "primary": "#0f172a",
+    "secondary": "#e8ecf1",
+    "accent": "#a16207",
+    "muted": "#e8ecf1",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Trust navy + premium gold"
+  },
+  {
+   "type": "Online Course/E-learning",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0d9488",
+    "secondary": "#e8f1f4",
+    "accent": "#ea580c",
+    "muted": "#e8f1f4",
+    "card": "#ffffff",
+    "border": "#5eead4"
+   },
+   "note": "Progress teal + achievement orange"
+  },
+  {
+   "type": "Non-profit/Charity",
+   "palette": {
+    "background": "#ecfeff",
+    "foreground": "#164e63",
+    "primary": "#0891b2",
+    "secondary": "#e8f1f6",
+    "accent": "#ea580c",
+    "muted": "#e8f1f6",
+    "card": "#ffffff",
+    "border": "#a5f3fc"
+   },
+   "note": "Compassion blue + action orange"
+  },
+  {
+   "type": "Music Streaming",
+   "palette": {
+    "background": "#0f0f23",
+    "foreground": "#f8fafc",
+    "primary": "#1e1b4b",
+    "secondary": "#27273b",
+    "accent": "#22c55e",
+    "muted": "#27273b",
+    "card": "#1b1b30",
+    "border": "#312e81"
+   },
+   "note": "Dark audio + play green"
+  },
+  {
+   "type": "Video Streaming/OTT",
+   "palette": {
+    "background": "#000000",
+    "foreground": "#f8fafc",
+    "primary": "#0f0f23",
+    "secondary": "#181818",
+    "accent": "#e11d48",
+    "muted": "#181818",
+    "card": "#0c0c0d",
+    "border": "#312e81"
+   },
+   "note": "Cinema dark + play red"
+  },
+  {
+   "type": "Job Board/Recruitment",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0369a1",
+    "secondary": "#e7eff5",
+    "accent": "#16a34a",
+    "muted": "#e7eff5",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "Professional blue + success green"
+  },
+  {
+   "type": "Marketplace (P2P)",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#4c1d95",
+    "primary": "#7c3aed",
+    "secondary": "#eceef9",
+    "accent": "#16a34a",
+    "muted": "#eceef9",
+    "card": "#ffffff",
+    "border": "#ddd6fe"
+   },
+   "note": "Trust purple + transaction green"
+  },
+  {
+   "type": "Logistics/Delivery",
+   "palette": {
+    "background": "#eff6ff",
+    "foreground": "#1e40af",
+    "primary": "#2563eb",
+    "secondary": "#e9eff8",
+    "accent": "#ea580c",
+    "muted": "#e9eff8",
+    "card": "#ffffff",
+    "border": "#bfdbfe"
+   },
+   "note": "Tracking blue + delivery orange"
+  },
+  {
+   "type": "Agriculture/Farm Tech",
+   "palette": {
+    "background": "#f0fdf4",
+    "foreground": "#14532d",
+    "primary": "#15803d",
+    "secondary": "#e8f0f1",
+    "accent": "#a16207",
+    "muted": "#e8f0f1",
+    "card": "#ffffff",
+    "border": "#bbf7d0"
+   },
+   "note": "Earth green + harvest gold"
+  },
+  {
+   "type": "Construction/Architecture",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#334155",
+    "primary": "#64748b",
+    "secondary": "#ebf0f5",
+    "accent": "#ea580c",
+    "muted": "#ebf0f5",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Industrial grey + safety orange"
+  },
+  {
+   "type": "Automotive/Car Dealership",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e293b",
+    "secondary": "#e9edf1",
+    "accent": "#dc2626",
+    "muted": "#e9edf1",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Premium dark + action red"
+  },
+  {
+   "type": "Photography Studio",
+   "palette": {
+    "background": "#000000",
+    "foreground": "#fafafa",
+    "primary": "#18181b",
+    "secondary": "#181818",
+    "accent": "#f8fafc",
+    "muted": "#181818",
+    "card": "#0c0c0c",
+    "border": "#3f3f46"
+   },
+   "note": "Pure black + white contrast"
+  },
+  {
+   "type": "Coworking Space",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#78350f",
+    "primary": "#f59e0b",
+    "secondary": "#f1f2ef",
+    "accent": "#2563eb",
+    "muted": "#f1f2ef",
+    "card": "#ffffff",
+    "border": "#fde68a"
+   },
+   "note": "Energetic amber + booking blue"
+  },
+  {
+   "type": "Home Services (Plumber/Electrician)",
+   "palette": {
+    "background": "#eff6ff",
+    "foreground": "#1e3a8a",
+    "primary": "#1e40af",
+    "secondary": "#e9eef6",
+    "accent": "#ea580c",
+    "muted": "#e9eef6",
+    "card": "#ffffff",
+    "border": "#bfdbfe"
+   },
+   "note": "Professional blue + urgent orange"
+  },
+  {
+   "type": "Childcare/Daycare",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#9d174d",
+    "primary": "#f472b6",
+    "secondary": "#f1f0f6",
+    "accent": "#16a34a",
+    "muted": "#f1f0f6",
+    "card": "#ffffff",
+    "border": "#fce7f3"
+   },
+   "note": "Soft pink + safe green"
+  },
+  {
+   "type": "Senior Care/Elderly",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0369a1",
+    "secondary": "#e7eff5",
+    "accent": "#16a34a",
+    "muted": "#e7eff5",
+    "card": "#ffffff",
+    "border": "#e0f2fe"
+   },
+   "note": "Calm blue + reassuring green"
+  },
+  {
+   "type": "Medical Clinic",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0891b2",
+    "secondary": "#e8f1f6",
+    "accent": "#16a34a",
+    "muted": "#e8f1f6",
+    "card": "#ffffff",
+    "border": "#ccfbf1"
+   },
+   "note": "Medical teal + health green"
+  },
+  {
+   "type": "Pharmacy/Drug Store",
+   "palette": {
+    "background": "#f0fdf4",
+    "foreground": "#14532d",
+    "primary": "#15803d",
+    "secondary": "#e8f0f1",
+    "accent": "#0369a1",
+    "muted": "#e8f0f1",
+    "card": "#ffffff",
+    "border": "#bbf7d0"
+   },
+   "note": "Pharmacy green + trust blue"
+  },
+  {
+   "type": "Dental Practice",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0ea5e9",
+    "secondary": "#e8f2f8",
+    "accent": "#0ea5e9",
+    "muted": "#e8f2f8",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "Fresh blue + smile yellow"
+  },
+  {
+   "type": "Veterinary Clinic",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0d9488",
+    "secondary": "#e8f1f4",
+    "accent": "#ea580c",
+    "muted": "#e8f1f4",
+    "card": "#ffffff",
+    "border": "#99f6e4"
+   },
+   "note": "Caring teal + warm orange"
+  },
+  {
+   "type": "Florist/Plant Shop",
+   "palette": {
+    "background": "#f0fdf4",
+    "foreground": "#14532d",
+    "primary": "#15803d",
+    "secondary": "#e8f0f1",
+    "accent": "#ec4899",
+    "muted": "#e8f0f1",
+    "card": "#ffffff",
+    "border": "#bbf7d0"
+   },
+   "note": "Natural green + floral pink"
+  },
+  {
+   "type": "Bakery/Cafe",
+   "palette": {
+    "background": "#fef3c7",
+    "foreground": "#78350f",
+    "primary": "#92400e",
+    "secondary": "#edeef0",
+    "accent": "#92400e",
+    "muted": "#edeef0",
+    "card": "#ffffff",
+    "border": "#fde68a"
+   },
+   "note": "Warm brown + cream white"
+  },
+  {
+   "type": "Brewery/Winery",
+   "palette": {
+    "background": "#fef2f2",
+    "foreground": "#450a0a",
+    "primary": "#7c2d12",
+    "secondary": "#ecedf0",
+    "accent": "#a16207",
+    "muted": "#ecedf0",
+    "card": "#ffffff",
+    "border": "#fecaca"
+   },
+   "note": "Deep burgundy + craft gold"
+  },
+  {
+   "type": "Airline",
+   "palette": {
+    "background": "#eff6ff",
+    "foreground": "#1e40af",
+    "primary": "#1e3a8a",
+    "secondary": "#e9eef5",
+    "accent": "#ea580c",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#bfdbfe"
+   },
+   "note": "Sky blue + booking orange"
+  },
+  {
+   "type": "News/Media Platform",
+   "palette": {
+    "background": "#fef2f2",
+    "foreground": "#450a0a",
+    "primary": "#dc2626",
+    "secondary": "#f0edf1",
+    "accent": "#1e40af",
+    "muted": "#f0edf1",
+    "card": "#ffffff",
+    "border": "#fecaca"
+   },
+   "note": "Breaking red + link blue"
+  },
+  {
+   "type": "Magazine/Blog",
+   "palette": {
+    "background": "#fafafa",
+    "foreground": "#09090b",
+    "primary": "#18181b",
+    "secondary": "#e8ecf0",
+    "accent": "#ec4899",
+    "muted": "#e8ecf0",
+    "card": "#ffffff",
+    "border": "#e4e4e7"
+   },
+   "note": "Editorial black + accent pink"
+  },
+  {
+   "type": "Freelancer Platform",
+   "palette": {
+    "background": "#eef2ff",
+    "foreground": "#312e81",
+    "primary": "#6366f1",
+    "secondary": "#ebeff9",
+    "accent": "#16a34a",
+    "muted": "#ebeff9",
+    "card": "#ffffff",
+    "border": "#c7d2fe"
+   },
+   "note": "Creative indigo + hire green"
+  },
+  {
+   "type": "Marketing Agency",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#831843",
+    "primary": "#ec4899",
+    "secondary": "#f1eef5",
+    "accent": "#0891b2",
+    "muted": "#f1eef5",
+    "card": "#ffffff",
+    "border": "#fbcfe8"
+   },
+   "note": "Bold pink + creative cyan"
+  },
+  {
+   "type": "Event Management",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#4c1d95",
+    "primary": "#7c3aed",
+    "secondary": "#eceef9",
+    "accent": "#ea580c",
+    "muted": "#eceef9",
+    "card": "#ffffff",
+    "border": "#ddd6fe"
+   },
+   "note": "Excitement purple + action orange"
+  },
+  {
+   "type": "Membership/Community",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#4c1d95",
+    "primary": "#7c3aed",
+    "secondary": "#eceef9",
+    "accent": "#16a34a",
+    "muted": "#eceef9",
+    "card": "#ffffff",
+    "border": "#ddd6fe"
+   },
+   "note": "Community purple + join green"
+  },
+  {
+   "type": "Newsletter Platform",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0369a1",
+    "secondary": "#e7eff5",
+    "accent": "#ea580c",
+    "muted": "#e7eff5",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "Trust blue + subscribe orange"
+  },
+  {
+   "type": "Digital Products/Downloads",
+   "palette": {
+    "background": "#eef2ff",
+    "foreground": "#312e81",
+    "primary": "#6366f1",
+    "secondary": "#ebeff9",
+    "accent": "#16a34a",
+    "muted": "#ebeff9",
+    "card": "#ffffff",
+    "border": "#c7d2fe"
+   },
+   "note": "Digital indigo + buy green"
+  },
+  {
+   "type": "Church/Religious Organization",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#4c1d95",
+    "primary": "#7c3aed",
+    "secondary": "#eceef9",
+    "accent": "#a16207",
+    "muted": "#eceef9",
+    "card": "#ffffff",
+    "border": "#ddd6fe"
+   },
+   "note": "Spiritual purple + warm gold"
+  },
+  {
+   "type": "Sports Team/Club",
+   "palette": {
+    "background": "#fef2f2",
+    "foreground": "#7f1d1d",
+    "primary": "#dc2626",
+    "secondary": "#f0edf1",
+    "accent": "#dc2626",
+    "muted": "#f0edf1",
+    "card": "#ffffff",
+    "border": "#fecaca"
+   },
+   "note": "Team red + championship gold"
+  },
+  {
+   "type": "Museum/Gallery",
+   "palette": {
+    "background": "#fafafa",
+    "foreground": "#09090b",
+    "primary": "#18181b",
+    "secondary": "#e8ecf0",
+    "accent": "#18181b",
+    "muted": "#e8ecf0",
+    "card": "#ffffff",
+    "border": "#e4e4e7"
+   },
+   "note": "Gallery black + white space"
+  },
+  {
+   "type": "Theater/Cinema",
+   "palette": {
+    "background": "#0f0f23",
+    "foreground": "#f8fafc",
+    "primary": "#1e1b4b",
+    "secondary": "#27273b",
+    "accent": "#ca8a04",
+    "muted": "#27273b",
+    "card": "#1b1b30",
+    "border": "#4338ca"
+   },
+   "note": "Dramatic dark + spotlight gold"
+  },
+  {
+   "type": "Language Learning App",
+   "palette": {
+    "background": "#eef2ff",
+    "foreground": "#312e81",
+    "primary": "#4f46e5",
+    "secondary": "#ebeef8",
+    "accent": "#16a34a",
+    "muted": "#ebeef8",
+    "card": "#ffffff",
+    "border": "#c7d2fe"
+   },
+   "note": "Learning indigo + progress green"
+  },
+  {
+   "type": "Coding Bootcamp",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#22c55e",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Terminal dark + success green"
+  },
+  {
+   "type": "Cybersecurity Platform",
+   "palette": {
+    "background": "#000000",
+    "foreground": "#e0e0e0",
+    "primary": "#00ff41",
+    "secondary": "#181818",
+    "accent": "#ff3333",
+    "muted": "#181818",
+    "card": "#0c130e",
+    "border": "#1f1f1f"
+   },
+   "note": "Matrix green + alert red"
+  },
+  {
+   "type": "Developer Tool / IDE",
+   "palette": {
+    "background": "#0f172a",
+    "foreground": "#f8fafc",
+    "primary": "#1e293b",
+    "secondary": "#272f42",
+    "accent": "#22c55e",
+    "muted": "#272f42",
+    "card": "#1b2336",
+    "border": "#475569"
+   },
+   "note": "Code dark + run green"
+  },
+  {
+   "type": "Biotech / Life Sciences",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0ea5e9",
+    "secondary": "#e8f2f8",
+    "accent": "#059669",
+    "muted": "#e8f2f8",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "DNA blue + life green"
+  },
+  {
+   "type": "Space Tech / Aerospace",
+   "palette": {
+    "background": "#0b0b10",
+    "foreground": "#f8fafc",
+    "primary": "#f8fafc",
+    "secondary": "#232328",
+    "accent": "#3b82f6",
+    "muted": "#232328",
+    "card": "#1e1e23",
+    "border": "#1e293b"
+   },
+   "note": "Star white + launch blue"
+  },
+  {
+   "type": "Architecture / Interior",
+   "palette": {
+    "background": "#ffffff",
+    "foreground": "#171717",
+    "primary": "#171717",
+    "secondary": "#e8ecf0",
+    "accent": "#a16207",
+    "muted": "#e8ecf0",
+    "card": "#ffffff",
+    "border": "#e5e5e5"
+   },
+   "note": "Minimal black + accent gold"
+  },
+  {
+   "type": "Quantum Computing Interface",
+   "palette": {
+    "background": "#050510",
+    "foreground": "#e0e0ff",
+    "primary": "#00ffff",
+    "secondary": "#1d1d28",
+    "accent": "#ff00ff",
+    "muted": "#1d1d28",
+    "card": "#101823",
+    "border": "#333344"
+   },
+   "note": "Quantum cyan + interference purple"
+  },
+  {
+   "type": "Biohacking / Longevity App",
+   "palette": {
+    "background": "#f5f5f7",
+    "foreground": "#1c1c1e",
+    "primary": "#ff4d4d",
+    "secondary": "#f2eef2",
+    "accent": "#059669",
+    "muted": "#f2eef2",
+    "card": "#ffffff",
+    "border": "#e5e5ea"
+   },
+   "note": "Bio red/blue + vitality green"
+  },
+  {
+   "type": "Autonomous Drone Fleet Manager",
+   "palette": {
+    "background": "#0d1117",
+    "foreground": "#e6edf3",
+    "primary": "#00ff41",
+    "secondary": "#25292f",
+    "accent": "#ff3333",
+    "muted": "#25292f",
+    "card": "#182424",
+    "border": "#30363d"
+   },
+   "note": "Terminal green + alert red"
+  },
+  {
+   "type": "Generative Art Platform",
+   "palette": {
+    "background": "#fafafa",
+    "foreground": "#09090b",
+    "primary": "#18181b",
+    "secondary": "#e8ecf0",
+    "accent": "#ec4899",
+    "muted": "#e8ecf0",
+    "card": "#ffffff",
+    "border": "#e4e4e7"
+   },
+   "note": "Canvas neutral + creative pink"
+  },
+  {
+   "type": "Spatial Computing OS / App",
+   "palette": {
+    "background": "#888888",
+    "foreground": "#000000",
+    "primary": "#ffffff",
+    "secondary": "#e5e7eb",
+    "accent": "#ffffff",
+    "muted": "#e5e7eb",
+    "card": "#999999",
+    "border": "#cccccc"
+   },
+   "note": "Glass white + system blue"
+  },
+  {
+   "type": "Sustainable Energy / Climate Tech",
+   "palette": {
+    "background": "#ecfdf5",
+    "foreground": "#064e3b",
+    "primary": "#059669",
+    "secondary": "#e8f1f3",
+    "accent": "#059669",
+    "muted": "#e8f1f3",
+    "card": "#ffffff",
+    "border": "#a7f3d0"
+   },
+   "note": "Nature green + solar gold"
+  },
+  {
+   "type": "Chat & Messaging App",
+   "palette": {
+    "background": "#ffffff",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#059669",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Messenger blue + online green"
+  },
+  {
+   "type": "Notes & Writing App",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#78716c",
+    "secondary": "#f6f6f6",
+    "accent": "#d97706",
+    "muted": "#f6f6f6",
+    "card": "#ffffff",
+    "border": "#eeeded"
+   },
+   "note": "Warm ink + amber accent on cream"
+  },
+  {
+   "type": "Habit Tracker",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#d97706",
+    "secondary": "#fcf6f0",
+    "accent": "#059669",
+    "muted": "#fcf6f0",
+    "card": "#ffffff",
+    "border": "#faeee1"
+   },
+   "note": "Streak amber + habit green"
+  },
+  {
+   "type": "Food Delivery / On-Demand",
+   "palette": {
+    "background": "#fff7ed",
+    "foreground": "#0f172a",
+    "primary": "#ea580c",
+    "secondary": "#fdf4f0",
+    "accent": "#2563eb",
+    "muted": "#fdf4f0",
+    "card": "#ffffff",
+    "border": "#fceae1"
+   },
+   "note": "Appetizing orange + trust blue"
+  },
+  {
+   "type": "Recipe & Cooking App",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#9a3412",
+    "secondary": "#f8f2f0",
+    "accent": "#059669",
+    "muted": "#f8f2f0",
+    "card": "#ffffff",
+    "border": "#f2e6e2"
+   },
+   "note": "Warm terracotta + fresh green"
+  },
+  {
+   "type": "Meditation & Mindfulness",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#0f172a",
+    "primary": "#7c3aed",
+    "secondary": "#f7f3fd",
+    "accent": "#059669",
+    "muted": "#f7f3fd",
+    "card": "#ffffff",
+    "border": "#efe7fc"
+   },
+   "note": "Calm lavender + mindful green"
+  },
+  {
+   "type": "Weather App",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0f172a",
+    "primary": "#0284c7",
+    "secondary": "#eff7fb",
+    "accent": "#f59e0b",
+    "muted": "#eff7fb",
+    "card": "#ffffff",
+    "border": "#e0f0f8"
+   },
+   "note": "Sky blue + sun amber"
+  },
+  {
+   "type": "Diary & Journal App",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#92400e",
+    "secondary": "#f8f3f0",
+    "accent": "#6366f1",
+    "muted": "#f8f3f0",
+    "card": "#ffffff",
+    "border": "#f1e8e2"
+   },
+   "note": "Warm journal brown + ink violet"
+  },
+  {
+   "type": "CRM & Client Management",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#059669",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Professional blue + deal green"
+  },
+  {
+   "type": "Inventory & Stock Management",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#334155",
+    "secondary": "#f2f3f4",
+    "accent": "#059669",
+    "muted": "#f2f3f4",
+    "card": "#ffffff",
+    "border": "#e6e8ea"
+   },
+   "note": "Industrial slate + stock green"
+  },
+  {
+   "type": "Flashcard & Study Tool",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#0f172a",
+    "primary": "#7c3aed",
+    "secondary": "#f7f3fd",
+    "accent": "#059669",
+    "muted": "#f7f3fd",
+    "card": "#ffffff",
+    "border": "#efe7fc"
+   },
+   "note": "Study purple + correct green"
+  },
+  {
+   "type": "Booking & Appointment App",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0f172a",
+    "primary": "#0284c7",
+    "secondary": "#eff7fb",
+    "accent": "#059669",
+    "muted": "#eff7fb",
+    "card": "#ffffff",
+    "border": "#e0f0f8"
+   },
+   "note": "Calendar blue + available green"
+  },
+  {
+   "type": "Invoice & Billing Tool",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a5f",
+    "secondary": "#f1f3f5",
+    "accent": "#059669",
+    "muted": "#f1f3f5",
+    "card": "#ffffff",
+    "border": "#e4e7eb"
+   },
+   "note": "Navy professional + paid green"
+  },
+  {
+   "type": "Grocery & Shopping List",
+   "palette": {
+    "background": "#ecfdf5",
+    "foreground": "#0f172a",
+    "primary": "#059669",
+    "secondary": "#f0f8f6",
+    "accent": "#d97706",
+    "muted": "#f0f8f6",
+    "card": "#ffffff",
+    "border": "#e1f2ed"
+   },
+   "note": "Fresh green + food amber"
+  },
+  {
+   "type": "Parenting & Baby Tracker",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#0f172a",
+    "primary": "#ec4899",
+    "secondary": "#fdf4f8",
+    "accent": "#0284c7",
+    "muted": "#fdf4f8",
+    "card": "#ffffff",
+    "border": "#fce9f2"
+   },
+   "note": "Soft pink + trust blue"
+  },
+  {
+   "type": "Scanner & Document Manager",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e293b",
+    "secondary": "#f1f2f3",
+    "accent": "#2563eb",
+    "muted": "#f1f2f3",
+    "card": "#ffffff",
+    "border": "#e4e5e7"
+   },
+   "note": "Document grey + scan blue"
+  },
+  {
+   "type": "Calendar & Scheduling App",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#059669",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Calendar blue + event green"
+  },
+  {
+   "type": "Expense Splitter / Bill Split",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#059669",
+    "secondary": "#f0f8f6",
+    "accent": "#dc2626",
+    "muted": "#f0f8f6",
+    "card": "#ffffff",
+    "border": "#e1f2ed"
+   },
+   "note": "Balance green + owe red"
+  },
+  {
+   "type": "Voice Recorder & Memo",
+   "palette": {
+    "background": "#ffffff",
+    "foreground": "#0f172a",
+    "primary": "#dc2626",
+    "secondary": "#fcf1f1",
+    "accent": "#2563eb",
+    "muted": "#fcf1f1",
+    "card": "#ffffff",
+    "border": "#fae4e4"
+   },
+   "note": "Recording red + waveform blue"
+  },
+  {
+   "type": "Bookmark & Read-Later",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#d97706",
+    "secondary": "#fcf6f0",
+    "accent": "#2563eb",
+    "muted": "#fcf6f0",
+    "card": "#ffffff",
+    "border": "#faeee1"
+   },
+   "note": "Warm amber + link blue"
+  },
+  {
+   "type": "Translator App",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#ea580c",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Global blue + teal + accent orange"
+  },
+  {
+   "type": "File Manager & Transfer",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#d97706",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Folder blue + file amber"
+  },
+  {
+   "type": "Email Client",
+   "palette": {
+    "background": "#ffffff",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#dc2626",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Inbox blue + priority red"
+  },
+  {
+   "type": "Casual Puzzle Game",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#0f172a",
+    "primary": "#ec4899",
+    "secondary": "#fdf4f8",
+    "accent": "#f59e0b",
+    "muted": "#fdf4f8",
+    "card": "#ffffff",
+    "border": "#fce9f2"
+   },
+   "note": "Cheerful pink + reward gold"
+  },
+  {
+   "type": "Trivia & Quiz Game",
+   "palette": {
+    "background": "#eff6ff",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#f59e0b",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Quiz blue + gold leaderboard"
+  },
+  {
+   "type": "Idle & Clicker Game",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#d97706",
+    "secondary": "#fcf6f0",
+    "accent": "#7c3aed",
+    "muted": "#fcf6f0",
+    "card": "#ffffff",
+    "border": "#faeee1"
+   },
+   "note": "Coin gold + prestige purple"
+  },
+  {
+   "type": "Word & Crossword Game",
+   "palette": {
+    "background": "#ffffff",
+    "foreground": "#0f172a",
+    "primary": "#15803d",
+    "secondary": "#f0f7f3",
+    "accent": "#d97706",
+    "muted": "#f0f7f3",
+    "card": "#ffffff",
+    "border": "#e2efe7"
+   },
+   "note": "Word green + letter amber"
+  },
+  {
+   "type": "Meme & Sticker Maker",
+   "palette": {
+    "background": "#ffffff",
+    "foreground": "#0f172a",
+    "primary": "#ec4899",
+    "secondary": "#fdf4f8",
+    "accent": "#2563eb",
+    "muted": "#fdf4f8",
+    "card": "#ffffff",
+    "border": "#fce9f2"
+   },
+   "note": "Viral pink + comedy yellow + share blue"
+  },
+  {
+   "type": "AI Photo & Avatar Generator",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#0f172a",
+    "primary": "#7c3aed",
+    "secondary": "#f7f3fd",
+    "accent": "#ec4899",
+    "muted": "#f7f3fd",
+    "card": "#ffffff",
+    "border": "#efe7fc"
+   },
+   "note": "AI purple + generation pink"
+  },
+  {
+   "type": "Link-in-Bio Page Builder",
+   "palette": {
+    "background": "#ffffff",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#ec4899",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Brand blue + creator purple"
+  },
+  {
+   "type": "Wardrobe & Outfit Planner",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#0f172a",
+    "primary": "#be185d",
+    "secondary": "#fbf1f5",
+    "accent": "#d97706",
+    "muted": "#fbf1f5",
+    "card": "#ffffff",
+    "border": "#f7e3eb"
+   },
+   "note": "Fashion rose + gold accent"
+  },
+  {
+   "type": "Plant Care Tracker",
+   "palette": {
+    "background": "#f0fdf4",
+    "foreground": "#0f172a",
+    "primary": "#15803d",
+    "secondary": "#f0f7f3",
+    "accent": "#d97706",
+    "muted": "#f0f7f3",
+    "card": "#ffffff",
+    "border": "#e2efe7"
+   },
+   "note": "Nature green + sun yellow"
+  },
+  {
+   "type": "Book & Reading Tracker",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#78716c",
+    "secondary": "#f6f6f6",
+    "accent": "#d97706",
+    "muted": "#f6f6f6",
+    "card": "#ffffff",
+    "border": "#eeeded"
+   },
+   "note": "Book brown + page amber"
+  },
+  {
+   "type": "Couple & Relationship App",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#0f172a",
+    "primary": "#be185d",
+    "secondary": "#fbf1f5",
+    "accent": "#dc2626",
+    "muted": "#fbf1f5",
+    "card": "#ffffff",
+    "border": "#f7e3eb"
+   },
+   "note": "Romance rose + love red"
+  },
+  {
+   "type": "Family Calendar & Chores",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#d97706",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Family blue + chore green"
+  },
+  {
+   "type": "Mood Tracker",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#0f172a",
+    "primary": "#7c3aed",
+    "secondary": "#f7f3fd",
+    "accent": "#d97706",
+    "muted": "#f7f3fd",
+    "card": "#ffffff",
+    "border": "#efe7fc"
+   },
+   "note": "Mood purple + insight amber"
+  },
+  {
+   "type": "Gift & Wishlist",
+   "palette": {
+    "background": "#fff1f2",
+    "foreground": "#0f172a",
+    "primary": "#dc2626",
+    "secondary": "#fcf1f1",
+    "accent": "#ec4899",
+    "muted": "#fcf1f1",
+    "card": "#ffffff",
+    "border": "#fae4e4"
+   },
+   "note": "Gift red + gold + surprise pink"
+  },
+  {
+   "type": "Yoga & Stretching Guide",
+   "palette": {
+    "background": "#f5f5f0",
+    "foreground": "#0f172a",
+    "primary": "#6b7280",
+    "secondary": "#f6f6f7",
+    "accent": "#0891b2",
+    "muted": "#f6f6f7",
+    "card": "#ffffff",
+    "border": "#edeeef"
+   },
+   "note": "Sage neutral + calm teal"
+  },
+  {
+   "type": "Calorie & Nutrition Counter",
+   "palette": {
+    "background": "#ecfdf5",
+    "foreground": "#0f172a",
+    "primary": "#059669",
+    "secondary": "#f0f8f6",
+    "accent": "#ea580c",
+    "muted": "#f0f8f6",
+    "card": "#ffffff",
+    "border": "#e1f2ed"
+   },
+   "note": "Healthy green + macro orange"
+  },
+  {
+   "type": "Period & Cycle Tracker",
+   "palette": {
+    "background": "#fdf2f8",
+    "foreground": "#0f172a",
+    "primary": "#be185d",
+    "secondary": "#fbf1f5",
+    "accent": "#7c3aed",
+    "muted": "#fbf1f5",
+    "card": "#ffffff",
+    "border": "#f7e3eb"
+   },
+   "note": "Blush rose + fertility lavender"
+  },
+  {
+   "type": "Medication & Pill Reminder",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0f172a",
+    "primary": "#0284c7",
+    "secondary": "#eff7fb",
+    "accent": "#dc2626",
+    "muted": "#eff7fb",
+    "card": "#ffffff",
+    "border": "#e0f0f8"
+   },
+   "note": "Medical blue + alert red"
+  },
+  {
+   "type": "Water & Hydration Reminder",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0f172a",
+    "primary": "#0284c7",
+    "secondary": "#eff7fb",
+    "accent": "#0891b2",
+    "muted": "#eff7fb",
+    "card": "#ffffff",
+    "border": "#e0f0f8"
+   },
+   "note": "Refreshing blue + water cyan"
+  },
+  {
+   "type": "Local Events & Discovery",
+   "palette": {
+    "background": "#fff7ed",
+    "foreground": "#0f172a",
+    "primary": "#ea580c",
+    "secondary": "#fdf4f0",
+    "accent": "#2563eb",
+    "muted": "#fdf4f0",
+    "card": "#ffffff",
+    "border": "#fceae1"
+   },
+   "note": "Event orange + map blue"
+  },
+  {
+   "type": "Study Together / Virtual Coworking",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#059669",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Focus blue + session green"
+  },
+  {
+   "type": "Kids Learning (ABC & Math)",
+   "palette": {
+    "background": "#eff6ff",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#ec4899",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Learning blue + play yellow + fun pink"
+  },
+  {
+   "type": "Music Instrument Learning",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#dc2626",
+    "secondary": "#fcf1f1",
+    "accent": "#d97706",
+    "muted": "#fcf1f1",
+    "card": "#ffffff",
+    "border": "#fae4e4"
+   },
+   "note": "Musical red + warm amber"
+  },
+  {
+   "type": "Parking Finder",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#dc2626",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Available blue/green + occupied red"
+  },
+  {
+   "type": "Public Transit Guide",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#ea580c",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Transit blue + line colors"
+  },
+  {
+   "type": "Road Trip Planner",
+   "palette": {
+    "background": "#fff7ed",
+    "foreground": "#0f172a",
+    "primary": "#ea580c",
+    "secondary": "#fdf4f0",
+    "accent": "#d97706",
+    "muted": "#fdf4f0",
+    "card": "#ffffff",
+    "border": "#fceae1"
+   },
+   "note": "Adventure orange + map teal"
+  },
+  {
+   "type": "Emergency SOS & Safety",
+   "palette": {
+    "background": "#fff1f2",
+    "foreground": "#0f172a",
+    "primary": "#dc2626",
+    "secondary": "#fcf1f1",
+    "accent": "#2563eb",
+    "muted": "#fcf1f1",
+    "card": "#ffffff",
+    "border": "#fae4e4"
+   },
+   "note": "Alert red + safety blue"
+  },
+  {
+   "type": "Wallpaper & Theme App",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#0f172a",
+    "primary": "#7c3aed",
+    "secondary": "#f7f3fd",
+    "accent": "#2563eb",
+    "muted": "#f7f3fd",
+    "card": "#ffffff",
+    "border": "#efe7fc"
+   },
+   "note": "Aesthetic purple + trending pink"
+  },
+  {
+   "type": "Home Decoration & Interior Design",
+   "palette": {
+    "background": "#faf5f2",
+    "foreground": "#0f172a",
+    "primary": "#78716c",
+    "secondary": "#f6f6f6",
+    "accent": "#d97706",
+    "muted": "#f6f6f6",
+    "card": "#ffffff",
+    "border": "#eeeded"
+   },
+   "note": "Interior warm grey + gold accent"
+  },
+  {
+   "type": "Academic Journal / Scholarly Publishing",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a5f",
+    "secondary": "#e9eef5",
+    "accent": "#b45309",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#cbd5e1"
+   },
+   "note": "Scholarly navy + citation gold + serif accent"
+  },
+  {
+   "type": "API Developer Portal",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#22c55e",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Code dark + endpoint green + syntax colors"
+  },
+  {
+   "type": "Forum / Discussion Board",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e293b",
+    "primary": "#475569",
+    "secondary": "#eaeff3",
+    "accent": "#2563eb",
+    "muted": "#eaeff3",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Neutral grey + topic accent + unread indicator"
+  },
+  {
+   "type": "Directory / Listing Site",
+   "palette": {
+    "background": "#ecfdf5",
+    "foreground": "#064e3b",
+    "primary": "#059669",
+    "secondary": "#e8f1f3",
+    "accent": "#d97706",
+    "muted": "#e8f1f3",
+    "card": "#ffffff",
+    "border": "#a7f3d0"
+   },
+   "note": "Category green + verified badge + map accent"
+  },
+  {
+   "type": "Status Page / Incident Management",
+   "palette": {
+    "background": "#f0fdf4",
+    "foreground": "#14532d",
+    "primary": "#16a34a",
+    "secondary": "#e8f0f1",
+    "accent": "#dc2626",
+    "muted": "#e8f0f1",
+    "card": "#ffffff",
+    "border": "#bbf7d0"
+   },
+   "note": "Operational green + incident red + maintenance amber"
+  },
+  {
+   "type": "Wiki / Encyclopedia",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e40af",
+    "primary": "#1e3a8a",
+    "secondary": "#e9eef5",
+    "accent": "#7c3aed",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#bfdbfe"
+   },
+   "note": "Knowledge blue + link purple + clean white"
+  },
+  {
+   "type": "Auction Platform",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#16a34a",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Dark luxury + bid green + outbid red + urgency"
+  },
+  {
+   "type": "Changelog / Release Notes",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e293b",
+    "primary": "#475569",
+    "secondary": "#eaeff3",
+    "accent": "#059669",
+    "muted": "#eaeff3",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Feature green + fix blue + breaking red badges"
+  },
+  {
+   "type": "Citizen Science Platform",
+   "palette": {
+    "background": "#f0fdf4",
+    "foreground": "#14532d",
+    "primary": "#15803d",
+    "secondary": "#e8f0f1",
+    "accent": "#d97706",
+    "muted": "#e8f0f1",
+    "card": "#ffffff",
+    "border": "#bbf7d0"
+   },
+   "note": "Discovery green + volunteer badge + data neutral"
+  },
+  {
+   "type": "Classifieds / Buy-Sell",
+   "palette": {
+    "background": "#eff6ff",
+    "foreground": "#1e40af",
+    "primary": "#2563eb",
+    "secondary": "#e9eff8",
+    "accent": "#16a34a",
+    "muted": "#e9eff8",
+    "card": "#ffffff",
+    "border": "#bfdbfe"
+   },
+   "note": "Listing blue + price green + seller badge"
+  },
+  {
+   "type": "Conference / Symposium Landing Page",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a5f",
+    "secondary": "#e9eef5",
+    "accent": "#a16207",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#cbd5e1"
+   },
+   "note": "Academic navy + gold keynote + track chips"
+  },
+  {
+   "type": "Crowdfunding Platform",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#d97706",
+    "secondary": "#fcf6f0",
+    "accent": "#16a34a",
+    "muted": "#fcf6f0",
+    "card": "#ffffff",
+    "border": "#faeee1"
+   },
+   "note": "Funding progress amber + goal green + urgency"
+  },
+  {
+   "type": "Digital Signage / Kiosk",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#ef4444",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "High contrast dark + brand accent + large touch targets"
+  },
+  {
+   "type": "E-signature / Document Workflow",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a5f",
+    "secondary": "#e9eef5",
+    "accent": "#16a34a",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#cbd5e1"
+   },
+   "note": "Trust navy + signature green + audit trail"
+  },
+  {
+   "type": "Feature Flag / Config Management",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#16a34a",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Enabled green + disabled grey + experimental amber"
+  },
+  {
+   "type": "Government Portal / Civic Services",
+   "palette": {
+    "background": "#eff6ff",
+    "foreground": "#1e3a8a",
+    "primary": "#1e40af",
+    "secondary": "#e9eff5",
+    "accent": "#16a34a",
+    "muted": "#e9eff5",
+    "card": "#ffffff",
+    "border": "#bfdbfe"
+   },
+   "note": "Professional blue + service green + accessibility"
+  },
+  {
+   "type": "Grant / Funding Portal",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a5f",
+    "secondary": "#e9eef5",
+    "accent": "#16a34a",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#cbd5e1"
+   },
+   "note": "Institution navy + funding green + deadline urgency"
+  },
+  {
+   "type": "LMS (Learning Management System)",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0d9488",
+    "secondary": "#e8f1f4",
+    "accent": "#d97706",
+    "muted": "#e8f1f4",
+    "card": "#ffffff",
+    "border": "#5eead4"
+   },
+   "note": "Education teal + course amber + grade green"
+  },
+  {
+   "type": "No-code / Low-code Builder",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#4c1d95",
+    "primary": "#7c3aed",
+    "secondary": "#eceef9",
+    "accent": "#ec4899",
+    "muted": "#eceef9",
+    "card": "#ffffff",
+    "border": "#ddd6fe"
+   },
+   "note": "Builder purple + component pink + canvas neutral"
+  },
+  {
+   "type": "Open Source Project Landing",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#a16207",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Dark code + star gold + fork silver + sponsor purple"
+  },
+  {
+   "type": "Patient Portal / Health Records",
+   "palette": {
+    "background": "#f0f9ff",
+    "foreground": "#0c4a6e",
+    "primary": "#0284c7",
+    "secondary": "#e8f2f8",
+    "accent": "#16a34a",
+    "muted": "#e8f2f8",
+    "card": "#ffffff",
+    "border": "#bae6fd"
+   },
+   "note": "Clinical blue + health green + alert red"
+  },
+  {
+   "type": "Patent / IP Database",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#1e293b",
+    "primary": "#475569",
+    "secondary": "#eaeff3",
+    "accent": "#a16207",
+    "muted": "#eaeff3",
+    "card": "#ffffff",
+    "border": "#e2e8f0"
+   },
+   "note": "Formal neutral + patent type chips + status badges"
+  },
+  {
+   "type": "Q&A Community Platform",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#2563eb",
+    "secondary": "#f1f5fd",
+    "accent": "#d97706",
+    "muted": "#f1f5fd",
+    "card": "#ffffff",
+    "border": "#e4ecfc"
+   },
+   "note": "Knowledge blue + accepted green + reputation gold"
+  },
+  {
+   "type": "Research Lab / University Department",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a5f",
+    "secondary": "#e9eef5",
+    "accent": "#a16207",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#cbd5e1"
+   },
+   "note": "Institutional navy + research accent + serif headings"
+  },
+  {
+   "type": "Resume / CV Builder",
+   "palette": {
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "primary": "#1e3a5f",
+    "secondary": "#e9eef5",
+    "accent": "#16a34a",
+    "muted": "#e9eef5",
+    "card": "#ffffff",
+    "border": "#cbd5e1"
+   },
+   "note": "Professional navy + section accent + success green"
+  },
+  {
+   "type": "Review Platform",
+   "palette": {
+    "background": "#fffbeb",
+    "foreground": "#0f172a",
+    "primary": "#f59e0b",
+    "secondary": "#fcf6f0",
+    "accent": "#16a34a",
+    "muted": "#fcf6f0",
+    "card": "#ffffff",
+    "border": "#faeee1"
+   },
+   "note": "Star gold + positive green + negative red"
+  },
+  {
+   "type": "RPA / Automation Dashboard",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#16a34a",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Dark terminal + running green + failed red + queued amber"
+  },
+  {
+   "type": "Survey / Form Builder",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0d9488",
+    "secondary": "#e8f1f4",
+    "accent": "#d97706",
+    "muted": "#e8f1f4",
+    "card": "#ffffff",
+    "border": "#5eead4"
+   },
+   "note": "Question teal + progress green + submit blue"
+  },
+  {
+   "type": "Telemedicine Platform",
+   "palette": {
+    "background": "#f0fdfa",
+    "foreground": "#134e4a",
+    "primary": "#0891b2",
+    "secondary": "#e8f1f6",
+    "accent": "#16a34a",
+    "muted": "#e8f1f6",
+    "card": "#ffffff",
+    "border": "#ccfbf1"
+   },
+   "note": "Medical teal + video green + waiting amber"
+  },
+  {
+   "type": "Testimonial & Social Proof Widget",
+   "palette": {
+    "background": "#faf5ff",
+    "foreground": "#4c1d95",
+    "primary": "#7c3aed",
+    "secondary": "#eceef9",
+    "accent": "#f59e0b",
+    "muted": "#eceef9",
+    "card": "#ffffff",
+    "border": "#ddd6fe"
+   },
+   "note": "Trust purple + quote gold + verified blue"
+  },
+  {
+   "type": "Ticketing / Box Office",
+   "palette": {
+    "background": "#020617",
+    "foreground": "#f8fafc",
+    "primary": "#0f172a",
+    "secondary": "#1a1e2f",
+    "accent": "#16a34a",
+    "muted": "#1a1e2f",
+    "card": "#0e1223",
+    "border": "#334155"
+   },
+   "note": "Event theme colors + available green + sold-out red"
+  }
+ ],
+ "fonts": [
+  {
+   "name": "Classic Elegant",
+   "display": "Playfair Display",
+   "body": "Inter",
+   "mood": "elegant, luxury, sophisticated, timeless, premium, editorial",
+   "best_for": "Luxury brands, fashion, spa, beauty, editorial, magazines, high-end e-commerce"
+  },
+  {
+   "name": "Modern Professional",
+   "display": "Poppins",
+   "body": "Open Sans",
+   "mood": "modern, professional, clean, corporate, friendly, approachable",
+   "best_for": "SaaS, corporate sites, business apps, startups, professional services"
+  },
+  {
+   "name": "Tech Startup",
+   "display": "Space Grotesk",
+   "body": "DM Sans",
+   "mood": "tech, startup, modern, innovative, bold, futuristic",
+   "best_for": "Tech companies, startups, SaaS, developer tools, AI products"
+  },
+  {
+   "name": "Editorial Classic",
+   "display": "Cormorant Garamond",
+   "body": "Libre Baskerville",
+   "mood": "editorial, classic, literary, traditional, refined, bookish",
+   "best_for": "Publishing, blogs, news sites, literary magazines, book covers"
+  },
+  {
+   "name": "Minimal Swiss",
+   "display": "Inter",
+   "body": "Inter",
+   "mood": "minimal, clean, swiss, functional, neutral, professional",
+   "best_for": "Dashboards, admin panels, documentation, enterprise apps, design systems"
+  },
+  {
+   "name": "Playful Creative",
+   "display": "Fredoka",
+   "body": "Nunito",
+   "mood": "playful, friendly, fun, creative, warm, approachable",
+   "best_for": "Children's apps, educational, gaming, creative tools, entertainment"
+  },
+  {
+   "name": "Bold Statement",
+   "display": "Bebas Neue",
+   "body": "Source Sans 3",
+   "mood": "bold, impactful, strong, dramatic, modern, headlines",
+   "best_for": "Marketing sites, portfolios, agencies, event pages, sports"
+  },
+  {
+   "name": "Wellness Calm",
+   "display": "Lora",
+   "body": "Raleway",
+   "mood": "calm, wellness, health, relaxing, natural, organic",
+   "best_for": "Health apps, wellness, spa, meditation, yoga, organic brands"
+  },
+  {
+   "name": "Developer Mono",
+   "display": "JetBrains Mono",
+   "body": "IBM Plex Sans",
+   "mood": "code, developer, technical, precise, functional, hacker",
+   "best_for": "Developer tools, documentation, code editors, tech blogs, CLI apps"
+  },
+  {
+   "name": "Retro Vintage",
+   "display": "Abril Fatface",
+   "body": "Merriweather",
+   "mood": "retro, vintage, nostalgic, dramatic, decorative, bold",
+   "best_for": "Vintage brands, breweries, restaurants, creative portfolios, posters"
+  },
+  {
+   "name": "Geometric Modern",
+   "display": "Outfit",
+   "body": "Work Sans",
+   "mood": "geometric, modern, clean, balanced, contemporary, versatile",
+   "best_for": "General purpose, portfolios, agencies, modern brands, landing pages"
+  },
+  {
+   "name": "Luxury Serif",
+   "display": "Cormorant",
+   "body": "Montserrat",
+   "mood": "luxury, high-end, fashion, elegant, refined, premium",
+   "best_for": "Fashion brands, luxury e-commerce, jewelry, high-end services"
+  },
+  {
+   "name": "Friendly SaaS",
+   "display": "Plus Jakarta Sans",
+   "body": "Plus Jakarta Sans",
+   "mood": "friendly, modern, saas, clean, approachable, professional",
+   "best_for": "SaaS products, web apps, dashboards, B2B, productivity tools"
+  },
+  {
+   "name": "News Editorial",
+   "display": "Newsreader",
+   "body": "Roboto",
+   "mood": "news, editorial, journalism, trustworthy, readable, informative",
+   "best_for": "News sites, blogs, magazines, journalism, content-heavy sites"
+  },
+  {
+   "name": "Handwritten Charm",
+   "display": "Caveat",
+   "body": "Quicksand",
+   "mood": "handwritten, personal, friendly, casual, warm, charming",
+   "best_for": "Personal blogs, invitations, creative portfolios, lifestyle brands"
+  },
+  {
+   "name": "Corporate Trust",
+   "display": "Lexend",
+   "body": "Source Sans 3",
+   "mood": "corporate, trustworthy, accessible, readable, professional, clean",
+   "best_for": "Enterprise, government, healthcare, finance, accessibility-focused"
+  },
+  {
+   "name": "Brutalist Raw",
+   "display": "Space Mono",
+   "body": "Space Mono",
+   "mood": "brutalist, raw, technical, monospace, minimal, stark",
+   "best_for": "Brutalist designs, developer portfolios, experimental, tech art"
+  },
+  {
+   "name": "Fashion Forward",
+   "display": "Syne",
+   "body": "Manrope",
+   "mood": "fashion, avant-garde, creative, bold, artistic, edgy",
+   "best_for": "Fashion brands, creative agencies, art galleries, design studios"
+  },
+  {
+   "name": "Soft Rounded",
+   "display": "Varela Round",
+   "body": "Nunito Sans",
+   "mood": "soft, rounded, friendly, approachable, warm, gentle",
+   "best_for": "Children's products, pet apps, friendly brands, wellness, soft UI"
+  },
+  {
+   "name": "Premium Sans (DM Sans)",
+   "display": "DM Sans",
+   "body": "DM Sans",
+   "mood": "premium, modern, clean, sophisticated, versatile, balanced",
+   "best_for": "Premium brands, modern agencies, SaaS, portfolios, startups"
+  },
+  {
+   "name": "Vietnamese Friendly",
+   "display": "Be Vietnam Pro",
+   "body": "Noto Sans",
+   "mood": "vietnamese, international, readable, clean, multilingual, accessible",
+   "best_for": "Vietnamese sites, multilingual apps, international products"
+  },
+  {
+   "name": "Legal Professional",
+   "display": "EB Garamond",
+   "body": "Lato",
+   "mood": "legal, professional, traditional, trustworthy, formal, authoritative",
+   "best_for": "Law firms, legal services, contracts, formal documents, government"
+  },
+  {
+   "name": "Medical Clean",
+   "display": "Figtree",
+   "body": "Noto Sans",
+   "mood": "medical, clean, accessible, professional, healthcare, trustworthy",
+   "best_for": "Healthcare, medical clinics, pharma, health apps, accessibility"
+  },
+  {
+   "name": "Financial Trust",
+   "display": "IBM Plex Sans",
+   "body": "IBM Plex Sans",
+   "mood": "financial, trustworthy, professional, corporate, banking, serious",
+   "best_for": "Banks, finance, insurance, investment, fintech, enterprise"
+  },
+  {
+   "name": "Startup Bold (Outfit + Rubik)",
+   "display": "Outfit",
+   "body": "Rubik",
+   "mood": "startup, bold, modern, innovative, confident, dynamic",
+   "best_for": "Startups, pitch decks, product launches, bold brands"
+  },
+  {
+   "name": "E-commerce Clean",
+   "display": "Rubik",
+   "body": "Nunito Sans",
+   "mood": "ecommerce, clean, shopping, product, retail, conversion",
+   "best_for": "E-commerce, online stores, product pages, retail, shopping"
+  },
+  {
+   "name": "Academic/Research",
+   "display": "Crimson Pro",
+   "body": "Atkinson Hyperlegible",
+   "mood": "academic, research, scholarly, accessible, readable, educational",
+   "best_for": "Universities, research papers, academic journals, educational"
+  },
+  {
+   "name": "Minimalist Portfolio",
+   "display": "Archivo",
+   "body": "Space Grotesk",
+   "mood": "minimal, portfolio, designer, creative, clean, artistic",
+   "best_for": "Design portfolios, creative professionals, minimalist brands"
+  },
+  {
+   "name": "Accessibility First",
+   "display": "Atkinson Hyperlegible",
+   "body": "Atkinson Hyperlegible",
+   "mood": "accessible, readable, inclusive, WCAG, dyslexia-friendly, clear",
+   "best_for": "Accessibility-critical sites, government, healthcare, inclusive design"
+  },
+  {
+   "name": "Spatial Clear",
+   "display": "Inter",
+   "body": "Inter",
+   "mood": "spatial, legible, glass, system, clean, neutral",
+   "best_for": "Spatial computing, AR/VR, glassmorphism interfaces"
+  },
+  {
+   "name": "Bauhaus Geometric",
+   "display": "Outfit",
+   "body": "Outfit",
+   "mood": "bauhaus, geometric, constructivist, bold, uppercase, architectural, mechanical, poster, tactile",
+   "best_for": "Bauhaus mobile apps, bold editorial mobile, design-forward branding apps, art/culture platforms"
+  },
+  {
+   "name": "Modern Dark Cinema (Inter System)",
+   "display": "Inter",
+   "body": "Inter",
+   "mood": "dark, cinematic, technical, precision, clean, premium, developer, professional, high-end utility",
+   "best_for": "Developer tools, fintech/trading, AI dashboards, streaming platforms, high-end productivity apps"
+  },
+  {
+   "name": "Terminal CLI Monospace",
+   "display": "JetBrains Mono",
+   "body": "JetBrains Mono",
+   "mood": "terminal, cli, hacker, monospace, matrix, developer, retro-future, command line, precision, OLED",
+   "best_for": "Developer tools, Web3/blockchain apps, hacker aesthetic, sci-fi games, ARG, security tools, geek-culture portfolios"
+  },
+  {
+   "name": "Kinetic Brutalism (Space Grotesk)",
+   "display": "Space Grotesk",
+   "body": "Space Grotesk",
+   "mood": "kinetic, brutalist, aggressive, uppercase, oversized, display, motion, street, bold, high-energy, zine",
+   "best_for": "Music/culture apps, sports platforms, brand flagship mobile, performance dashboards, underground product drops"
+  },
+  {
+   "name": "Flat Design Mobile (System Bold)",
+   "display": "Inter",
+   "body": "Inter",
+   "mood": "flat, clean, system, bold, geometric, cross-platform, icon, poster, minimal, functional, responsive",
+   "best_for": "Cross-platform apps, dashboards, system UI, onboarding, marketing pages, informational apps, icon-heavy interfaces"
+  },
+  {
+   "name": "Material You MD3 (Roboto System)",
+   "display": "Roboto",
+   "body": "Roboto",
+   "mood": "material design 3, md3, android, google, tonal, friendly, rounded, accessible, adaptive",
+   "best_for": "Android apps, cross-platform tools, productivity software, data-heavy B2B dashboards, enterprise mobile"
+  },
+  {
+   "name": "Neo Brutalism Mobile (Space Grotesk Bold)",
+   "display": "Space Grotesk",
+   "body": "Space Grotesk",
+   "mood": "neo brutalism, pop art, loud, bold, heavy, stickers, mechanical, high contrast, cream, gen-z",
+   "best_for": "Creative tools, Gen-Z marketing, e-commerce for youth culture, content portfolios, collage-style apps"
+  },
+  {
+   "name": "Bold Typography Mobile (Inter Poster)",
+   "display": "Inter",
+   "body": "Playfair Display",
+   "mood": "bold typography, editorial, poster, near-black, vermillion, luxury, type-as-hero, manifesto, high-contrast",
+   "best_for": "Creative brand flagships, reading platforms, event apps, flash pages, luxury mobile experiences"
+  },
+  {
+   "name": "Academia Mobile (Cormorant + Crimson + Cinzel)",
+   "display": "Cormorant Garamond",
+   "body": "Crimson Pro",
+   "mood": "academia, library, mahogany, parchment, brass, scholarly, prestige, antique, victorian, leather",
+   "best_for": "Knowledge management apps, scholarly reading tools, personal brand portfolios, RPG games, cultural community platforms"
+  },
+  {
+   "name": "Web3 Bitcoin DeFi (Space Grotesk + Inter + Mono)",
+   "display": "Space Grotesk",
+   "body": "Inter",
+   "mood": "web3, bitcoin, defi, digital gold, fintech, crypto, trustless, luminescent, precision, dark",
+   "best_for": "DeFi protocols and wallets, NFT platforms, metaverse social apps, high-tech brand landing pages"
+  },
+  {
+   "name": "Claymorphism Mobile (Nunito + DM Sans)",
+   "display": "Nunito",
+   "body": "DM Sans",
+   "mood": "claymorphism, clay, rounded, playful, candy, bubbly, soft, 3d, children, education, tactile, spring, nunito, dm sans",
+   "best_for": "Children education apps, teen social, brand mascot apps, creative tools, fintech gamification"
+  },
+  {
+   "name": "Enterprise SaaS Mobile (Plus Jakarta Sans)",
+   "display": "Plus Jakarta Sans",
+   "body": "Plus Jakarta Sans",
+   "mood": "enterprise, saas, b2b, professional, indigo, modern, approachable, legible, ios dynamic type, android scaling",
+   "best_for": "B2B SaaS apps, productivity tools, government and finance mobile apps, admin dashboards, enterprise onboarding"
+  },
+  {
+   "name": "Neumorphism Mobile (Plus Jakarta Sans + System)",
+   "display": "Plus Jakarta Sans",
+   "body": "Plus Jakarta Sans",
+   "mood": "neumorphism, soft ui, monochromatic, cool grey, minimal, physical, depth, ceramic, system font, utility",
+   "best_for": "Smart home controls, minimal tools, aesthetic dashboards, health monitors, brand showcase pages"
+  }
+ ]
+}
