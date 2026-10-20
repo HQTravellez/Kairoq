@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="/create.css?v=20261105">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261025">
+<link rel="stylesheet" href="/chat-box.css?v=2">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -419,7 +420,7 @@
           </div>
         </details>
         <details class="menu up pick" id="menu-mode">
-          <summary aria-label="Mode"><span id="mode-label">Build</span></summary>
+          <summary aria-label="Mode"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg><span id="mode-label">Build</span></summary>
           <div class="menu-panel" role="menu">
             <p class="menu-note">How Kairoq should work on your next message</p>
             <button type="button" id="mode-build" aria-pressed="true"><b>Build</b><span>Makes the change now and tests it in a browser</span></button>
@@ -428,7 +429,7 @@
           </div>
         </details>
         <details class="menu up pick" id="menu-tier">
-          <summary aria-label="Model"><span id="tier-label">Standard</span></summary>
+          <summary aria-label="Model"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span id="tier-label">Standard</span></summary>
           <div class="menu-panel" role="menu" id="tier-panel"></div>
         </details>
         <select id="tier" aria-label="Model" hidden></select>
@@ -1165,6 +1166,6 @@
   </form>
 </dialog>
 
-<script src="/create.js?v=20261104"></script>
+<script src="/create.js?v=20261106"></script>
 </body>
 </html>
