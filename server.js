@@ -6613,7 +6613,7 @@ async function streamAppAi(body,onToken,onFirst){
 // in parallel, models per tier, the fast lane for small edits and live progress (it needs
 // KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true to write whole apps).
 // OpenCode as the build engine (opencode-engine.js) counts its model calls against the same budget.
-require("./opencode-engine").configure({enforceBudget,recordUsage:u=>recordUsage(u,{purpose:"developer-build",model:u.model,provider:"opencode"})});
+require("./opencode-engine").configure({enforceBudget,recordUsage:u=>recordUsage(u,{purpose:"developer-build",model:u.model,provider:"opencode"}),checkUrl:"http://127.0.0.1:"+PORT+"/internal/opencode-check"});
 function builderProvider(){
   const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
   if(chosen==="openrouter"&&process.env.OPENROUTER_API_KEY)return"openrouter";
@@ -6765,6 +6765,13 @@ const server = http.createServer(async (req, res) => {
   if(typeof hostRoute==="string"){if(!await reactBackend.handle(req,res,{onlyProject:hostRoute.slice(8)})){res.writeHead(404);res.end();}return;}
   if(hostRoute)return;
   if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
+  // OpenCode's kairoq_check tool (opencode-engine.js): this machine only, with the change's secret.
+  if(url==="/internal/opencode-check"&&req.method==="POST"){
+    const local=["127.0.0.1","::1","::ffff:127.0.0.1"].includes(req.socket.remoteAddress);
+    if(!local)return json(res,404,{error:"Not found"});
+    try{const report=await require("./opencode-engine").runCheck(String(req.headers.authorization||"").replace(/^Bearer\s+/i,""));return json(res,200,{report})}
+    catch(e){return json(res,e.status||500,{error:String(e.message||e).slice(0,500)})}
+  }
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
   // MCP server for AI assistants (API-key authenticated; see kairoq-mcp.js).
   if(url==="/mcp"||url.startsWith("/mcp?"))return void await require("./kairoq-mcp").handle(req,res,{callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null}).catch(e=>{if(!res.headersSent)json(res,500,{error:String(e.message||e).slice(0,300)})});

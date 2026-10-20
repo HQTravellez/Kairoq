@@ -623,6 +623,14 @@
       <p class="muted small">Posts for Instagram, Google, WhatsApp, Facebook and LinkedIn, an email to your customers and a QR poster for your counter or window, written from what your live pages say.</p>
       <div class="row"><button class="ghost" id="kit-write" type="button">Write my launch posts</button><a class="ghost button-link" id="kit-poster" target="_blank" rel="noopener">Print a QR poster</a><span class="muted small" id="kit-status" role="status"></span></div>
       <div class="kit" id="kit"></div>
+      <div id="clips-section" class="hidden">
+        <h3>Launch videos</h3>
+        <p class="muted small">Short vertical clips for Reels, TikTok, WhatsApp status and Google Business, made from your own photos. Pick up to 4; each becomes one clip. Your photo stays as it is: only the camera and small things like light and steam move.</p>
+        <div class="photo-picks" id="clips-photos"></div>
+        <div class="row wrap"><input id="clips-note" maxlength="300" placeholder="Optional: what should move, e.g. steam rising from the coffee"><button class="ghost" id="clips-go" type="button">Make clips</button></div>
+        <p class="muted small" id="clips-status" role="status"></p>
+        <div class="videos" id="clips-list"></div>
+      </div>
     </section>
     <h3>Custom domain</h3>
     <div class="row"><input id="domain" placeholder="www.example.com"><button class="ghost" id="add-domain" type="button">Add</button></div>
@@ -971,6 +979,14 @@
         <select id="genimage-aspect" aria-label="Shape"><option value="16:9">Wide 16:9</option><option value="4:3">4:3</option><option value="1:1">Square</option><option value="3:4">Portrait 3:4</option><option value="9:16">Phone 9:16</option></select>
         <button class="ghost" id="genimage-go" type="button">Generate</button></div>
       <p class="muted small" id="genimage-status" role="status"></p>
+    </section>
+    <section id="herovideo-section" class="hidden">
+      <h3>Hero video</h3>
+      <p class="muted small">A calm, looping video for the top of your site, made from one of your photos. It plays muted; visitors who prefer less motion see the photo instead.</p>
+      <div class="photo-picks" id="herovideo-photos"></div>
+      <div class="row wrap"><input id="herovideo-note" maxlength="300" placeholder="Optional: what should move, e.g. the waves"><button class="ghost" id="herovideo-go" type="button">Make the video</button></div>
+      <p class="muted small" id="herovideo-status" role="status"></p>
+      <div class="videos" id="herovideo-list"></div>
     </section>
     <p class="error" id="design-error" role="alert"></p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>

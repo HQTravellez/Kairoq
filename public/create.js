@@ -1452,7 +1452,7 @@ function renderGrow(g){
 async function loadGrow(){
  const p=state.project;$('grow').classList.toggle('hidden',!p.published);if(!p.published)return;
  $('kit-poster').href='/api/create/projects/'+p.id+'/poster';
- const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);renderKit(grow.kit);text($('grow-status'),'');text($('kit-status'),'');
+ const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);renderKit(grow.kit);text($('grow-status'),'');text($('kit-status'),'');text($('clips-status'),'');loadVideos('launch').catch(err=>text($('clips-status'),err.message));
 }
 // The launch kit: each text with a Copy button.
 function renderKit(kit){
@@ -1470,6 +1470,64 @@ $('kit-write').onclick=async()=>{
  try{const {kit,credits}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{op:'kit'}});renderKit(kit);text($('kit-status'),'Ready'+(credits?' ('+credits+' credit'+(credits===1?'':'s')+')':'')+'. Check each text before posting.')}
  catch(err){text($('kit-status'),err.message)}finally{b.disabled=false}
 };
+// Videos made from the project's photos: launch clips (Grow) and a hero video (Design).
+// One panel per kind: photo picker, price on the button, and the clips with their state.
+const VIDEO_UI={launch:{section:'clips-section',photos:'clips-photos',note:'clips-note',go:'clips-go',status:'clips-status',list:'clips-list',max:4},
+ hero:{section:'herovideo-section',photos:'herovideo-photos',note:'herovideo-note',go:'herovideo-go',status:'herovideo-status',list:'herovideo-list',max:1}};
+const videoPicks={launch:new Set(),hero:new Set()};let videoTimer=null;
+function videoPrice(kind){
+ const u=VIDEO_UI[kind],n=videoPicks[kind].size,c=state.me.video_generation?.credits||0,paid=state.me.viewer?.kind==='customer'&&c>0;
+ $(u.go).textContent=(kind==='hero'?'Make the video':'Make '+(n>1?n+' clips':'a clip'))+(paid&&n?' · '+c*n+' credits':'');
+ $(u.go).disabled=!n||state.project.role==='viewer';
+}
+async function loadVideos(kind){
+ const u=VIDEO_UI[kind];
+ $(u.section).classList.toggle('hidden',!state.me.video_generation?.enabled);
+ if(!state.me.video_generation?.enabled)return;
+ const id=state.project.id,d=await api('/projects/'+id+'/videos');
+ const box=$(u.photos);box.replaceChildren();
+ for(const n of [...videoPicks[kind]])if(!d.photos.some(p=>p.name===n))videoPicks[kind].delete(n);
+ if(!d.photos.length)box.append(el('p','muted small','Add photos to the project first (the image button in the chat). Your own photos look best.'));
+ for(const p of d.photos){
+  const b=el('button','photo-pick');b.type='button';b.title=p.name;b.setAttribute('aria-pressed',String(videoPicks[kind].has(p.name)));
+  const img=el('img');img.alt=p.name;img.loading='lazy';img.src='/api/create/projects/'+id+'/asset?name='+encodeURIComponent(p.name);b.append(img);
+  b.onclick=()=>{const s=videoPicks[kind];if(s.has(p.name))s.delete(p.name);else{if(s.size>=u.max){if(u.max===1)s.clear();else return}s.add(p.name)}loadVideosLocal(kind,d)};
+  box.append(b);
+ }
+ loadVideosLocal(kind,d);
+}
+// Re-renders the picks and the clip list from data already loaded.
+function loadVideosLocal(kind,d){
+ const u=VIDEO_UI[kind],id=state.project.id;
+ for(const b of $(u.photos).querySelectorAll('.photo-pick'))b.setAttribute('aria-pressed',String(videoPicks[kind].has(b.title)));
+ videoPrice(kind);
+ const list=$(u.list);list.replaceChildren();
+ for(const v of d.videos.filter(x=>x.kind===kind)){
+  const card=el('div','video-card'+(kind==='hero'?' hero':''));
+  if(v.status==='done'){
+   const vid=el('video');vid.controls=true;vid.muted=true;vid.loop=true;vid.playsInline=true;vid.preload='metadata';vid.src='/api/create/projects/'+id+'/video?name='+encodeURIComponent(v.name);card.append(vid);
+   const row=el('div','row'),dl=el('a','ghost button-link','Download');dl.href=vid.src+'&download=1';row.append(dl);
+   if(kind==='hero'&&v.site_message&&state.project.role!=='viewer'){const put=el('button','ghost','Put it on my site');put.type='button';put.onclick=()=>{for(const dlg of ['design-dialog','publish-dialog'])if($(dlg).open)$(dlg).close();send(v.site_message,'build')};row.append(put)}
+   card.append(row);
+  }else card.append(el('span','muted',v.status==='running'?'Making the video… (usually 1 to 3 minutes)':'Not made: '+(v.error||'failed')+(v.credits?' Credits refunded.':'')));
+  if(v.status!=='running'&&state.project.role!=='viewer'){const del=el('button','link-btn','Remove');del.type='button';del.onclick=async()=>{try{const r=await api('/projects/'+id+'/videos',{method:'DELETE',body:{id:v.id}});loadVideosLocal(kind,{...d,videos:r.videos})}catch(err){text($(u.status),err.message)}};card.append(del)}
+  list.append(card);
+ }
+ // While clips are being made, check again every 10 seconds.
+ clearTimeout(videoTimer);
+ if(d.videos.some(x=>x.status==='running'))videoTimer=setTimeout(()=>{if(!$(u.section).closest('dialog')?.open)return;loadVideos(kind).catch(()=>{})},10000);
+}
+for(const kind of ['launch','hero']){
+ const u=VIDEO_UI[kind];
+ $(u.go).onclick=async()=>{
+  const b=$(u.go);b.disabled=true;text($(u.status),'Starting…');
+  try{const r=await api('/projects/'+state.project.id+'/videos',{method:'POST',body:{kind,photos:[...videoPicks[kind]],note:$(u.note).value}});
+   text($(u.status),(r.started.length>1?r.started.length+' clips are':'The video is')+' being made'+(r.credits?' ('+r.credits+' credits)':'')+'. You can close this window; they keep going.');
+   videoPicks[kind].clear();$(u.note).value='';refreshCredits();await loadVideos(kind)}
+  catch(err){text($(u.status),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+  finally{videoPrice(kind)}
+ };
+}
 $('grow-suggest').onclick=async()=>{
  const b=$('grow-suggest');b.disabled=true;text($('grow-status'),'Reading your pages…');$('grow-details').open=true;
  try{const {suggestion:s,credits}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{op:'suggest'}});fillGrowForm(s.business,s.faq);if(s.seo&&s.seo.title&&!$('seo-title').value)$('seo-title').value=s.seo.title;if(s.seo&&s.seo.description&&!$('seo-description').value)$('seo-description').value=s.seo.description;text($('grow-status'),'Filled in from what your pages say'+(credits?' ('+credits+' credit'+(credits===1?'':'s')+')':'')+'. Check it, add anything missing, then Save.')}
@@ -2285,6 +2343,7 @@ async function renderDesign(){
  for(const [sel,val] of [['design-display',ds.fonts?.display||'Inter'],['design-body',ds.fonts?.body||'Inter']]){const el=$(sel);el.replaceChildren();for(const f of d.fonts)el.append(new Option(f,f));el.value=val}
  $('design-radius').value=['0rem','0.375rem','0.75rem','1.25rem'].includes(ds.radius)?ds.radius:'0.75rem';
  renderSkills();
+ text($('herovideo-status'),'');loadVideos('hero').catch(err=>text($('herovideo-status'),err.message));
  $('genimage-section').classList.toggle('hidden',!state.me.image_generation?.enabled);
  const c=state.me.image_generation?.credits;text($('genimage-status'),state.me.viewer?.kind==='customer'&&c?c+' credits per image. Saved to the project images; then ask the chat to use it.':'Saved to the project images; then ask the chat to use it.');
  for(const el of ['design-name','design-summary','design-notes','design-display','design-body','design-radius','design-save','design-direction','design-regenerate','design-add-system','genimage-go'])$(el).disabled=!editor;
