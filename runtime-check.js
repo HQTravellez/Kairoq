@@ -15,9 +15,56 @@ async function browser(){
  return b;
 }
 const IGNORED=/favicon\.ico|Download the React DevTools|net::ERR_ABORTED/;
+// ---------- fast lane: Lightpanda ----------
+// Lightpanda (a light headless browser, AGPL-3.0, run unmodified as its own process and driven
+// over CDP) opens apps in a fraction of Chromium's time and memory. It has no real rendering, so
+// it only does checks that need none: does a live page start without errors (the hourly live
+// guard) and reading pages for search engines. Anything it reports as broken is confirmed in
+// Chromium before it counts, and any error of its own falls back to Chromium. Off unless the
+// binary is installed (Dockerfile ARG KAIROQ_LIGHTPANDA=on); telemetry is switched off.
+function lightpandaPath(){if(process.env.KAIROQ_LIGHTPANDA==='off')return null;return[process.env.KAIROQ_LIGHTPANDA_PATH,'/usr/local/bin/lightpanda'].find(p=>p&&fs.existsSync(p))||null}
+let fastPromise=null,fastProc=null;
+async function fastBrowser(){
+ const bin=lightpandaPath();if(!bin)return null;
+ if(!fastPromise){
+  fastPromise=(async()=>{
+   const {chromium}=require('playwright-core'),port=String(19300+Math.floor(Math.random()*600));
+   fastProc=require('child_process').spawn(bin,['serve','--host','127.0.0.1','--port',port,'--disable-metrics'],{env:{PATH:process.env.PATH||'',HOME:process.env.HOME||'/tmp',LIGHTPANDA_DISABLE_TELEMETRY:'true'},stdio:'ignore'});
+   fastProc.on('exit',()=>{fastPromise=null;fastProc=null});
+   let last;for(let i=0;i<40;i++){try{return await chromium.connectOverCDP('http://127.0.0.1:'+port)}catch(e){last=e;await new Promise(r=>setTimeout(r,150))}}
+   throw last||Error('Lightpanda did not start');
+  })().catch(e=>{fastPromise=null;try{fastProc&&fastProc.kill()}catch{}throw e});
+ }
+ const b=await fastPromise;
+ if(!b.isConnected()){fastPromise=null;try{fastProc&&fastProc.kill()}catch{}return fastBrowser()}
+ return b;
+}
+let fastStats={runs:0,fallbacks:0,confirmed:0};
+// The page check in Lightpanda: uncaught errors, failed own requests, blank page.
+async function fastCheck(url,{timeoutMs=15000}={}){
+ const b=await fastBrowser();if(!b)return null;
+ const ctx=b.contexts()[0]||await b.newContext(),page=await ctx.newPage(),errors=[];
+ const add=e=>{const text=String(e).slice(0,500);if(!IGNORED.test(text)&&!errors.includes(text)&&errors.length<10)errors.push(text)};
+ const own=u=>{try{return new URL(u).origin===new URL(url).origin}catch{return false}};
+ page.on('pageerror',e=>add('Uncaught error: '+(e.stack||e.message||e)));
+ page.on('response',r=>{if(r.status()>=500&&own(r.url()))add('HTTP '+r.status()+' from '+r.request().method()+' '+r.url())});
+ try{
+  await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
+  await page.waitForTimeout(800);
+  const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))});
+  if(blank)add('Blank page: nothing rendered inside #root.');
+  return{skipped:false,errors,facts:{opened:!blank},engine:'lightpanda'};
+ }finally{await page.close().catch(()=>{})}
+}
 // sandbox: the app's data requests go to a test copy of its data (react-sandbox.js).
 // journey: also add a record the way a customer would (savesData below).
-async function check(url,{timeoutMs=15000,sandbox,journey=false}={}){
+async function check(url,{timeoutMs=15000,sandbox,journey=false,fast=false}={}){
+ // A plain "does it start" check can take the fast lane; a problem found there is confirmed below.
+ if(fast&&!sandbox&&!journey&&lightpandaPath()){
+  fastStats.runs++;
+  try{const r=await fastCheck(url,{timeoutMs});if(r&&!r.errors.length)return r;if(r)fastStats.confirmed++}
+  catch(e){fastStats.fallbacks++}
+ }
  if(!available())return{skipped:true,errors:[]};
  const context=await (await browser()).newContext({viewport:{width:1280,height:800}});
  if(sandbox){const appId=(/\/builder\/p\/([a-f0-9]{12})-/.exec(new URL(url).pathname)||[])[1],origin=new URL(url).origin;await context.route('**/*',r=>{let u;try{u=new URL(r.request().url())}catch{return r.continue()}return appId&&u.origin===origin&&u.pathname.startsWith('/api/apps/'+appId+'/')?r.continue({headers:{...r.request().headers(),'x-kairoq-sandbox':sandbox}}):r.continue()})}
@@ -254,13 +301,25 @@ async function deadClicks(page,url){
 // The pages of a published site as an anonymous visitor sees them (site-search.js): starts at
 // url, follows the site's own links (not #hash ones) and returns up to max pages with their
 // rendered #root, text, title and description. Only GET requests are sent: nothing is saved.
-async function renderSite(url,{max=15,timeoutMs=20000}={}){
+async function renderSite(url,opts={}){
+ if(opts.fast!==false&&lightpandaPath()){
+  fastStats.runs++;
+  try{const b=await fastBrowser();const pages=b&&await crawl(url,{...opts,ctx:b.contexts()[0]||await b.newContext(),shared:true});if(pages&&pages.length)return pages;if(process.env.KAIROQ_DEBUG_FAST)console.warn('fast crawl empty',pages);fastStats.fallbacks++}
+  catch(e){if(process.env.KAIROQ_DEBUG_FAST)console.warn('fast crawl',e.message);fastStats.fallbacks++}
+ }
  if(!available())return null;
- const ctx=await (await browser()).newContext({viewport:{width:1280,height:900}});
+ return crawl(url,{...opts,ctx:await (await browser()).newContext({viewport:{width:1280,height:900}})});
+}
+// Reads every page of a site the way a search engine sees it after JavaScript ran.
+// shared: the context belongs to someone else (Lightpanda has one), so only the page is closed.
+async function crawl(url,{max=15,timeoutMs=20000,ctx,shared=false}={}){
  const start=new URL(url),base=start.pathname.endsWith('/')?start.pathname:start.pathname+'/';
+ let page;
  try{
-  await ctx.route('**/*',r=>['GET','HEAD'].includes(r.request().method())?r.continue():r.abort());
-  const page=await ctx.newPage(),queue=['/'],seen=new Set(['/']),pages=[];
+  page=await ctx.newPage();
+  // Reading pages never sends a form or anything else that changes data.
+  await page.route('**/*',r=>['GET','HEAD'].includes(r.request().method())?r.continue():r.abort());
+  const queue=['/'],seen=new Set(['/']),pages=[];
   while(queue.length&&pages.length<max){
    const rel=queue.shift();
    try{
@@ -276,7 +335,7 @@ async function renderSite(url,{max=15,timeoutMs=20000}={}){
    }catch{}
   }
   return pages;
- }finally{await ctx.close().catch(()=>{})}
+ }finally{if(page)await page.close().catch(()=>{});if(!shared)await ctx.close().catch(()=>{})}
 }
 // Saves a 1200x630 PNG of a page (used as the social share image).
 async function screenshot(url,file){
@@ -669,5 +728,5 @@ async function renderHtml(html,{width,height}){
   return await page.screenshot({type:'png',clip:{x:0,y:0,width,height}});
  }finally{await context.close().catch(()=>{})}
 }
-async function close(){for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
-module.exports={renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
+async function close(){if(fastPromise){const b=await fastPromise.catch(()=>null);fastPromise=null;await b?.close().catch(()=>{})}try{fastProc&&fastProc.kill()}catch{}for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
+module.exports={fastStats:()=>({...fastStats,installed:Boolean(lightpandaPath())}),renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};

@@ -21,6 +21,8 @@ function items({env=process.env}={}){
  ];
  // Only when the owner chose OpenCode as the build engine: whether it is installed and has a model.
  if(String(env.KAIROQ_BUILD_ENGINE||'').toLowerCase()==='opencode')list.push({id:'engine',label:'OpenCode writes the apps',ok:require('./opencode-engine').enabled(),required:false,fix:'In Railway add the variable KAIROQ_OPENCODE=on (it installs OpenCode when the app is built) and redeploy; OpenCode uses the same AI key as the builder.'});
+ // Only when the owner switched on the fast browser lane: whether Lightpanda got installed.
+ if(String(env.KAIROQ_LIGHTPANDA||'').toLowerCase()==='on')list.push({id:'fastlane',label:'Fast browser checks (Lightpanda)',ok:require('./runtime-check').fastStats().installed,required:false,fix:'Keep the Railway variable KAIROQ_LIGHTPANDA=on and redeploy: the Dockerfile installs Lightpanda when the app is built.'});
  return{items:list,done:list.filter(i=>i.ok).length,total:list.length,missing_required:list.filter(i=>i.required&&!i.ok).length};
 }
 module.exports={items};
