@@ -2875,9 +2875,17 @@ function openAppBuilder(mode="web"){
   setAppBuildMode(mode);
   promptEl.focus();
 }
+// The builder frame is emptied first and covered by a plain "Setting up" panel until the
+// builder says its editor is on screen, so nothing from a previous visit shows in between.
+let builderTimer=null;
+function builderReady(){clearTimeout(builderTimer);$("#buildView")?.classList.remove("loading")}
 function openBuilder(url){
-  $("#buildFrame").src=url;
+  const frame=$("#buildFrame"),view=$("#buildView");
+  view.classList.add("loading");
+  frame.src="about:blank";
   setMainView("build");
+  setTimeout(()=>{frame.src=url},30);
+  clearTimeout(builderTimer);builderTimer=setTimeout(builderReady,30000);
 }
 function launchAppBuild(prompt){
   $("#khError")?.classList.add("hidden");
@@ -2919,7 +2927,10 @@ loadHomeApps();
 // The builder inside this page sends people back here instead of showing its own start page;
 // a build that could not start comes back with the error and the request to try again.
 window.addEventListener("message",e=>{
-  if(e.origin!==location.origin||!e.data||e.data.kairoq!=="home")return;
+  if(e.origin!==location.origin||!e.data)return;
+  if(e.data.kairoq==="ready")return builderReady();
+  if(e.data.kairoq!=="home")return;
+  builderReady();
   setMainView("command");$("#commandCenter")?.classList.remove("show-work");
   if(e.data.prompt){setAppBuildMode(String(e.data.prompt).startsWith("Build a mobile app: ")?"mobile":"web");promptEl.value=String(e.data.prompt).replace(/^Build a mobile app: /,"");resizePrompt()}
   const err=$("#khError");if(err){err.textContent=e.data.error?"The build could not start: "+String(e.data.error).slice(0,300).replace(/[.\s]*$/,".")+" Try again, or change the request.":"";err.classList.toggle("hidden",!e.data.error)}

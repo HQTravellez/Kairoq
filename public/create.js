@@ -10,6 +10,8 @@ async function api(path,{method='GET',body}={}){
  return data;
 }
 function show(screen){
+ // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
+ if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
  for(const id of ['auth','home','editor','share-screen','check-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
@@ -218,22 +220,23 @@ async function askThenBuild(prompt){
  const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length);
  const draw=()=>{
   const q=questions[at];card.replaceChildren();
-  const head=el('div','ask-top');head.append(el('span','ask-head','A few quick questions'));
+  // Top: where you are and Skip. Middle: the question and its answers. Bottom: Back, Decide for me, Next.
+  const head=el('div','ask-top');head.append(el('span','ask-count',questions.length>1?'Question '+(at+1)+' of '+questions.length:'One quick question'));
   const skip=el('button','ask-link','Skip');skip.type='button';skip.onclick=()=>build(answers());head.append(skip);
   const opts=el('div','ask-opts');
-  (q.options||[]).forEach((o,i)=>{
+  (q.options||[]).forEach(o=>{
    const row=el('label','ask-opt');const input=document.createElement('input');
    input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
-   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o)};
+   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o);for(const r of opts.children)r.classList.toggle('on',r.querySelector('input').checked)};
+   row.classList.toggle('on',input.checked);
    row.append(input,el('span',null,o));opts.append(row);
   });
   const foot=el('div','ask-foot');
-  foot.append(el('span','ask-count','Question '+(at+1)+' of '+questions.length));
-  const back=el('button','ask-link','Back');back.type='button';back.disabled=at===0;back.onclick=()=>{at--;draw()};
-  const auto=el('button','ghost','Decide for me');auto.type='button';auto.onclick=()=>build(answers());
+  if(at>0){const back=el('button','ask-link','Back');back.type='button';back.onclick=()=>{at--;draw()};foot.append(back)}
+  const auto=el('button','ask-ghost','Decide for me');auto.type='button';auto.onclick=()=>build(answers());
   const last=at===questions.length-1;
-  const next=el('button','primary',last?'Build it':'Next');next.type='button';next.onclick=()=>{if(last)build(answers());else{at++;draw()}};
-  foot.append(back,auto,next);
+  const next=el('button','ask-next',last?'Build it':'Next');next.type='button';next.onclick=()=>{if(last)build(answers());else{at++;draw()}};
+  foot.append(auto,next);
   card.append(head,el('p','ask-q',q.q),opts,foot);
   list.scrollTop=list.scrollHeight;
  };
@@ -697,6 +700,7 @@ async function send(message,mode,path='/chat',extra={}){
  text($('chat-error'),'');
  const images=state.attachments.filter(a=>a.kind!=='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
  const files=state.attachments.filter(a=>a.kind==='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
+ state.lastSent=message;
  $('messages').append(messageItem({role:'user',text:message,mode,images:[...images,...files].map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
  $('chat-input').value='';state.attachments=[];renderAttachments();
  try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,...(state.model&&state.model!=='auto'?{model:state.model}:{}),images:images.length?images:undefined,files:files.length?files:undefined,...extra}});watch(job)}
@@ -953,6 +957,8 @@ async function watch(job){
   if(done.model_fallback)$('messages').append(messageItem({role:'assistant',text:done.model_fallback}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
+  // A message that could not be built stays in the chat and goes back in the box to try again.
+  if(done.status==='failed'&&state.lastSent&&!state.project.messages.some(m=>m.role==='user'&&m.text===state.lastSent)){$('messages').append(messageItem({role:'user',text:state.lastSent}));if(!$('chat-input').value.trim()){$('chat-input').value=state.lastSent;syncSend()}}
   if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?(done.mode==='repair'?'\nRounds that did not finish were refunded.':'\nYour credits were refunded.'):''),failed:true}));
   if(state.code)renderFiles();
   if(state.data)renderData();
