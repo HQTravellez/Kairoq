@@ -1,17 +1,29 @@
 "use strict";
 const test=require("node:test"),assert=require("node:assert/strict");
 const engine=require("../api-workflow");
+function operationFixture(operationId,requestSchema,responseSchema){
+ return{post:{operationId,
+  requestBody:{required:true,content:{"application/json":{schema:requestSchema}}},
+  responses:{"200":{content:{"application/json":{schema:responseSchema}}}}
+ }};
+}
 const trip={
  openapi:"3.0.3",info:{title:"Synthetic Trip-Ninja-style optimizer contract",version:"fixture"},
  servers:[{url:"https://test.trip-provider.example/v1"}],
  paths:{
-  "/get-searches":{post:{operationId:"getSearches",requestBody:{required:true,content:{"application/json":{schema:{type:"object",required:["route"],properties:{route:{type:"string"}}}}}},responses:{"200":{content:{"application/json":{schema:{type:"object",required:["trip_id","queries"],properties:{trip_id:{type:"string"},queries:{type:"array",items:{type:"object"}}}}}}}}}},
-  "/generate-solutions":{post:{operationId:"generateSolutions",requestBody:{required:true,content:{"application/json":{schema:{type:"object",required:["trip_id","datasource_responses"],properties:{trip_id:{type:"string"},datasource_responses:{type:"object"}}}}}},responses:{"200":{content:{"application/json":{schema:{type:"object",required:["solutions"],properties:{solutions:{type:"array",items:{type:"object"}}}}}}}}}}
+  "/get-searches":operationFixture("getSearches",
+   {type:"object",required:["route"],properties:{route:{type:"string"}}},
+   {type:"object",required:["trip_id","queries"],properties:{trip_id:{type:"string"},queries:{type:"array",items:{type:"object"}}}}),
+  "/generate-solutions":operationFixture("generateSolutions",
+   {type:"object",required:["trip_id","datasource_responses"],properties:{trip_id:{type:"string"},datasource_responses:{type:"object"}}},
+   {type:"object",required:["solutions"],properties:{solutions:{type:"array",items:{type:"object"}}}})
  }
 };
 function supplier(title,endpoint,operationId){
  return{openapi:"3.0.3",info:{title,version:"fixture"},servers:[{url:"https://"+title.toLowerCase()+".test.example"}],
-  paths:{[endpoint]:{post:{operationId,requestBody:{required:true,content:{"application/json":{schema:{type:"object",required:["origin","destination"],properties:{origin:{type:"string"},destination:{type:"string"}}}}}},responses:{"200":{content:{"application/json":{schema:{type:"array",items:{type:"object"}}}}}}}}}}};
+  paths:{[endpoint]:operationFixture(operationId,
+   {type:"object",required:["origin","destination"],properties:{origin:{type:"string"},destination:{type:"string"}}},
+   {type:"array",items:{type:"object"}})}};
 }
 const contracts={tripninja:trip,sabre:supplier("Sabre","/air/search","searchFlights"),atlas:supplier("Atlas","/offers","getOffers")};
 const recipe={steps:[
