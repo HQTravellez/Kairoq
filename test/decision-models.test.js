@@ -41,7 +41,7 @@ test("Unavailable key and network failures fall back without claiming success",a
  assert.equal(broken.status,"fallback");
 });
 test("Reject oversized state and unknown providers",async()=>{
- await assert.rejects(d.routeTask("x".repeat(24001),{key:"fake"}),/24000/);
+ await assert.rejects(d.routeTask("x".repeat(24001),{key:"fake"}),/12000/);
  await assert.rejects(d.routeTask("hello",{provider:"custom",key:"fake"}),/Unknown/);
 });
 test("ScaleDown compression produces a smaller optional context",async()=>{
@@ -59,4 +59,10 @@ test("No key, malformed compression, and network failure preserve full original 
  assert.equal(invalid.status,"fallback");assert.equal(invalid.content,original);
  const bad=await d.compressToolResult(original,"problem",{key:"fake",fetchImpl:async()=>{throw Error("offline")}});
  assert.equal(bad.content,original);
+});
+
+test("Public fixture credential guard prevents external routing requests",async()=>{
+ let requested=false;
+ await assert.rejects(d.routeTask("api_key=VERYSECRET",{key:"fake",fetchImpl:async()=>{requested=true}}),/credential/i);
+ assert.equal(requested,false);
 });
