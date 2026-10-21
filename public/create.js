@@ -202,10 +202,18 @@ $('new-form').onsubmit=async e=>{
  finally{$('new-submit').disabled=false}
 };
 
+// A card-sized app name from the request: its first clause ("Digital menu for my café with today's
+// specials" → "Digital menu for my café"), at most 40 characters, never ending on "with", "for" etc.
+function shortName(prompt){
+ let t=String(prompt).replace(/^Build a mobile app:\s*/i,'').replace(/\s+/g,' ').trim().split(/[.!?\n:;]/)[0].trim();
+ const m=/\s(with|that|which|where|so|including|plus)\s/i.exec(t.slice(12));if(m)t=t.slice(0,12+m.index);
+ if(t.length>40){const c=t.slice(0,41);t=c.slice(0,Math.max(c.lastIndexOf(' '),20))}
+ return t.replace(/[\s,;-]+(a|an|the|and|or|with|for|of|to|in|my|our)$/i,'').replace(/[\s,;:-]+$/,'')||'New app';
+}
 // Started from the main Kairoq page: open the editor straight away and ask any quick questions
 // inside the chat, one at a time, before the first build starts.
 async function askThenBuild(prompt){
- const name=prompt.replace(/^Build a mobile app:\s*/i,'').split(/\s+/).slice(0,6).join(' ').replace(/[.,;:]+$/,'');
+ const name=shortName(prompt);
  const {project}=await api('/projects',{method:'POST',body:{name}});
  await openProject(project.id);
  const list=$('messages');list.replaceChildren();
