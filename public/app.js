@@ -825,6 +825,10 @@ function money(n){
 function escapeHTML(s){
   return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 }
+// The Studio, sales, tour and listing renderers call this spelling; missing values render as empty text.
+function escapeHtml(s){
+  return escapeHTML(s??"");
+}
 
 function renderMarkdown(markdown=""){
   let text=String(markdown??"")
