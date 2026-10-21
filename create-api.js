@@ -1034,6 +1034,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const b=await readJson(req,16000000);
    // A sponsored template slot: what to start with comes from the slot, not the request.
    const slot=b.sponsored?require('./partners').startFromSlot(String(b.sponsored)):null;
+   // A greeting is not an app: "hi" never becomes a project named "hi".
+   const asked=String(b.prompt||b.name||'').trim();
+   if(!slot&&!b.template&&asked&&require('./builder-smalltalk').smallTalk(asked))return send(res,422,{error:'That reads like a greeting, not an app. Describe what to build, for example "a booking page for my yoga studio".'}),true;
    const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.answers?require('./clarify').withAnswers(b.prompt,b.answers):b.prompt,template:b.template,tier:b.tier,engine:b.engine==='opencode'?'opencode':undefined,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
