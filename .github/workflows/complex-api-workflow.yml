@@ -6,7 +6,10 @@ on:
   pull_request:
     paths:
       - 'api-workflow.js'
+      - 'api-intelligence.js'
+      - 'api-intelligence-pipeline.js'
       - 'test/api-workflow.test.js'
+      - 'test/api-intelligence-pipeline.test.js'
       - '.github/workflows/complex-api-workflow.yml'
   workflow_dispatch:
 permissions:
@@ -22,5 +25,8 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: node --check api-workflow.js
+      - run: node --check api-intelligence.js
+      - run: node --check api-intelligence-pipeline.js
       - run: node --check test/api-workflow.test.js
-      - run: node --test test/api-workflow.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js
+      - run: node --check test/api-intelligence-pipeline.test.js
+      - run: node --test test/api-intelligence-pipeline.test.js test/api-workflow.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js
