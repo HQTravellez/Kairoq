@@ -207,3 +207,6 @@ dialog select,dialog textarea,dialog input[type=text],dialog input[type=email],d
 dialog select:focus,dialog textarea:focus,dialog input:focus{border-color:var(--d-focus)!important;box-shadow:0 0 0 3px #c2512d26!important;outline:0!important}
 #saveSettings{display:flex!important;width:auto!important;margin:20px 0 0 auto!important;align-items:center}
 dialog label,dialog .field-label{color:var(--d-ink)!important;font-weight:500}
+
+/* App cards: ember tints, never random hues (set per card from the name in app.js) */
+.kh-app-thumb{background:linear-gradient(135deg,var(--t1,#f4d6cb),var(--t2,#e4a28a))!important;color:var(--t3,#6e2a1c)!important;font-family:var(--font)!important;font-weight:600!important;letter-spacing:-.02em}

@@ -1672,8 +1672,15 @@ async function generateVideoFromPrompt(raw){
   }
 }
 
+// "hi", "thanks" or "what can you do" is conversation, not an app to build: it is answered in Ask
+// and never opens the builder or creates a project.
+const SMALL_TALK=/^(hi+|hello|hey+|hiya|yo|hola|good (morning|afternoon|evening|day)|thanks|thank you|thx|ok|okay|k|yes|yep|sure|cool|nice|great|test(ing)?|what can you do|who are you|how does this work|help)[\s!.?,]*$/i;
 async function send(regenerateFrom=null){
-  if(regenerateFrom===null && appBuildMode) return startAppBuild(promptEl.value.trim());
+  if(regenerateFrom===null && appBuildMode){
+    const asked=promptEl.value.trim();
+    if(!SMALL_TALK.test(asked)) return startAppBuild(asked);
+    setAppBuildMode(false);
+  }
   setMainView("chat");
   const raw=promptEl.value.trim();
   if(busy || (!raw && !attachments.length))return;
@@ -2901,8 +2908,11 @@ function launchAppBuild(prompt){
 // picture when Kairoq has taken one, its initials on a colour from its name underneath.
 function appCard(name,{thumbUrl,sub,onOpen}){
   const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
-  let hue=0;for(const ch of name)hue=(hue*31+ch.charCodeAt(0))%360;
-  const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--h",hue);thumb.setAttribute("aria-hidden","true");
+  // Before Kairoq has a picture of the app: its initials on one of five ember tints, picked by name.
+  const TINTS=[["#f4d6cb","#e4a28a","#6e2a1c"],["#f8ddc8","#eda574","#7a3410"],["#fae8c8","#f0c27a","#7a4a0c"],["#f1d9dc","#d79aa3","#5e2230"],["#f3ebe0","#dcc8ae","#5a4630"]];
+  let hash=0;for(const ch of name)hash=(hash*31+ch.charCodeAt(0))>>>0;
+  const [t1,t2,t3]=TINTS[hash%TINTS.length];
+  const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--t1",t1);thumb.style.setProperty("--t2",t2);thumb.style.setProperty("--t3",t3);thumb.setAttribute("aria-hidden","true");
   thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
   if(thumbUrl){const img=document.createElement("img");img.src=thumbUrl;img.alt="";img.loading="lazy";img.decoding="async";img.onerror=()=>img.remove();thumb.append(img)}
   const meta=document.createElement("span");meta.className="kh-app-meta";
