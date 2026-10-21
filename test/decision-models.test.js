@@ -47,9 +47,9 @@ test("Reject oversized state and unknown providers",async()=>{
 test("ScaleDown compression produces a smaller optional context",async()=>{
  const raw="Long agent tool trace. ".repeat(350);let req;
  const result=await d.compressToolResult(raw,"Find the API request error",{key:"fake",
-  fetchImpl:mockHttp({results:{compressed_prompt:"The API returned an HTTP 400 error."}},(_u,options)=>{req=JSON.parse(options.body)})});
+  fetchImpl:mockHttp({results:{success:true,compressed_prompt:"The API returned an HTTP 400 error."}},(_u,options)=>{req=JSON.parse(options.body)})});
  assert.equal(result.status,"compressed");assert.ok(result.compressedLength<raw.length);
- assert.equal(req.context,raw);assert.equal(req.compression_rate,"auto");
+ assert.equal(req.context,raw);assert.equal(req.scaledown.rate,"auto");
 });
 test("No key, malformed compression, and network failure preserve full original input",async()=>{
  const original="abc ".repeat(1200);
