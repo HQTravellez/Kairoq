@@ -1,0 +1,26 @@
+name: Complex API workflow proof
+on:
+  push:
+    branches:
+      - feature/api-orchestration-tripninja-proof
+  pull_request:
+    paths:
+      - 'api-workflow.js'
+      - 'test/api-workflow.test.js'
+      - '.github/workflows/complex-api-workflow.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-orchestration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --check api-workflow.js
+      - run: node --check test/api-workflow.test.js
+      - run: node --test test/api-workflow.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js
