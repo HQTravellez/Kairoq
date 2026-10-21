@@ -85,7 +85,7 @@ async function routeTask(state,{
   }
 }
 function parseCompressed(text,original){
-  const x=text?.results?.compressed_prompt??text?.compressed_prompt;
+  const x=text?.results?.success===true?text.results.compressed_prompt:null;
   if(typeof x!=="string"||!x.trim())return{status:"fallback",content:original,reason:"Invalid compressed content"};
   // Compression is optional context; caller retains the source for subsequent re-read.
   if(x.length>=original.length)return{status:"unchanged",content:original,reason:"Compression did not reduce text"};
@@ -100,7 +100,7 @@ async function compressToolResult(original,question,{
   if(original.length<minChars)return{status:"unchanged",content:original,reason:"Below compression threshold"};
   try{
     const result=await requestJson(ENDPOINTS.compress,key,{
-      context:original,prompt:question,compression_rate:"auto"
+      context:original,prompt:question,scaledown:{rate:"auto"}
     },{fetchImpl,timeoutMs,scaledown:true});
     if(result.status==="unavailable")return{...result,content:original};
     return parseCompressed(result,original);
