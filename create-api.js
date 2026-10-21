@@ -154,7 +154,12 @@ function parseImages(list){
 }
 // Summarizes the model's partial output for live display in the editor.
 function streamSnapshot(text,mode){
- if(mode==='discuss')return{text:text.slice(-6000)};
+ // Discuss streams plain text. A reply in the builder's JSON format shows only its message and
+ // plan, and the closing QUESTION line only its question, so the chat never shows code.
+ if(mode==='discuss'){
+  if(/^\s*(?:```(?:json)?\s*)?\{/.test(text)){const b=streamSnapshot(text,'build');return{text:[b.message,b.plan.map(x=>'- '+x).join('\n')].filter(Boolean).join('\n\n')}}
+  return{text:text.replace(/(^|\n)\s*QUESTION:\s*([^|\n]*)[^\n]*\s*$/i,(m,nl,q)=>nl+'\n'+q.trim()).slice(-6000)};
+ }
  const matches=[...text.matchAll(/"(src\/[^"\\]+\.(?:jsx|js|tsx|ts|css|json))"\s*:\s*"/g)];
  // Files changed by find/replace edits ("src/x.jsx":[{"find":…) are listed too.
  const edited=[...text.matchAll(/"(src\/[^"\\]+\.(?:jsx|js|tsx|ts|css|json))"\s*:\s*\[/g)].map(m=>m[1]);

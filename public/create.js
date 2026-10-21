@@ -269,6 +269,17 @@ function renderMessages(pendingText){
  list.scrollTop=list.scrollHeight;
  renderErrors();
 }
+// A reply stored as raw JSON (the builder's own format) reads as its message, plan and question.
+function readable(t){
+ const s=String(t||'').trim();
+ if(!/^(?:```(?:json)?\s*)?\{/.test(s))return s;
+ try{
+  const v=JSON.parse(s.replace(/^```(?:json)?\s*/,'').replace(/```\s*$/,''));
+  const q=v.question||v.before_building||v.ask,qt=typeof q==='string'?q:q&&q.text;
+  const plan=Array.isArray(v.plan)?v.plan.map(x=>'- '+x).join('\n'):'';
+  return[v.message,plan,qt?'**'+qt+'**':''].filter(Boolean).join('\n\n')||s;
+ }catch{return s}
+}
 function messageItem(m,last,index){
  const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
  const tl=m.timeline||[];
@@ -277,7 +288,7 @@ function messageItem(m,last,index){
   const think=tl.find(e=>e.t==='think');
   const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
   if(thoughtMs!=null){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secs(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
-  li.append(renderMarkdown(m.text));
+  li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
    const q=el('div','question-options');

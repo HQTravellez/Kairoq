@@ -63,3 +63,7 @@
 #editor #connect-open{display:inline-flex!important;align-items:center;gap:6px}
 #editor #connect-open .lbl{line-height:1}
 #editor :focus-visible{outline:2px solid #6a5cf6!important;outline-offset:2px!important}
+
+/* "Implement this plan" under a Discuss reply: a real button, like Lovable's */
+#editor .messages li.assistant>.small-btn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;height:34px;padding:0 14px!important;border-radius:10px!important;border:0!important;background:var(--b-ink)!important;color:#fff!important;font-size:13px!important;font-weight:600!important;box-shadow:var(--b-shadow-1)!important}
+#editor .messages li.assistant>.small-btn:hover{background:#2b2a24!important}
