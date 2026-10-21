@@ -11,8 +11,9 @@
   --d-ink:#15140f;
   --d-ink-2:#4f4b43;
   --d-ink-3:#857f74;
-  --d-brand:linear-gradient(120deg,#ff7a45 0%,#f2547d 48%,#6a5cf6 100%);
-  --d-focus:#6a5cf6;
+  --d-brand:linear-gradient(120deg,#b4432a 0%,#e2703a 55%,#f2a341 100%);
+  --d-ember:#c2512d;
+  --d-focus:#c2512d;
   --d-r-sm:10px;--d-r:14px;--d-r-lg:20px;--d-r-xl:28px;
   --d-shadow-1:0 1px 2px #15140f0d;
   --d-shadow-2:0 1px 2px #15140f0a,0 12px 32px -14px #15140f2e;
@@ -25,12 +26,12 @@
 html,body,button,input,select,textarea{font-family:var(--font)!important}
 body{background:var(--d-bg)!important;color:var(--d-ink);font-feature-settings:"ss01","cv11";text-rendering:optimizeLegibility}
 h1,h2,h3,.brand-title,.welcome h1,.kh-hero h1,.studio-header-card h1{font-family:var(--font)!important;text-wrap:balance}
-::selection{background:#6a5cf62e}
+::selection{background:#e2703a33}
 :focus-visible{outline:2px solid var(--d-focus)!important;outline-offset:2px!important}
 input,textarea{caret-color:var(--d-focus)}
 
 /* ---------- Brand mark: the gradient tile, used in the sidebar and on the new-chat screen ---------- */
-.brand-mark{background:var(--d-brand)!important;color:#fff!important;border-radius:10px!important;font-family:var(--font)!important;font-weight:700!important;box-shadow:inset 0 0 0 1px #ffffff2e,0 2px 6px #f2547d40!important}
+.brand-mark{background:var(--d-brand)!important;color:#fff!important;border-radius:10px!important;font-family:var(--font)!important;font-weight:700!important;box-shadow:inset 0 0 0 1px #ffffff2e,0 2px 6px #b4432a40!important}
 .brand-title{font-size:18px!important;font-weight:600!important;letter-spacing:-.02em!important;color:var(--d-ink)!important}
 .brand-subtitle{color:var(--d-ink-3)!important}
 
@@ -56,9 +57,9 @@ input,textarea{caret-color:var(--d-focus)}
 .main[data-view=chat]:has(.welcome)>.kh-sky{display:block!important}
 .main[data-view=chat]:has(.welcome){background:var(--d-bg)!important}
 .kh-sky::after{content:none!important}
-.kh-sky i:nth-child(1){background:#ffb08f!important}
-.kh-sky i:nth-child(2){background:#b7b2ff!important}
-.kh-sky i:nth-child(3){background:#ffc7d9!important;opacity:.4!important}
+.kh-sky i:nth-child(1){background:#f2b48a!important}
+.kh-sky i:nth-child(2){background:#f4c98f!important}
+.kh-sky i:nth-child(3){background:#f6d9b8!important;opacity:.4!important}
 .kh-hero h1 em{background:var(--d-brand)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
 
 /* ---------- New-chat screen: plain top, a bright horizon rising behind the prompt ---------- */
@@ -67,12 +68,12 @@ input,textarea{caret-color:var(--d-focus)}
 .main[data-view=chat]:has(.welcome){isolation:isolate;overflow-x:hidden!important}
 .main[data-view=chat]:has(.welcome) .composer-shell{position:relative;z-index:auto!important}
 .main[data-view=chat]:has(.welcome) .composer-shell::before{content:"";position:absolute;z-index:-1;left:50%;width:100vw;transform:translateX(-50%);top:-26vh;bottom:-260px;pointer-events:none;-webkit-mask-image:linear-gradient(#000 calc(100% - 200px),transparent);mask-image:linear-gradient(#000 calc(100% - 200px),transparent);
-  background:radial-gradient(120% 92% at 50% 100%,#ff8a3d 0%,#ff5263 26%,#ee5fbd 46%,#8a6dff 62%,#5b8cff 70%,#f7f6f300 86%)}
+  background:radial-gradient(120% 92% at 50% 100%,#7a2e3a 0%,#b4432a 22%,#e2703a 40%,#f2a341 56%,#f7d3a1 68%,#f7f6f300 84%)}
 .main[data-view=chat]:has(.welcome) .messages{display:flex!important;flex-direction:column;justify-content:safe flex-end;overflow-y:auto}
 .main[data-view=chat]:has(.welcome) .welcome{margin:0 auto 20px!important}
 .main[data-view=chat]:has(.welcome) .composer-shell{padding-bottom:clamp(56px,26vh,280px)!important}
 @media(max-width:640px){.main[data-view=chat]:has(.welcome) .composer-shell{padding-bottom:clamp(32px,14vh,120px)!important}.main[data-view=chat]:has(.welcome) .welcome h1{font-size:32px!important}}
-.main[data-view=chat]:has(.welcome) .composer{border-radius:var(--d-r-xl)!important;border-color:#ffffff!important;box-shadow:0 2px 6px #15140f14,0 30px 70px -20px #6a1f4a66!important}
+.main[data-view=chat]:has(.welcome) .composer{border-radius:var(--d-r-xl)!important;border-color:#ffffff!important;box-shadow:0 2px 6px #15140f14,0 30px 70px -20px #7a2e3a59!important}
 .main[data-view=chat]:has(.welcome) .composer-shell>:not(.composer){color:#ffffffd9!important}
 .welcome .orb{display:none!important}
 .welcome{position:relative;z-index:1;margin-top:clamp(48px,14vh,140px)!important}
@@ -84,7 +85,7 @@ input,textarea{caret-color:var(--d-focus)}
 
 /* ---------- The prompt box: one look on every screen ---------- */
 .composer{background:var(--d-surface)!important;border:1px solid var(--d-line)!important;border-radius:var(--d-r-lg)!important;box-shadow:var(--d-shadow-2)!important;transition:border-color .15s,box-shadow .15s}
-.composer:focus-within{border-color:var(--d-line-strong)!important;box-shadow:0 0 0 4px #6a5cf614,var(--d-shadow-2)!important}
+.composer:focus-within{border-color:var(--d-line-strong)!important;box-shadow:0 0 0 4px #c2512d1f,var(--d-shadow-2)!important}
 .composer textarea{font-size:15px!important;color:var(--d-ink)!important}
 .composer textarea::placeholder{color:#a19b8f!important}
 .composer-shell{position:relative;z-index:2}
@@ -153,7 +154,7 @@ dialog .icon-btn:hover{background:var(--d-tint)!important;border-color:var(--d-l
 .studio-panel .agent-principle{background:var(--d-tint)!important;border:0!important;border-radius:var(--d-r)!important;box-shadow:none!important;color:var(--d-ink-2)!important}
 .studio-form label{color:var(--d-ink)!important;font-size:13px!important;font-weight:500!important}
 .studio-form input,.studio-form textarea,.studio-form select{background:var(--d-surface)!important;border:1px solid var(--d-line-strong)!important;border-radius:var(--d-r-sm)!important;font-size:14px!important;color:var(--d-ink)!important;box-shadow:none!important}
-.studio-form input:focus,.studio-form textarea:focus{border-color:var(--d-focus)!important;box-shadow:0 0 0 3px #6a5cf61f!important;outline:0!important}
+.studio-form input:focus,.studio-form textarea:focus{border-color:var(--d-focus)!important;box-shadow:0 0 0 3px #c2512d26!important;outline:0!important}
 @media(max-width:900px){.studio-header-card{flex-direction:column;align-items:flex-start!important}.studio-status-bar{width:100%}.studio-status-item{flex:1}}
 
 /* ---------- Connections, Templates and Playbook sheets: white like every other surface ---------- */
@@ -192,7 +193,7 @@ dialog [class*=avatar],dialog .conn-icon,dialog .connector-icon{border-radius:10
 .main[data-view=command]{isolation:isolate}
 .main[data-view=command] .kh-composer-slot{position:relative}
 .main[data-view=command] .kh-composer-slot::before{content:"";position:absolute;z-index:-1;left:50%;width:100vw;transform:translateX(-50%);top:-24vh;bottom:-220px;pointer-events:none;-webkit-mask-image:linear-gradient(#000 calc(100% - 180px),transparent);mask-image:linear-gradient(#000 calc(100% - 180px),transparent);
-  background:radial-gradient(120% 92% at 50% 100%,#ff8a3d 0%,#ff5263 26%,#ee5fbd 46%,#8a6dff 62%,#5b8cff 70%,#f7f6f300 86%)}
+  background:radial-gradient(120% 92% at 50% 100%,#7a2e3a 0%,#b4432a 22%,#e2703a 40%,#f2a341 56%,#f7d3a1 68%,#f7f6f300 84%)}
 .main[data-view=command] .kh-hero p{color:var(--d-ink-2)!important}
 #khApps{position:relative;z-index:1;background:var(--d-surface)!important;border:1px solid var(--d-line)!important;border-radius:24px!important;box-shadow:0 -10px 40px -24px #15140f40,var(--d-shadow-2)!important;padding:18px 22px 26px!important;margin-top:28px}
 #khApps h2{font-size:15px!important;font-weight:600!important;color:var(--d-ink)!important;margin:0 0 14px!important}
@@ -203,6 +204,6 @@ dialog [class*=avatar],dialog .conn-icon,dialog .connector-icon{border-radius:10
 dialog .eyebrow{display:none!important}
 input[type=range]{accent-color:var(--d-ink)}
 dialog select,dialog textarea,dialog input[type=text],dialog input[type=email],dialog input[type=url],dialog input[type=number]{border:1px solid var(--d-line-strong)!important;border-radius:var(--d-r-sm)!important;background:var(--d-surface)!important;color:var(--d-ink)!important;font-size:14px!important;box-shadow:none!important}
-dialog select:focus,dialog textarea:focus,dialog input:focus{border-color:var(--d-focus)!important;box-shadow:0 0 0 3px #6a5cf61f!important;outline:0!important}
+dialog select:focus,dialog textarea:focus,dialog input:focus{border-color:var(--d-focus)!important;box-shadow:0 0 0 3px #c2512d26!important;outline:0!important}
 #saveSettings{display:flex!important;width:auto!important;margin:20px 0 0 auto!important;align-items:center}
 dialog label,dialog .field-label{color:var(--d-ink)!important;font-weight:500}

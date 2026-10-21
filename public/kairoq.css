@@ -1,0 +1,71 @@
+/* Kairoq, one look for the standalone pages (Build Studio, API Intelligence, Carousel Designer).
+   The same tokens as the workspace (design.css): Geist, one ink, Kairoq's ember accent, white
+   surfaces on a warm page, one field, one button pair. Loaded after each page's own styles. */
+:root{
+  --k-bg:#f7f6f3;--k-surface:#fff;--k-tint:#f4f2ee;--k-line:#e8e5de;--k-line-strong:#d9d5cc;
+  --k-ink:#15140f;--k-ink-2:#4f4b43;--k-ink-3:#857f74;
+  --k-ember:#c2512d;--k-brand:linear-gradient(120deg,#b4432a 0%,#e2703a 55%,#f2a341 100%);
+  --k-shadow-1:0 1px 2px #15140f0d;--k-shadow-2:0 1px 2px #15140f0a,0 12px 32px -14px #15140f2e;
+  --surface:var(--k-surface);--edge:var(--k-line);--border:var(--k-line);--muted:var(--k-ink-3);--ink:var(--k-ink);--accent:var(--k-ember);
+  color:var(--k-ink)!important;background:var(--k-bg)!important;color-scheme:light;
+  font-family:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important
+}
+html,body{background:var(--k-bg)!important;color:var(--k-ink)!important}
+body,button,input,select,textarea{font-family:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}
+::selection{background:#e2703a33}
+:focus-visible{outline:2px solid var(--k-ember)!important;outline-offset:2px!important}
+
+/* Page shell: the work sits on white panels on the warm page */
+.app,.shell,.layout{background:var(--k-bg)!important}
+.panel,.preview{background:transparent!important;border-color:var(--k-line)!important;color:var(--k-ink)!important}
+.app>.panel{background:var(--k-surface)!important;border-right:1px solid var(--k-line)!important}
+.panel .panel,.controls,.report,.notice,.status,details,.empty,.example{background:var(--k-surface)!important;border:1px solid var(--k-line)!important;border-radius:14px!important;box-shadow:var(--k-shadow-1)!important;color:var(--k-ink-2)!important}
+section.panel:not(.app>.panel){background:var(--k-surface)!important;border:1px solid var(--k-line)!important;border-radius:20px!important;box-shadow:var(--k-shadow-1)!important}
+
+/* Type: Geist, ink headings, no tracked capitals */
+h1,h2,h3,h4{font-family:"Geist",ui-sans-serif,sans-serif!important;color:var(--k-ink)!important;text-wrap:balance}
+h1{font-weight:600!important;letter-spacing:-.035em!important}
+h2,h3{font-weight:600!important;letter-spacing:-.02em!important}
+p,.lead,.sub,.muted,.small,small,.status{color:var(--k-ink-2)!important}
+.muted,.small,small{color:var(--k-ink-3)!important}
+.crumb,.eyebrow,label{letter-spacing:0!important;text-transform:none!important}
+.crumb,.eyebrow{color:var(--k-ink-3)!important;font-size:13px!important;font-weight:500!important}
+.crumb{text-decoration:none}
+.crumb:hover{color:var(--k-ink)!important}
+label{color:var(--k-ink)!important;font-size:13px!important;font-weight:500!important}
+a{color:var(--k-ink)}
+a:not(.crumb):not(.small){text-decoration-color:var(--k-line-strong);text-underline-offset:3px}
+.logo{color:var(--k-ink)!important}
+
+/* Fields */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select,textarea{background:var(--k-surface)!important;color:var(--k-ink)!important;border:1px solid var(--k-line-strong)!important;border-radius:10px!important;box-shadow:none!important;font-size:14px!important}
+input::placeholder,textarea::placeholder{color:#a19b8f!important}
+input:focus,select:focus,textarea:focus{border-color:var(--k-ember)!important;box-shadow:0 0 0 3px #c2512d26!important;outline:0!important}
+input[type=range],input[type=checkbox],input[type=radio]{accent-color:var(--k-ink)}
+summary{color:var(--k-ink)!important;font-weight:500}
+
+/* Buttons: white secondary by default, ink primary, quiet danger */
+button,a.small[style*=border]{background:var(--k-surface)!important;color:var(--k-ink)!important;border:1px solid var(--k-line-strong)!important;border-radius:10px!important;box-shadow:var(--k-shadow-1)!important;font-weight:600!important;filter:none!important;transition:background-color .15s,border-color .15s}
+button:hover{background:var(--k-tint)!important}
+button.primary,.primary,button:not(.secondary):not(.danger):not(.pill)[type=submit]{background:var(--k-ink)!important;color:#fff!important;border-color:var(--k-ink)!important}
+button.primary:hover,.primary:hover,button:not(.secondary):not(.danger):not(.pill)[type=submit]:hover{background:#2b2a24!important}
+.danger,button.danger{color:#a33a22!important}
+button:disabled{opacity:.5!important;cursor:not-allowed!important}
+.pill{background:var(--k-tint)!important;color:var(--k-ink-2)!important;border:1px solid var(--k-line)!important;border-radius:999px!important}
+.strip button.active,.strip button[aria-pressed=true]{background:var(--k-ink)!important;color:#fff!important;border-color:var(--k-ink)!important}
+
+/* Previews keep their content as built: only the frame changes */
+.canvas{background:var(--k-tint)!important;border:1px solid var(--k-line)!important;border-radius:16px!important}
+.canvas.mobile iframe{border-color:#2b2a24!important}
+.canvasWrap{box-shadow:0 2px 6px #15140f14,0 30px 70px -24px #15140f40!important;border-radius:10px!important}
+/* The link to API Intelligence carries inline dark styles */
+a.small[style]{display:inline-flex!important;align-items:center;gap:6px;padding:8px 12px!important;background:var(--k-surface)!important;color:var(--k-ink)!important;border:1px solid var(--k-line-strong)!important;border-radius:10px!important;font-weight:500;box-shadow:var(--k-shadow-1)}
+.eyebrow:empty{display:none!important}
+.example span,.example small,.example p{color:var(--k-ink-3)!important}
+strong,b{color:var(--k-ink)!important}
+a,.top a,header a{color:var(--k-ink)!important}
+header{color:var(--k-ink-2)!important}
+input[type=file]{background:var(--k-surface)!important;color:var(--k-ink-2)!important;border:1px dashed var(--k-line-strong)!important;border-radius:10px!important;padding:10px!important}
+input[type=file]::file-selector-button{background:var(--k-tint);color:var(--k-ink);border:1px solid var(--k-line-strong);border-radius:8px;padding:6px 10px;margin-right:10px;font:inherit;font-weight:500;cursor:pointer}
+input[type=color]{background:var(--k-surface)!important;border:1px solid var(--k-line-strong)!important;border-radius:10px!important;padding:4px!important;height:42px}
+.field{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
