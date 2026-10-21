@@ -3,6 +3,7 @@
 // Official Jev API: https://docs.typesafe.ai/introduction/quickstart
 // ScaleDown endpoints: https://docs.scaledown.ai/
 // No arbitrary URL, shell or credentials in generated applications.
+const {publicFixture}=require("./decision-layer");
 const ENDPOINTS=Object.freeze({
   jev:"https://api.typesafe.ai/v1/systemone",
   scaledown:"https://api.scaledown.xyz/v1/scaledown",
@@ -25,7 +26,8 @@ const RULES=Object.freeze({
 function sanitizedState(value){
   if(typeof value!=="string"&&(!value||typeof value!=="object"||Array.isArray(value)))throw Error("Expected an explicit text or object state");
   const encoded=typeof value==="string"?value:JSON.stringify(value);
-  if(!encoded.trim()||Buffer.byteLength(encoded)>24000)throw Error("Decision state must contain 1–24000 UTF-8 bytes");
+  if(!encoded.trim()||Buffer.byteLength(encoded)>12000)throw Error("Decision state must contain 1–12000 UTF-8 bytes");
+  publicFixture(encoded); // Shared credential-pattern guard for public synthetic fixtures.
   return value;
 }
 function isSensitiveAction(action){
@@ -93,7 +95,8 @@ async function compressToolResult(original,question,{
   key=process.env.SCALEDOWN_API_KEY,fetchImpl,timeoutMs=7000,minChars=4000
 }={}){
   if(typeof original!=="string"||typeof question!=="string")throw Error("Text result and query required");
-  if(original.length>200000||question.length>1000)throw Error("Compression input too large");
+  if(original.length>12000||question.length>1000)throw Error("Compression input too large");
+  publicFixture(original);publicFixture(question);
   if(original.length<minChars)return{status:"unchanged",content:original,reason:"Below compression threshold"};
   try{
     const result=await requestJson(ENDPOINTS.compress,key,{
