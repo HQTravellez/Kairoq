@@ -2,7 +2,7 @@
    top bar, the preview as a card, quiet grouped controls, chat bubbles, one prompt box.
    Loaded last on create.html. */
 /* One brand gradient across Kairoq: the builder's logo, highlights and landing use it too */
-:root{--grad:linear-gradient(120deg,#b4432a 0%,#e2703a 55%,#f2a341 100%)}
+:root{--grad:linear-gradient(120deg,#b4432a 0%,#e2703a 55%,#f2a341 100%);--accent:#c2512d;--accent-2:#e2703a;--accent-3:#f2a341}
 
 /* On a phone the toolbar scrolls sideways instead of cutting controls off */
 @media(max-width:760px){#editor .stage-bar{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap!important}#editor .stage-bar::-webkit-scrollbar{display:none}#editor .stage-bar>*{flex-shrink:0}}
