@@ -278,6 +278,17 @@ function messageItem(m,last,index){
   const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
   if(thoughtMs!=null){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secs(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
   li.append(renderMarkdown(m.text));
+  // The builder's open question: one click answers it and builds (asking was free).
+  if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
+   const q=el('div','question-options');
+   m.question.options.forEach((o,i)=>{
+    const rec=i===m.question.recommended,b=el('button','q-opt'+(rec?' recommended':''),o);b.type='button';
+    if(rec)b.append(el('span','q-tag','Recommended'));
+    b.onclick=()=>{q.querySelectorAll('button').forEach(x=>{x.disabled=true});send(o,'build')};
+    q.append(b);
+   });
+   li.append(q,el('p','q-hint','Pick one, or type your own answer. "ok" goes with the recommended option.'));
+  }
   const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan');
   if(acts.length){
    const d=el('details','acts'),s=el('summary');s.append(icon('down','toggle'),el('span',null,summarize(tl)||acts.length+' steps'));
