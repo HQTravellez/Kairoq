@@ -6,6 +6,7 @@ on:
       - 'scripts/compare-builder-engines.js'
       - 'test/integration-lab.test.js'
       - 'test/decision-layer.test.js'
+      - 'test/decision-models.test.js'
       - '.github/workflows/integration-lab.yml'
   workflow_dispatch:
 permissions:
@@ -21,6 +22,7 @@ jobs:
       - run: npm ci
       - run: node --check integration-lab/bridges.js
       - run: node --check integration-lab/decision-layer.js
+      - run: node --check integration-lab/decision-models.js
       - run: node --check integration-lab/stagehand-readonly.mjs
       - run: node --check scripts/compare-builder-engines.js
-      - run: node --test test/integration-lab.test.js test/decision-layer.test.js test/opencode-engine.test.js test/api-learning.test.js
+      - run: node --test test/integration-lab.test.js test/decision-layer.test.js test/decision-models.test.js test/opencode-engine.test.js test/api-learning.test.js
