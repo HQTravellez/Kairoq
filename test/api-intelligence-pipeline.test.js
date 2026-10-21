@@ -21,7 +21,7 @@ const contracts={
   ["/fares","getFares","POST",obj(["origin","destination"],{origin:{type:"string"},destination:{type:"string"}})]])
 };
 const recipe={steps:[
- {id:"plan",type:"call",provider:"tripninja",operationId:"prepareSearch",args:{body:{$ref:"input"}}},
+ {id:"plan",type:"call",provider:"tripninja",operationId:"prepareSearch",args:{body:{$ref:"input.search"}}},
  {id:"responses",type:"fanout",items:{$ref:"steps.plan.queries"},routeField:"source",keyField:"key",
   routes:{supplier:{provider:"supplier",operationId:"getFares",args:{body:{$ref:"item.args"}}}}},
  {id:"final",type:"call",provider:"tripninja",operationId:"solve",
@@ -77,7 +77,7 @@ test("full pipeline: contracts -> CDM + Jev advice -> SDKs -> four mocked suppli
  assert.equal(prepared.advisory.estimatesUSD.jev,.00000462);
  assert.equal(prepared.advisory.estimatesUSD.scaledown,null);
  const output=await pipe.testWorkflow({prepared,contracts,workflow:recipe,
-  input:{journey:"YYZ-LHR"},approvedOperations:approvals,invoke:fakeExecutor});
+  input:{search:{journey:"YYZ-LHR"}},approvedOperations:approvals,invoke:fakeExecutor});
  assert.equal(output.operationCount,3);
  assert.deepEqual(output.output,{itineraries:[{price:125}]});
 });
@@ -85,11 +85,11 @@ test("baseline and intelligence-assisted workflows yield exactly same determinis
  const disabled=await pipe.prepare({contracts,workflow:recipe,publicDocumentation:[publicSnippet],ai:{enabled:false}});
  assert.equal(disabled.advisory.cdm[0].status,"disabled");
  assert.equal(disabled.advisory.jev.status,"disabled");
- const out=await pipe.testWorkflow({prepared:disabled,contracts,workflow:recipe,input:{journey:"YYZ-LHR"},
+ const out=await pipe.testWorkflow({prepared:disabled,contracts,workflow:recipe,input:{search:{journey:"YYZ-LHR"}},
   approvedOperations:approvals,invoke:fakeExecutor});
  const enabled=await pipe.prepare({contracts,workflow:recipe,publicDocumentation:[publicSnippet],
   ai:{enabled:true,allowThirdPartyDisclosure:true,scaleDownKey:"fixture-cdm",jevKey:"fixture-jev"},fetchImpl:mockVendor});
- const out2=await pipe.testWorkflow({prepared:enabled,contracts,workflow:recipe,input:{journey:"YYZ-LHR"},
+ const out2=await pipe.testWorkflow({prepared:enabled,contracts,workflow:recipe,input:{search:{journey:"YYZ-LHR"}},
   approvedOperations:approvals,invoke:fakeExecutor});
  assert.deepEqual(out,out2);
 });
@@ -107,7 +107,7 @@ test("missing credentials do not block deterministic API SDK generation or workf
  assert.equal(prepared.sdks.supplier.status,"generated-unexecuted");
  assert.equal(prepared.advisory.estimatesUSD.jev,null);
  const out=await pipe.testWorkflow({prepared,contracts,workflow:recipe,
-  input:{journey:"YYZ-LHR"},approvedOperations:approvals,invoke:fakeExecutor});
+  input:{search:{journey:"YYZ-LHR"}},approvedOperations:approvals,invoke:fakeExecutor});
  assert.equal(out.status,"completed");
 });
 test("external provider errors and confidence failures return review/unavailable, never invented operations",async()=>{
@@ -128,7 +128,7 @@ test("AI suggestions cannot grant write approvals or modify workflow graph",asyn
  const prep=await pipe.prepare({contracts,workflow:recipe,publicDocumentation:[publicSnippet],
   ai:{enabled:true,allowThirdPartyDisclosure:true,scaleDownKey:"fixture-cdm",jevKey:"fixture-jev"},fetchImpl:mockVendor});
  await assert.rejects(()=>pipe.testWorkflow({prepared:prep,contracts,workflow:recipe,
-  input:{journey:"YYZ-LHR"},approvedOperations:[],invoke:fakeExecutor}),/Explicit approval/);
+  input:{search:{journey:"YYZ-LHR"}},approvedOperations:[],invoke:fakeExecutor}),/Explicit approval/);
 });
 test("no estimated ScaleDown cost when rates are missing; rejecting negative rates",()=>{
  assert.equal(ai.estimateCost({input:100,output:12},null),null);
