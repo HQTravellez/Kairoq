@@ -112,7 +112,17 @@ test('scheduled automations run the function when due, log the run, email the ow
  assert.ok(logs.some(l=>l.source==='functions/remind.js'&&l.message==='reminding 1 bookings via schedule'),'the function log lines are kept');
  assert.ok(logs.some(l=>l.source==='automation reminders'&&/ran on schedule: ok 200/.test(l.message)));
  const st=(await request(server,'GET','/api/create/projects/'+id+'/automations',{headers:{cookie}})).json.automations;
- assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);assert.match(st[0].next,/T09:00:00\.000Z$/);assert.ok(Date.parse(st[0].next)>Date.now(),'next run is in the future');assert.equal(st[2].next,null);
+ assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);
+ // This fixture runs on Oct 20, 2026, but the status endpoint uses actual wall-clock time.
+ // When the test runs after Oct 20, an overdue schedule is correctly reported as due now.
+ const capturedNow=Date.now(),next=Date.parse(st[0].next);
+ if(automations.due(CONFIG.automations[0],at('20','09:00'),capturedNow)){
+  assert.ok(Math.abs(next-capturedNow)<30000,'overdue automation should be due now');
+ }else{
+  assert.match(st[0].next,/T09:00:00\.000Z$/);
+  assert.ok(next>=capturedNow,'upcoming scheduled run should not be in the past');
+ }
+ assert.equal(st[2].next,null);
  // Run now from the editor.
  const ran=(await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'reminders'}})).json;
  assert.equal(ran.run.result,'ok 200 {"reminded":1}');assert.equal(ran.automations[0].runs,2);
