@@ -37,7 +37,7 @@ There is no TypeSafe/Jev API call. GitHub Actions job `local-laya` tests actual 
 To run the real HASTE trial on a dedicated Python 3.11 environment:
 
 ```sh
-python -m pip install 'scaledown[haste]==0.1.0'
+python -m pip install 'scaledown[haste] @ git+https://github.com/scaledown-team/scaledown.git@43826532367e868157a37956a5b036346351b5d9'
 python scripts/local-haste-trial.py --out benchmark-artifacts/local-haste.json
 ```
 
