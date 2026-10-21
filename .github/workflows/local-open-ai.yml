@@ -1,0 +1,60 @@
+name: Open-source local AI trial
+on:
+  push:
+    branches:
+      - experiment/opencode-onlook-heyapi-stagehand
+    paths:
+      - 'scripts/laya-local-eval.py'
+      - 'scripts/local-haste-trial.py'
+      - 'integration-lab/local-laya.js'
+      - '.github/workflows/local-open-ai.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-haste:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install open-source ScaleDown HASTE (Python, isolated CI only)
+        run: python -m pip install 'scaledown[haste]==0.1.0'
+      - name: Execute real local HASTE selection with synthetic public Python
+        run: python scripts/local-haste-trial.py --out benchmark-artifacts/local-haste.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scaledown-local-haste-result
+          path: benchmark-artifacts/local-haste.json
+          if-no-files-found: warn
+  local-laya:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Apache-2.0 Laya at pinned upstream revision (in evaluation runner only)
+        run: python -m pip install 'git+https://github.com/NandhaKishorM/laya@6f0496f797dc7127265d62e1543a62de507d943c'
+      - name: Export exactly the same public task-routing fixtures as previous benchmark
+        run: |
+          mkdir -p benchmark-artifacts
+          node -e "process.stdout.write(JSON.stringify(require('./scripts/decision-provider-benchmark').fixtures))" > benchmark-artifacts/routing-fixtures.json
+      - name: Run actual local CPU model inference, report accuracy, abstention and latency
+        env:
+          HF_HUB_DISABLE_TELEMETRY: '1'
+          TOKENIZERS_PARALLELISM: 'false'
+        run: python scripts/laya-local-eval.py --fixtures benchmark-artifacts/routing-fixtures.json --out benchmark-artifacts/local-laya.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: laya-cpu-real-inference-result
+          path: benchmark-artifacts/local-laya.json
+          if-no-files-found: warn
