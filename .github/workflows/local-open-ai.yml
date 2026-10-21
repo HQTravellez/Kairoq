@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install open-source ScaleDown HASTE (Python, isolated CI only)
-        run: python -m pip install 'scaledown[haste]==0.1.0'
+        run: python -m pip install 'scaledown[haste] @ git+https://github.com/scaledown-team/scaledown.git@43826532367e868157a37956a5b036346351b5d9'
       - name: Execute real local HASTE selection with synthetic public Python
         run: python scripts/local-haste-trial.py --out benchmark-artifacts/local-haste.json
       - uses: actions/upload-artifact@v4
