@@ -1,0 +1,24 @@
+name: Integration lab smoke tests
+on:
+  pull_request:
+    paths:
+      - 'integration-lab/**'
+      - 'scripts/compare-builder-engines.js'
+      - 'test/integration-lab.test.js'
+      - '.github/workflows/integration-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-adapters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --check integration-lab/bridges.js
+      - run: node --check integration-lab/stagehand-readonly.mjs
+      - run: node --check scripts/compare-builder-engines.js
+      - run: node --test test/integration-lab.test.js test/opencode-engine.test.js test/api-learning.test.js
