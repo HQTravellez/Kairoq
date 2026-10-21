@@ -234,6 +234,19 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   const Q=require('./builder-question'),a=Q.answer(message,Q.pending(builder.loadMeta(id)));
   if(a){shownText=String(message).trim();message=a.message;mode='build'}
  }
+ // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
+ // build, no design pick), and a question that asks for no change gets an answer instead of a build.
+ if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&!shownText){
+  const S=require('./builder-smalltalk'),kind=S.smallTalk(message);
+  if(kind){
+   const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
+   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
+   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
+   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+   return job;
+  }
+  if(mode==='build'&&S.questionOnly(message)&&!supportQuestion(message))mode='discuss';
+ }
  if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&supportQuestion(message)){
   const meta=builder.loadMeta(id),answer=supportAnswer(meta);
   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);

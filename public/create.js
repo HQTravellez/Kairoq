@@ -806,7 +806,8 @@ function workCard(){
   li=el('li','assistant work');li.id='stream';
   const status=el('button','status-line');status.type='button';status.append(el('span','status-text','Thinking'),icon('chev'));status.onclick=()=>openDetail('live');
   const head=el('div','work-head');head.append(status,el('span','work-time'));const stop=el('button','ghost work-stop','Stop');stop.type='button';stop.onclick=()=>$('stop-job').click();head.append(stop);
-  li.append(head,el('ol','stages'),el('p','work-think hidden'),el('ol','rail live'),el('div','work-msg hidden'));
+  // Like Lovable: one status line, then what Kairoq says and plans; the step checklist stays in Details.
+  li.append(head,el('div','work-msg hidden'),el('ol','stages'),el('p','work-think hidden'),el('ol','rail live'));
   $('messages').append(li);$('messages').scrollTop=$('messages').scrollHeight;
  }
  return li;
@@ -835,7 +836,7 @@ function renderBuildOverlay(j){
  const p=state.project,fresh=p&&p.current_version<=1&&!(p.versions||[]).some(v=>v.n>1);
  o.classList.toggle('first',Boolean(fresh));o.classList.remove('hidden');
  const box=o.querySelector('.bo-card');box.replaceChildren();
- if(fresh){box.append(el('p','bo-kicker','Building'),el('h3',null,p.name),stageList(j));const t=thinkingLine();if(t&&stageOf(phaseOf(j))==='thinking')box.append(el('p','bo-think',t))}
+ if(fresh){box.append(el('span','bo-spin'),el('h3',null,p.name),el('p','bo-think',liveStatus(j)))}
  else box.append(el('span','bo-spin'),el('span',null,(PHASES[phaseOf(j)]||'Working')+'… the preview updates when it is ready'));
 }
 function liveStatus(j){
@@ -867,10 +868,14 @@ function renderWork(j){
  const th=li.querySelector('.work-think'),thought=stageOf(phaseOf(j))==='thinking'?thinkingLine():'';th.classList.toggle('hidden',!thought);text(th,thought);
  renderBuildOverlay(j);
  const r=li.querySelector('.rail.live');r.replaceChildren();
- for(const e of liveEvents(j).filter(e=>e.t!=='plan').slice(-6))r.append(eventRow(e,{live:true}));
+ // Only the files it is changing and the problems it is fixing show here; notes (the design pick,
+ // engine switches) and the rest stay in Details.
+ for(const e of liveEvents(j).filter(e=>e.t==='edit'||e.t==='fix'||(e.t==='build'&&e.ok===false)).slice(-6))r.append(eventRow(e,{live:true}));
  const msg=li.querySelector('.work-msg');
  const said=j.mode==='discuss'?(st&&st.text)||'':j.mode==='agent'&&j.agent&&j.agent.steps.length?'':work.message;
- msg.classList.toggle('hidden',!said);text(msg,said);
+ const planText=j.mode!=='discuss'&&work.plan&&work.plan.length?work.plan.map(x=>'- '+x).join('\n'):'';
+ const body=[said,planText].filter(Boolean).join('\n\n');
+ msg.classList.toggle('hidden',!body);msg.replaceChildren(body?renderMarkdown(body):'');
  if(detailState.source==='live')renderDetail();
  if(stick)list.scrollTop=list.scrollHeight;
 }

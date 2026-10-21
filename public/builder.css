@@ -67,3 +67,19 @@
 /* "Implement this plan" under a Discuss reply: a real button, like Lovable's */
 #editor .messages li.assistant>.small-btn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;height:34px;padding:0 14px!important;border-radius:10px!important;border:0!important;background:var(--b-ink)!important;color:#fff!important;font-size:13px!important;font-weight:600!important;box-shadow:var(--b-shadow-1)!important}
 #editor .messages li.assistant>.small-btn:hover{background:#2b2a24!important}
+
+/* ---------- While it works: one status line, its words and plan; steps live in Details ---------- */
+#editor li.work .stages{display:none!important}
+#editor li.work .work-msg{margin:6px 0 4px;color:var(--b-ink)!important;font-size:14px;line-height:1.6}
+#editor li.work .work-msg ul{margin:6px 0 0;padding-left:18px}
+#editor li.work .work-think{color:var(--b-ink-3)!important;font-size:12px!important;font-style:normal}
+#editor li.work .status-text{color:var(--b-ink-2)!important;font-weight:500;background:linear-gradient(90deg,var(--b-ink-3) 0%,var(--b-ink) 50%,var(--b-ink-3) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:b-shimmer 1.6s linear infinite}
+@keyframes b-shimmer{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){#editor li.work .status-text{animation:none;color:var(--b-ink-2)!important;background:none}}
+/* The strip above the prompt box repeats the status line; its Stop stays reachable from the line */
+#editor .chat:has(#stream) #progress{display:none!important}
+/* First build: the preview shows the app's name and one quiet status, not a checklist */
+#build-overlay .bo-card{text-align:center;display:grid;justify-items:center;gap:10px}
+#build-overlay .bo-card h3{margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em;color:#15140f}
+#build-overlay .bo-card .bo-think{margin:0;color:#857f74;font-size:14px}
+#build-overlay .bo-kicker{display:none}
