@@ -25,3 +25,29 @@ Before any merge to main or enablement for users, complete all of the following:
 A successful offline unit test is NOT a full-stack production benchmark.
 
 Upstream source references: https://github.com/anomalyco/opencode ; https://github.com/onlook-dev/onlook ; https://github.com/hey-api/hey-api ; https://github.com/browserbase/stagehand.
+
+## Jev and ScaleDown CDM decision/context trial
+
+A separate CommonJS adapter lives at `integration-lab/decision-models.js`, with offline tests at `test/decision-models.test.js`. No production Kairoq modules import it.
+
+- **Jev:** Calls TypeSafe's official `/v1/systemone` endpoint with a `choice` question across five existing specialist handlers: coding, API, design, QA, or discussion. Requires `TYPESAFE_API_KEY`.
+- **ScaleDown Classify:** Alternative decision provider using `/v1/scaledown` and `SCALEDOWN_API_KEY`.
+- **ScaleDown Compress:** Optional text-only compression of large tool results using `/compress/raw/`. The caller must retain the original source for re-reading.
+- **Safety:** Confidence and selected-label probability must both reach 0.82; unknown choices fail closed. High-impact actions never receive authority from a model choice.
+- **Privacy:** Experiment inputs must be sanitized. Never transmit customer data or credentials, and never embed vendor keys in generated apps.
+- **Costs:** Offline mock tests do not make billable model calls. Actual provider validation requires credentials and explicit paid-usage approval.
+
+### Example in an isolated test harness
+
+```js
+const {routeTask,compressToolResult}=require("./integration-lab/decision-models");
+const suggestion=await routeTask("Build an API integration for Trip Ninja",{
+  provider:"jev",key:process.env.TYPESAFE_API_KEY,action:"read API documentation"
+});
+if(suggestion.status==="routed") console.log(suggestion.route);
+// This NEVER grants authority to deploy or send anything.
+```
+
+**Release blocker:** No real provider calls, confidence calibration, cross-model benchmarking, or factual-retention tests have been completed. Do not replace Kairoq's prompt history automatically with compressed context.
+
+Primary references: https://docs.typesafe.ai/introduction/quickstart and https://www.langchain.com/blog/building-long-running-agents-with-scaledown-and-deep-agents
