@@ -5,7 +5,13 @@
 :root{--grad:linear-gradient(120deg,#b4432a 0%,#e2703a 55%,#f2a341 100%);--accent:#c2512d;--accent-2:#e2703a;--accent-3:#f2a341}
 
 /* On a phone the toolbar scrolls sideways instead of cutting controls off */
-@media(max-width:760px){#editor .stage-bar{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap!important}#editor .stage-bar::-webkit-scrollbar{display:none}#editor .stage-bar>*{flex-shrink:0}}
+/* When the stage is narrow the toolbar scrolls sideways instead of wrapping over itself */
+#editor .stage-bar{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap!important}#editor .stage-bar::-webkit-scrollbar{display:none}#editor .stage-bar>*{flex-shrink:0}
+/* One typeface: the landing's highlighted words and project initials use Geist, not an italic serif */
+.landing{--serif:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.landing h2 em,.hero h1 em{font-style:normal!important;font-weight:inherit!important;letter-spacing:inherit!important;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.steps li::after,.quote{font-style:normal!important}
+.projects.cards .thumb{font-family:"Geist",ui-sans-serif,sans-serif!important;font-weight:600!important;letter-spacing:-.02em;background:var(--thumb,var(--grad))!important}
 
 #editor{
   --b-bg:#fbfaf8;--b-tint:#f1efea;--b-surface:#fff;--b-line:#e8e5de;--b-line-strong:#d9d5cc;
