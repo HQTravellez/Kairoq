@@ -1,0 +1,35 @@
+name: Jev and ScaleDown real-provider benchmark
+on:
+  push:
+    branches:
+      - experiment/opencode-onlook-heyapi-stagehand
+    paths:
+      - 'scripts/decision-provider-benchmark.js'
+      - 'test/decision-provider-benchmark.test.js'
+      - '.github/workflows/decision-provider-benchmark.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+      SCALEDOWN_API_KEY: ${{ secrets.SCALEDOWN_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Offline benchmark methodology checks
+        run: node --test test/decision-provider-benchmark.test.js test/decision-models.test.js
+      - name: Live real-provider comparison (public synthetic fixtures only)
+        run: node scripts/decision-provider-benchmark.js --out benchmark-artifacts/decision-providers.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jev-scaledown-real-or-blocked-report
+          path: benchmark-artifacts/decision-providers.json
+          if-no-files-found: warn
