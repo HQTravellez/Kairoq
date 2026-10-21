@@ -275,6 +275,16 @@ function cleanBuildError(e){
 }
 
 // ---------- model response ----------
+// Models now and then drop the src/ folder ("backend.json", "App.jsx") or add "./" or "/";
+// such a path is put where it belongs instead of failing the whole build.
+function fixPath(name){
+ if(typeof name!=='string')return name;
+ let p=name.trim().replace(/\\/g,'/').replace(/^(?:\.\/|\/)+/,'');
+ if(validPath(p))return p;
+ if(!/^(src|functions|sql)\//.test(p)&&validPath('src/'+p))return 'src/'+p;
+ return name;
+}
+function fixPaths(obj){const out={};for(const [k,v] of Object.entries(obj||{}))out[fixPath(k)]=v;return out}
 function parseEdit(content){
  let value=content;
  if(typeof value==='string'){
@@ -290,7 +300,7 @@ function parseEdit(content){
  if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
  const plan=(Array.isArray(value.plan)?value.plan:[]).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,6);
- return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:value.files||{},edits,delete:del,images:imageRequests(value.images),checks:Array.isArray(value.checks)?value.checks.slice(0,2):[]};
+ return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:fixPaths(value.files),edits:fixPaths(edits),delete:del.map(fixPath),images:imageRequests(value.images),checks:Array.isArray(value.checks)?value.checks.slice(0,2):[]};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];

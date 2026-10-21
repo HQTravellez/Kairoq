@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/calm.css?v=20">
   <link rel="stylesheet" href="/sidebar.css?v=4">
   <link rel="stylesheet" href="/composer.css?v=4">
-  <link rel="stylesheet" href="/home.css?v=12">
+  <link rel="stylesheet" href="/home.css?v=13">
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay hidden">
@@ -294,6 +294,7 @@
 
       <section id="buildView" class="build-view hidden" aria-label="App builder">
         <iframe id="buildFrame" title="App builder"></iframe>
+        <div class="build-loading" aria-live="polite"><span class="build-spinner" aria-hidden="true"></span><p>Setting up your app…</p></div>
       </section>
 
       <section id="studioView" class="studio-view hidden">
@@ -1354,7 +1355,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=27"></script>
+  <script src="/app.js?v=28"></script>
 <script src="/connections.js?v=20"></script>
 </body>
 </html>

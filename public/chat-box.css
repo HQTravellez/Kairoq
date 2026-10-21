@@ -42,3 +42,24 @@
 .model-tag.top{background:#e8efff;color:#2f5bd3}
 .model-tag.cost{margin-left:6px;padding:0;color:#c2581f;background:none;font-weight:500;font-size:11.5px}
 .chat .composer-bar #menu-tier .menu-panel{max-height:min(460px,60vh);overflow-y:auto}
+
+/* Quick questions card in the chat: fits the narrow chat column, nothing wraps mid-word. */
+.messages li.ask-card{gap:12px;padding:16px!important}
+.ask-card .ask-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ask-card .ask-count{font-size:12px;font-weight:600;color:var(--accent);margin:0}
+.ask-card .ask-link{flex:none;white-space:nowrap;border:0;background:none;box-shadow:none;padding:4px 8px;border-radius:8px;color:var(--muted);font:500 12.5px/1 inherit;cursor:pointer}
+.ask-card .ask-link:hover{background:var(--hover);color:var(--text)}
+.ask-card .ask-q{margin:0;font-size:15px;font-weight:600;line-height:1.35;color:var(--text)}
+.ask-card .ask-opts{display:grid;gap:8px}
+.ask-card .ask-opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:14px;font-weight:500;line-height:1.3;cursor:pointer;transition:border-color .12s,background .12s}
+.ask-card .ask-opt:hover{border-color:#cfc9bd}
+.ask-card .ask-opt.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink) inset}
+.ask-card .ask-opt input{flex:none;width:16px;height:16px;margin:0;padding:0;border:0;background:none;box-shadow:none;outline:none;accent-color:var(--ink);appearance:auto;-webkit-appearance:auto}
+.ask-card .ask-opt input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.ask-card .ask-foot{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:nowrap;margin-top:2px}
+.ask-card .ask-foot .ask-link{margin-right:auto;padding-left:0}
+.ask-card .ask-ghost,.ask-card .ask-next{flex:none;white-space:nowrap;height:34px;padding:0 14px;border-radius:999px;font:600 13px/1 inherit;cursor:pointer;box-shadow:none}
+.ask-card .ask-ghost{border:1px solid var(--border);background:#fff;color:var(--text)}
+.ask-card .ask-ghost:hover{background:var(--hover)}
+.ask-card .ask-next{border:0;background:var(--ink);color:var(--ink-text)}
+.ask-card .ask-next:hover{opacity:.9}
