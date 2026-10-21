@@ -149,8 +149,8 @@ async function liveInvoker({provider,plan,operationId,args,approvedWrites}){
  // Separate explicit invocation: api-adapter still enforces host, DNS, credential,
  // live-enabled, and per-operation write gates. Never called by run() automatically.
  return require("./api-adapter").execute({
-  plan,operationId,...args,credentialName:"KAIROQ_API_TOKEN_"+provider.toUpperCase(),
-  approved:true,approvedWrites
+  plan,operationId,pathParams:args.pathParams||{},query:args.query||{},body:args.body,
+  credentialName:"KAIROQ_API_TOKEN_"+provider.toUpperCase(),approved:true,approvedWrites
  });
 }
 module.exports={run,validateSpec,contractsFrom,materialize,lookup,opApprovalKey,liveInvoker,MAX_FANOUT};
