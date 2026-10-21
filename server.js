@@ -6655,7 +6655,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   if(opts.only&&!allowPaid)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
   // Pro tier: stronger models first, then the standard paid chain; never free models.
-  const proCandidates=String(process.env.KAIROQ_PRO_MODELS||"anthropic/claude-sonnet-4.5,openai/gpt-5").split(",").map(m=>m.trim()).filter(Boolean);
+  const proCandidates=String(process.env.KAIROQ_PRO_MODELS||"anthropic/claude-sonnet-5.5,openai/gpt-6").split(",").map(m=>m.trim()).filter(Boolean);
   const visionCandidates=String(process.env.KAIROQ_VISION_MODELS||"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean);
   if((opts.tier==="pro"||opts.tier==="vision")&&!allowPaid)throw Error("Pro and image models need KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left this month."+(errors.length?" "+errors.join(" | "):""));
   const maxCandidates=String(process.env.KAIROQ_MAX_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);

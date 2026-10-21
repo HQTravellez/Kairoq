@@ -505,7 +505,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  meta=loadMeta(id);
  let base=loadFiles(id,meta.current_version);
  if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
- const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
+ // The first build turns the bare starter into a whole product, as Lovable does, not one basic page.
+ const firstBuild=require('./react-design').isUntouchedStarter(base);
+ const request='Current project files:\n\n'+contextFiles(base)+(firstBuild?'\n\n'+FIRST_BUILD:'')+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null,securityTries=0;
@@ -518,7 +520,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
  let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),check:files=>selfCheck(id,meta,files,checkRuntime),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
  let usedOpenCode=false,usedFallback=false;
- const ocRequest=(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
+ const ocRequest=(firstBuild?FIRST_BUILD+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
  let thinking='',thoughtMs=null,firstPlan=null;
@@ -681,6 +683,14 @@ async function polish(id,{shots,note='',...opts}){
  return result?{...result,...(done>1?{rounds:done}:{})}:{unchanged:true,version:loadMeta(id).current_version,preview_url:previewUrl(loadMeta(id))};
 }
 
+// What a first build delivers: a complete, designed product the owner can show the same day.
+const FIRST_BUILD=`This is the first build: the project is still the bare starter. Deliver the whole product the request describes, finished and designed, not a single basic page:
+- A website: a shared header with working navigation and a footer; a home page with a strong hero (real headline, one clear call to action, a real photo) and 5 to 7 distinct sections that fit the business (services or menu, how it works, highlights, testimonials written as clearly illustrative, pricing or rates when relevant, FAQ, contact); and 2 to 4 more pages the navigation names (for example About, Services, Pricing, Contact, Booking), each with real content.
+- An app or tool: a layout with sidebar or top navigation, 3 to 5 working screens (an overview with real numbers from the data, a list with search and filters, a detail view, a create or edit form, settings), sample records in the backend so nothing opens empty, and designed empty, loading and error states.
+- Every form the product needs works and saves (booking, sign-up, contact, order) with validation and a clear confirmation.
+- Design: follow the design direction and tokens; a consistent type scale, generous spacing, one accent colour, real photos (generated images or https://images.unsplash.com URLs that fit the subject), subtle hover and focus states, and a layout that works on a phone.
+- Write the copy for this business: names, prices and times that sound real, never lorem ipsum. Where a fact would need real data you do not have (actual prices, inventory, addresses), use clearly sample values and say so in your message.
+Split the code into components and pages (src/pages/, src/components/) rather than one long App.jsx. In "message", say in two or three sentences what you built and what to try first.`;
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.
 Answer questions about the app, suggest improvements, and when the user wants a change, reply with a short numbered plan of what you would change and which files. Keep answers brief and concrete. Plain text, no JSON.
 When the user must choose something before the change can be built, end with exactly one last line: QUESTION: the question? | recommended option | other option (2 to 4 short options, the safest first). Ask a question once; when the user has answered or said "ok"/"yes", do not ask it again.`;
