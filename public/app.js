@@ -2897,29 +2897,42 @@ function launchAppBuild(prompt){
   setAppBuildMode(false);
   openBuilder("/create?embed=1");
 }
-async function loadHomeApps(){
-  const box=$("#khApps"),list=$("#khAppList");if(!box||!list)return;
-  try{
-    const r=await fetch("/api/create/projects",{credentials:"same-origin"});
-    const {projects=[]}=r.ok?await r.json():{};
-    list.replaceChildren(...projects.slice(0,6).map(p=>{
-      const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
-      const name=String(p.name||"Untitled app");
-      let hue=0;for(const ch of name)hue=(hue*31+ch.charCodeAt(0))%360;
-      const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--h",hue);thumb.setAttribute("aria-hidden","true");
-      thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
-      // The app's own picture once Kairoq has taken one; the initials stay underneath.
-      if(p.thumb){const img=document.createElement("img");img.src=p.thumb;img.alt="";img.loading="lazy";img.decoding="async";img.onerror=()=>img.remove();thumb.append(img)}
-      const meta=document.createElement("span");meta.className="kh-app-meta";
-      const title=document.createElement("strong");title.textContent=name;
-      const when=document.createElement("small");when.textContent=p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"";
-      meta.append(title,when);b.append(thumb,meta);
-      b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
-      li.append(b);return li;
-    }));
-    box.classList.toggle("hidden",!projects.length);
-  }catch{box.classList.add("hidden")}
+// One app card (Home's "Your apps" and the projects grid under the new-chat prompt): the app's
+// picture when Kairoq has taken one, its initials on a colour from its name underneath.
+function appCard(name,{thumbUrl,sub,onOpen}){
+  const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
+  let hue=0;for(const ch of name)hue=(hue*31+ch.charCodeAt(0))%360;
+  const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--h",hue);thumb.setAttribute("aria-hidden","true");
+  thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  if(thumbUrl){const img=document.createElement("img");img.src=thumbUrl;img.alt="";img.loading="lazy";img.decoding="async";img.onerror=()=>img.remove();thumb.append(img)}
+  const meta=document.createElement("span");meta.className="kh-app-meta";
+  const title=document.createElement("strong");title.textContent=name;
+  const when=document.createElement("small");when.textContent=sub||"";
+  meta.append(title,when);b.append(thumb,meta);b.onclick=onOpen;
+  li.append(b);return li;
 }
+function showProjectsTab(tab){
+  for(const t of document.querySelectorAll(".wp-tab")){const on=t.dataset.wp===tab;t.classList.toggle("active",on);t.setAttribute("aria-selected",String(on))}
+  const mine=tab==="mine",has=$("#wpList")?.children.length>0;
+  $("#wpList")?.classList.toggle("hidden",!mine||!has);
+  $("#wpEmpty")?.classList.toggle("hidden",!mine||has);
+  $("#wpTemplates")?.classList.toggle("hidden",mine);
+}
+async function loadHomeApps(){
+  const box=$("#khApps"),list=$("#khAppList"),grid=$("#wpList");
+  let projects=[];
+  try{const r=await fetch("/api/create/projects",{credentials:"same-origin"});({projects=[]}=r.ok?await r.json():{})}catch{}
+  const cards=n=>projects.slice(0,n).map(p=>{const name=String(p.name||"Untitled app");return appCard(name,{thumbUrl:p.thumb,sub:p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"",onOpen:()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id))})});
+  if(box&&list){list.replaceChildren(...cards(6));box.classList.toggle("hidden",!projects.length)}
+  if(grid){
+    grid.replaceChildren(...cards(12));
+    const ideas=[...document.querySelectorAll(".kh-app-ideas [data-idea]")].map(b=>b.textContent.trim()).filter(Boolean);
+    $("#wpTemplates")?.replaceChildren(...ideas.map(idea=>appCard(idea,{sub:"Start from this",onOpen:()=>startAppBuild(idea)})));
+    showProjectsTab(projects.length?"mine":"templates");
+  }
+}
+for(const t of document.querySelectorAll(".wp-tab"))t.onclick=()=>showProjectsTab(t.dataset.wp);
+if($("#wpAll"))$("#wpAll").onclick=()=>openBuilder("/create?embed=1");
 function startAppBuild(prompt){
   if(!prompt){promptEl.focus();return}
   launchAppBuild(prompt);

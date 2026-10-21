@@ -62,9 +62,12 @@ input,textarea{caret-color:var(--d-focus)}
 .kh-hero h1 em{background:var(--d-brand)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
 
 /* ---------- New-chat screen: plain top, a bright horizon rising behind the prompt ---------- */
-.main[data-view=chat]:has(.welcome)>.kh-sky{inset:auto 0 0 0!important;height:68%!important;-webkit-mask-image:none!important;mask-image:none!important;
-  background:radial-gradient(135% 100% at 50% 100%,#ff8a3d 0%,#ff5263 24%,#ee5fbd 44%,#8a6dff 60%,#5b8cff 68%,#f7f6f300 84%)!important}
-.main[data-view=chat]:has(.welcome)>.kh-sky i{display:none!important}
+.main[data-view=chat]:has(.welcome)>.kh-sky{display:none!important}
+/* The horizon belongs to the prompt: it rises behind the box and runs on under the projects sheet */
+.main[data-view=chat]:has(.welcome){isolation:isolate;overflow-x:hidden!important}
+.main[data-view=chat]:has(.welcome) .composer-shell{position:relative;z-index:auto!important}
+.main[data-view=chat]:has(.welcome) .composer-shell::before{content:"";position:absolute;z-index:-1;left:50%;width:100vw;transform:translateX(-50%);top:-26vh;bottom:-260px;pointer-events:none;-webkit-mask-image:linear-gradient(#000 calc(100% - 200px),transparent);mask-image:linear-gradient(#000 calc(100% - 200px),transparent);
+  background:radial-gradient(120% 92% at 50% 100%,#ff8a3d 0%,#ff5263 26%,#ee5fbd 46%,#8a6dff 62%,#5b8cff 70%,#f7f6f300 86%)}
 .main[data-view=chat]:has(.welcome) .messages{display:flex!important;flex-direction:column;justify-content:safe flex-end;overflow-y:auto}
 .main[data-view=chat]:has(.welcome) .welcome{margin:0 auto 20px!important}
 .main[data-view=chat]:has(.welcome) .composer-shell{padding-bottom:clamp(56px,26vh,280px)!important}
@@ -159,3 +162,47 @@ dialog .icon-btn:hover{background:var(--d-tint)!important;border-color:var(--d-l
 dialog [class*=avatar],dialog .conn-icon,dialog .connector-icon{border-radius:10px!important}
 
 @media(prefers-reduced-motion:reduce){*{transition:none!important}.suggestions button:hover{transform:none}}
+
+/* ---------- New-chat home: the prompt over the horizon, the projects sheet rising below ---------- */
+.wp{display:none;order:10}
+.main[data-view=chat]:has(.welcome){overflow-y:auto!important;grid-template-rows:auto auto auto auto!important}
+.main[data-view=chat]:has(.welcome)>#messages{overflow:visible!important;height:auto!important;min-height:calc(100dvh - 72px - 170px - clamp(56px,26vh,280px))!important}
+.main[data-view=chat]:has(.welcome) .wp{display:block;position:relative;z-index:2;padding:0 24px 48px;margin-top:-8px}
+.wp-sheet{max-width:1180px;margin:0 auto;background:var(--d-surface);border:1px solid var(--d-line);border-radius:24px;box-shadow:0 -10px 40px -24px #15140f40,var(--d-shadow-2);padding:18px 22px 26px}
+.wp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.wp-tabs{display:inline-flex;gap:2px;padding:3px;background:var(--d-tint);border:1px solid var(--d-line);border-radius:12px}
+.wp-tab{border:0;background:transparent;color:var(--d-ink-2);font:500 13px/1 var(--font);padding:8px 12px;border-radius:9px;cursor:pointer}
+.wp-tab:hover{color:var(--d-ink)}
+.wp-tab.active{background:var(--d-surface);color:var(--d-ink);box-shadow:var(--d-shadow-1),inset 0 0 0 1px var(--d-line)}
+.wp-all{border:0;background:transparent;color:var(--d-ink-2);font:500 13px/1 var(--font);padding:8px 10px;border-radius:9px;cursor:pointer}
+.wp-all:hover{background:var(--d-tint);color:var(--d-ink)}
+.wp-grid,#khAppList{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.wp-grid .kh-app,#khAppList .kh-app{display:flex;flex-direction:column;width:100%;padding:0;border:0;background:transparent;text-align:left;cursor:pointer;border-radius:14px}
+.wp-grid .kh-app-thumb,#khAppList .kh-app-thumb{position:relative;display:grid;place-items:center;aspect-ratio:16/10;border-radius:12px;overflow:hidden;border:1px solid var(--d-line);font-size:22px!important;transition:transform .2s,box-shadow .2s}
+.wp-grid .kh-app-thumb img,#khAppList .kh-app-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
+.wp-grid .kh-app:hover .kh-app-thumb,#khAppList .kh-app:hover .kh-app-thumb{transform:translateY(-2px);box-shadow:0 12px 28px -14px #15140f59}
+.wp-grid .kh-app-meta,#khAppList .kh-app-meta{display:flex;flex-direction:column;gap:2px;padding:10px 2px 0}
+.wp-grid .kh-app-meta strong,#khAppList .kh-app-meta strong{font-size:14px;font-weight:600;color:var(--d-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wp-grid .kh-app-meta small,#khAppList .kh-app-meta small{font-size:12px;color:var(--d-ink-3)}
+.wp-empty{margin:8px 2px 4px;color:var(--d-ink-3);font-size:14px}
+@media(max-width:640px){.main[data-view=chat]:has(.welcome) .wp{padding:0 12px 32px}.wp-sheet{padding:14px 14px 20px;border-radius:20px}.wp-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.main[data-view=chat]:has(.welcome)>#messages{min-height:calc(100dvh - 64px - 170px - clamp(32px,14vh,120px))!important}}
+
+/* ---------- Home: the same horizon behind the prompt, the same sheet of apps ---------- */
+.main[data-view=command]>.kh-sky{display:none!important}
+.main[data-view=command]{isolation:isolate}
+.main[data-view=command] .kh-composer-slot{position:relative}
+.main[data-view=command] .kh-composer-slot::before{content:"";position:absolute;z-index:-1;left:50%;width:100vw;transform:translateX(-50%);top:-24vh;bottom:-220px;pointer-events:none;-webkit-mask-image:linear-gradient(#000 calc(100% - 180px),transparent);mask-image:linear-gradient(#000 calc(100% - 180px),transparent);
+  background:radial-gradient(120% 92% at 50% 100%,#ff8a3d 0%,#ff5263 26%,#ee5fbd 46%,#8a6dff 62%,#5b8cff 70%,#f7f6f300 86%)}
+.main[data-view=command] .kh-hero p{color:var(--d-ink-2)!important}
+#khApps{position:relative;z-index:1;background:var(--d-surface)!important;border:1px solid var(--d-line)!important;border-radius:24px!important;box-shadow:0 -10px 40px -24px #15140f40,var(--d-shadow-2)!important;padding:18px 22px 26px!important;margin-top:28px}
+#khApps h2{font-size:15px!important;font-weight:600!important;color:var(--d-ink)!important;margin:0 0 14px!important}
+#khAppList{display:grid!important}
+@media(max-width:640px){#khAppList{grid-template-columns:repeat(2,minmax(0,1fr))}#khApps{padding:14px!important;border-radius:20px!important}}
+
+/* ---------- Settings and other dialogs: no tracked caps kicker, themed controls, a normal-size save ---------- */
+dialog .eyebrow{display:none!important}
+input[type=range]{accent-color:var(--d-ink)}
+dialog select,dialog textarea,dialog input[type=text],dialog input[type=email],dialog input[type=url],dialog input[type=number]{border:1px solid var(--d-line-strong)!important;border-radius:var(--d-r-sm)!important;background:var(--d-surface)!important;color:var(--d-ink)!important;font-size:14px!important;box-shadow:none!important}
+dialog select:focus,dialog textarea:focus,dialog input:focus{border-color:var(--d-focus)!important;box-shadow:0 0 0 3px #6a5cf61f!important;outline:0!important}
+#saveSettings{display:flex!important;width:auto!important;margin:20px 0 0 auto!important;align-items:center}
+dialog label,dialog .field-label{color:var(--d-ink)!important;font-weight:500}

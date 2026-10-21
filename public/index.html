@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/sidebar.css?v=4">
   <link rel="stylesheet" href="/composer.css?v=4">
   <link rel="stylesheet" href="/home.css?v=13">
-  <link rel="stylesheet" href="/design.css?v=7">
+  <link rel="stylesheet" href="/design.css?v=15">
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay hidden">
@@ -767,6 +767,21 @@
           Review important details. Connected services may charge usage fees.
         </div>
       </div>
+
+      <section id="welcomeProjects" class="wp" aria-label="Your projects">
+        <div class="wp-sheet">
+          <div class="wp-head">
+            <div class="wp-tabs" role="tablist">
+              <button type="button" class="wp-tab active" data-wp="mine" role="tab" aria-selected="true">My projects</button>
+              <button type="button" class="wp-tab" data-wp="templates" role="tab" aria-selected="false">Templates</button>
+            </div>
+            <button type="button" id="wpAll" class="wp-all">View all</button>
+          </div>
+          <ul id="wpList" class="wp-grid"></ul>
+          <p id="wpEmpty" class="wp-empty hidden">No projects yet. Describe one above, or start from a template.</p>
+          <ul id="wpTemplates" class="wp-grid hidden"></ul>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -1356,7 +1371,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=30"></script>
+  <script src="/app.js?v=31"></script>
 <script src="/connections.js?v=20"></script>
 </body>
 </html>
