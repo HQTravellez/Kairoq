@@ -129,7 +129,16 @@ test('scheduled automations run the function when due, log the run, email the ow
  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'nope'}})).status,404);
  // A function that keeps failing: one email after the third failure in a row, none before or after.
  await builder.saveSource(id,{...builder.loadFiles(id,builder.loadMeta(id).current_version),'functions/remind.js':BROKEN},{summary:'break'});
- for(const day of ['21','22','23','24']){r=await automations.tick({now:at(day,'09:00'),send});const x=r.find(y=>y.project===id&&y.name==='reminders');assert.equal(x.ok,false);assert.match(x.result,/boom/)}
+ // Manual Run now above records the real system clock. All simulated later runs must
+ // occur *after* that timestamp, even when this test executes after October 21, 2026.
+ const anchor=new Date(Math.max(Date.now(),at('20','09:00')));
+ const firstUtc=Date.UTC(anchor.getUTCFullYear(),anchor.getUTCMonth(),anchor.getUTCDate()+2,9);
+ for(let offset=0;offset<4;offset++){
+  r=await automations.tick({now:firstUtc+offset*86400000,send});
+  const x=r.find(y=>y.project===id&&y.name==='reminders');
+  assert.ok(x,'scheduled reminder must be due after previous manual run');
+  assert.equal(x.ok,false);assert.match(x.result,/boom/);
+ }
  // Both automations run the broken function, so each gets exactly one email (at its third failure, not its fourth).
  assert.deepEqual(mails.map(m=>m.subject).sort(),['Auto: the automation "hourly" keeps failing','Auto: the automation "reminders" keeps failing']);assert.match(mails[0].text,/failed 3 times in a row/);
  const st2=(await request(server,'GET','/api/create/projects/'+id+'/automations',{headers:{cookie}})).json.automations[0];
