@@ -2572,10 +2572,7 @@ async function initializeProductLayer(){
   }
   applyDemoMode(!!state.demo_mode);
   if($("#demoModeToggle"))$("#demoModeToggle").onchange=()=>applyDemoMode($("#demoModeToggle").checked);
-  if(!state.onboarding_complete && !localStorage.getItem("pai_onboarding_seen")){
-    localStorage.setItem("pai_onboarding_seen","1");
-    setTimeout(openOnboarding,650);
-  }
+  // Like Lovable, the first screen is the prompt, not a setup wizard: setup opens only when asked.
 }
 
 
