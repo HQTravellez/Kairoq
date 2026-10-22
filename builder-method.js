@@ -16,4 +16,13 @@ const VERIFY=`- Your "message" must be honest: describe what you changed, not th
 // How to treat review findings (receiving-code-review).
 const REVIEW=`Treat these findings as claims to check, not orders: for each one, look at the code it points to. Fix the ones that are right; if one is wrong (the code already handles it, or the change would break what the user asked for), leave that part as it is and say why in "message" in one short sentence.`;
 
-module.exports={DEBUG,VERIFY,REVIEW};
+// Karpathy-inspired discipline (multica-ai/andrej-karpathy-skills, MIT).
+// Applied to actual model prompts; no external scripts or packages are installed.
+const KARPATHY=`Engineering habits for this requested change:
+- Think before coding: identify the intended user-visible outcome and the existing files or contracts involved. Surface a material ambiguity or unavailable API capability; never invent an answer. For small ambiguities, state a safe assumption and proceed.
+- Simplicity first: deliver the smallest complete solution. Do not add unrequested framework layers, abstractions or options, and do not replace functioning logic unnecessarily.
+- Surgical changes: edit only files needed for the request, preserve unrelated features and comments, and remove only unused code introduced by your own changes.
+- Goal-driven verification: choose concrete checks for the requested behavior (build, invalid inputs, persistence, desktop/mobile or authenticated workflows as applicable). Let Kairoq run its independent checks and fix their root causes. Never claim that an unexecuted check passed.
+- External APIs: honor the imported specification, credentials, approval gates and sandbox evidence. When an integration is blocked, state the missing evidence instead of guessing endpoints or faking success.
+These habits add to, and never override, Kairoq's existing security, validation, deployment and output-format rules.`;
+module.exports={DEBUG,VERIFY,REVIEW,KARPATHY};
