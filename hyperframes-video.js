@@ -85,7 +85,9 @@ async function render(job,{env=process.env,exec=execFileAsync}={}){
    DO_NOT_TRACK:"1",CI:"1",NODE_ENV:"production"};
  const invoke=async(args,timeout)=>exec(bin,args,{cwd:dir,env:safeEnv,shell:false,timeout,maxBuffer:400000});
  // Errors are surfaced without echoing credentials or arbitrary CLI stderr.
- try{await invoke(["check","--json"],90000)}catch(e){throw Error("HyperFrames validation failed (check): "+String(e.code||"invalid composition").slice(0,60))}
+ try{await invoke(["check","--json"],90000)}catch(e){
+  if(env.KAIROQ_HF_DEBUG_PUBLIC_FIXTURE==="1")console.error("PUBLIC_FIXTURE_HF_CHECK_OUTPUT",String(e.stdout||e.stderr||"").slice(0,6000));
+  throw Error("HyperFrames validation failed (check): "+String(e.code||"invalid composition").slice(0,60))}
  try{await invoke(["render","--quality","draft","--fps","15","--output","render.mp4"],180000)}catch(e){throw Error("HyperFrames rendering failed: "+String(e.code||"process error").slice(0,60))}
  const size=mp4(path.join(dir,"render.mp4"));
  // A container metadata tag alone is not authenticity proof; validate duration independently.
