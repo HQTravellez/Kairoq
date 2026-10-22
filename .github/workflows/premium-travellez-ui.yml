@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci --ignore-scripts
+      - run: npm ci
       - run: node --test test/react-premium-design.test.js
       - name: Build deterministic dashboard for browser QA
         run: |
