@@ -63,12 +63,12 @@ async function request(url,payload,key,{fetchImpl=globalThis.fetch,timeoutMs=700
   const response=await fetchImpl(url,{method:"POST",redirect:"error",signal:controller.signal,
    headers:{"Content-Type":"application/json",...(url===ENDPOINTS.jev?{Authorization:"Bearer "+key}:{"x-api-key":key})},
    body:JSON.stringify(payload)});
-  if(!response.ok)throw Error("Provider HTTP "+response.status);
+  if(!response.ok)return{status:"unavailable",reason:"Provider rejected request",httpStatus:response.status};
   const raw=await response.text();
   if(raw.length>100000)throw Error("Oversized provider output");
   return{status:"ok",data:JSON.parse(raw),latencyMs:Math.round((performance.now()-started)*100)/100};
- }catch{
-  return{status:"unavailable",reason:"Inference provider failed or timed out"};
+ }catch(e){
+  return{status:"unavailable",reason:e?.name==="AbortError"?"Request timed out":"Transport or response parsing failed"};
  }finally{clearTimeout(timer)}
 }
 function countTokens(data){
@@ -84,7 +84,7 @@ async function classifyDocumentation(text,{
  if(!enabled)return{status:"disabled",source:info};
  if(!Number.isFinite(minConfidence)||minConfidence<.5||minConfidence>1)throw Error("Invalid CDM confidence threshold");
  const r=await request(ENDPOINTS.classify,{text,labels:LABELS,reasoning:false},key,{fetchImpl});
- if(r.status!=="ok")return{status:"unavailable",source:info};
+ if(r.status!=="ok")return{status:"unavailable",source:info,reason:r.reason,httpStatus:r.httpStatus??null};
  return{...parseClassify(r.data,minConfidence),source:info,latencyMs:r.latencyMs,
   usage:countTokens(r.data)}; // do not return raw provider data or source
 }
@@ -99,7 +99,7 @@ async function chooseInvestigation(state,{
   model:"jev-latest",state,questions:{next:{type:"choice",
    instructions:"Choose one next investigation task based only on observed API integration evidence. Never create permissions, change an API contract, or execute network actions.",criteria:NEXT}}
  },key,{fetchImpl});
- if(r.status!=="ok")return{status:"unavailable",source:info};
+ if(r.status!=="ok")return{status:"unavailable",source:info,reason:r.reason,httpStatus:r.httpStatus??null};
  return{...parseJev(r.data,minConfidence),source:info,latencyMs:r.latencyMs,
   usage:countTokens(r.data)};
 }
