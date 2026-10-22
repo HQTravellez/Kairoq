@@ -1,5 +1,7 @@
 ---
 name: Chakra UI design direction
+default: on
+group: visual
 description: Premium React UI guidance using Chakra UI v3 composition patterns and accessible component structure. Use Chakra components only when the runtime dependency is installed and explicitly supported; otherwise implement the same quality using Kairoq's existing Tailwind and Radix kit.
 ---
 # Premium UI with Chakra design principles
