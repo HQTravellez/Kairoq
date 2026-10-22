@@ -16,7 +16,7 @@ const RULES=Object.freeze([
   principle:"Use caches when measured access patterns and latency demands justify them",
   suggested:"Measure response latency and hit rates first; then define cache invalidation and sensitive-data boundaries",
   tradeoff:"Caches add staleness, invalidation complexity and privacy risks"},
- {id:"queue",signals:/batch|background|render|long.running|webhook|retri|asynchronous|document processing|email|video|sync/i,
+ {id:"queue",signals:/batch|background|render|long.running|webhook|retri|asynchronous|document processing|email|video|sync|queue|queued|queues|job/i,
   principle:"Move lengthy work into bounded queues when synchronous user requests would time out",
   suggested:"Use an explicit job state machine, idempotency key, retry budget, dead-letter handling and observability",
   tradeoff:"Queues require monitoring, scheduling, failure recovery and eventual-consistency UX"},
