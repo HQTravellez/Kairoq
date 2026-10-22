@@ -33,7 +33,7 @@ jobs:
           builder.runBuild(demo.files(),'/tmp/travellez-dashboard-dist').then(()=>console.log('Dashboard build complete')).catch(e=>{console.error(e);process.exitCode=1});
           NODE
       - name: Install Chromium
-        run: npx --yes playwright@1.56.1 install --with-deps chromium
+        run: npx --yes playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
       - name: Run browser screenshot and interaction checks
         run: |
           node - <<'NODE'
