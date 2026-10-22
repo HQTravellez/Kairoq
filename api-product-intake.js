@@ -64,7 +64,7 @@ function blueprint(brief,rawPlan=null,{catalogId}={}){
   workflowExecution:"disabled-until-approved-sandbox-and-credentials",warnings,
   next:formal?"Have Kairoq generate a validated product schema and mapping; review it before building":"Select a candidate API, import its official specification, and review the actual auth and schema"};
 }
-async function analyze({brief,apiPlan,apiSpec,documentationUrl,documentationText,catalogId,apiJsonManifest}={},opts={}){
+async function analyze({brief,apiPlan,apiSpec,documentationUrl,documentationText,catalogId,apiJsonManifest,autoDiscover=false}={},opts={}){
  brief=checkBrief(brief);
  const choices=[apiPlan!==undefined,apiSpec!==undefined,!!documentationUrl,!!documentationText,apiJsonManifest!==undefined].filter(Boolean);
  if(choices.length>1)throw Error("Provide one contract/documentation source at a time");
@@ -73,12 +73,38 @@ async function analyze({brief,apiPlan,apiSpec,documentationUrl,documentationText
  if(apiSpec!==undefined)raw=require("./api-learning").learn(apiSpec);
  if(documentationText)raw=docs.infer(documentationText);
  if(documentationUrl)raw=await docs.discover(documentationUrl,opts);
- return{blueprint:blueprint(brief,raw,{catalogId}),apiPlan:raw};
+ const inspected=[];
+ if(autoDiscover===true&&!raw){
+  const selections=catalogId?[catalog.find(catalogId)]:catalog.search(brief,{limit:3}).candidates;
+  // Only already allowlisted public HTTPS documentation leads. No API execution.
+  for(const item of selections.slice(0,3)){
+   if(!item.https||!item.url.startsWith("https://")){
+    inspected.push({name:item.name,status:"skipped-insecure-directory-entry"});continue;
+   }
+   try{
+    const discovered=await (opts.docsDiscover||docs.discover)(item.url,opts);
+    let valid=false;
+    try{orchestrator.contract(discovered);valid=true;}catch{}
+    inspected.push({name:item.name,url:item.url,status:valid?"formal-contract-imported":"unstructured-or-unsupported-documentation",
+     format:discovered?.format||"unknown"});
+    if(valid){raw=discovered;break;}
+   }catch(err){
+    const message=String(err.message||err);
+    inspected.push({name:item.name,status:/allowlisted/i.test(message)?"blocked-host-not-allowlisted":"documentation-not-imported",
+     reason:/allowlisted/i.test(message)?"Configure the provider documentation host allowlist":"Inspect this provider's official API specification manually"});
+   }
+  }
+ }
+ const bp=blueprint(brief,raw,{catalogId});
+ if(inspected.length)bp.automatedDiscovery={attempts:inspected,
+  status:bp.formalContract?"formal-contract-found":"no-formal-contract-found",
+  warning:"Only preapproved HTTPS documentation hosts are fetched; no provider operation is executed"};
+ return{blueprint:bp,apiPlan:raw};
 }
-async function prepare({brief,apiPlan,apiSpec,documentationUrl,documentationText,catalogId,apiJsonManifest}={},{
+async function prepare({brief,apiPlan,apiSpec,documentationUrl,documentationText,catalogId,apiJsonManifest,autoDiscover=false}={},{
  callModel,docsOptions
 }={}){
- const {blueprint:bp,apiPlan:raw}=await analyze({brief,apiPlan,apiSpec,documentationUrl,documentationText,catalogId,apiJsonManifest},docsOptions);
+ const {blueprint:bp,apiPlan:raw}=await analyze({brief,apiPlan,apiSpec,documentationUrl,documentationText,catalogId,apiJsonManifest,autoDiscover},docsOptions);
  if(!bp.formalContract)return{blueprint:bp,productPlan:null,readiness:"blocked-no-formal-contract",externalCalls:0};
  if(typeof callModel!=="function")throw Error("A product planning model is required");
  const plan=await orchestrator.plan(callModel,{brief:bp.brief,apiContract:raw,
