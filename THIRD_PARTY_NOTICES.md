@@ -71,3 +71,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## img2threejs: the 3D product method
 
 The `three-product` design skill follows the pass-by-pass method of img2threejs, https://github.com/img2threejs/img2threejs, licensed under the Apache License 2.0 (full text in `licenses/img2threejs-LICENSE.txt`). No code from it is included.
+
+## HeyGen HyperFrames (optional HTML-to-video CLI)
+
+`hyperframes-video.js` and `scripts/hyperframes-smoke.js` provide a Kairoq-written, opt-in, local adapter to the separately installed HyperFrames CLI from https://github.com/heygen-com/hyperframes, released under the Apache License 2.0 License (source revision `4371981b740d92f70e520cfbec34db68a1c93434`). Kairoq does not vendor or execute HyperFrames packages by default, does not import arbitrary external skill instructions, and does not bundle its fonts or binaries. Operator installation in a sandboxed worker is required to render. This adaptation uses the documented HyperFrames composition format; no source code from the upstream package is copied.
