@@ -30,7 +30,7 @@ function rank(item,terms,raw){
  }
  if(name===raw)score+=28;
  else if(raw.length>=4&&name.includes(raw))score+=10;
- if(item.https)score+=.1; // tie-break only, not reliability certification
+ if(item.https&&score>0)score+=.1; // HTTPS tie-breaks relevant matches only; never makes an unrelated API a match
  return score;
 }
 function summary(entry,score){
