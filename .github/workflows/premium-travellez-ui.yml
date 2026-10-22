@@ -1,0 +1,74 @@
+name: Premium Travellez UI benchmark
+on:
+  push:
+    branches: [feature/chakra-ui-v3-react]
+    paths:
+      - 'react-demo-travellez.js'
+      - 'design-skills/chakra-ui/**'
+      - 'test/react-premium-design.test.js'
+      - '.github/workflows/premium-travellez-ui.yml'
+  pull_request:
+    paths:
+      - 'react-demo-travellez.js'
+      - 'design-skills/chakra-ui/**'
+      - 'test/react-premium-design.test.js'
+      - '.github/workflows/premium-travellez-ui.yml'
+  workflow_dispatch:
+jobs:
+  compile-and-screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test test/react-premium-design.test.js
+      - name: Build deterministic dashboard for browser QA
+        run: |
+          node - <<'NODE'
+          const demo=require('./react-demo-travellez'),builder=require('./react-builder');
+          builder.runBuild(demo.files(),'/tmp/travellez-dashboard-dist').then(()=>console.log('Dashboard build complete')).catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+      - name: Install Chromium
+        run: npx --yes playwright@1.56.1 install --with-deps chromium
+      - name: Run browser screenshot and interaction checks
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'),http=require('http'),path=require('path');
+          const {chromium}=require('playwright-core');
+          const root='/tmp/travellez-dashboard-dist';
+          const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png'};
+          const server=http.createServer((req,res)=>{const url=new URL(req.url,'http://localhost'),file=path.join(root,decodeURIComponent(url.pathname)==='/'?'index.html':decodeURIComponent(url.pathname));if(!file.startsWith(root+path.sep)){res.writeHead(403);return res.end()}fs.readFile(file,(e,data)=>{if(e){res.writeHead(404);return res.end()}res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');res.end(data)})});
+          (async()=>{
+            await new Promise(r=>server.listen(4173,'127.0.0.1',r));
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+            fs.mkdirSync('premium-ui-evidence',{recursive:true});
+            for(const viewport of [{width:1440,height:900,name:'desktop'},{width:390,height:844,name:'mobile'}]){
+              const page=await browser.newPage({viewport:{width:viewport.width,height:viewport.height},deviceScaleFactor:1});
+              const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
+              await page.getByText('Recent travel requests').waitFor();
+              if(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2))throw Error(viewport.name+' horizontal overflow');
+              await page.screenshot({path:'premium-ui-evidence/'+viewport.name+'.png',fullPage:true});
+              await page.getByRole('button',{name:'Hotels'}).click();
+              if(!(await page.getByRole('button',{name:'Search hotels'}).isVisible()))throw Error('Tab switching failed');
+              await page.getByRole('combobox',{name:'Filter status'}).selectOption('Pending');
+              if((await page.getByRole('button',{name:'Approve'}).count())!==2)throw Error('Pending filter failed');
+              await page.getByRole('button',{name:'Approve'}).first().click();
+              if((await page.getByRole('button',{name:'Approve'}).count())!==1)throw Error('Approval interaction failed');
+              if(errors.length)throw Error(viewport.name+' browser errors: '+errors.join(' | '));
+              console.log(viewport.name+' PASS screenshot + no overflow + tabs + filter + approval');
+              await page.close();
+            }
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>server.close());
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: premium-travellez-desktop-mobile
+          path: premium-ui-evidence/*.png
+          if-no-files-found: warn
