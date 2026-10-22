@@ -1,0 +1,39 @@
+name: API discovery and product preparation
+on:
+  push:
+    branches:
+      - feature/public-api-catalog
+    paths:
+      - 'api-catalog.js'
+      - 'api-product-intake.js'
+      - 'data/public-api-catalog.json'
+      - 'public/api-studio.html'
+      - 'app-builder.js'
+      - 'server.js'
+      - 'test/api-public-catalog.test.js'
+      - '.github/workflows/api-product-intake.yml'
+  pull_request:
+    paths:
+      - 'api-catalog.js'
+      - 'api-product-intake.js'
+      - 'data/public-api-catalog.json'
+      - 'public/api-studio.html'
+      - 'app-builder.js'
+      - 'server.js'
+      - 'test/api-public-catalog.test.js'
+      - '.github/workflows/api-product-intake.yml'
+permissions:
+  contents: read
+jobs:
+  build-requirements-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check api-catalog.js && node --check api-product-intake.js && node --check server.js && node --check app-builder.js && node --check test/api-public-catalog.test.js
+      - run: node --test test/api-public-catalog.test.js test/api-studio.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js
