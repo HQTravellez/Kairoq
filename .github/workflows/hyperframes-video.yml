@@ -43,6 +43,7 @@ jobs:
       - name: Render actual 3-second MP4 from static HTML, then verify duration
         env:
           KAIROQ_HYPERFRAMES: on
+          KAIROQ_HF_DEBUG_PUBLIC_FIXTURE: '1'
           HYPERFRAMES_BIN: ${{ runner.temp }}/hf-tools/node_modules/.bin/hyperframes
           CHROMIUM_PATH: /usr/bin/google-chrome
         run: node scripts/hyperframes-smoke.js
