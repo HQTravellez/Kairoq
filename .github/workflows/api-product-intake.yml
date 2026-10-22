@@ -5,6 +5,12 @@ on:
       - feature/public-api-catalog
     paths:
       - 'api-catalog.js'
+      - 'api-apijson.js'
+      - 'api-docs.js'
+      - 'api-pattern-catalog.js'
+      - 'api-system-design.js'
+      - 'product-orchestrator.js'
+      - 'test/api-knowledge.test.js'
       - 'api-product-intake.js'
       - 'data/public-api-catalog.json'
       - 'public/api-studio.html'
@@ -35,5 +41,5 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: node --check api-catalog.js && node --check api-product-intake.js && node --check server.js && node --check app-builder.js && node --check test/api-public-catalog.test.js
-      - run: node --test test/api-public-catalog.test.js test/api-studio.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js
+      - run: node --check api-catalog.js && node --check api-product-intake.js && node --check api-apijson.js && node --check api-pattern-catalog.js && node --check api-system-design.js && node --check server.js && node --check app-builder.js && node --check test/api-knowledge.test.js
+      - run: node --test test/api-knowledge.test.js test/api-public-catalog.test.js test/api-studio.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js
