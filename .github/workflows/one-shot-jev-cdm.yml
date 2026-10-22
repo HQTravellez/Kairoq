@@ -1,0 +1,34 @@
+name: One-shot real Jev CDM smoke
+# Only the initial commit that adds this workflow triggers a push run.
+# All later executions require an explicit manual dispatch on this branch.
+on:
+  push:
+    branches:
+      - feature/api-orchestration-tripninja-proof
+    paths:
+      - '.github/workflows/one-shot-jev-cdm.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tiny-real-provider-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: One request per available AI provider using synthetic public fixtures
+        env:
+          KAIROQ_AI_ONESHOT_CONSENT: 'YES'
+          KAIROQ_PROBE_RESULT: benchmark-artifacts/live-jev-cdm-oneshot.json
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          SCALEDOWN_API_KEY: ${{ secrets.SCALEDOWN_API_KEY }}
+        run: node scripts/run-real-models-once.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: one-shot-jev-cdm-smoke-evidence
+          path: benchmark-artifacts/live-jev-cdm-oneshot.json
+          if-no-files-found: warn
