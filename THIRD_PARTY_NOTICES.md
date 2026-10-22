@@ -71,3 +71,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## img2threejs: the 3D product method
 
 The `three-product` design skill follows the pass-by-pass method of img2threejs, https://github.com/img2threejs/img2threejs, licensed under the Apache License 2.0 (full text in `licenses/img2threejs-LICENSE.txt`). No code from it is included.
+
+## Karpathy-inspired coding guidelines
+
+`builder-method.js` adds Kairoq-specific, paraphrased coding discipline inspired by the four principles (Think Before Coding, Simplicity First, Surgical Changes, and Goal-Driven Execution) in `andrej-karpathy-skills` by multica-ai: https://github.com/multica-ai/andrej-karpathy-skills (observed revision `2c606141936f1eeef17fa3043a72095b4765b9c2`). The upstream README identifies its license as MIT. No upstream scripts, plugins, or package dependencies are installed, and no upstream source file is bundled. Principles are applied within Kairoq's existing model prompt and never override security/validation rules.
