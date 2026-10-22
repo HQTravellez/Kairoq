@@ -42,7 +42,7 @@ function html(raw){
  "<div id=\"title\" class=\"clip\" data-start=\"0.2\" data-duration=\"2.8\" data-track-index=\"1\"><h1 id=\"hf-headline\">"+title+"</h1></div>",
  "<div id=\"subtitle\" class=\"clip\" data-start=\"1\" data-duration=\"2\" data-track-index=\"2\"><p id=\"hf-subtitle\">"+subtitle+"</p></div>",
  "<div id=\"footer\" class=\"clip\" data-start=\"2\" data-duration=\"1\" data-track-index=\"3\">KAiROQ / MOTION</div>",
- "</div><script>",
+ "</div><script src=\"assets/gsap.min.js\"></script><script>",
  "window.__timelines=window.__timelines||{};",
  "const tl=gsap.timeline({paused:true});",
  "tl.fromTo('#hf-headline',{opacity:0,y:75},{opacity:1,y:0,duration:.65,ease:'power3.out'},.25);",
@@ -56,6 +56,11 @@ function html(raw){
 function prepare(raw){
  const info=options(raw),dir=fs.mkdtempSync(path.join(os.tmpdir(),"kairoq-hf-"));
  fs.writeFileSync(path.join(dir,"index.html"),html(raw),{mode:0o600});
+ // Copy the already-installed GSAP runtime into this isolated project; never use a CDN.
+ const gsapFile=process.env.KAIROQ_GSAP_JS||require.resolve("gsap/dist/gsap.min.js");
+ if(!path.isAbsolute(gsapFile)||!fs.statSync(gsapFile).isFile())throw Error("A local GSAP runtime is required");
+ fs.mkdirSync(path.join(dir,"assets"),{recursive:true});
+ fs.copyFileSync(gsapFile,path.join(dir,"assets","gsap.min.js"));
  return{dir,html:path.join(dir,"index.html"),output:path.join(dir,"render.mp4"),info};
 }
 function owned(job){
