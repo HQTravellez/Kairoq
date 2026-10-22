@@ -1,0 +1,54 @@
+name: HyperFrames safe motion video proof
+on:
+  push:
+    branches:
+      - feature/hyperframes-renderer
+  pull_request:
+    paths:
+      - 'hyperframes-video.js'
+      - 'test/hyperframes-video.test.js'
+      - 'scripts/hyperframes-smoke.js'
+      - '.github/workflows/hyperframes-video.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  adapter-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check hyperframes-video.js && node --check scripts/hyperframes-smoke.js
+      - run: node --test test/hyperframes-video.test.js test/videos.test.js
+  actual-mp4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned HyperFrames CLI in a temporary path (not Kairoq runtime)
+        run: npm install --prefix "$RUNNER_TEMP/hf-tools" --no-save --no-audit --no-fund hyperframes@0.8.185
+      - name: Verify FFmpeg and browser availability
+        run: |
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+          command -v ffprobe
+          (command -v chromium || command -v google-chrome || command -v chromium-browser)
+      - name: Render actual 3-second MP4 from static HTML, then verify duration
+        env:
+          KAIROQ_HYPERFRAMES: on
+          HYPERFRAMES_BIN: ${{ runner.temp }}/hf-tools/node_modules/.bin/hyperframes
+          CHROMIUM_PATH: /usr/bin/google-chrome
+        run: node scripts/hyperframes-smoke.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hyperframes-actual-render
+          path: benchmark-artifacts/hyperframes-motion.mp4
+          if-no-files-found: warn
