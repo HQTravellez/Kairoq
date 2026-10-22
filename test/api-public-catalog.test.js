@@ -63,7 +63,7 @@ test("catalog avoids overlarge searches, invalid selections, and privileged exec
  assert.throws(()=>catalog.search("flight",{limit:999}),/limit/);
  assert.throws(()=>catalog.find("__proto__"),/Invalid API catalog/);
  assert.throws(()=>catalog.find("0".repeat(16)),/Unknown/);
- assert.equal(catalog.search("glarbquuxnonexistentabcdef123",{limit:5}).candidates.length,0);
+ assert.equal(catalog.search("zzqxxvqlkmnop987654321",{limit:5}).candidates.length,0);
 });
 test("requirements map only to names documented by imported formal operations and flag unsupported actions",()=>{
  const bp=intake.blueprint("Search flights by airport and issue tickets with an employee dashboard",contract);
