@@ -5,6 +5,7 @@ const docs=require("./api-docs");
 const catalog=require("./api-public-catalog");
 const apijson=require("./api-apijson");
 const patterns=require("./api-pattern-catalog");
+const systemDesign=require("./api-system-design");
 const orchestrator=require("./product-orchestrator");
 function briefText(value){
  if(typeof value!=="string"||value.trim().length<12||value.length>6000)throw Error("Describe the product in 12-6000 characters");
@@ -58,6 +59,7 @@ async function prepare(input={},deps={}){
   category:input.category||"",limit:Math.min(20,Math.max(1,Number(input.limit||10))),secureOnly:true
  }):null;
  const architecturePatterns=patterns.search(brief);
+ const architectureReview=systemDesign.recommend(brief);
  const review={stage:verifiedContract?"formal-contract-imported":"needs-formal-contract",
   candidateCount:directory?.matchedCount||0,documentStatus,formalContract:!!verifiedContract,
   operationCount:verifiedContract?.operations?.length||0,
@@ -72,11 +74,11 @@ async function prepare(input={},deps={}){
  if(input.buildPlan===true){
   if(typeof deps.callModel!=="function")throw Error("An approved Kairoq planning model is required");
   productPlan=await orchestrator.plan(deps.callModel,{brief,apiContract:verifiedContract,
-   architecturePatterns:architecturePatterns.matches});
+   architecturePatterns:architecturePatterns.matches,architectureReview:architectureReview.recommendations});
  }
  return{status:"prepared-for-review",source:{catalog:"public-apis/public-apis",
   ...(documentation?{documentation}:{}),apiJsonProtocolSource:apijson.SOURCE},
-  review,directory,architecturePatterns,apiContract:verifiedContract,
+  review,directory,architecturePatterns,architectureReview,apiContract:verifiedContract,
   documentationDraft:!verifiedContract&&plan?plan:null,
   featureEvidence:evidence(brief,verifiedContract),productPlan,
   nextActions:verifiedContract?[
