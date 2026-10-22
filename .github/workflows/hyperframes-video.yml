@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: node --check hyperframes-video.js && node --check scripts/hyperframes-smoke.js
+      - run: node --check hyperframes-video.js && node --check scripts/hyperframes-smoke.js && node --check scripts/hyperframes-frame-check.js
       - run: node --test test/hyperframes-video.test.js test/videos.test.js
   actual-mp4:
     runs-on: ubuntu-latest
@@ -48,9 +48,14 @@ jobs:
           CHROMIUM_PATH: /usr/bin/google-chrome
           KAIROQ_GSAP_JS: ${{ runner.temp }}/hf-tools/node_modules/gsap/dist/gsap.min.js
         run: node scripts/hyperframes-smoke.js
+      - name: Decode and compare two real frames (motion proof)
+        run: node scripts/hyperframes-frame-check.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: hyperframes-actual-render
-          path: benchmark-artifacts/hyperframes-motion.mp4
+          path: |
+            benchmark-artifacts/hyperframes-motion.mp4
+            benchmark-artifacts/hyperframes-intro.png
+            benchmark-artifacts/hyperframes-outro.png
           if-no-files-found: warn
