@@ -6889,17 +6889,6 @@ const server = http.createServer(async (req, res) => {
       return json(res,200,await require("./api-product-intake").prepare(input,{callModel:callDeveloperCodingModel}));}
     catch(error){return json(res,422,{error:String(error.message||error)});}
   }
-  if (req.method === "POST" && url === "/api/developer/api/catalog") {
-    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
-    try{const b=await getBody(req,2000);return json(res,200,await require("./api-public-catalog").discover({query:b.query||"",category:b.category||"",limit:Math.max(1,Math.min(30,Number(b.limit||12))),secureOnly:true}));}
-    catch(e){return json(res,422,{error:String(e.message||e)})}
-  }
-  if (req.method === "POST" && url === "/api/developer/api/prepare") {
-    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
-    try{const b=await getBody(req,2300000);
-      return json(res,200,await require("./api-product-prep").prepare(b,{callModel:callDeveloperCodingModel}));
-    }catch(e){return json(res,422,{error:String(e.message||e)})}
-  }
   if (req.method === "POST" && url === "/api/developer/api/discover"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000);return json(res,200,body.documentationUrl?await require("./api-docs").discover(body.documentationUrl):require("./api-docs").infer(body.documentationText));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/execute"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,await require("./api-adapter").execute(body));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/diff"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,require("./api-evolution").diff(body.before,body.after));}catch(e){return json(res,422,{error:String(e.message||e)});}}
