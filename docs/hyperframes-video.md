@@ -47,4 +47,8 @@ The result is \`benchmark-artifacts/hyperframes-motion.mp4\` only after HyperFra
 3. Add a clearly labeled Motion Video choice to Kairoq's existing video section (alongside existing photo animation), then a verified preview/download flow.
 4. Add full accessibility/contrast, responsive/video-format checks, brand presets, optional voice/music, and commercial licensing checks for uploaded media.
 
-A passing mocked subprocess test is **not** proof that the real CLI renders correctly. Full renderer deployment remains blocked pending an isolated worker and media inspection.
+## Actual CI evidence (2026-10-21)
+
+A real HyperFrames CLI `0.8.185` worker, with local GSAP `3.13.0`, checked and rendered the 3-second 9:16 example successfully: **145,959-byte MP4**, **3.000 seconds** validated via `ffprobe`; no model API calls. The isolated CI invocation is at https://github.com/HQTravellez/Kairoq/actions/runs/39708625583. Subsequent CI also decodes two PNG frames and verifies they are not identical. The files are downloadable as that run's `hyperframes-actual-render` artifact (the frame checks apply to subsequent runs). Real video generation is therefore demonstrated for this template, **not** for arbitrary source compositions.
+
+Human visual and audio review, production queue isolation, quotas and deployment remain outstanding. Do not treat offline success as a fully integrated Kairoq video UI.
