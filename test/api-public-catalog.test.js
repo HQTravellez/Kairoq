@@ -5,19 +5,20 @@ const importer=require("../api-learning"),planner=require("../product-orchestrat
 const fixture={
  openapi:"3.0.3",info:{title:"Fictional Flight API",version:"2026-10"},
  servers:[{url:"https://flight.example.com/v1"}],
- security:[{key:[]}],
- components:{securitySchemes:{key:{type:"http",scheme:"bearer"}}},
+ security:[{key:[]}],components:{securitySchemes:{key:{type:"http",scheme:"bearer"}}},
  paths:{
   "/flights/search":{get:{
    operationId:"searchFlights",summary:"Search flight itineraries by departure and arrival airport",
-   parameters:[{name:"origin",in:"query",required:true,schema:{type:"string"}},
-               {name:"destination",in:"query",required:true,schema:{type:"string"}}],
-   responses:{"200":{content:{"application/json":{schema:{type:"object",properties:{offers:{type:"array",items:{type:"object",properties:{id:{type:"string"},price:{type:"number"}}}}}}}}}}
+   parameters:[
+    {name:"origin",in:"query",required:true,schema:{type:"string"}},
+    {name:"destination",in:"query",required:true,schema:{type:"string"}}
+   ],
+   responses:{"200":{description:"Results",content:{"application/json":{schema:{type:"object",properties:{offers:{type:"array",items:{type:"string"}}}}}}}}
   }},
   "/bookings":{post:{
    operationId:"createBooking",summary:"Confirm a booked flight itinerary from a flight offer",
-   requestBody:{required:true,content:{"application/json":{schema:{type:"object",required:["offer_id"],properties:{offer_id:{type:"string"}}}}},
-   responses:{"201":{content:{"application/json":{schema:{type:"object",properties:{reference:{type:"string"}}}}}}}
+   requestBody:{required:true,content:{"application/json":{schema:{type:"object",required:["offer_id"],properties:{offer_id:{type:"string"}}}}}},
+   responses:{"201":{description:"Success",content:{"application/json":{schema:{type:"object",properties:{reference:{type:"string"}}}}}}}
   }}
  }
 };
