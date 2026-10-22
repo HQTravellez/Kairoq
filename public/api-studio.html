@@ -6,7 +6,7 @@
 <header><div><strong>KAIROQ</strong> / API Intelligence</div><a href="/">Back to workspace</a></header>
 <h1>Build with real APIs.</h1><button id="magicCreate" class="secondary" hidden>Create a single-use sign-in link</button><p id="magicLinkOutput" class="small" role="status"></p><p class="lead">Import documentation, understand endpoints and authentication, review API changes, and generate an API-aware product. No credentials are sent to the browser by Kairoq.</p>
 <section id="signInPanel" class="panel" hidden><h2>Sign in to API Studio</h2><p>Use your existing Kairoq workspace password to unlock SDK generation and OAuth connections.</p><button id="magicSignIn" type="button" hidden>Sign in with secure link</button><form id="studioLogin"><div class="field"><label for="studioPassword">Workspace password</label><input id="studioPassword" type="password" autocomplete="current-password" required></div><button id="studioSignIn" type="submit">Sign in</button><p id="studioLoginStatus" role="status" aria-live="polite"></p></form></section>
-<section class="panel" style="margin-top:22px" aria-label="Search Public API directory"><h2>0. Discover APIs for your product</h2><p class="small">Search the pinned Public APIs community directory by keyword or use your product brief. A listing is not a verified integration and no API call happens by selecting it.</p><div class="field"><label for="catalogQuery">What API capability do you need?</label><input id="catalogQuery" type="search" maxlength="500" placeholder="flight search, business data, weather, maps…"></div><div class="actions"><button type="button" id="catalogSearch">Find matching APIs</button><button type="button" id="catalogFromBrief" class="secondary">Suggest APIs from product brief</button></div><div id="catalogResults" class="catalog-results" aria-live="polite"><p class="small">Describe your product and search to find candidate providers.</p></div></section>
+<section class="panel" style="margin-top:22px" aria-label="Search Public API directory"><h2>0. Discover APIs for your product</h2><p class="small">Search the pinned Public APIs community directory by keyword or use your product brief. A listing is not a verified integration and no API call happens by selecting it.</p><div class="field"><label for="catalogQuery">What API capability do you need?</label><input id="catalogQuery" type="search" maxlength="500" placeholder="flight search, business data, weather, maps…"></div><div class="actions"><button type="button" id="catalogSearch">Find matching APIs</button><button type="button" id="catalogFromBrief" class="secondary">Suggest APIs from product brief</button><button type="button" id="autoDocFromBrief" class="secondary">Find and read API documentation</button></div><div id="catalogResults" class="catalog-results" aria-live="polite"><p class="small">Describe your product and search to find candidate providers.</p></div></section>
 <div class="grid">
 <section class="panel"><h2>1. Read provider documentation</h2><div class="field"><label for="docsUrl">Public documentation URL (HTTPS)</label><input id="docsUrl" type="url" placeholder="https://docs.example.com/openapi.json"></div><div class="field"><label for="docsText">Or paste OpenAPI JSON, Postman JSON, or documentation text</label><textarea id="docsText" placeholder="Paste API documentation here"></textarea></div><div class="actions"><button id="discover">Analyze documentation</button></div><p class="small">URL imports require a server-side host allowlist. Import the provider’s official OpenAPI or Postman specification (JSON) where possible; marketing pages produce a draft that cannot authorize an integration.</p></section>
 <section class="panel"><h2>2. Build a product</h2><div class="field"><label for="project">Product name</label><input id="project" value="API-powered workspace"></div><div class="field"><label for="brief">What should Kairoq build?</label><textarea id="brief">Build a premium full-stack dashboard using the imported API operations, with authenticated users, clear integration status, empty states and graceful errors.</textarea></div><div class="actions"><button id="build" disabled>Build with API context</button></div><p class="small">Generated apps can plan integrations from the API contract. Actual live API execution is a separate permissioned step.</p></section>
@@ -123,6 +123,25 @@ $("catalogFromBrief").addEventListener("click",()=>action($("catalogFromBrief"),
  if(brief.length<12)throw Error("Describe the product before requesting API suggestions");
  $("catalogQuery").value=brief.slice(0,500);
  await searchCatalog(brief);
+}));
+$("autoDocFromBrief").addEventListener("click",()=>action($("autoDocFromBrief"),async()=>{
+ const brief=$("brief").value.trim();
+ if(brief.length<12)throw Error("Describe the product before discovering APIs");
+ status("Checking the best three directory leads using approved HTTPS documentation hosts.");
+ const response=await request("/api/developer/api/analyze",{brief,autoDiscover:true,catalogId:selectedCatalogId||undefined});
+ const report=response.blueprint.automatedDiscovery||{attempts:[],status:"no-candidates"};
+ $("output").textContent=JSON.stringify({blueprint:response.blueprint,attempts:report.attempts},null,2);
+ if(response.blueprint.formalContract){
+  plan=response.apiPlan;preparedProductPlan=null;generatedSdk=null;
+  $("operation").replaceChildren();
+  for(const op of plan.operations){const el=document.createElement("option");el.value=op.id;el.textContent=op.method+" "+op.path;$("operation").append(el);}
+  $("productPrepare").disabled=false;$("sdkGenerate").disabled=false;$("backendGenerate").disabled=false;$("test").disabled=false;$("build").disabled=true;
+  $("preparedStatus").textContent="Found a versioned formal contract. Prepare and validate the product plan before building.";
+  status("Imported formal API documentation. Review the provider and sandbox permissions before executing any live operations.");
+ }else{
+  $("preparedStatus").textContent="No approved formal API specification found. Import official OpenAPI/Postman JSON or allowlist the relevant documentation host.";
+  status("Automatic API discovery did not establish a verified contract; no provider calls were executed.");
+ }
 }));
 $("productPrepare").addEventListener("click",()=>action($("productPrepare"),async()=>{
  if(!plan||plan.format==="unstructured")throw Error("Import a verified formal OpenAPI or Postman specification first");
