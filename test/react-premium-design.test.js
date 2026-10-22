@@ -8,6 +8,10 @@ test("premium design skill is enabled by default and available to the generator"
  const found=skills.builtin().find(x=>x.id==="chakra-ui");
  assert.ok(found,"Chakra UI design guidance should be registered");
  assert.equal(found.defaultOn,true);
+ const pro=skills.builtin().find(x=>x.id==="ui-ux-pro-max");
+ assert.ok(pro,"UI UX Pro Max design skill should be registered");
+ assert.equal(pro.defaultOn,true);
+ assert.match(skills.promptNote({owner:"test-owner"}),/UI UX Pro Max — Kairoq design guidance/);
  assert.match(skills.promptNote({owner:"test-owner"}),/Premium UI with Chakra design principles/);
 });
 test("Travellez dashboard has valid React source, reusable design tokens and no unapproved imports",()=>{
