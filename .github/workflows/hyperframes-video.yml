@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install pinned HyperFrames CLI in a temporary path (not Kairoq runtime)
-        run: npm install --prefix "$RUNNER_TEMP/hf-tools" --no-save --no-audit --no-fund hyperframes@0.8.185
+        run: npm install --prefix "$RUNNER_TEMP/hf-tools" --no-save --no-audit --no-fund hyperframes@0.8.185 gsap@3.13.0
       - name: Verify FFmpeg and browser availability
         run: |
           if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
@@ -46,6 +46,7 @@ jobs:
           KAIROQ_HF_DEBUG_PUBLIC_FIXTURE: '1'
           HYPERFRAMES_BIN: ${{ runner.temp }}/hf-tools/node_modules/.bin/hyperframes
           CHROMIUM_PATH: /usr/bin/google-chrome
+          KAIROQ_GSAP_JS: ${{ runner.temp }}/hf-tools/node_modules/gsap/dist/gsap.min.js
         run: node scripts/hyperframes-smoke.js
       - uses: actions/upload-artifact@v4
         if: always()
