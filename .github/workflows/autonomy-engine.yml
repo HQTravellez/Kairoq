@@ -24,4 +24,4 @@ jobs:
       - name: Syntax validation
         run: node --check server.js && node --check autonomy-engine.js && node --check autonomy-store.js && node --check api-skill-memory.js
       - name: Autonomy unit tests
-        run: node --test test/autonomy-engine.test.js test/api-skill-memory.test.js
+        run: node --test test/autonomy-engine.test.js test/api-skill-memory.test.js test/automations.test.js
