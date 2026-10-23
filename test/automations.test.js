@@ -169,7 +169,7 @@ test('record-triggered automations run after a create, cannot start themselves, 
  // its audit log. Wait for the log itself rather than asserting it synchronously.
  let sandboxLogFound=false;
  for(let i=0;i<60;i++){
-  sandboxLogFound=applog.list(id).some(l=>l.source==='automation welcome'&&/\\(test copy\\)/.test(l.message));
+  sandboxLogFound=applog.list(id).some(l=>l.source==='automation welcome'&&/\(test copy\)/.test(l.message));
   if(sandboxLogFound)break;
   await wait(50);
  }
