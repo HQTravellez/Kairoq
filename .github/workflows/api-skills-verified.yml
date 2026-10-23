@@ -14,4 +14,4 @@ jobs:
         with:
           node-version: '22'
       - run: node --check server.js && node --check autonomy-engine.js && node --check api-skills-verified.js
-      - run: node --test test/api-skills-verified.test.js test/autonomy-engine.test.js test/api-skill-memory.test.js
+      - run: node --test test/api-skills-verified.test.js test/autonomy-engine.test.js test/api-skill-memory.test.js test/automations.test.js
