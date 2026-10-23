@@ -5,8 +5,10 @@ on:
   pull_request:
     paths:
       - 'autonomy-engine.js'
+      - 'api-skill-memory.js'
       - 'autonomy-store.js'
       - 'test/autonomy-engine.test.js'
+      - 'test/api-skill-memory.test.js'
       - 'server.js'
       - 'public/api-studio.html'
       - '.github/workflows/autonomy-engine.yml'
@@ -20,6 +22,6 @@ jobs:
         with:
           node-version: '22'
       - name: Syntax validation
-        run: node --check server.js && node --check autonomy-engine.js && node --check autonomy-store.js
+        run: node --check server.js && node --check autonomy-engine.js && node --check autonomy-store.js && node --check api-skill-memory.js
       - name: Autonomy unit tests
-        run: node --test test/autonomy-engine.test.js
+        run: node --test test/autonomy-engine.test.js test/api-skill-memory.test.js
