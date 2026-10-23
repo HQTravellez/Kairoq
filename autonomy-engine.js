@@ -58,6 +58,10 @@ async function run(input,{execute=adapter.execute,sleep=ms=>new Promise(r=>setTi
  const assessment=assess(operation,response);
  const evidence=summaryFrom({plan,operation,assessment,attempts,response,durationMs:Date.now()-started});
  await persistence.append(input.projectId,{type:'api-execution',passed:assessment.passed,...evidence});
+ if(process.env.KAIROQ_AUTONOMY_AUTO_SKILLS==='true'&&persistence===store){
+  try{await require('./api-skills-verified').learn({projectId:input.projectId,operationId:operation.id});}
+  catch(_){await persistence.append(input.projectId,{type:'skill-learning-error',operationId:operation.id,reason:'Automatic skill learning failed',recordedAt:new Date().toISOString()});}
+ }
  return {passed:assessment.passed,assessment,attempts,evidence,
    // The caller may inspect response, but this is never persisted and must be sanitized for API responses.
    response:{status:response.status,data:validation.sanitize(response.data,[input.credentialName?process.env[input.credentialName]:''])}};

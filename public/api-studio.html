@@ -16,7 +16,8 @@
 <p class="small">Run one explicitly approved operation, validate the returned status and JSON schema, then save privacy-reduced evidence to persistent project memory. No automatic write retries. Requires workspace sign-in and server-side API allowlists.</p>
 <div class="field"><label for="memoryProject">Project memory ID</label><input id="memoryProject" value="api-studio" pattern="[A-Za-z0-9_-]+" maxlength="80"></div>
 <div class="actions"><button id="autonomyRun" type="button" disabled>Execute, verify and remember</button><button class="secondary" type="button" id="memoryRead">View saved evidence</button></div>
-<pre id="autonomyEvidence" aria-label="API verification evidence">No verification completed.</pre>
+<pre id="autonomyEvidence" aria-label="API verification evidence">No verification completed.</pre><div class="actions"><button id="skillLearn" type="button">Learn from execution evidence</button><button id="skillActive" type="button" class="secondary">View active API skill</button></div>
+<pre id="skillEvidence" aria-label="Versioned API skill evidence">No skill loaded.</pre>
 </section>
 <section class="panel"><h2>5. Inspect the API contract</h2><p id="status" class="status" role="status" aria-live="polite">No API documentation imported yet.</p><pre id="output" aria-label="Imported API contract">Waiting for API documentation.</pre></section>
 <section class="panel" style="margin-top:18px"><h2>6. Test a server-side operation</h2><p class="small danger">Live calls are disabled by default and require server-side enablement, allowlisted hosts, dedicated credentials and explicit approval. Mutating calls require separate write approval.</p><div class="grid"><div class="field"><label for="operation">Operation</label><select id="operation"><option value="">Import an API first</option></select></div><div class="field"><label for="credential">Server credential variable name (optional)</label><input id="credential" placeholder="KAIROQ_API_TOKEN_PROVIDER"></div><div class="field"><label for="oauthForTest">OAuth connection for API testing (optional)</label><select id="oauthForTest"><option value="">No OAuth (use API key if required)</option></select></div></div><div class="field"><label for="params">Path parameters JSON</label><textarea id="params" rows="2">{}</textarea></div><div class="field"><label for="payload">Request body JSON (optional)</label><textarea id="payload" rows="2"></textarea></div><div class="actions"><button id="test" class="secondary" disabled>Review and test selected operation</button></div></section>
@@ -112,6 +113,16 @@ $("autonomyRun").addEventListener("click",()=>action($("autonomyRun"),async()=>{
  });
  $("autonomyEvidence").textContent=JSON.stringify(result,null,2);
  status(result.passed?"Verified against expected response":"Verification failed or blocked; inspect evidence");
+}));
+$("skillLearn").addEventListener("click",()=>action($("skillLearn"),async()=>{
+ if(!plan)throw Error("Import a formal API contract first");
+ const result=await request("/api/developer/api/autonomy/skills/learn",{projectId:$("memoryProject").value.trim(),operationId:$("operation").value});
+ $("skillEvidence").textContent=JSON.stringify(result,null,2);status("Skill learning: "+result.status);
+}));
+$("skillActive").addEventListener("click",()=>action($("skillActive"),async()=>{
+ if(!plan)throw Error("Import an API contract first");
+ const result=await request("/api/developer/api/autonomy/skills/active",{projectId:$("memoryProject").value.trim(),operationId:$("operation").value});
+ $("skillEvidence").textContent=JSON.stringify(result,null,2);
 }));
 $("memoryRead").addEventListener("click",()=>action($("memoryRead"),async()=>{
  const result=await request("/api/developer/api/autonomy/history",{projectId:$("memoryProject").value.trim()});
