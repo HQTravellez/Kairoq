@@ -112,6 +112,16 @@ test('scheduled automations run the function when due, log the run, email the ow
  assert.ok(logs.some(l=>l.source==='functions/remind.js'&&l.message==='reminding 1 bookings via schedule'),'the function log lines are kept');
  assert.ok(logs.some(l=>l.source==='automation reminders'&&/ran on schedule: ok 200/.test(l.message)));
  const st=(await request(server,'GET','/api/create/projects/'+id+'/automations',{headers:{cookie}})).json.automations;
+ assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);
+ // This fixture runs on Oct 20, 2026, but the status endpoint uses actual wall-clock time.
+ // When the test runs after Oct 20, an overdue schedule is correctly reported as due now.
+ const capturedNow=Date.now(),next=Date.parse(st[0].next);
+ if(automations.due(CONFIG.automations[0],at('20','09:00'),capturedNow)){
+  assert.ok(Math.abs(next-capturedNow)<30000,'overdue automation should be due now');
+ }else{
+  assert.match(st[0].next,/T09:00:00\.000Z$/);
+  assert.ok(next>=capturedNow,'upcoming scheduled run should not be in the past');
+ }
  assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);// The simulation ran on Oct 20, 2026. When CI runs after that date, the
  // real-time status endpoint correctly reports an overdue run as due NOW,
  // not at a fixed 09:00 UTC. Assert the runtime contract for either case.
@@ -134,7 +144,16 @@ test('scheduled automations run the function when due, log the run, email the ow
  db.prepare('UPDATE automation_runs SET last_run=? WHERE name IN (?, ?)').run(at('20','09:30'),'reminders','hourly');
  // A function that keeps failing: one email after the third failure in a row, none before or after.
  await builder.saveSource(id,{...builder.loadFiles(id,builder.loadMeta(id).current_version),'functions/remind.js':BROKEN},{summary:'break'});
- for(const day of ['21','22','23','24']){r=await automations.tick({now:at(day,'09:00'),send});const x=r.find(y=>y.project===id&&y.name==='reminders');assert.equal(x.ok,false);assert.match(x.result,/boom/)}
+ // Manual Run now above records the real system clock. All simulated later runs must
+ // occur *after* that timestamp, even when this test executes after October 21, 2026.
+ const anchor=new Date(Math.max(Date.now(),at('20','09:00')));
+ const firstUtc=Date.UTC(anchor.getUTCFullYear(),anchor.getUTCMonth(),anchor.getUTCDate()+2,9);
+ for(let offset=0;offset<4;offset++){
+  r=await automations.tick({now:firstUtc+offset*86400000,send});
+  const x=r.find(y=>y.project===id&&y.name==='reminders');
+  assert.ok(x,'scheduled reminder must be due after previous manual run');
+  assert.equal(x.ok,false);assert.match(x.result,/boom/);
+ }
  // Both automations run the broken function, so each gets exactly one email (at its third failure, not its fourth).
  assert.deepEqual(mails.map(m=>m.subject).sort(),['Auto: the automation "hourly" keeps failing','Auto: the automation "reminders" keeps failing']);assert.match(mails[0].text,/failed 3 times in a row/);
  const st2=(await request(server,'GET','/api/create/projects/'+id+'/automations',{headers:{cookie}})).json.automations[0];
