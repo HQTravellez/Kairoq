@@ -6865,6 +6865,28 @@ const server = http.createServer(async (req, res) => {
   if(url==="/api/developer/oauth/disconnect"&&req.method==="POST"){if(!authEnabled())return json(res,403,{error:"Set APP_PASSWORD before managing OAuth connections."});if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{const body=await getBody(req,5000);return json(res,200,require("./api-oauth").disconnect(String(body.provider||"")))}catch(e){return json(res,422,{error:e.message})}}
   if (req.method === "POST" && url === "/api/developer/api/discover"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000);return json(res,200,body.documentationUrl?await require("./api-docs").discover(body.documentationUrl):require("./api-docs").infer(body.documentationText));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/execute"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,await require("./api-adapter").execute(body));}catch(e){return json(res,422,{error:String(e.message||e)});}}
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/run'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,2200000);if(body.approved!==true)return json(res,403,{error:'Execution requires approval'});
+    const result=await require('./autonomy-engine').run(body);return json(res,200,result);
+   }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&(url==='/api/developer/api/autonomy/skills/learn'||url==='/api/developer/api/autonomy/skills/active')){
+    if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+    try{const body=await getBody(req,3000),skills=require('./api-skills-verified');
+      return json(res,200,url.endsWith('/learn')?await skills.learn(body):await skills.active(body));
+    }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/history'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,2000);return json(res,200,{records:await require('./autonomy-store').history(body.projectId)});}
+   catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/skill/candidate'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,30000);return json(res,200,await require('./autonomy-engine').proposeSkill(body));}
+   catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
   if (req.method === "POST" && url === "/api/developer/api/diff"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,require("./api-evolution").diff(body.before,body.after));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if(req.method==="POST"&&url==="/api/developer/api/backend"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000),result=require("./api-backend").generate(body.apiPlan||body.apiSpec);return json(res,200,{filename:result.filename,operations:result.operations,archiveBase64:require("./project-portability").zip(result.files).toString("base64")});}catch(error){return json(res,422,{error:error.message});}}
   if(req.method==='POST'&&url==='/api/developer/plan'){if(!isAuthenticated(req))return json(res,401,{error:'Authentication required.'});try{const body=await getBody(req,2200000);if(String(body.brief||'').length<12||String(body.brief).length>6000)throw Error('Describe the product in 12–6000 characters');const planner=require('./product-orchestrator'),apiContract=planner.contract(body.apiPlan||body.apiSpec||(body.documentationUrl?await require('./api-docs').discover(body.documentationUrl):null)),plan=await planner.plan(callDeveloperCodingModel,{brief:body.brief,apiContract});return json(res,200,{plan,readiness:planner.readiness(plan,apiContract,'planned-app'),externalCalls:0});}catch(e){return json(res,422,{error:e.message});}}

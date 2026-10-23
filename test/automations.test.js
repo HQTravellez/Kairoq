@@ -112,11 +112,26 @@ test('scheduled automations run the function when due, log the run, email the ow
  assert.ok(logs.some(l=>l.source==='functions/remind.js'&&l.message==='reminding 1 bookings via schedule'),'the function log lines are kept');
  assert.ok(logs.some(l=>l.source==='automation reminders'&&/ran on schedule: ok 200/.test(l.message)));
  const st=(await request(server,'GET','/api/create/projects/'+id+'/automations',{headers:{cookie}})).json.automations;
- assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);assert.match(st[0].next,/T09:00:00\.000Z$/);assert.ok(Date.parse(st[0].next)>Date.now(),'next run is in the future');assert.equal(st[2].next,null);
+ assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);// The simulation ran on Oct 20, 2026. When CI runs after that date, the
+ // real-time status endpoint correctly reports an overdue run as due NOW,
+ // not at a fixed 09:00 UTC. Assert the runtime contract for either case.
+ const next=Date.parse(st[0].next),checkedAt=Date.now();
+ assert.ok(Number.isFinite(next),'next run is a valid timestamp');
+ // The schedule status uses actual wall-clock time, whereas this integration test
+ // simulated October 20. Overdue tasks are shown as due now, while future
+ // schedules retain their daily 09:00 UTC slot.
+ const dueImmediately=Math.abs(next-checkedAt)<30000;
+ const nextAtNine=/T09:00:00\.000Z$/.test(st[0].next)&&next>=checkedAt;
+ assert.ok(dueImmediately||nextAtNine,'next run is immediately due or a future 09:00 UTC occurrence');
+ assert.equal(st[2].next,null);
  // Run now from the editor.
  const ran=(await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'reminders'}})).json;
  assert.equal(ran.run.result,'ok 200 {"reminded":1}');assert.equal(ran.automations[0].runs,2);
  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'nope'}})).status,404);
+ // The manual action records the actual machine clock, whereas scheduled ticks in
+ // this test use the simulated Oct 20–24 timeline. Rebase only the test
+ // fixture's last-run timestamps so the later simulated days are actually due.
+ db.prepare('UPDATE automation_runs SET last_run=? WHERE name IN (?, ?)').run(at('20','09:30'),'reminders','hourly');
  // A function that keeps failing: one email after the third failure in a row, none before or after.
  await builder.saveSource(id,{...builder.loadFiles(id,builder.loadMeta(id).current_version),'functions/remind.js':BROKEN},{summary:'break'});
  for(const day of ['21','22','23','24']){r=await automations.tick({now:at(day,'09:00'),send});const x=r.find(y=>y.project===id&&y.name==='reminders');assert.equal(x.ok,false);assert.match(x.result,/boom/)}
@@ -150,7 +165,15 @@ test('record-triggered automations run after a create, cannot start themselves, 
  assert.equal(JSON.parse(sdb.prepare('SELECT data FROM records WHERE id=?').get(t.json.item.id).data).welcomed,true,'ran on the test copy');
  assert.equal(db.prepare("SELECT COUNT(*) n FROM records WHERE collection='bookings'").get().n,1,'the real data has only Ben');
  assert.equal(db.prepare("SELECT COUNT(*) n FROM records WHERE collection='notes'").get().n,1);
- assert.ok(applog.list(id).some(l=>l.source==='automation welcome'&&/\(test copy\)/.test(l.message)));
+ // Sandbox database writes can complete before the asynchronous automation writes
+ // its audit log. Wait for the log itself rather than asserting it synchronously.
+ let sandboxLogFound=false;
+ for(let i=0;i<60;i++){
+  sandboxLogFound=applog.list(id).some(l=>l.source==='automation welcome'&&/\(test copy\)/.test(l.message));
+  if(sandboxLogFound)break;
+  await wait(50);
+ }
+ assert.ok(sandboxLogFound,'sandbox automation emits a test-copy audit log');
  // Run now on the test copy, as the agent does.
  const r=await automations.runNow(id,'reminders',{sb:{dir:box.dir,token:box.token},version:meta.current_version});
  assert.equal(r.result,'ok 200 {"reminded":2}','sees the two bookings on the test copy');
