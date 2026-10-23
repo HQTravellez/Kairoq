@@ -128,6 +128,10 @@ test('scheduled automations run the function when due, log the run, email the ow
  const ran=(await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'reminders'}})).json;
  assert.equal(ran.run.result,'ok 200 {"reminded":1}');assert.equal(ran.automations[0].runs,2);
  assert.equal((await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'nope'}})).status,404);
+ // The manual action records the actual machine clock, whereas scheduled ticks in
+ // this test use the simulated Oct 20–24 timeline. Rebase only the test
+ // fixture's last-run timestamps so the later simulated days are actually due.
+ db.prepare('UPDATE automation_runs SET last_run=? WHERE name IN (?, ?)').run(at('20','09:30'),'reminders','hourly');
  // A function that keeps failing: one email after the third failure in a row, none before or after.
  await builder.saveSource(id,{...builder.loadFiles(id,builder.loadMeta(id).current_version),'functions/remind.js':BROKEN},{summary:'break'});
  for(const day of ['21','22','23','24']){r=await automations.tick({now:at(day,'09:00'),send});const x=r.find(y=>y.project===id&&y.name==='reminders');assert.equal(x.ok,false);assert.match(x.result,/boom/)}
