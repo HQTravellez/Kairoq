@@ -66,7 +66,7 @@ const PERMISSIONS_FILE = path.join(__dirname, "workspace", ".tool-permissions.js
 const USAGE_FILE = path.join(__dirname, "workspace", ".usage-ledger.jsonl");
 const DEAD_LETTER_FILE = path.join(__dirname, "workspace", ".dead-letter.json");
 const PLAYBOOK_FILE = path.join(__dirname, "workspace", ".company-playbook.json");
-const PRODUCT_STATE_FILE = path.join(__dirname, "workspace", ".product-state.json");
+const PRODUCT_STATE_FILE = process.env.PRODUCT_STATE_FILE || path.join(__dirname, "workspace", ".product-state.json");
 const OPEN_LOOPS_FILE = path.join(__dirname, "workspace", ".open-loops.json");
 
 const TOURS_FILE = path.join(__dirname, "workspace", ".studio-tours.json");
@@ -909,6 +909,34 @@ function readJsonFileSafe(file, fallback) {
 function writeJsonFileSafe(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(value, null, 2), "utf8");
+}
+
+// Product state is the small settings object the web app keeps per workspace: onboarding,
+// demo mode, vertical mode and workflow cards. The browser keeps its own copy and merges ours in.
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function loadProductState() {
+  const state = readJsonFileSafe(PRODUCT_STATE_FILE, {});
+  return isPlainObject(state) ? state : {};
+}
+
+function saveProductState(patch) {
+  const next = { ...loadProductState(), ...patch, updated_at: new Date().toISOString() };
+  if (Array.isArray(next.workflow_cards)) next.workflow_cards = next.workflow_cards.slice(0, 100);
+  writeJsonFileSafe(PRODUCT_STATE_FILE, next);
+  return next;
+}
+
+async function handleProductStateSave(req, res) {
+  try {
+    const body = await getBody(req, 1_000_000);
+    if (!isPlainObject(body.state)) return json(res, 400, { error: "Expected a JSON body with a state object." });
+    return json(res, 200, { ok: true, state: saveProductState(body.state) });
+  } catch (err) {
+    return json(res, 400, { error: err.message || "Could not save product state." });
+  }
 }
 
 
@@ -6863,8 +6891,56 @@ const server = http.createServer(async (req, res) => {
   if(url==="/api/developer/oauth/start"&&req.method==="POST"){if(!authEnabled())return json(res,403,{error:"Set APP_PASSWORD before enabling shared OAuth connections."});if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{const body=await getBody(req,5000),flow=require("./api-oauth").start(String(body.provider||""));res.setHeader("Set-Cookie",flow.cookie);return json(res,200,{authorizationUrl:flow.url})}catch(e){return json(res,422,{error:e.message})}}
   if(url.startsWith("/api/developer/oauth/callback?")&&req.method==="GET"){const params=new URL(url,"https://kairoq.invalid").searchParams;try{if(params.has("error"))throw Error("Provider declined authorization");const state=parseCookies(req).kq_oauth_state||"";await require("./api-oauth").complete({state:params.get("state"),code:params.get("code"),cookie:state});res.writeHead(303,{"Location":"/api-studio.html","Set-Cookie":"kq_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/api/developer/oauth; Max-Age=0","Cache-Control":"no-store"});return res.end()}catch(e){return json(res,422,{error:e.message})}}
   if(url==="/api/developer/oauth/disconnect"&&req.method==="POST"){if(!authEnabled())return json(res,403,{error:"Set APP_PASSWORD before managing OAuth connections."});if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{const body=await getBody(req,5000);return json(res,200,require("./api-oauth").disconnect(String(body.provider||"")))}catch(e){return json(res,422,{error:e.message})}}
+  // Public APIs directory discovery is read-only and strictly separate from live execution.
+  if(req.method==="POST"&&url==="/api/developer/api/catalog"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{
+      const input=await getBody(req,2500),catalog=require("./api-catalog");
+      return json(res,200,{...catalog.search(String(input.query||""),{category:input.category||"",limit:input.limit??12}),
+        categories:catalog.categories(),stats:catalog.stats()});
+    }catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
+  if(req.method==="POST"&&url==="/api/developer/api/catalog/resolve"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const input=await getBody(req,500);return json(res,200,require("./api-catalog").find(input.id));}
+    catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
+  if(req.method==="POST"&&url==="/api/developer/api/analyze"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const input=await getBody(req,2200000);
+      return json(res,200,await require("./api-product-intake").analyze(input));}
+    catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
+  if(req.method==="POST"&&url==="/api/developer/api/prepare"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const input=await getBody(req,2200000);
+      return json(res,200,await require("./api-product-intake").prepare(input,{callModel:callDeveloperCodingModel}));}
+    catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
   if (req.method === "POST" && url === "/api/developer/api/discover"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000);return json(res,200,body.documentationUrl?await require("./api-docs").discover(body.documentationUrl):require("./api-docs").infer(body.documentationText));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/execute"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,await require("./api-adapter").execute(body));}catch(e){return json(res,422,{error:String(e.message||e)});}}
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/run'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,2200000);if(body.approved!==true)return json(res,403,{error:'Execution requires approval'});
+    const result=await require('./autonomy-engine').run(body);return json(res,200,result);
+   }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&(url==='/api/developer/api/autonomy/skills/learn'||url==='/api/developer/api/autonomy/skills/active')){
+    if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+    try{const body=await getBody(req,3000),skills=require('./api-skills-verified');
+      return json(res,200,url.endsWith('/learn')?await skills.learn(body):await skills.active(body));
+    }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/history'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,2000);return json(res,200,{records:await require('./autonomy-store').history(body.projectId)});}
+   catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/skill/candidate'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,30000);return json(res,200,await require('./autonomy-engine').proposeSkill(body));}
+   catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
   if (req.method === "POST" && url === "/api/developer/api/diff"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,require("./api-evolution").diff(body.before,body.after));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if(req.method==="POST"&&url==="/api/developer/api/backend"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000),result=require("./api-backend").generate(body.apiPlan||body.apiSpec);return json(res,200,{filename:result.filename,operations:result.operations,archiveBase64:require("./project-portability").zip(result.files).toString("base64")});}catch(error){return json(res,422,{error:error.message});}}
   if(req.method==='POST'&&url==='/api/developer/plan'){if(!isAuthenticated(req))return json(res,401,{error:'Authentication required.'});try{const body=await getBody(req,2200000);if(String(body.brief||'').length<12||String(body.brief).length>6000)throw Error('Describe the product in 12–6000 characters');const planner=require('./product-orchestrator'),apiContract=planner.contract(body.apiPlan||body.apiSpec||(body.documentationUrl?await require('./api-docs').discover(body.documentationUrl):null)),plan=await planner.plan(callDeveloperCodingModel,{brief:body.brief,apiContract});return json(res,200,{plan,readiness:planner.readiness(plan,apiContract,'planned-app'),externalCalls:0});}catch(e){return json(res,422,{error:e.message});}}
@@ -6978,6 +7054,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/cloud/load") return handleCloudLoad(req, res);
   if (req.method === "POST" && url === "/api/cloud/save") return handleCloudSave(req, res);
   if (req.method === "POST" && url === "/api/memory/extract") return handleMemoryExtract(req, res);
+  if (req.method === "GET" && url === "/api/product-state") return json(res, 200, { state: loadProductState() });
+  if (req.method === "POST" && url === "/api/product-state") return handleProductStateSave(req, res);
   if (req.method === "GET" && url.startsWith("/api/loops")) return handleOpenLoopsList(req, res);
   if (req.method === "POST" && url === "/api/loops/create") return handleOpenLoopCreate(req, res);
   if (req.method === "POST" && url === "/api/loops/update") return handleOpenLoopUpdate(req, res);

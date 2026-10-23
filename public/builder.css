@@ -1,0 +1,91 @@
+/* The app builder's editor, in the same system as the workspace (design.css): one continuous
+   top bar, the preview as a card, quiet grouped controls, chat bubbles, one prompt box.
+   Loaded last on create.html. */
+/* One brand gradient across Kairoq: the builder's logo, highlights and landing use it too */
+:root{--grad:linear-gradient(120deg,#b4432a 0%,#e2703a 55%,#f2a341 100%);--accent:#c2512d;--accent-2:#e2703a;--accent-3:#f2a341}
+
+/* On a phone the toolbar scrolls sideways instead of cutting controls off */
+/* When the stage is narrow the toolbar scrolls sideways instead of wrapping over itself */
+#editor .stage-bar{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap!important}#editor .stage-bar::-webkit-scrollbar{display:none}#editor .stage-bar>*{flex-shrink:0}
+/* One typeface: the landing's highlighted words and project initials use Geist, not an italic serif */
+.landing{--serif:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.landing h2 em,.hero h1 em{font-style:normal!important;font-weight:inherit!important;letter-spacing:inherit!important;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.steps li::after,.quote{font-style:normal!important}
+.projects.cards .thumb{font-family:"Geist",ui-sans-serif,sans-serif!important;font-weight:600!important;letter-spacing:-.02em;background:var(--thumb,var(--grad))!important}
+
+#editor{
+  --b-bg:#fbfaf8;--b-tint:#f1efea;--b-surface:#fff;--b-line:#e8e5de;--b-line-strong:#d9d5cc;
+  --b-ink:#15140f;--b-ink-2:#4f4b43;--b-ink-3:#857f74;
+  --b-brand:linear-gradient(120deg,#b4432a 0%,#e2703a 55%,#f2a341 100%);
+  --b-shadow-1:0 1px 2px #15140f0d;--b-shadow-2:0 1px 2px #15140f0a,0 12px 32px -14px #15140f2e
+}
+
+/* ---------- One chrome: chat column, top bar and stage share a surface ---------- */
+#editor .chat{background:var(--b-bg)!important;border-right:0!important}
+#editor .stage{background:var(--b-bg)!important}
+#editor .chat-head{height:54px;padding:0 12px!important;border-bottom:0!important;background:transparent!important;align-items:center}
+#editor #project-name{font-weight:600!important;font-size:15px!important;letter-spacing:-.01em;color:var(--b-ink)!important;border-radius:8px!important;background:transparent!important;border:1px solid transparent!important}
+#editor #project-name:hover{background:var(--b-tint)!important}
+#editor #project-name:focus{background:#fff!important;border-color:var(--b-line-strong)!important}
+#editor .stage-bar{height:54px;gap:6px!important;padding:0 12px 0 4px!important;background:transparent!important;border-bottom:0!important;box-shadow:none!important}
+
+/* ---------- Toolbar: segmented switches, quiet icons, two real buttons ---------- */
+#editor .stage-bar .seg{background:var(--b-tint)!important;border:0!important;border-radius:10px!important;padding:3px!important;gap:2px!important;box-shadow:none!important}
+#editor .stage-bar .seg button{height:30px;border-radius:8px!important;border:0!important;background:transparent!important;color:var(--b-ink-2)!important;font-size:13px!important;font-weight:500!important;box-shadow:none!important}
+#editor .stage-bar .seg button:hover{color:var(--b-ink)!important}
+#editor .stage-bar .seg button[aria-pressed=true],#editor .stage-bar .seg button.active,#editor .stage-bar .seg button.on{background:var(--b-surface)!important;color:var(--b-ink)!important;box-shadow:var(--b-shadow-1),inset 0 0 0 1px var(--b-line)!important}
+#editor .stage-bar .ghost,#editor .stage-bar .menu>summary{height:32px;min-width:32px;border-radius:8px!important;border:0!important;background:transparent!important;color:var(--b-ink-2)!important;box-shadow:none!important;font-size:13px!important;font-weight:500!important}
+#editor .stage-bar .ghost:hover,#editor .stage-bar .menu>summary:hover,#editor .stage-bar .menu[open]>summary{background:var(--b-tint)!important;color:var(--b-ink)!important}
+#editor #versions{height:32px!important;min-width:150px;max-width:280px;field-sizing:content;padding:0 28px 0 12px!important;border-radius:10px!important;border:1px solid var(--b-line)!important;background-color:var(--b-surface)!important;color:var(--b-ink-2)!important;font-size:13px!important;font-variant-numeric:tabular-nums;box-shadow:var(--b-shadow-1)!important}
+#editor #versions:hover{border-color:var(--b-line-strong)!important}
+#editor #share-open{height:34px;padding:0 14px!important;border-radius:10px!important;border:1px solid var(--b-line-strong)!important;background:var(--b-surface)!important;color:var(--b-ink)!important;font-weight:600!important;box-shadow:var(--b-shadow-1)!important}
+#editor #share-open:hover{background:var(--b-tint)!important}
+#editor #publish-open{height:34px;padding:0 16px!important;border-radius:10px!important;border:0!important;background:var(--b-ink)!important;color:#fff!important;font-weight:600!important;box-shadow:var(--b-shadow-1)!important}
+#editor #publish-open:hover{background:#2b2a24!important}
+#editor .menu-panel{border:1px solid var(--b-line)!important;border-radius:14px!important;box-shadow:0 2px 6px #15140f0f,0 24px 60px -20px #15140f40!important;background:var(--b-surface)!important;padding:6px!important}
+#editor .menu-panel button{border-radius:10px!important}
+#editor .menu-panel button:hover{background:var(--b-tint)!important}
+
+/* ---------- The preview is a card on the chrome ---------- */
+#editor .canvas{padding:0 12px 12px 4px!important;background:transparent!important}
+#editor .canvas>iframe,#editor #frame{border:1px solid var(--b-line)!important;border-radius:14px!important;box-shadow:var(--b-shadow-1)!important;background:#fff!important}
+
+/* ---------- Chat: soft user bubbles, the brand mark for Kairoq ---------- */
+#editor .messages{padding-top:8px!important}
+#editor .messages li.user{background:var(--b-tint)!important;border:0!important;border-radius:18px 18px 6px 18px!important;color:var(--b-ink)!important;font-size:14px!important;line-height:1.5!important;padding:10px 14px!important;box-shadow:none!important}
+#editor .messages li.assistant{color:var(--b-ink)!important;font-size:14px!important;line-height:1.6!important}
+#editor .messages .assistant::before{background:var(--b-brand)!important;border-radius:6px!important;box-shadow:inset 0 0 0 1px #ffffff2e!important}
+#editor .messages .status-line{color:var(--b-ink-3)!important}
+#editor .msg-meta{color:var(--b-ink-3)!important;font-size:12px!important;gap:10px!important}
+#editor .msg-meta .ver{background:var(--b-surface)!important;border:1px solid var(--b-line)!important;border-radius:6px!important;color:var(--b-ink-2)!important;font-weight:600}
+#editor .details-link{color:var(--b-ink-2)!important;text-decoration:underline;text-decoration-color:var(--b-line-strong);text-underline-offset:3px}
+
+/* ---------- The prompt box: same as the workspace home ---------- */
+#editor #chat-form{background:var(--b-surface)!important;border:1px solid var(--b-line)!important;border-radius:20px!important;box-shadow:var(--b-shadow-2)!important;transition:border-color .15s,box-shadow .15s}
+#editor #chat-form:focus-within{border-color:var(--b-line-strong)!important;box-shadow:0 0 0 4px #c2512d1f,var(--b-shadow-2)!important}
+#editor #chat-input{font-size:14px!important;color:var(--b-ink)!important;caret-color:#c2512d}
+#editor #chat-form button[type=submit]{width:32px;height:32px;border-radius:999px!important;background:var(--b-ink)!important;color:#fff!important;border:0!important}
+#editor #chat-form button[type=submit]:disabled,#editor #chat-form button[type=submit].is-empty{background:var(--b-line)!important;color:#fff!important}
+#editor #connect-open{display:inline-flex!important;align-items:center;gap:6px}
+#editor #connect-open .lbl{line-height:1}
+#editor :focus-visible{outline:2px solid #c2512d!important;outline-offset:2px!important}
+
+/* "Implement this plan" under a Discuss reply: a real button, like Lovable's */
+#editor .messages li.assistant>.small-btn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;height:34px;padding:0 14px!important;border-radius:10px!important;border:0!important;background:var(--b-ink)!important;color:#fff!important;font-size:13px!important;font-weight:600!important;box-shadow:var(--b-shadow-1)!important}
+#editor .messages li.assistant>.small-btn:hover{background:#2b2a24!important}
+
+/* ---------- While it works: one status line, its words and plan; steps live in Details ---------- */
+#editor li.work .stages{display:none!important}
+#editor li.work .work-msg{margin:6px 0 4px;color:var(--b-ink)!important;font-size:14px;line-height:1.6}
+#editor li.work .work-msg ul{margin:6px 0 0;padding-left:18px}
+#editor li.work .work-think{color:var(--b-ink-3)!important;font-size:12px!important;font-style:normal}
+#editor li.work .status-text{color:var(--b-ink-2)!important;font-weight:500;background:linear-gradient(90deg,var(--b-ink-3) 0%,var(--b-ink) 50%,var(--b-ink-3) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:b-shimmer 1.6s linear infinite}
+@keyframes b-shimmer{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){#editor li.work .status-text{animation:none;color:var(--b-ink-2)!important;background:none}}
+/* The strip above the prompt box repeats the status line; its Stop stays reachable from the line */
+#editor .chat:has(#stream) #progress{display:none!important}
+/* First build: the preview shows the app's name and one quiet status, not a checklist */
+#build-overlay .bo-card{text-align:center;display:grid;justify-items:center;gap:10px}
+#build-overlay .bo-card h3{margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em;color:#15140f}
+#build-overlay .bo-card .bo-think{margin:0;color:#857f74;font-size:14px}
+#build-overlay .bo-kicker{display:none}
