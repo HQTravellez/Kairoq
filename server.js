@@ -6871,6 +6871,12 @@ const server = http.createServer(async (req, res) => {
     const result=await require('./autonomy-engine').run(body);return json(res,200,result);
    }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
   }
+  if(req.method==='POST'&&(url==='/api/developer/api/autonomy/skills/learn'||url==='/api/developer/api/autonomy/skills/active')){
+    if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+    try{const body=await getBody(req,3000),skills=require('./api-skills-verified');
+      return json(res,200,url.endsWith('/learn')?await skills.learn(body):await skills.active(body));
+    }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
   if(req.method==='POST'&&url==='/api/developer/api/autonomy/history'){
    if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
    try{const body=await getBody(req,2000);return json(res,200,{records:await require('./autonomy-store').history(body.projectId)});}

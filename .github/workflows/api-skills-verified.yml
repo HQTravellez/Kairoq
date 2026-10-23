@@ -1,0 +1,19 @@
+name: Verified API skill checks
+on:
+  push:
+    branches: [feat/verified-api-skill-evolution]
+  pull_request:
+    paths: ['api-skills-verified.js', 'test/api-skills-verified.test.js', 'autonomy-engine.js', 'server.js', 'public/api-studio.html', '.github/workflows/api-skills-verified.yml']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - run: node --check server.js && node --check autonomy-engine.js && node --check api-skills-verified.js
+      - run: node --test test/api-skills-verified.test.js test/autonomy-engine.test.js test/api-skill-memory.test.js test/automations.test.js
