@@ -112,7 +112,17 @@ test('scheduled automations run the function when due, log the run, email the ow
  assert.ok(logs.some(l=>l.source==='functions/remind.js'&&l.message==='reminding 1 bookings via schedule'),'the function log lines are kept');
  assert.ok(logs.some(l=>l.source==='automation reminders'&&/ran on schedule: ok 200/.test(l.message)));
  const st=(await request(server,'GET','/api/create/projects/'+id+'/automations',{headers:{cookie}})).json.automations;
- assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);assert.match(st[0].next,/T09:00:00\.000Z$/);assert.ok(Date.parse(st[0].next)>Date.now(),'next run is in the future');assert.equal(st[2].next,null);
+ assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);// The simulation ran on Oct 20, 2026. When CI runs after that date, the
+ // real-time status endpoint correctly reports an overdue run as due NOW,
+ // not at a fixed 09:00 UTC. Assert the runtime contract for either case.
+ const next=Date.parse(st[0].next),checkedAt=Date.now();
+ assert.ok(Number.isFinite(next),'next run is a valid timestamp');
+ assert.ok(next>=checkedAt-30000,'next run is not stale');
+ if(automations.due(CONFIG.automations[0],Date.parse(at('20','09:00')),checkedAt)){
+  assert.ok(next<=checkedAt+30000,'overdue schedule is available immediately');
+ }else{
+  assert.match(st[0].next,/T09:00:00\.000Z$/,'upcoming daily schedule stays at nine UTC');
+ }assert.equal(st[2].next,null);
  // Run now from the editor.
  const ran=(await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'reminders'}})).json;
  assert.equal(ran.run.result,'ok 200 {"reminded":1}');assert.equal(ran.automations[0].runs,2);
