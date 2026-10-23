@@ -1,0 +1,27 @@
+name: Coding guidelines integration
+on:
+  push:
+    branches:
+      - feature/karpathy-coding-guidelines
+  pull_request:
+    paths:
+      - 'builder-method.js'
+      - 'react-builder.js'
+      - 'product-orchestrator.js'
+      - 'test/karpathy-coding-guidelines.test.js'
+      - '.github/workflows/karpathy-guidelines.yml'
+permissions:
+  contents: read
+jobs:
+  guidelines-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check builder-method.js && node --check react-builder.js && node --check product-orchestrator.js
+      - run: node --test test/karpathy-coding-guidelines.test.js test/react-builder.test.js test/product-orchestration.test.js
