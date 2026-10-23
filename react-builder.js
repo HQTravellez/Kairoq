@@ -77,11 +77,13 @@ Rules:
 - Kairoq builds, previews, tests and hosts the app itself. Never tell the user to run a command, start a server, run npm or Vite, install anything or deploy by hand; when they ask for the preview or to "start the server", the preview already runs in the Preview tab.
 - A message that reports a problem you cannot see in the code ("I can't see the website", "the preview is blank") when the project has no errors is not a change request: reply with files {} and a message that says the app builds and opens without errors and what to check (the Preview tab, the open-in-new-tab button, a reload), and change nothing. Never rewrite the entry point or add recovery screens for a problem you cannot reproduce.
 - Before you answer, check your own work: (1) if the request is already implemented exactly as asked, say so and change nothing; (2) every import resolves to a file you include or that already exists, or to an available package, so leave no import unresolved; (3) new pages and components are actually rendered: add routes and navigation links in App.jsx or the layout, or the user cannot see them; (4) the whole feature works, with no placeholders, TODOs or "rest of the code unchanged" comments. If not everything fits in one reply, finish the most important part completely and say in "message" what is left.
-${require('./builder-method').VERIFY}
+${METHOD.VERIFY}
+${METHOD.KARPATHY}
 - Generated images: when the app needs photos or illustrations that are not uploaded, you may add "images":[{"name":"hero-terrace.jpg","prompt":"detailed description of the photo","aspect":"16:9"}] to your reply (at most 4, aspect 1:1, 4:3, 3:2, 16:9, 9:16 or 3:4) and use them as ./uploads/<name>. Only when the user's message says image generation is available; otherwise use https photo URLs.${require('./react-design').RULES}
 Respond with ONLY a JSON object, no markdown fences:
 {"plan":["2 to 6 short steps you will take, written for the user, e.g. \"Add a booking form to the home page\""],"message":"one or two sentences telling the user what you changed","files":{"src/new-or-rewritten.jsx":"full file content"},"edits":{"src/existing.jsx":[{"find":"exact current lines","replace":"new lines"}]},"delete":["src/unused.jsx"]}
 Include only files you create or change. "files", "edits", "delete" and "images" are each optional, but send at least one change.
+Questions: build with sensible defaults whenever you can. Only when one decision changes what you build and you cannot pick it safely (it needs facts you do not have, such as real prices or inventory), send no changes and ask once instead: {"plan":["..."],"message":"one sentence","question":{"text":"the question?","options":["2 to 4 short choices"],"recommended":0}}, with the safest option recommended. Never ask the same question twice. When the user has answered or approved ("ok", "yes", "go ahead"), build with that answer (the recommended option for a plain approval) and do not ask again.
 When you add or change a flow a customer uses (sign up, book, order, add or edit a record, a form), also send "checks": up to 2 browser checks that prove it works, e.g. "checks":[{"name":"Add a contact","path":"","steps":[{"action":"click","text":"Add contact"},{"action":"fill","label":"Name","value":"Test Ana"},{"action":"click","text":"Save"},{"action":"expect","text":"Test Ana"}]}]. Steps: click/fill/select by the exact visible text, label or placeholder; "expect" a text that only appears when it worked; "goto" a "#/route" path when needed; test data like test-ana@example.com. When the flow needs an account, start with the steps that create one. Kairoq runs each check on a test copy of the data and keeps the ones that pass, so they protect the flow in every later change. No checks for purely visual changes.${require('./react-edits').PROMPT_NOTE}`;
 
 function slugId(){return crypto.randomBytes(6).toString('hex')}
@@ -297,10 +299,12 @@ function parseEdit(content){
  }
  if(!value||typeof value!=='object'||(value.files!==undefined&&(typeof value.files!=='object'||value.files===null||Array.isArray(value.files))))throw Error('Response JSON needs a "files" object');
  const edits=require('./react-edits').normalize(value.edits);
- if(!value.files&&!Object.keys(edits).length)throw Error('Response JSON needs a "files" object or "edits"');
+ // A reply that only asks the owner a question changes nothing; edit() saves the question.
+ const question=require('./builder-question').fromReply(value);
+ if(!value.files&&!Object.keys(edits).length&&!(Array.isArray(value.delete)&&value.delete.length)&&!question)throw Error('Response JSON needs a "files" object or "edits"');
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
  const plan=(Array.isArray(value.plan)?value.plan:[]).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,6);
- return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:fixPaths(value.files),edits:fixPaths(edits),delete:del.map(fixPath),images:imageRequests(value.images),checks:Array.isArray(value.checks)?value.checks.slice(0,2):[]};
+ return{message:String(value.message||'Updated the app.').slice(0,2000),plan,files:fixPaths(value.files),edits:fixPaths(edits),delete:del.map(fixPath),images:imageRequests(value.images),checks:Array.isArray(value.checks)?value.checks.slice(0,2):[],question};
 }
 // Images the model asks Kairoq to generate: [{name:'hero.jpg',prompt,aspect}].
 const ASPECTS=['1:1','4:3','3:2','16:9','9:16','3:4','2:3'];
@@ -425,7 +429,7 @@ function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
 }
-function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10).map(m=>({role:m.role==='user'?'user':'assistant',content:m.text}))}
+function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10).map(m=>({role:m.role==='user'?'user':'assistant',content:require('./builder-question').historyText(m)}))}
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
@@ -502,7 +506,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  meta=loadMeta(id);
  let base=loadFiles(id,meta.current_version);
  if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
- const request='Current project files:\n\n'+contextFiles(base)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
+ // The first build turns the bare starter into a whole product, as Lovable does, not one basic page.
+ const firstBuild=require('./react-design').isUntouchedStarter(base);
+ const request='Current project files:\n\n'+contextFiles(base)+(firstBuild?'\n\n'+FIRST_BUILD:'')+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null,securityTries=0;
@@ -515,7 +521,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
  let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),check:files=>selfCheck(id,meta,files,checkRuntime),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
  let usedOpenCode=false,usedFallback=false;
- const ocRequest=(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
+ const ocRequest=(firstBuild?FIRST_BUILD+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
  let thinking='',thoughtMs=null,firstPlan=null;
@@ -537,6 +543,14 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   if(attempt===1){thoughtMs=(firstToken||Date.now())-started;firstPlan=reply.plan}
   tl.add({t:'think',ms:(firstToken||Date.now())-started,text:attempt===1?thinking:''});
   if(attempt===1&&reply.plan.length)tl.add({t:'plan',items:reply.plan});
+  // A question instead of a change: nothing is built; the chat shows it with its options as buttons.
+  if(reply.question&&!Object.keys(reply.files).length&&!Object.keys(reply.edits).length&&!reply.delete.length){
+   const Q=require('./builder-question'),now=new Date().toISOString(),text=Q.display(reply.message==='Updated the app.'?'':reply.message,reply.question);
+   const fresh=loadMeta(id);
+   fresh.messages.push({role:'user',text:displayText||String(instruction).trim().slice(0,12000),at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text,question:reply.question,mode:'question',at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),timeline:tl.stored(),thought_ms:thoughtMs});
+   saveMeta(fresh);
+   return{unchanged:true,question:reply.question,message:text,plan:firstPlan||[],version:fresh.current_version,preview_url:previewUrl(fresh),timeline:tl.stored(),duration_ms:tl.elapsed()};
+  }
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design});tl.add({t:'note',icon:'image',text:'Generated '+reply.images.length+' image'+(reply.images.length===1?'':'s')})}
   let next={...work};
   for(const name of reply.delete)if(name!=='src/main.jsx'&&name!=='src/App.jsx')delete next[name];
@@ -670,8 +684,17 @@ async function polish(id,{shots,note='',...opts}){
  return result?{...result,...(done>1?{rounds:done}:{})}:{unchanged:true,version:loadMeta(id).current_version,preview_url:previewUrl(loadMeta(id))};
 }
 
+// What a first build delivers: a complete, designed product the owner can show the same day.
+const FIRST_BUILD=`This is the first build: the project is still the bare starter. Deliver the whole product the request describes, finished and designed, not a single basic page:
+- A website: a shared header with working navigation and a footer; a home page with a strong hero (real headline, one clear call to action, a real photo) and 5 to 7 distinct sections that fit the business (services or menu, how it works, highlights, testimonials written as clearly illustrative, pricing or rates when relevant, FAQ, contact); and 2 to 4 more pages the navigation names (for example About, Services, Pricing, Contact, Booking), each with real content.
+- An app or tool: a layout with sidebar or top navigation, 3 to 5 working screens (an overview with real numbers from the data, a list with search and filters, a detail view, a create or edit form, settings), sample records in the backend so nothing opens empty, and designed empty, loading and error states.
+- Every form the product needs works and saves (booking, sign-up, contact, order) with validation and a clear confirmation.
+- Design: follow the design direction and tokens; a consistent type scale, generous spacing, one accent colour, real photos (generated images or https://images.unsplash.com URLs that fit the subject), subtle hover and focus states, and a layout that works on a phone.
+- Write the copy for this business: names, prices and times that sound real, never lorem ipsum. Where a fact would need real data you do not have (actual prices, inventory, addresses), use clearly sample values and say so in your message.
+Split the code into components and pages (src/pages/, src/components/) rather than one long App.jsx. In "message", say in two or three sentences what you built and what to try first.`;
 const DISCUSS_PROMPT=`You are the planning partner inside an app builder like Lovable. The user is discussing their React + Tailwind app (with an optional built-in backend for sign-in and saved data). Do not write or change code.
-Answer questions about the app, suggest improvements, and when the user wants a change, reply with a short numbered plan of what you would change and which files. Keep answers brief and concrete. Plain text, no JSON.`;
+Answer questions about the app, suggest improvements, and when the user wants a change, reply with a short numbered plan of what you would change and which files. Keep answers brief and concrete. Plain text, no JSON.
+When the user must choose something before the change can be built, end with exactly one last line: QUESTION: the question? | recommended option | other option (2 to 4 short options, the safest first). Ask a question once; when the user has answered or said "ok"/"yes", do not ask it again.`;
 function parseText(content){if(typeof content==='string'){const t=content.trim();if(!t)throw Error('Empty answer');return t}return String(content?.message||content?.answer||JSON.stringify(content))}
 async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[],context=''}={}){
  const meta=loadMeta(id);
@@ -680,8 +703,10 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  const files=meta.current_version?loadFiles(id,meta.current_version):template(meta.name);
  const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+(context?'\n\n'+context:'')+'\n\nMessage: '+text,images)}];
  const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
- addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:answer,mode:'discuss'}]);
- return{message:answer};
+ const Q=require('./builder-question'),{text:said,question:asked}=Q.fromText(answer);
+ const shown=Q.display(said,asked);
+ addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:shown,mode:'discuss',...(asked?{question:asked}:{})}]);
+ return{message:shown,...(asked?{question:asked}:{})};
 }
 
 // Validates, builds and saves source files as a new version without the AI.
