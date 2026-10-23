@@ -276,7 +276,7 @@ test('project knowledge reaches the model; the Max tier appears when configured'
  process.env.KAIROQ_BUILDER_PAID_APPROVED='true';process.env.KAIROQ_MAX_MODELS='anthropic/claude-fable-test';
  try{
   const {cookie}=await signup('know@example.com');
-  const id=(await request(server,'POST','/api/create/projects',{headers:{cookie},body:{name:'K'}})).json.project.id;
+  const id=(await request(server,'POST','/api/create/projects',{headers:{cookie},body:{name:'Project knowledge workspace'}})).json.project.id;
   assert.equal((await request(server,'POST','/api/create/projects/'+id+'/knowledge',{headers:{cookie},body:{text:'Brand colour is teal. Prices in EUR.'}})).json.project.knowledge,'Brand colour is teal. Prices in EUR.');
   const me=(await request(server,'GET','/api/create/me',{headers:{cookie}})).json;
   assert.deepEqual(me.tiers.map(t=>[t.id,t.credits,t.enabled]),[['standard',1,true],['pro',5,true],['max',15,true]]);

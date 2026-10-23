@@ -113,13 +113,16 @@ function setProject(meta,ids){
  return list.slice(0,6);
 }
 function promptNote(meta){
- const list=active(meta);
+ const selected=new Set(Array.isArray(meta.skills)?meta.skills:[]);
+ const list=active(meta).sort((a,b)=>Number(selected.has(b.id)||b.source!=='builtin')-Number(selected.has(a.id)||a.source!=='builtin'));
  if(!list.length)return'';
  let budget=MAX_PROMPT,out='\n\nDESIGN SKILLS for this project. Follow them (the project knowledge and the user\'s requests win if they conflict):';
- for(const s of list){
-  const text='\n\n### Skill: '+s.name+'\n'+s.body;
-  if(text.length>budget){out+='\n\n### Skill: '+s.name+'\n'+s.body.slice(0,Math.max(0,budget-100))+'\n…(shortened)';break}
-  out+=text;budget-=text.length;
+ for(const [index,s] of list.entries()){
+  const heading='\n\n### Skill: '+s.name+'\n',suffix='\n…(shortened)';
+  const allowance=Math.floor(budget/(list.length-index));
+  const text=heading+s.body;
+  const part=text.length<=allowance?text:heading+s.body.slice(0,Math.max(0,allowance-heading.length-suffix.length))+suffix;
+  out+=part;budget-=part.length;
  }
  return out;
 }
