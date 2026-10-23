@@ -27,6 +27,7 @@ test('retries transient GET errors only within bounds',async()=>{
 });
 test('candidate skill requires independent improved benchmark',async()=>{
  const memory=fakeStore(),result={passed:true,evidence:{responseDigest:'abc'}};
+ memory.values.push({type:'api-execution',passed:true,responseDigest:'abc'});
  const skill=await engine.proposeSkill({projectId:'demo',skillId:'fixture',runResults:[result]},memory);
  await assert.rejects(()=>engine.promoteSkill({projectId:'demo',skillId:'fixture',version:skill.version,benchmark:{newPassed:1,oldPassed:1,total:1}},memory),/benchmark/);
  const promotion=await engine.promoteSkill({projectId:'demo',skillId:'fixture',version:skill.version,benchmark:{newPassed:2,oldPassed:1,total:2}},memory);
