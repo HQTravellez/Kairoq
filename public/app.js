@@ -1052,7 +1052,7 @@ function appendMessage(msg,index,scroll=true){
 
 function welcome(){
   const w=document.createElement("div");w.className="welcome";
-  w.innerHTML=`<div class="orb">✦</div><h1>What would you like to work on?</h1><p>Make space for your next idea.</p><div class="suggestions"><button>Draft an email</button><button>Research a company</button><button>Plan my content</button><button>Find new leads</button></div>`;
+  w.innerHTML=`<div class="orb">✦</div><h1>What would you like to work on?</h1><p>Ask a question, build an app, or hand Kairoq a task.</p><div class="suggestions"><button>Draft an email</button><button>Research a company</button><button>Plan my content</button><button>Find new leads</button></div>`;
   w.querySelectorAll(".suggestions button").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent;resizePrompt();promptEl.focus()});
   return w;
 }
@@ -1672,8 +1672,15 @@ async function generateVideoFromPrompt(raw){
   }
 }
 
+// "hi", "thanks" or "what can you do" is conversation, not an app to build: it is answered in Ask
+// and never opens the builder or creates a project.
+const SMALL_TALK=/^(hi+|hello|hey+|hiya|yo|hola|good (morning|afternoon|evening|day)|thanks|thank you|thx|ok|okay|k|yes|yep|sure|cool|nice|great|test(ing)?|what can you do|who are you|how does this work|help)[\s!.?,]*$/i;
 async function send(regenerateFrom=null){
-  if(regenerateFrom===null && appBuildMode) return startAppBuild(promptEl.value.trim());
+  if(regenerateFrom===null && appBuildMode){
+    const asked=promptEl.value.trim();
+    if(!SMALL_TALK.test(asked)) return startAppBuild(asked);
+    setAppBuildMode(false);
+  }
   setMainView("chat");
   const raw=promptEl.value.trim();
   if(busy || (!raw && !attachments.length))return;
@@ -2572,10 +2579,7 @@ async function initializeProductLayer(){
   }
   applyDemoMode(!!state.demo_mode);
   if($("#demoModeToggle"))$("#demoModeToggle").onchange=()=>applyDemoMode($("#demoModeToggle").checked);
-  if(!state.onboarding_complete && !localStorage.getItem("pai_onboarding_seen")){
-    localStorage.setItem("pai_onboarding_seen","1");
-    setTimeout(openOnboarding,650);
-  }
+  // Like Lovable, the first screen is the prompt, not a setup wizard: setup opens only when asked.
 }
 
 
@@ -2900,29 +2904,45 @@ function launchAppBuild(prompt){
   setAppBuildMode(false);
   openBuilder("/create?embed=1");
 }
-async function loadHomeApps(){
-  const box=$("#khApps"),list=$("#khAppList");if(!box||!list)return;
-  try{
-    const r=await fetch("/api/create/projects",{credentials:"same-origin"});
-    const {projects=[]}=r.ok?await r.json():{};
-    list.replaceChildren(...projects.slice(0,6).map(p=>{
-      const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
-      const name=String(p.name||"Untitled app");
-      let hue=0;for(const ch of name)hue=(hue*31+ch.charCodeAt(0))%360;
-      const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--h",hue);thumb.setAttribute("aria-hidden","true");
-      thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
-      // The app's own picture once Kairoq has taken one; the initials stay underneath.
-      if(p.thumb){const img=document.createElement("img");img.src=p.thumb;img.alt="";img.loading="lazy";img.decoding="async";img.onerror=()=>img.remove();thumb.append(img)}
-      const meta=document.createElement("span");meta.className="kh-app-meta";
-      const title=document.createElement("strong");title.textContent=name;
-      const when=document.createElement("small");when.textContent=p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"";
-      meta.append(title,when);b.append(thumb,meta);
-      b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
-      li.append(b);return li;
-    }));
-    box.classList.toggle("hidden",!projects.length);
-  }catch{box.classList.add("hidden")}
+// One app card (Home's "Your apps" and the projects grid under the new-chat prompt): the app's
+// picture when Kairoq has taken one, its initials on a colour from its name underneath.
+function appCard(name,{thumbUrl,sub,onOpen}){
+  const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
+  // Before Kairoq has a picture of the app: its initials on one of five ember tints, picked by name.
+  const TINTS=[["#f4d6cb","#e4a28a","#6e2a1c"],["#f8ddc8","#eda574","#7a3410"],["#fae8c8","#f0c27a","#7a4a0c"],["#f1d9dc","#d79aa3","#5e2230"],["#f3ebe0","#dcc8ae","#5a4630"]];
+  let hash=0;for(const ch of name)hash=(hash*31+ch.charCodeAt(0))>>>0;
+  const [t1,t2,t3]=TINTS[hash%TINTS.length];
+  const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--t1",t1);thumb.style.setProperty("--t2",t2);thumb.style.setProperty("--t3",t3);thumb.setAttribute("aria-hidden","true");
+  thumb.textContent=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  if(thumbUrl){const img=document.createElement("img");img.src=thumbUrl;img.alt="";img.loading="lazy";img.decoding="async";img.onerror=()=>img.remove();thumb.append(img)}
+  const meta=document.createElement("span");meta.className="kh-app-meta";
+  const title=document.createElement("strong");title.textContent=name;
+  const when=document.createElement("small");when.textContent=sub||"";
+  meta.append(title,when);b.append(thumb,meta);b.onclick=onOpen;
+  li.append(b);return li;
 }
+function showProjectsTab(tab){
+  for(const t of document.querySelectorAll(".wp-tab")){const on=t.dataset.wp===tab;t.classList.toggle("active",on);t.setAttribute("aria-selected",String(on))}
+  const mine=tab==="mine",has=$("#wpList")?.children.length>0;
+  $("#wpList")?.classList.toggle("hidden",!mine||!has);
+  $("#wpEmpty")?.classList.toggle("hidden",!mine||has);
+  $("#wpTemplates")?.classList.toggle("hidden",mine);
+}
+async function loadHomeApps(){
+  const box=$("#khApps"),list=$("#khAppList"),grid=$("#wpList");
+  let projects=[];
+  try{const r=await fetch("/api/create/projects",{credentials:"same-origin"});({projects=[]}=r.ok?await r.json():{})}catch{}
+  const cards=n=>projects.slice(0,n).map(p=>{const name=String(p.name||"Untitled app");return appCard(name,{thumbUrl:p.thumb,sub:p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"",onOpen:()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id))})});
+  if(box&&list){list.replaceChildren(...cards(6));box.classList.toggle("hidden",!projects.length)}
+  if(grid){
+    grid.replaceChildren(...cards(12));
+    const ideas=[...document.querySelectorAll(".kh-app-ideas [data-idea]")].map(b=>b.textContent.trim()).filter(Boolean);
+    $("#wpTemplates")?.replaceChildren(...ideas.map(idea=>appCard(idea,{sub:"Start from this",onOpen:()=>startAppBuild(idea)})));
+    showProjectsTab(projects.length?"mine":"templates");
+  }
+}
+for(const t of document.querySelectorAll(".wp-tab"))t.onclick=()=>showProjectsTab(t.dataset.wp);
+if($("#wpAll"))$("#wpAll").onclick=()=>openBuilder("/create?embed=1");
 function startAppBuild(prompt){
   if(!prompt){promptEl.focus();return}
   launchAppBuild(prompt);
