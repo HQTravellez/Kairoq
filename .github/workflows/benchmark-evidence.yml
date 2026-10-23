@@ -26,8 +26,19 @@ jobs:
       - run: test -x /usr/bin/chromium
       - run: npm run check
       - run: node --test test/api-learning.test.js test/complex-products.test.js test/builder-assets.test.js test/project-github.test.js test/project-portability.test.js test/studio-assets.test.js test/benchmark-gates.test.js test/evidence-route.test.js test/app-release.test.js test/design-pipeline.test.js test/website-benchmark.test.js test/website-release.test.js test/journey-qa.test.js test/real-visual-repair.test.js test/app-runtime.test.js test/app-platform.test.js test/app-platform-browser.test.js test/product-orchestration.test.js test/api-evolution.test.js test/api-oauth-sdk.test.js test/api-integration.test.js test/provider-sandbox-cli.test.js test/platform-panel-order.test.js test/developer-agent.test.js
+      - name: Experimental adapters (no credentials or network required)
+        run: node --test test/integration-lab.test.js test/decision-models.test.js
+      - run: node --test --test-concurrency=2 test/design-progress.test.js test/generic-release-proof.test.js test/build-publication.test.js test/api-learning.test.js test/complex-products.test.js test/builder-assets.test.js test/project-github.test.js test/project-portability.test.js test/studio-assets.test.js test/benchmark-gates.test.js test/evidence-route.test.js test/app-release.test.js test/design-pipeline.test.js test/website-benchmark.test.js test/website-release.test.js test/journey-qa.test.js test/real-visual-repair.test.js test/app-runtime.test.js test/app-platform.test.js test/app-platform-browser.test.js test/product-orchestration.test.js test/api-evolution.test.js test/api-oauth-sdk.test.js test/api-integration.test.js test/provider-sandbox-cli.test.js test/developer-agent.test.js
         env:
           CHROMIUM_PATH: /usr/bin/chromium
+      # The Railway image runs its own test list during the build; run the same command here
+      # so a test that would block the deploy fails CI first.
+      - name: Dockerfile build tests
+        run: sh -c "$(grep -m1 '^RUN node --test' Dockerfile | sed 's/^RUN //')"
+        env:
+          CHROMIUM_PATH: /usr/bin/chromium
+          NODE_ENV: production
+          TZ: UTC
   deployed-benchmark:
     if: github.event_name == 'workflow_dispatch'
     needs: regression

@@ -5,9 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b0d10">
   <title>Kairoq</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/styles.css?v=153">
-  <link rel="stylesheet" href="/calm.css?v=19">
-<style>.developer-launch{position:fixed;bottom:22px;right:22px;z-index:5000;text-decoration:none;padding:13px 19px;border-radius:999px;color:#fff;background:#535de8;box-shadow:0 9px 35px #171a5988;font:700 14px system-ui;letter-spacing:-.01em}.developer-launch:hover{background:#777eff}</style></head>
+  <link rel="stylesheet" href="/calm.css?v=20">
+  <link rel="stylesheet" href="/sidebar.css?v=4">
+  <link rel="stylesheet" href="/composer.css?v=4">
+  <link rel="stylesheet" href="/home.css?v=13">
+  <link rel="stylesheet" href="/design.css?v=17">
+</head>
 <body>
   <div id="loginOverlay" class="login-overlay hidden">
     <form id="loginForm" class="login-card">
@@ -21,7 +28,7 @@
   </div>
 
   <div class="app">
-    <aside class="sidebar">
+    <aside class="sidebar kn" aria-label="Main">
       <div class="brand">
         <div class="brand-mark">K</div>
         <div>
@@ -30,79 +37,90 @@
         </div>
       </div>
 
-      <button id="commandCenterBtn" class="new-chat command-center-nav active">⌂ Overview</button>
-      <button id="newChat" class="new-chat">＋ New chat</button>
-      <button id="outcomesNavBtn" class="new-chat primary-nav-secondary">✓ Outcomes</button>
-      <button id="historyNavBtn" class="new-chat primary-nav-secondary">◴ History</button>
-      <button id="studioSideBtn" class="new-chat primary-nav-secondary">▣ Studio</button>
-      <div class="agent-nav-label">AGENTS</div>
-      <button id="salesNavBtn" class="new-chat primary-nav-secondary">↗ Sales agent</button>
-      <button id="marketingNavBtn" class="new-chat primary-nav-secondary">✎ Marketing agent</button>
-      <button id="workspaceBtn" class="new-chat secondary-action">◫ Memory</button>
-      <div class="project-picker">
-        <label>PROJECT</label>
-        <select id="projectSelect"></select>
-        <button id="newProjectBtn" title="New project">＋</button>
-      </div>
-      <button id="compareBtn" class="new-chat secondary-action">⇄ Compare models</button>
-      <button id="agentBtn" class="new-chat secondary-action">◆ Specialists</button>
-      <button id="connectorsBtn" class="new-chat secondary-action">⌁ Connections</button>
-      <button id="botsBtn" class="new-chat secondary-action">◷ Watchers</button>
-      <button id="templatesBtn" class="new-chat secondary-action">▤ Templates</button>
-      <button id="playbookBtn" class="new-chat secondary-action">⬡ How We Work</button>
-      <button id="workflowsBtn" class="new-chat secondary-action">◫ Outcomes</button>
-      <button id="opsBtn" class="new-chat secondary-action">⚿ Security</button>
+      <button type="button" id="newChat" class="kn-new"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>New chat</span></button>
 
-      <div class="protection-card">
-        <div class="protection-row">
-          <div>
-            <strong>Free Only</strong>
-            <small>Hard-block paid models</small>
+      <nav class="kn-group" aria-label="Workspace">
+        <button type="button" id="commandCenterBtn" class="kn-item active"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+        <button type="button" id="outcomesNavBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span>Your work</span></button>
+        <button type="button" id="historyNavBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>History</span></button>
+        <button type="button" id="studioSideBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><span>Studio</span></button>
+        <button type="button" id="buildNavBtn" class="kn-item" data-build-app><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/></svg><span>Build an app</span></button>
+      </nav>
+
+      <nav class="kn-group" aria-labelledby="kn-agents">
+        <div class="kn-label" id="kn-agents">Agents</div>
+        <button type="button" id="salesNavBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17 10 11l4 4 6-7"/><path d="M15 8h5v5"/></svg><span>Sales</span></button>
+        <button type="button" id="marketingNavBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span>Marketing</span></button>
+        <button type="button" id="agentBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg><span>Specialists</span></button>
+        <button type="button" id="botsBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Watchers</span></button>
+      </nav>
+
+      <nav class="kn-group kn-tools" aria-labelledby="kn-tools">
+        <div class="kn-label" id="kn-tools">Tools</div>
+        <button type="button" id="workspaceBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg><span>Memory</span></button>
+        <button type="button" id="connectorsBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5"/></svg><span>Connections</span></button>
+        <button type="button" id="templatesBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Templates</span></button>
+        <button type="button" id="playbookBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg><span>How we work</span></button>
+        <details class="kn-fold">
+          <summary><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></summary>
+          <button type="button" id="workflowsBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h6.5"/></svg><span>Workflows</span></button>
+          <button type="button" id="compareBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 3 8l4 4M3 8h13M17 12l4 4-4 4M21 16H8"/></svg><span>Compare models</span></button>
+          <button type="button" id="opsBtn" class="kn-item"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.4 3.4 8.3 8 9 4.6-.7 8-4.6 8-9V6z"/></svg><span>Security</span></button>
+          <a class="kn-item" href="/build-studio.html"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span>Build Studio</span></a>
+          <a class="kn-item" href="/api-studio.html"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span>API &amp; OAuth</span></a>
+          <a class="kn-item" href="/apps/housing-enquiries/"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span>Housing enquiries</span></a>
+          <div class="project-picker kn-project">
+            <label for="projectSelect">Project</label>
+            <select id="projectSelect"></select>
+            <button type="button" id="newProjectBtn" title="New project" aria-label="New project"><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
           </div>
-          <label class="switch"><input id="freeOnly" type="checkbox" checked><span></span></label>
+        </details>
+      </nav>
+
+      <div class="kn-chats">
+        <div class="history-head kn-label-row">
+          <div class="kn-label">Chats</div>
+          <button type="button" id="clearChats" title="Clear all chats">Clear</button>
         </div>
-        <div class="protection-row">
-          <div>
-            <strong>Smart fallback</strong>
-            <small>Retry another free model</small>
+        <div id="historyList" class="history-list"></div>
+      </div>
+
+      <details class="kn-settings">
+        <summary><svg class="kn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Model settings</span></summary>
+        <div class="protection-card">
+          <div class="protection-row">
+            <div><strong>Free only</strong><small>Never use paid models</small></div>
+            <label class="switch"><input id="freeOnly" type="checkbox" checked aria-label="Free only"><span></span></label>
           </div>
-          <label class="switch"><input id="smartFallback" type="checkbox" checked><span></span></label>
-        </div>
-        <div class="protection-row">
-          <div>
-            <strong>Web search</strong>
-            <small>OpenRouter server search</small>
+          <div class="protection-row">
+            <div><strong>Smart fallback</strong><small>Try another free model if one fails</small></div>
+            <label class="switch"><input id="smartFallback" type="checkbox" checked aria-label="Smart fallback"><span></span></label>
           </div>
-          <label class="switch"><input id="webSearch" type="checkbox"><span></span></label>
+          <div class="protection-row">
+            <div><strong>Web search</strong><small>Let answers search the web</small></div>
+            <label class="switch"><input id="webSearch" type="checkbox" aria-label="Web search"><span></span></label>
+          </div>
         </div>
-      </div>
-
-      <div class="side-label">PRESETS</div>
-      <div id="presetList" class="preset-list">
-        <button data-preset="quick" class="preset active">⚡ Quick</button>
-        <button data-preset="smart" class="preset">◐ Smart</button>
-        <button data-preset="deep" class="preset">✦ Deep reasoning</button>
-        <button data-preset="coding" class="preset">⌘ Coding</button>
-        <button data-preset="research" class="preset">⌕ Research</button>
-        <button data-preset="writing" class="preset">✎ Writing</button>
-        <button data-preset="vision" class="preset">◉ Vision</button>
-      </div>
-
-      <div class="side-label">RECOMMENDED</div>
-      <div class="recommended-grid">
-        <button data-reco="fast">Fast</button>
-        <button data-reco="bestfree">Best Free</button>
-        <button data-reco="coding">Coding</button>
-        <button data-reco="reasoning">Reasoning</button>
-        <button data-reco="vision">Vision</button>
-        <button data-reco="premium">Premium</button>
-      </div>
-
-      <div class="history-head">
-        <div class="side-label">CHATS</div>
-        <button id="clearChats" title="Clear all chats">Clear</button>
-      </div>
-      <div id="historyList" class="history-list"></div>
+        <div class="kn-label">Mode</div>
+        <div id="presetList" class="preset-list">
+          <button type="button" data-preset="quick" class="preset active">Quick</button>
+          <button type="button" data-preset="smart" class="preset">Smart</button>
+          <button type="button" data-preset="deep" class="preset">Deep reasoning</button>
+          <button type="button" data-preset="coding" class="preset">Coding</button>
+          <button type="button" data-preset="research" class="preset">Research</button>
+          <button type="button" data-preset="writing" class="preset">Writing</button>
+          <button type="button" data-preset="vision" class="preset">Vision</button>
+        </div>
+        <div class="kn-label">Pick a model</div>
+        <div class="recommended-grid">
+          <button type="button" data-reco="fast">Fast</button>
+          <button type="button" data-reco="bestfree">Best free</button>
+          <button type="button" data-reco="coding">Coding</button>
+          <button type="button" data-reco="reasoning">Reasoning</button>
+          <button type="button" data-reco="vision">Vision</button>
+          <button type="button" data-reco="premium">Premium</button>
+        </div>
+      </details>
 
       <div class="sidebar-footer">
         <div><span class="status-dot"></span>Your workspace</div>
@@ -111,283 +129,174 @@
     </aside>
 
     <main class="main">
+      <div class="kh-sky" aria-hidden="true"><i></i><i></i><i></i></div>
       <header class="topbar simple-topbar">
-        <button id="sidebarToggle" class="icon-btn sidebar-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+        <button id="sidebarToggle" class="icon-btn sidebar-toggle" aria-label="Menu" aria-expanded="false"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
         <div>
-          <div id="mainViewTitle" class="topbar-title">Today</div>
-          <div id="mainViewSubtitle" class="topbar-subtitle">What needs to happen?</div>
+          <div id="mainViewTitle" class="topbar-title">Home</div>
+          <div id="mainViewSubtitle" class="topbar-subtitle"></div>
         </div>
         <div class="header-actions">
-          <button id="studioNavBtn" class="topbar-chat-btn">▣ Studio</button>
-          <button id="chatViewBtn" class="topbar-chat-btn">✦ Ask Kairoq</button>
+          <button type="button" id="studioNavBtn" class="topbar-chat-btn">Studio</button>
+          <button type="button" id="chatViewBtn" class="topbar-chat-btn">Ask Kairoq</button>
           <button id="shellModeBtn" class="topbar-chat-btn ghost">Simple</button>
           <span id="zeroCostPill" class="zero-cost-pill">LOCAL + FREE</span><div id="freePill" class="free-pill">FREE FIRST</div>
-          <button id="settingsBtn" class="icon-btn" title="Settings">⚙</button>
+          <button type="button" id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
         </div>
       </header>
 
 
-      <section id="commandCenter" class="command-center-view">
-        <div class="cc-shell">
-          <div class="cc-hero atlas-hero">
-            <div>
-              <div class="cc-kicker">KAIROQ</div>
-              <h1>What needs to happen?</h1>
-              <p>Give Kairoq an outcome. It keeps track of what is unfinished, works across your apps, and comes back when something needs you.</p>
-              <div class="atlas-chip-row">
-                <button id="finishItBtn" class="atlas-chip finish-it-chip">✦ What am I forgetting?</button>
-                <button class="atlas-chip work-studio-chip" data-prompt="Create the actual work file I need. Ask only for essential missing information, then produce a real Excel, Word, PowerPoint, PDF, or CSV file — not just instructions." data-agent="atlas">▦ Create a file</button>
-                <button class="atlas-chip creative-engine-chip" data-prompt="Create a polished image for me using the local/free creative engine. Keep the rendering job as an Outcome until the file is actually ready." data-agent="atlas">✦ Create for me</button>
-                <button class="atlas-chip browser-operator-chip" data-prompt="Go on the web and handle this for me. Decide whether to search, inspect pages, or use the browser. Do all read-only work automatically. If a website change is required, prepare one precise approval with the exact change and then continue after I approve." data-agent="atlas">◎ Do it on the web</button>
-                <button class="atlas-chip" data-prompt="Review my important emails and tell me what needs a reply first." data-agent="relay">Review my email</button>
-                <button class="atlas-chip" data-prompt="Prepare me for tomorrow. Check my calendar and build a short meeting brief." data-agent="orbit">Prepare tomorrow</button>
-                <button class="atlas-chip" data-prompt="Help me plan a business trip. Ask only for the details you really need first." data-agent="compass">Plan a trip</button>
-                <button class="atlas-chip" data-prompt="Research a competitor and show only the important changes and actions." data-agent="scout">Research competitor</button>
-                <button class="atlas-chip" data-prompt="Create a premium social media image for my business." data-agent="writer" data-media="image">Create image</button>
-                <button class="atlas-chip" data-prompt="Animate this into a short social video." data-agent="writer" data-media="video">Create video</button>
-                <button class="atlas-chip commerce-chip" data-prompt="Build me a complete premium Shopify store. Start by creating a full concept preview first: brand, visual direction, homepage, products, collections, About and FAQ pages. Keep everything as draft and show me the preview before changing Shopify. Ask only for essential missing information." data-agent="atlas">Build Shopify store</button>
-                <button class="atlas-chip autopilot-chip" data-prompt="Operate my Shopify store like an owner. Check store health, identify the highest-value problems, create evidence-based optimization experiments, and keep unresolved issues as open loops. Do not change the live store without approval." data-agent="atlas">Run my store</button>
-              </div>
+      <section id="commandCenter" class="command-center-view kh">
+        <div class="cc-shell kh-shell">
+          <div class="kh-hero">
+            <h1 id="khGreeting">What should we <em>get done</em>?</h1>
+            <p>Describe the outcome. Kairoq works across your apps and comes back when something needs you.</p>
+            <div class="kh-modes" role="tablist" aria-label="What to make">
+              <button type="button" role="tab" class="kh-mode" data-mode="ask" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Ask</button>
+              <button type="button" role="tab" class="kh-mode" data-mode="web" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg>Web app</button>
+              <button type="button" role="tab" class="kh-mode" data-mode="mobile" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>Mobile app</button>
             </div>
-            <div class="cc-hero-actions">
-              <button id="ccRefresh" class="cc-secondary-btn">↻ Refresh</button>
-              <button id="ccOpenWorkflows" class="cc-primary-btn">View all work</button>
+            <div id="khComposerSlot" class="kh-composer-slot"></div>
+            <p id="khError" class="kh-error hidden" role="alert"></p>
+            <div class="kh-pills">
+              <button type="button" id="finishItBtn" class="kh-pill"><span class="kh-ic kh-ic-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg></span>What am I forgetting?</button>
+              <button type="button" class="kh-pill atlas-chip" data-prompt="Review my important emails and tell me what needs a reply first." data-agent="relay"><span class="kh-ic kh-ic-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>Review my email</button>
+              <button type="button" class="kh-pill atlas-chip" data-prompt="Prepare me for tomorrow. Check my calendar and build a short meeting brief." data-agent="orbit"><span class="kh-ic kh-ic-green"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Prepare tomorrow</button>
+              <button type="button" class="kh-pill atlas-chip" data-prompt="Create the actual work file I need. Ask only for essential missing information, then produce a real Excel, Word, PowerPoint, PDF, or CSV file — not just instructions." data-agent="atlas"><span class="kh-ic kh-ic-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>Make a file</button>
             </div>
-          </div>
-
-          <div class="cc-metrics">
-            <button class="cc-metric attention" data-cc-open="workflows">
-              <span class="cc-metric-icon">!</span>
-              <span>
-                <strong id="ccAttentionCount">0</strong>
-                <small>Needs attention</small>
-              </span>
-            </button>
-            <button class="cc-metric" data-cc-open="workflows">
-              <span class="cc-metric-icon">◫</span>
-              <span>
-                <strong id="ccActiveCount">0</strong>
-                <small>Active work</small>
-              </span>
-            </button>
-            <button class="cc-metric" data-cc-open="bots">
-              <span class="cc-metric-icon">◷</span>
-              <span>
-                <strong id="ccBotCount">0</strong>
-                <small>Watchers</small>
-              </span>
-            </button>
-            <button class="cc-metric" data-cc-open="connectors">
-              <span class="cc-metric-icon">⌁</span>
-              <span>
-                <strong id="ccConnectorCount">0</strong>
-                <small>Connected apps</small>
-              </span>
-            </button>
-          </div>
-
-          <div class="cc-layout atlas-top-strip">
-            <section class="cc-panel atlas-capability-panel">
-              <div class="cc-panel-head">
-                <div>
-                  <span class="cc-panel-kicker">CONNECTED</span>
-                  <h2>Connected abilities</h2>
-                </div>
-              </div>
-              <div id="atlasCapabilityList" class="atlas-capability-list">
-                <div class="cc-empty">Checking connected apps…</div>
-              </div>
-            </section>
-
-            <section class="cc-panel atlas-budget-panel">
-              <div class="cc-panel-head">
-                <div>
-                  <span class="cc-panel-kicker">SPEND CONTROL</span>
-                  <h2>Cost-aware by default</h2>
-                </div>
-              </div>
-              <div class="atlas-budget-copy">Atlas can prefer free/community routes, the cheapest internal route, or the best quality route depending on your goal.</div>
-              <div class="atlas-budget-row">
-                <label for="spendModeSelect">Generation mode</label>
-                <select id="spendModeSelect">
-                  <option value="free">Free first</option>
-                  <option value="cheap" selected>Cheap first</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="best">Best quality</option>
-                </select>
-              </div>
-              <div id="atlasBudgetHint" class="atlas-budget-hint">Kairoq will prefer cheaper routes first.</div>
+            <div class="kh-pills kh-app-ideas hidden">
+              <button type="button" class="kh-pill" data-idea><span class="kh-ic kh-ic-green"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"/><path d="M4 20c3-1 5-4 8-4s5 3 8 4M12 7v6M7 11l5 2 5-2"/></svg></span>Booking page for a yoga studio</button>
+              <button type="button" class="kh-pill" data-idea><span class="kh-ic kh-ic-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3"/></svg></span>Digital menu for a coffee shop</button>
+              <button type="button" class="kh-pill" data-idea><span class="kh-ic kh-ic-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 6 3-6"/></svg></span>Inventory tracker for a jewellery store</button>
+              <button type="button" class="kh-pill" data-idea><span class="kh-ic kh-ic-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18V7M21 18v-5a3 3 0 0 0-3-3h-7v8M3 14h18M7 11.5h.01"/></svg></span>Guest portal for a boutique hotel</button>
+            </div>
+            <section id="khApps" class="kh-apps hidden" aria-label="Your apps">
+              <h2>Your apps</h2>
+              <ul id="khAppList"></ul>
             </section>
           </div>
 
-          <section id="storeOperatorPanel" class="cc-panel store-operator-panel">
-            <div class="cc-panel-head">
-              <div>
-                <span class="cc-panel-kicker">COMMERCE OPERATOR</span>
-                <h2>Store autopilot</h2>
-                <p class="open-loops-sub">Real Shopify signals → problems → experiments → Outcomes.</p>
+          <div id="khWork" class="kh-work">
+          <h2 class="kh-work-title">Your work</h2>
+          <div class="kh-stats" role="group" aria-label="Summary">
+            <button type="button" class="kh-stat cc-metric attention" data-cc-open="workflows"><strong id="ccAttentionCount">0</strong><span>need you</span></button>
+            <button type="button" class="kh-stat cc-metric" data-cc-open="workflows"><strong id="ccActiveCount">0</strong><span>in progress</span></button>
+            <button type="button" class="kh-stat cc-metric" data-cc-open="bots"><strong id="ccBotCount">0</strong><span>watchers</span></button>
+            <button type="button" class="kh-stat cc-metric" data-cc-open="connectors"><strong id="ccConnectorCount">0</strong><span>apps connected</span></button>
+          </div>
+
+          <div class="kh-grid">
+            <section class="kh-card">
+              <header class="kh-card-head">
+                <h2>Needs you</h2>
+                <button type="button" id="ccPriorityOpen" class="kh-link">All work</button>
+              </header>
+              <div id="ccPriorityList" class="cc-priority-list kh-list"><div class="cc-empty">Loading your work…</div></div>
+            </section>
+
+            <section class="kh-card open-loops-panel">
+              <header class="kh-card-head">
+                <h2>Outcomes <span class="kh-count" id="loopCount">0</span></h2>
+                <div class="kh-card-actions">
+                  <button type="button" id="scanLoopsBtn" class="kh-link">Find unfinished</button>
+                  <button type="button" id="addLoopBtn" class="kh-link">Add</button>
+                </div>
+              </header>
+              <div class="open-loop-summary kh-sub"><span><b id="loopOverdueCount">0</b> overdue</span><span><b id="loopValue">$0</b> at stake</span></div>
+              <div id="openLoopsList" class="open-loops-list kh-list"><div class="cc-empty">No outcomes yet. Ask for something and Kairoq keeps track until it is done.</div></div>
+            </section>
+          </div>
+
+          <section class="kh-card">
+            <header class="kh-card-head">
+              <h2>Recent</h2>
+              <div class="kh-card-actions">
+                <span id="ccLastUpdated" class="cc-updated kh-muted">—</span>
+                <button type="button" id="ccRefresh" class="kh-link">Refresh</button>
+                <button type="button" id="ccOpenWorkflows" class="kh-link">View all</button>
               </div>
-              <div class="open-loop-actions">
-                <button id="storeAnalyzeBtn" class="cc-secondary-btn">↻ Analyze store</button>
-                <button id="storeImproveBtn" class="cc-primary-btn">✦ Find growth moves</button>
-              </div>
-            </div>
-            <div id="storeHealthEmpty" class="store-health-empty">Connect Shopify to see live store health.</div>
-            <div id="storeHealthContent" class="hidden">
-              <div class="store-score-row">
-                <div class="store-score"><strong id="storeHealthScore">—</strong><small>health</small></div>
-                <div class="store-stat"><strong id="storeRevenue">—</strong><small>30d order value</small></div>
-                <div class="store-stat"><strong id="storeOrders">—</strong><small>orders</small></div>
-                <div class="store-stat"><strong id="storeAov">—</strong><small>AOV</small></div>
-                <div class="store-stat"><strong id="storeIssueCount">—</strong><small>issues</small></div>
-              </div>
-              <div id="storeIssueList" class="store-issue-list"></div>
-              <div class="growth-divider"></div>
-              <div class="growth-head">
-                <div><strong>Growth intelligence</strong><small>Shopify + abandoned checkout + connected ads</small></div>
-                <button id="growthRefreshBtn" class="cc-link-btn">Refresh funnel →</button>
-              </div>
-              <div class="growth-metrics">
-                <div><strong id="growthAdSpend">—</strong><small>ad spend</small></div>
-                <div><strong id="growthBlendedRoas">—</strong><small>blended ROAS</small></div>
-                <div><strong id="growthAbandonedValue">—</strong><small>checkout value open</small></div>
-                <div><strong id="growthAbandonedCount">—</strong><small>open checkouts</small></div>
-              </div>
-              <div id="growthSourceNote" class="growth-note">Connect Meta Ads or Google Ads to compare acquisition spend with Shopify outcomes.</div>
-            </div>
+            </header>
+            <div id="ccRecentActivity" class="cc-activity-list kh-list"><div class="cc-empty">Nothing yet today.</div></div>
           </section>
 
-          <section class="cc-panel open-loops-panel">
-            <div class="cc-panel-head">
-              <div>
-                <span class="cc-panel-kicker">OUTCOMES</span>
-                <h2>Outcomes</h2>
-                <p class="open-loops-sub">Things Kairoq keeps owning until there is evidence they are actually finished.</p>
-              </div>
-              <div class="open-loop-actions">
-                <button id="scanLoopsBtn" class="cc-secondary-btn">✦ Find unfinished work</button>
-                <button id="addLoopBtn" class="cc-primary-btn">＋ Add outcome</button>
-              </div>
-            </div>
-            <div class="open-loop-summary">
-              <div><strong id="loopCount">0</strong><small>active</small></div>
-              <div><strong id="loopOverdueCount">0</strong><small>overdue</small></div>
-              <div><strong id="loopValue">$0</strong><small>value at stake</small></div>
-            </div>
-            <div id="openLoopsList" class="open-loops-list">
-              <div class="cc-empty">No active outcomes yet.</div>
-            </div>
-          </section>
+          <details class="kh-more">
+            <summary>More tools <small>Files, store, team, channels and spending</small></summary>
+            <div class="kh-more-grid">
+              <section class="kh-card work-studio-panel">
+                <header class="kh-card-head"><h2>Files Kairoq made</h2><button type="button" id="workProductsRefreshBtn" class="kh-link">Refresh</button></header>
+                <p class="kh-note">Excel, Word, PowerPoint, PDF and CSV. Saved to OneDrive or SharePoint when Microsoft 365 is connected.</p>
+                <div id="workProductsList" class="work-products-list kh-list"><div class="cc-empty">No files yet.</div></div>
+              </section>
 
-          <section class="cc-panel work-studio-panel">
-            <div class="cc-panel-head">
-              <div>
-                <span class="cc-panel-kicker">WORK STUDIO</span>
-                <h2>Files Kairoq made</h2>
-                <p class="open-loops-sub">Excel, Word, PowerPoint, PDF and CSV — create locally, then save to OneDrive or SharePoint when Microsoft 365 is connected.</p>
-              </div>
-              <button id="workProductsRefreshBtn" class="cc-link-btn">Refresh →</button>
-            </div>
-            <div class="work-format-strip">
-              <span>XLSX</span><span>DOCX</span><span>PPTX</span><span>PDF</span><span>CSV</span>
-            </div>
-            <div id="workProductsList" class="work-products-list">
-              <div class="cc-empty">No work files yet.</div>
-            </div>
-          </section>
+              <section class="kh-card cc-team-panel">
+                <header class="kh-card-head"><h2>Your agents</h2><button type="button" id="ccTeamOpen" class="kh-link">All agents</button></header>
+                <div id="ccAgentGrid" class="cc-agent-grid kh-agents"></div>
+              </section>
 
-          <div class="cc-layout">
-            <section class="cc-panel cc-priority-panel">
-              <div class="cc-panel-head">
-                <div>
-                  <span class="cc-panel-kicker">PRIORITY QUEUE</span>
-                  <h2>What needs you</h2>
+              <section class="kh-card atlas-capability-panel">
+                <header class="kh-card-head"><h2>What Kairoq can reach</h2></header>
+                <div id="atlasCapabilityList" class="atlas-capability-list kh-list"><div class="cc-empty">Checking connected apps…</div></div>
+              </section>
+
+              <section class="kh-card atlas-budget-panel">
+                <header class="kh-card-head"><h2>Spending</h2></header>
+                <div class="atlas-budget-row kh-field">
+                  <label for="spendModeSelect">When Kairoq makes images and videos</label>
+                  <select id="spendModeSelect">
+                    <option value="free">Free first</option>
+                    <option value="cheap" selected>Cheapest first</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="best">Best quality</option>
+                  </select>
                 </div>
-                <button id="ccPriorityOpen" class="cc-link-btn">Open workflows →</button>
-              </div>
-              <div id="ccPriorityList" class="cc-priority-list">
-                <div class="cc-empty">Loading your work…</div>
-              </div>
-            </section>
+                <div id="atlasBudgetHint" class="atlas-budget-hint kh-note">Kairoq will prefer cheaper routes first.</div>
+              </section>
 
-            <section class="cc-panel cc-team-panel">
-              <div class="cc-panel-head">
-                <div>
-                  <span class="cc-panel-kicker">YOUR AI TEAM</span>
-                  <h2>Ready to work</h2>
-                </div>
-                <button id="ccTeamOpen" class="cc-link-btn">All agents →</button>
-              </div>
-              <div id="ccAgentGrid" class="cc-agent-grid"></div>
-            </section>
-          </div>
+              <section class="kh-card atlas-anywhere-panel">
+                <header class="kh-card-head"><h2>Message Kairoq from your phone</h2></header>
+                <p class="kh-note">Send a task from Telegram, WhatsApp or SMS. Anything that changes something waits for your approval.</p>
+                <div id="atlasChannelStatus" class="atlas-channel-list kh-list"><div class="cc-empty">Checking channels…</div></div>
+                <button type="button" id="atlasOpenConnectors" class="kh-btn">Set up channels</button>
+              </section>
 
-          <div class="cc-layout cc-lower">
-            <section class="cc-panel">
-              <div class="cc-panel-head">
-                <div>
-                  <span class="cc-panel-kicker">QUICK START</span>
-                  <h2>Give Kairoq an outcome</h2>
+              <section id="storeOperatorPanel" class="kh-card store-operator-panel">
+                <header class="kh-card-head">
+                  <h2>Shopify store</h2>
+                  <div class="kh-card-actions">
+                    <button type="button" id="storeAnalyzeBtn" class="kh-link">Check store</button>
+                    <button type="button" id="storeImproveBtn" class="kh-link">Find growth moves</button>
+                  </div>
+                </header>
+                <div id="storeHealthEmpty" class="store-health-empty kh-note">Connect Shopify to see how your store is doing.</div>
+                <div id="storeHealthContent" class="hidden">
+                  <div class="store-score-row kh-figures">
+                    <div><strong id="storeHealthScore">—</strong><small>health</small></div>
+                    <div><strong id="storeRevenue">—</strong><small>30-day sales</small></div>
+                    <div><strong id="storeOrders">—</strong><small>orders</small></div>
+                    <div><strong id="storeAov">—</strong><small>average order</small></div>
+                    <div><strong id="storeIssueCount">—</strong><small>issues</small></div>
+                  </div>
+                  <div id="storeIssueList" class="store-issue-list kh-list"></div>
+                  <div class="growth-head kh-card-head"><h3>Ads and checkouts</h3><button type="button" id="growthRefreshBtn" class="kh-link">Refresh</button></div>
+                  <div class="growth-metrics kh-figures">
+                    <div><strong id="growthAdSpend">—</strong><small>ad spend</small></div>
+                    <div><strong id="growthBlendedRoas">—</strong><small>return on ads</small></div>
+                    <div><strong id="growthAbandonedValue">—</strong><small>left in checkouts</small></div>
+                    <div><strong id="growthAbandonedCount">—</strong><small>open checkouts</small></div>
+                  </div>
+                  <div id="growthSourceNote" class="growth-note kh-note">Connect Meta Ads or Google Ads to compare ad spend with Shopify sales.</div>
                 </div>
-              </div>
-              <div class="cc-quick-grid">
-                <button class="cc-quick" data-prompt="Review my important emails and tell me what needs a reply first." data-agent="relay">
-                  <span>⇄</span><strong>Review inbox</strong><small>Find priority messages and draft replies</small>
-                </button>
-                <button class="cc-quick" data-prompt="Help me plan a business trip. Ask only for details you actually need, then find the best options." data-agent="compass">
-                  <span>◇</span><strong>Plan a trip</strong><small>Research options, policy and itinerary</small>
-                </button>
-                <button class="cc-quick" data-prompt="Research a competitor and give me the important changes, evidence, and actions." data-agent="scout">
-                  <span>◉</span><strong>Research competitor</strong><small>Web research and intelligence</small>
-                </button>
-                <button class="cc-quick" data-prompt="Draft a concise professional follow-up email based on the context I provide." data-agent="writer">
-                  <span>✎</span><strong>Draft message</strong><small>Emails, documents and follow-ups</small>
-                </button>
-                <button class="cc-quick work-quick" data-prompt="Create the actual business file I need. Choose Excel, Word, PowerPoint, PDF, or CSV based on my request, build it professionally, and give me the file." data-agent="atlas">
-                  <span>▦</span><strong>Create work file</strong><small>Excel, Word, PowerPoint, PDF or CSV</small>
-                </button>
-                <button class="cc-quick" data-prompt="Create a premium social media image for my business." data-agent="writer" data-media="image">
-                  <span>🎨</span><strong>Create image</strong><small>Generate or edit visual content</small>
-                </button>
-                <button class="cc-quick" data-prompt="Create a short premium promotional video for my business." data-agent="writer" data-media="video">
-                  <span>🎬</span><strong>Create video</strong><small>Generate or animate video</small>
-                </button>
-                <button class="cc-quick commerce-quick" data-prompt="Build me a premium Shopify store from one sentence. Create the store concept and preview first, then prepare draft Shopify products, collections and pages for my approval. Do not publish anything live." data-agent="atlas">
-                  <span>🛍️</span><strong>Build a store</strong><small>Prompt → preview → Shopify draft</small>
-                </button>
-              </div>
-            </section>
-
-            <section class="cc-panel atlas-anywhere-panel">
-              <div class="cc-panel-head">
-                <div>
-                  <span class="cc-panel-kicker">ATLAS ANYWHERE</span>
-                  <h2>Message Atlas without opening the app</h2>
-                </div>
-              </div>
-              <p class="atlas-anywhere-copy">Send Atlas a task from Telegram, WhatsApp, or SMS. Read/research work can finish in the conversation; consequential actions are queued for approval.</p>
-              <div id="atlasChannelStatus" class="atlas-channel-list">
-                <div class="cc-empty">Checking channels…</div>
-              </div>
-              <button id="atlasOpenConnectors" class="cc-secondary-btn atlas-channel-button">Set up channels</button>
-            </section>
-
-            <section class="cc-panel">
-              <div class="cc-panel-head">
-                <div>
-                  <span class="cc-panel-kicker">RECENT ACTIVITY</span>
-                  <h2>Today</h2>
-                </div>
-                <span id="ccLastUpdated" class="cc-updated">—</span>
-              </div>
-              <div id="ccRecentActivity" class="cc-activity-list">
-                <div class="cc-empty">No activity yet.</div>
-              </div>
-            </section>
+              </section>
+            </div>
+          </details>
           </div>
         </div>
       </section>
 
+      <section id="buildView" class="build-view hidden" aria-label="App builder">
+        <iframe id="buildFrame" title="App builder"></iframe>
+        <div class="build-loading" aria-live="polite"><span class="build-spinner" aria-hidden="true"></span><p>Setting up your app…</p></div>
+      </section>
 
       <section id="studioView" class="studio-view hidden">
         <div class="studio-shell">
@@ -812,13 +721,13 @@
           <div class="composer-bottom">
             <div class="composer-tools inline-controls">
               <input id="fileInput" type="file" multiple hidden accept="image/*,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.py,.html,.css,.xml,.yaml,.yml,.log">
-              <button id="attachBtn" class="tool-btn" title="Attach image or text/code file">＋</button>
-              <button id="imageModeBtn" class="tool-btn image-mode-btn" title="Generate or edit image">🎨</button>
-              <button id="videoModeBtn" class="tool-btn video-mode-btn" title="Generate or animate video">🎬</button>
+              <button type="button" id="attachBtn" class="tool-btn" title="Attach a file" aria-label="Attach a file"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5 12.6 20a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg></button>
+              <button type="button" id="imageModeBtn" class="tool-btn image-mode-btn" title="Make or edit an image" aria-label="Make or edit an image"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg></button>
+              <button type="button" id="videoModeBtn" class="tool-btn video-mode-btn" title="Make a video" aria-label="Make a video"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg></button>
 
               <div class="inline-select model-inline">
                 <select id="modelSelect" aria-label="Model"></select>
-                <button id="favoriteBtn" class="star-btn" title="Favorite model">☆</button>
+                <button type="button" id="favoriteBtn" class="star-btn" title="Favourite this model" aria-label="Favourite this model">☆</button>
               </div>
 
               <div class="inline-select compact-inline">
@@ -844,12 +753,12 @@
                 <img src="/assets/mascot-ghost.png" alt="Atlas mascot">
               </button>
               <button id="agentQuickBtn" class="agent-quick-btn" title="Choose an AI agent"><span id="agentQuickGlyph">◆</span><span id="agentQuickName">Kairoq</span></button>
-              <button id="modelSearchBtn" class="tool-btn" title="Search models">⌕</button>
+              <button type="button" id="modelSearchBtn" class="tool-btn" title="Search models" aria-label="Search models"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></button>
               <div id="modelBadge" class="model-badge hidden">⚡ Free Auto</div>
             </div>
             <div class="send-actions">
               <button id="stopBtn" class="stop-btn hidden" title="Stop">■</button>
-              <button id="sendBtn" class="send-btn" title="Send">↑</button>
+              <button type="button" id="sendBtn" class="send-btn" title="Send" aria-label="Send"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
             </div>
           </div>
         </div>
@@ -858,6 +767,21 @@
           Review important details. Connected services may charge usage fees.
         </div>
       </div>
+
+      <section id="welcomeProjects" class="wp" aria-label="Your projects">
+        <div class="wp-sheet">
+          <div class="wp-head">
+            <div class="wp-tabs" role="tablist">
+              <button type="button" class="wp-tab active" data-wp="mine" role="tab" aria-selected="true">My projects</button>
+              <button type="button" class="wp-tab" data-wp="templates" role="tab" aria-selected="false">Templates</button>
+            </div>
+            <button type="button" id="wpAll" class="wp-all">View all</button>
+          </div>
+          <ul id="wpList" class="wp-grid"></ul>
+          <p id="wpEmpty" class="wp-empty hidden">No projects yet. Describe one above, or start from a template.</p>
+          <ul id="wpTemplates" class="wp-grid hidden"></ul>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -1149,133 +1073,91 @@
   </dialog>
 
 
-  <dialog id="connectorsDialog">
-    <div class="model-dialog-card">
-      <div class="settings-head">
+  <dialog id="connectorsDialog" class="kd">
+    <div class="model-dialog-card kd-card">
+      <div class="settings-head kd-head">
         <div>
-          <div class="eyebrow">CONNECTORS</div>
-          <h2>Apps your agents can use</h2>
+          <h2>Connections</h2>
+          <p class="kd-sub">Apps Kairoq can read from. Sending email, booking a meeting or changing a site always waits for your OK.</p>
         </div>
-        <button id="closeConnectors" class="icon-btn">✕</button>
+        <button type="button" id="closeConnectors" class="icon-btn kd-close" autofocus aria-label="Close">✕</button>
       </div>
-
-      <div class="connector-list">
-        <div class="connector-row">
-          <div>
-            <strong>Google Gmail + Calendar</strong>
-            <small id="googleConnectorStatus">Checking…</small>
+      <div class="kd-body">
+        <h3 class="kd-label">Your accounts</h3>
+        <div class="connector-list">
+          <div class="connector-row">
+            <div><strong>Google</strong><small id="googleConnectorStatus">Checking…</small></div>
+            <button type="button" id="connectGoogle" class="secondary-btn">Connect</button>
           </div>
-          <button id="connectGoogle" class="secondary-btn">Connect Google</button>
-        </div>
-        <div class="connector-row microsoft-row">
-          <div>
-            <strong>Microsoft 365</strong>
-            <small id="microsoftConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Microsoft 365</strong><small id="microsoftConnectorStatus">Checking…</small></div>
+            <button type="button" id="connectMicrosoft" class="secondary-btn">Connect</button>
           </div>
-          <button id="connectMicrosoft" class="secondary-btn">Connect Microsoft</button>
-        </div>
-        <div class="connector-row local-ai-row">
-          <div>
-            <strong>Local AI</strong>
-            <small id="localAiConnectorStatus">Checking Ollama / local endpoint…</small>
+          <div class="connector-row">
+            <div><strong>Shopify</strong><small id="shopifyConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Railway variable</span>
           </div>
-          <span class="connector-env">$0 API cost</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>GitHub</strong>
-            <small id="githubConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Slack</strong><small id="slackConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Railway variable</span>
           </div>
-          <span class="connector-env">via .env</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Travellez / Nuitee</strong>
-            <small id="nuiteeConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>GitHub</strong><small id="githubConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Railway variable</span>
           </div>
-          <span class="connector-env">via .env</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Slack</strong>
-            <small id="slackConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Meta Ads</strong><small id="metaAdsConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Read only</span>
           </div>
-          <span class="connector-env">via .env</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Shopify</strong>
-            <small id="shopifyConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Google Ads</strong><small id="googleAdsConnectorStatus">Checking…</small></div>
+            <span class="connector-env">With Google</span>
           </div>
-          <span class="connector-env">via .env</span>
         </div>
-        <div class="connector-row">
-          <div>
-            <strong>Meta Ads</strong>
-            <small id="metaAdsConnectorStatus">Checking…</small>
+        <h3 class="kd-label">Message Kairoq from your phone</h3>
+        <div class="connector-list">
+          <div class="connector-row">
+            <div><strong>Telegram</strong><small id="telegramConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Free</span>
           </div>
-          <span class="connector-env">read-only reporting</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Google Ads</strong>
-            <small id="googleAdsConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>WhatsApp and SMS</strong><small id="twilioConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Twilio</span>
           </div>
-          <span class="connector-env">Google OAuth</span>
         </div>
-        <div class="connector-row">
-          <div>
-            <strong>Web Operator</strong>
-            <small id="browserlessConnectorStatus">Checking…</small>
+        <details class="kd-fold">
+          <summary>Behind the scenes</summary>
+          <div class="connector-list">
+          <div class="connector-row">
+            <div><strong>Local AI</strong><small id="localAiConnectorStatus">Checking…</small></div>
+            <span class="connector-env">No API cost</span>
           </div>
-          <span class="connector-env">via .env</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Notifications</strong>
-            <small id="notificationsConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Web browsing</strong><small id="browserlessConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Railway variable</span>
           </div>
-          <span class="connector-env">via .env</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Telegram — message Atlas</strong>
-            <small id="telegramConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Notifications</strong><small id="notificationsConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Railway variable</span>
           </div>
-          <span class="connector-env">free Bot API</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>WhatsApp + SMS — message Atlas</strong>
-            <small id="twilioConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Higgsfield media</strong><small id="higgsfieldConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Pay as you go</span>
           </div>
-          <span class="connector-env">via Twilio</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Higgsfield media</strong>
-            <small id="higgsfieldConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Travellez / Nuitee</strong><small id="nuiteeConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Railway variable</span>
           </div>
-          <span class="connector-env">pay as you go</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Credential encryption</strong>
-            <small id="encryptionConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Approved webhook</strong><small id="webhookConnectorStatus">Checking…</small></div>
+            <span class="connector-env">Railway variable</span>
           </div>
-          <span class="connector-env">AES-256-GCM</span>
-        </div>
-        <div class="connector-row">
-          <div>
-            <strong>Approved webhook</strong>
-            <small id="webhookConnectorStatus">Checking…</small>
+          <div class="connector-row">
+            <div><strong>Saved-key encryption</strong><small id="encryptionConnectorStatus">Checking…</small></div>
+            <span class="connector-env">AES-256</span>
           </div>
-          <span class="connector-env">via .env</span>
-        </div>
-      </div>
-
-      <div class="settings-note connector-note">
-        Read actions can run automatically. Sending email, calendar events, browser actions, and outbound Telegram/WhatsApp/SMS messages pause for approval.
+          </div>
+        </details>
       </div>
     </div>
   </dialog>
@@ -1431,43 +1313,44 @@
     </div>
   </dialog>
 
-  <dialog id="templatesDialog">
-    <div class="model-dialog-card templates-card">
-      <div class="settings-head">
+  <dialog id="templatesDialog" class="kd">
+    <div class="model-dialog-card kd-card templates-card">
+      <div class="settings-head kd-head">
         <div>
-          <div class="eyebrow">TEMPLATES</div>
-          <h2>Ready-made agents and bots</h2>
+          <h2>Templates</h2>
+          <p class="kd-sub">Ready-made jobs. Try one in chat, or let it run on a schedule.</p>
         </div>
-        <button id="closeTemplates" class="icon-btn">✕</button>
+        <button type="button" id="closeTemplates" class="icon-btn kd-close" autofocus aria-label="Close">✕</button>
       </div>
-      <div id="templateModeTabs" class="mode-tabs"></div>
-      <div id="templateGrid" class="template-grid"></div>
+      <div id="templateModeTabs" class="mode-tabs kd-tabs"></div>
+      <div id="templateGrid" class="template-grid kd-body"></div>
     </div>
   </dialog>
 
-  <dialog id="playbookDialog">
-    <div class="model-dialog-card playbook-card">
-      <div class="settings-head">
+  <dialog id="playbookDialog" class="kd">
+    <div class="model-dialog-card kd-card playbook-card">
+      <div class="settings-head kd-head">
         <div>
-          <div class="eyebrow">COMPANY PLAYBOOK</div>
-          <h2>How your company works</h2>
+          <h2>How we work</h2>
+          <p class="kd-sub">Kairoq reads this before every task, so replies sound like you and follow your rules.</p>
         </div>
-        <button id="closePlaybook" class="icon-btn">✕</button>
+        <button type="button" id="closePlaybook" class="icon-btn kd-close" autofocus aria-label="Close">✕</button>
       </div>
-
-      <div class="playbook-grid">
-        <label>Company overview<textarea id="pb_company_overview" rows="4"></textarea></label>
-        <label>Tone of voice<textarea id="pb_tone_of_voice" rows="4"></textarea></label>
-        <label>Approval rules<textarea id="pb_approval_rules" rows="4"></textarea></label>
-        <label>Travel policy<textarea id="pb_travel_policy" rows="4"></textarea></label>
-        <label>Housing policy<textarea id="pb_housing_policy" rows="4"></textarea></label>
-        <label>Preferred suppliers<textarea id="pb_suppliers" rows="4"></textarea></label>
-        <label>Pricing rules<textarea id="pb_pricing_rules" rows="4"></textarea></label>
-        <label>Escalation rules<textarea id="pb_escalation_rules" rows="4"></textarea></label>
-        <label class="wide">Things never to do<textarea id="pb_never_do" rows="4"></textarea></label>
+      <div class="kd-body playbook-grid kd-form">
+        <label>What the business does<textarea id="pb_company_overview" rows="3" placeholder="We run two boutique apartments in Lisbon for business travellers."></textarea></label>
+        <label>How we sound<textarea id="pb_tone_of_voice" rows="2" placeholder="Warm, short, no jargon."></textarea></label>
+        <label>Never do<textarea id="pb_never_do" rows="2" placeholder="Never promise refunds. Never share guest details."></textarea></label>
+        <details class="kd-fold">
+          <summary>More rules</summary>
+          <label>What needs my approval<textarea id="pb_approval_rules" rows="2"></textarea></label>
+          <label>Prices and discounts<textarea id="pb_pricing_rules" rows="2"></textarea></label>
+          <label>Suppliers we use<textarea id="pb_suppliers" rows="2"></textarea></label>
+          <label>When to escalate<textarea id="pb_escalation_rules" rows="2"></textarea></label>
+          <label>Travel policy<textarea id="pb_travel_policy" rows="2"></textarea></label>
+          <label>Housing policy<textarea id="pb_housing_policy" rows="2"></textarea></label>
+        </details>
       </div>
-      <div class="tool-safety-note">Atlas and scheduled bots include this playbook as company context.</div>
-      <button id="savePlaybook" class="primary-btn">Save playbook</button>
+      <div class="kd-foot"><button type="button" id="savePlaybook" class="primary-btn">Save</button></div>
     </div>
   </dialog>
 
@@ -1488,7 +1371,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=20"></script>
-<script src="/connections.js?v=18"></script>
-<a class="developer-launch" href="/build-studio.html" aria-label="Open AI Developer Build Studio">✦ Build Website / App</a><a class="developer-launch" style="bottom:72px" href="/api-studio.html" aria-label="Open OAuth connections and API SDK tools">API · OAuth &amp; SDKs ↗</a><a class="developer-launch" style="bottom:122px" href="/apps/housing-enquiries/">Housing Enquiry Tracker ↗</a></body>
+  <script src="/app.js?v=32"></script>
+<script src="/connections.js?v=20"></script>
+</body>
 </html>

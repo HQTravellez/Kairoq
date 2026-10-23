@@ -1,5 +1,7 @@
 const fs = require("fs");
 const path = require("path");
+// Data first: on a persistent volume when one is attached (see storage.js).
+require("./storage").prepare();
 const workspace = path.join(__dirname, "workspace");
 const generated = path.join(__dirname, "public", "generated");
 const durable = path.join(workspace, "generated");

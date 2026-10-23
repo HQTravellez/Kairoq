@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --azul: #1d4e89; --azul-dark: #12345c; --sand: #f6f1e8; --terracotta: #c4683f; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--sand); color: #1f2933; }
+.font-display { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.01em; }
+.tile-pattern {
+  background-color: var(--azul);
+  background-image: radial-gradient(circle at 25% 25%, rgba(255,255,255,.14) 2px, transparent 2.5px), radial-gradient(circle at 75% 75%, rgba(255,255,255,.14) 2px, transparent 2.5px);
+  background-size: 28px 28px;
+}
+.photo { background: linear-gradient(135deg, #d9c7a7, #b98b62); }
+input, select, textarea { font: inherit; }
+
+@layer components {
+  .input { @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-[#1d4e89] focus:ring-2 focus:ring-[#1d4e89]/20; }
+}

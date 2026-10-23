@@ -5,11 +5,11 @@ function filename(id){if(!/^site-[a-f0-9-]{36}$/.test(id))throw Error('Invalid w
 function save(job){fs.mkdirSync(ROOT,{recursive:true});const file=filename(job.id);fs.writeFileSync(file+'.tmp',JSON.stringify(job,null,2));fs.renameSync(file+'.tmp',file);}
 function submit(input,callModel){
  if(input.id&&[...active.values()].some(job=>job.projectId===input.id))throw Error('This website already has a running job');
- const job={id:'site-'+crypto.randomUUID(),operation:input.id?'website-revision':'website-build',projectId:input.id||null,status:'queued',created_at:new Date().toISOString()};save(job);active.set(job.id,job);
+ const job={id:'site-'+crypto.randomUUID(),auto_deploy:input.auto_deploy===true,operation:input.id?'website-revision':'website-build',projectId:input.id||null,status:'queued',created_at:new Date().toISOString()};save(job);active.set(job.id,job);
  setImmediate(async()=>{try{
   const web=require('./developer-agent'),progress=status=>{job.status=status;save(job);};progress('designing');
   const generated=input.id?await web.revise(String(input.id),String(input.instruction||''),callModel,input):await web.build({...input,onProgress:progress},callModel);
-  const {preview,files,...result}=generated;job.status='complete';job.projectId=result.id;job.result={...result,preview_url:'/api/developer/preview/'+result.id+'/index.html',files:Object.keys(files)};
+  const {preview,files,...result}=generated;job.status='complete';job.projectId=result.id;await require('./build-publication').finish(job,{...result,preview_url:'/api/developer/preview/'+result.id+'/index.html',files:Object.keys(files)},{save,callModel});
  }catch(error){job.status='failed';job.error=String(error.message||error);if(error.projectId)job.projectId=error.projectId;}finally{job.completed_at=new Date().toISOString();save(job);active.delete(job.id);}});
  return{...job};
 }

@@ -20,6 +20,7 @@ const PORT = Number(process.env.PORT || 3002);
 const SITE_NAME = process.env.SITE_NAME || "Kairoq";
 const PUBLIC_DIR = path.join(__dirname, "public");
 const OR_CHAT = "https://openrouter.ai/api/v1/chat/completions";
+const reactBuilder=require("./react-builder"),reactBackend=require("./react-backend"),reactHosting=require("./react-hosting"),createApi=require("./create-api");
 const OR_MODELS = "https://openrouter.ai/api/v1/models";
 const OR_KEY = "https://openrouter.ai/api/v1/key";
 const ZERO_COST_MODE = String(process.env.ZERO_COST_MODE || "true").toLowerCase() !== "false";
@@ -65,7 +66,7 @@ const PERMISSIONS_FILE = path.join(__dirname, "workspace", ".tool-permissions.js
 const USAGE_FILE = path.join(__dirname, "workspace", ".usage-ledger.jsonl");
 const DEAD_LETTER_FILE = path.join(__dirname, "workspace", ".dead-letter.json");
 const PLAYBOOK_FILE = path.join(__dirname, "workspace", ".company-playbook.json");
-const PRODUCT_STATE_FILE = path.join(__dirname, "workspace", ".product-state.json");
+const PRODUCT_STATE_FILE = process.env.PRODUCT_STATE_FILE || path.join(__dirname, "workspace", ".product-state.json");
 const OPEN_LOOPS_FILE = path.join(__dirname, "workspace", ".open-loops.json");
 
 const TOURS_FILE = path.join(__dirname, "workspace", ".studio-tours.json");
@@ -238,11 +239,11 @@ function sanitizeAuditData(data){
 }
 async function audit(type,data={}){
   const event={id:crypto.randomUUID(),type,at:new Date().toISOString(),data:sanitizeAuditData(data)};
-  try{fs.appendFileSync(AUDIT_FILE,JSON.stringify(event)+"\\n","utf8")}catch{}
+  try{fs.appendFileSync(AUDIT_FILE,JSON.stringify(event)+"\n","utf8")}catch{}
   if(cloudConfigured()){try{await fetchWithRetry(`${SUPABASE_URL}/rest/v1/ai_audit_log`,{method:"POST",headers:supabaseHeaders(),body:JSON.stringify({id:event.id,owner_id:MEMORY_OWNER_ID,event,created_at:event.at})},{retries:2})}catch{}}
   return event;
 }
-function readLocalJsonLines(file,limit=500){try{if(!fs.existsSync(file))return[];return fs.readFileSync(file,"utf8").trim().split(/\\n+/).filter(Boolean).slice(-limit).reverse().map(JSON.parse)}catch{return[]}}
+function readLocalJsonLines(file,limit=500){try{if(!fs.existsSync(file))return[];const rows=[];for(const line of fs.readFileSync(file,"utf8").split(/\r?\n/)){for(const part of line.split(/(?<=\})\\n(?=\{)/)){if(!part.trim())continue;try{rows.push(JSON.parse(part))}catch{}}}return rows.slice(-limit).reverse()}catch{return[]}}
 async function getAuditEvents(limit=200){
   if(cloudConfigured()){try{const u=`${SUPABASE_URL}/rest/v1/ai_audit_log?owner_id=eq.${encodeURIComponent(MEMORY_OWNER_ID)}&select=event&order=created_at.desc&limit=${Math.min(500,limit)}`;const r=await fetchWithRetry(u,{headers:supabaseHeaders()},{retries:2});const d=await r.json().catch(()=>[]);if(r.ok)return(d||[]).map(x=>x.event).filter(Boolean)}catch{}}
   return readLocalJsonLines(AUDIT_FILE,limit);
@@ -260,8 +261,8 @@ async function saveToolPermissions(p){const m={...DEFAULT_TOOL_PERMISSIONS,...p}
 async function toolPermission(name){return(await loadToolPermissions())[name]||"approve"}
 function requestRateKey(req){return String(req.headers["x-forwarded-for"]||"").split(",")[0].trim()||req.socket?.remoteAddress||"local"}
 function enforceRateLimit(req){if(!(REQUESTS_PER_MINUTE>0))return;const k=requestRateKey(req),now=Date.now(),a=(rateBuckets.get(k)||[]).filter(t=>now-t<60000);if(a.length>=REQUESTS_PER_MINUTE){const e=new Error("Rate limit exceeded. Try again shortly.");e.statusCode=429;throw e}a.push(now);rateBuckets.set(k,a)}
-async function recordUsage(usage={},context={}){const cost=Number(usage.cost??usage.total_cost??0),r={id:crypto.randomUUID(),at:new Date().toISOString(),cost:Number.isFinite(cost)?cost:0,prompt_tokens:Number(usage.prompt_tokens||usage.input_tokens||0),completion_tokens:Number(usage.completion_tokens||usage.output_tokens||0),total_tokens:Number(usage.total_tokens||0),context:sanitizeAuditData(context)};try{fs.appendFileSync(USAGE_FILE,JSON.stringify(r)+"\n","utf8")}catch{};if(cloudConfigured()){try{await fetchWithRetry(`${SUPABASE_URL}/rest/v1/ai_usage_ledger`,{method:"POST",headers:supabaseHeaders(),body:JSON.stringify({id:r.id,owner_id:MEMORY_OWNER_ID,usage:r,created_at:r.at})},{retries:2})}catch{}}return r}
-async function usageTotals(){let rs=[];if(cloudConfigured()){try{const d=new Date();d.setUTCDate(1);d.setUTCHours(0,0,0,0);const u=`${SUPABASE_URL}/rest/v1/ai_usage_ledger?owner_id=eq.${encodeURIComponent(MEMORY_OWNER_ID)}&created_at=gte.${encodeURIComponent(d.toISOString())}&select=usage`;const r=await fetchWithRetry(u,{headers:supabaseHeaders()},{retries:2});const x=await r.json().catch(()=>[]);if(r.ok)rs=(x||[]).map(y=>y.usage).filter(Boolean)}catch{}}if(!rs.length)rs=readLocalJsonLines(USAGE_FILE,5000);const n=new Date(),day=n.toISOString().slice(0,10),mon=n.toISOString().slice(0,7);let daily=0,monthly=0;for(const x of rs){const at=String(x.at||""),c=Number(x.cost||0);if(at.startsWith(day))daily+=c;if(at.startsWith(mon))monthly+=c}return{daily,monthly}}
+async function recordUsage(usage={},context={}){const cost=Number(usage.cost??usage.total_cost??0),r={id:crypto.randomUUID(),at:new Date().toISOString(),cost:Number.isFinite(cost)?cost:0,prompt_tokens:Number(usage.prompt_tokens||usage.input_tokens||0),completion_tokens:Number(usage.completion_tokens||usage.output_tokens||0),total_tokens:Number(usage.total_tokens||0),cached_tokens:Number(usage.prompt_tokens_details?.cached_tokens||usage.cache_read_input_tokens||0),cache_write_tokens:Number(usage.prompt_tokens_details?.cache_write_tokens||usage.cache_creation_input_tokens||0),context:sanitizeAuditData(context)};try{fs.appendFileSync(USAGE_FILE,JSON.stringify(r)+"\n","utf8")}catch{};if(cloudConfigured()){try{await fetchWithRetry(`${SUPABASE_URL}/rest/v1/ai_usage_ledger`,{method:"POST",headers:supabaseHeaders(),body:JSON.stringify({id:r.id,owner_id:MEMORY_OWNER_ID,usage:r,created_at:r.at})},{retries:2})}catch{}}return r}
+async function usageTotals(filter={}){let rs=[];if(cloudConfigured()){try{const d=new Date();d.setUTCDate(1);d.setUTCHours(0,0,0,0);const u=`${SUPABASE_URL}/rest/v1/ai_usage_ledger?owner_id=eq.${encodeURIComponent(MEMORY_OWNER_ID)}&created_at=gte.${encodeURIComponent(d.toISOString())}&select=usage`;const r=await fetchWithRetry(u,{headers:supabaseHeaders()},{retries:2});const x=await r.json().catch(()=>[]);if(r.ok)rs=(x||[]).map(y=>y.usage).filter(Boolean)}catch{}}if(!rs.length)rs=readLocalJsonLines(USAGE_FILE,20000);const n=new Date(),day=n.toISOString().slice(0,10),mon=n.toISOString().slice(0,7);let daily=0,monthly=0;for(const x of rs){if(filter.purpose&&x.context?.purpose!==filter.purpose)continue;const at=String(x.at||""),c=Number(x.cost||0);if(at.startsWith(day))daily+=c;if(at.startsWith(mon))monthly+=c}return{daily,monthly}}
 async function enforceBudget(){const t=await usageTotals();if(DAILY_COST_LIMIT_USD>0&&t.daily>=DAILY_COST_LIMIT_USD)throw new Error(`Daily AI cost limit reached ($${DAILY_COST_LIMIT_USD.toFixed(2)}).`);if(MONTHLY_COST_LIMIT_USD>0&&t.monthly>=MONTHLY_COST_LIMIT_USD)throw new Error(`Monthly AI cost limit reached ($${MONTHLY_COST_LIMIT_USD.toFixed(2)}).`);return t}
 async function notify(title,message,data={}){await audit("notification.created",{title,message,data});if(!NOTIFY_WEBHOOK_URL)return{delivered:false};try{const r=await fetchWithRetry(NOTIFY_WEBHOOK_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,message,data,at:new Date().toISOString()})},{retries:3});return{delivered:r.ok,status:r.status}}catch(e){return{delivered:false,error:e.message}}}
 
@@ -269,13 +270,25 @@ function authEnabled() {
   return Boolean(process.env.APP_PASSWORD);
 }
 
+// The owner cookie is an HMAC of the password with a server-side secret, so a leaked cookie
+// cannot be used to guess the password offline. The secret comes from KAIROQ_SESSION_SECRET
+// or is generated once and kept next to the project data.
+let ownerSessionSecret=null;
+function sessionSecret(){
+  if(ownerSessionSecret)return ownerSessionSecret;
+  if(process.env.KAIROQ_SESSION_SECRET)return(ownerSessionSecret=process.env.KAIROQ_SESSION_SECRET);
+  const file=path.join(require("./react-builder").ROOT(),".owner-session-secret");
+  try{ownerSessionSecret=fs.readFileSync(file,"utf8").trim()}catch{}
+  if(!ownerSessionSecret){ownerSessionSecret=crypto.randomBytes(32).toString("hex");try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,ownerSessionSecret,{mode:0o600,flag:"wx"})}catch{try{ownerSessionSecret=fs.readFileSync(file,"utf8").trim()||ownerSessionSecret}catch{}}}
+  return ownerSessionSecret;
+}
 function sessionToken() {
   if (!authEnabled()) return "";
-  return crypto
-    .createHash("sha256")
-    .update(`openrouter-private-ai:${process.env.APP_PASSWORD}`)
-    .digest("hex");
+  return crypto.createHmac("sha256",sessionSecret()).update(`owner-session:${process.env.APP_PASSWORD}`).digest("hex");
 }
+// Without APP_PASSWORD only requests made on the server machine itself (local development)
+// act as the owner; a deployed server without a password does not hand ownership to visitors.
+function localRequest(req){const a=String(req.socket?.remoteAddress||"");return(a==="127.0.0.1"||a==="::1"||a==="::ffff:127.0.0.1")&&!req.headers["x-forwarded-for"]&&!req.headers["forwarded"]}
 
 function parseCookies(req) {
   const out = {};
@@ -288,8 +301,23 @@ function parseCookies(req) {
   return out;
 }
 
+function crossSiteRequest(req){
+  const site=String(req.headers["sec-fetch-site"]||"");
+  if(site&&site!=="same-origin"&&site!=="none")return true;
+  const origin=req.headers.origin;
+  if(origin===undefined)return false;
+  try{return new URL(origin).host!==String(req.headers.host||"")}catch{return true}
+}
+// A temporary open door chosen by the owner: until KAIROQ_OPEN_ACCESS_UNTIL (a date or time,
+// at most 14 days ahead) every visitor is treated as the owner, without the password. It closes
+// on its own at that time; deleting the variable closes it at once.
+function openAccessUntil(now=Date.now()){
+  const t=Date.parse(String(process.env.KAIROQ_OPEN_ACCESS_UNTIL||""));
+  return Number.isFinite(t)&&t>now&&t-now<=14*86400000?t:0;
+}
 function isAuthenticated(req) {
-  if (!authEnabled()) return true;
+  if (openAccessUntil()) return true;
+  if (!authEnabled()) return localRequest(req);
   const cookies = parseCookies(req);
   const received = cookies[SESSION_COOKIE] || "";
   const expected = sessionToken();
@@ -881,6 +909,34 @@ function readJsonFileSafe(file, fallback) {
 function writeJsonFileSafe(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(value, null, 2), "utf8");
+}
+
+// Product state is the small settings object the web app keeps per workspace: onboarding,
+// demo mode, vertical mode and workflow cards. The browser keeps its own copy and merges ours in.
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function loadProductState() {
+  const state = readJsonFileSafe(PRODUCT_STATE_FILE, {});
+  return isPlainObject(state) ? state : {};
+}
+
+function saveProductState(patch) {
+  const next = { ...loadProductState(), ...patch, updated_at: new Date().toISOString() };
+  if (Array.isArray(next.workflow_cards)) next.workflow_cards = next.workflow_cards.slice(0, 100);
+  writeJsonFileSafe(PRODUCT_STATE_FILE, next);
+  return next;
+}
+
+async function handleProductStateSave(req, res) {
+  try {
+    const body = await getBody(req, 1_000_000);
+    if (!isPlainObject(body.state)) return json(res, 400, { error: "Expected a JSON body with a state object." });
+    return json(res, 200, { ok: true, state: saveProductState(body.state) });
+  } catch (err) {
+    return json(res, 400, { error: err.message || "Could not save product state." });
+  }
 }
 
 
@@ -4036,13 +4092,22 @@ async function handleConnectorStatus(_req, res) {
   });
 }
 
+const ownerLoginFailures=new Map();
 async function handleLogin(req, res) {
   if (!authEnabled()) return json(res, 200, { ok: true, authRequired: false });
+  // Failed attempts are limited per address (10 per 15 minutes) and overall (100 per 15 minutes).
+  const ip=require("./client-ip").clientIp(req),now=Date.now();
+  for(const [k,v] of ownerLoginFailures)if(v.every(t=>now-t>900000))ownerLoginFailures.delete(k);
+  const mine=(ownerLoginFailures.get(ip)||[]).filter(t=>now-t<900000),all=[...ownerLoginFailures.values()].flat().filter(t=>now-t<900000);
+  if(mine.length>=10||all.length>=100)return json(res,429,{error:"Too many sign-in attempts. Try again in 15 minutes."});
   const body = await getBody(req, 100_000);
-  if (body.password !== process.env.APP_PASSWORD) {
+  const given=crypto.createHash("sha256").update(String(body.password??"")).digest(),expected=crypto.createHash("sha256").update(String(process.env.APP_PASSWORD)).digest();
+  if (!crypto.timingSafeEqual(given,expected)) {
+    ownerLoginFailures.set(ip,[...mine,now].slice(-20));
     return json(res, 401, { error: "Incorrect password." });
   }
-  const secure = (process.env.SITE_URL || "").startsWith("https://");
+  ownerLoginFailures.delete(ip);
+  const secure = /^https:\/\//.test(process.env.SITE_URL || process.env.KAIROQ_PUBLIC_URL || "") || Boolean(process.env.RAILWAY_PUBLIC_DOMAIN);
   const cookie = `${SESSION_COOKIE}=${sessionToken()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${secure ? "; Secure" : ""}`;
   return json(res, 200, { ok: true }, { "Set-Cookie": cookie });
 }
@@ -6521,42 +6586,206 @@ function parseDeveloperResponse(content,model="coding model"){
   }
   throw Error("Response did not contain complete project files; "+clean.length+" characters");
 }
-async function callDeveloperCodingModel(opts={}){
-  if(experiential.configured())return experiential.callProject(opts,{enforceBudget,recordUsage,parse:parseDeveloperResponse});
-  if(!process.env.OPENROUTER_API_KEY)return callFreeLlmJSON(opts);
+async function callDeveloperCodingModel(opts={}){return callBuilderModel(opts,parseDeveloperResponse)}
+// AI used inside generated apps (ai.chat). Own model setting and monthly cap (purpose app-ai).
+async function callAppAi({system,messages,maxTokens=1000,onToken,vision=false}){
+  if(!process.env.OPENROUTER_API_KEY)throw Object.assign(Error("AI is not configured on this server"),{status:503});
+  const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+  const cap=Number(process.env.KAIROQ_APP_AI_MONTHLY_LIMIT_USD??20);
+  const overCap=cap>0&&(await usageTotals({purpose:"app-ai"})).monthly>=cap;
+  // Images (ai.extract on a photo) need a model that can see; there is no free fallback for those.
+  if(vision&&!(paid&&!overCap))throw Object.assign(Error("Reading images needs a paid vision model on this server (KAIROQ_BUILDER_PAID_APPROVED and app AI budget)."),{status:503});
+  const models=vision?String(process.env.KAIROQ_APP_AI_VISION_MODEL||"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):(paid&&!overCap?String(process.env.KAIROQ_APP_AI_MODEL||"deepseek/deepseek-v3.2").split(",").map(m=>m.trim()).filter(Boolean):[]).concat(["openrouter/free"]);
+  const errors=[];
+  for(const model of models){
+    const free=model.endsWith(":free")||model==="openrouter/free";
+    try{
+      if(!free)await enforceBudget();
+      const body={model,max_tokens:maxTokens,messages:[...(system?[{role:"system",content:system}]:[]),...messages]};
+      // Live typing: stream the answer; once words have reached the visitor there is no fallback.
+      if(onToken){
+        let streamed=false;
+        try{
+          const out=await streamAppAi(body,onToken,()=>{streamed=true});
+          if(!free)await recordUsage({...out.usage,cost:Number(out.usage?.cost||0)},{purpose:"app-ai",model});
+          if(!out.text.trim())throw Error("Empty response");
+          return{text:out.text};
+        }catch(e){if(streamed)throw Object.assign(Error("The answer was interrupted. Try again."),{status:502,final:true});throw e}
+      }
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:AbortSignal.timeout(60000),body:JSON.stringify(body)});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
+      const raw=data.choices?.[0]?.message?.content;
+      const text=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
+      if(!free)await recordUsage({...data.usage,cost:Number(data.usage?.cost||0)},{purpose:"app-ai",model});
+      if(!text.trim())throw Error("Empty response");
+      return{text};
+    }catch(e){if(e.final)throw e;errors.push(model+": "+String(e.message||e).slice(0,120))}
+  }
+  throw Object.assign(Error("AI is unavailable right now. "+errors.join(" | ")),{status:503});
+}
+// One streamed OpenRouter chat call: calls onToken with each piece of text, returns {text,usage}.
+async function streamAppAi(body,onToken,onFirst){
+  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders({Accept:"text/event-stream"}),signal:AbortSignal.timeout(90000),body:JSON.stringify({...body,stream:true,usage:{include:true}})});
+  if(!response.ok||!response.body){const data=await response.json().catch(()=>({}));throw Error(data.error?.message||"Provider HTTP "+response.status)}
+  const decoder=new TextDecoder();let buf="",text="",usage=null;
+  for await(const chunk of response.body){
+    buf+=decoder.decode(chunk,{stream:true});let i;
+    while((i=buf.indexOf("\n"))>=0){
+      const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+      if(!line.startsWith("data:"))continue;
+      const raw=line.slice(5).trim();if(raw==="[DONE]")continue;
+      let d;try{d=JSON.parse(raw)}catch{continue}
+      if(d.error)throw Error(d.error.message||"Provider error");
+      if(d.usage)usage=d.usage;
+      const piece=d.choices?.[0]?.delta?.content;
+      if(typeof piece==="string"&&piece){if(!text)onFirst();text+=piece;onToken(piece)}
+    }
+  }
+  return{text,usage};
+}
+// Which service writes the apps: Experiential Labs whenever its key is set (the owner's choice
+// for now), else OpenRouter. KAIROQ_BUILDER_PROVIDER=openrouter switches to OpenRouter: builds
+// in parallel, models per tier, the fast lane for small edits and live progress (it needs
+// KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true to write whole apps).
+// OpenCode as the build engine (opencode-engine.js) counts its model calls against the same budget.
+require("./opencode-engine").configure({enforceBudget,recordUsage:u=>recordUsage(u,{purpose:"developer-build",model:u.model,provider:"opencode"}),checkUrl:"http://127.0.0.1:"+PORT+"/internal/opencode-check"});
+function builderProvider(){
+  const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
+  if(chosen==="openrouter"&&process.env.OPENROUTER_API_KEY)return"openrouter";
+  return experiential.configured()?"experiential":"openrouter";
+}
+async function callBuilderModel(opts={},parse=parseDeveloperResponse){
+  // A model the owner picked by name in the chat box (model-choices.js) goes through OpenRouter
+  // first; when it cannot run (no key, paid builds off, budget, provider error) Auto takes over.
+  if(opts.model){
+    const {model,onFallback,...rest}=opts;
+    try{
+      if(!process.env.OPENROUTER_API_KEY)throw Error("OpenRouter is not set up");
+      return await callOpenRouterBuilder({...rest,only:model},parse);
+    }catch(err){
+      if(err.name==="AbortError"||rest.signal?.aborted)throw err;
+      console.log("[builder] chosen model "+model+" failed, using Auto: "+String(err.message||err).slice(0,200));
+      onFallback?.(err);opts=rest;
+    }
+  }
+  if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
+  return callOpenRouterBuilder(opts,parse);
+}
+async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
+  if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
-  const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),"deepseek/deepseek-v3.2"];
-  const allowPaid=mode==="premium" && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
-  const models=[...freeCandidates,...(allowPaid?paidCandidates:[])].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
+  const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
+  let allowPaid=(mode==="premium"||mode==="paid-first") && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
+  if(opts.only&&!allowPaid)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
+  if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
+  // Pro tier: stronger models first, then the standard paid chain; never free models.
+  const proCandidates=String(process.env.KAIROQ_PRO_MODELS||"anthropic/claude-sonnet-5.5,openai/gpt-6").split(",").map(m=>m.trim()).filter(Boolean);
+  const visionCandidates=String(process.env.KAIROQ_VISION_MODELS||"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean);
+  if((opts.tier==="pro"||opts.tier==="vision")&&!allowPaid)throw Error("Pro and image models need KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left this month."+(errors.length?" "+errors.join(" | "):""));
+  const maxCandidates=String(process.env.KAIROQ_MAX_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
+  if(opts.tier==="max"&&(!allowPaid||!maxCandidates.length))throw Error("The Max tier needs KAIROQ_MAX_MODELS, KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left.");
+  const ordered=opts.tier==="max"?[...maxCandidates,...proCandidates]:opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
+  // Design work (the design brief and the screenshot review) can go to a stronger model
+  // (KAIROQ_DESIGN_MODELS, e.g. Fable) first, whatever tier wrote the code.
+  const designFirst=opts.design&&allowPaid?String(process.env.KAIROQ_DESIGN_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean):[];
+  // Small, clear edits on the Standard tier ("make the button blue") go to a fast model first
+  // (KAIROQ_FAST_MODELS); the usual models follow if it fails.
+  const fastFirst=opts.fast&&allowPaid&&(!opts.tier||opts.tier==="standard")?String(process.env.KAIROQ_FAST_MODELS??"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):[];
+  const models=opts.only?[opts.only]:[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
     if(!free&&!allowPaid)continue;
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
-      const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(20000,opts.maxOutputTokens)):10000;
-      const rates=free?[0,0]:model.includes("deepseek")?[0.5,1]:[5,25];
+      // Pro and Max models can write whole apps in one reply, so they get a larger output cap.
+      const designModel=designFirst.includes(model);
+      const premium=opts.tier==="pro"||opts.tier==="max"||designModel;
+      const outputCap=premium?Math.max(4000,Number(process.env.KAIROQ_PREMIUM_OUTPUT_TOKENS)||32000):Math.max(2000,Number(process.env.KAIROQ_STANDARD_OUTPUT_TOKENS)||16000);
+      const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):10000;
+      const rates=free?[0,0]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
       if(!free){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
         if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
+        if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
       }
-      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(110000)]):AbortSignal.timeout(110000),body:JSON.stringify({model,messages:opts.messages,temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"}})});
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
-      const message=data.choices?.[0]?.message||{};
-      const raw=message.content;
-      const content=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
-      const cost=Number(data.usage?.cost||0);
-      if(free&&cost>0)throw Error("Free request unexpectedly billed");
-      if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model});
+      const stream=typeof opts.onToken==="function";
+      // One request; a reply cut off at the output limit is continued (model-continue.js).
+      let lastData=null;
+      const ask=async(msgs,onTok)=>{
+        const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(premium?900000:300000):110000)]):AbortSignal.timeout(stream?(premium?900000:300000):110000),body:JSON.stringify({model,messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
+        const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{}),opts.onReasoning):await response.json().catch(()=>({}));
+        if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
+        const message=data.choices?.[0]?.message||{};
+        const raw=message.content;
+        const text=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
+        const cost=Number(data.usage?.cost||0);
+        if(free&&cost>0)throw Error("Free request unexpectedly billed");
+        if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model,tier:opts.tier||"standard",...(designModel?{design:true}:{})});
+        lastData=data;
+        return{content:text,finish:data.choices?.[0]?.finish_reason};
+      };
+      const {content}=await require("./model-continue").complete(ask,opts.messages,{onToken:stream?opts.onToken:undefined});
+      const data=lastData||{},message=data.choices?.[0]?.message||{};
       if(!content.trim())throw Error("Empty response; finish="+data.choices?.[0]?.finish_reason+" reasoning="+String(message.reasoning||"").length);
-      return parseDeveloperResponse(content,model);
+      return parse(content,model);
     }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}
   }
   throw Error("No coding model returned usable project files. "+errors.join(" | "));
+}
+// Generates one image for a Create project (hero photos, illustrations) with an OpenRouter
+// image model. Returns {mime, data(base64)}. Counts against the builder budget.
+function builderImagesEnabled(){return Boolean(process.env.OPENROUTER_API_KEY)&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&process.env.KAIROQ_IMAGE_GENERATION!=="off"}
+async function generateBuilderImage({prompt,aspect="16:9",signal}={}){
+  if(!builderImagesEnabled())throw Error("Image generation needs OPENROUTER_API_KEY and KAIROQ_BUILDER_PAID_APPROVED=true");
+  const model=String(process.env.KAIROQ_IMAGE_MODEL||"google/gemini-2.5-flash-image");
+  const reserve=Number(process.env.KAIROQ_IMAGE_COST_USD||0.05);
+  const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
+  const totals=await enforceBudget();
+  if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
+  if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
+  const timeout=AbortSignal.timeout(120000);
+  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:signal?AbortSignal.any([signal,timeout]):timeout,body:JSON.stringify({model,modalities:["image","text"],image_config:{aspect_ratio:aspect},messages:[{role:"user",content:"Create one high-quality image for a website or app. "+String(prompt).slice(0,2000)+"\nPhotographic and natural unless an illustration is asked for. No text, captions, watermarks or logos in the image."}]})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.error?.message||"Image provider HTTP "+response.status);
+  const url=data.choices?.[0]?.message?.images?.[0]?.image_url?.url||"";
+  const m=/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(url);
+  await recordUsage({...data.usage,cost:Number(data.usage?.cost)||reserve},{purpose:"developer-build",model,image:true});
+  if(!m)throw Error("The image model returned no image");
+  return{mime:m[1],data:m[2]};
+}
+// Reads an OpenAI-compatible SSE stream into the same shape as a non-streamed response.
+// onReasoning(delta, all) receives the model's reasoning ("thinking") as it streams, where the model shares it.
+async function readChatStream(body,onToken,onReasoning){
+  const reader=body.getReader(),decoder=new TextDecoder();
+  let buffer="",content="",reasoning="",usage=null,finish=null,error=null;
+  const handle=line=>{
+    if(!line.startsWith("data:"))return;
+    const payload=line.slice(5).trim();
+    if(!payload||payload==="[DONE]")return;
+    let event;try{event=JSON.parse(payload)}catch{return}
+    if(event.error)error=event.error;
+    if(event.usage)usage=event.usage;
+    const choice=event.choices?.[0];
+    if(choice?.finish_reason)finish=choice.finish_reason;
+    const delta=choice?.delta||{};
+    if(typeof delta.reasoning==="string"&&delta.reasoning){reasoning+=delta.reasoning;if(onReasoning)try{onReasoning(delta.reasoning,reasoning)}catch{}}
+    if(typeof delta.content==="string"&&delta.content){content+=delta.content;try{onToken(delta.content,content)}catch{}}
+  };
+  for(;;){
+    const {done,value}=await reader.read();
+    if(done)break;
+    buffer+=decoder.decode(value,{stream:true});
+    let i;while((i=buffer.indexOf("\n"))>=0){handle(buffer.slice(0,i).trim());buffer=buffer.slice(i+1)}
+  }
+  handle(buffer.trim());
+  if(error)throw Error(error.message||"Provider stream error");
+  return{choices:[{message:{content,reasoning},finish_reason:finish}],usage};
 }
 async function handleDeveloperBuild(req,res){
   try{
@@ -6580,8 +6809,33 @@ async function handleDeveloperPublish(req,res){
     return json(res,200,result);
   }catch(err){return json(res,422,{error:String(err.message||err)})}
 }
+reactBackend.configure({appAi:callAppAi});
+// A failed request must never take the whole server down.
+process.on("unhandledRejection",e=>console.error("[unhandled]",e&&e.stack||e));
 const server = http.createServer(async (req, res) => {
   const url = req.url || "/";
+  const hostRoute=reactHosting.handleHost(req,res);
+  if(typeof hostRoute==="string"){if(!await reactBackend.handle(req,res,{onlyProject:hostRoute.slice(8)})){res.writeHead(404);res.end();}return;}
+  if(hostRoute)return;
+  if(url.startsWith("/api/apps/")&&await reactBackend.handle(req,res))return;
+  // OpenCode's kairoq_check tool (opencode-engine.js): this machine only, with the change's secret.
+  if(url==="/internal/opencode-check"&&req.method==="POST"){
+    const local=["127.0.0.1","::1","::ffff:127.0.0.1"].includes(req.socket.remoteAddress);
+    if(!local)return json(res,404,{error:"Not found"});
+    try{const report=await require("./opencode-engine").runCheck(String(req.headers.authorization||"").replace(/^Bearer\s+/i,""));return json(res,200,{report})}
+    catch(e){return json(res,e.status||500,{error:String(e.message||e).slice(0,500)})}
+  }
+  if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;
+  // MCP server for AI assistants (API-key authenticated; see kairoq-mcp.js).
+  if(url==="/mcp"||url.startsWith("/mcp?"))return void await require("./kairoq-mcp").handle(req,res,{callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null}).catch(e=>{if(!res.headersSent)json(res,500,{error:String(e.message||e).slice(0,300)})});
+  // Owner routes use a cookie, so state-changing requests must come from Kairoq's own pages
+  // (a published app on a sibling subdomain could otherwise send them with the owner's cookie).
+  // Inbound channel webhooks are called by outside services and check their own secrets.
+  if(!/^(GET|HEAD|OPTIONS)$/.test(req.method)&&url.startsWith("/api/")&&!url.startsWith("/api/create/")&&!url.startsWith("/api/channels/")&&crossSiteRequest(req))return json(res,403,{error:"Cross-site request refused"});
+  if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
+  if(url==="/api/whatsapp/webhook"&&await require("./whatsapp").handle(req,res,{callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null}).catch(e=>{console.warn("[whatsapp]",e.message);if(!res.headersSent){res.writeHead(500);res.end()}}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24}|\/check\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
   if(url.startsWith("/apps/") && (await appRuntime.handle(req,res)||await housingBuilder.handle(req,res)))return;
@@ -6612,7 +6866,7 @@ const server = http.createServer(async (req, res) => {
   if(url==="/api/developer/supabase-migration"&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});res.writeHead(200,{"Content-Type":"text/plain","Cache-Control":"no-store"});return res.end(fs.readFileSync(path.join(__dirname,"migrations","20261008_builder_supabase.sql"),"utf8"));}
   if(url.startsWith("/api/developer/releases/")&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const id=url.slice("/api/developer/releases/".length);return json(res,200,{versions:appRelease.versions(id),deployments:appRelease.history(id)})}catch(e){return json(res,404,{error:e.message})}}
   if(url==="/api/developer/rollback"&&req.method==="POST"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,30000);if(body.confirm!=="ROLLBACK_APP")return json(res,400,{error:"Confirm rollback"});return json(res,200,await appRelease.deploy(String(body.id||""),{version:Number(body.version),rollback:true}))}catch(e){return json(res,422,{error:e.message})}}
-  if(url==="/api/developer/repair"&&req.method==="POST"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,30000);appRuntime.getProject(String(body.id||""));return json(res,202,appBuilder.submit({id:body.id,repair:true,reported_issue:!!String(body.issue||"").trim(),instruction:String(body.issue||"Diagnose this app in Chromium and repair any broken auth, CRUD, dashboard or mobile behavior.")},callDeveloperCodingModel))}catch(e){return json(res,422,{error:e.message})}}
+  if(url==="/api/developer/repair"&&req.method==="POST"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,30000);appRuntime.getProject(String(body.id||""));return json(res,202,appBuilder.submit({id:body.id,repair:true,auto_deploy:body.auto_deploy===true,reported_issue:!!String(body.issue||"").trim(),instruction:String(body.issue||"Diagnose this app in Chromium and repair any broken auth, CRUD, dashboard or mobile behavior.")},callDeveloperCodingModel))}catch(e){return json(res,422,{error:e.message})}}
   if(url==="/api/developer/projects"&&req.method==="GET"){
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     return json(res,200,{projects:[...appBuilder.listProjects(),...developerAgent.listProjects()].sort((a,b)=>(b.updated_at||b.created_at).localeCompare(a.updated_at||a.created_at))});
@@ -6631,14 +6885,62 @@ const server = http.createServer(async (req, res) => {
     if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
     let local=false;try{local=(await getLocalLlmModels()).length>0}catch{}
     const ai=local||Boolean(process.env.OPENROUTER_API_KEY)||experiential.configured();
-    return json(res,200,{experiential:experiential.configured(),builder_provider:experiential.configured()?"experiential":"openrouter",ai_generation:ai,local_model:local,openrouter:!!process.env.OPENROUTER_API_KEY,github_publishing:!!(process.env.GITHUB_TOKEN&&process.env.GITHUB_REPO),repository:process.env.GITHUB_REPO||null,chromium:!!process.env.CHROMIUM_PATH,starter_template:true});
+    return json(res,200,{experiential:experiential.configured(),builder_provider:builderProvider(),ai_generation:ai,local_model:local,openrouter:!!process.env.OPENROUTER_API_KEY,github_publishing:!!(process.env.GITHUB_TOKEN&&process.env.GITHUB_REPO),repository:process.env.GITHUB_REPO||null,chromium:!!process.env.CHROMIUM_PATH,starter_template:true});
   }
   if(url==="/api/developer/oauth/providers"&&req.method==="GET"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{return json(res,200,{providers:require("./api-oauth").providers()})}catch(e){return json(res,422,{error:e.message})}}
   if(url==="/api/developer/oauth/start"&&req.method==="POST"){if(!authEnabled())return json(res,403,{error:"Set APP_PASSWORD before enabling shared OAuth connections."});if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{const body=await getBody(req,5000),flow=require("./api-oauth").start(String(body.provider||""));res.setHeader("Set-Cookie",flow.cookie);return json(res,200,{authorizationUrl:flow.url})}catch(e){return json(res,422,{error:e.message})}}
   if(url.startsWith("/api/developer/oauth/callback?")&&req.method==="GET"){const params=new URL(url,"https://kairoq.invalid").searchParams;try{if(params.has("error"))throw Error("Provider declined authorization");const state=parseCookies(req).kq_oauth_state||"";await require("./api-oauth").complete({state:params.get("state"),code:params.get("code"),cookie:state});res.writeHead(303,{"Location":"/api-studio.html","Set-Cookie":"kq_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/api/developer/oauth; Max-Age=0","Cache-Control":"no-store"});return res.end()}catch(e){return json(res,422,{error:e.message})}}
   if(url==="/api/developer/oauth/disconnect"&&req.method==="POST"){if(!authEnabled())return json(res,403,{error:"Set APP_PASSWORD before managing OAuth connections."});if(!isAuthenticated(req))return json(res,401,{error:"Authentication required"});try{const body=await getBody(req,5000);return json(res,200,require("./api-oauth").disconnect(String(body.provider||"")))}catch(e){return json(res,422,{error:e.message})}}
+  // Public APIs directory discovery is read-only and strictly separate from live execution.
+  if(req.method==="POST"&&url==="/api/developer/api/catalog"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{
+      const input=await getBody(req,2500),catalog=require("./api-catalog");
+      return json(res,200,{...catalog.search(String(input.query||""),{category:input.category||"",limit:input.limit??12}),
+        categories:catalog.categories(),stats:catalog.stats()});
+    }catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
+  if(req.method==="POST"&&url==="/api/developer/api/catalog/resolve"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const input=await getBody(req,500);return json(res,200,require("./api-catalog").find(input.id));}
+    catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
+  if(req.method==="POST"&&url==="/api/developer/api/analyze"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const input=await getBody(req,2200000);
+      return json(res,200,await require("./api-product-intake").analyze(input));}
+    catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
+  if(req.method==="POST"&&url==="/api/developer/api/prepare"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const input=await getBody(req,2200000);
+      return json(res,200,await require("./api-product-intake").prepare(input,{callModel:callDeveloperCodingModel}));}
+    catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
   if (req.method === "POST" && url === "/api/developer/api/discover"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000);return json(res,200,body.documentationUrl?await require("./api-docs").discover(body.documentationUrl):require("./api-docs").infer(body.documentationText));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/execute"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,await require("./api-adapter").execute(body));}catch(e){return json(res,422,{error:String(e.message||e)});}}
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/run'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,2200000);if(body.approved!==true)return json(res,403,{error:'Execution requires approval'});
+    const result=await require('./autonomy-engine').run(body);return json(res,200,result);
+   }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&(url==='/api/developer/api/autonomy/skills/learn'||url==='/api/developer/api/autonomy/skills/active')){
+    if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+    try{const body=await getBody(req,3000),skills=require('./api-skills-verified');
+      return json(res,200,url.endsWith('/learn')?await skills.learn(body):await skills.active(body));
+    }catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/history'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,2000);return json(res,200,{records:await require('./autonomy-store').history(body.projectId)});}
+   catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
+  if(req.method==='POST'&&url==='/api/developer/api/autonomy/skill/candidate'){
+   if(!authEnabled()||!isAuthenticated(req))return json(res,401,{error:'Authenticated workspace required'});
+   try{const body=await getBody(req,30000);return json(res,200,await require('./autonomy-engine').proposeSkill(body));}
+   catch(error){return json(res,422,{error:String(error.message||error).slice(0,300)});}
+  }
   if (req.method === "POST" && url === "/api/developer/api/diff"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,require("./api-evolution").diff(body.before,body.after));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if(req.method==="POST"&&url==="/api/developer/api/backend"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000),result=require("./api-backend").generate(body.apiPlan||body.apiSpec);return json(res,200,{filename:result.filename,operations:result.operations,archiveBase64:require("./project-portability").zip(result.files).toString("base64")});}catch(error){return json(res,422,{error:error.message});}}
   if(req.method==='POST'&&url==='/api/developer/plan'){if(!isAuthenticated(req))return json(res,401,{error:'Authentication required.'});try{const body=await getBody(req,2200000);if(String(body.brief||'').length<12||String(body.brief).length>6000)throw Error('Describe the product in 12–6000 characters');const planner=require('./product-orchestrator'),apiContract=planner.contract(body.apiPlan||body.apiSpec||(body.documentationUrl?await require('./api-docs').discover(body.documentationUrl):null)),plan=await planner.plan(callDeveloperCodingModel,{brief:body.brief,apiContract});return json(res,200,{plan,readiness:planner.readiness(plan,apiContract,'planned-app'),externalCalls:0});}catch(e){return json(res,422,{error:e.message});}}
@@ -6752,6 +7054,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/cloud/load") return handleCloudLoad(req, res);
   if (req.method === "POST" && url === "/api/cloud/save") return handleCloudSave(req, res);
   if (req.method === "POST" && url === "/api/memory/extract") return handleMemoryExtract(req, res);
+  if (req.method === "GET" && url === "/api/product-state") return json(res, 200, { state: loadProductState() });
+  if (req.method === "POST" && url === "/api/product-state") return handleProductStateSave(req, res);
   if (req.method === "GET" && url.startsWith("/api/loops")) return handleOpenLoopsList(req, res);
   if (req.method === "POST" && url === "/api/loops/create") return handleOpenLoopCreate(req, res);
   if (req.method === "POST" && url === "/api/loops/update") return handleOpenLoopUpdate(req, res);
@@ -6870,13 +7174,42 @@ if (process.env.NODE_ENV !== "test") {
   recoverMediaJobs();
   setTimeout(() => schedulerTick().catch(()=>{}), 5_000);
   setInterval(() => schedulerTick().catch(()=>{}), 60_000);
+  setInterval(() => reactBackend.runAllSchedules().catch(e=>console.warn("[create-schedules]",e.message)), 5*60_000).unref();
+  // Automations in generated apps: checked every minute so "at 09:00" means 09:00.
+  setInterval(() => reactBackend.runAllAutomations().catch(e=>console.warn("[create-automations]",e.message)), 60_000).unref();
+// The learning loop: once a day, judge Kairoq's build rules and propose new ones from repeated failures.
+setInterval(() => { require("./build-lessons").run({ callModel: callBuilderModel }).catch(() => {}); }, 3_600_000).unref?.();
+// Live hosting: renew monthly charges, warn, pause after the grace period, bring paid sites back.
+setInterval(() => { require("./hosting-billing").tick().catch(e => console.warn("[hosting-billing]", e.message)); }, 3_600_000).unref?.();
+// Web agent watches that are due (competitor prices and the like), checked hourly.
+setInterval(() => { require("./web-tasks").tick({ callModel: callBuilderModel }).catch(e => console.warn("[web-tasks]", e.message)); }, 3_600_000).unref?.();
+  const runBackup=()=>{try{const b=require("./create-backups").run();if(b.errors.length)console.warn("[create-backups]",b.errors.join("; "))}catch(e){console.warn("[create-backups]",e.message)}};
+  setTimeout(runBackup,10*60_000).unref();setInterval(runBackup,24*3600_000).unref();
+  // Live-app monitor: re-runs saved checks on every published app (KAIROQ_MONITOR_HOURS, 0 = off).
+  const monitorHours=Number(process.env.KAIROQ_MONITOR_HOURS??24);
+  // The live guard (live-guard.js) replaces the daily monitor: hourly by default, and it repairs,
+  // rolls back or calls a person (KAIROQ_GUARD_HOURS, 0 = off; KAIROQ_LIVE_GUARD=off for the old monitor).
+  const guardHours=Number(process.env.KAIROQ_GUARD_HOURS??1);
+  if(process.env.KAIROQ_LIVE_GUARD!=='off'&&guardHours>0){const local=u=>"http://127.0.0.1:"+PORT+u,runGuard=()=>require("./live-guard").guardAll({callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check(local(u),o),inspect:(u,o)=>require("./runtime-check").inspect(local(u),o),busy:createApi.busy,exclusive:createApi.exclusive}).catch(e=>console.warn("[live-guard]",e.message));setTimeout(runGuard,15*60_000).unref();setInterval(runGuard,guardHours*3600_000).unref();}
+  else if(monitorHours>0){const runMonitor=()=>require("./react-checks").monitorAll({inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[create-monitor]",e.message));setTimeout(runMonitor,20*60_000).unref();setInterval(runMonitor,monitorHours*3600_000).unref();}
+  // Growth watch: every few hours, runs the weekly AI-customer test and brief on published apps
+  // whose watch is due (KAIROQ_WATCH_CHECK_HOURS, 0 = off).
+  const watchHours=Number(process.env.KAIROQ_WATCH_CHECK_HOURS??6);
+  if(watchHours>0){const runWatch=()=>createApi.watchAll({callModel:callBuilderModel,browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o)}).catch(e=>console.warn("[growth-watch]",e.message));setTimeout(runWatch,30*60_000).unref();setInterval(runWatch,watchHours*3600_000).unref();}
+  // Pictures of the starter templates for the gallery, taken once per template version.
+  require("./project-thumbs").start();
+  setTimeout(()=>require("./template-thumbs").run({base:"http://127.0.0.1:"+PORT}).then(r=>{if(r.failed.length)console.warn("[template-thumbs]",r.failed.join("; "))}).catch(e=>console.warn("[template-thumbs]",e.message)),45_000).unref();
   require("./scripts/verify-builder-assets").startup().catch(e=>console.warn("[builder-assets] PROVIDER SMOKE ERROR "+e.message));
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);
     console.log(`Free Only defaults to ON.`);
-    console.log(authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
+    console.log(openAccessUntil() ? "Password protection: OPEN TO EVERYONE until "+new Date(openAccessUntil()).toISOString()+" (KAIROQ_OPEN_ACCESS_UNTIL)" : authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
+    {const sites=String(process.env.KAIROQ_SITES_DOMAIN||"").toLowerCase().replace(/^\.+|\.+$/g,"");let main="";try{main=new URL(process.env.KAIROQ_PUBLIC_URL||"").hostname}catch{}
+     const parent=h=>h.split(".").slice(-2).join(".");
+     if(sites&&main&&parent(sites)===parent(main))console.warn("WARNING: KAIROQ_SITES_DOMAIN ("+sites+") shares its parent domain with Kairoq ("+main+"). Use a separate domain for published apps; see docs/create.md.");}
     if (!APP_ENCRYPTION_KEY) console.warn("Warning: APP_ENCRYPTION_KEY is not set; persisted connector credentials are not encrypted at rest.");
     if(process.env.TRAVELLEZ_BENCHMARK==="true"&&experiential.configured())require("./travellez-benchmark").run(callDeveloperCodingModel).catch(e=>console.error("[travellez-benchmark] ERROR "+e.message));
+    if(process.env.GENERIC_RELEASE_PROOF)require("./generic-release-proof").run(callDeveloperCodingModel).catch(e=>console.error("[generic-proof] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true"&&experiential.configured())require("./journey-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[journey-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true"&&experiential.configured())require("./design-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[design-smoke] ERROR "+e.message));
     if(process.env.FULLSTACK_APP_SMOKE_TEST==="true")require("./release-smoke").run(callDeveloperCodingModel).catch(e=>console.error("[release-smoke] ERROR "+e.message));
@@ -6901,6 +7234,7 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
-  callDeveloperCodingModel, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
+  openAccessUntil, isAuthenticated,
+  callDeveloperCodingModel, callBuilderModel, callAppAi, parseDeveloperResponse, googleNewsSignals, resolveAutoModel, encryptJson, decryptJson, sanitizeAuditData, nextRunAt, safeWorkspacePath,
   DEFAULT_TOOL_PERMISSIONS, toolNeedsApproval, cleanModel, agentPersona, normalizeMediaProviderOrder, imageAspectRatio, pollinationsImageSize, generateImageSelfHost, generateVideoSelfHost, normalizeOpenLoop, openLoopPriorityScore, normalizeShopifyStorePlan, renderStorePreview, calculateStoreHealth, normalizeStoreExperiment, calculateCommerceFunnel, mediaProviderOrderForBudget, normalizeMediaJob, localSdConfigured, wan2gpConfigured, createXlsxWorkProduct, createDocxWorkProduct, createPptxWorkProduct, createPdfWorkProduct, createCsvWorkProduct, listWorkProducts, microsoftScopes, microsoftConfigured, microsoftSharePointConfigured, getLocalLlmModels, resolveLocalLlmModel, callFreeLlmText, freeFallbacks, likelyConsequentialMessage, pursuitScore, normalizePursuit, extractCompanyFromHeadline, normalizeArrivalBrief, arrivalFacts, renderArrivalBriefHtml
 };

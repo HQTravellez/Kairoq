@@ -1,5 +1,11 @@
 # Kairoq v16 — AI Sales Agent + AI Marketing Agent
 
+## Kairoq Create — build apps by chatting
+
+Open `/create`. Describe an app, and Kairoq writes a real React + Vite + Tailwind project, shows it in a live preview, and changes it as you chat. Every change is a saved version you can preview or restore. Publish in one click to `/sites/<name>/`, connect a custom domain, and sell credits to customers through Stripe. Setup and security details: [docs/create.md](docs/create.md).
+
+The app builder uses a paid coding model first when `KAIROQ_BUILDER_MODE=paid-first` and `KAIROQ_BUILDER_PAID_APPROVED=true`, capped by `KAIROQ_BUILDER_MONTHLY_LIMIT_USD` (default $100). The app-wide `DAILY_COST_LIMIT_USD` and `MONTHLY_COST_LIMIT_USD` also apply, so keep them above the builder cap. When the cap is reached it falls back to free models.
+
 Kairoq now surfaces two outcome-focused workers first, while keeping the existing Studio underneath.
 
 ## AI Sales Agent
@@ -1666,3 +1672,28 @@ Set GITHUB_TOKEN in Railway, with access to the selected repository. New private
 Endpoints: authenticated /api/developer/assets, /assets/search, /assets/download; /api/developer/github/status/ID, /github/push, /github/pull; /api/developer/export/ID. Only downloaded hash-addressed asset bytes are public under /builder-assets/.
 
 For a bounded real-provider check set KAIROQ_ASSET_SMOKE_TEST=true. One check per deployment SHA searches/downloads an image, sound and model and records [builder-assets] PROVIDER SMOKE in Railway logs. It does not regenerate apps or poll providers.
+
+### Automatic publication and retained generic release proof
+
+Build Studio's **After checks pass** selector can explicitly request automatic
+publication for a new app, website, revision or app repair. Preview-only remains
+the default. Automatic publication uses the same visual, functional, public-URL
+and rollback gates as manual launch; a failed release is never reported complete.
+The `auto_deploy: true` option is also accepted by authenticated builder routes.
+
+Set `GENERIC_RELEASE_PROOF` to a unique lowercase run ID (4–60 characters) for
+one bounded, real-model verification on server startup. It generates a fresh
+three-collection project-delivery app, verifies internal business success and
+rejection scenarios, deploys through normal public Chromium checks, introduces
+a deliberately failing **draft**, diagnoses and repairs it with the real model,
+then deploys and checks the repaired version. A separate synthetic saved record
+must survive the entire repair. No provider bookings, billing or purchases run.
+The working public release stays active while the faulty draft is repaired.
+
+Evidence is retained at `/generated/generic-proof/<run-id>/report.json`, with
+commit provenance and hash-checked before/after screenshots. These artifacts
+contain only synthetic verification data and are public; the generated app still
+requires its own login. A failed or interrupted run is not retried automatically
+on restart. Read the report, correct its blocker, and choose a new run ID when
+explicitly starting another attempt. Passing this scenario proves this build,
+not arbitrary applications, external OAuth providers or universal design quality.

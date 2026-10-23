@@ -1,0 +1,5 @@
+{
+  "collections": { "enquiries": { "access": "submit-only" } },
+  "email": true,
+  "ai": true
+}

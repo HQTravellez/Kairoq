@@ -1,0 +1,57 @@
+/* Chat composer toolbar: one icon set, flat pill selects (no box inside a box), one action button.
+   Loaded after styles.css and calm.css. */
+.composer .composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.composer .composer-tools{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
+.composer .kc-ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+.composer .tool-btn{width:34px;height:34px;display:grid;place-items:center;padding:0;border:0!important;border-radius:9px;background:transparent!important;color:#6f6a60!important;cursor:pointer;box-shadow:none!important}
+.composer .tool-btn:hover{background:#efece4!important;color:#292824!important}
+.composer .tool-btn.active{background:#f3e6df!important;color:var(--accent)!important}
+
+/* The selects: one quiet pill each, the wrapper draws nothing. */
+.composer .inline-select{display:flex;align-items:center;gap:0;height:auto;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;border-radius:0}
+.composer .inline-select select{appearance:none;-webkit-appearance:none;height:32px;max-width:190px;padding:0 28px 0 12px;border:1px solid #e3dfd5!important;border-radius:999px;background:#faf8f3 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2377736b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 10px center/14px!important;color:#3f3c36;font:500 12.5px/1 var(--font);cursor:pointer;box-shadow:none!important;text-overflow:ellipsis}
+.composer .inline-select select:hover{border-color:#cfc9bb!important;background-color:#fff!important}
+.composer .inline-select select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.composer .model-inline select{max-width:200px}
+.composer .star-btn{width:28px;height:28px;display:grid;place-items:center;margin-left:2px;padding:0;border:0!important;background:transparent!important;color:#a39d90;font-size:15px;line-height:1;cursor:pointer;border-radius:8px}
+.composer .star-btn:hover{color:#6f6a60;background:#efece4!important}
+.composer .star-btn.active{color:#c48a1a}
+
+/* The agent picker stays; the mascot next to it opened the same dialog, so it goes. */
+.composer .composer-mascot{display:none!important}
+.composer .agent-quick-btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid #e3dfd5!important;border-radius:999px;background:#faf8f3!important;color:#3f3c36!important;font:500 12.5px/1 var(--font);box-shadow:none!important;cursor:pointer}
+.composer .agent-quick-btn:hover{border-color:#cfc9bb!important;background:#fff!important}
+.composer #agentQuickGlyph{font-size:10px;color:var(--accent)}
+
+.composer .send-btn{width:38px;height:38px;display:grid;place-items:center;padding:0;border:0;border-radius:12px;background:var(--accent)!important;color:#fffaf3!important;box-shadow:none!important;cursor:pointer}
+.composer .send-btn .kc-ico{width:19px;height:19px;stroke-width:2.2}
+.composer .send-btn:hover{background:#a5553b!important}
+.composer .send-btn:disabled{opacity:.4;cursor:default}
+
+@media(max-width:760px){
+ .composer .inline-select.compact-inline{display:none}
+ .composer .model-inline select{max-width:150px}
+ .composer .agent-quick-btn #agentQuickName{display:none}
+}
+
+/* Top bar: two quiet view buttons, one status pill, the mode switch and settings. */
+.topbar .header-actions{display:flex;align-items:center;gap:6px}
+.topbar .topbar-chat-btn{height:32px;padding:0 12px;border:1px solid transparent!important;border-radius:999px;background:transparent!important;color:#5d5951!important;font:500 12.5px/1 var(--font);box-shadow:none!important;cursor:pointer}
+.topbar .topbar-chat-btn:hover{background:#efece4!important;color:#292824!important}
+.topbar .topbar-chat-btn.active{background:#292824!important;color:#fffaf3!important}
+.topbar #shellModeBtn{border-color:#e3dfd5!important}
+.topbar #zeroCostPill{display:none!important}
+.topbar #freePill{height:24px;display:inline-flex;align-items:center;padding:0 10px;border:1px solid #d9e7d4;border-radius:999px;background:#f1f7ee;color:#4c7a43;font:600 11px/1 var(--font);letter-spacing:0;text-transform:none}
+.topbar #settingsBtn{width:34px;height:34px;display:grid;place-items:center;padding:0;border:0!important;border-radius:9px;background:transparent!important;color:#6f6a60}
+.topbar #settingsBtn:hover{background:#efece4!important;color:#292824}
+.topbar .kc-ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:760px){.topbar #freePill,.topbar #studioNavBtn{display:none!important}.topbar .topbar-title{white-space:nowrap}}
+
+/* One row of essentials: attach, image, video, model, send. Reasoning level, purpose, favourite and agent picker
+   keep their defaults and stay reachable in Settings and the sidebar. */
+.composer #favoriteBtn,.composer .inline-select.compact-inline,.composer #agentQuickBtn,.composer #modelSearchBtn{display:none!important}
+
+/* Top bar: menu on the left, settings on the right, nothing else. */
+.topbar #studioNavBtn,.topbar #chatViewBtn,.topbar #shellModeBtn,.topbar #freePill,.topbar #zeroCostPill{display:none!important}
+.main[data-view=command] .topbar{background:transparent!important}
