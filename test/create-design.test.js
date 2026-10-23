@@ -149,7 +149,7 @@ test('design dialog: edit colours and fonts, new direction from the AI, add the 
 });
 
 test('skills: built-in library, your own skills, always-on, and import from GitHub',async()=>{
- assert.deepEqual(skills.builtin().map(s=>s.id),['accessibility','app-onboarding','app-screens','brand-from-logo','brutalist-style','craft-accessibility-baseline','craft-animation-discipline','craft-color','craft-floor','craft-form-validation','craft-laws-of-ux','craft-rtl-and-bidi','craft-state-coverage','craft-typography','craft-typography-hierarchy','craft-typography-hierarchy-editorial','dashboard','data-viz','diagrams','digital-guide','ecommerce','editorial','email-newsletter','event-flyer','faq-page','framer-motion','frontend-design','help-docs','human-crafted','illustration-icons','kanban-board','launch-deck','loyalty-rewards','luxury-hospitality','magazine-cover','marketplace','mobile-app','modern-css','modern-saas','monthly-report','pitch-deck','presentation-slides','pricing-page','printable-invoice','redesign','remotion-video','resume-portfolio','scroll-story','secure-app','social-carousel','social-dashboard','social-share-card','soft-minimal-style','staff-onboarding','team-goals','three-3d','three-product','waitlist-page','web-interface-guidelines','weekly-update']);
+ assert.deepEqual(skills.builtin().map(s=>s.id),['accessibility','app-onboarding','app-screens','brand-from-logo','brutalist-style','chakra-ui','craft-accessibility-baseline','craft-animation-discipline','craft-color','craft-floor','craft-form-validation','craft-laws-of-ux','craft-rtl-and-bidi','craft-state-coverage','craft-typography','craft-typography-hierarchy','craft-typography-hierarchy-editorial','dashboard','data-viz','diagrams','digital-guide','ecommerce','editorial','email-newsletter','engineering-feedback','event-flyer','faq-page','framer-motion','frontend-design','help-docs','human-crafted','illustration-icons','kanban-board','launch-deck','loyalty-rewards','luxury-hospitality','magazine-cover','marketplace','mobile-app','modern-css','modern-saas','monthly-report','pitch-deck','presentation-slides','pricing-page','printable-invoice','redesign','remotion-video','resume-portfolio','scroll-story','secure-app','social-carousel','social-dashboard','social-share-card','soft-minimal-style','staff-onboarding','team-goals','three-3d','three-product','ui-ux-pro-max','waitlist-page','web-interface-guidelines','weekly-update']);
  // Page types adapted from html-anything carry a group; the styles do not.
  assert.equal(skills.builtin().filter(s=>s.group==='Page types').length,25);
  for(const s of skills.builtin())assert.ok(s.name&&s.description.length>40&&s.body.length>1500,s.id);
@@ -162,7 +162,11 @@ test('skills: built-in library, your own skills, always-on, and import from GitH
  const pid=(await request(server,'POST','/api/create/projects',{headers:{cookie},body:{name:'Brand test'}})).json.project.id;
  assert.match(builder.knowledgeNote(builder.loadMeta(pid)),/### Skill: Our brand[\s\S]*pill buttons/);
  // Craft skills marked "default: on" reach every project until the owner turns them off.
- const note=builder.knowledgeNote(builder.loadMeta(pid));assert.match(note,/### Skill: Human-crafted/);assert.match(note,/### Skill: Frontend design \(Anthropic\)/);assert.match(note,/### Skill: Accessibility/);
+ const meta=builder.loadMeta(pid),skillNote=skills.promptNote(meta);
+ for(const skill of skills.active(meta))assert.ok(skillNote.includes('### Skill: '+skill.name+'\n'),'Active skill represented: '+skill.id);
+ assert.ok(skillNote.length<=26200,'Active skill guidance stays within its fixed prompt budget');
+ assert.ok(skillNote.indexOf('### Skill: Our brand')<skillNote.indexOf('### Skill: Accessibility'),'Owner guidance precedes built-in defaults');
+ const note=builder.knowledgeNote(meta);assert.match(note,/### Skill: Human-crafted/);assert.match(note,/### Skill: Frontend design \(Anthropic\)/);assert.match(note,/### Skill: Accessibility/);
  await request(server,'POST','/api/create/skills/default',{headers:{cookie},body:{id:'human-crafted',on:false}});
  assert.ok(!builder.knowledgeNote(builder.loadMeta(pid)).includes('### Skill: Human-crafted'));
  await request(server,'POST','/api/create/skills/default',{headers:{cookie},body:{id:'human-crafted',on:true}});

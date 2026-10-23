@@ -42,7 +42,7 @@ test("real CLI arguments are explicit, shell-free, output is verified by MP4 sig
  try{
   const exec=async(bin,args,opts)=>{
    seen.push({bin,args,opts});
-   assert.equal(opts.shell,false);assert.equal(opts.cwd,job.dir);
+   assert.equal(opts.shell,false);assert.equal(opts.cwd,fs.realpathSync(job.dir));
    if(args[0]==="render"){
     const b=Buffer.alloc(1536,0);b.write("ftyp",4,"ascii");fs.writeFileSync(job.output,b);
     return{stdout:"Rendered",stderr:""};

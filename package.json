@@ -8,7 +8,7 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "benchmark:verify": "node scripts/verify-benchmark.js",
-    "check": "node --check server.js && node --check public/app.js",
+    "check": "node --check server.js && node --check public/app.js && node --check public/app-platform-runtime.js && node --check public/app-components-runtime.js && node --check public/app-workflows-runtime.js",
     "higgsfield:seedance": "tsx index.ts",
     "eval:models": "node scripts/model-eval.js",
     "eval:judge": "node scripts/model-eval.js --judge-only"

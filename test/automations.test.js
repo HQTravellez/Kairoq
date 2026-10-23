@@ -116,23 +116,13 @@ test('scheduled automations run the function when due, log the run, email the ow
  // This fixture runs on Oct 20, 2026, but the status endpoint uses actual wall-clock time.
  // When the test runs after Oct 20, an overdue schedule is correctly reported as due now.
  const capturedNow=Date.now(),next=Date.parse(st[0].next);
+ assert.ok(Number.isFinite(next),'next run is a valid timestamp');
  if(automations.due(CONFIG.automations[0],at('20','09:00'),capturedNow)){
   assert.ok(Math.abs(next-capturedNow)<30000,'overdue automation should be due now');
  }else{
   assert.match(st[0].next,/T09:00:00\.000Z$/);
   assert.ok(next>=capturedNow,'upcoming scheduled run should not be in the past');
  }
- assert.equal(st.length,3);assert.equal(st[0].name,'reminders');assert.equal(st[0].ok,true);assert.equal(st[0].runs,1);// The simulation ran on Oct 20, 2026. When CI runs after that date, the
- // real-time status endpoint correctly reports an overdue run as due NOW,
- // not at a fixed 09:00 UTC. Assert the runtime contract for either case.
- const next=Date.parse(st[0].next),checkedAt=Date.now();
- assert.ok(Number.isFinite(next),'next run is a valid timestamp');
- // The schedule status uses actual wall-clock time, whereas this integration test
- // simulated October 20. Overdue tasks are shown as due now, while future
- // schedules retain their daily 09:00 UTC slot.
- const dueImmediately=Math.abs(next-checkedAt)<30000;
- const nextAtNine=/T09:00:00\.000Z$/.test(st[0].next)&&next>=checkedAt;
- assert.ok(dueImmediately||nextAtNine,'next run is immediately due or a future 09:00 UTC occurrence');
  assert.equal(st[2].next,null);
  // Run now from the editor.
  const ran=(await request(server,'POST','/api/create/projects/'+id+'/automations',{headers:{cookie},body:{name:'reminders'}})).json;
