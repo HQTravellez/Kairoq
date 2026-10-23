@@ -154,7 +154,12 @@ function parseImages(list){
 }
 // Summarizes the model's partial output for live display in the editor.
 function streamSnapshot(text,mode){
- if(mode==='discuss')return{text:text.slice(-6000)};
+ // Discuss streams plain text. A reply in the builder's JSON format shows only its message and
+ // plan, and the closing QUESTION line only its question, so the chat never shows code.
+ if(mode==='discuss'){
+  if(/^\s*(?:```(?:json)?\s*)?\{/.test(text)){const b=streamSnapshot(text,'build');return{text:[b.message,b.plan.map(x=>'- '+x).join('\n')].filter(Boolean).join('\n\n')}}
+  return{text:text.replace(/(^|\n)\s*QUESTION:\s*([^|\n]*)[^\n]*\s*$/i,(m,nl,q)=>nl+'\n'+q.trim()).slice(-6000)};
+ }
  const matches=[...text.matchAll(/"(src\/[^"\\]+\.(?:jsx|js|tsx|ts|css|json))"\s*:\s*"/g)];
  // Files changed by find/replace edits ("src/x.jsx":[{"find":…) are listed too.
  const edited=[...text.matchAll(/"(src\/[^"\\]+\.(?:jsx|js|tsx|ts|css|json))"\s*:\s*\[/g)].map(m=>m[1]);
@@ -222,6 +227,26 @@ function supportAnswer(meta){
 function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
  for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ // An answer to the builder's open question ("ok", "yes", an option or its number) builds with
+ // that answer, even from Discuss: the chat shows what the owner typed, the model gets a clear instruction.
+ let shownText;
+ if(!hooks&&(mode==='build'||mode==='discuss')){
+  const Q=require('./builder-question'),a=Q.answer(message,Q.pending(builder.loadMeta(id)));
+  if(a){shownText=String(message).trim();message=a.message;mode='build'}
+ }
+ // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
+ // build, no design pick), and a question that asks for no change gets an answer instead of a build.
+ if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&!shownText){
+  const S=require('./builder-smalltalk'),kind=S.smallTalk(message);
+  if(kind){
+   const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
+   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
+   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
+   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+   return job;
+  }
+  if(mode==='build'&&S.questionOnly(message)&&!supportQuestion(message))mode='discuss';
+ }
  if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&supportQuestion(message)){
   const meta=builder.loadMeta(id),answer=supportAnswer(meta);
   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
@@ -301,7 +326,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    else{
     const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
     const fast=quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
-    job.result=await builder.edit(id,message,{callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // The first build of a new project on Pro or Max gets a free design review.
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
@@ -314,6 +339,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    // can grant credits back (POST /api/create/admin/credits). The chat still says when a
    // change breaks a saved check or shows errors, so the customer can ask for a fix.
    if(research.sources.length&&job.result){job.result.sources=research.sources;const m=builder.loadMeta(id),lastMsg=m.messages.at(-1);if(lastMsg&&lastMsg.role==='assistant'){lastMsg.sources=research.sources;builder.saveMeta(m)}}
+   // Asking before building is free: a reply that only asks the owner a question costs nothing.
+   if(job.result&&job.result.question&&!job.refunded){job.free='A question before building is free.';if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: a question before building','refund:'+job.id)}catch{}job.refunded=true}
    // A change that still broke the app was not kept (the preview stays on the working version), so it is free.
    if(job.result&&job.result.rolled_back){job.rolled_back=job.result.rolled_back.kept;if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: the change was not kept','refund:'+job.id);job.refunded=true}catch{}}
    const problem=mode!=='discuss'&&job.result&&!job.result.unchanged&&!job.result.rolled_back&&((job.result.check_failures||[]).length?'checks':(job.result.runtime_errors||[]).length?'errors':null);
@@ -324,7 +351,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    // so there only browser errors make it free.
    const notWorking=hooks?problem==='errors':problem||(job.result&&job.result.unchanged);
    const unchanged=Boolean(job.result&&job.result.unchanged)&&!problem;
-   if(mode!=='discuss'&&payWhenWorks()&&notWorking&&(payMode()==='refund'||unchanged)){
+   if(mode!=='discuss'&&!job.refunded&&payWhenWorks()&&notWorking&&(payMode()==='refund'||unchanged)){
     // Refund mode (or a change that changed nothing): the change itself is free.
     job.free=problem==='checks'?'This change broke a saved check, so it was free.':problem==='errors'?'This change still shows errors in the browser, so it was free.':'Nothing changed, so it was free.';
     if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: the change did not work','refund:'+job.id);job.refunded=true}catch{}
@@ -1007,6 +1034,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const b=await readJson(req,16000000);
    // A sponsored template slot: what to start with comes from the slot, not the request.
    const slot=b.sponsored?require('./partners').startFromSlot(String(b.sponsored)):null;
+   // A greeting is not an app: "hi" never becomes a project named "hi".
+   const asked=String(b.prompt||b.name||'').trim();
+   if(!slot&&!b.template&&asked&&require('./builder-smalltalk').smallTalk(asked))return send(res,422,{error:'That reads like a greeting, not an app. Describe what to build, for example "a booking page for my yoga studio".'}),true;
    const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.answers?require('./clarify').withAnswers(b.prompt,b.answers):b.prompt,template:b.template,tier:b.tier,engine:b.engine==='opencode'?'opencode':undefined,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
