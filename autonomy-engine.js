@@ -12,7 +12,6 @@ const sdk=require('./api-sdk');
 const store=require('./autonomy-store');
 
 function contractFor(input){const plan=input?.operations?input:api.learn(input);if(!Array.isArray(plan.operations)||!plan.operations.length)throw Error('Documented operations required');if(plan.format==='unstructured')throw Error('Formal API specification required for live execution');return plan;}
-function redact(value){return validation.sanitize(value).toString===String.prototype.toString&&typeof value==='string'?'[redacted]':validation.sanitize(value);}
 function statusCodes(op){return op.successCodes?.length?op.successCodes.map(Number):[200,201,202,204];}
 function assess(op,result){
  const expected=statusCodes(op),validStatus=expected.includes(result.status),schema=op.responseSchemas?.[String(result.status)];
@@ -22,7 +21,7 @@ function assess(op,result){
 }
 function summaryFrom({plan,operation,assessment,attempts,response,durationMs}){
  // Deliberately retain no request bodies, response bodies, authorization headers or token values.
- return {operationId:operation.id,method:operation.method,path:operation.path,baseHost:new URL(plan.baseUrl).hostname,assessment,attempts,durationMs,responseDigest:crypto.createHash('sha256').update(JSON.stringify(response.data)).digest('hex'),responseBytes:Buffer.byteLength(JSON.stringify(response.data)),recordedAt:new Date().toISOString()};
+ return {operationId:operation.id,method:operation.method,path:operation.path,baseHost:new URL(plan.baseUrl).hostname,assessment,attempts,durationMs,responseDigest:crypto.createHash('sha256').update(JSON.stringify(response.data??null)).digest('hex'),responseBytes:Buffer.byteLength(JSON.stringify(response.data??null)),recordedAt:new Date().toISOString()};
 }
 function assertInput(input){
  if(!input||typeof input!=='object'||!input.projectId||!input.operationId)throw Error('projectId and operationId required');
@@ -80,7 +79,8 @@ async function proposeSkill({projectId,skillId,runResults},persistence=store){
  if(!Array.isArray(runResults)||!runResults.length)throw Error('Evidence required');
  if(!/^[a-zA-Z0-9_-]{1,80}$/.test(skillId||''))throw Error('Invalid skill ID');
  const history=await persistence.history(projectId),previous=history.filter(x=>x.type==='skill-candidate'&&x.skillId===skillId);
- const success=runResults.filter(x=>x.passed&&x.evidence?.responseDigest).length;
+ const verified=new Set(history.filter(x=>x.type==='api-execution'&&x.passed).map(x=>x.responseDigest));
+ const success=runResults.filter(x=>x.passed&&x.evidence?.responseDigest&&verified.has(x.evidence.responseDigest)).length;
  const revision={type:'skill-candidate',skillId,version:previous.length+1,evidenceCount:runResults.length,success,requiresIndependentBenchmark:true,status:'candidate',createdAt:new Date().toISOString()};
  await persistence.append(projectId,revision);
  return revision;
