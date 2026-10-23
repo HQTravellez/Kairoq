@@ -13,5 +13,11 @@ test('trusted platform panel mounts before a generated page footer', {skip:!fs.e
   assert.equal(await page.locator('#kq-platform-controls').count(),1);
   await page.evaluate(()=>window.KairoqPlatform.initialize({collections:[]},{}));
   assert.equal(await page.locator('#kq-platform-controls').count(),1,'reinitialization must not duplicate the panel');
+  await page.setContent('<div id="app-view"><main><div data-kq-platform-slot></div></main><footer>Page footer</footer></div>');
+  await page.evaluate(()=>window.KairoqPlatform.initialize({collections:[]},{}));
+  assert.equal(await page.locator('[data-kq-platform-slot] > #kq-platform-controls').count(),1,'explicit platform slots are preserved');
+  await page.setContent('<div id="app-view"><main><h1>Workspace</h1><div role="contentinfo">Nested footer</div></main></div>');
+  await page.evaluate(()=>window.KairoqPlatform.initialize({collections:[]},{}));
+  assert.deepEqual(await page.locator('#app-view main > *').evaluateAll(nodes=>nodes.map(n=>n.tagName.toLowerCase())),['h1','section','div']);
  }finally{await browser.close();}
 });
