@@ -165,7 +165,15 @@ test('record-triggered automations run after a create, cannot start themselves, 
  assert.equal(JSON.parse(sdb.prepare('SELECT data FROM records WHERE id=?').get(t.json.item.id).data).welcomed,true,'ran on the test copy');
  assert.equal(db.prepare("SELECT COUNT(*) n FROM records WHERE collection='bookings'").get().n,1,'the real data has only Ben');
  assert.equal(db.prepare("SELECT COUNT(*) n FROM records WHERE collection='notes'").get().n,1);
- assert.ok(applog.list(id).some(l=>l.source==='automation welcome'&&/\(test copy\)/.test(l.message)));
+ // Sandbox database writes can complete before the asynchronous automation writes
+ // its audit log. Wait for the log itself rather than asserting it synchronously.
+ let sandboxLogFound=false;
+ for(let i=0;i<60;i++){
+  sandboxLogFound=applog.list(id).some(l=>l.source==='automation welcome'&&/\\(test copy\\)/.test(l.message));
+  if(sandboxLogFound)break;
+  await wait(50);
+ }
+ assert.ok(sandboxLogFound,'sandbox automation emits a test-copy audit log');
  // Run now on the test copy, as the agent does.
  const r=await automations.runNow(id,'reminders',{sb:{dir:box.dir,token:box.token},version:meta.current_version});
  assert.equal(r.result,'ok 200 {"reminded":2}','sees the two bookings on the test copy');
