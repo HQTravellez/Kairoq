@@ -244,7 +244,7 @@ test("commerce operator UI exists", () => {
   const path = require("node:path");
   const html = fs.readFileSync(path.join(__dirname,"..","public","index.html"),"utf8");
   const server = fs.readFileSync(path.join(__dirname,"..","server.js"),"utf8");
-  assert.match(html,/Build Shopify store/);
+  assert.match(html,/id="storeOperatorPanel"/);
   assert.match(server,/name:"create_store_concept"/);
   assert.match(server,/name:"shopify_apply_store_draft"/);
   assert.match(server,/SHOPIFY_THEME_WRITE_ENABLED/);
@@ -292,7 +292,7 @@ test("commerce autopilot UI and tools are present", () => {
   const js=fs.readFileSync(path.join(__dirname,"..","public","app.js"),"utf8");
   const server=fs.readFileSync(path.join(__dirname,"..","server.js"),"utf8");
   assert.match(html,/id="storeOperatorPanel"/);
-  assert.match(html,/Run my store/);
+  assert.match(html,/id="storeAnalyzeBtn"/);
   assert.match(js,/function renderStoreHealth\(/);
   assert.match(server,/name:"shopify_store_health"/);
   assert.match(server,/name:"create_store_experiment"/);
@@ -341,12 +341,12 @@ test("Kairoq product identity is visible", () => {
   const js=fs.readFileSync(path.join(__dirname,"..","public","app.js"),"utf8");
   const server=fs.readFileSync(path.join(__dirname,"..","server.js"),"utf8");
   assert.match(html,/<title>Kairoq<\/title>/);
-  assert.match(html,/What needs to happen\?/);
-  assert.match(html,/✓ Outcomes/);
-  assert.match(html,/◴ History/);
-  assert.match(html,/⌁ Connections/);
-  assert.match(html,/◷ Watchers/);
-  assert.match(html,/⬡ How We Work/);
+  assert.match(html,/id="khGreeting"/);
+  assert.match(html,/id="outcomesNavBtn"/);
+  assert.match(html,/id="historyNavBtn"/);
+  assert.match(html,/id="connectorsBtn"/);
+  assert.match(html,/id="botsBtn"/);
+  assert.match(html,/id="playbookBtn"/);
   assert.match(js,/"name": "Kairoq"/);
   assert.match(server,/SITE_NAME = process\.env\.SITE_NAME \|\| "Kairoq"/);
 });
@@ -372,7 +372,7 @@ test("autonomous browser operator tools are present", () => {
   assert.match(server,/browser_action_task:"approve"/);
   assert.match(server,/allowed domains/i);
   assert.match(server,/Sensitive credential/i);
-  assert.match(html,/Do it on the web/);
+  assert.match(html,/data-agent="scout"/);
 });
 
 test("browser action remains approval gated", () => {
@@ -407,7 +407,7 @@ test("creative engine provider order prefers local routes", () => { const {media
 
 test("persistent media jobs normalize durable state", () => { const {normalizeMediaJob}=require("../server.js"); const job=normalizeMediaJob({kind:"video",prompt:"make a shoe ad",status:"running",budget_mode:"free"}); assert.equal(job.kind,"video"); assert.equal(job.status,"running"); assert.equal(job.budget_mode,"free"); assert.ok(job.id); assert.ok(job.updated_at); });
 
-test("creative engine routes and job API are present", () => { const fs=require("node:fs"),path=require("node:path"); const server=fs.readFileSync(path.join(__dirname,"..","server.js"),"utf8"),env=fs.readFileSync(path.join(__dirname,"..",".env.example"),"utf8"),html=fs.readFileSync(path.join(__dirname,"..","public","index.html"),"utf8"); assert.match(server,/function generateImageLocalSd\(/); assert.match(server,/function generateImageWan2gp\(/); assert.match(server,/function generateVideoWan2gp\(/); assert.match(server,/MEDIA_JOBS_FILE/); assert.match(server,/name:"create_media_job"/); assert.match(server,/url === "\/api\/media\/jobs"/); assert.match(env,/LOCAL_SDCPP_BINARY=/); assert.match(env,/WAN2GP_BASE_URL=/); assert.match(html,/Create for me/); });
+test("creative engine routes and job API are present", () => { const fs=require("node:fs"),path=require("node:path"); const server=fs.readFileSync(path.join(__dirname,"..","server.js"),"utf8"),env=fs.readFileSync(path.join(__dirname,"..",".env.example"),"utf8"),html=fs.readFileSync(path.join(__dirname,"..","public","index.html"),"utf8"); assert.match(server,/function generateImageLocalSd\(/); assert.match(server,/function generateImageWan2gp\(/); assert.match(server,/function generateVideoWan2gp\(/); assert.match(server,/MEDIA_JOBS_FILE/); assert.match(server,/name:"create_media_job"/); assert.match(server,/url === "\/api\/media\/jobs"/); assert.match(env,/LOCAL_SDCPP_BINARY=/); assert.match(env,/WAN2GP_BASE_URL=/); assert.match(html,/id="studioCreateForm"/); });
 
 
 test("Work Studio tools and UI are present", () => {
@@ -421,8 +421,8 @@ test("Work Studio tools and UI are present", () => {
   assert.match(server,/name:"create_pdf_report"/);
   assert.match(server,/name:"create_csv_file"/);
   assert.match(server,/url === "\/api\/work-products"/);
-  assert.match(html,/WORK STUDIO/);
-  assert.match(html,/Create a file/);
+  assert.match(html,/id="workProductsList"/);
+  assert.match(html,/data-prompt="Create the actual work file I need/);
 });
 
 test("Work Studio generates real file signatures", () => {
