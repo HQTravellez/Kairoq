@@ -66,7 +66,7 @@ const PERMISSIONS_FILE = path.join(__dirname, "workspace", ".tool-permissions.js
 const USAGE_FILE = path.join(__dirname, "workspace", ".usage-ledger.jsonl");
 const DEAD_LETTER_FILE = path.join(__dirname, "workspace", ".dead-letter.json");
 const PLAYBOOK_FILE = path.join(__dirname, "workspace", ".company-playbook.json");
-const PRODUCT_STATE_FILE = path.join(__dirname, "workspace", ".product-state.json");
+const PRODUCT_STATE_FILE = process.env.PRODUCT_STATE_FILE || path.join(__dirname, "workspace", ".product-state.json");
 const OPEN_LOOPS_FILE = path.join(__dirname, "workspace", ".open-loops.json");
 
 const TOURS_FILE = path.join(__dirname, "workspace", ".studio-tours.json");
@@ -909,6 +909,34 @@ function readJsonFileSafe(file, fallback) {
 function writeJsonFileSafe(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(value, null, 2), "utf8");
+}
+
+// Product state is the small settings object the web app keeps per workspace: onboarding,
+// demo mode, vertical mode and workflow cards. The browser keeps its own copy and merges ours in.
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function loadProductState() {
+  const state = readJsonFileSafe(PRODUCT_STATE_FILE, {});
+  return isPlainObject(state) ? state : {};
+}
+
+function saveProductState(patch) {
+  const next = { ...loadProductState(), ...patch, updated_at: new Date().toISOString() };
+  if (Array.isArray(next.workflow_cards)) next.workflow_cards = next.workflow_cards.slice(0, 100);
+  writeJsonFileSafe(PRODUCT_STATE_FILE, next);
+  return next;
+}
+
+async function handleProductStateSave(req, res) {
+  try {
+    const body = await getBody(req, 1_000_000);
+    if (!isPlainObject(body.state)) return json(res, 400, { error: "Expected a JSON body with a state object." });
+    return json(res, 200, { ok: true, state: saveProductState(body.state) });
+  } catch (err) {
+    return json(res, 400, { error: err.message || "Could not save product state." });
+  }
 }
 
 
@@ -7026,6 +7054,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/cloud/load") return handleCloudLoad(req, res);
   if (req.method === "POST" && url === "/api/cloud/save") return handleCloudSave(req, res);
   if (req.method === "POST" && url === "/api/memory/extract") return handleMemoryExtract(req, res);
+  if (req.method === "GET" && url === "/api/product-state") return json(res, 200, { state: loadProductState() });
+  if (req.method === "POST" && url === "/api/product-state") return handleProductStateSave(req, res);
   if (req.method === "GET" && url.startsWith("/api/loops")) return handleOpenLoopsList(req, res);
   if (req.method === "POST" && url === "/api/loops/create") return handleOpenLoopCreate(req, res);
   if (req.method === "POST" && url === "/api/loops/update") return handleOpenLoopUpdate(req, res);
