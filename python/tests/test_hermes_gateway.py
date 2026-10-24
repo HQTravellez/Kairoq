@@ -4,6 +4,8 @@ import os
 import pathlib
 import unittest
 from unittest import mock
+import sys
+import types
 
 PATH = pathlib.Path(__file__).resolve().parents[1] / "hermes_gateway.py"
 spec = importlib.util.spec_from_file_location("kairoq_hermes_gateway", PATH)
@@ -38,6 +40,19 @@ class HermesGatewayTests(unittest.TestCase):
         # Operator may explicitly enable audited Hermes toolsets later.
         self.assertNotIn("terminal", module.TOOLSETS)
         self.assertNotIn("shell", module.TOOLSETS)
+
+    def test_upstream_hermes_final_response_is_displayed(self):
+        class FakeAgent:
+            def __init__(self, **kwargs):
+                self.options = kwargs
+            def run_conversation(self, prompt):
+                self.last_prompt = prompt
+                return {"completed": True, "final_response": "Hello from Hermes", "messages": []}
+        with mock.patch.object(module, "configured", return_value=True), \
+             mock.patch.object(module, "TOKEN", "test-token"), \
+             mock.patch.dict(sys.modules, {"run_agent": types.SimpleNamespace(AIAgent=FakeAgent)}):
+            answer = module.generate([{"role": "user", "content": "Hi"}], "conversation-1")
+            self.assertEqual(answer, "Hello from Hermes")
 
     def test_iteration_cap_is_bounded(self):
         self.assertGreaterEqual(module.MAX_ITERATIONS, 1)
