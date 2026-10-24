@@ -6666,6 +6666,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
       onFallback?.(err);opts=rest;
     }
   }
+  if(opts.tier==="chat")return callOpenRouterBuilder(opts,parse);
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   return callOpenRouterBuilder(opts,parse);
 }
@@ -6685,14 +6686,14 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   if((opts.tier==="pro"||opts.tier==="vision")&&!allowPaid)throw Error("Pro and image models need KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left this month."+(errors.length?" "+errors.join(" | "):""));
   const maxCandidates=String(process.env.KAIROQ_MAX_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
   if(opts.tier==="max"&&(!allowPaid||!maxCandidates.length))throw Error("The Max tier needs KAIROQ_MAX_MODELS, KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left.");
-  const ordered=opts.tier==="max"?[...maxCandidates,...proCandidates]:opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
+  const ordered=opts.tier==="chat"?freeCandidates:opts.tier==="max"?[...maxCandidates,...proCandidates]:opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
   // Design work (the design brief and the screenshot review) can go to a stronger model
   // (KAIROQ_DESIGN_MODELS, e.g. Fable) first, whatever tier wrote the code.
   const designFirst=opts.design&&allowPaid?String(process.env.KAIROQ_DESIGN_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean):[];
   // Small, clear edits on the Standard tier ("make the button blue") go to a fast model first
   // (KAIROQ_FAST_MODELS); the usual models follow if it fails.
   const fastFirst=opts.fast&&allowPaid&&(!opts.tier||opts.tier==="standard")?String(process.env.KAIROQ_FAST_MODELS??"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):[];
-  const models=opts.only?[opts.only]:[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  const models=opts.only?[opts.only]:opts.tier==="chat"?freeCandidates.filter((m,i,a)=>m&&a.indexOf(m)===i):[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
   for(const model of models){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";

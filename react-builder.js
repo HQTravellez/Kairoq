@@ -422,7 +422,7 @@ function lightMessages(list){
   return{...m,...(m.thinking?{thinking:keep?m.thinking.slice(0,keep):''}:{}),...(m.timeline?{timeline:m.timeline.map(e=>e.t==='think'&&e.text?{...e,text:keep?e.text.slice(0,keep):''}:e)}:{})};
  });
 }
-function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.versions,messages:lightMessages(m.messages.slice(-100)),domains:m.domains,files:m.current_version?Object.keys(loadFiles(id,m.current_version)).sort():[]}}
+function detail(id){const m=loadMeta(id);return{...summary(m),versions:m.versions,messages:lightMessages(m.messages.slice(-500)),domains:m.domains,files:m.current_version?Object.keys(loadFiles(id,m.current_version)).sort():[]}}
 function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_version);if(!Object.hasOwn(files,name))throw Object.assign(Error('Unknown file'),{status:404});return files[name]}
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
@@ -432,7 +432,7 @@ function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
 }
-function historyMessages(meta){return meta.messages.filter(m=>m.text).slice(-10).map(m=>({role:m.role==='user'?'user':'assistant',content:require('./builder-question').historyText(m)}))}
+function historyMessages(meta){return meta.messages.filter(m=>m.text&&['user','assistant'].includes(m.role)).slice(-20).map(m=>({role:m.role,content:require('./builder-question').historyText(m)}))}
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
@@ -733,11 +733,16 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  const text=String(question||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Ask a question or describe an idea'),{status:400});
  const files=meta.current_version?loadFiles(id,meta.current_version):template(meta.name);
- const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Current project files:\n\n'+contextFiles(files,90000)+(context?'\n\n'+context:'')+'\n\nMessage: '+text,images)}];
- const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:3000,signal,tier,onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
+ // Ordinary questions need a project summary, not every source file and a coding-scale output.
+ const codeQuestion=/\b(source|code|file|function|component|route|import|bug|error|camera|scanner|database|auth|implement|where is|why does)\b/i.test(text);
+ const codeContext=codeQuestion?contextFiles(files,24000):require('./project-memory').note(meta,files);
+ const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+'\n\nMessage: '+text,images)}];
+ // Save what the owner said before inference, so failed model calls cannot make it vanish.
+ addMessages(id,[{role:'user',text,mode:'discuss'}]);
+ const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:1200,signal,tier:'chat',onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
  const Q=require('./builder-question'),{text:said,question:asked}=Q.fromText(answer);
  const shown=Q.display(said,asked);
- addMessages(id,[{role:'user',text,mode:'discuss'},{role:'assistant',text:shown,mode:'discuss',...(asked?{question:asked}:{})}]);
+ addMessages(id,[{role:'assistant',text:shown,mode:'discuss',...(asked?{question:asked}:{})}]);
  return{message:shown,...(asked?{question:asked}:{})};
 }
 
