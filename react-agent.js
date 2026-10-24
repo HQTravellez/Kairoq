@@ -70,6 +70,8 @@ function htmlToText(html){
 }
 function describe(a){
  const t=a.tool;
+ if(t==='list_capabilities')return'Looked up Kairoq capabilities';
+ if(t==='inspect_api_docs')return'Inspected API documentation at '+String(a.url||'').slice(0,80);
  if(t==='read_files')return'Read '+(Array.isArray(a.paths)?a.paths.slice(0,8).join(', '):'files');
  if(t==='search')return'Searched for "'+String(a.query||'').slice(0,60)+'"';
  if(t==='write_files'){const n=Object.keys(a.files||{});const d=Array.isArray(a.delete)?a.delete:[];return'Wrote '+(n.length?n.join(', '):'nothing')+(d.length?'; deleted '+d.join(', '):'')}
