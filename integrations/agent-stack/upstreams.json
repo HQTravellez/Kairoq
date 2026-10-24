@@ -1,4 +1,7 @@
 {
   "ecc": {"repository":"affaan-m/ECC","commit":"90606c8315ee09cafc303515c5f33024db6b9882","license":"MIT","mode":"existing local concept adaptation"},
-  "mem0": {"repository":"mem0ai/mem0","commit":"2c81af3bbe27d9bccb09c772d583df9e9be72ee5","license":"Apache-2.0","mode":"self-hosted REST adapter"}
+  "understand-anything": {"repository":"Egonex-AI/Understand-Anything","commit":"e24fcf6d371bcfa529bc110bacb1bb43de1b8d33","license":"MIT","mode":"graph schema interchange"},
+  "ruflo": {"repository":"ruvnet/ruflo","commit":"2bc73c0994d8b0f2eedbdda66ccbbc60ac0eb5fc","license":"MIT","package":"ruflo@3.60.1","mode":"MCP capability discovery only"},
+  "mem0": {"repository":"mem0ai/mem0","commit":"2c81af3bbe27d9bccb09c772d583df9e9be72ee5","license":"Apache-2.0","mode":"self-hosted REST adapter"},
+  "autoharness": {"repository":"tigerless-labs/autoharness","commit":"c0aef3f2a80108ddbafce9eb8f8ac15d7a407dfc","license":"MIT","mode":"inert stage_skill create-intent import"}
 }

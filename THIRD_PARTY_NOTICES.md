@@ -82,7 +82,10 @@ the following projects without vendoring their implementation or automatically
 installing their hooks. Reviewed source commits are in `upstreams.json`.
 
 - ECC — https://github.com/affaan-m/ECC — MIT; existing scoped-recall concept adaptation.
+- Understand-Anything — https://github.com/Egonex-AI/Understand-Anything — MIT; graph-format interoperability.
+- Ruflo — https://github.com/ruvnet/ruflo — MIT; optional independently installed MCP server.
 - Mem0 — https://github.com/mem0ai/mem0 — Apache-2.0; optional independently operated OSS REST service.
+- AutoHarness — https://github.com/tigerless-labs/autoharness — MIT; staged create-intent interoperability.
 
 Upstream binaries/services carry their own dependencies, licenses and operational
 requirements. API/schema compatibility and offline tests do not establish production readiness.
