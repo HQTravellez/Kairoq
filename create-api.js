@@ -1081,7 +1081,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   const id=pm[1],action=pm[2]||'';
   const {role}=ownedProject(v,id,NEED[method+':'+action]||'owner');
   const projectView=(pid,r=role)=>projectViewFor(pid,r);
-  if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null}),true;
+  if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null,active_job:(()=>{const j=[...jobs.values()].find(j=>j.projectId===id&&ACTIVE.has(j.status));return j?publicJob(j):null})()}),true;
   // The app's picture for its card (project-thumbs.js).
   if(action==='/thumb'&&method==='GET'){const jpg=require('./project-thumbs').read(id);if(!jpg)return send(res,404,{error:'No picture yet'}),true;res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'private, max-age=86400','X-Content-Type-Options':'nosniff'});res.end(jpg);return true}
   // What the AI always knows about this project (project-memory.js).
