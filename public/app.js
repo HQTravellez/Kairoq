@@ -1074,31 +1074,41 @@ function option(value,label){
 }
 
 function fillModelSelect(){
-  // Keep the primary picker small. The existing searchable model dialog remains
-  // available for advanced users and retains full model selection.
   const previous=ui.lastModel||"openrouter/free";
   modelSelect.replaceChildren();
-  const local=allModels.filter(m=>m.local&&m.id!=="local/auto");
-  if(local.length)modelSelect.appendChild(option("local/auto","◉ Ollama Auto · Local"));
   modelSelect.appendChild(option("openrouter/free","⚡ Free Auto"));
   modelSelect.appendChild(option("smart-auto","✦ Smart Auto"));
-  if(local.length){
-    const g=document.createElement("optgroup");g.label="Ollama · on your server";
-    local.forEach(m=>g.appendChild(option(m.id,cleanText(m.name))));
-    modelSelect.appendChild(g);
-  }
-  const fav=allModels.filter(m=>favorites.includes(m.id)).slice(0,8);
-  if(fav.length){
-    const group=document.createElement("optgroup");group.label="★ Favorites";
-    for(const m of fav)group.appendChild(option(m.id,cleanText(m.name)));
-    modelSelect.appendChild(group);
-  }
-  // Preserve previously selected advanced models without showing hundreds of options.
-  if(previous!=="openrouter/free"&&previous!=="smart-auto"&&![...modelSelect.options].some(x=>x.value===previous)){
-    const chosen=allModels.find(m=>m.id===previous);
-    if(chosen)modelSelect.appendChild(option(previous,cleanText(chosen.name)));
+
+  const visible=allModels.filter(m=>m&&m.id&&m.id!=="openrouter/free"&&m.id!=="smart-auto");
+  const seen=new Set(["openrouter/free","smart-auto"]);
+  const addGroup=(label,items,limit)=>{
+    const group=document.createElement("optgroup");group.label=label;
+    for(const m of items){
+      if(group.children.length>=limit)break;
+      if(seen.has(m.id))continue;
+      seen.add(m.id);
+      group.appendChild(option(m.id,cleanText(m.name||m.id)+(m.isFree?" · FREE":"")));
+    }
+    if(group.children.length)modelSelect.appendChild(group);
+  };
+  const local=visible.filter(m=>m.local&&m.id!=="local/auto");
+  if(local.length)addGroup("Ollama · Local",[
+    {id:"local/auto",name:"Ollama Auto",isFree:true},...local],16);
+  const free=visible.filter(m=>m.isFree&&!m.local);
+  // Show the actual free model catalog instead of hiding everything in a dialog.
+  addGroup("Free cloud models",free,25);
+  addGroup("Hermes · Python",visible.filter(m=>m.id.startsWith("python/")),10);
+  addGroup("★ Favorites",visible.filter(m=>favorites.includes(m.id)),16);
+  // Paid models stay in the searchable model dialog unless previously selected.
+  if(!seen.has(previous)){
+    const chosen=visible.find(m=>m.id===previous);
+    if(chosen)addGroup("Previously selected",[chosen],1);
   }
   modelSelect.value=[...modelSelect.options].some(x=>x.value===previous)?previous:"openrouter/free";
+  if(freeOnlyEl.checked){
+    const selected=visible.find(m=>m.id===modelSelect.value);
+    if(selected&&!selected.isFree)modelSelect.value="openrouter/free";
+  }
   updateModelUI();
 }
 
@@ -1609,7 +1619,7 @@ async function generateImageFromPrompt(raw){
     contentEl.innerHTML=renderMarkdown(md);bindCodeButtons(contentEl);
     const finalMsg={role:"assistant",content:md,model:data.model||"media/image",usage:data.usage||{cost:null}};
     chat.messages.push(finalMsg);
-    addAnswerBadge(box,`${data.provider||"Media"} · ${finalMsg.model}`,finalMsg.usage);
+
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory?.();loadWorkflowCards?.();
     setMascotState?.("success");
@@ -1659,7 +1669,7 @@ async function generateVideoFromPrompt(raw){
     contentEl.innerHTML=renderMarkdown(md);bindCodeButtons(contentEl);
     const finalMsg={role:"assistant",content:md,model:data.model||"media/video",usage:{cost:null}};
     chat.messages.push(finalMsg);
-    addAnswerBadge(box,`${data.provider||"Media"} · ${finalMsg.model}`,finalMsg.usage);
+
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory?.();loadWorkflowCards?.();
     setMascotState?.("success");
@@ -1743,6 +1753,7 @@ async function send(regenerateFrom=null){
       signal:abortController.signal,
       body:JSON.stringify({
         model:modelSelect.value||"openrouter/free",
+        conversationId:String(currentChatId||"default"),
         messages:outgoing,
         systemPrompt:settings.systemPrompt||"",
         temperature:Number(settings.temperature??0.7),
@@ -1795,7 +1806,7 @@ async function send(regenerateFrom=null){
 
     const finalMsg={role:"assistant",content:text,model:finalModel||modelSelect.value,usage};
     chat.messages.push(finalMsg);
-    addAnswerBadge(box,finalMsg.model,usage);
+
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory();loadUsage();
 

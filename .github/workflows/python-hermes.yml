@@ -1,0 +1,50 @@
+name: Python Hermes Migration Checks
+on:
+  pull_request:
+    paths:
+      - 'python/**'
+      - 'Dockerfile.hermes-python'
+      - 'server.js'
+      - 'public/app.js'
+      - '.github/workflows/python-hermes.yml'
+  workflow_dispatch:
+jobs:
+  gateway-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Python syntax
+        run: python -m compileall -q python/
+      - name: Gateway contract tests (no model keys)
+        run: python -m unittest discover -s python/tests -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node and frontend syntax
+        run: |
+          node --check server.js
+          node --check public/app.js
+
+  hermes-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the pinned complete Hermes Python image
+        run: docker build --progress=plain -f Dockerfile.hermes-python -t kairoq-hermes-ci .
+      - name: Start isolated Hermes gateway and verify health
+        run: |
+          docker run -d --rm --name kairoq-hermes-ci -e KAIROQ_PYTHON_AGENT_TOKEN=ci-only-strong-token -p 127.0.0.1:18090:8090 kairoq-hermes-ci
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18090/health > /tmp/hermes-health.json; then break; fi
+            sleep 2
+          done
+          cat /tmp/hermes-health.json
+          grep -q '"engine": "hermes-python"' /tmp/hermes-health.json
+          curl -sS -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18090/chat -H 'Content-Type: application/json' -d '{"messages":[]}' | grep -q 401
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs kairoq-hermes-ci || true

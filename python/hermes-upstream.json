@@ -1,0 +1,9 @@
+{
+  "upstream_repository": "https://github.com/NousResearch/hermes-agent",
+  "revision": "5894e750c3dba980d43b25aa29e3958149ba2c61",
+  "license": "MIT",
+  "license_owner": "Nous Research",
+  "integration": "full-upstream-source",
+  "purpose": "Use the complete Hermes Python agent as Kairoq's next-generation agent runtime; preserve all upstream tools, memory, skills, gateways and provider adapters under upstream licenses.",
+  "note": "A pinned checkout and isolated runner are necessary, but are not themselves a validated Kairoq production migration."
+}
