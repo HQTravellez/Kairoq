@@ -3023,7 +3023,7 @@ $("#settingsBtn").onclick=()=>{
 $("#temperature").oninput=e=>$("#temperatureValue").textContent=e.target.value;
 $("#saveSettings").onclick=()=>{settings={systemPrompt:$("#systemPrompt").value,temperature:Number($("#temperature").value),responsePace:$("#responsePace")?.value||"natural"};saveAll()};
 
-$("#modelSearchBtn").onclick=()=>{$("#modelDialog").showModal();$("#modelSearch").value="";currentModelFilter="all";$$(".filter-chip").forEach(b=>b.classList.toggle("active",b.dataset.filter==="all"));renderModelResults();setTimeout(()=>$("#modelSearch").focus(),20)};
+$("#modelSearchBtn").onclick=()=>{$("#modelDialog").showModal();$("#modelSearch").value="";currentModelFilter=freeOnlyEl.checked?"free":"all";$(".filter-chip").forEach(b=>b.classList.toggle("active",b.dataset.filter===currentModelFilter));renderModelResults();setTimeout(()=>$("#modelSearch").focus(),20)};
 $("#closeModelDialog").onclick=()=>$("#modelDialog").close();
 $("#modelSearch").oninput=renderModelResults;
 $$(".filter-chip").forEach(b=>b.onclick=()=>{currentModelFilter=b.dataset.filter;$$(".filter-chip").forEach(x=>x.classList.toggle("active",x===b));renderModelResults()});
