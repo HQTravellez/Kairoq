@@ -20,11 +20,27 @@ function makeClient({env=process.env,fetchImpl=fetch}={}){
  }
  return {
   health:()=>request("GET","/api/session?limit=1"),
+  models:()=>request("GET","/api/provider"),
   createSession:(directory)=>request("POST","/api/session",{location:{directory}}),
   setModel:(sessionID,model)=>request("POST","/api/session/"+encodeURIComponent(sessionID)+"/model",{model}),
   prompt:(sessionID,text)=>request("POST","/api/session/"+encodeURIComponent(sessionID)+"/prompt",{text}),
   wait:(sessionID)=>request("POST","/api/experimental/session/"+encodeURIComponent(sessionID)+"/wait",{}),
   messages:(sessionID)=>request("GET","/api/session/"+encodeURIComponent(sessionID)+"/message?order=desc&limit=30"),
+  diffs:(sessionID)=>request("GET","/api/session/"+encodeURIComponent(sessionID)+"/diff"),
+  async runTurn({directory,model,text,repairPrompt}){
+   if(typeof directory!=="string"||!directory.startsWith("/")||!text)throw Error("An isolated absolute workspace directory and task are required");
+   const session=await this.createSession(directory);
+   const sessionID=session?.id;
+   if(!sessionID)throw Error("OpenCode did not return a session ID");
+   if(model)await this.setModel(sessionID,model);
+   await this.prompt(sessionID,text);
+   await this.wait(sessionID);
+   const first={messages:await this.messages(sessionID),diffs:await this.diffs(sessionID)};
+   if(!repairPrompt)return{sessionID,first};
+   await this.prompt(sessionID,repairPrompt);
+   await this.wait(sessionID);
+   return{sessionID,first,repair:{messages:await this.messages(sessionID),diffs:await this.diffs(sessionID)}};
+  },
  };
 }
 module.exports={config,makeClient};
