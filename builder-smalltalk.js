@@ -12,10 +12,11 @@ const CHANGE=/\b(add|change|make|create|build|remove|update|fix|put|replace|move
 function smallTalk(message){
  const t=String(message||'').trim().replace(/[\s!.?,:)😊🙂👋🙏]+$/u,'');
  if(!t)return null;
- if(t.length>60||t.split(/\s+/).length>8)return null;
+ if(t.length>80||t.split(/\s+/).length>10)return null;
  const rest=t.replace(GREETING,'').replace(THANKS,'').replace(HELP,'').trim();
  if(rest&&CHANGE.test(rest))return null;
- if(rest.split(/\s+/).filter(Boolean).length>3)return null;
+ // "hi how are you doing today": a greeting followed by chit-chat is still a greeting.
+ if(rest.split(/\s+/).filter(Boolean).length>(GREETING.test(t)?6:3))return null;
  if(HELP.test(t))return'help';
  if(GREETING.test(t))return'greeting';
  if(THANKS.test(t))return'thanks';
@@ -44,4 +45,15 @@ function reply(kind,meta){
  return lead+'\n\n'+(fresh?'Tell me about the app:':'Tell me what to change, for example:')+'\n'+examples.map(e=>'- '+e).join('\n');
 }
 
-module.exports={smallTalk,questionOnly,reply};
+// Talking to the builder rather than asking for a change: "what happened", "why is it so
+// slow", "are you there", "how are you". It starts like conversation and names no change, so it
+// gets an answer (Discuss) instead of a build that would report "Updated the app." for nothing.
+const CONVERSATION=/^(hi+|hello|hey+|yo|good (morning|afternoon|evening|day)|what|why|how|is|are|was|were|did|does|do|where|when|who|which|anyone|anybody|any ?one|still|so|hmm+|um+|uh+|ok so|and)\b/i;
+function conversation(message){
+ const t=String(message||'').trim();
+ if(!t||t.length>300||/https?:\/\//i.test(t))return false;
+ if(t.split(/\s+/).length>25)return false;
+ return CONVERSATION.test(t)&&!CHANGE.test(t);
+}
+
+module.exports={smallTalk,questionOnly,conversation,reply};

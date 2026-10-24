@@ -320,7 +320,6 @@ The polish pass first asks two different models (the vision tier and the Pro tie
 
 ### Design skills that improve themselves
 
-`node scripts/improve-skill.js --skill <id> --url … --email … --password … --cases hotel,salon --holdout cafe --judge-model <vision model> [--rounds 3] --yes` (owner, offline): the built-in skill is scored by building the test briefs with it and judging the screenshots; a model diagnoses the most common problem, makes one change, and the change is kept only if the training score rises by 0.15 and the held-out score does not drop (`skill-lab.js`). Unsafe text is refused. The result is written to `design-skills/<id>/SKILL.proposed.md` for you to read and commit; nothing is overwritten. Each round costs the builds' credits; without `--yes` it only prints the plan.
 
 ### Side-effect guard
 

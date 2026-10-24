@@ -10,6 +10,9 @@ on:
       - 'api-intelligence-pipeline.js'
       - 'test/api-workflow.test.js'
       - 'test/api-intelligence-pipeline.test.js'
+      - 'test/api-jev-wiring.test.js'
+      - 'api-product-intake.js'
+      - 'public/api-studio.html'
       - 'test/automations.test.js'
       - 'scripts/audit-tripninja-public-contract.js'
       - '.github/workflows/complex-api-workflow.yml'
@@ -31,7 +34,7 @@ jobs:
       - run: node --check api-intelligence-pipeline.js
       - run: node --check test/api-workflow.test.js
       - run: node --check test/api-intelligence-pipeline.test.js
-      - run: node --test test/api-intelligence-pipeline.test.js test/api-workflow.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js test/automations.test.js
+      - run: node --test test/api-intelligence-pipeline.test.js test/api-jev-wiring.test.js test/api-workflow.test.js test/api-learning.test.js test/api-integration.test.js test/api-oauth-sdk.test.js test/automations.test.js
 
   legacy-tripninja-contract:
     runs-on: ubuntu-latest

@@ -32,3 +32,12 @@ test('"hi" in Build gets a free reply and starts no build',async()=>{
  assert.match(last.text,/^Hi! I'm ready to work on Yoga Studio\./);
  assert.equal(last.credits,0);
 });
+
+test('everyday messages get an answer, not a build that reports "Updated the app."',()=>{
+ const S=require('../builder-smalltalk');
+ for(const m of ['hi how are you doing today','hello, are you there','good morning Kairoq how is everything'])assert.equal(S.smallTalk(m),'greeting',m);
+ for(const m of ['what happened','why is it so slow','is anyone there','how are you'])assert.equal(S.conversation(m),true,m);
+ for(const m of ['a booking page for my yoga studio','add a gallery page','hi, add a gallery page','make the header blue','what if we add a pricing page','https://example.com what is this'])assert.equal(S.conversation(m),false,m);
+ const api=require('fs').readFileSync(require('path').join(__dirname,'../create-api.js'),'utf8');
+ assert.match(api,/S\.questionOnly\(message\)\|\|S\.conversation\(message\)/);
+});

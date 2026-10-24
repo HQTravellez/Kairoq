@@ -14,7 +14,7 @@
 <section class="panel" style="margin-bottom:18px"><h2>3. Prepare the product from requirements and documentation</h2><p class="small">Kairoq matches your product brief against documented operations, generates and validates a data schema, screens, workflows, and unsupported-feature list. Review this before starting a build. No live provider calls occur.</p><div class="actions"><button type="button" id="productPrepare" disabled>Prepare and validate product plan</button></div><p id="preparedStatus" role="status" aria-live="polite" class="small">First import a formal API specification.</p></section>
 <section class="panel" style="margin-bottom:18px"><h2>4. OAuth connections</h2><p class="small">Connect an administrator-approved OAuth provider. OAuth credentials and access tokens remain on the server. If no providers appear, configure KAIROQ_OAUTH_PROVIDERS, KAIROQ_OAUTH_ENCRYPTION_KEY, KAIROQ_OAUTH_REDIRECT_URI and APP_PASSWORD in Railway.</p><div class="field"><label for="oauthProvider">Configured OAuth provider</label><select id="oauthProvider"><option value="">Loading provider configuration…</option></select></div><p id="oauthStatus" class="small" role="status" aria-live="polite">Checking available providers…</p><div class="actions"><button id="oauthConnect" disabled>Connect OAuth</button><button id="oauthDisconnect" class="secondary" disabled>Disconnect</button><button id="oauthRefresh" class="secondary">Refresh connections</button></div></section>
 <section class="panel" style="margin-bottom:18px"><h2>5. Generate a reusable API SDK</h2><p class="small">Create a server-side JavaScript client from the imported contract. Generated code is reviewed before use and does not automatically install packages or bypass API permissions.</p><div class="actions"><button id="sdkGenerate" disabled>Generate SDK</button><button id="sdkDownload" class="secondary" disabled>Download JavaScript SDK</button><button id="backendGenerate" class="secondary" disabled>Generate backend ZIP</button></div><p id="sdkStatus" class="small" role="status" aria-live="polite">Import an API to enable SDK generation.</p></section>
-<section class="panel"><h2>6. Inspect the API contract and product plan</h2><p id="status" class="status" role="status" aria-live="polite">No API documentation imported yet.</p><pre id="output" aria-label="Imported API contract">Waiting for API documentation.</pre></section>
+<section class="panel"><h2>6. Inspect the API contract and product plan</h2><p id="status" class="status" role="status" aria-live="polite">No API documentation imported yet.</p><p id="jevAdvice" class="small" hidden></p><pre id="output" aria-label="Imported API contract">Waiting for API documentation.</pre></section>
 <section class="panel" style="margin-top:18px"><h2>7. Test a server-side operation</h2><p class="small danger">Live calls are disabled by default and require server-side enablement, allowlisted hosts, dedicated credentials and explicit approval. Mutating calls require separate write approval.</p><div class="grid"><div class="field"><label for="operation">Operation</label><select id="operation"><option value="">Import an API first</option></select></div><div class="field"><label for="credential">Server credential variable name (optional)</label><input id="credential" placeholder="KAIROQ_API_TOKEN_PROVIDER"></div><div class="field"><label for="oauthForTest">OAuth connection for API testing (optional)</label><select id="oauthForTest"><option value="">No OAuth (use API key if required)</option></select></div></div><div class="field"><label for="params">Path parameters JSON</label><textarea id="params" rows="2">{}</textarea></div><div class="field"><label for="payload">Request body JSON (optional)</label><textarea id="payload" rows="2"></textarea></div><div class="actions"><button id="test" class="secondary" disabled>Review and test selected operation</button></div></section>
 </main><script>
 "use strict";
@@ -61,6 +61,22 @@ async function refreshProviders(){
 }
 
 function status(message){$("status").textContent=message;}
+// Jev + ScaleDown triage of the API documentation (advisory; set up on the server).
+function showJev(intel){
+ const el=$("jevAdvice");if(!el)return;
+ if(!intel){el.hidden=true;return;}
+ let text;
+ if(intel.status==="off")text="AI triage (Jev): off. "+intel.reason+".";
+ else if(intel.status!=="ok")text="AI triage (Jev) unavailable: "+(intel.reason||"unknown error")+".";
+ else{
+  const labels=(intel.cdm||[]).filter(n=>n.status==="classified").map(n=>n.label+" "+Math.round(n.confidence*100)+"%");
+  const jev=intel.jev||{};
+  text="AI triage (Jev): "+(intel.nextStep?"next, "+intel.nextStep+" ("+Math.round(jev.confidence*100)+"% confident)":"no confident suggestion ("+(jev.reason||jev.status||"review")+")")+
+   (labels.length?". Documentation is about: "+labels.join(", "):"")+
+   ((intel.missingKeys||[]).length?". Missing: "+intel.missingKeys.join(", "):"")+". Advisory only.";
+ }
+ el.textContent=text;el.hidden=false;
+}
 async function request(url,body){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(body)});const data=await r.json();if(r.status===401)requireSignIn();if(!r.ok)throw Error(data.error||"Request failed ("+r.status+")");return data;}
 async function action(button,fn){button.disabled=true;try{await fn();}catch(e){status(e.message);$("output").textContent=String(e.message);}finally{button.disabled=false;}}
 $("oauthProvider").addEventListener("change",refreshProviders);
@@ -131,6 +147,7 @@ $("autoDocFromBrief").addEventListener("click",()=>action($("autoDocFromBrief"),
  const response=await request("/api/developer/api/analyze",{brief,autoDiscover:true,catalogId:selectedCatalogId||undefined});
  const report=response.blueprint.automatedDiscovery||{attempts:[],status:"no-candidates"};
  $("output").textContent=JSON.stringify({blueprint:response.blueprint,attempts:report.attempts},null,2);
+ showJev(response.blueprint.intelligence);
  if(response.blueprint.formalContract){
   plan=response.apiPlan;preparedProductPlan=null;generatedSdk=null;
   $("operation").replaceChildren();
@@ -153,6 +170,7 @@ $("productPrepare").addEventListener("click",()=>action($("productPrepare"),asyn
  const mapped=result.blueprint.requirements.filter(r=>r.operations.length).length;
  $("preparedStatus").textContent="Validated product schema and workflows. "+mapped+"/"+result.blueprint.requirements.length+" requirement statements have possible operation matches. Missing or unverified capabilities must be reviewed before live use.";
  $("output").textContent=JSON.stringify({productPlan:result.productPlan,blueprint:result.blueprint,readiness:result.readiness},null,2);
+ showJev(result.blueprint.intelligence);
  status("Product plan prepared and validated. Review unsupported capabilities and approval requirements, then choose Build.");
  $("build").disabled=false;
 }));

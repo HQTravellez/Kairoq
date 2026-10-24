@@ -7037,6 +7037,15 @@ const server = http.createServer(async (req, res) => {
       return json(res,200,await require("./api-product-intake").prepare(input,{callModel:callDeveloperCodingModel}));}
     catch(error){return json(res,422,{error:String(error.message||error)});}
   }
+  // Multi-provider orchestration: validated call graph, generated SDKs and Jev/CDM advisory.
+  // Nothing is executed against a provider here.
+  if(req.method==="POST"&&url==="/api/developer/api/orchestrate"){
+    if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});
+    try{const input=await getBody(req,2200000),pipeline=require("./api-intelligence-pipeline");
+      return json(res,200,await pipeline.prepare({contracts:input.contracts,workflow:input.workflow,
+        publicDocumentation:Array.isArray(input.publicDocumentation)?input.publicDocumentation:[],ai:pipeline.aiSettings()}));}
+    catch(error){return json(res,422,{error:String(error.message||error)});}
+  }
   if (req.method === "POST" && url === "/api/developer/api/discover"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,2200000);return json(res,200,body.documentationUrl?await require("./api-docs").discover(body.documentationUrl):require("./api-docs").infer(body.documentationText));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if (req.method === "POST" && url === "/api/developer/api/execute"){if(!isAuthenticated(req))return json(res,401,{error:"Authentication required."});try{const body=await getBody(req,100000);return json(res,200,await require("./api-adapter").execute(body));}catch(e){return json(res,422,{error:String(e.message||e)});}}
   if(req.method==='POST'&&url==='/api/developer/api/autonomy/run'){

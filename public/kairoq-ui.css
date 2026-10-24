@@ -241,3 +241,4 @@ input.kq-switch{appearance:none!important;-webkit-appearance:none!important;widt
 input.kq-switch{background:#d6d6d2!important;border-radius:999px!important;position:relative!important;flex:none!important;margin:0!important;cursor:pointer}
 input.kq-switch:checked{background:var(--k-accent)!important}
 input.kq-switch::after{content:""!important;display:block!important}
+.assistant-content table{width:max-content!important}
