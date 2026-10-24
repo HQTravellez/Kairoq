@@ -1,16 +1,11 @@
-# Kairoq Python agent, runs the full MIT Hermes source.
-FROM python:3.13-slim
-RUN apt-get update && apt-get install -y --no-install-recommends git build-essential curl && rm -rf /var/lib/apt/lists/*
-WORKDIR /opt
-RUN git init hermes \
-    && cd hermes \
-    && git remote add origin https://github.com/NousResearch/hermes-agent.git \
-    && git fetch --depth=1 origin 5894e750c3dba980d43b25aa29e3958149ba2c61 \
-    && git checkout --detach FETCH_HEAD \
-    && test -f LICENSE
-RUN python -m pip install --no-cache-dir -e /opt/hermes
+# Use NousResearch's fully provisioned Hermes image, including its pinned
+# Python environment and browser/runtime dependencies. A plain pip install
+# from the source checkout does not provision the upstream runtime.
+# The image tag must be pinned to a verified digest before production release.
+FROM nousresearch/hermes-agent:latest
+USER root
 WORKDIR /app
 COPY python/hermes_gateway.py /app/hermes_gateway.py
 ENV HERMES_SOURCE=/opt/hermes PYTHONUNBUFFERED=1 PORT=8090
 EXPOSE 8090
-CMD ["python","/app/hermes_gateway.py"]
+ENTRYPOINT ["/opt/hermes/.venv/bin/python", "/app/hermes_gateway.py"]
