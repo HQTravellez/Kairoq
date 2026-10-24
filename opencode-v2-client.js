@@ -12,8 +12,10 @@ function config(env=process.env){
 }
 function makeClient({env=process.env,fetchImpl=fetch}={}){
  const {base,key}=config(env);
+ const username=env.KAIROQ_OPENCODE_V2_USERNAME||"opencode";
+ const auth=key?"Basic "+Buffer.from(username+":"+key).toString("base64"):"";
  async function request(method,route,body){
-  const response=await fetchImpl(base+route,{method,headers:{"Content-Type":"application/json",...(key?{Authorization:"Bearer "+key}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(20000)});
+  const response=await fetchImpl(base+route,{method,headers:{"Content-Type":"application/json",...(auth?{Authorization:auth}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(20000)});
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw Error("OpenCode V2 HTTP "+response.status+": "+String(data?.error?.message||"unavailable").slice(0,180));
   return data.data??data;
