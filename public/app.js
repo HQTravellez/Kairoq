@@ -1078,8 +1078,15 @@ function fillModelSelect(){
   // available for advanced users and retains full model selection.
   const previous=ui.lastModel||"openrouter/free";
   modelSelect.replaceChildren();
+  const local=allModels.filter(m=>m.local&&m.id!=="local/auto");
+  if(local.length)modelSelect.appendChild(option("local/auto","◉ Ollama Auto · Local"));
   modelSelect.appendChild(option("openrouter/free","⚡ Free Auto"));
   modelSelect.appendChild(option("smart-auto","✦ Smart Auto"));
+  if(local.length){
+    const g=document.createElement("optgroup");g.label="Ollama · on your server";
+    local.forEach(m=>g.appendChild(option(m.id,cleanText(m.name))));
+    modelSelect.appendChild(g);
+  }
   const fav=allModels.filter(m=>favorites.includes(m.id)).slice(0,8);
   if(fav.length){
     const group=document.createElement("optgroup");group.label="★ Favorites";
