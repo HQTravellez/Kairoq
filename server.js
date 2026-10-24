@@ -4260,7 +4260,7 @@ async function handleChat(req, res) {
 
     const lastUserText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
     const websiteUrlMatch=lastUserText.match(/https:\/\/[^\s<>\])"'\x60]+/i);
-    if(websiteUrlMatch && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about/i.test(lastUserText))){
+    if(websiteUrlMatch && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about|api|docs|documentation|integrat|build|clone|analy[sz]e|read|explore|compare/i.test(lastUserText))){
       const siteUrl=websiteUrlMatch[0].replace(/[.,;!?]+$/,"");
       writeSSE(res,"status",{message:"Reading public website directly…"});
       try{
