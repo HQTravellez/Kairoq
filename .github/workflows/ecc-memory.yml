@@ -1,0 +1,29 @@
+name: ECC project memory recall
+on:
+  push:
+    paths:
+      - 'ecc-context-recall.js'
+      - 'react-builder.js'
+      - 'react-agent.js'
+      - 'test/ecc-context-recall.test.js'
+      - '.github/workflows/ecc-memory.yml'
+  pull_request:
+    paths:
+      - 'ecc-context-recall.js'
+      - 'react-builder.js'
+      - 'react-agent.js'
+      - 'test/ecc-context-recall.test.js'
+      - '.github/workflows/ecc-memory.yml'
+permissions:
+  contents: read
+jobs:
+  scoped-memory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check ecc-context-recall.js && node --check react-builder.js && node --check react-agent.js
+      - run: node --test test/ecc-context-recall.test.js
