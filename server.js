@@ -4333,11 +4333,11 @@ async function handleChat(req, res) {
         }catch(localErr){
           if(localErr.afterPartial)throw localErr;
           await audit("local_llm.chat_fallback",{model:preferredLocal,error:localErr.message});
-          if(!OPENROUTER_FREE_FALLBACK_ENABLED||!openRouterConfigured())throw localErr;
-          writeSSE(res,"status",{message:"Local model unavailable — using OpenRouter free fallback…"});
+          if((!OPENROUTER_FREE_FALLBACK_ENABLED||!openRouterConfigured())&&!require("./opencode-free").configured())throw localErr;
+          writeSSE(res,"status",{message:"Local model unavailable — checking independent free providers…"});
         }
-      }else if(openRouterConfigured()&&OPENROUTER_FREE_FALLBACK_ENABLED){
-        writeSSE(res,"status",{message:"No local model detected — using OpenRouter free fallback…"});
+      }else if((openRouterConfigured()&&OPENROUTER_FREE_FALLBACK_ENABLED)||require("./opencode-free").configured()){
+        writeSSE(res,"status",{message:"No local model detected — checking configured free providers…"});
       }else{
         throw new Error("Zero Cost mode needs either a local Ollama/llama.cpp model or an OpenRouter key for the free fallback.");
       }
