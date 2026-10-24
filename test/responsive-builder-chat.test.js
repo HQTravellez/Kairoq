@@ -23,3 +23,10 @@ test('nutrition records are separate from users and not deleted without confirma
  assert.match(backend,/DELETE FROM records WHERE collection=\?/);
  assert.doesNotMatch(backend.slice(backend.indexOf('function ownerClearNutritionRecords'),backend.indexOf('function ownerDelete(')),/DELETE FROM users/);
 });
+
+test('missing camera complaint is routed to real feature diagnosis, not preview help',()=>{
+ assert.match(api,/function missingFeatureComplaint\(message\)/);
+ assert.match(api,/if\(missingFeatureComplaint\(t\)\)return false/);
+ assert.match(api,/Reproduce the missing-feature behavior in a browser/);
+ assert.match(api,/Never answer with generic preview-refresh guidance/);
+});
