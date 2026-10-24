@@ -450,6 +450,10 @@ async function callFreeLlmText({messages,temperature=0.2,webSearch=false}={}){
       if(!OPENROUTER_FREE_FALLBACK_ENABLED||!openRouterConfigured())throw localErr;
     }
   }
+  if(require('./opencode-free').configured()){
+    try{return (await require('./opencode-free').complete(messages,{temperature})).text}
+    catch(e){if(!openRouterConfigured())throw Error("Independent free provider unavailable: "+e.message)}
+  }
   if(!openRouterConfigured())throw new Error("No free LLM route is available. Start a local model or configure an OpenRouter API key.");
   const payload={model:"openrouter/free",messages,temperature};
   if(webSearch&&OPENROUTER_WEB_SEARCH_ENABLED){
@@ -4338,6 +4342,20 @@ async function handleChat(req, res) {
         throw new Error("Zero Cost mode needs either a local Ollama/llama.cpp model or an OpenRouter key for the free fallback.");
       }
 
+      // Independent provider is attempted before the account-limited OpenRouter route.
+      if(require('./opencode-free').configured()){
+        writeSSE(res,"status",{message:"Trying independent free inference provider…"});
+        try{
+          const answer=await require('./opencode-free').complete(finalMessages,{temperature});
+          writeSSE(res,"token",{text:answer.text});
+          writeSSE(res,"meta",{model:answer.model,usage:{cost:0}});
+          writeSSE(res,"done",{ok:true,provider:answer.provider,zeroCost:true});
+          return res.end();
+        }catch(e){
+          await audit("free_provider.fallback",{provider:"opencode-zen",error:String(e.message).slice(0,200)});
+          if(!openRouterConfigured())throw Error("No available free inference route. "+e.message);
+        }
+      }
       const common={
         messages:finalMessages,temperature,reasoning_effort:effort,
         stream:true,usage:{include:true}
