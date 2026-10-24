@@ -365,7 +365,7 @@ function verifiedCard(v,checks,added){
  const ul=el('ul');for(const [ok,t] of rows){const li=el('li',ok?'ok':'bad');li.append(el('span','vmark',ok?'✓':'✗'),el('span',null,t));ul.append(li)}
  box.append(ul);
  const actualFlows=checks&&checks.ran>0&&Array.isArray(checks.failed)&&checks.failed.length===0;
- const note=el('p','verification-scope',actualFlows?'Only the listed browser checks and saved flows were tested. Other requested features may still be unverified.':'These checks show the app opens and fits a phone. The features you asked for have not been tested step by step yet.');
+ const note=el('p','verification-scope',actualFlows?'Only the listed browser checks and saved flows were tested. Other requested features may still be unverified.':'These checks show the app opens and fits a phone. The features you asked for have NOT been verified by these checks.');
  box.append(note);
  box.title='Browser check scope only; this is not certification that the whole application is complete.';
  return box;
