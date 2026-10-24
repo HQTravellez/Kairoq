@@ -19,3 +19,10 @@ test('Kairoq agent integrates safe optional CDM advisory',()=>{
  assert.match(agent,/decision-router'\)\.suggest\(text\)/);
  assert.match(agent,/decision-router'\)\.note\(decision\)/);
 });
+
+test('project Data users list exposes a confirmation-based account removal control',()=>{
+ const ui=fs.readFileSync(path.join(__dirname,'../public/create.js'),'utf8');
+ assert.match(ui,/Remove account/);
+ assert.match(ui,/deleteOwnedRecords:false/);
+ assert.match(ui,/await api\('\/projects\/'\+state\.project\.id\+'\/users'/);
+});
