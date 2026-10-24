@@ -4235,6 +4235,7 @@ async function handleChat(req, res) {
     const webSearch=body.webSearch===true;
 
     if(requestedModel==="python/hermes"){
+      if(freeOnly || ZERO_COST_MODE)return json(res,403,{error:"Hermes Python model is not verified free; disable Free Only and configure an approved provider."});
       if(!process.env.KAIROQ_PYTHON_AGENT_URL||!process.env.KAIROQ_PYTHON_AGENT_TOKEN)
         return json(res,503,{error:"Hermes Python engine is not configured."});
       // The Python backend and current Node app share no implicitly trusted user state:
