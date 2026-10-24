@@ -1124,6 +1124,22 @@ function updateModelUI(){
   modelBadge.textContent=modelSelect.value==="openrouter/free"?"⚡ Free Auto":modelSelect.value==="smart-auto"?"✦ Smart Auto":`${info.name}${info.isFree?" · FREE":""}`;
   $("#favoriteBtn").classList.toggle("active",favorites.includes(modelSelect.value));
   $("#favoriteBtn").textContent=favorites.includes(modelSelect.value)?"★":"☆";
+  const details=$("#activeModelDetails");
+  if(details){
+    if(modelSelect.value==="openrouter/free"){
+      details.textContent="Free Auto · Kairoq chooses an available free model · Browser and API tools are provided by Kairoq, not the model";
+    }else if(modelSelect.value==="smart-auto"){
+      details.textContent="Smart Auto · Automatic routing · Model usage, availability and costs depend on provider and account permissions";
+    }else{
+      const context=Number.isFinite(Number(info.context_length))&&Number(info.context_length)>0
+        ?" · Context: "+Number(info.context_length).toLocaleString()+" tokens":" · Context: not reported";
+      details.textContent=info.name+" · "+(info.isFree?"Free":"Paid or unknown pricing")
+        +context+" · Vision: "+(info.supportsVision?"reported":"not verified")
+        +" · Reasoning: "+(info.supportsReasoning?"reported":"not verified")
+        +" · Remaining requests: not reported";
+    }
+  }
+
 }
 
 function renderModelResults(){
@@ -1142,7 +1158,7 @@ function renderModelResults(){
     const left=document.createElement("div");
     left.innerHTML=`<div class="model-result-name">${escapeHTML(cleanText(m.name||m.id))}</div><div class="model-result-id">${escapeHTML(m.id)}</div>`;
     const meta=document.createElement("div");meta.className="model-result-meta";
-    meta.textContent=[m.isFree?"FREE":"PAID",m.supportsVision?"VISION":"",m.supportsReasoning?"REASONING":""].filter(Boolean).join(" · ");
+    meta.textContent=[m.isFree?"Free":"Paid/unknown",m.supportsVision?"Vision":"",m.supportsReasoning?"Reasoning":"",Number(m.context_length)>0?Number(m.context_length).toLocaleString()+" context":"", "Quota not reported"].filter(Boolean).join(" · ");
     b.append(left,meta);
     b.onclick=()=>{modelSelect.value=m.id;updateModelUI();$("#modelDialog").close()};
     host.appendChild(b);
