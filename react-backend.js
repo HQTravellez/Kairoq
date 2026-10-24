@@ -521,6 +521,16 @@ function ownerRecords(id,collection){
  if(!/^[a-z][a-z0-9_]{0,39}$/.test(collection))throw fail(400,'Bad collection');
  return database(id).prepare('SELECT * FROM records WHERE collection=? ORDER BY created_at DESC LIMIT 200').all(collection).map(record);
 }
+// Owner-only targeted clearing. Never delete users, sessions, goals, or weight history.
+const NUTRITION_COLLECTIONS=new Set(['food_logs','food_log','food_entries','food_diary','meal_entries','meal_logs','nutrition_entries','nutrition_logs','daily_foods','logged_foods']);
+function ownerClearNutritionRecords(id,collection,{confirm=false}={}){
+ if(confirm!==true)throw fail(400,'Explicit confirmation required');
+ if(typeof collection!=='string'||!NUTRITION_COLLECTIONS.has(collection))throw fail(400,'Only recognized nutrition log collections can be cleared');
+ const db=database(id);
+ const count=db.prepare('SELECT COUNT(*) n FROM records WHERE collection=?').get(collection).n;
+ db.prepare('DELETE FROM records WHERE collection=?').run(collection);
+ return{cleared:true,collection,deleted:count,usersUntouched:true,otherCollectionsUntouched:true};
+}
 function ownerDelete(id,recordId){const d=database(id),row=d.prepare('SELECT collection,owner_id FROM records WHERE id=?').get(String(recordId));if(!row)throw fail(404,'Record not found');d.prepare('DELETE FROM records WHERE id=?').run(String(recordId));publish(id,row.collection,'deleted',{id:String(recordId)},row.owner_id);return{deleted:recordId}}
 
 // ---------- browser client (virtual module "kairoq") ----------
@@ -695,4 +705,4 @@ async function runAllSchedules(options){
 }
 // Every due automation on every app (called every minute by the server).
 function runAllAutomations(options){return require('./react-automations').tick(options)}
-module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,ownerClearNutritionRecords,database,close,ACCESS};
