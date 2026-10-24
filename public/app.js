@@ -1619,7 +1619,7 @@ async function generateImageFromPrompt(raw){
     contentEl.innerHTML=renderMarkdown(md);bindCodeButtons(contentEl);
     const finalMsg={role:"assistant",content:md,model:data.model||"media/image",usage:data.usage||{cost:null}};
     chat.messages.push(finalMsg);
-    addAnswerBadge(box,`${data.provider||"Media"} · ${finalMsg.model}`,finalMsg.usage);
+
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory?.();loadWorkflowCards?.();
     setMascotState?.("success");
@@ -1669,7 +1669,7 @@ async function generateVideoFromPrompt(raw){
     contentEl.innerHTML=renderMarkdown(md);bindCodeButtons(contentEl);
     const finalMsg={role:"assistant",content:md,model:data.model||"media/video",usage:{cost:null}};
     chat.messages.push(finalMsg);
-    addAnswerBadge(box,`${data.provider||"Media"} · ${finalMsg.model}`,finalMsg.usage);
+
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory?.();loadWorkflowCards?.();
     setMascotState?.("success");
@@ -1806,7 +1806,7 @@ async function send(regenerateFrom=null){
 
     const finalMsg={role:"assistant",content:text,model:finalModel||modelSelect.value,usage};
     chat.messages.push(finalMsg);
-    addAnswerBadge(box,finalMsg.model,usage);
+
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory();loadUsage();
 
