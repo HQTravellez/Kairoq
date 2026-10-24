@@ -1182,6 +1182,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/nutrition'&&method==='DELETE'){
    const b=await readJson(req,1000);
    return send(res,200,backend.ownerClearNutritionRecords(id,b.collection,{confirm:b.confirm===true})),true;
+  // Project-owner only. This route is handled before /chat and does not start a model job.
+  if(action==='/users'&&method==='DELETE'){
+   const b=await readJson(req,1500);
+   if(b.confirm!==true)throw Object.assign(Error('Confirm account removal explicitly'),{status:400});
+   if(b.deleteOwnedRecords!==undefined&&typeof b.deleteOwnedRecords!=='boolean')throw Object.assign(Error('deleteOwnedRecords must be boolean'),{status:400});
+   return send(res,200,backend.ownerRemoveAppUser(id,b.email,{deleteOwnedRecords:b.deleteOwnedRecords===true})),true;
   }
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}

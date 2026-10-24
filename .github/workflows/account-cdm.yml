@@ -1,0 +1,34 @@
+name: Owner account and CDM safety
+on:
+  push:
+    paths:
+      - 'react-backend.js'
+      - 'create-api.js'
+      - 'react-agent.js'
+      - 'decision-router.js'
+      - 'test/account-management-and-cdm.test.js'
+      - 'test/decision-router.test.js'
+      - '.github/workflows/account-cdm.yml'
+  pull_request:
+    paths:
+      - 'react-backend.js'
+      - 'create-api.js'
+      - 'react-agent.js'
+      - 'decision-router.js'
+      - 'test/account-management-and-cdm.test.js'
+      - 'test/decision-router.test.js'
+      - '.github/workflows/account-cdm.yml'
+permissions:
+  contents: read
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check react-backend.js && node --check create-api.js && node --check react-agent.js && node --check decision-router.js
+      - run: npm ci
+      - run: node --test test/account-management-and-cdm.test.js test/decision-router.test.js test/decision-models.test.js

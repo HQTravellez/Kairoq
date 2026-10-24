@@ -441,7 +441,20 @@ async function renderData(){
  text($('outbox-title'),outbox.length+' email'+(outbox.length===1?'':'s')+' kept because email is not set up yet');
  $('outbox-list').replaceChildren(...outbox.map(m=>{const li=document.createElement('li'),pre=document.createElement('pre');pre.textContent=(m.to_kind==='me'&&m.user_email?'To '+m.user_email:'To you')+' · '+when(new Date(m.at).toISOString())+'\n'+m.subject+'\n\n'+m.text;li.append(pre);return li}));
  const users=$('users');users.replaceChildren();
- for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
+ for(const u of d.users){
+  const li=document.createElement('li'),name=document.createElement('span'),remove=document.createElement('button');
+  name.textContent=u.email+' · '+when(u.created_at);remove.type='button';remove.className='ghost';
+  remove.textContent='Remove account';remove.setAttribute('aria-label','Remove '+u.email+' from this app');
+  remove.onclick=async()=>{
+   if(!confirm('Remove account '+u.email+' from this app? This will revoke sign-in sessions. Saved app records will be retained.'))return;
+   remove.disabled=true;
+   try{
+    await api('/projects/'+state.project.id+'/users',{method:'DELETE',body:{email:u.email,confirm:true,deleteOwnedRecords:false}});
+    await renderData();
+   }catch(error){alert('Account was not removed: '+error.message);remove.disabled=false;}
+  };
+  li.append(name,document.createTextNode(' '),remove);users.append(li);
+ }
  const records=$('records');records.replaceChildren();
  text($('records-title'),state.collection?'Records in '+state.collection:'Records');
  const nutritionCollections=new Set(['food_logs','food_log','food_entries','food_diary','meal_entries','meal_logs','nutrition_entries','nutrition_logs','daily_foods','logged_foods']);
