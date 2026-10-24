@@ -30,3 +30,11 @@ test('React builder actually feeds the owner requirements to browser acceptance'
  assert.match(source,/featureQA\.verify\(\{requirements:ownerRequirements/);
  assert.match(source,/last\.feature_acceptance=acceptance/);
 });
+
+test('successful React feature repair records evidence and recalls project lessons',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const src=fs.readFileSync(path.join(__dirname,'../react-builder.js'),'utf8');
+ assert.match(src,/hermes-learning-loop'\)\.recall/);
+ assert.match(src,/acceptance\?\.allPassed&&attempt>1&&lastError/);
+ assert.match(src,/hermes-learning-loop'\)\.observe/);
+});
