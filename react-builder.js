@@ -502,6 +502,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
+ const buildContract=require('./conversational-build-contract');
+ const ownerRequirements=buildContract.merge(meta.owner_requirements||[],text);
  if(!meta.current_version)await initialize(meta);
  const tl=require('./react-timeline').create(onEvent);
  const brief=await prepareDesign(id,text,{callModel,tier,signal,images,onProgress});
@@ -511,7 +513,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
  // The first build turns the bare starter into a whole product, as Lovable does, not one basic page.
  const firstBuild=require('./react-design').isUntouchedStarter(base);
- const request='Current project files:\n\n'+contextFiles(base)+(firstBuild?'\n\n'+FIRST_BUILD:'')+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
+ const request='Current project files:\n\n'+contextFiles(base)+(firstBuild?'\n\n'+FIRST_BUILD:'')+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+buildContract.prompt(ownerRequirements);
  const imageCache=new Map();let imageNotes=[];
  const messages=[{role:'system',content:SYSTEM_PROMPT+knowledgeNote(meta)},...historyMessages(meta),{role:'user',content:userContent(request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null,securityTries=0;
@@ -627,16 +629,18 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const message=rollback?'I could not get this change to work: after '+attempt+' tries the app still did not show (a blank page in Kairoq\'s browser). Your preview stays on version '+working.n+', which works, and this change was free. The broken try is saved as version '+n+' if you want to look at it. Try describing the change another way, or in smaller steps.':reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
   const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(usedOpenCode?{engine:'opencode'}:{}),...(usedFallback?{engine_fallback:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{})});
+  const featureVerification=buildContract.evidence({browser:verified,checks,features:[]});
+  if(!rollback)fresh.owner_requirements=ownerRequirements;
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(usedOpenCode?{engine:'opencode'}:{}),...(usedFallback?{engine_fallback:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{}),feature_verification:featureVerification});
   if(!rollback)fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{})});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{}),feature_verification:featureVerification});
   saveMeta(fresh);
   // Checks the AI wrote for the flows it built: kept only when they pass on the new version.
   const adopted=!rollback&&inspect&&reply.checks.length&&!runtimeErrors.length?await adoptChecks(id,previewUrl(fresh,n),reply.checks,{inspect,version:n}).catch(()=>[]):[];
   if(adopted.length){const m=loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.tests_added=adopted;saveMeta(m)}tl.add({t:'check',ok:true,text:'Saved '+adopted.length+' new check'+(adopted.length===1?'':'s')+' for later changes: '+adopted.join(', ')})}
   if(rollback)return{version:working.n,message,changed:[],attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:[],rolled_back:{tried:n,kept:working.n,errors:runtimeErrors},preview_url:previewUrl(fresh)};
-  return{version:n,message,changed,attempts:attempt,engine:usedOpenCode?'opencode':'kairoq',...(usedFallback?{engine_fallback:true}:{}),plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,engine:usedOpenCode?'opencode':'kairoq',...(usedFallback?{engine_fallback:true}:{}),plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),feature_verification:featureVerification,...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
  }finally{if(ocSession)ocSession.close()}
