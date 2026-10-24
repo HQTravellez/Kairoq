@@ -1,0 +1,61 @@
+name: HyperFrames safe motion video proof
+on:
+  push:
+    branches:
+      - feature/hyperframes-renderer
+  pull_request:
+    paths:
+      - 'hyperframes-video.js'
+      - 'test/hyperframes-video.test.js'
+      - 'scripts/hyperframes-smoke.js'
+      - '.github/workflows/hyperframes-video.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  adapter-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check hyperframes-video.js && node --check scripts/hyperframes-smoke.js && node --check scripts/hyperframes-frame-check.js
+      - run: node --test test/hyperframes-video.test.js test/videos.test.js
+  actual-mp4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned HyperFrames CLI in a temporary path (not Kairoq runtime)
+        run: npm install --prefix "$RUNNER_TEMP/hf-tools" --no-save --no-audit --no-fund hyperframes@0.8.185 gsap@3.13.0
+      - name: Verify FFmpeg and browser availability
+        run: |
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+          command -v ffprobe
+          (command -v chromium || command -v google-chrome || command -v chromium-browser)
+      - name: Render actual 3-second MP4 from static HTML, then verify duration
+        env:
+          KAIROQ_HYPERFRAMES: on
+          KAIROQ_HF_DEBUG_PUBLIC_FIXTURE: '1'
+          HYPERFRAMES_BIN: ${{ runner.temp }}/hf-tools/node_modules/.bin/hyperframes
+          CHROMIUM_PATH: /usr/bin/google-chrome
+          KAIROQ_GSAP_JS: ${{ runner.temp }}/hf-tools/node_modules/gsap/dist/gsap.min.js
+        run: node scripts/hyperframes-smoke.js
+      - name: Decode and compare two real frames (motion proof)
+        run: node scripts/hyperframes-frame-check.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hyperframes-actual-render
+          path: |
+            benchmark-artifacts/hyperframes-motion.mp4
+            benchmark-artifacts/hyperframes-intro.png
+            benchmark-artifacts/hyperframes-outro.png
+          if-no-files-found: warn

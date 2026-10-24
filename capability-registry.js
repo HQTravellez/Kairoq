@@ -18,7 +18,7 @@ const CAPABILITIES = Object.freeze([
   {id:"autoharness",label:"AutoHarness skill staging",group:"Agents",status:"review-candidates-only",entry:"integrations/agent-stack/autoharness.js",tools:[]},
   {id:"understand",label:"Static code dependency graph",group:"Engineering",status:"graph-export",entry:"integrations/agent-stack/understand.js",tools:[]},
   {id:"ecc",label:"Project context recall",group:"Knowledge",status:"concept-adaptation",entry:"ecc-context-recall.js",tools:[]},
-  {id:"media",label:"AI media and Remotion workflows",group:"Creative",status:"feature-specific",entry:"video-gen.js",tools:[]},
+  {id:"media",label:"AI media and Remotion workflows",group:"Creative",status:"feature-specific",entry:"hyperframes-video.js",tools:[]},
   {id:"sales",label:"Sales lead research and outreach drafting",group:"Business",status:"feature-specific",entry:"agent-brain.js",tools:[]},
   {id:"marketing",label:"Marketing content and approved publishing",group:"Business",status:"feature-specific",entry:"server.js",tools:[]}
 ]);

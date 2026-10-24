@@ -75,6 +75,10 @@ The `three-product` design skill follows the pass-by-pass method of img2threejs,
 ## Karpathy-inspired coding guidelines
 
 `builder-method.js` adds Kairoq-specific, paraphrased coding discipline inspired by the four principles (Think Before Coding, Simplicity First, Surgical Changes, and Goal-Driven Execution) in `andrej-karpathy-skills` by multica-ai: https://github.com/multica-ai/andrej-karpathy-skills (observed revision `2c606141936f1eeef17fa3043a72095b4765b9c2`). The upstream README identifies its license as MIT. No upstream scripts, plugins, or package dependencies are installed, and no upstream source file is bundled. Principles are applied within Kairoq's existing model prompt and never override security/validation rules.
+## HeyGen HyperFrames (optional HTML-to-video CLI)
+
+`hyperframes-video.js` and `scripts/hyperframes-smoke.js` provide a Kairoq-written, opt-in, local adapter to the separately installed HyperFrames CLI from https://github.com/heygen-com/hyperframes, released under the Apache License 2.0 License (source revision `4371981b740d92f70e520cfbec34db68a1c93434`). Kairoq does not vendor or execute HyperFrames packages by default, does not import arbitrary external skill instructions, and does not bundle its fonts or binaries. Operator installation in a sandboxed worker is required to render. This adaptation uses the documented HyperFrames composition format; no source code from the upstream package is copied.
+
 ## Modular agent-stack interoperability
 
 The adapters in `integrations/agent-stack/` interoperate with, or adapt concepts from,
