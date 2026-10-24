@@ -4391,6 +4391,25 @@ async function handleChat(req, res) {
         return res.end();
       }
     }
+    // A model picked by name in the picker is used as picked (ported from #146): Zero Cost
+    // mode used to swap any choice for Local Auto / Free Auto without saying so.
+    if(ZERO_COST_MODE&&!["openrouter/free","smart-auto","openrouter/auto","local/auto"].includes(requestedModel)){
+      if(isLocalModelId(requestedModel)){
+        const exact=stripLocalModelId(requestedModel);
+        writeSSE(res,"status",{message:`Local · ${exact}`});
+        await streamLocalLlm({messages:finalMessages,temperature,model:exact,effort},res);
+        writeSSE(res,"done",{ok:true,provider:"local",model:exact,zeroCost:true});
+        return res.end();
+      }
+      const selected=models.find(m=>m.id===requestedModel);
+      if(!selected)throw Object.assign(new Error(`${requestedModel} isn't available right now. Use Refresh models, or choose Auto (free).`),{status:400});
+      if(!selected.isFree)throw Object.assign(new Error(`${selected.name||requestedModel} is a paid model, and paid models are switched off (Zero Cost mode). Choose a free model or Auto (free).`),{status:400});
+      writeSSE(res,"status",{message:`Free · ${selected.name||requestedModel}`});
+      const result=await streamOpenRouter({messages:finalMessages,temperature,reasoning_effort:effort,model:requestedModel,stream:true,usage:{include:true}},res);
+      if(result.usage)await recordUsage(result.usage,{model:result.finalModel,kind:"chat_selected_free"});
+      writeSSE(res,"done",{ok:true,provider:"openrouter-free",model:result.finalModel,zeroCost:true});
+      return res.end();
+    }
     if(ZERO_COST_MODE){
       const preferredLocal=isLocalModelId(requestedModel)&&requestedModel!=="local/auto"?stripLocalModelId(requestedModel):await resolveLocalLlmModel();
       if(preferredLocal){

@@ -65,6 +65,17 @@ test("a model on the OpenAI-compatible route (Ollama, Ollama Cloud) streams thin
     assert.equal(of("thinking"), "Weigh scale and budget. Keep it short.");
     assert.equal(of("token"), "Pick the simplest stack that ships.", "answer arrives (the old stream reader split on a literal \\n and returned nothing)");
     assert.equal(model.seen[0].reasoning_effort, "high", "the effort picker reaches the model");
+
+    // A model picked by name is used as picked, not swapped for an Auto route (ported from #146).
+    const ask = async modelId => (await fetch(`http://127.0.0.1:${port}/api/chat/stream`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: modelId, messages: [{ role: "user", content: "hi" }] }),
+    })).text();
+    const local = await ask("local/gemma4:31b");
+    assert.match(local, /Pick the simplest stack/);
+    assert.equal(model.seen.at(-1).model, "gemma4:31b");
+    const missing = await ask("someone/not-in-catalog");
+    assert.match(missing, /isn't available right now|not currently confirmed as a zero-cost model/, "an unknown pick says so instead of silently using another model");
   } finally {
     server.kill();
     await model.close();
