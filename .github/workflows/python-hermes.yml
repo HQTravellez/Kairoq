@@ -1,0 +1,29 @@
+name: Python Hermes Migration Checks
+on:
+  pull_request:
+    paths:
+      - 'python/**'
+      - 'Dockerfile.hermes-python'
+      - 'server.js'
+      - 'public/app.js'
+      - '.github/workflows/python-hermes.yml'
+  workflow_dispatch:
+jobs:
+  gateway-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Python syntax
+        run: python -m compileall -q python/
+      - name: Gateway contract tests (no model keys)
+        run: python -m unittest discover -s python/tests -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node and frontend syntax
+        run: |
+          node --check server.js
+          node --check public/app.js
