@@ -1182,6 +1182,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/nutrition'&&method==='DELETE'){
    const b=await readJson(req,1000);
    return send(res,200,backend.ownerClearNutritionRecords(id,b.collection,{confirm:b.confirm===true})),true;
+  }
   // Project-owner only. This route is handled before /chat and does not start a model job.
   if(action==='/users'&&method==='DELETE'){
    const b=await readJson(req,1500);
