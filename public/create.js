@@ -155,49 +155,15 @@ $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/bl
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
 for(const b of document.querySelectorAll('.example'))b.onclick=()=>{$('new-prompt').value=b.textContent;$('new-prompt').focus()};
-// A new app: when the request leaves something important open, a few quick questions first
-// (tap an answer, or let Kairoq decide); then the build starts.
-async function startBuild(prompt,answers){
- const {project,job}=await api('/projects',{method:'POST',body:{prompt,...(answers&&answers.length?{answers}:{})}});
- $('new-prompt').value='';$('clarify').classList.add('hidden');
- const shown=answers&&answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
- await openProject(project.id,{pendingText:shown,job});
-}
-function renderClarify(prompt,questions){
- const box=$('clarify');box.replaceChildren();
- const picked=questions.map(()=>new Set());
- box.append(el('p','cl-title','A few quick questions, so it is right the first time'));
- questions.forEach((q,i)=>{
-  const row=el('div','cl-q');row.append(el('p','cl-text',q.q));
-  const opts=el('div','cl-opts');
-  for(const o of q.options){
-   const b=el('button','chip',o);b.type='button';b.setAttribute('aria-pressed','false');
-   b.onclick=()=>{if(!q.multi){picked[i].clear();for(const x of opts.children)x.setAttribute('aria-pressed','false')}
-    if(picked[i].has(o)){picked[i].delete(o);b.setAttribute('aria-pressed','false')}else{picked[i].add(o);b.setAttribute('aria-pressed','true')}};
-   opts.append(b);
-  }
-  row.append(opts);box.append(row);
- });
- const go=el('button','primary','Build it');go.type='button';
- const skip=el('button','ghost','Decide for me');skip.type='button';
- const run=async withAnswers=>{go.disabled=skip.disabled=true;text($('home-error'),'');
-  try{await startBuild(prompt,withAnswers?questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length):[])}
-  catch(err){text($('home-error'),err.message);go.disabled=skip.disabled=false}};
- go.onclick=()=>run(true);skip.onclick=()=>run(false);
- const actions=el('div','row cl-actions');actions.append(skip,go);box.append(actions);
- box.classList.remove('hidden');box.scrollIntoView({block:'nearest',behavior:'smooth'});
-}
+// A new app from the home box: the editor opens straight away and any quick questions, then
+// "How should it feel?" (the look), are asked inside the chat before the first build starts.
 $('new-form').onsubmit=async e=>{
  e.preventDefault();text($('home-error'),'');$('new-submit').disabled=true;
  try{
   const prompt=$('new-prompt').value.trim();
-  // Answers already given for this exact request: build straight away.
-  if(!$('clarify').classList.contains('hidden')&&$('clarify').dataset.prompt===prompt)return $('clarify').querySelector('.primary')?.click();
-  const note=document.querySelector('#new-form .prompt-note'),was=note&&note.textContent;
-  if(note)note.textContent='Reading your request…';
-  const {questions}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]})).finally(()=>{if(note)note.textContent=was});
-  if(questions&&questions.length){$('clarify').dataset.prompt=prompt;renderClarify(prompt,questions);return}
-  await startBuild(prompt);
+  if(!prompt)return;
+  await askThenBuild(prompt);
+  $('new-prompt').value='';
  }catch(err){text($('home-error'),err.message)}
  finally{$('new-submit').disabled=false}
 };
@@ -221,15 +187,22 @@ async function askThenBuild(prompt){
  const card=document.createElement('li');card.className='assistant ask-card';
  card.append(el('p','ask-head','Reading your request…'));list.append(card);
  const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
- const build=answers=>{mine.remove();card.remove();
+ // The picked look (if any) becomes the project's colours and fonts before the build starts.
+ const build=async(answers,look)=>{
+  if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt}}).catch(err=>console.warn('look',err.message));
+  mine.remove();card.remove();
   send(answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt,'build')};
- if(!questions.length)return build([]);
  const picked=questions.map(()=>new Set());let at=0;
  const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length);
+ // The last question is always the look: "How should it feel?" (create-look.js).
+ const total=questions.length+(window.KairoqLook?1:0);
+ const lookStep=()=>window.KairoqLook.step({card,name,count:total>1?'Question '+total+' of '+total:'One quick question',
+  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw()}:null});
+ if(!questions.length)return window.KairoqLook?lookStep():build([]);
  const draw=()=>{
   const q=questions[at];card.replaceChildren();
   // Top: where you are and Skip. Middle: the question and its answers. Bottom: Back, Decide for me, Next.
-  const head=el('div','ask-top');head.append(el('span','ask-count',questions.length>1?'Question '+(at+1)+' of '+questions.length:'One quick question'));
+  const head=el('div','ask-top');head.append(el('span','ask-count',total>1?'Question '+(at+1)+' of '+total:'One quick question'));
   const skip=el('button','ask-link','Skip');skip.type='button';skip.onclick=()=>build(answers());head.append(skip);
   const opts=el('div','ask-opts');
   (q.options||[]).forEach(o=>{
@@ -242,8 +215,8 @@ async function askThenBuild(prompt){
   const foot=el('div','ask-foot');
   if(at>0){const back=el('button','ask-link','Back');back.type='button';back.onclick=()=>{at--;draw()};foot.append(back)}
   const auto=el('button','ask-ghost','Decide for me');auto.type='button';auto.onclick=()=>build(answers());
-  const last=at===questions.length-1;
-  const next=el('button','ask-next',last?'Build it':'Next');next.type='button';next.onclick=()=>{if(last)build(answers());else{at++;draw()}};
+  const last=at===questions.length-1,final=last&&!window.KairoqLook;
+  const next=el('button','ask-next',final?'Build it':'Next');next.type='button';next.onclick=()=>{if(final)build(answers());else if(last)lookStep();else{at++;draw()}};
   foot.append(auto,next);
   card.append(head,el('p','ask-q',q.q),opts,foot);
   list.scrollTop=list.scrollHeight;
