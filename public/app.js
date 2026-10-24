@@ -1138,7 +1138,19 @@ function renderModelResults(){
     const meta=document.createElement("div");meta.className="model-result-meta";
     meta.textContent=[m.isFree?"Free":"Paid/unknown",m.supportsVision?"Vision":"",m.supportsReasoning?"Reasoning":"",Number(m.context_length)>0?Number(m.context_length).toLocaleString()+" context":"", "Quota not reported"].filter(Boolean).join(" · ");
     b.append(left,meta);
-    b.onclick=()=>{modelSelect.value=m.id;updateModelUI();$("#modelDialog").close()};
+    b.onclick=()=>{
+      if(freeOnlyEl.checked&&!m.isFree&&m.id!=="openrouter/free"){
+        setStatus("Free Only is enabled. Choose a verified free model or disable Free Only first.");
+        return;
+      }
+      // Advanced dialog results are not necessarily in the compact <select>.
+      // Insert the chosen model as an option BEFORE assigning its value.
+      if(![...modelSelect.options].some(o=>o.value===m.id))
+        modelSelect.appendChild(option(m.id,cleanText(m.name||m.id)));
+      modelSelect.value=m.id;
+      updateModelUI();
+      $("#modelDialog").close();
+    };
     host.appendChild(b);
   });
 }
@@ -3011,7 +3023,7 @@ $("#settingsBtn").onclick=()=>{
 $("#temperature").oninput=e=>$("#temperatureValue").textContent=e.target.value;
 $("#saveSettings").onclick=()=>{settings={systemPrompt:$("#systemPrompt").value,temperature:Number($("#temperature").value),responsePace:$("#responsePace")?.value||"natural"};saveAll()};
 
-$("#modelSearchBtn").onclick=()=>{$("#modelDialog").showModal();$("#modelSearch").value="";currentModelFilter="all";$$(".filter-chip").forEach(b=>b.classList.toggle("active",b.dataset.filter==="all"));renderModelResults();setTimeout(()=>$("#modelSearch").focus(),20)};
+$("#modelSearchBtn").onclick=()=>{$("#modelDialog").showModal();$("#modelSearch").value="";currentModelFilter=freeOnlyEl.checked?"free":"all";$(".filter-chip").forEach(b=>b.classList.toggle("active",b.dataset.filter===currentModelFilter));renderModelResults();setTimeout(()=>$("#modelSearch").focus(),20)};
 $("#closeModelDialog").onclick=()=>$("#modelDialog").close();
 $("#modelSearch").oninput=renderModelResults;
 $$(".filter-chip").forEach(b=>b.onclick=()=>{currentModelFilter=b.dataset.filter;$$(".filter-chip").forEach(x=>x.classList.toggle("active",x===b));renderModelResults()});
