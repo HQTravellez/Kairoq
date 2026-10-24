@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/composer.css?v=4">
   <link rel="stylesheet" href="/home.css?v=13">
   <link rel="stylesheet" href="/design.css?v=17">
+  <link rel="stylesheet" href="/kairoq-ui.css?v=8">
   <link rel="stylesheet" href="/kairoq-ui.css?v=2">
 </head>
 <body>
@@ -720,16 +721,27 @@
               <button type="button" id="imageModeBtn" class="tool-btn image-mode-btn" title="Make or edit an image" aria-label="Make or edit an image"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg></button>
               <button type="button" id="videoModeBtn" class="tool-btn video-mode-btn" title="Make a video" aria-label="Make a video"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg></button>
 
+              <div class="kq-model">
+                <button type="button" id="modelPickerBtn" class="kq-model-btn" aria-haspopup="dialog" aria-expanded="false" title="Choose a model"><span id="modelPickerLabel">Auto</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+                <div id="modelPicker" class="kq-picker" role="dialog" aria-label="Choose a model" hidden>
+                  <input id="modelPickerSearch" class="kq-picker-search" type="search" placeholder="Search models" autocomplete="off">
+                  <div id="modelPickerList" class="kq-picker-list" role="listbox" aria-label="Models"></div>
+                  <div class="kq-picker-foot">
+                    <button type="button" id="modelPickerRefresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>Refresh models</button>
+                    <button type="button" id="modelPickerEdit"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Edit models…</button>
+                  </div>
+                </div>
+              </div>
               <div class="inline-select model-inline">
                 <select id="modelSelect" aria-label="Model"></select>
                 <button type="button" id="favoriteBtn" class="star-btn" title="Favourite this model" aria-label="Favourite this model">☆</button>
               </div>
 
               <div class="inline-select compact-inline">
-                <select id="effortSelect" aria-label="Thinking effort">
-                  <option value="low">Light</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">Ultra</option>
+                <select id="effortSelect" aria-label="Thinking effort" title="How hard the model thinks before answering">
+                  <option value="low">Low</option>
+                  <option value="medium">Med</option>
+                  <option value="high">High</option>
                 </select>
               </div>
 
@@ -820,6 +832,16 @@
 
       <button id="saveSettings" class="primary-btn" value="default">Save settings</button>
     </form>
+  </dialog>
+
+  <dialog id="modelsEditDialog" class="kq-models-edit" aria-labelledby="modelsEditTitle">
+   <div class="kq-edit-card">
+    <div class="kq-edit-head"><h2 id="modelsEditTitle">Models</h2><button type="button" class="kq-edit-close" id="modelsEditClose" aria-label="Close">×</button></div>
+    <p class="kq-edit-note">Choose which models appear in the picker.</p>
+    <input id="modelsEditSearch" class="kq-picker-search" type="search" placeholder="Search models" autocomplete="off">
+    <div id="modelsEditList" class="kq-edit-list"></div>
+    <div class="kq-edit-foot"><button type="button" id="modelsEditReset">Reset to defaults</button><button type="button" id="modelsEditDone" class="kq-edit-done">Done</button></div>
+   </div>
   </dialog>
 
   <dialog id="modelDialog">
@@ -1366,7 +1388,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=32"></script>
+  <script src="/app.js?v=33"></script>
 <script src="/connections.js?v=20"></script>
 </body>
 </html>

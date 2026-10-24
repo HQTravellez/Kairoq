@@ -374,7 +374,7 @@ function isLocalModelId(id=""){
 function stripLocalModelId(id=""){
   return String(id).replace(/^local\//,"");
 }
-async function localChatCompletion({messages,temperature=0.2,tools=null,responseFormat=null,model="",stream=false}={}){
+async function localChatCompletion({messages,temperature=0.2,tools=null,responseFormat=null,model="",stream=false,effort=""}={}){
   const resolved=model||await resolveLocalLlmModel({tools:Array.isArray(tools)&&tools.length>0});
   if(!resolved)throw new Error("No local model is available. Start Ollama/llama.cpp or set LOCAL_LLM_MODEL.");
   const payload={
@@ -383,6 +383,7 @@ async function localChatCompletion({messages,temperature=0.2,tools=null,response
     temperature,
     stream
   };
+  if(["low","medium","high"].includes(effort))payload.reasoning_effort=effort;
   if(Array.isArray(tools)&&tools.length){
     payload.tools=tools;
     payload.tool_choice="auto";
@@ -409,8 +410,14 @@ async function localChatCompletion({messages,temperature=0.2,tools=null,response
   if(!message)throw new Error("Local model returned no message.");
   return {message,usage:data.usage||null,model:data.model||resolved};
 }
-async function streamLocalLlm({messages,temperature=0.7,model=""},res){
-  const {response,model:resolved}=await localChatCompletion({messages,temperature,model,stream:true});
+// Models share their "thinking" under different names: OpenRouter/Ollama use delta.reasoning,
+// DeepSeek-style APIs use delta.reasoning_content. Chat shows it in a collapsible "Thought" panel.
+function reasoningDelta(delta){
+  const r=delta?.reasoning??delta?.reasoning_content??delta?.thinking;
+  return typeof r==="string"?r:"";
+}
+async function streamLocalLlm({messages,temperature=0.7,model="",effort=""},res){
+  const {response,model:resolved}=await localChatCompletion({messages,temperature,model,stream:true,effort});
   if(!response.body)throw new Error("Local model returned no stream.");
   const reader=response.body.getReader();
   const decoder=new TextDecoder();
@@ -419,10 +426,10 @@ async function streamLocalLlm({messages,temperature=0.7,model=""},res){
     const {value,done}=await reader.read();
     if(done)break;
     buffer+=decoder.decode(value,{stream:true});
-    const blocks=buffer.split("\\n\\n");
+    const blocks=buffer.split(/\r?\n\r?\n/);
     buffer=blocks.pop()||"";
     for(const block of blocks){
-      for(const line of block.split("\\n")){
+      for(const line of block.split(/\r?\n/)){
         if(!line.startsWith("data:"))continue;
         const raw=line.slice(5).trim();
         if(!raw||raw==="[DONE]")continue;
@@ -430,6 +437,8 @@ async function streamLocalLlm({messages,temperature=0.7,model=""},res){
         if(chunk?.error)throw new Error(chunk.error?.message||String(chunk.error));
         if(chunk?.model)finalModel=chunk.model;
         if(chunk?.usage)usage=chunk.usage;
+        const thought=reasoningDelta(chunk?.choices?.[0]?.delta);
+        if(thought)writeSSE(res,"thinking",{text:thought});
         const delta=chunk?.choices?.[0]?.delta?.content;
         if(typeof delta==="string"&&delta){
           emitted=true;
@@ -715,6 +724,8 @@ async function streamOpenRouter(payload, res) {
       if (chunk?.model) finalModel = chunk.model;
       if (chunk?.usage) usage = chunk.usage;
 
+      const thought = reasoningDelta(chunk?.choices?.[0]?.delta);
+      if (thought) writeSSE(res, "thinking", { text: thought });
       const delta = chunk?.choices?.[0]?.delta?.content;
       if (typeof delta === "string" && delta) {
         emitted = true;
@@ -4310,7 +4321,8 @@ async function handleChat(req, res) {
           messages:hermesSystem?[{role:"system",content:hermesSystem},...normalizeMessages(body.messages,100)]:normalizeMessages(body.messages,100),
           signal:hermesController.signal,
           onToken:text=>writeSSE(res,"token",{text}),
-          onStatus:message=>writeSSE(res,"status",{message})
+          onReasoning:text=>writeSSE(res,"thinking",{text}),
+          onStatus:message=>{writeSSE(res,"status",{message});writeSSE(res,"step",{text:message})}
         });
         writeSSE(res,"meta",{model:"hermes/agent",usage:{...(reply.usage||{}),cost:null}});
         writeSSE(res,"done",{ok:true,provider:"hermes",finishReason:reply.finishReason});
@@ -4379,6 +4391,25 @@ async function handleChat(req, res) {
         return res.end();
       }
     }
+    // A model picked by name in the picker is used as picked (ported from #146): Zero Cost
+    // mode used to swap any choice for Local Auto / Free Auto without saying so.
+    if(ZERO_COST_MODE&&!["openrouter/free","smart-auto","openrouter/auto","local/auto"].includes(requestedModel)){
+      if(isLocalModelId(requestedModel)){
+        const exact=stripLocalModelId(requestedModel);
+        writeSSE(res,"status",{message:`Local · ${exact}`});
+        await streamLocalLlm({messages:finalMessages,temperature,model:exact,effort},res);
+        writeSSE(res,"done",{ok:true,provider:"local",model:exact,zeroCost:true});
+        return res.end();
+      }
+      const selected=models.find(m=>m.id===requestedModel);
+      if(!selected)throw Object.assign(new Error(`${requestedModel} isn't available right now. Use Refresh models, or choose Auto (free).`),{status:400});
+      if(!selected.isFree)throw Object.assign(new Error(`${selected.name||requestedModel} is a paid model, and paid models are switched off (Zero Cost mode). Choose a free model or Auto (free).`),{status:400});
+      writeSSE(res,"status",{message:`Free · ${selected.name||requestedModel}`});
+      const result=await streamOpenRouter({messages:finalMessages,temperature,reasoning_effort:effort,model:requestedModel,stream:true,usage:{include:true}},res);
+      if(result.usage)await recordUsage(result.usage,{model:result.finalModel,kind:"chat_selected_free"});
+      writeSSE(res,"done",{ok:true,provider:"openrouter-free",model:result.finalModel,zeroCost:true});
+      return res.end();
+    }
     if(ZERO_COST_MODE){
       const preferredLocal=isLocalModelId(requestedModel)&&requestedModel!=="local/auto"?stripLocalModelId(requestedModel):await resolveLocalLlmModel();
       if(preferredLocal){
@@ -4387,7 +4418,7 @@ async function handleChat(req, res) {
           writeSSE(res,"status",{message:`Zero Cost · local ${preferredLocal} · paid web search blocked`});
         }
         try{
-          const result=await streamLocalLlm({messages:finalMessages,temperature,model:preferredLocal},res);
+          const result=await streamLocalLlm({messages:finalMessages,temperature,model:preferredLocal,effort},res);
           writeSSE(res,"done",{ok:true,provider:"local",zeroCost:true});
           return res.end();
         }catch(localErr){
@@ -4460,7 +4491,7 @@ async function handleChat(req, res) {
     if(isLocalModelId(requestedModel)){
       const model=requestedModel==="local/auto"?await resolveLocalLlmModel():stripLocalModelId(requestedModel);
       writeSSE(res,"status",{message:`Local · ${model}`});
-      const result=await streamLocalLlm({messages:finalMessages,temperature,model},res);
+      const result=await streamLocalLlm({messages:finalMessages,temperature,model,effort},res);
       writeSSE(res,"done",{ok:true,provider:"local",zeroCost:true});
       return res.end();
     }

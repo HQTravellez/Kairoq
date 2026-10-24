@@ -143,3 +143,35 @@ tests in `test/chat-browser.test.js` (runs a real Chromium when one is installed
 - `server.js` → `handleChat` — routing and fallback; `GET /api/hermes/status`.
 - `hermes/` — Dockerfile, `config.yaml`, `entrypoint.sh`, `railway.json`, `UPSTREAM.md`.
 - `test/hermes-chat.test.js` — runs without Hermes, against a fake of its API server.
+
+## Fast replies (like the Hermes desktop app)
+
+The Hermes desktop app feels instant because it uses a fast hosted model (Gemma 4 31B on
+Ollama Cloud) and streams every word. Kairoq's "Free Auto" route instead waits in line for
+free OpenRouter models and, when those are busy, falls back to providers that only send the
+whole answer at the end, so a reply can take 20+ seconds and then appear all at once.
+
+To get the same speed, point Kairoq's OpenAI-compatible model route at Ollama Cloud
+(Railway → Kairoq service → Variables):
+
+| Variable | Value |
+|---|---|
+| `LOCAL_LLM_BASE_URL` | `https://ollama.com/v1` |
+| `LOCAL_LLM_API_KEY` | key from ollama.com/settings/keys |
+| `LOCAL_LLM_MODEL` | `gemma4:31b` |
+
+With `ZERO_COST_MODE` on (the default) chat tries this route first and streams it. Ollama
+lists Gemma 4 31B at about $0.14 per million input tokens and $0.40 per million output tokens
+and may ask for a payment method before the key works.
+
+When Hermes is configured, owner chats go to Hermes first. Hermes adds memory and tools,
+which costs a little time on each reply; how fast it feels then depends on the model Hermes
+itself uses (`KAIROQ_HERMES_MODEL`).
+
+### Thought panel
+
+Models that share their thinking (`delta.reasoning`, `delta.reasoning_content`, or
+`<think>…</think>` at the start of the answer) now show it live in a "Thinking…" panel above
+the reply. It folds to "Thought for Ns" when the answer starts and is saved with the chat.
+Hermes tool steps (searches, page reads) appear in the same panel. The **Low / Med / High**
+picker next to the model sets how hard the model thinks (`reasoning_effort`).
