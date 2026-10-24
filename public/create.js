@@ -252,7 +252,7 @@ async function askThenBuild(prompt){
 }
 // ---------- editor ----------
 async function openProject(id,{pendingText,job}={}){
- const {project,account}=await api('/projects/'+id);
+ const {project,account,active_job}=await api('/projects/'+id);
  state.project=project;
  if(account)renderCredits(account);
  show('editor');history.replaceState(null,'','/create?project='+id);
@@ -266,7 +266,7 @@ async function openProject(id,{pendingText,job}={}){
  setPreview(project.preview_url);
  if(state.code)await renderFiles();
  if(state.data)await renderData();
- if(job)watch(job);
+ if(job||active_job)watch(job||active_job);
 }
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
