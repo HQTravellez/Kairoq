@@ -26,3 +26,11 @@ test('actual React builder integrates and saves owner requirements per project',
  assert.match(source,/fresh\.owner_requirements=ownerRequirements/);
  assert.match(source,/feature_verification:featureVerification/);
 });
+
+test('autonomous agent uses the same project requirement ledger',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const source=fs.readFileSync(path.join(__dirname,'../react-agent.js'),'utf8');
+ assert.match(source,/ownerContract\.merge\(meta\.owner_requirements\|\|\[\],text\)/);
+ assert.match(source,/ownerContract\.prompt\(ownerRequirements\)/);
+ assert.match(source,/fresh\.owner_requirements=ownerRequirements/);
+});
