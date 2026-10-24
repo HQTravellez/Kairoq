@@ -207,8 +207,16 @@ function stuckError(meta){
 }
 // "I can't see the website": a report about the preview, not a change request. Changing code
 // for it wastes credits and fixes nothing, so it gets a free answer with what to check.
+// Feature-level complaints are NOT preview-loading questions.
+// They must reach the builder's diagnose-and-repair path rather than canned help.
+function missingFeatureComplaint(message){
+ const t=String(message||'').trim();
+ return t.length<=500&&/\b(camera|scan|scanner|barcode|nutrition label|food search|dashboard|weight history|macro tracker)\b/i.test(t)&&
+ /\b(can'?t|cannot|can not|don'?t|do not|unable|missing|not visible|not showing|where is|where's|doesn'?t appear|you said|promised)\b/i.test(t);
+}
 function supportQuestion(message){
  const t=String(message||'').trim();
+ if(missingFeatureComplaint(t))return false;
  if(t.length>240||/https?:\/\//i.test(t)||/^(add|change|make|remove|update|create|build|replace|move|put|use|rename|delete|fix)\b/i.test(t))return false;
  return /\b(can'?t|cannot|can not|don'?t|do not|not able to|unable to|couldn'?t)\s+(see|view|open|find|load|access)\b|\bwant to (see|view|open)\b|\b(blank|white|empty|black)\s+(page|screen|preview|site)\b|\b(page|screen|preview|site|website|app)\s+(is|looks|stays|went|goes)\s+(blank|white|empty|black)\b|\b(preview|website|web site|site|app|page|screen)\b[^.]{0,40}\b(not|isn'?t|doesn'?t|won'?t|never)\s+(showing|show|loading|load|opening|open|appear|appearing|visible|there|work|working)\b|\bnothing (shows|appears|loads|is showing)\b|\bwhere is (the|my) (website|site|app|preview)\b/i.test(t);
 }
@@ -236,6 +244,11 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
  }
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ if((mode==='build'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingFeatureComplaint(message)){
+  const ownerComplaint=String(message).trim();
+  mode='build';
+  message='The owner reports a promised app feature is missing or inaccessible: '+ownerComplaint+'. Inspect the CURRENT app source, routes, authentication state, and actual reachable controls. Reproduce the missing-feature behavior in a browser. Implement or repair the actual feature in the existing project if it is absent or unreachable; preserve existing app functionality. Run the relevant browser journey and report only what was demonstrated. Never answer with generic preview-refresh guidance or claim success from a page-load test alone.';
+ }
  // An answer to the builder's open question ("ok", "yes", an option or its number) builds with
  // that answer, even from Discuss: the chat shows what the owner typed, the model gets a clear instruction.
  let shownText;
