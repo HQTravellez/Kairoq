@@ -764,8 +764,35 @@ function renderAttachments(){
  wrap.classList.toggle('hidden',!state.attachments.length);costHint();
 }
 $('chat-form').onsubmit=e=>{e.preventDefault();const message=$('chat-input').value.trim();if(message)send(message,state.mode)};
+// Keep the build watcher intact while a separate, read-only discussion streams.
+async function discussWhileBuilding(message){
+ if(state.sideChatPending){text($('chat-error'),'Your discussion reply is still arriving.');return}
+ state.sideChatPending=true;
+ const projectId=state.project.id;
+ const images=state.attachments.filter(a=>a.kind!=='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
+ $('messages').append(messageItem({role:'user',text:message,mode:'discuss'}));
+ let answer=messageItem({role:'assistant',text:'Reading your question…'});$('messages').append(answer);
+ $('chat-input').value='';
+ try{
+  const {job}=await api('/projects/'+projectId+'/chat',{method:'POST',body:{message,mode:'discuss',tier:state.tier,images:images.length?images:undefined}});
+  state.attachments=[];renderAttachments();
+  let current=job;
+  const deadline=Date.now()+60000;
+  while(!['complete','failed'].includes(current.status)){
+   if(Date.now()>deadline)throw Error('The discussion is taking longer than expected. Your build continues; reopen the project to retrieve the reply.');
+   await new Promise(r=>setTimeout(r,300));
+   current=(await api('/jobs/'+job.id)).job;
+   if(current.stream?.text){const next=messageItem({role:'assistant',text:current.stream.text});answer.replaceWith(next);answer=next;}
+  }
+  if(current.status==='failed')throw Error(current.error);
+  // Re-render only this reply; never replace or stop the active build watcher.
+  $('messages').append(messageItem({role:'assistant',text:current.result.message}));answer.remove();
+ }catch(err){answer.remove();$('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));}
+ finally{state.sideChatPending=false;}
+}
 async function send(message,mode,path='/chat',extra={}){
  // Keep chat responsive without starting a second build or executing queued changes.
+ if(state.job&&mode==='discuss')return discussWhileBuilding(message);
  if(state.job){
   const msg=String(message||'').trim();
   if(!msg)return;

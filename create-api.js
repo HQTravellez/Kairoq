@@ -232,9 +232,10 @@ function supportAnswer(meta){
   'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
  ].join('\n');
 }
-function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
+function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
- if(active){
+ const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
+ if(active&&!concurrentDiscuss){
   // A greeting must never enter the build queue or block the chat UI.
   if(!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
    const answer='Hello! A build is currently '+active.status+'. You can watch or stop the active job; no new build was started.';
@@ -244,7 +245,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
  }
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
- if((mode==='build'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingFeatureComplaint(message)){
+ if(!concurrentDiscuss&&(mode==='build'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingFeatureComplaint(message)){
   const ownerComplaint=String(message).trim();
   mode='build';
   message='The owner reports a promised app feature is missing or inaccessible: '+ownerComplaint+'. Inspect the CURRENT app source, routes, authentication state, and actual reachable controls. Reproduce the missing-feature behavior in a browser. Implement or repair the actual feature in the existing project if it is absent or unreachable; preserve existing app functionality. Run the relevant browser journey and report only what was demonstrated. Never answer with generic preview-refresh guidance or claim success from a page-load test alone.';
@@ -252,7 +253,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // An answer to the builder's open question ("ok", "yes", an option or its number) builds with
  // that answer, even from Discuss: the chat shows what the owner typed, the model gets a clear instruction.
  let shownText;
- if(!hooks&&(mode==='build'||mode==='discuss')){
+ if(!concurrentDiscuss&&!hooks&&(mode==='build'||mode==='discuss')){
   const Q=require('./builder-question'),a=Q.answer(message,Q.pending(builder.loadMeta(id)));
   if(a){shownText=String(message).trim();message=a.message;mode='build'}
  }
@@ -323,7 +324,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    const versionBefore=builder.loadMeta(id).current_version;
    if((mode==='build'||mode==='discuss')&&!referenceOnly&&process.env.KAIROQ_WEB_RESEARCH!=='off'){
     update({status:'researching'});
-    research=await require('./web').gather(message,{callModel,tier:modelTier,signal,webSearch,onProgress:p=>update({status:'researching',progress:p})}).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
+    research=await require('./web').gather(message,{callModel,tier:modelTier,signal,webSearch,browseSite,onProgress:p=>update({status:'researching',progress:p})}).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
     update({progress:null});
     if(research.context)context=[context,research.context].filter(Boolean).join('\n\n');
    }
@@ -341,7 +342,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     let extra='';
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',context,extra].filter(Boolean).join('\n\n');
-    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
+    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
      onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
@@ -405,9 +406,9 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     const memory={};
     if(usedRecipes.length)memory.recipes=usedRecipes.map(r=>r.title);
     if(recalled)memory.recalled=recalled.name;
-    if(mode!=='discuss'&&!hooks){const learned=await mem.learnPreferences(memOwner,message,{callModel}).catch(()=>[]);if(learned.length)memory.learned=learned}
+    if(mode!=='discuss'&&!hooks)mem.track(mem.learnPreferences(memOwner,message,{callModel}).catch(()=>[]));
     if(Object.keys(memory).length){job.result.memory=memory;try{const m=builder.loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.memory=memory;builder.saveMeta(m)}}catch{}}
-    if(mode!=='discuss'&&!hooks){const result=job.result;mem.track(usedRecipes.length?mem.useRecipes(memOwner,usedRecipes.map(r=>r.id),result,{callModel}):mem.writeRecipe(memOwner,{message,result,mode,projectId:id},{callModel}))}
+    if(mode!=='discuss'&&!hooks&&job.result.verification?.verified!==false){const result=job.result;mem.track(usedRecipes.length?mem.useRecipes(memOwner,usedRecipes.map(r=>r.id),result,{callModel}):mem.writeRecipe(memOwner,{message,result,mode,projectId:id},{callModel}))}
    }
    // The learning loop: what this build ran into on the way, and how it ended.
    if(mode!=='discuss'&&job.result)try{require('./build-lessons').recordBuild(id,{mode,result:job.result})}catch{}
@@ -805,7 +806,7 @@ function streamJob(req,res,job){
 }
 
 async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite}){
- const deps={callModel,checkRuntime,inspect,webSearch,designShots,generateImage};
+ const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
