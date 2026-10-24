@@ -1,0 +1,26 @@
+name: App request routing proof
+on:
+  push:
+    paths:
+      - 'public/app.js'
+      - 'test/app-intent-routing.test.js'
+      - '.github/workflows/app-intent-routing.yml'
+  pull_request:
+    paths:
+      - 'public/app.js'
+      - 'test/app-intent-routing.test.js'
+      - '.github/workflows/app-intent-routing.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  intent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check public/app.js
+      - run: node --test test/app-intent-routing.test.js
