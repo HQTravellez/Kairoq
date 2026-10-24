@@ -207,8 +207,16 @@ function stuckError(meta){
 }
 // "I can't see the website": a report about the preview, not a change request. Changing code
 // for it wastes credits and fixes nothing, so it gets a free answer with what to check.
+// Feature-level complaints are NOT preview-loading questions.
+// They must reach the builder's diagnose-and-repair path rather than canned help.
+function missingFeatureComplaint(message){
+ const t=String(message||'').trim();
+ return t.length<=500&&/\b(camera|scan|scanner|barcode|nutrition label|food search|dashboard|weight history|macro tracker)\b/i.test(t)&&
+ /\b(can'?t|cannot|can not|don'?t|do not|unable|missing|not visible|not showing|where is|where's|doesn'?t appear|you said|promised)\b/i.test(t);
+}
 function supportQuestion(message){
  const t=String(message||'').trim();
+ if(missingFeatureComplaint(t))return false;
  if(t.length>240||/https?:\/\//i.test(t)||/^(add|change|make|remove|update|create|build|replace|move|put|use|rename|delete|fix)\b/i.test(t))return false;
  return /\b(can'?t|cannot|can not|don'?t|do not|not able to|unable to|couldn'?t)\s+(see|view|open|find|load|access)\b|\bwant to (see|view|open)\b|\b(blank|white|empty|black)\s+(page|screen|preview|site)\b|\b(page|screen|preview|site|website|app)\s+(is|looks|stays|went|goes)\s+(blank|white|empty|black)\b|\b(preview|website|web site|site|app|page|screen)\b[^.]{0,40}\b(not|isn'?t|doesn'?t|won'?t|never)\s+(showing|show|loading|load|opening|open|appear|appearing|visible|there|work|working)\b|\bnothing (shows|appears|loads|is showing)\b|\bwhere is (the|my) (website|site|app|preview)\b/i.test(t);
 }
@@ -225,8 +233,22 @@ function supportAnswer(meta){
  ].join('\n');
 }
 function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
- for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+ const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
+ if(active){
+  // A greeting must never enter the build queue or block the chat UI.
+  if(!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
+   const answer='Hello! A build is currently '+active.status+'. You can watch or stop the active job; no new build was started.';
+   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true}};
+   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
+  }
+  throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
+ }
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ if((mode==='build'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingFeatureComplaint(message)){
+  const ownerComplaint=String(message).trim();
+  mode='build';
+  message='The owner reports a promised app feature is missing or inaccessible: '+ownerComplaint+'. Inspect the CURRENT app source, routes, authentication state, and actual reachable controls. Reproduce the missing-feature behavior in a browser. Implement or repair the actual feature in the existing project if it is absent or unreachable; preserve existing app functionality. Run the relevant browser journey and report only what was demonstrated. Never answer with generic preview-refresh guidance or claim success from a page-load test alone.';
+ }
  // An answer to the builder's open question ("ok", "yes", an option or its number) builds with
  // that answer, even from Discuss: the chat shows what the owner typed, the model gets a clear instruction.
  let shownText;
@@ -1059,7 +1081,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   const id=pm[1],action=pm[2]||'';
   const {role}=ownedProject(v,id,NEED[method+':'+action]||'owner');
   const projectView=(pid,r=role)=>projectViewFor(pid,r);
-  if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null}),true;
+  if(!action&&method==='GET')return send(res,200,{project:projectView(id),account:v.kind==='customer'?accounts.fromRequest(req):null,active_job:(()=>{const j=[...jobs.values()].find(j=>j.projectId===id&&ACTIVE.has(j.status));return j?publicJob(j):null})()}),true;
   // The app's picture for its card (project-thumbs.js).
   if(action==='/thumb'&&method==='GET'){const jpg=require('./project-thumbs').read(id);if(!jpg)return send(res,404,{error:'No picture yet'}),true;res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'private, max-age=86400','X-Content-Type-Options':'nosniff'});res.end(jpg);return true}
   // What the AI always knows about this project (project-memory.js).
@@ -1157,6 +1179,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     return send(res,201,{added,assistant:view()}),true;
    }
   }
+  if(action==='/nutrition'&&method==='DELETE'){
+   const b=await readJson(req,1000);
+   return send(res,200,backend.ownerClearNutritionRecords(id,b.collection,{confirm:b.confirm===true})),true;
   // Project-owner only. This route is handled before /chat and does not start a model job.
   if(action==='/users'&&method==='DELETE'){
    const b=await readJson(req,1500);
