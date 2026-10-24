@@ -350,9 +350,13 @@ function verifiedCard(v,checks,added){
  if(!rows.length)return document.createTextNode('');
  const all=rows.every(r=>r[0]);
  const box=el('div','verified '+(all?'ok':'bad'));
- box.append(el('div','verified-head',all?'Verified by Kairoq':'Kairoq found problems'));
+ box.append(el('div','verified-head',all?'Browser checks passed':'Browser checks found problems'));
  const ul=el('ul');for(const [ok,t] of rows){const li=el('li',ok?'ok':'bad');li.append(el('span','vmark',ok?'✓':'✗'),el('span',null,t));ul.append(li)}
- box.append(ul);box.title='Tested in a real browser on a test copy of your data, the way a customer would use it.';
+ box.append(ul);
+ const actualFlows=checks&&checks.ran>0&&Array.isArray(checks.failed)&&checks.failed.length===0;
+ const note=el('p','verification-scope',actualFlows?'Only the listed browser checks and saved flows were tested. Other requested features may still be unverified.':'Feature workflows (such as food search, daily calorie calculations, saved macro targets and weight history) have NOT been verified by these checks.');
+ box.append(note);
+ box.title='Browser check scope only; this is not certification that the whole application is complete.';
  return box;
 }
 function renderVersions(){
