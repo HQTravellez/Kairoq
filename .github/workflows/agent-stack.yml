@@ -14,6 +14,7 @@ on:
       - 'builder-response-policy.js'
       - 'model-output-guard.js'
       - 'test/model-output-guard.test.js'
+      - 'test/batch-scaffold.test.js'
       - 'test/*discuss*.test.js'
       - 'test/builder-response-policy.test.js'
       - 'test/agent-stack*.test.js'
@@ -35,7 +36,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci --ignore-scripts
       - run: npm run check
-      - run: node --test test/agent-stack.test.js test/agent-stack-builder.test.js test/ecc-context-recall.test.js test/hermes-learning-loop.test.js test/responsive-builder-chat.test.js test/builder-response-policy.test.js test/concurrent-discuss.test.js test/free-chat-orchestration.test.js test/model-output-guard.test.js
+      - run: node --test test/agent-stack.test.js test/agent-stack-builder.test.js test/ecc-context-recall.test.js test/hermes-learning-loop.test.js test/responsive-builder-chat.test.js test/builder-response-policy.test.js test/concurrent-discuss.test.js test/free-chat-orchestration.test.js test/model-output-guard.test.js test/batch-scaffold.test.js
       - run: node scripts/agent-stack.js status
       - run: node scripts/agent-stack.js graph > "$RUNNER_TEMP/agent-stack-graph.json"
       - uses: actions/upload-artifact@v4

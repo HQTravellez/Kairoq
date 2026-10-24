@@ -73,3 +73,21 @@ The screenshot fix proves image routing and payload retention. It does not prove
 the sample camera button in a pasted transcript is wired or that body measurements can
 be inferred from a photo. Do not enable the optional integrations or claim those app
 features are implemented without their separate runtime evidence.
+
+## Follow-up: bulk scaffold writes
+
+The agent protocol now prefers one `write_files` action for a cohesive scaffold,
+splitting only when the response limit requires it. Adjacent independent write actions
+are coalesced before the eight-tool limit; read/edit/delete and overlapping-file
+boundaries keep their order. This fixes silent loss of independent writes beyond the
+old action limit as well as avoiding repeated static checks within one response.
+
+`test/batch-scaffold.test.js`: **2 passed, 0 failed/skipped**. Fifteen independent
+writes become one action with every file retained. An actual agent run writes three
+modules in one file batch, builds them with Vite, and proves a counter click in Chrome.
+It uses two scripted model replies (write/test, then finish); no live model speed claim.
+The controlled test took 5.4 seconds overall on this machine.
+
+CI on initial PR commit 28fa546: 15 workflows completed successfully, including the
+new Node 22/24 modular stack workflow; broad benchmark was still running at inspection.
+Follow-up commit CI must be checked separately.
