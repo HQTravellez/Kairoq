@@ -30,3 +30,14 @@ test('missing camera complaint is routed to real feature diagnosis, not preview 
  assert.match(api,/Reproduce the missing-feature behavior in a browser/);
  assert.match(api,/Never answer with generic preview-refresh guidance/);
 });
+
+test('reopening a project reconnects active job so owner can stop or inspect it',()=>{
+ assert.match(api,/active_job:/);
+ assert.match(ui,/const \{project,account,active_job\}=await api/);
+ assert.match(ui,/if\(job\|\|active_job\)watch\(job\|\|active_job\)/);
+});
+test('nutrition-only deletion is exposed in data panel with explicit confirmation',()=>{
+ assert.match(ui,/nutritionCollections\.has\(state\.collection\)/);
+ assert.match(ui,/Delete ALL nutrition records/);
+ assert.match(ui,/\/nutrition'\,\{method:'DELETE'/);
+});
