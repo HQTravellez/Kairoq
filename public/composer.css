@@ -55,3 +55,11 @@
 /* Top bar: menu on the left, settings on the right, nothing else. */
 .topbar #studioNavBtn,.topbar #chatViewBtn,.topbar #shellModeBtn,.topbar #freePill,.topbar #zeroCostPill{display:none!important}
 .main[data-view=command] .topbar{background:transparent!important}
+
+/* Hermes-inspired agent workspace: compact, functional entrypoints, no fake status. */
+.agent-capabilities{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:0 0 9px;font-size:12px;}
+.agent-capabilities-label{font-size:10px;letter-spacing:.1em;opacity:.62;font-weight:700;margin-right:3px;}
+.agent-capabilities a{color:inherit;text-decoration:none;border:1px solid var(--border,rgba(145,157,181,.28));border-radius:99px;padding:5px 10px;background:rgba(120,140,170,.07);transition:background .18s,border-color .18s;}
+.agent-capabilities a:hover,.agent-capabilities a:focus-visible{background:rgba(120,140,170,.2);border-color:currentColor;}
+.agent-capabilities-hint{opacity:.55;font-size:11px;}
+@media(max-width:680px){.agent-capabilities-hint{display:none}.agent-capabilities-label{width:100%}.agent-capabilities{gap:5px}.agent-capabilities a{padding:5px 8px}}
