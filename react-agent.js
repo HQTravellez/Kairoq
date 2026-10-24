@@ -93,7 +93,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const generated=[],pendingChecks=[];
  // The agent's browser tests and SQL reads use a test copy of the data, never the real one.
  const box=require('./react-sandbox').create(id);
- let checksWarned=false;
+ let checksWarned=false,lastSavedChecks=null;
  const limit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
  const wb=require('./web').createBrowser({browseSite,maxOps:intEnv('KAIROQ_WEB_MAX_ACTIONS',30,5,100)});
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
@@ -120,7 +120,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const url=built.url+(route.startsWith('#')?route:'');
   const r=await inspect(url,{steps:Array.isArray(a.steps)?a.steps.slice(0,20):[],screenshot:vision,sandbox:box.token});
   if(r.skipped)return{text:prefix+' (Browser testing is not available on this server.)'};
-  lastTest={errors:r.errors,failed:r.steps.filter(s=>!s.ok).length};
+  lastTest={errors:r.errors,failed:r.steps.filter(s=>!s.ok).length,steps:r.steps.length};
   tl.add({t:'test',ok:!r.errors.length&&!lastTest.failed,text:r.steps.length?'Tested '+r.steps.length+' step'+(r.steps.length===1?'':'s')+' in a browser':'Opened the app in a browser',detail:[...r.steps.filter(s=>!s.ok).map(s=>s.step+' → '+s.error),...r.errors]});
   // A passing flow named with save_as becomes a saved check once the work is saved.
   if(a.save_as&&!lastTest.failed&&!r.errors.length&&Array.isArray(a.steps)&&a.steps.length){try{const c=require('./react-checks').normalize({name:a.save_as,path:a.path,steps:a.steps});const i=pendingChecks.findIndex(x=>x.name.toLowerCase()===c.name.toLowerCase());if(i>=0)pendingChecks.splice(i,1);pendingChecks.push(c);prefix+=' Saved as the check "'+c.name+'" when you finish.'}catch(e){prefix+=' Not saved as a check: '+e.message+'.'}}
@@ -252,7 +252,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const changed=Object.keys(files).filter(k=>base[k]!==files[k]).concat(Object.keys(base).filter(k=>!Object.hasOwn(files,k)));
   const fresh=builder.loadMeta(id),now=new Date().toISOString();
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
-  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped},...(errors.length?{runtime_errors:errors}:{})});
+  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements});
+  message=require('./engineering-completion-gate').resultMessage(message,completion);
+  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
   fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
@@ -302,10 +304,12 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     if(lastTest&&lastTest.errors.length&&!finishWarned){finishWarned=true;results.push('finish: the last test still shows problems (listed above). Fix them and test again, or call finish again to stop anyway.');continue}
     if(!checksWarned&&inspect&&require('./react-checks').list(builder.loadMeta(id)).length){
      checksWarned=true;report({status:'checking'});
-     const cr=await require('./react-checks').run(id,built.url,{inspect,version:built.n});
+     const cr=await require('./react-checks').run(id,built.url,{inspect,version:built.n});lastSavedChecks=cr;
      if(cr.failed.length){results.push('finish: these saved checks (flows that worked before) now fail:\n'+require('./react-checks').failureText(cr.failed)+'\nFix them and test again, or call finish again to stop anyway.');continue}
      results.push('Saved checks: all '+cr.ran+' passed.');
     }
+    const verdict=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements});
+    if(!verdict.verified&&!finishWarned){finishWarned=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Run real browser interactions, repair failures, and retest. If blocked, call finish again to save an explicitly UNVERIFIED draft.');continue}
     finished=save(message);break;
    }
    try{const r=await tool(a);results.push(clip(r.text,20000));if(r.image)image=r.image}
