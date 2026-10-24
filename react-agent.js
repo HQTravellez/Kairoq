@@ -113,7 +113,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=await require('./decision-router').suggest(text);
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
- const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
+ const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
 
@@ -131,7 +131,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const url=built.url+(route.startsWith('#')?route:'');
   const r=await inspect(url,{steps:Array.isArray(a.steps)?a.steps.slice(0,20):[],screenshot:vision,sandbox:box.token});
   if(r.skipped)return{text:prefix+' (Browser testing is not available on this server.)'};
-  lastTest={errors:r.errors,failed:r.steps.filter(s=>!s.ok).length,steps:r.steps.length};
+  lastTest={errors:r.errors,failed:r.steps.filter(s=>!s.ok).length,steps:r.steps.length,assertions:(Array.isArray(a.steps)?a.steps:[]).filter(s=>s.action==='expect').length};
   tl.add({t:'test',ok:!r.errors.length&&!lastTest.failed,text:r.steps.length?'Tested '+r.steps.length+' step'+(r.steps.length===1?'':'s')+' in a browser':'Opened the app in a browser',detail:[...r.steps.filter(s=>!s.ok).map(s=>s.step+' → '+s.error),...r.errors]});
   // A passing flow named with save_as becomes a saved check once the work is saved.
   if(a.save_as&&!lastTest.failed&&!r.errors.length&&Array.isArray(a.steps)&&a.steps.length){try{const c=require('./react-checks').normalize({name:a.save_as,path:a.path,steps:a.steps});const i=pendingChecks.findIndex(x=>x.name.toLowerCase()===c.name.toLowerCase());if(i>=0)pendingChecks.splice(i,1);pendingChecks.push(c);prefix+=' Saved as the check "'+c.name+'" when you finish.'}catch(e){prefix+=' Not saved as a check: '+e.message+'.'}}
@@ -272,6 +272,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   builder.saveMeta(fresh);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
   const failedChecks=require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.enabled!==false&&c.last&&c.last.version===built.n&&!c.last.ok).map(c=>({name:c.name,step:c.last.step||'',error:c.last.error||''}));
+  // Persist only executor-verified procedures; this background disk write does not call a model.
+  require('./account-memory').track(require('./verified-learning').capture({meta:fresh,query:text,
+   tools:steps.flatMap(s=>s.tools||[]),evidence:{built:!dirty,verified:completion.verified&&!stopped,skipped:false,
+    errors,failed:lastTest?.failed||0,interactions:lastTest?.steps||0,assertions:lastTest?.assertions||0,
+    version:built.n,sourceDigest:require('./verified-learning').sourceDigest(files)}}).catch(()=>({status:'unavailable'})));
   return{version:built.n,message,changed,verification:completion,steps:steps.length,timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
  }
  function noChange(message){
@@ -302,7 +307,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   invalidReplies=0;
   messages.push({role:'assistant',content:JSON.stringify({thought:reply.thought,actions:reply.actions})});
   const entry={n:step,thought:reply.thought,actions:reply.actions.map(describe)};
-  steps.push({...entry,summary:(reply.thought?reply.thought+' — ':'')+entry.actions.join('; ')});
+  steps.push({...entry,tools:reply.actions.map(a=>a.tool),summary:(reply.thought?reply.thought+' — ':'')+entry.actions.join('; ')});
   report({status:'working',step});
   const results=[];let image=null,finished=null;
   for(const a of reply.actions){

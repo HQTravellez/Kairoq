@@ -1,0 +1,26 @@
+name: Verified procedural learning
+on:
+  pull_request:
+    paths:
+      - 'verified-learning.js'
+      - 'react-agent.js'
+      - 'react-builder.js'
+      - 'scripts/learning-data.js'
+      - 'scripts/benchmark-learning.js'
+      - 'test/verified-learning.test.js'
+      - 'test/batch-scaffold.test.js'
+      - '.github/workflows/verified-learning.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  learning:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: node --test test/verified-learning.test.js test/hermes-learning-loop.test.js test/api-skill-memory.test.js test/engineering-completion-gate.test.js test/agent-stack-builder.test.js
+      - run: node scripts/benchmark-learning.js
