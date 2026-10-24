@@ -32,3 +32,10 @@ The Python gateway restricts request size, requires a bearer secret and caps Her
 - Hermes free inference is configured to use `openrouter/free` with an existing Railway reference, subject to provider quota and successful real call; no unlimited-free promise.
 - App generation, database actions, browser QA and deploy workflows remain Node-owned and need parity migration, not just an HTTP proxy.
 - A separate benchmark suite has an unrelated failure in `test/create-checks.test.js` (`no scripted reply`); investigate before production release.
+
+## Verification gate — official runtime image
+- A real upstream `AIAgent` import failed with `ModuleNotFoundError: dotenv` in the hand-built Python 3.13 container, despite passing its HTTP health check. The custom Dockerfile was therefore replaced by the upstream fully provisioned `nousresearch/hermes-agent` image; import verification is required in CI before use.
+- The official image is currently referenced by `latest` **only for testing**. Before production use, pin a known-good immutable digest and verify the exact upstream revision and its licenses.
+- Railway Python service has a 512 MB volume mounted at `/data`, with `HERMES_HOME=/data/hermes`, to retain memory across restarts. Persistence is not yet verified with a real model conversation.
+- The separate benchmark suite currently reports nine failing Node tests, including agent flow, app build, memory, and web-source behavior. No full product parity is claimed.
+- Do not merge or route production chat to this service until the real runtime import, authenticated model request, isolation, and browser app-building benchmarks pass.
