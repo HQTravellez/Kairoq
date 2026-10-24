@@ -101,7 +101,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  let work={...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=false,lastTest=null,finishWarned=false,invalidReplies=0;
  const steps=[];
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+ownerContract.prompt(ownerRequirements);
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text);
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
