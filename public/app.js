@@ -1680,10 +1680,10 @@ const SMALL_TALK=/^(hi+|hello|hey+|hiya|yo|hola|good (morning|afternoon|evening|
 function isAppCreationRequest(message){
   const text=String(message||'').trim();
   if(!text||text.length>1200)return false;
-  if(/^(how|why|what|where|when|can i|could i|should i|explain|show me how|teach me|compare|review|debug)\\b/i.test(text))return false;
-  if(/\\b(example|tutorial|snippet|sample code|explain|guide|instructions|how to)\\b/i.test(text))return false;
-  const product=/\\b(web[ -]?app|web application|mobile app|ios app|android app|website|dashboard|saas|portal|application|app)\\b/i;
-  const request=/\\b(build|create|make|develop|generate|design|need|want|looking for|set up|setup)\\b/i;
+  if(/^(how|why|what|where|when|can i|could i|should i|explain|show me how|teach me|compare|review|debug)\b/i.test(text))return false;
+  if(/\b(example|tutorial|snippet|sample code|explain|guide|instructions|how to)\b/i.test(text))return false;
+  const product=/\b(web[ -]?app|web application|mobile app|ios app|android app|website|dashboard|saas|portal|application|app)\b/i;
+  const request=/\b(build|create|make|develop|generate|design|need|want|looking for|set up|setup)\b/i;
   return product.test(text)&&request.test(text);
 }
 async function send(regenerateFrom=null){
