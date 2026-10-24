@@ -58,7 +58,8 @@ def generate(messages, conversation_key):
     if isinstance(result, str):
         return result
     if isinstance(result, dict):
-        return str(result.get("response") or result.get("content") or result.get("message") or "")
+        # Upstream Hermes returns a result envelope with `final_response`.
+        return str(result.get("final_response") or result.get("response") or result.get("content") or result.get("message") or "")
     return str(result)
 
 
