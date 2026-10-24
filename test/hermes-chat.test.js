@@ -177,3 +177,15 @@ test("Hermes remembers and learns on its own, without approvals nobody can give"
   const allowed = /api_server: \[([^\]]+)\]/.exec(yaml)[1];
   for (const t of ["memory", "session_search", "skills"]) assert.match(allowed, new RegExp(`\\b${t}\\b`));
 });
+
+test("Hermes sees the chat's last 100 messages and a larger always-on memory", () => {
+  const msgs = Array.from({ length: 130 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: "m" + i }));
+  const out = hermes.toHermesMessages(msgs);
+  assert.equal(out.length, 100);
+  assert.equal(out[0].content, "m30");
+  const server = fs.readFileSync(path.join(__dirname, "../server.js"), "utf8");
+  assert.match(server, /normalizeMessages\(body\.messages,100\)/);
+  const yaml = fs.readFileSync(path.join(__dirname, "../hermes/config.yaml"), "utf8");
+  assert.match(yaml, /memory_char_limit: 5000/);
+  assert.match(yaml, /user_char_limit: 3000/);
+});

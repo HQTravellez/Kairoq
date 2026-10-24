@@ -35,9 +35,15 @@ has no shell. Hermes' own bundled skills are also available.
 Hermes keeps its own long-term memory and learns new skills by itself. Both live on the
 service's volume (`/opt/data`), so they survive restarts and redeploys.
 
-- **Memory:** `memories/USER.md` (what it knows about you) and `memories/MEMORY.md` (its own
-  notes). Every 4 messages a background review saves anything worth remembering. Saying
-  "remember that…" makes it save right away. Every new chat starts with this memory loaded.
+- **Within a chat:** Hermes sees the chat's last **100 messages** (other models get 50).
+- **Every past chat:** all conversations are stored in Hermes' database and searchable with
+  `session_search` (no limit, no extra cost), so it can look up something said weeks ago
+  in another chat. Checked locally: a new chat found an earlier chat by searching for a
+  word from it.
+- **Always-on memory:** `memories/USER.md` (what it knows about you, up to 3,000 characters)
+  and `memories/MEMORY.md` (its own notes, up to 5,000), loaded into every new chat. Every
+  4 messages a background review saves anything worth keeping (4 is how often it checks,
+  not a limit). Saying "remember that…" makes it save right away.
 - **Self-learning:** when a reply takes 5 or more tool steps, a background review decides
   whether the approach is worth keeping and writes it as a new skill in `/opt/data/skills`.
   Learned skills show up in later chats next to Superpowers and Hermes' bundled skills.

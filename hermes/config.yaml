@@ -52,13 +52,18 @@ skills:
   write_approval: false
 
 # Long-term memory (MEMORY.md = Hermes' notes, USER.md = what it knows about the owner), kept
-# on the volume and loaded into every new chat. Every 4 messages a background review saves
-# anything worth remembering; Hermes can also save on its own when asked to remember.
+# on the volume and loaded into every new chat. nudge_interval is HOW OFTEN a background review
+# looks for things to save (every 4 of your messages), not a limit on what is kept. Hermes can
+# also save at once when asked to remember something.
 memory:
   memory_enabled: true
   user_profile_enabled: true
   write_approval: false
   nudge_interval: 4
+  # Always-loaded notes, larger than Hermes' defaults (2,200 / 1,375 characters). Everything
+  # else said in any past chat stays searchable through session_search (no limit).
+  memory_char_limit: 5000
+  user_char_limit: 3000
 
 # Listen on every interface (IPv4 and, where available, IPv6) so Railway's
 # private network and health check both reach it. Access still needs the key.

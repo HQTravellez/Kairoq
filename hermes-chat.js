@@ -9,7 +9,7 @@
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 20_000; // until Hermes starts answering
 const DEFAULT_IDLE_TIMEOUT_MS = 120_000;   // Hermes sends a keepalive every 10s
-const MAX_MESSAGES = 50;
+const MAX_MESSAGES = 100; // the chat's last 100 messages; older ones via Hermes session search
 
 function settings(env = process.env) {
   return {

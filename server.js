@@ -647,9 +647,9 @@ function purposePrompt(purpose) {
   return map[purpose] || "";
 }
 
-function normalizeMessages(messages) {
+function normalizeMessages(messages, limit = 50) {
   if (!Array.isArray(messages)) return [];
-  return messages.slice(-50).map(msg => ({
+  return messages.slice(-limit).map(msg => ({
     role: ["user", "assistant", "system"].includes(msg.role) ? msg.role : "user",
     content: msg.content
   }));
@@ -4305,7 +4305,9 @@ async function handleChat(req, res) {
       writeSSE(res,"status",{message:"Hermes is thinking…"});
       try{
         const reply=await hermes.streamChat({
-          messages:hermesSystem?[{role:"system",content:hermesSystem},...messages]:messages,
+          // Hermes keeps the last 100 messages of this chat in view (other models get 50);
+          // older chats and anything earlier stay reachable through its memory and session search.
+          messages:hermesSystem?[{role:"system",content:hermesSystem},...normalizeMessages(body.messages,100)]:normalizeMessages(body.messages,100),
           signal:hermesController.signal,
           onToken:text=>writeSSE(res,"token",{text}),
           onStatus:message=>writeSSE(res,"status",{message})
