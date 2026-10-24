@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','POST:/look':'editor','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -1053,6 +1053,19 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
   // Before a first build: a few quick questions when the request leaves something important open (free).
   if(route==='/clarify'&&method==='POST'){limitedKey('clarify:'+v.owner,30,3600000);const b=await readJson(req,8000);return send(res,200,{questions:process.env.KAIROQ_CLARIFY==='off'?[]:await require('./clarify').questions(b.prompt,{callModel:(o,parse)=>callModel({...o,fast:true},parse),tier:b.tier})}),true}
+  // Looks: the colours and fonts picked before a first build (looks.js).
+  if(route==='/looks'&&method==='GET'){
+   const looks=require('./looks'),recent=[];
+   // Palettes of the owner's three newest apps go last, so new apps do not repeat them.
+   for(const p of listFor(v).filter(p=>p.role==='owner').slice(0,3)){try{const id=builder.loadMeta(p.id).design?.look_id;if(id)recent.push(String(id).split('--')[0])}catch{}}
+   return send(res,200,{feels:looks.FEELS.map(([id,label])=>({id,label})),looks:looks.catalog(),brand:looks.brand(v.owner),recent}),true;
+  }
+  if(route==='/looks/brand'&&method==='POST'){const b=await readJson(req,8000);return send(res,200,{brand:require('./looks').saveBrand(v.owner,b.look===null?null:b.look)}),true}
+  if(route==='/looks/from-site'&&method==='POST'){
+   limitedKey('look-site:'+v.owner,12,3600000);
+   const b=await readJson(req,4000);
+   return send(res,200,await require('./looks').fromSite(String(b.url||'').trim(),{own:Boolean(b.own)})),true;
+  }
   if(route==='/projects'&&method==='POST'){
    const b=await readJson(req,16000000);
    // A sponsored template slot: what to start with comes from the slot, not the request.
@@ -1148,6 +1161,14 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
   if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
+  // The look picked before the first build becomes the project's design (react-builder prepareDesign).
+  if(action==='/look'&&method==='POST'){
+   const b=await readJson(req,12000),meta=builder.loadMeta(id);
+   if(meta.design)throw Object.assign(Error('This app already has its look. Ask for colour or font changes in the chat.'),{status:409});
+   meta.planned_design=require('./looks').toDesign(b.look,{request:String(b.prompt||'').slice(0,4000),projectName:meta.name});
+   builder.saveMeta(meta);
+   return send(res,200,{design:meta.planned_design}),true;
+  }
   // Ask your data: a question in plain words, answered from the app's saved records or SQL tables.
   if(action==='/askdata'&&method==='POST'){
    limitedKey('askdata:'+id,30,600000);

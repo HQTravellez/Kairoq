@@ -164,7 +164,7 @@ async function shoot(page,width,height,maxHeight){
  const full=await page.evaluate(()=>document.documentElement.scrollHeight).catch(()=>height);
  return(await page.screenshot({type:'jpeg',quality:60,fullPage:true,clip:{x:0,y:0,width,height:Math.max(height,Math.min(full,maxHeight))}})).toString('base64');
 }
-async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=25000}={}){
+async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=25000,lite=false}={}){
  const runtime=require('./runtime-check');
  if(!runtime.available())throw fail(503,'Website analysis needs a browser, which is not available on this server.');
  const start=await safeUrl(raw);let rules=await robots(start.origin,{fetchImpl}),origin=start.origin;
@@ -212,13 +212,13 @@ async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=2
    }catch(e){if(e.status)throw e;pages.push({url:u.href,path:u.pathname,error:String(e.message||e).split('\n')[0].slice(0,200)})}
   }
  }finally{await context.close().catch(()=>{})}
- // The home page on a phone: layout, navigation and overflow.
+ // The home page on a phone: layout, navigation and overflow (skipped for a quick look read).
  let phone=null;
- const pc=await b.newContext({viewport:{width:390,height:844},userAgent:UA+' Mobile',isMobile:true,hasTouch:true,deviceScaleFactor:1});
- try{await guardContext(pc);const p=await pc.newPage();await p.goto(start.href,{waitUntil:'load',timeout:timeoutMs});await p.waitForLoadState('networkidle',{timeout:6000}).catch(()=>{});await p.waitForTimeout(600);await scrollThrough(p);phone=await p.evaluate(phoneFacts);shots.push({name:'reference-home-phone',page:start.pathname,mime:'image/jpeg',data:await shoot(p,390,844,2200)})}
+ const pc=lite?null:await b.newContext({viewport:{width:390,height:844},userAgent:UA+' Mobile',isMobile:true,hasTouch:true,deviceScaleFactor:1});
+ if(pc)try{await guardContext(pc);const p=await pc.newPage();await p.goto(start.href,{waitUntil:'load',timeout:timeoutMs});await p.waitForLoadState('networkidle',{timeout:6000}).catch(()=>{});await p.waitForTimeout(600);await scrollThrough(p);phone=await p.evaluate(phoneFacts);shots.push({name:'reference-home-phone',page:start.pathname,mime:'image/jpeg',data:await shoot(p,390,844,2200)})}
  catch(e){phone={error:String(e.message||e).split('\n')[0].slice(0,200)}}finally{await pc.close().catch(()=>{})}
  const scripts=[...new Set(pages.flatMap(p=>p.scripts||[]))];
- const openapi=await discoverOpenApi(origin,{fetchImpl,extra:[...api.values()].map(a=>a.url).filter(u=>/openapi|swagger|api-docs/i.test(u))});
+ const openapi=lite?null:await discoverOpenApi(origin,{fetchImpl,extra:[...api.values()].map(a=>a.url).filter(u=>/openapi|swagger|api-docs/i.test(u))});
  const ok=pages.filter(p=>!p.error);
  if(!ok.length)throw fail(422,'The website did not load in the browser: '+(pages[0]?.error||'no pages'));
  return{kind:'website',url:start.href,origin,analyzed_at:new Date().toISOString(),pages:pages.map(({scripts,...p})=>p),phone,api:[...api.values()],integrations:integrations(scripts.concat([...api.values()].map(a=>a.url))),openapi,design:designTokens(ok[0]),robots_skipped:skipped,screenshots:shots};
