@@ -1,0 +1,24 @@
+name: Honest preview evidence
+on:
+  push:
+    paths:
+      - 'public/create.js'
+      - 'test/preview-verification-scope.test.js'
+      - '.github/workflows/preview-verification.yml'
+  pull_request:
+    paths:
+      - 'public/create.js'
+      - 'test/preview-verification-scope.test.js'
+      - '.github/workflows/preview-verification.yml'
+permissions:
+  contents: read
+jobs:
+  verification-copy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check public/create.js
+      - run: node --test test/preview-verification-scope.test.js
