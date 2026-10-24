@@ -1,0 +1,29 @@
+name: Curated engineering skills
+on:
+  push:
+    paths:
+      - 'engineering-workflows.js'
+      - 'react-builder.js'
+      - 'react-agent.js'
+      - 'test/engineering-workflows.test.js'
+      - '.github/workflows/engineering-skills.yml'
+  pull_request:
+    paths:
+      - 'engineering-workflows.js'
+      - 'react-builder.js'
+      - 'react-agent.js'
+      - 'test/engineering-workflows.test.js'
+      - '.github/workflows/engineering-skills.yml'
+permissions:
+  contents: read
+jobs:
+  skills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check engineering-workflows.js && node --check react-builder.js && node --check react-agent.js
+      - run: node --test test/engineering-workflows.test.js
