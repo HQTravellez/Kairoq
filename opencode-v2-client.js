@@ -1,0 +1,30 @@
+"use strict";
+// Direct OpenCode V2 server API client. Requires private loopback/sidecar deployment.
+// Never forward user-provided URLs or execute arbitrary shell commands.
+const DEFAULT="http://127.0.0.1:4096";
+function config(env=process.env){
+ const base=env.KAIROQ_OPENCODE_V2_URL||DEFAULT;
+ const url=new URL(base);
+ if(!["http:","https:"].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw Error("Invalid OpenCode URL");
+ const host=url.hostname.toLowerCase();
+ if(!["127.0.0.1","localhost","::1"].includes(host)&&env.KAIROQ_OPENCODE_V2_TRUSTED_REMOTE!=="true")throw Error("Remote OpenCode servers must be explicitly trusted");
+ return {base:url.href.replace(/\/$/,""),key:env.KAIROQ_OPENCODE_V2_TOKEN||""};
+}
+function makeClient({env=process.env,fetchImpl=fetch}={}){
+ const {base,key}=config(env);
+ async function request(method,route,body){
+  const response=await fetchImpl(base+route,{method,headers:{"Content-Type":"application/json",...(key?{Authorization:"Bearer "+key}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(20000)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error("OpenCode V2 HTTP "+response.status+": "+String(data?.error?.message||"unavailable").slice(0,180));
+  return data.data??data;
+ }
+ return {
+  health:()=>request("GET","/api/session?limit=1"),
+  createSession:(directory)=>request("POST","/api/session",{location:{directory}}),
+  setModel:(sessionID,model)=>request("POST","/api/session/"+encodeURIComponent(sessionID)+"/model",{model}),
+  prompt:(sessionID,text)=>request("POST","/api/session/"+encodeURIComponent(sessionID)+"/prompt",{text}),
+  wait:(sessionID)=>request("POST","/api/experimental/session/"+encodeURIComponent(sessionID)+"/wait",{}),
+  messages:(sessionID)=>request("GET","/api/session/"+encodeURIComponent(sessionID)+"/message?order=desc&limit=30"),
+ };
+}
+module.exports={config,makeClient};
