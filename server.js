@@ -605,7 +605,7 @@ async function getModels(force = false) {
   }
 
   const pythonModels=(process.env.KAIROQ_PYTHON_AGENT_URL&&process.env.KAIROQ_PYTHON_AGENT_TOKEN)?[{
-    id:"python/hermes",name:"Hermes · Python Agent",context_length:null,isFree:false,
+    id:"python/hermes",name:"Hermes · Python Agent",context_length:null,isFree:process.env.KAIROQ_HERMES_FREE_VERIFIED==="true",
     inputPrice:null,outputPrice:null,inputModalities:["text"],supportsVision:false,
     supportsTools:true,supportsReasoning:true,source:"hermes-python",configured:true
   }]:[];
@@ -4235,7 +4235,7 @@ async function handleChat(req, res) {
     const webSearch=body.webSearch===true;
 
     if(requestedModel==="python/hermes"){
-      if(freeOnly || ZERO_COST_MODE)return json(res,403,{error:"Hermes Python model is not verified free; disable Free Only and configure an approved provider."});
+      if((freeOnly || ZERO_COST_MODE) && process.env.KAIROQ_HERMES_FREE_VERIFIED!=="true")return json(res,403,{error:"Hermes Python model is not verified free; configure an authorized free provider or disable Free Only and Zero Cost Mode."});
       if(!process.env.KAIROQ_PYTHON_AGENT_URL||!process.env.KAIROQ_PYTHON_AGENT_TOKEN)
         return json(res,503,{error:"Hermes Python engine is not configured."});
       // The Python backend and current Node app share no implicitly trusted user state:
