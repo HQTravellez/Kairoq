@@ -168,3 +168,76 @@ body,.app,.main,.main[data-view=chat],.main[data-view=command]{background:var(--
 .assistant-content .md-table-wrap table{display:table!important;min-width:0!important;width:auto!important;border:0!important;border-radius:0!important}
 /* Phone: keep the model and effort on one row. */
 @media (max-width:640px){.composer .composer-tools{flex-wrap:nowrap!important;gap:2px!important}.composer .model-inline{max-width:120px!important}}
+
+/* ---------- model picker (like Hermes) ---------- */
+.composer .model-inline,.composer #modelBadge,.composer #favoriteBtn{display:none!important}
+.kq-model{position:relative;display:flex;align-items:center}
+.kq-model-btn{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 8px;border:0;background:transparent;border-radius:8px;color:var(--k-muted);font:500 13px/1 var(--k-font);cursor:pointer;max-width:220px}
+.kq-model-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kq-model-btn svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.kq-model-btn:hover,.kq-model-btn[aria-expanded=true]{background:var(--k-hover);color:var(--k-ink)}
+.kq-picker{position:absolute;left:0;bottom:calc(100% + 10px);z-index:60;width:340px;max-height:min(460px,62vh);display:flex;flex-direction:column;background:var(--k-surface);border:1px solid var(--k-line);border-radius:14px;box-shadow:0 12px 40px rgba(28,28,30,.14),0 2px 6px rgba(28,28,30,.06);overflow:hidden}
+.kq-picker[hidden]{display:none}
+.kq-picker-search{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--k-line);padding:12px 14px;font:14px var(--k-font);color:var(--k-ink);background:transparent;outline:none}
+.kq-picker-search::placeholder{color:var(--k-faint)}
+.kq-picker-list{overflow-y:auto;padding:6px;flex:1}
+.kq-group{font-size:11.5px;font-weight:600;color:var(--k-faint);padding:10px 8px 4px;letter-spacing:.02em}
+.kq-row{display:flex;align-items:center;gap:8px;min-height:34px;padding:0 8px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--k-ink)}
+.kq-row:hover,.kq-row.active{background:var(--k-hover)}
+.kq-row.selected{background:#eceff7}
+.kq-row.selected .kq-row-name{font-weight:600}
+.kq-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kq-row-hint{display:none}
+.kq-star{flex:none;width:22px;height:22px;display:grid;place-items:center;border:0;background:none;border-radius:6px;cursor:pointer;color:#c4c4c0;padding:0}
+.kq-star svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.kq-star:hover{color:var(--k-muted)}
+.kq-star.on{color:#d79b16}.kq-star.on svg{fill:currentColor}
+.kq-badge{flex:none;font-size:10.5px;font-weight:600;color:var(--k-muted);border:1px solid var(--k-line);border-radius:5px;padding:1px 5px}
+.kq-empty{padding:18px 10px;color:var(--k-muted);font-size:13.5px}
+.kq-picker-foot{border-top:1px solid var(--k-line);padding:4px}
+.kq-picker-foot button{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:0 10px;border:0;background:none;border-radius:8px;font:14px var(--k-font);color:var(--k-muted);cursor:pointer;text-align:left}
+.kq-picker-foot button:hover{background:var(--k-hover);color:var(--k-ink)}
+.kq-picker-foot svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* Edit models */
+dialog.kq-models-edit{width:min(440px,calc(100vw - 32px))!important;max-width:440px!important;color:var(--k-ink);font-family:var(--k-font)}
+dialog.kq-models-edit>.kq-edit-card{display:flex!important;flex-direction:column;max-height:min(640px,86vh);padding:0!important;border:1px solid var(--k-line)!important;border-radius:16px!important;background:var(--k-surface)!important;box-shadow:0 24px 60px rgba(28,28,30,.2)!important;overflow:hidden}
+dialog.kq-models-edit h2{font-size:16px!important}
+.kq-models-edit::backdrop{background:rgba(28,28,30,.28)}
+.kq-edit-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 0}
+.kq-edit-head h2{margin:0;font-size:16px;font-weight:600}
+.kq-edit-close{border:0;background:none;font-size:22px;line-height:1;color:var(--k-muted);cursor:pointer;width:32px;height:32px;border-radius:8px}
+.kq-edit-close:hover{background:var(--k-hover)}
+.kq-edit-note{margin:4px 16px 10px;font-size:13px;color:var(--k-muted)}
+.kq-models-edit .kq-picker-search{border-top:1px solid var(--k-line)}
+.kq-edit-list{overflow-y:auto;padding:4px 8px;flex:1}
+.kq-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;padding:0 8px;font-size:14px;border-radius:8px;cursor:pointer}
+.kq-toggle-row:hover{background:var(--k-hover)}
+.kq-toggle-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kq-toggle-row.kq-provider{margin-top:10px;font-size:12px;font-weight:600;color:var(--k-muted)}
+.kq-switch{appearance:none;flex:none;width:34px;height:20px;border-radius:999px;background:#d6d6d2;position:relative;cursor:pointer;transition:background .15s ease;margin:0}
+.kq-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s ease}
+.kq-switch:checked{background:var(--k-accent)}
+.kq-switch:checked::after{transform:translateX(14px)}
+.kq-edit-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:1px solid var(--k-line)}
+.kq-edit-foot button{border:0;background:none;font:14px var(--k-font);color:var(--k-muted);cursor:pointer;padding:8px 10px;border-radius:8px}
+.kq-edit-foot button:hover{background:var(--k-hover);color:var(--k-ink)}
+.kq-edit-foot .kq-edit-done{background:var(--k-ink);color:#fff}
+.kq-edit-foot .kq-edit-done:hover{background:#000;color:#fff}
+
+/* Effort: plain text with a small chevron, next to the model. */
+.composer #effortSelect{appearance:none;-webkit-appearance:none;padding-right:18px!important;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2366666b' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 2px center/14px!important;font-weight:500!important}
+@media (max-width:640px){
+  .kq-picker{position:fixed;left:12px;right:12px;width:auto;bottom:calc(env(safe-area-inset-bottom) + 150px);max-height:60vh}
+  .kq-model-btn{max-width:130px}
+}
+
+/* Search boxes in the picker are plain: no inherited border or focus ring. */
+.kq-picker input.kq-picker-search,dialog.kq-models-edit input.kq-picker-search{border:0!important;border-bottom:1px solid var(--k-line)!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:12px 16px!important;height:auto!important;outline:none!important}
+dialog.kq-models-edit input.kq-picker-search{border-top:1px solid var(--k-line)!important}
+dialog.kq-models-edit label.kq-toggle-row{font-weight:400}
+dialog.kq-models-edit label.kq-toggle-row.kq-provider{font-weight:600;color:var(--k-muted)!important}
+input.kq-switch{appearance:none!important;-webkit-appearance:none!important;width:34px!important;height:20px!important;border:0!important;padding:0!important;box-shadow:none!important}
+input.kq-switch{background:#d6d6d2!important;border-radius:999px!important;position:relative!important;flex:none!important;margin:0!important;cursor:pointer}
+input.kq-switch:checked{background:var(--k-accent)!important}
+input.kq-switch::after{content:""!important;display:block!important}

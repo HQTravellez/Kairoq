@@ -1100,9 +1100,9 @@ function fillModelSelect(){
   const previous=ui.lastModel||"openrouter/free";
   modelSelect.replaceChildren();
   const local=allModels.filter(m=>m.local&&m.id!=="local/auto");
-  if(local.length)modelSelect.appendChild(option("local/auto","◉ Ollama Auto · Local"));
-  modelSelect.appendChild(option("openrouter/free","⚡ Free Auto"));
-  modelSelect.appendChild(option("smart-auto","✦ Smart Auto"));
+  if(local.length)modelSelect.appendChild(option("local/auto","Ollama auto"));
+  modelSelect.appendChild(option("openrouter/free","Auto (free)"));
+  modelSelect.appendChild(option("smart-auto","Auto (best)"));
   if(local.length){
     const g=document.createElement("optgroup");g.label="Ollama · on your server";
     local.forEach(m=>g.appendChild(option(m.id,cleanText(m.name))));
@@ -1128,6 +1128,7 @@ function updateModelUI(){
   ui.lastModel=modelSelect.value;saveAll();
   const info=modelInfo(modelSelect.value);
   modelBadge.textContent=modelSelect.value==="openrouter/free"?"⚡ Free Auto":modelSelect.value==="smart-auto"?"✦ Smart Auto":`${info.name}${info.isFree?" · FREE":""}`;
+  if($("#modelPickerLabel"))$("#modelPickerLabel").textContent=pickerLabel(modelSelect.value);
   $("#favoriteBtn").classList.toggle("active",favorites.includes(modelSelect.value));
   $("#favoriteBtn").textContent=favorites.includes(modelSelect.value)?"★":"☆";
   const details=$("#activeModelDetails");
@@ -1147,6 +1148,109 @@ function updateModelUI(){
   }
 
 }
+
+// ---- Model picker (like Hermes): the model name as plain text, opening a searchable list
+// grouped by provider, with favourites and "Edit models" to choose which models show up.
+const PROVIDER_NAMES={anthropic:"Anthropic",openai:"OpenAI",google:"Google","meta-llama":"Meta",deepseek:"DeepSeek",qwen:"Qwen",mistralai:"Mistral","x-ai":"xAI",moonshotai:"Moonshot","z-ai":"Z.ai",nousresearch:"Nous Research",openrouter:"OpenRouter",microsoft:"Microsoft",nvidia:"NVIDIA",cohere:"Cohere",amazon:"Amazon",perplexity:"Perplexity",minimax:"MiniMax"};
+// Shown by default; everything else is one switch away in Edit models.
+const DEFAULT_PROVIDERS=["anthropic","openai","google","meta-llama","deepseek","qwen","mistralai","x-ai","moonshotai","z-ai","nousresearch"];
+const AUTO_MODELS=[{id:"openrouter/free",name:"Auto (free)",hint:"Kairoq picks an available free model"},{id:"smart-auto",name:"Auto (best)",hint:"Kairoq picks the best model for the question"}];
+let modelVisibility={};
+try{modelVisibility=JSON.parse(localStorage.getItem("kq-model-visibility")||"{}")||{}}catch{modelVisibility={}}
+function saveModelVisibility(){try{localStorage.setItem("kq-model-visibility",JSON.stringify(modelVisibility))}catch{}}
+function providerKey(m){return m.local?"ollama":String(m.id||"").split("/")[0]||"other"}
+function providerName(key){return key==="ollama"?"Ollama":PROVIDER_NAMES[key]||key.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase())}
+function pickerLabel(id){
+  const auto=AUTO_MODELS.find(a=>a.id===id);if(auto)return auto.name;
+  if(id==="local/auto")return"Ollama auto";
+  const m=allModels.find(x=>x.id===id);
+  if(m?.local||id.startsWith("local/")){
+    // "gemma4:31b · Local" → "Gemma4:31B"
+    const raw=cleanText(m?.name||id).replace(/^local\//,"").replace(/\s*·\s*local$/i,"");
+    return raw.charAt(0).toUpperCase()+raw.slice(1).replace(/:(\d+(?:\.\d+)?)b\b/i,(_,n)=>":"+n+"B");
+  }
+  return modelInfo(id).name||id;
+}
+function modelShown(m){
+  if(m.id in modelVisibility)return modelVisibility[m.id];
+  if(m.local||favorites.includes(m.id))return true;
+  return DEFAULT_PROVIDERS.includes(providerKey(m));
+}
+function pickModel(id,name){
+  const m=allModels.find(x=>x.id===id);
+  if(freeOnlyEl.checked&&m&&!m.isFree&&!m.local){setStatus("Free Only is on. Choose a free model or turn Free Only off in settings.",true);return false}
+  if(![...modelSelect.options].some(o=>o.value===id))modelSelect.appendChild(option(id,name||pickerLabel(id)));
+  modelSelect.value=id;updateModelUI();return true;
+}
+function pickerRow(m,{hint="",auto=false}={}){
+  const row=document.createElement("div");row.className="kq-row"+(modelSelect.value===m.id?" selected":"");row.setAttribute("role","option");row.setAttribute("aria-selected",modelSelect.value===m.id?"true":"false");row.tabIndex=-1;row.dataset.id=m.id;
+  const star=document.createElement("button");star.type="button";star.className="kq-star"+(favorites.includes(m.id)?" on":"");
+  star.setAttribute("aria-label",(favorites.includes(m.id)?"Remove from":"Add to")+" favourites");star.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>';
+  if(auto)star.style.visibility="hidden";
+  star.onclick=e=>{e.stopPropagation();favorites=favorites.includes(m.id)?favorites.filter(x=>x!==m.id):[...favorites,m.id];saveAll();renderModelPicker()};
+  const name=document.createElement("span");name.className="kq-row-name";name.textContent=m.label||pickerLabel(m.id);
+  row.append(star,name);
+  if(hint){const h=document.createElement("span");h.className="kq-row-hint";h.textContent=hint;row.appendChild(h)}
+  if(m.isFree&&!m.local&&!auto){const b=document.createElement("span");b.className="kq-badge";b.textContent="Free";row.appendChild(b)}
+  if(m.supportsReasoning&&!auto){const b=document.createElement("span");b.className="kq-badge";b.textContent="Thinks";b.title="Shares its thinking";row.appendChild(b)}
+  row.onclick=()=>{if(pickModel(m.id,m.label))closeModelPicker()};
+  return row;
+}
+function renderModelPicker(){
+  const host=$("#modelPickerList");if(!host)return;
+  const q=$("#modelPickerSearch").value.trim().toLowerCase();
+  const match=m=>!q||`${pickerLabel(m.id)} ${m.id} ${providerName(providerKey(m))}`.toLowerCase().includes(q);
+  host.replaceChildren();
+  const section=(title,rows)=>{if(!rows.length)return;const h=document.createElement("div");h.className="kq-group";h.textContent=title;host.append(h,...rows)};
+  section("Auto",AUTO_MODELS.filter(a=>!q||a.name.toLowerCase().includes(q)).map(a=>pickerRow({id:a.id,label:a.name},{hint:a.hint,auto:true})));
+  const fav=allModels.filter(m=>favorites.includes(m.id)&&match(m));
+  section("Favourites",fav.map(m=>pickerRow(m)));
+  const groups=new Map();
+  for(const m of allModels){
+    if(m.id==="local/auto"||favorites.includes(m.id)||!match(m))continue;
+    if(!q&&!modelShown(m))continue;
+    const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
+  }
+  const order=[...groups.keys()].sort((a,b)=>(a==="ollama"?-1:b==="ollama"?1:0)||((DEFAULT_PROVIDERS.indexOf(a)+1||99)-(DEFAULT_PROVIDERS.indexOf(b)+1||99))||a.localeCompare(b));
+  for(const k of order)section(providerName(k),groups.get(k).slice(0,q?60:40).map(m=>pickerRow(m)));
+  if(!host.querySelector(".kq-row")){const e=document.createElement("div");e.className="kq-empty";e.textContent=q?`No models match “${$("#modelPickerSearch").value}”.`:"No models yet. Use Refresh models.";host.appendChild(e)}
+}
+function openModelPicker(){
+  const p=$("#modelPicker");p.hidden=false;$("#modelPickerBtn").setAttribute("aria-expanded","true");
+  $("#modelPickerSearch").value="";renderModelPicker();
+  requestAnimationFrame(()=>{$("#modelPickerSearch").focus();p.querySelector(".kq-row.selected")?.scrollIntoView({block:"nearest"})});
+}
+function closeModelPicker(focusButton=false){
+  const p=$("#modelPicker");if(!p||p.hidden)return;p.hidden=true;$("#modelPickerBtn").setAttribute("aria-expanded","false");if(focusButton)$("#modelPickerBtn").focus();
+}
+function renderModelsEdit(){
+  const host=$("#modelsEditList");const q=$("#modelsEditSearch").value.trim().toLowerCase();host.replaceChildren();
+  const groups=new Map();
+  for(const m of allModels){if(m.id==="local/auto")continue;if(q&&!`${pickerLabel(m.id)} ${m.id}`.toLowerCase().includes(q))continue;const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m)}
+  const keys=[...groups.keys()].sort((a,b)=>(a==="ollama"?-1:b==="ollama"?1:0)||((DEFAULT_PROVIDERS.indexOf(a)+1||99)-(DEFAULT_PROVIDERS.indexOf(b)+1||99))||a.localeCompare(b));
+  const toggle=(label,checked,onchange,cls="")=>{const l=document.createElement("label");l.className="kq-toggle-row "+cls;const t=document.createElement("span");t.textContent=label;const i=document.createElement("input");i.type="checkbox";i.className="kq-switch";i.checked=checked;i.setAttribute("role","switch");i.onchange=()=>onchange(i.checked);l.append(t,i);return l};
+  for(const k of keys){
+    const list=groups.get(k);const shown=list.filter(modelShown).length;
+    host.appendChild(toggle(providerName(k)+` · ${shown} of ${list.length}`,shown>0,on=>{for(const m of list)modelVisibility[m.id]=on;saveModelVisibility();renderModelsEdit()},"kq-provider"));
+    for(const m of list)host.appendChild(toggle(pickerLabel(m.id),modelShown(m),on=>{modelVisibility[m.id]=on;saveModelVisibility();renderModelsEdit()}));
+  }
+  if(!keys.length){const e=document.createElement("div");e.className="kq-empty";e.textContent="No models match.";host.appendChild(e)}
+}
+$("#modelPickerBtn").onclick=e=>{e.stopPropagation();$("#modelPicker").hidden?openModelPicker():closeModelPicker()};
+$("#modelPickerSearch").oninput=renderModelPicker;
+$("#modelPickerSearch").onkeydown=e=>{
+  const rows=[...$("#modelPickerList").querySelectorAll(".kq-row")];if(!rows.length)return;
+  let i=rows.findIndex(r=>r.classList.contains("active"));
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();rows[i]?.classList.remove("active");i=e.key==="ArrowDown"?Math.min(rows.length-1,i+1):Math.max(0,i-1);rows[i].classList.add("active");rows[i].scrollIntoView({block:"nearest"})}
+  if(e.key==="Enter"){e.preventDefault();(rows[i]||rows[0]).click()}
+};
+$("#modelPicker").onkeydown=e=>{if(e.key==="Escape"){e.stopPropagation();closeModelPicker(true)}};
+document.addEventListener("click",e=>{if(!e.target.closest(".kq-model"))closeModelPicker()});
+$("#modelPickerRefresh").onclick=async()=>{await loadModels();renderModelPicker()};
+$("#modelPickerEdit").onclick=()=>{closeModelPicker();$("#modelsEditSearch").value="";renderModelsEdit();$("#modelsEditDialog").showModal()};
+$("#modelsEditSearch").oninput=renderModelsEdit;
+$("#modelsEditReset").onclick=()=>{modelVisibility={};saveModelVisibility();renderModelsEdit()};
+$("#modelsEditDone").onclick=$("#modelsEditClose").onclick=()=>$("#modelsEditDialog").close();
 
 function renderModelResults(){
   const q=$("#modelSearch").value.trim().toLowerCase();
@@ -1389,12 +1493,15 @@ memoryStore.settings ||= {autoMemory:true,autoSummarize:true};
 ensureProject(currentProject);
 workspaceMemory=memoryLinesToText(memoryStore.global);
 
-function applyPreset(name){
+// keepChoices: on page load, keep the model and thinking effort the person last picked
+// (the preset used to reset them to Free Auto / Low on every refresh).
+function applyPreset(name,{keepChoices=false}={}){
   const p=PRESETS[name];if(!p)return;
-  ui.preset=name;ui.effort=p.effort;ui.purpose=p.purpose;
-  effortSelect.value=p.effort;purposeSelect.value=p.purpose;webSearchEl.checked=p.web;
+  ui.preset=name;ui.purpose=p.purpose;
+  if(!keepChoices||!ui.effort)ui.effort=p.effort;
+  effortSelect.value=ui.effort;purposeSelect.value=p.purpose;webSearchEl.checked=p.web;
   routing.webSearch=p.web;
-  if(p.model){modelSelect.value=p.model;updateModelUI();}
+  if(p.model&&!(keepChoices&&ui.lastModel)){modelSelect.value=p.model;updateModelUI();}
   $$(".preset").forEach(b=>b.classList.toggle("active",b.dataset.preset===name));
   saveAll();
   setStatus(`${name[0].toUpperCase()+name.slice(1)} preset selected`);
@@ -3094,7 +3201,7 @@ updateRouting();
 if(!currentChatId&&chats.length)currentChatId=chats[0].id;
 if(!getChat())newChat();else{renderHistory();renderChat()}
 setMainView(["chat","studio"].includes(mainView) ? mainView : "command");
-applyPreset(ui.preset||"quick");
+applyPreset(ui.preset||"quick",{keepChoices:true});
 checkSession().then(async ok=>{
   if(ok){
     await checkCloudMemory();
