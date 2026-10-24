@@ -4245,7 +4245,8 @@ async function handleChat(req, res) {
     const zeroCostSystem=ZERO_COST_MODE
       ?"ZERO COST MODE is active. Do not claim a paid external search or paid model was used. If current web information is required but no free/local web tool is available, say so rather than inventing current facts."
       :"";
-    const system=[presetSystem,customPresetPrompt,memorySystem,zeroCostSystem,userSystem].filter(Boolean).join("\n\n");
+    const capabilitySystem="Kairoq has an existing guarded public website reader, web research path and API documentation tooling. Do not claim Kairoq categorically cannot browse or read external documentation. If the request needs public API docs, use the application-provided research results when available; if fetching fails, report that specific failure. Never claim sandbox requests or generated integration code have been executed unless there is execution evidence. Current user project context may be incomplete: do not assume the active app is about nutrition when the user asks about Sabre travel APIs.";
+    const system=[presetSystem,capabilitySystem,customPresetPrompt,memorySystem,zeroCostSystem,userSystem].filter(Boolean).join("\n\n");
     const finalMessages=system?[{role:"system",content:system},...messages]:messages;
     const temperature=Number.isFinite(Number(body.temperature))?Math.max(0,Math.min(2,Number(body.temperature))):0.7;
 
@@ -4290,7 +4291,8 @@ async function handleChat(req, res) {
         return res.end();
       }
     }
-    const needsOnlineResearch=webSearch||/\b(latest|current|today|recent|news|online|search (?:the )?(?:web|internet|online)|look up|research online|as of 20\d{2}|this week|right now|live prices?|compare.*(?:prices|providers))\b/i.test(lastUserText);
+    const wantsApiResearch=/\b(api|apis|sdk|swagger|openapi|endpoint|integration|integrate)\b/i.test(lastUserText)&&/\b(sabre|documentation|docs|developer|read|research|browse|find|build|connect|integration|integrate)\b/i.test(lastUserText);
+    const needsOnlineResearch=webSearch||wantsApiResearch||/\b(latest|current|today|recent|news|online|search (?:the )?(?:web|internet|online)|look up|research online|as of 20\d{2}|this week|right now|live prices?|compare.*(?:prices|providers))\b/i.test(lastUserText);
     if(!websiteUrlMatch && needsOnlineResearch){
       writeSSE(res,"status",{message:"Searching public web sources…"});
       try{
