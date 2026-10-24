@@ -530,6 +530,7 @@ function ownerClearNutritionRecords(id,collection,{confirm=false}={}){
  const count=db.prepare('SELECT COUNT(*) n FROM records WHERE collection=?').get(collection).n;
  db.prepare('DELETE FROM records WHERE collection=?').run(collection);
  return{cleared:true,collection,deleted:count,usersUntouched:true,otherCollectionsUntouched:true};
+}
 // Only the authenticated project owner can invoke this through create-api.
 // Keep deletion independent of a running AI generation job.
 function ownerRemoveAppUser(id,email,{deleteOwnedRecords=false}={}){
@@ -725,5 +726,4 @@ async function runAllSchedules(options){
 }
 // Every due automation on every app (called every minute by the server).
 function runAllAutomations(options){return require('./react-automations').tick(options)}
-module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,ownerClearNutritionRecords,database,close,ACCESS};
-module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,ownerRemoveAppUser,database,close,ACCESS};
+module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,ownerClearNutritionRecords,ownerRemoveAppUser,database,close,ACCESS};
