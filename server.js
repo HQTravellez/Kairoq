@@ -6666,6 +6666,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
       onFallback?.(err);opts=rest;
     }
   }
+  if(opts.tier==="chat")return callOpenRouterBuilder(opts,parse);
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   return callOpenRouterBuilder(opts,parse);
 }
