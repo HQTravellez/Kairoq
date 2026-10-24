@@ -4323,6 +4323,22 @@ async function handleChat(req, res) {
         return res.end();
       }
     }
+    if(ZERO_COST_MODE && requestedModel!=="openrouter/free" && requestedModel!=="smart-auto" && requestedModel!=="openrouter/auto"){
+      // Never silently swap a manually selected free model for Local Auto / Free Auto.
+      if(isLocalModelId(requestedModel)){
+        const exact=requestedModel==="local/auto"?await resolveLocalLlmModel():stripLocalModelId(requestedModel);
+        if(!exact)throw Error("Selected local model is not available.");
+        const result=await streamLocalLlm({messages:finalMessages,temperature,model:exact},res);
+        writeSSE(res,"done",{ok:true,provider:"local",model:exact,zeroCost:true});
+        return res.end();
+      }
+      const selected=models.find(m=>m.id===requestedModel);
+      if(!selected||!selected.isFree)throw Error("Selected model is not verified free and cannot run in Zero Cost mode.");
+      const result=await streamOpenRouter({messages:finalMessages,temperature,model:requestedModel,stream:true,usage:{include:true}},res);
+      if(result.usage)await recordUsage(result.usage,{model:result.finalModel,kind:"chat_selected_free"});
+      writeSSE(res,"done",{ok:true,provider:"openrouter-free",model:result.finalModel,zeroCost:true});
+      return res.end();
+    }
     if(ZERO_COST_MODE){
       const preferredLocal=isLocalModelId(requestedModel)&&requestedModel!=="local/auto"?stripLocalModelId(requestedModel):await resolveLocalLlmModel();
       if(preferredLocal){

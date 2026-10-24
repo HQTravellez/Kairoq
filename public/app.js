@@ -1087,6 +1087,23 @@ function fillModelSelect(){
     local.forEach(m=>g.appendChild(option(m.id,cleanText(m.name))));
     modelSelect.appendChild(g);
   }
+  // Explicitly expose every eligible free model in the primary selector.
+  // Do not hide the catalog behind favorites or a separate advanced dialog.
+  const eligibleFree=allModels.filter(m=>m.isFree&&m.id!=="openrouter/free"&&!m.local);
+  if(eligibleFree.length){
+    const g=document.createElement("optgroup");g.label="Free cloud models";
+    for(const m of eligibleFree)g.appendChild(option(m.id,cleanText(m.name||m.id)));
+    modelSelect.appendChild(g);
+  }
+  // Keep the full catalog accessible even when Free Only is off.
+  if(!freeOnlyEl.checked){
+    const other=allModels.filter(m=>!m.isFree&&!m.local);
+    if(other.length){
+      const g=document.createElement("optgroup");g.label="Other models · may require payment";
+      for(const m of other)g.appendChild(option(m.id,cleanText(m.name||m.id)));
+      modelSelect.appendChild(g);
+    }
+  }
   const fav=allModels.filter(m=>favorites.includes(m.id)).slice(0,8);
   if(fav.length){
     const group=document.createElement("optgroup");group.label="★ Favorites";
