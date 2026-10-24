@@ -22,3 +22,11 @@ test('failed browser assertion never becomes passed',async()=>{
  const r=await qa.verify({requirements:[req[0]],proposed:[valid],id:'demo',url:'http://example.test',inspect:async()=>({}),checksModule:{normalize:c=>c,run:async()=>({ran:1,failed:[{error:'Food not in diary'}]})}});
  assert.equal(r.allPassed,false);assert.match(r.results[0].reason,/Food not in diary/);
 });
+
+test('React builder actually feeds the owner requirements to browser acceptance',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const source=fs.readFileSync(path.join(__dirname,'../react-builder.js'),'utf8');
+ assert.match(source,/featureQA\.instructions\(ownerRequirements\)/);
+ assert.match(source,/featureQA\.verify\(\{requirements:ownerRequirements/);
+ assert.match(source,/last\.feature_acceptance=acceptance/);
+});
