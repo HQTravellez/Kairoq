@@ -1,0 +1,27 @@
+name: Free conversational orchestration
+on:
+  push:
+    paths:
+      - 'server.js'
+      - 'react-builder.js'
+      - 'test/free-chat-orchestration.test.js'
+      - '.github/workflows/free-chat-orchestration.yml'
+  pull_request:
+    paths:
+      - 'server.js'
+      - 'react-builder.js'
+      - 'test/free-chat-orchestration.test.js'
+      - '.github/workflows/free-chat-orchestration.yml'
+permissions:
+  contents: read
+jobs:
+  conversational:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check server.js && node --check react-builder.js
+      - run: node --test test/free-chat-orchestration.test.js
