@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const loop=require('../hermes-learning-loop');
 const DIGEST='a'.repeat(64);
-function store(){const records=[];return {records,append:async(_,r)=>{records.push(r);return r;},history:async()=>records};}
+function store(){const records=[];return {records,append:async(projectId,r)=>{records.push({...r,projectId});return r;},history:async(projectId)=>records.filter(r=>r.projectId===projectId)};}
 test('verified learnings persist across independent calls and failed attempts never enter recall',async()=>{
  const db=store();
  await loop.observe({projectId:'demo',task:'Generate app',diagnostic:'Registration button missed POST request',correction:'Use trusted registration runtime',passed:false,evidenceDigest:DIGEST},db);
@@ -19,7 +19,7 @@ test('rejects unverified results and possible secrets',async()=>{
 test('API learning requires verified executions and holdout improvement',async()=>{
  const db=store(),pattern={name:'List records',verification:'HTTP 200 and schema validated',requestPattern:'GET /records'};
  await assert.rejects(loop.proposeApiSkill({projectId:'demo',skillId:'records',pattern,evidenceDigests:[DIGEST]},db),/verified/);
- db.records.push({type:'api-execution',passed:true,responseDigest:DIGEST});
+ db.records.push({projectId:'demo',type:'api-execution',passed:true,responseDigest:DIGEST});
  const candidate=await loop.proposeApiSkill({projectId:'demo',skillId:'records',pattern,evidenceDigests:[DIGEST]},db);
  assert.equal(candidate.version,1);
  assert.equal(await loop.recalledApiSkill({projectId:'demo',skillId:'records'},db),null);
