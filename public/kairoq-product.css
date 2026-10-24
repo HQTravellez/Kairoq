@@ -1,0 +1,23 @@
+/* Kairoq product baseline: deliberate spacing, legible primary task, accessible composer. */
+:root { --k-focus: #7ca9ff; --k-radius: 16px; }
+.composer-shell { max-width: 920px; width: min(100%, 920px); margin-inline:auto; padding-inline: clamp(12px, 2vw, 22px); box-sizing:border-box; }
+.composer { border-radius: var(--k-radius); overflow: visible; box-sizing:border-box; }
+.composer textarea#prompt { width:100%; min-height:60px; max-height:200px; resize:vertical; line-height:1.55; font-size:15px; box-sizing:border-box; }
+.composer-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.composer-tools { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
+.model-inline { min-width:148px; max-width:min(280px, 100%); }
+#modelSelect { min-width:148px; max-width:250px; font-size:13px; text-overflow:ellipsis; }
+#modelSearchBtn { border-radius:10px; }
+#statusBar.status-bar { position:relative; inset:auto; margin:0 0 10px; padding:0 4px; max-height:88px; overflow:auto; z-index:auto; pointer-events:auto; }
+.composer button:focus-visible, .composer select:focus-visible, .composer textarea:focus-visible, #modelSearchBtn:focus-visible { outline:2px solid var(--k-focus); outline-offset:2px; }
+.composer button:disabled { opacity:.5; cursor:not-allowed; }
+#modelBadge.hidden, #activeModelDetails:empty { display:none !important; }
+@media (max-width:640px) {
+  .composer-shell { padding-inline:12px; }
+  .composer-bottom { gap:8px; }
+  .composer-tools { flex:1 1 100%; }
+  #modelSelect { max-width:185px; }
+  .composer button, .composer select { min-height:40px; }
+  .send-actions { margin-left:auto; }
+}
+@media (prefers-reduced-motion: reduce) { .composer *, #modelDialog * { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
