@@ -454,3 +454,20 @@ input.kq-switch:checked{background:var(--k-wine)!important}
 .main .composer-shell .composer,.main .composer-shell>.status-bar{max-width:none!important}
 .main[data-view=command] .composer-shell{padding:12px 40px 14px!important}
 @media (max-width:640px){.main .messages{padding:16px 16px 0!important}.main .composer-shell{padding:8px 12px 12px!important}}
+
+/* PDF tools dialog (+ menu → PDF tools) */
+.kq-pdf{border:0!important;border-radius:14px!important;padding:20px 22px!important;background:#fff!important;width:min(480px,calc(100vw - 32px))!important;max-width:none!important;margin:auto!important;inset:0;height:fit-content;box-shadow:0 30px 80px -20px rgba(0,0,0,.35);color:#1d1d1f;font-family:Geist,-apple-system,sans-serif}
+.kq-pdf::backdrop{background:rgba(29,29,31,.32)}
+.kq-pdf-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.kq-pdf-head h2{margin:0;font-size:18px;font-weight:600}
+.kq-pdf-x{width:34px;height:34px;border:1px solid #e8e3dc;border-radius:8px;background:#fff;font-size:18px;cursor:pointer}
+.kq-pdf-tools{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.kq-pdf-tool{height:34px;padding:0 12px;border:1px solid #dcdce0;border-radius:17px;background:#fff;font:500 13px inherit;cursor:pointer;color:#1d1d1f}
+.kq-pdf-tool.on{background:#1d1d1f;border-color:#1d1d1f;color:#fff}
+.kq-pdf-sub,.kq-pdf-note{font-size:12.5px;color:#6e6e73;margin:6px 0 10px}
+.kq-pdf input[type=file]{display:block;margin:6px 0 10px;font-size:13px}
+.kq-pdf-opt label{display:flex;flex-direction:column;gap:4px;font-size:13px;margin-bottom:10px}
+.kq-pdf-opt input{height:36px;border:1px solid #dcdce0;border-radius:8px;padding:0 10px;font:14px inherit}
+.kq-pdf-go{height:38px;padding:0 18px;border:0;border-radius:8px;background:var(--k-wine,#8a2d3b);color:#fff;font:500 14px inherit;cursor:pointer}
+.kq-pdf-go:disabled{opacity:.5}
+.kq-pdf-dl{color:var(--k-wine,#8a2d3b);font-weight:600}
+.kq-pdf-head,.kq-pdf-head h2{border:0!important;background:none!important;box-shadow:none!important;padding:0!important}

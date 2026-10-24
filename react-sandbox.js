@@ -23,7 +23,9 @@ function create(id){
  const dir=path.join(builder.projectDir(id),'sandboxes',token);
  fs.mkdirSync(dir,{recursive:true});
  const backend=require('./react-backend'),pg=require('./pg-sync');
- if(pg.enabled())copySchema(backend.database(id),pg.schemaName('sb_'+token));
+ // An app whose data is in the owner's Supabase gets a SQLite test copy, never tables in their database.
+ if(require('./app-database').connection(id))pg.exportToSqlite(backend.database(id),path.join(dir,'data.sqlite'));
+ else if(pg.enabled())copySchema(backend.database(id),pg.schemaName('sb_'+token));
  else snapshot(path.join(builder.projectDir(id),'data.sqlite'),path.join(dir,'data.sqlite'),{conn:fs.existsSync(path.join(builder.projectDir(id),'data.sqlite'))?backend.database(id):null});
  snapshot(path.join(builder.projectDir(id),'app-sql.sqlite'),path.join(dir,'app-sql.sqlite'));
  boxes.set(token,{id,dir,at:Date.now()});
@@ -47,7 +49,7 @@ function destroy(token){
  boxes.delete(token);
  try{require('./react-backend').closeFile(path.join(b.dir,'data.sqlite'))}catch{}
  const pg=require('./pg-sync');
- if(pg.enabled())try{require('./react-backend').database(b.id).exec('DROP SCHEMA IF EXISTS "'+pg.schemaName('sb_'+token)+'" CASCADE')}catch{}
+ if(pg.enabled()&&!require('./app-database').connection(b.id))try{require('./react-backend').database(b.id).exec('DROP SCHEMA IF EXISTS "'+pg.schemaName('sb_'+token)+'" CASCADE')}catch{}
  try{require('./react-sql').closeEverywhere(b.dir)}catch{}
  fs.rmSync(b.dir,{recursive:true,force:true});
 }

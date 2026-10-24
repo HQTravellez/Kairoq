@@ -4167,7 +4167,13 @@ async function readPublicWebsiteForChat(rawUrl){
   const headings=[...html.matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/gi)].slice(0,12).map(m=>m[1].replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
   const content=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/\s+/g," ").trim();
   let browserContent="",browserHeadings=[];
-  if(content.length<800 || (headings.length===0&&content.length<1800)){
+  // Crawl4AI, when connected (crawl4ai.js), reads thin or script-built pages as clean Markdown.
+  const crawl4ai=require("./crawl4ai");
+  if(crawl4ai.configured()&&(content.length<800 || (headings.length===0&&content.length<1800))){
+    try{const md=await crawl4ai.markdown(u.toString());if(md.length>content.length+80){browserContent=md.slice(0,12000);browserHeadings=[...md.matchAll(/^#{1,3}\s+(.+)$/gm)].slice(0,18).map(m=>m[1].trim())}}
+    catch(e){console.warn("Crawl4AI reader:",e.message)}
+  }
+  if(!browserContent&&(content.length<800 || (headings.length===0&&content.length<1800))){
     try{const result=await require("./browser-reader").renderPage(u.toString());browserContent=String(result.body||"").slice(0,12000);browserHeadings=Array.isArray(result.headings)?result.headings:[]}
     catch(e){console.warn("Chromium renderer unavailable:",e.message)}
   }
@@ -6637,6 +6643,9 @@ function pluginStatus(env = process.env) {
       { id: "memory", name: "Memory", tag: "built in", about: "Remembers you across chats and searches every past conversation.", kairoq: { on: true }, hermes: hermesOn ? { on: true } : off("Hermes isn't connected") },
       { id: "jev", name: "Jev API pipeline", source: "claude-x-jev", about: "Reads API docs and suggests the next step in API Studio.", kairoq: jevOn ? { on: true } : off(jev.enabled ? "Needs TYPESAFE_API_KEY and SCALEDOWN_API_KEY" : "Set KAIROQ_API_INTELLIGENCE=on and the Typesafe and ScaleDown keys"), hermes: null },
       { id: "hyperframes", name: "HyperFrames", about: "Turns a script into a short video made from HTML scenes.", kairoq: videoOn ? { on: true } : off("Needs KAIROQ_HYPERFRAMES=on and the renderer installed"), hermes: null },
+      { id: "supabase", name: "Supabase", source: "supabase/supabase", about: "Keep an app's sign-ups and saved data in your own Supabase. Connect it per app in the app builder: Settings → Database.", kairoq: { on: true, note: "Per app" }, hermes: null },
+      { id: "crawl4ai", name: "Crawl4AI", source: "unclecode/crawl4ai", about: "Reads hard, script-built websites as clean text when you share a link, without sending the page to an outside reader.", kairoq: require("./crawl4ai").configured(env) ? { on: true } : off("Set KAIROQ_CRAWL4AI_URL to a Crawl4AI server"), hermes: null },
+      { id: "stirling-pdf", name: "Stirling PDF", source: "Stirling-Tools/Stirling-PDF", about: "PDF tools in the chat's + menu: merge, split, make smaller, read scanned pages, pages to images.", kairoq: require("./stirling-pdf").configured(env) ? { on: true } : off("Set KAIROQ_STIRLING_URL to a Stirling PDF server"), hermes: null },
       { id: "last30days", name: "last30days", source: "mvanhorn/last30days-skill", about: "Type /last30days and a topic in chat: what people said about it in the last 30 days on Reddit, Hacker News, YouTube, GitHub and the web, with links. Add deep for a wider search.", kairoq: require("./last30days").available() ? { on: true, note: [env.BRAVE_API_KEY ? "web search on" : "free sources; BRAVE_API_KEY adds web search", env.SCRAPECREATORS_API_KEY ? "TikTok and Instagram on" : ""].filter(Boolean).join(" · ") } : off("Not installed on this server"), hermes: hermesOn ? { on: true, note: "Hermes writes it up" } : null },
       { id: "dashi", name: "dashi-ppt", about: "Makes slide decks. Kairoq's own slide maker is used until dashi's licence is reviewed.", kairoq: off("Waiting on licence review"), hermes: null },
     ],
@@ -7353,6 +7362,17 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/media/jobs") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobsList(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/create") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobCreate(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/retry") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobRetry(req,res); }
+  // PDF tools (stirling-pdf.js): the files go to the connected Stirling PDF server and come straight back.
+  if (req.method === "GET" && url === "/api/pdf/tools") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); const pdf=require("./stirling-pdf"); return json(res,200,{on:pdf.configured(),tools:pdf.tools()}); }
+  if (req.method === "POST" && url === "/api/pdf/run") {
+    if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."});
+    try{
+      const body=await getBody(req,60_000_000);
+      const out=await require("./stirling-pdf").run(String(body.tool||""),body.files,body.options||{});
+      res.writeHead(200,{"Content-Type":out.type,"Content-Disposition":'attachment; filename="'+out.name+'"',"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
+      return res.end(out.bytes);
+    }catch(e){return json(res,e.status||500,{error:e.message||"The PDF tool failed."})}
+  }
   if (req.method === "GET" && url === "/api/plugins") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,pluginStatus()); }
   if (req.method === "GET" && url === "/api/hermes/status") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,await require("./hermes-chat").health()); }
   if (req.method === "POST" && url === "/api/chat/stream") return handleChat(req, res);
