@@ -521,6 +521,27 @@ function ownerRecords(id,collection){
  if(!/^[a-z][a-z0-9_]{0,39}$/.test(collection))throw fail(400,'Bad collection');
  return database(id).prepare('SELECT * FROM records WHERE collection=? ORDER BY created_at DESC LIMIT 200').all(collection).map(record);
 }
+// Only the authenticated project owner can invoke this through create-api.
+// Keep deletion independent of a running AI generation job.
+function ownerRemoveAppUser(id,email,{deleteOwnedRecords=false}={}){
+ const value=String(email||'').trim().toLowerCase();
+ if(!value||value.length>254||!/^\S+@\S+\.\S+$/.test(value))throw fail(400,'An exact valid account email is required');
+ if(typeof deleteOwnedRecords!=='boolean')throw fail(400,'deleteOwnedRecords must be boolean');
+ const db=database(id),target=db.prepare('SELECT id,email FROM users WHERE email=?').get(value);
+ if(!target)throw fail(404,'No account with that email exists in this app');
+ const total=db.prepare('SELECT COUNT(*) n FROM records WHERE owner_id=?').get(target.id).n;
+ db.exec('BEGIN');
+ try{
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(target.id);
+  db.prepare('DELETE FROM app_tokens WHERE user_id=?').run(target.id);
+  if(deleteOwnedRecords)db.prepare('DELETE FROM records WHERE owner_id=?').run(target.id);
+  db.prepare('DELETE FROM users WHERE id=?').run(target.id);
+  db.exec('COMMIT');
+ }catch(err){try{db.exec('ROLLBACK')}catch{}throw err}
+ return{removed:true,email:value,sessionsRevoked:true,recordsDeleted:deleteOwnedRecords?total:0,
+  retainedOwnedRecords:deleteOwnedRecords?0:total,
+  note:'Other payment, file and email history may require separate retention or deletion'};
+}
 function ownerDelete(id,recordId){const d=database(id),row=d.prepare('SELECT collection,owner_id FROM records WHERE id=?').get(String(recordId));if(!row)throw fail(404,'Record not found');d.prepare('DELETE FROM records WHERE id=?').run(String(recordId));publish(id,row.collection,'deleted',{id:String(recordId)},row.owner_id);return{deleted:recordId}}
 
 // ---------- browser client (virtual module "kairoq") ----------
@@ -695,4 +716,4 @@ async function runAllSchedules(options){
 }
 // Every due automation on every app (called every minute by the server).
 function runAllAutomations(options){return require('./react-automations').tick(options)}
-module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,database,close,ACCESS};
+module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,ownerRemoveAppUser,database,close,ACCESS};
