@@ -131,7 +131,8 @@ test("Kairoq routes owner chat to Hermes first and falls back only before any re
   const server = fs.readFileSync(path.join(__dirname, "../server.js"), "utf8");
   const hermesAt = server.indexOf('require("./hermes-chat")');
   assert.ok(hermesAt > server.indexOf("async function handleChat"));
-  assert.ok(hermesAt < server.indexOf('require("./chat-url").extractWebsite'), "Hermes must run before the old website shortcut");
+  assert.ok(hermesAt < server.indexOf("const siteUrlFromMessage"), "Hermes must run before the old website shortcut");
+  assert.ok(hermesAt > server.indexOf('require("./chat-browser").wantsBrowser(askText)'), "browser tasks go to the real browser before Hermes");
   assert.match(server, /hermes\.configured\(\)&&isAuthenticated\(req\)/);
   assert.match(server, /if\(hermesErr\.afterPartial\|\|hermesController\.signal\.aborted\)throw hermesErr/);
 });

@@ -1688,6 +1688,24 @@ function isAppCreationRequest(message){
   const request=/\b(build|create|make|develop|generate|design|need|want|looking for|set up|setup)\b/i;
   return product.test(text)&&request.test(text);
 }
+// Live view of a browser-use run: the latest screenshot from Kairoq's headless Chromium,
+// shown above the answer while the agent works, and left there as the final page.
+function showBrowserFrame(box,data){
+  const image=String(data&&data.image||"");
+  if(!image||!/^[A-Za-z0-9+/=]+$/.test(image))return;
+  let view=box.querySelector(".browser-live");
+  if(!view){
+    view=document.createElement("figure");view.className="browser-live";
+    view.style.cssText="margin:0 0 10px;border:1px solid var(--border,#d0d0d0);border-radius:10px;overflow:hidden;max-width:640px;background:#fff";
+    const img=document.createElement("img");img.alt="Live view of the browser";img.style.cssText="display:block;width:100%;height:auto";
+    const cap=document.createElement("figcaption");cap.style.cssText="font-size:12px;padding:6px 10px;opacity:.75;border-top:1px solid var(--border,#d0d0d0)";
+    view.append(img,cap);
+    box.insertBefore(view,box.firstChild);
+  }
+  view.querySelector("img").src="data:image/jpeg;base64,"+image;
+  view.querySelector("figcaption").textContent=(data.step?`Step ${Number(data.step)} · `:"")+String(data.caption||"").slice(0,140);
+}
+
 async function send(regenerateFrom=null){
   if(regenerateFrom===null){
     const asked=promptEl.value.trim();
@@ -1779,6 +1797,7 @@ async function send(regenerateFrom=null){
         smoothRenderer.push(token);
       }
       if(event==="status")setStatus(data.message||"");
+      if(event==="browser")showBrowserFrame(box,data);
       if(event==="meta"){finalModel=data.model||finalModel;usage=data.usage||usage}
       if(event==="error"){streamError=data.message||"Request failed";setStatus(streamError,true)}
       if(event==="done")setStatus(data.fallbackUsed?"Answered using free fallback":"Complete");

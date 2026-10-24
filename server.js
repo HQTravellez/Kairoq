@@ -4266,6 +4266,32 @@ async function handleChat(req, res) {
     });
     sseStarted=true;
 
+    // Browser use: "find/check/do X on <site>" opens the site in headless Chromium and works
+    // through it with the browser agent, streaming each step and a live screenshot. A plain
+    // link or "summarise this" still goes to the page readers below.
+    const askText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
+    const browseUrl=require("./chat-url").extractWebsite(askText);
+    if(browseUrl&&isAuthenticated(req)&&require("./chat-browser").wantsBrowser(askText)){
+      const browserController=new AbortController();
+      const stopBrowser=()=>{if(!res.writableEnded)browserController.abort()};
+      res.on("close",stopBrowser);
+      try{
+        const r=await require("./chat-browser").run({
+          url:browseUrl,task:askText,callModel:callBuilderModel,signal:browserController.signal,
+          onStatus:message=>writeSSE(res,"status",{message}),
+          onFrame:f=>writeSSE(res,"browser",f)
+        });
+        writeSSE(res,"token",{text:r.markdown});
+        writeSSE(res,"meta",{model:"kairoq/browser",usage:{cost:null}});
+        writeSSE(res,"done",{ok:r.outcome==="completed",provider:"browser",outcome:r.outcome});
+        return res.end();
+      }catch(browserErr){
+        if(browserController.signal.aborted)throw browserErr;
+        await audit("chat.browser_failed",{error:String(browserErr.message).slice(0,300)});
+        writeSSE(res,"status",{message:"Couldn't use the browser ("+String(browserErr.message).slice(0,140)+") — reading the page instead…"});
+      }finally{res.off("close",stopBrowser)}
+    }
+
     // Hermes Agent (separate private service, see docs/HERMES.md) answers owner chats
     // when configured. It has its own web search/reading and long-term memory, so it
     // runs before Kairoq's older website-reader and web-research shortcuts. If Hermes
@@ -4314,7 +4340,7 @@ async function handleChat(req, res) {
             output=await callFreeLlmText({messages:[{role:"user",content:prompt}],temperature:0.15});
             if(!String(output||"").trim())throw new Error("No AI answer returned.");
           }catch(modelErr){
-            output="I retrieved **"+page.url+"** but the free AI model could not analyze it ("+modelErr.message+"). Here is the actual retrieved page content:\n\n"+safeExcerpt.slice(0,5000);
+            output="I opened **"+page.url+"** but the AI model couldn't answer about it right now ("+String(modelErr.message).slice(0,160)+"). Please try again in a moment. The page starts with:\n\n> "+safeExcerpt.slice(0,600).replace(/\s+/g," ").trim()+"…";
           }
         }
         writeSSE(res,"token",{text:output});

@@ -81,6 +81,23 @@ earlier experiment; this integration doesn't use them.
 To turn Hermes off, delete `KAIROQ_HERMES_URL` on the Kairoq service. Chat goes back to the
 existing routes immediately.
 
+## Browser use in chat
+
+Separate from Hermes. When a message asks Kairoq to **do or find something on a website**
+("find the price of a double room on hotel.com", "open the browser and check example.com"),
+chat opens the site in Kairoq's own headless Chromium and works through it with the browser
+agent (`browser-agent.js`): clicking, typing, scrolling. Each step appears in the status line
+and a live screenshot is shown above the answer. The answer ends with the list of steps taken.
+
+- A bare link or "summarise this site" still goes to the page reader / Hermes.
+- Owner only, public `https` sites only. Forms are never really submitted (runtime-check guards).
+- Sites with captchas or sign-in walls end as "blocked" with a clear message.
+- Uses the same model as the /create web agent; step limit `KAIROQ_WEB_TASK_STEPS` (default 15).
+- If Chromium can't start, chat says so and falls back to reading the page.
+
+Code: `chat-browser.js`, the `browser` SSE event in `public/app.js` (`showBrowserFrame`),
+tests in `test/chat-browser.test.js` (runs a real Chromium when one is installed).
+
 ## Code
 
 - `hermes-chat.js` — streaming client, timeouts, error handling, attachment conversion.
