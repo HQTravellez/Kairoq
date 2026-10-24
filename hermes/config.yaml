@@ -1,0 +1,72 @@
+# Kairoq-managed Hermes configuration.
+#
+# hermes/entrypoint.sh copies this file into $HERMES_HOME on EVERY boot, so the
+# tool lockdown below always wins over anything written at runtime. ${VAR}
+# placeholders are expanded by Hermes itself; entrypoint.sh supplies defaults.
+
+# Schema version of the pinned Hermes release (see hermes/UPSTREAM.md). Update
+# together with the image digest.
+_config_version: 46
+
+model:
+  provider: "${KAIROQ_HERMES_PROVIDER}"
+  default: "${KAIROQ_HERMES_MODEL}"
+  base_url: "${KAIROQ_HERMES_BASE_URL}"
+
+agent:
+  # Kairoq chat is a conversation, not an unattended job: keep tool loops short.
+  max_turns: 12
+  # Hard removal, applied after every per-platform setting. Kairoq users must
+  # never reach a shell, the container's files, a real browser, the desktop,
+  # scheduled jobs, connected accounts, code execution or sub-agents.
+  disabled_toolsets:
+    - terminal
+    - file
+    - browser
+    - computer_use
+    - cronjob
+    - connections
+    - code_execution
+    - delegation
+    - kanban
+    - project
+    - desktop_ui
+    - image_gen
+    - video_gen
+    - tts
+
+# What chat requests coming through the API server may use: web search and page
+# reading, image understanding, long-term memory, recall of past chats, a to-do
+# planner and skills (instruction documents Hermes can read and refine).
+platform_toolsets:
+  api_server: [web, vision, memory, session_search, todo, skills]
+
+# Skill libraries shipped in the image (read-only for Hermes). Superpowers by Jesse
+# Vincent (MIT) lives in /opt/kairoq/skills/superpowers; see hermes/UPSTREAM.md.
+skills:
+  external_dirs:
+    - "${KAIROQ_SKILLS_DIR}"
+  # Self-learning: after a reply that took 5+ tool steps, a background review decides whether
+  # the approach is worth saving as a new skill (written to /opt/data/skills, which persists).
+  creation_nudge_interval: 5
+  write_approval: false
+
+# Long-term memory (MEMORY.md = Hermes' notes, USER.md = what it knows about the owner), kept
+# on the volume and loaded into every new chat. nudge_interval is HOW OFTEN a background review
+# looks for things to save (every 4 of your messages), not a limit on what is kept. Hermes can
+# also save at once when asked to remember something.
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  write_approval: false
+  nudge_interval: 4
+  # Always-loaded notes, larger than Hermes' defaults (2,200 / 1,375 characters). Everything
+  # else said in any past chat stays searchable through session_search (no limit).
+  memory_char_limit: 5000
+  user_char_limit: 3000
+
+# Listen on every interface (IPv4 and, where available, IPv6) so Railway's
+# private network and health check both reach it. Access still needs the key.
+platforms:
+  api_server:
+    host: ""

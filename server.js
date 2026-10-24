@@ -647,9 +647,9 @@ function purposePrompt(purpose) {
   return map[purpose] || "";
 }
 
-function normalizeMessages(messages) {
+function normalizeMessages(messages, limit = 50) {
   if (!Array.isArray(messages)) return [];
-  return messages.slice(-50).map(msg => ({
+  return messages.slice(-limit).map(msg => ({
     role: ["user", "assistant", "system"].includes(msg.role) ? msg.role : "user",
     content: msg.content
   }));
@@ -4266,6 +4266,62 @@ async function handleChat(req, res) {
     });
     sseStarted=true;
 
+    // Browser use: "find/check/do X on <site>" opens the site in headless Chromium and works
+    // through it with the browser agent, streaming each step and a live screenshot. A plain
+    // link or "summarise this" still goes to the page readers below.
+    const askText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
+    const browseUrl=require("./chat-url").extractWebsite(askText);
+    if(browseUrl&&isAuthenticated(req)&&require("./chat-browser").wantsBrowser(askText)){
+      const browserController=new AbortController();
+      const stopBrowser=()=>{if(!res.writableEnded)browserController.abort()};
+      res.on("close",stopBrowser);
+      try{
+        const r=await require("./chat-browser").run({
+          url:browseUrl,task:askText,callModel:callBuilderModel,signal:browserController.signal,
+          onStatus:message=>writeSSE(res,"status",{message}),
+          onFrame:f=>writeSSE(res,"browser",f)
+        });
+        writeSSE(res,"token",{text:r.markdown});
+        writeSSE(res,"meta",{model:"kairoq/browser",usage:{cost:null}});
+        writeSSE(res,"done",{ok:r.outcome==="completed",provider:"browser",outcome:r.outcome});
+        return res.end();
+      }catch(browserErr){
+        if(browserController.signal.aborted)throw browserErr;
+        await audit("chat.browser_failed",{error:String(browserErr.message).slice(0,300)});
+        writeSSE(res,"status",{message:"Couldn't use the browser ("+String(browserErr.message).slice(0,140)+") — reading the page instead…"});
+      }finally{res.off("close",stopBrowser)}
+    }
+
+    // Hermes Agent (separate private service, see docs/HERMES.md) answers owner chats
+    // when configured. It has its own web search/reading and long-term memory, so it
+    // runs before Kairoq's older website-reader and web-research shortcuts. If Hermes
+    // cannot start a reply, chat falls back to the existing model routes below.
+    const hermes=require("./hermes-chat");
+    if(hermes.configured()&&isAuthenticated(req)&&!isLocalModelId(requestedModel)){
+      const hermesSystem=[presetSystem,customPresetPrompt,memorySystem,userSystem].filter(Boolean).join("\n\n");
+      const hermesController=new AbortController();
+      const stopHermes=()=>{if(!res.writableEnded)hermesController.abort()};
+      res.on("close",stopHermes);
+      writeSSE(res,"status",{message:"Hermes is thinking…"});
+      try{
+        const reply=await hermes.streamChat({
+          // Hermes keeps the last 100 messages of this chat in view (other models get 50);
+          // older chats and anything earlier stay reachable through its memory and session search.
+          messages:hermesSystem?[{role:"system",content:hermesSystem},...normalizeMessages(body.messages,100)]:normalizeMessages(body.messages,100),
+          signal:hermesController.signal,
+          onToken:text=>writeSSE(res,"token",{text}),
+          onStatus:message=>writeSSE(res,"status",{message})
+        });
+        writeSSE(res,"meta",{model:"hermes/agent",usage:{...(reply.usage||{}),cost:null}});
+        writeSSE(res,"done",{ok:true,provider:"hermes",finishReason:reply.finishReason});
+        return res.end();
+      }catch(hermesErr){
+        if(hermesErr.afterPartial||hermesController.signal.aborted)throw hermesErr;
+        await audit("hermes.chat_fallback",{error:String(hermesErr.message).slice(0,300),status:hermesErr.status||0});
+        writeSSE(res,"status",{message:"Hermes unavailable — using backup model…"});
+      }finally{res.off("close",stopHermes)}
+    }
+
     const lastUserText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
     const siteUrlFromMessage=require("./chat-url").extractWebsite(lastUserText);
     if(siteUrlFromMessage && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about|api|docs|documentation|integrat|build|clone|analy[sz]e|read|explore|compare/i.test(lastUserText))){
@@ -4286,7 +4342,7 @@ async function handleChat(req, res) {
             output=await callFreeLlmText({messages:[{role:"user",content:prompt}],temperature:0.15});
             if(!String(output||"").trim())throw new Error("No AI answer returned.");
           }catch(modelErr){
-            output="I retrieved **"+page.url+"** but the free AI model could not analyze it ("+modelErr.message+"). Here is the actual retrieved page content:\n\n"+safeExcerpt.slice(0,5000);
+            output="I opened **"+page.url+"** but the AI model couldn't answer about it right now ("+String(modelErr.message).slice(0,160)+"). Please try again in a moment. The page starts with:\n\n> "+safeExcerpt.slice(0,600).replace(/\s+/g," ").trim()+"…";
           }
         }
         writeSSE(res,"token",{text:output});
@@ -7188,6 +7244,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/media/jobs") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobsList(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/create") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobCreate(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/retry") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobRetry(req,res); }
+  if (req.method === "GET" && url === "/api/hermes/status") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,await require("./hermes-chat").health()); }
   if (req.method === "POST" && url === "/api/chat/stream") return handleChat(req, res);
   if (req.method === "GET") return serveStatic(req, res);
 
