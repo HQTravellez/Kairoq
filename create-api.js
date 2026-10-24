@@ -1166,6 +1166,10 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     return send(res,201,{added,assistant:view()}),true;
    }
   }
+  if(action==='/nutrition'&&method==='DELETE'){
+   const b=await readJson(req,1000);
+   return send(res,200,backend.ownerClearNutritionRecords(id,b.collection,{confirm:b.confirm===true})),true;
+  }
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
   if(action==='/chat'&&method==='POST'){const b=await readJson(req,60000000);const context=await parseFiles(b.files);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',model:typeof b.model==='string'?b.model:null,images:parseImages(b.images),context,fix:b.fix===true},deps))}),true}
