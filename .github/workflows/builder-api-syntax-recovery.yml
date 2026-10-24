@@ -1,0 +1,25 @@
+name: Builder API syntax recovery
+on:
+  push:
+    paths:
+      - 'create-api.js'
+      - 'test/builder-api-syntax-recovery.test.js'
+      - '.github/workflows/builder-api-syntax-recovery.yml'
+  pull_request:
+    paths:
+      - 'create-api.js'
+      - 'test/builder-api-syntax-recovery.test.js'
+      - '.github/workflows/builder-api-syntax-recovery.yml'
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check create-api.js && node --check react-backend.js && node --check react-builder.js && node --check server.js
+      - run: node --test test/builder-api-syntax-recovery.test.js
