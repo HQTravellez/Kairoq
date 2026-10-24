@@ -53,8 +53,18 @@ def generate(messages, conversation_key):
         max_iterations=MAX_ITERATIONS, enabled_toolsets=TOOLSETS,
         session_id=scoped_session_id(conversation_key),
         quiet_mode=True,
+        run_budget_seconds=90,
+        skip_background_review=True,
+        skip_context_files=True,
     )
-    result = agent.run_conversation(prompt)
+    try:
+        result = agent.run_conversation(prompt)
+    finally:
+        # Hermes owns background workers and session storage; flush and release
+        # resources on every request, including provider exceptions.
+        close = getattr(agent, "close", None)
+        if callable(close):
+            close()
     if isinstance(result, str):
         return result
     if isinstance(result, dict):
