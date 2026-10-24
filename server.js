@@ -4247,7 +4247,7 @@ async function handleChat(req, res) {
         upstream=await fetch(endpoint,{method:"POST",headers:{
           "Content-Type":"application/json",
           "Authorization":"Bearer "+process.env.KAIROQ_PYTHON_AGENT_TOKEN
-        },body:JSON.stringify({messages}),signal:AbortSignal.timeout(120000)});
+        },body:JSON.stringify({messages,conversationId:String(body.conversationId||"default").slice(0,128)}),signal:AbortSignal.timeout(120000)});
         const data=await upstream.json().catch(()=>({}));
         if(!upstream.ok)throw Error(data.error||"Hermes Python engine unavailable.");
         res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","Connection":"keep-alive"});
