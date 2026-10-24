@@ -669,6 +669,18 @@ function writeSSE(res, event, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
+// OpenRouter's own wording ("never purchased credits", "rate limit") means little to a person
+// chatting; say what happened and what fixes it.
+function plainOpenRouterError(status, message = "") {
+  const m = String(message);
+  if (status === 402 || /insufficient credits|never purchased credits/i.test(m))
+    return "OpenRouter turned this down: your OpenRouter account has no credits, so even its free models are capped at a few requests a day. Add credits at openrouter.ai/settings/credits, or connect Hermes or Ollama Cloud (see docs/HERMES.md).";
+  if (status === 429 || /rate.?limit/i.test(m))
+    return "The free models are busy or you've hit today's free limit. Try again in a minute, or pick another model.";
+  if (status === 401 || /no auth|invalid api key|user not found/i.test(m))
+    return "Kairoq's OpenRouter key isn't valid. Check OPENROUTER_API_KEY in Railway → Variables.";
+  return m;
+}
 async function streamOpenRouter(payload, res) {
   const response = await fetchWithRetry(OR_CHAT, {
     method: "POST",
@@ -683,6 +695,7 @@ async function streamOpenRouter(payload, res) {
       const parsed = JSON.parse(raw);
       message = parsed?.error?.message || parsed?.message || message;
     } catch {}
+    message = plainOpenRouterError(response.status, message);
     const err = new Error(message);
     err.status = response.status;
     throw err;
@@ -716,7 +729,7 @@ async function streamOpenRouter(payload, res) {
       catch { continue; }
 
       if (chunk?.error) {
-        const err = new Error(chunk.error?.message || "OpenRouter stream error.");
+        const err = new Error(plainOpenRouterError(chunk.error?.code, chunk.error?.message || "OpenRouter stream error."));
         err.afterPartial = emitted;
         throw err;
       }
@@ -4232,7 +4245,12 @@ async function handleChat(req, res) {
 
     const models=await getModels();
     const map=new Map(models.map(m=>[m.id,m]));
-    let requestedModel=typeof body.model==="string"&&body.model?body.model:"openrouter/free";
+    // "Hermes Agent" in the model picker. Auto picks also go to Hermes when it is connected;
+    // any other named model is used as picked and bypasses Hermes.
+    const wantsHermes=body.model==="hermes/agent";
+    const autoPick=!body.model||["openrouter/free","smart-auto","openrouter/auto"].includes(body.model);
+    if(wantsHermes&&!require("./hermes-chat").configured())return json(res,400,{error:"Hermes Agent isn't connected yet. Set up the Hermes service on Railway (see docs/HERMES.md), or pick another model."});
+    let requestedModel=typeof body.model==="string"&&body.model&&!wantsHermes?body.model:"openrouter/free";
     requestedModel=resolveAutoModel(requestedModel,{freeOnly:body.freeOnly!==false});
     if(!require('./chat-model-eligibility').isConversationalModel({id:requestedModel,name:map.get(requestedModel)?.name}))requestedModel='openrouter/free';
     const freeOnly=body.freeOnly!==false;
@@ -4308,7 +4326,7 @@ async function handleChat(req, res) {
     // runs before Kairoq's older website-reader and web-research shortcuts. If Hermes
     // cannot start a reply, chat falls back to the existing model routes below.
     const hermes=require("./hermes-chat");
-    if(hermes.configured()&&isAuthenticated(req)&&!isLocalModelId(requestedModel)){
+    if(hermes.configured()&&isAuthenticated(req)&&(wantsHermes||autoPick)){
       const hermesSystem=[presetSystem,customPresetPrompt,memorySystem,userSystem].filter(Boolean).join("\n\n");
       const hermesController=new AbortController();
       const stopHermes=()=>{if(!res.writableEnded)hermesController.abort()};

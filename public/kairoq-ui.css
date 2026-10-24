@@ -242,3 +242,10 @@ input.kq-switch{background:#d6d6d2!important;border-radius:999px!important;posit
 input.kq-switch:checked{background:var(--k-accent)!important}
 input.kq-switch::after{content:""!important;display:block!important}
 .assistant-content table{width:max-content!important}
+
+/* Hermes row + disabled rows, and calm inline errors */
+.kq-row.disabled{cursor:default;color:var(--k-faint)}
+.kq-row.disabled:hover{background:transparent}
+.kq-row-note{font-size:12px;color:var(--k-faint);flex:none}
+.kq-error{margin-top:4px;padding:10px 12px;border-radius:10px;background:#fbf1ef;color:#8a2c1d;font-size:14px;line-height:1.5;max-width:640px}
+.status-bar.error{color:var(--k-muted)!important;background:none!important;border:0!important}
