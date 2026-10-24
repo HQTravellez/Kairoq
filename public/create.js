@@ -741,7 +741,22 @@ function renderAttachments(){
 }
 $('chat-form').onsubmit=e=>{e.preventDefault();const message=$('chat-input').value.trim();if(message)send(message,state.mode)};
 async function send(message,mode,path='/chat',extra={}){
- if(state.job)return;
+ // Keep chat responsive without starting a second build or executing queued changes.
+ if(state.job){
+  const msg=String(message||'').trim();
+  if(!msg)return;
+  const phase=liveStatus(work.job||state.job);
+  const short=/^(?:hi|hello|hey|thanks|thank you|ok|okay|status|what's happening|what is happening|are you stuck|update|\?+)\W*$/i.test(msg);
+  $('messages').append(messageItem({role:'user',text:msg,mode:'discuss'}));
+  if(short){
+   $('messages').append(messageItem({role:'assistant',text:'I am still here. Your '+(state.job.mode==='discuss'?'answer':'app build')+' is '+phase.toLowerCase()+'. The last preview is still available. Follow its steps or press Stop to interrupt it. This message did not start another build.'}));
+  }else{
+   state.pendingMessage=msg;
+   $('messages').append(messageItem({role:'assistant',text:'I received your update. The active build is '+phase.toLowerCase()+'. I will keep the new request in your composer when that operation ends. No additional change has been made.'}));
+  }
+  $('chat-input').value='';$('messages').scrollTop=$('messages').scrollHeight;
+  return;
+ }
  text($('chat-error'),'');
  const images=state.attachments.filter(a=>a.kind!=='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
  const files=state.attachments.filter(a=>a.kind==='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
@@ -854,13 +869,9 @@ function stageList(j){
 // The latest thought, in plain words, while the AI works out what to build.
 function thinkingLine(){const t=String(work.thinking||'').replace(/\s+/g,' ').trim();if(!t)return'';const parts=t.split(/(?<=[.!?])\s+/).filter(x=>x.length>12);return(parts.at(-1)||t).slice(-180)}
 function renderBuildOverlay(j){
- const o=$('build-overlay');if(!o)return;
- if(!j||j.mode==='discuss'){o.classList.add('hidden');return}
- const p=state.project,fresh=p&&p.current_version<=1&&!(p.versions||[]).some(v=>v.n>1);
- o.classList.toggle('first',Boolean(fresh));o.classList.remove('hidden');
- const box=o.querySelector('.bo-card');box.replaceChildren();
- if(fresh){box.append(el('span','bo-spin'),el('h3',null,p.name),el('p','bo-think',liveStatus(j)))}
- else box.append(el('span','bo-spin'),el('span',null,(PHASES[phaseOf(j)]||'Working')+'… the preview updates when it is ready'));
+ const overlay=$('build-overlay');
+ if(overlay)overlay.classList.add('hidden');
+ // The current preview remains visible; progress lives in the chat timeline.
 }
 function liveStatus(j){
  const p=phaseOf(j);
@@ -1014,6 +1025,11 @@ async function watch(job){
   if(state.data)renderData();
  }
  state.job=null;busy(false);
+ if(state.pendingMessage){
+  const pending=state.pendingMessage;state.pendingMessage=null;
+  const input=$('chat-input');if(input&&!input.value.trim())input.value=pending;
+  $('messages').append(messageItem({role:'assistant',text:'Your follow-up is ready to send. Review it in the message box; no change was made automatically.'}));
+ }
  return done;
 }
 // ---------- mobile app ----------
@@ -1148,7 +1164,7 @@ $('ref-build').onclick=async()=>{
  finally{$('ref-build').disabled=false}
 };
 $('stop-job').onclick=async()=>{if(!state.job)return;$('stop-job').disabled=true;try{await api('/jobs/'+state.job.id+'/cancel',{method:'POST'})}catch(err){text($('chat-error'),err.message)}finally{$('stop-job').disabled=false}};
-function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=on;$('fix').disabled=on;if(label)text($('progress-text'),label)}
+function busy(on,label){$('progress').classList.toggle('hidden',!on);$('send').disabled=false;$('fix').disabled=on;if(label)text($('progress-text'),label)}
 async function refreshCredits(){try{const v=await loadMe();if(v&&v.account)renderCredits(v.account)}catch{}}
 
 // ---------- visual edits ----------
