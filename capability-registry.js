@@ -6,6 +6,7 @@ const CAPABILITIES = Object.freeze([
   {id:"browser",label:"Browser research and website interaction",group:"Research",status:"wired-in-agent-mode",entry:"react-agent.js",tools:["web_search","web_open","web_act","fetch_url"]},
   {id:"headless_chromium",label:"Chromium browser rendering",group:"Research",status:"available-not-universal",entry:"browser-reader.js",tools:[]},
   {id:"api_docs",label:"OpenAPI, Swagger, Postman documentation extraction",group:"API",status:"separate-workflow",entry:"api-docs.js",tools:[]},
+  {id:"api_intelligence",label:"Jev + ScaleDown API documentation triage and multi-provider orchestration",group:"API",status:"opt-in",entry:"api-intelligence-pipeline.js",tools:[]},
   {id:"api_execution",label:"Approved API operation testing",group:"API",status:"allowlist-gated",entry:"api-adapter.js",tools:[]},
   {id:"knowledge_studio",label:"Document ingestion and knowledge search",group:"Knowledge",status:"separate-workflow",entry:"knowledge-http.js",tools:[]},
   {id:"learning",label:"Verified procedural learning",group:"Knowledge",status:"partially-wired",entry:"hermes-learning-loop.js",tools:[]},

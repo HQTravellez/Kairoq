@@ -99,6 +99,9 @@ async function analyze({brief,apiPlan,apiSpec,documentationUrl,documentationText
  if(inspected.length)bp.automatedDiscovery={attempts:inspected,
   status:bp.formalContract?"formal-contract-found":"no-formal-contract-found",
   warning:"Only preapproved HTTPS documentation hosts are fetched; no provider operation is executed"};
+ // Jev + ScaleDown triage of the documentation (owner opt-in, advisory only).
+ try{bp.intelligence=await require("./api-intelligence-pipeline").advise({blueprint:bp,apiPlan:raw,documentationText},{env:opts.env,fetchImpl:opts.intelligenceFetch})}
+ catch(e){bp.intelligence={status:"unavailable",reason:String(e.message||e).slice(0,200)}}
  return{blueprint:bp,apiPlan:raw};
 }
 async function prepare({brief,apiPlan,apiSpec,documentationUrl,documentationText,catalogId,apiJsonManifest,autoDiscover=false}={},{

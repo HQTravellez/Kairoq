@@ -1,6 +1,18 @@
 # Jev + ScaleDown CDM advisory layer for Kairoq's complex API builder
 
-**Status: isolated, opt-in experimental branch**. No main-branch imports, no production network activity, no Trip Ninja live booking and no customer data sent to vendor models.
+**Status: wired into API Studio, opt-in.** Off by default. With `KAIROQ_API_INTELLIGENCE=on`
+plus `TYPESAFE_API_KEY` (Jev) and `SCALEDOWN_API_KEY` (CDM):
+
+- **API Studio → analyze / prepare**: after Kairoq reads the documentation, CDM labels what the
+  public documentation is about (authentication, dependencies, mapping, errors) and Jev picks the
+  next thing to investigate. Shown under the status line as "AI triage (Jev)". The result is also
+  in `blueprint.intelligence` of `/api/developer/api/analyze` and `/prepare`.
+- **`POST /api/developer/api/orchestrate`** `{contracts:{name:openapi,…}, workflow, publicDocumentation:[…]}`:
+  validated multi-provider call graph, generated server-side SDKs and the same advisory. Nothing is
+  executed against a provider.
+
+Only public text is sent (anything that looks like a credential is refused), and AI output never
+changes the contract, the plan or permissions. No Trip Ninja live booking and no customer data.
 
 ## Architecture
 
