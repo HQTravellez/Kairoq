@@ -514,7 +514,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
  // The first build turns the bare starter into a whole product, as Lovable does, not one basic page.
  const firstBuild=require('./react-design').isUntouchedStarter(base);
- const request='Current project files:\n\n'+contextFiles(base)+(firstBuild?'\n\n'+FIRST_BUILD:'')+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+buildContract.prompt(ownerRequirements)+featureQA.instructions(ownerRequirements)+require('./engineering-workflows').prompt(text);
+ const request='Current project files:\n\n'+contextFiles(base)+(firstBuild?'\n\n'+FIRST_BUILD:'')+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+require('./engineering-workflows').prompt(text)+'\n\nRequest: '+text+buildContract.prompt(ownerRequirements)+featureQA.instructions(ownerRequirements);
  // Recall verified, project-local repair lessons as untrusted context only.
  let learningNote='';
  if(meta.current_version>1){try{
