@@ -604,7 +604,13 @@ async function getModels(force = false) {
     }catch{}
   }
 
+  const pythonModels=(process.env.KAIROQ_PYTHON_AGENT_URL&&process.env.KAIROQ_PYTHON_AGENT_TOKEN)?[{
+    id:"python/hermes",name:"Hermes · Python Agent",context_length:null,isFree:false,
+    inputPrice:null,outputPrice:null,inputModalities:["text"],supportsVision:false,
+    supportsTools:true,supportsReasoning:true,source:"hermes-python",configured:true
+  }]:[];
   const models=[
+    ...pythonModels,
     ...(localModels.length?[{
       id:"local/auto",name:"Kairoq Local Auto · FREE",context_length:null,isFree:true,
       inputPrice:"0",outputPrice:"0",inputModalities:["text"],supportsVision:false,
@@ -4228,6 +4234,31 @@ async function handleChat(req, res) {
     const smartFallback=body.smartFallback!==false;
     const webSearch=body.webSearch===true;
 
+    if(requestedModel==="python/hermes"){
+      if(!process.env.KAIROQ_PYTHON_AGENT_URL||!process.env.KAIROQ_PYTHON_AGENT_TOKEN)
+        return json(res,503,{error:"Hermes Python engine is not configured."});
+      // The Python backend and current Node app share no implicitly trusted user state:
+      // only this server calls its private authenticated endpoint.
+      const endpoint=new URL("/chat",process.env.KAIROQ_PYTHON_AGENT_URL);
+      if(!["http:","https:"].includes(endpoint.protocol)||endpoint.username||endpoint.password)
+        return json(res,503,{error:"Invalid Hermes service configuration"});
+      let upstream;
+      try {
+        upstream=await fetch(endpoint,{method:"POST",headers:{
+          "Content-Type":"application/json",
+          "Authorization":"Bearer "+process.env.KAIROQ_PYTHON_AGENT_TOKEN
+        },body:JSON.stringify({messages}),signal:AbortSignal.timeout(120000)});
+        const data=await upstream.json().catch(()=>({}));
+        if(!upstream.ok)throw Error(data.error||"Hermes Python engine unavailable.");
+        res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","Connection":"keep-alive"});
+        sseStarted=true;
+        writeSSE(res,"token",{text:String(data.message||"")});
+        writeSSE(res,"done",{ok:true,provider:"hermes-python",model:data.model,zeroCost:false});
+        return res.end();
+      } catch(error) {
+        return json(res,503,{error:"Hermes Python engine unavailable: "+String(error.message).slice(0,160)});
+      }
+    }
     if(!ZERO_COST_MODE && requestedModel!=="openrouter/free" && !isLocalModelId(requestedModel) && !PAID_LLM_ENABLED){
       return json(res,403,{error:"Paid models are locked. Enable PAID_LLM_ENABLED=true only if you intentionally want paid inference."});
     }
