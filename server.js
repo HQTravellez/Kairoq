@@ -592,7 +592,7 @@ async function getModels(force = false) {
     try{
       const response=await fetchWithRetry(OR_MODELS,{headers:openRouterHeaders()},{retries:2});
       const data=await response.json().catch(()=>({}));
-      if(response.ok)openRouterModels=(data?.data||[]).map(x=>({...cleanModel(x),source:"openrouter"}));
+      if(response.ok)openRouterModels=(data?.data||[]).map(x=>({...cleanModel(x),source:"openrouter"})).filter(require('./chat-model-eligibility').isConversationalModel);
     }catch{}
   }
 
@@ -624,11 +624,7 @@ function resolveAutoModel(model, { freeOnly = true, zeroCostMode = ZERO_COST_MOD
 }
 
 function freeFallbacks(models, primary = "", limit = 3) {
-  return models
-    .filter(m => m.isFree && m.id !== primary && !isLocalModelId(m.id) && m.id !== "openrouter/free")
-    .sort((a, b) => (b.context_length || 0) - (a.context_length || 0))
-    .slice(0, Math.max(0, Math.min(3, limit)))
-    .map(m => m.id);
+  return require('./chat-model-eligibility').conversationalFallbacks(models,primary,limit);
 }
 
 function purposePrompt(purpose) {
