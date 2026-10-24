@@ -82,6 +82,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
+ const ownerContract=require('./conversational-build-contract');
+ const ownerRequirements=ownerContract.merge(meta.owner_requirements||[],text);
  if(!meta.current_version){await builder.initialize(meta);meta=builder.loadMeta(id)}
  const tl=require('./react-timeline').create(onEvent);
  // A new project gets its design brief first (colours and fonts go into src/index.css).
@@ -99,7 +101,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  let work={...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=false,lastTest=null,finishWarned=false,invalidReplies=0;
  const steps=[];
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text;
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+ownerContract.prompt(ownerRequirements);
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
@@ -252,6 +254,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
   fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
+  fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
   builder.saveMeta(fresh);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
