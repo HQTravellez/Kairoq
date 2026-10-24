@@ -63,3 +63,5 @@
 .agent-capabilities a:hover,.agent-capabilities a:focus-visible{background:rgba(120,140,170,.2);border-color:currentColor;}
 .agent-capabilities-hint{opacity:.55;font-size:11px;}
 @media(max-width:680px){.agent-capabilities-hint{display:none}.agent-capabilities-label{width:100%}.agent-capabilities{gap:5px}.agent-capabilities a{padding:5px 8px}}
+
+.active-model-details{font-size:11px;color:var(--muted,#9aabc4);padding:0 4px 7px;line-height:1.5;overflow-wrap:anywhere}
