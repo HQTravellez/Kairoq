@@ -1,0 +1,139 @@
+/* Kairoq workspace — calm UI layer.
+   Loaded last on the main chat page. One quiet palette, one type scale, no decorative glow.
+   Earlier layers (styles, calm, sidebar, composer, home, design) stay for layout; this file
+   sets the look. */
+
+:root{
+  --k-bg:#f7f7f6;          /* page */
+  --k-panel:#efefed;       /* sidebar */
+  --k-surface:#ffffff;     /* composer, cards */
+  --k-ink:#1c1c1e;         /* text */
+  --k-muted:#66666b;       /* secondary text */
+  --k-faint:#8e8e93;       /* placeholders, hints */
+  --k-line:#e2e2df;        /* borders */
+  --k-hover:#e6e6e3;       /* hover fill */
+  --k-bubble:#e9e9e6;      /* your messages */
+  --k-accent:#2b59c3;      /* links, focus, the active item */
+  --k-radius:12px;
+  --k-col:760px;           /* reading column */
+  --k-font:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+
+/* ---------- canvas ---------- */
+body,.app,.main,.main[data-view=chat],.main[data-view=command]{background:var(--k-bg)!important;color:var(--k-ink);font-family:var(--k-font)!important}
+.kh-sky,.main>i{display:none!important}
+.main[data-view=chat]:has(.welcome) .composer-shell::before,
+.main[data-view=chat] .composer-shell::before{content:none!important;display:none!important;background:none!important}
+.main[data-view=command]{background-image:none!important}
+
+/* ---------- top bar ---------- */
+.topbar.simple-topbar{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+.topbar-title{font-size:14px!important;font-weight:600!important;letter-spacing:-.005em;color:var(--k-ink)!important}
+.topbar-subtitle{font-size:12px!important;color:var(--k-faint)!important}
+.topbar .icon-btn{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:8px!important;color:var(--k-muted)!important}
+.topbar .icon-btn:hover{background:var(--k-hover)!important;color:var(--k-ink)!important}
+
+/* ---------- sidebar ---------- */
+.sidebar.kn{background:var(--k-panel)!important;border-right:1px solid var(--k-line)!important;box-shadow:none!important;font-family:var(--k-font)!important}
+.sidebar.kn .brand{padding:6px 6px 14px!important;gap:10px!important}
+.sidebar.kn .brand-mark{width:30px!important;height:30px!important;border-radius:9px!important;font-size:15px!important;box-shadow:none!important}
+.sidebar.kn .brand-title{font-size:15px!important;font-weight:600!important;letter-spacing:-.01em}
+.sidebar.kn .brand-subtitle{display:none!important}
+.sidebar.kn .kn-new{background:var(--k-surface)!important;border:1px solid var(--k-line)!important;color:var(--k-ink)!important;border-radius:10px!important;min-height:38px!important;font-weight:500!important;box-shadow:0 1px 1px rgba(28,28,30,.04)!important;margin-bottom:12px!important}
+.sidebar.kn .kn-new:hover{border-color:#cfcfcb!important;background:#fff!important}
+.sidebar.kn .kn-group{gap:1px!important;margin-bottom:6px!important}
+.sidebar.kn .kn-item,.sidebar.kn .kn-fold>summary,.sidebar.kn .kn-settings>summary{min-height:34px!important;padding:0 10px!important;border-radius:8px!important;font-size:14px!important;color:var(--k-ink)!important;background:transparent!important;border:0!important;gap:10px!important;font-weight:400!important}
+.sidebar.kn .kn-item:hover,.sidebar.kn .kn-fold>summary:hover,.sidebar.kn .kn-settings>summary:hover{background:var(--k-hover)!important}
+.sidebar.kn .kn-item.active{background:var(--k-surface)!important;box-shadow:0 1px 2px rgba(28,28,30,.06)!important;font-weight:500!important}
+.sidebar.kn .kn-ico{width:17px!important;height:17px!important;stroke:var(--k-muted)!important;opacity:1!important}
+.sidebar.kn .kn-item.active .kn-ico{stroke:var(--k-ink)!important}
+.sidebar.kn .kn-label{font-size:12px!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important;color:var(--k-faint)!important;padding:0 10px!important}
+/* Recent chats take the free space; everything else sits under More. */
+.sidebar.kn .kn-chats{flex:1 1 auto!important;min-height:120px!important;margin-top:10px!important;overflow:auto!important;border-top:1px solid var(--k-line);padding-top:10px!important}
+.sidebar.kn .history-list button,.sidebar.kn .history-list .history-item{border-radius:8px!important;font-size:13.5px!important;color:var(--k-ink)!important;background:transparent!important;border:0!important;padding:7px 10px!important;text-align:left}
+.sidebar.kn .history-list button:hover,.sidebar.kn .history-list .history-item:hover{background:var(--k-hover)!important}
+.sidebar.kn .history-list .active,.sidebar.kn .history-list [aria-current]{background:var(--k-surface)!important;box-shadow:0 1px 2px rgba(28,28,30,.06)!important}
+.sidebar.kn #clearChats{font-size:12px!important;color:var(--k-faint)!important;background:none!important;border:0!important}
+.sidebar.kn #clearChats:hover{color:var(--k-ink)!important}
+.sidebar.kn .kn-more{border-top:1px solid var(--k-line);padding-top:6px!important;margin-top:6px!important}
+.sidebar.kn .kn-more[open]{max-height:46vh;overflow:auto}
+.sidebar.kn .sidebar-footer{font-size:12px!important;color:var(--k-faint)!important;border-top:1px solid var(--k-line)!important}
+
+/* ---------- empty state ---------- */
+.welcome{max-width:var(--k-col)!important}
+.welcome .orb{display:none!important}
+.welcome h1,.kh-hero h1{font-size:30px!important;line-height:1.2!important;font-weight:600!important;letter-spacing:-.02em!important;color:var(--k-ink)!important}
+.kh-hero h1 em{background:none!important;color:inherit!important;-webkit-text-fill-color:currentColor!important;font-style:normal!important}
+.welcome p,.kh-hero>p{font-size:15px!important;color:var(--k-muted)!important}
+.welcome .suggestions{gap:8px!important}
+.welcome .suggestions button,.kh-pill{background:transparent!important;border:1px solid var(--k-line)!important;border-radius:999px!important;color:var(--k-ink)!important;font-size:13.5px!important;padding:7px 14px!important;box-shadow:none!important}
+.welcome .suggestions button:hover,.kh-pill:hover{background:var(--k-surface)!important;border-color:#cfcfcb!important}
+.kh-ic{display:none!important}
+
+/* ---------- conversation ---------- */
+.messages{scroll-padding-bottom:24px}
+.message-row{max-width:var(--k-col)!important;margin-left:auto!important;margin-right:auto!important;padding:0 20px!important}
+.message-row .message{font-size:15.5px!important;line-height:1.65!important;color:var(--k-ink)!important}
+.message-row.user{display:flex!important;justify-content:flex-end!important}
+.message-row.user .message{background:var(--k-bubble)!important;border:0!important;border-radius:18px!important;padding:10px 16px!important;max-width:80%!important;box-shadow:none!important;white-space:pre-wrap}
+.message-row.assistant .message{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;max-width:100%!important}
+.assistant-content p{margin:0 0 .8em!important}
+.assistant-content a{color:var(--k-accent)!important;text-decoration:underline;text-underline-offset:2px}
+.assistant-content strong{font-weight:600}
+.assistant-content h1,.assistant-content h2,.assistant-content h3{font-weight:600!important;letter-spacing:-.01em;margin:1.2em 0 .5em!important}
+.assistant-content h1{font-size:20px!important}.assistant-content h2{font-size:18px!important}.assistant-content h3{font-size:16px!important}
+.assistant-content ul,.assistant-content ol{padding-left:1.3em!important;margin:0 0 .8em!important}
+.assistant-content li{margin:.25em 0!important}
+/* Wide tables scroll sideways instead of being cut off on a phone. */
+.assistant-content table{display:block!important;max-width:100%!important;overflow-x:auto!important;border-collapse:collapse!important;font-size:14px!important;border:1px solid var(--k-line)!important;border-radius:10px!important;background:var(--k-surface)!important}
+.assistant-content th,.assistant-content td{padding:8px 12px!important;border-bottom:1px solid var(--k-line)!important;text-align:left!important;white-space:nowrap}
+.assistant-content th{font-weight:600!important;color:var(--k-muted)!important;background:transparent!important}
+.assistant-content tr:last-child td{border-bottom:0!important}
+.assistant-content pre{background:#1f1f22!important;color:#ececef!important;border-radius:10px!important;padding:14px 16px!important;font-size:13px!important;line-height:1.55!important;overflow-x:auto!important}
+.assistant-content :not(pre)>code{background:var(--k-hover)!important;border-radius:5px!important;padding:.1em .35em!important;font-size:.9em!important}
+
+/* Copy / Regenerate: quiet text buttons that appear with the answer. */
+.answer-actions{display:flex!important;gap:2px!important;margin-top:6px!important;opacity:.0;transition:opacity .15s ease}
+.message-row:hover .answer-actions,.message-row:focus-within .answer-actions,.message-row:last-child .answer-actions{opacity:1}
+@media (hover:none){.answer-actions{opacity:1}}
+.answer-actions button{background:transparent!important;border:0!important;box-shadow:none!important;color:var(--k-muted)!important;font-size:12.5px!important;padding:4px 8px!important;border-radius:6px!important;min-height:0!important}
+.answer-actions button:hover{background:var(--k-hover)!important;color:var(--k-ink)!important}
+
+/* Live view of a browser-use run (chat-browser.js). */
+.browser-live{border-color:var(--k-line)!important;border-radius:12px!important}
+
+/* ---------- composer ---------- */
+.composer-shell{background:transparent!important}
+.composer{max-width:var(--k-col)!important;margin:0 auto!important;background:var(--k-surface)!important;border:1px solid var(--k-line)!important;border-radius:20px!important;box-shadow:0 1px 2px rgba(28,28,30,.04),0 8px 28px rgba(28,28,30,.06)!important;transition:border-color .15s ease,box-shadow .15s ease}
+.composer:focus-within{border-color:#c8c8c4!important;box-shadow:0 1px 2px rgba(28,28,30,.05),0 10px 32px rgba(28,28,30,.08)!important}
+#prompt{font-size:15.5px!important;line-height:1.5!important;color:var(--k-ink)!important;font-family:var(--k-font)!important}
+#prompt::placeholder{color:var(--k-faint)!important}
+.composer .tool-btn{border-radius:8px!important;color:var(--k-muted)!important;background:transparent!important;border:0!important}
+.composer .tool-btn:hover{background:var(--k-hover)!important;color:var(--k-ink)!important}
+.composer .inline-select select{background:transparent!important;border:1px solid var(--k-line)!important;border-radius:999px!important;font-size:13px!important;color:var(--k-ink)!important;box-shadow:none!important}
+.composer .star-btn{display:none!important}
+.composer .send-btn,#sendBtn{background:var(--k-ink)!important;color:#fff!important;border-radius:999px!important;width:36px!important;height:36px!important;box-shadow:none!important}
+.composer .send-btn:disabled,#sendBtn:disabled{opacity:.35!important}
+/* Model availability line: readable, quiet, and only a line. */
+.status-bar{color:var(--k-faint)!important;font-size:12px!important;text-shadow:none!important;max-width:var(--k-col);margin:0 auto 6px!important;padding:0 6px!important;background:none!important}
+.status-bar.error,.status-bar[data-state=error]{color:#b42318!important}
+.fineprint{color:var(--k-faint)!important;font-size:11.5px!important;text-shadow:none!important;text-align:center}
+
+/* ---------- focus and motion ---------- */
+.sidebar.kn :focus-visible,.main :focus-visible{outline:2px solid var(--k-accent)!important;outline-offset:2px!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- phone ---------- */
+@media (max-width:640px){
+  .message-row{padding:0 14px!important}
+  .message-row.user .message{max-width:88%!important}
+  .welcome h1,.kh-hero h1{font-size:26px!important}
+  .composer{border-radius:18px!important}
+}
+
+/* ---------- empty state overrides (design.css paints the composer pink and its hints white) ---------- */
+.main[data-view=chat]:has(.welcome) .composer{border-color:var(--k-line)!important;box-shadow:0 1px 2px rgba(28,28,30,.04),0 8px 28px rgba(28,28,30,.06)!important}
+.main[data-view=chat]:has(.welcome) .composer-shell>:not(.composer){color:var(--k-faint)!important}
+.main[data-view=chat]:has(.welcome){background:var(--k-bg)!important}
+/* Tables hug their columns rather than stretching a white box. */
+.assistant-content table{width:max-content!important}
