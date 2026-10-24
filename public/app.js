@@ -1743,6 +1743,7 @@ async function send(regenerateFrom=null){
       signal:abortController.signal,
       body:JSON.stringify({
         model:modelSelect.value||"openrouter/free",
+        conversationId:String(currentChatId||"default"),
         messages:outgoing,
         systemPrompt:settings.systemPrompt||"",
         temperature:Number(settings.temperature??0.7),
