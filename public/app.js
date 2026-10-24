@@ -1096,33 +1096,24 @@ function option(value,label){
 }
 
 function fillModelSelect(){
+  // Keep the primary picker small. The existing searchable model dialog remains
+  // available for advanced users and retains full model selection.
   const previous=ui.lastModel||"openrouter/free";
-  modelSelect.innerHTML="";
+  modelSelect.replaceChildren();
   modelSelect.appendChild(option("openrouter/free","⚡ Free Auto"));
   modelSelect.appendChild(option("smart-auto","✦ Smart Auto"));
-
-  const fav = allModels.filter(m=>favorites.includes(m.id));
-  const free = allModels.filter(m=>m.isFree).sort((a,b)=>a.name.localeCompare(b.name));
-  const anthropic = allModels.filter(m=>m.id.startsWith("anthropic/")).sort((a,b)=>a.name.localeCompare(b.name));
-  const google = allModels.filter(m=>m.id.startsWith("google/")).sort((a,b)=>a.name.localeCompare(b.name));
-  const openai = allModels.filter(m=>m.id.startsWith("openai/")).sort((a,b)=>a.name.localeCompare(b.name));
-  const others = allModels.filter(m=>!m.isFree&&!m.id.startsWith("anthropic/")&&!m.id.startsWith("google/")&&!m.id.startsWith("openai/")).slice(0,120);
-
-  function group(label,arr){
-    if(!arr.length)return;
-    const g=document.createElement("optgroup");g.label=label;
-    arr.forEach(m=>g.appendChild(option(m.id,`${cleanText(m.name)}${m.isFree?" · FREE":""}`)));
-    modelSelect.appendChild(g);
+  const fav=allModels.filter(m=>favorites.includes(m.id)).slice(0,8);
+  if(fav.length){
+    const group=document.createElement("optgroup");group.label="★ Favorites";
+    for(const m of fav)group.appendChild(option(m.id,cleanText(m.name)));
+    modelSelect.appendChild(group);
   }
-  group("★ Favorites",fav);
-  group("Free models",free);
-  group("Claude / Anthropic",anthropic);
-  group("Gemini / Google",google);
-  group("OpenAI",openai);
-  group("Other models",others);
-
-  if([...modelSelect.options].some(o=>o.value===previous)) modelSelect.value=previous;
-  else modelSelect.value="openrouter/free";
+  // Preserve previously selected advanced models without showing hundreds of options.
+  if(previous!=="openrouter/free"&&previous!=="smart-auto"&&![...modelSelect.options].some(x=>x.value===previous)){
+    const chosen=allModels.find(m=>m.id===previous);
+    if(chosen)modelSelect.appendChild(option(previous,cleanText(chosen.name)));
+  }
+  modelSelect.value=[...modelSelect.options].some(x=>x.value===previous)?previous:"openrouter/free";
   updateModelUI();
 }
 
