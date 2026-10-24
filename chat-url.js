@@ -4,6 +4,7 @@
 const IPV4=/^\d{1,3}(?:\.\d{1,3}){3}$/;
 function extractWebsite(text){
  const input=String(text||"").replace(/\\\./g,".");
+ if(/\bhttp:\/\//i.test(input))return null;
  const candidates=input.match(/(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:\/[\w\-./?%=&+#]*)?/ig)||[];
  for(let value of candidates){
   value=value.replace(/[.,;!?)}\]]+$/,"");
