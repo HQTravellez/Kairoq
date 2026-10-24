@@ -1074,33 +1074,24 @@ function option(value,label){
 }
 
 function fillModelSelect(){
+  // Keep the primary picker small. The existing searchable model dialog remains
+  // available for advanced users and retains full model selection.
   const previous=ui.lastModel||"openrouter/free";
-  modelSelect.innerHTML="";
+  modelSelect.replaceChildren();
   modelSelect.appendChild(option("openrouter/free","⚡ Free Auto"));
   modelSelect.appendChild(option("smart-auto","✦ Smart Auto"));
-
-  const fav = allModels.filter(m=>favorites.includes(m.id));
-  const free = allModels.filter(m=>m.isFree).sort((a,b)=>a.name.localeCompare(b.name));
-  const anthropic = allModels.filter(m=>m.id.startsWith("anthropic/")).sort((a,b)=>a.name.localeCompare(b.name));
-  const google = allModels.filter(m=>m.id.startsWith("google/")).sort((a,b)=>a.name.localeCompare(b.name));
-  const openai = allModels.filter(m=>m.id.startsWith("openai/")).sort((a,b)=>a.name.localeCompare(b.name));
-  const others = allModels.filter(m=>!m.isFree&&!m.id.startsWith("anthropic/")&&!m.id.startsWith("google/")&&!m.id.startsWith("openai/")).slice(0,120);
-
-  function group(label,arr){
-    if(!arr.length)return;
-    const g=document.createElement("optgroup");g.label=label;
-    arr.forEach(m=>g.appendChild(option(m.id,`${cleanText(m.name)}${m.isFree?" · FREE":""}`)));
-    modelSelect.appendChild(g);
+  const fav=allModels.filter(m=>favorites.includes(m.id)).slice(0,8);
+  if(fav.length){
+    const group=document.createElement("optgroup");group.label="★ Favorites";
+    for(const m of fav)group.appendChild(option(m.id,cleanText(m.name)));
+    modelSelect.appendChild(group);
   }
-  group("★ Favorites",fav);
-  group("Free models",free);
-  group("Claude / Anthropic",anthropic);
-  group("Gemini / Google",google);
-  group("OpenAI",openai);
-  group("Other models",others);
-
-  if([...modelSelect.options].some(o=>o.value===previous)) modelSelect.value=previous;
-  else modelSelect.value="openrouter/free";
+  // Preserve previously selected advanced models without showing hundreds of options.
+  if(previous!=="openrouter/free"&&previous!=="smart-auto"&&![...modelSelect.options].some(x=>x.value===previous)){
+    const chosen=allModels.find(m=>m.id===previous);
+    if(chosen)modelSelect.appendChild(option(previous,cleanText(chosen.name)));
+  }
+  modelSelect.value=[...modelSelect.options].some(x=>x.value===previous)?previous:"openrouter/free";
   updateModelUI();
 }
 
@@ -1111,6 +1102,22 @@ function updateModelUI(){
   modelBadge.textContent=modelSelect.value==="openrouter/free"?"⚡ Free Auto":modelSelect.value==="smart-auto"?"✦ Smart Auto":`${info.name}${info.isFree?" · FREE":""}`;
   $("#favoriteBtn").classList.toggle("active",favorites.includes(modelSelect.value));
   $("#favoriteBtn").textContent=favorites.includes(modelSelect.value)?"★":"☆";
+  const details=$("#activeModelDetails");
+  if(details){
+    if(modelSelect.value==="openrouter/free"){
+      details.textContent="Free Auto · Kairoq chooses an available free model · Browser and API tools are provided by Kairoq, not the model";
+    }else if(modelSelect.value==="smart-auto"){
+      details.textContent="Smart Auto · Automatic routing · Model usage, availability and costs depend on provider and account permissions";
+    }else{
+      const context=Number.isFinite(Number(info.context_length))&&Number(info.context_length)>0
+        ?" · Context: "+Number(info.context_length).toLocaleString()+" tokens":" · Context: not reported";
+      details.textContent=info.name+" · "+(info.isFree?"Free":"Paid or unknown pricing")
+        +context+" · Vision: "+(info.supportsVision?"reported":"not verified")
+        +" · Reasoning: "+(info.supportsReasoning?"reported":"not verified")
+        +" · Remaining requests: not reported";
+    }
+  }
+
 }
 
 function renderModelResults(){
@@ -1129,7 +1136,7 @@ function renderModelResults(){
     const left=document.createElement("div");
     left.innerHTML=`<div class="model-result-name">${escapeHTML(cleanText(m.name||m.id))}</div><div class="model-result-id">${escapeHTML(m.id)}</div>`;
     const meta=document.createElement("div");meta.className="model-result-meta";
-    meta.textContent=[m.isFree?"FREE":"PAID",m.supportsVision?"VISION":"",m.supportsReasoning?"REASONING":""].filter(Boolean).join(" · ");
+    meta.textContent=[m.isFree?"Free":"Paid/unknown",m.supportsVision?"Vision":"",m.supportsReasoning?"Reasoning":"",Number(m.context_length)>0?Number(m.context_length).toLocaleString()+" context":"", "Quota not reported"].filter(Boolean).join(" · ");
     b.append(left,meta);
     b.onclick=()=>{modelSelect.value=m.id;updateModelUI();$("#modelDialog").close()};
     host.appendChild(b);
