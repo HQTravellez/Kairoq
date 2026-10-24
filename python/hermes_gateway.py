@@ -21,7 +21,7 @@ MODEL = os.getenv("KAIROQ_HERMES_MODEL", "")
 BASE_URL = os.getenv("KAIROQ_HERMES_BASE_URL", "")
 API_KEY = os.getenv("KAIROQ_HERMES_API_KEY", "")
 TOKEN = os.getenv("KAIROQ_PYTHON_AGENT_TOKEN", "")
-TOOLSETS = [s.strip() for s in os.getenv("KAIROQ_HERMES_TOOLSETS", "").split(",") if s.strip()]
+TOOLSETS = [s.strip() for s in os.getenv("KAIROQ_HERMES_TOOLSETS", "safe").split(",") if s.strip()]
 MAX_ITERATIONS = min(20, max(1, int(os.getenv("KAIROQ_HERMES_MAX_ITERATIONS", "8"))))
 
 
