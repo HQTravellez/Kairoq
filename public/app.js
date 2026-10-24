@@ -2933,7 +2933,10 @@ function appCard(name,{thumbUrl,sub,onOpen}){
   const meta=document.createElement("span");meta.className="kh-app-meta";
   const title=document.createElement("strong");title.textContent=name;
   const when=document.createElement("small");when.textContent=sub||"";
-  meta.append(title,when);b.append(thumb,meta);b.onclick=onOpen;
+  const top=document.createElement("span");top.className="kh-app-topline";
+  const mark=document.createElement("span");mark.className="kh-app-kind";mark.textContent=/calori|nutrition|food/i.test(name)?"Nutrition":/yoga|studio/i.test(name)?"Wellness":/hotel|guest/i.test(name)?"Hospitality":/jewel|inventory/i.test(name)?"Operations":/menu|coffee|restaurant/i.test(name)?"Food & beverage":"Application";
+  const arrow=document.createElement("span");arrow.className="kh-app-arrow";arrow.textContent="↗";arrow.setAttribute("aria-hidden","true");
+  top.append(mark,arrow);meta.append(top,title,when);b.append(thumb,meta);b.setAttribute("aria-label","Open "+name);b.onclick=onOpen;
   li.append(b);return li;
 }
 function showProjectsTab(tab){
