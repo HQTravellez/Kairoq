@@ -1,0 +1,33 @@
+name: Hermes persistent learning proof
+on:
+  push:
+    paths:
+      - 'hermes-learning-loop.js'
+      - 'api-skill-memory.js'
+      - 'autonomy-store.js'
+      - 'test/hermes-learning-loop.test.js'
+      - 'test/api-skill-memory.test.js'
+      - '.github/workflows/hermes-persistence.yml'
+  pull_request:
+    paths:
+      - 'hermes-learning-loop.js'
+      - 'api-skill-memory.js'
+      - 'autonomy-store.js'
+      - 'test/hermes-learning-loop.test.js'
+      - 'test/api-skill-memory.test.js'
+      - '.github/workflows/hermes-persistence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  persistence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check hermes-learning-loop.js && node --check app-builder.js
+      - name: Verified skill and cross-process disk persistence tests
+        run: node --test test/hermes-learning-loop.test.js test/api-skill-memory.test.js
