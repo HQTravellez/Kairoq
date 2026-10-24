@@ -6,3 +6,6 @@ node_modules/
 
 workspace/
 eval-results/
+
+# Local executor evidence and reviewed procedural learning records
+.kairoq-autonomy/
