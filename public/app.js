@@ -1675,11 +1675,26 @@ async function generateVideoFromPrompt(raw){
 // "hi", "thanks" or "what can you do" is conversation, not an app to build: it is answered in Ask
 // and never opens the builder or creates a project.
 const SMALL_TALK=/^(hi+|hello|hey+|hiya|yo|hola|good (morning|afternoon|evening|day)|thanks|thank you|thx|ok|okay|k|yes|yep|sure|cool|nice|great|test(ing)?|what can you do|who are you|how does this work|help)[\s!.?,]*$/i;
+// Clear app-creation requests must enter the builder even when the user is in Ask mode.
+// Ordinary questions about coding, examples, and existing chat conversations stay in chat.
+function isAppCreationRequest(message){
+  const text=String(message||'').trim();
+  if(!text||text.length>1200)return false;
+  if(/^(how|why|what|where|when|can i|could i|should i|explain|show me how|teach me|compare|review|debug)\b/i.test(text))return false;
+  if(/\b(example|tutorial|snippet|sample code|explain|guide|instructions|how to)\b/i.test(text))return false;
+  const product=/\b(web[ -]?app|web application|mobile app|ios app|android app|website|dashboard|saas|portal|application|app)\b/i;
+  const request=/\b(build|create|make|develop|generate|design|need|want|looking for|set up|setup)\b/i;
+  return product.test(text)&&request.test(text);
+}
 async function send(regenerateFrom=null){
-  if(regenerateFrom===null && appBuildMode){
+  if(regenerateFrom===null){
     const asked=promptEl.value.trim();
-    if(!SMALL_TALK.test(asked)) return startAppBuild(asked);
-    setAppBuildMode(false);
+    if(appBuildMode){
+      if(!SMALL_TALK.test(asked))return startAppBuild(asked);
+      setAppBuildMode(false);
+    }else if(!attachments.length&&!imageMode&&!videoMode&&isAppCreationRequest(asked)){
+      return startAppBuild(asked);
+    }
   }
   setMainView("chat");
   const raw=promptEl.value.trim();
