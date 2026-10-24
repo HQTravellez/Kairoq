@@ -3121,7 +3121,48 @@ $$(".cc-quick").forEach(btn=>btn.onclick=()=>useCommandPrompt(btn));
 $("#clearChats").onclick=()=>{if(confirm("Delete all local chats?")){chats=[];currentChatId=null;newChat()}};
 // "+" opens a small menu (file, image, video), like Hermes' single "+" in the message box.
 $("#attachBtn").onclick=e=>{e.stopPropagation();const m=$("#plusMenu");m.hidden=!m.hidden;$("#attachBtn").setAttribute("aria-expanded",String(!m.hidden));if(!m.hidden)m.querySelector("button")?.focus()};
-$$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
+$$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else if(k==="pdf")openPdfTools();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
+// PDF tools (Stirling PDF on the server, stirling-pdf.js): pick a tool and PDFs, get the result back as a download.
+async function openPdfTools(){
+  let info={on:false,tools:[]};try{info=await (await fetch("/api/pdf/tools",{credentials:"same-origin"})).json()}catch{}
+  const dlg=document.createElement("dialog");dlg.className="kq-pdf";dlg.setAttribute("aria-label","PDF tools");
+  const close=()=>{dlg.close();dlg.remove()};
+  const mk=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  const head=mk("div","kq-pdf-head");head.append(mk("h2",null,"PDF tools"));const x=mk("button","kq-pdf-x","×");x.type="button";x.setAttribute("aria-label","Close");x.onclick=close;head.append(x);
+  dlg.append(head);
+  if(!info.on){dlg.append(mk("p","kq-pdf-note","PDF tools aren't connected yet. Add a Stirling PDF server on Railway and set KAIROQ_STIRLING_URL. The Plugins page shows how."));document.body.append(dlg);dlg.showModal();return}
+  let tool=info.tools[0].id;
+  const tools=mk("div","kq-pdf-tools");tools.setAttribute("role","radiogroup");tools.setAttribute("aria-label","Tool");
+  const files=mk("input");files.type="file";files.accept="application/pdf,.pdf";files.multiple=true;files.setAttribute("aria-label","PDF files");
+  const opt=mk("div","kq-pdf-opt"),status=mk("p","kq-pdf-note"),go=mk("button","kq-pdf-go","Run");go.type="button";
+  const drawOpt=()=>{opt.replaceChildren();
+    const field=(label,ph,name)=>{const l=mk("label",null,label);const i=mk("input");i.placeholder=ph;i.name=name;l.append(i);opt.append(l)};
+    if(tool==="split")field("Split after pages","e.g. 2,5 or 1-3","pages");
+    if(tool==="compress")field("How much smaller (1 light, 9 strongest)","5","level");
+    if(tool==="ocr")field("Language of the text","eng (English), fra (French), eng+fra","languages");
+    files.multiple=tool==="merge";
+  };
+  info.tools.forEach(t=>{const b=mk("button","kq-pdf-tool"+(t.id===tool?" on":""),t.label);b.type="button";b.setAttribute("role","radio");b.setAttribute("aria-checked",String(t.id===tool));
+    b.onclick=()=>{tool=t.id;[...tools.children].forEach(c=>{c.classList.toggle("on",c===b);c.setAttribute("aria-checked",String(c===b))});drawOpt()};tools.append(b)});
+  go.onclick=async()=>{
+    const list=[...files.files];if(!list.length){status.textContent="Choose a PDF first.";return}
+    go.disabled=true;status.textContent="Working… this can take a minute for big or scanned files.";
+    try{
+      const data=await Promise.all(list.map(f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok({name:f.name,data:String(r.result).split(",")[1]});r.onerror=no;r.readAsDataURL(f)})));
+      const options={};opt.querySelectorAll("input").forEach(i=>{if(i.value.trim())options[i.name]=i.value.trim()});
+      const r=await fetch("/api/pdf/run",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({tool,files:data,options})});
+      if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||"The PDF tool failed.")}
+      const name=(/filename="([^"]+)"/.exec(r.headers.get("content-disposition")||"")||[])[1]||"result.pdf";
+      const url=URL.createObjectURL(await r.blob());const a=mk("a","kq-pdf-dl","Download "+name);a.href=url;a.download=name;
+      status.replaceChildren("Done. ",a);a.click();
+    }catch(err){status.textContent=err.message}
+    finally{go.disabled=false}
+  };
+  drawOpt();
+  dlg.append(tools,mk("p","kq-pdf-sub","Your files go to your PDF server and straight back. Nothing is kept."),files,opt,go,status);
+  dlg.addEventListener("close",()=>dlg.remove());
+  document.body.append(dlg);dlg.showModal();
+}
 document.addEventListener("click",e=>{if(!e.target.closest(".kq-plus")){const m=$("#plusMenu");if(m&&!m.hidden){m.hidden=true;$("#attachBtn").setAttribute("aria-expanded","false")}}});
 $("#plusMenu")?.addEventListener("keydown",e=>{if(e.key==="Escape"){$("#plusMenu").hidden=true;$("#attachBtn").focus()}});
 $("#imageModeBtn").onclick=()=>setImageMode(!imageMode);
