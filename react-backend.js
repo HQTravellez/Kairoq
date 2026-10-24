@@ -46,10 +46,19 @@ function pgSchema(file){
  if(rel.length===4&&rel[1]==='sandboxes'&&/^[a-f0-9]{32}$/.test(rel[2])&&rel[3]==='data.sqlite')return'sb_'+rel[2];
  return null;
 }
+// The project a data file belongs to, and whether it is the app's own data (not a test copy).
+function fileOwner(file){
+ const rel=path.relative(builder.ROOT(),file).split(path.sep);
+ return/^[a-z0-9]{6,40}$/.test(rel[0]||'')?{id:rel[0],main:rel.length===2&&rel[1]==='data.sqlite'}:null;
+}
 function openFile(file){
  if(dbs.has(file))return dbs.get(file);
- const pg=require('./pg-sync'),schemaName=pg.enabled()?pgSchema(file):null;
- const db=schemaName?pg.open({schema:pg.schemaName(schemaName)}):new DatabaseSync(file);
+ const pg=require('./pg-sync'),owner=fileOwner(file);
+ // An app connected to the owner's own Supabase keeps its data there (app-database.js); its test
+ // copies are SQLite files (react-sandbox.js).
+ const ext=owner?require('./app-database').connection(owner.id):null;
+ const schemaName=!ext&&pg.enabled()?pgSchema(file):null;
+ const db=ext&&owner.main?pg.open({schema:ext.schema,url:ext.url,ca:ext.ca}):schemaName?pg.open({schema:pg.schemaName(schemaName)}):new DatabaseSync(file);
  db.exec(`PRAGMA journal_mode=WAL;
   CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,name TEXT,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL);
@@ -59,6 +68,7 @@ function openFile(file){
  try{db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT')}catch{}
  require('./react-backend-extras').migrate(db);
  if(schemaName&&schemaName.startsWith('app_')){require('./app-assistant').migrate(db);pg.copyFromSqlite(file,db,{key:'app-data'})}
+ else if(ext&&owner.main)require('./app-assistant').migrate(db);
  dbs.set(file,db);
  return db;
 }

@@ -1385,6 +1385,7 @@ $('settings-open').onclick=async()=>{
  $('memory-box').open=false;text($('memory-text'),'');
  $('memory-box').ontoggle=async()=>{if(!$('memory-box').open||$('memory-text').textContent)return;try{const {memory}=await api('/projects/'+state.project.id+'/memory');text($('memory-text'),memory||'Nothing yet: it starts with your first request.')}catch(err){text($('memory-text'),err.message)}};
  renderSecrets().catch(err=>text($('settings-error'),err.message));
+ renderDatabase().catch(err=>text($('settings-error'),err.message));
  $('download').href='/api/create/projects/'+state.project.id+'/download';
  try{
   const [{settings},gh]=await Promise.all([api('/projects/'+state.project.id+'/settings'),api('/projects/'+state.project.id+'/github')]);
@@ -1400,6 +1401,25 @@ $('settings-open').onclick=async()=>{
   if(!settings.encryption)text($('settings-error'),'Saving keys needs APP_ENCRYPTION_KEY on the server.');
  }catch(err){text($('settings-error'),err.message)}
  $('settings-dialog').showModal();
+};
+// The app's data in the owner's own Supabase (app-database.js on the server).
+function showDatabase(d){
+ const on=Boolean(d&&d.connected);
+ text($('db-status'),on?'Connected to Supabase ('+d.host+') since '+when(d.connected_at)+'. Sign-ups and saved data are kept in your Supabase, schema '+d.schema+(d.copied?' ('+d.copied+' rows copied across).':'.'):'Your app\'s sign-ups and saved data are stored by Kairoq. Connect your own Supabase to keep them in your account instead.');
+ $('db-form').classList.toggle('hidden',on);$('db-howto').classList.toggle('hidden',on);
+ $('db-connect').classList.toggle('hidden',on);$('db-disconnect').classList.toggle('hidden',!on);
+ $('db-open').classList.toggle('hidden',!on);if(on)$('db-open').href=d.dashboard;
+}
+async function renderDatabase(){const {database}=await api('/projects/'+state.project.id+'/database');showDatabase(database)}
+$('db-connect').onclick=async()=>{
+ text($('settings-error'),'');const b=$('db-connect');b.disabled=true;const was=b.textContent;b.textContent='Connecting…';
+ try{const {database}=await api('/projects/'+state.project.id+'/database',{method:'POST',body:{url:$('db-url').value.trim(),ca:$('db-ca').value.trim()}});$('db-url').value='';$('db-ca').value='';showDatabase(database)}
+ catch(err){text($('settings-error'),err.message)}
+ finally{b.disabled=false;b.textContent=was}
+};
+$('db-disconnect').onclick=async()=>{
+ if(!confirm('Disconnect Supabase? Your data stays in Supabase. The app goes back to Kairoq\'s own copy, as it was when you connected.'))return;
+ try{const {database}=await api('/projects/'+state.project.id+'/database',{method:'DELETE'});showDatabase(database)}catch(err){text($('settings-error'),err.message)}
 };
 async function saveSecrets(fields){
  const body={};for(const [id,name] of fields){const v=$(id).value.trim();if(v)body[name]=v}

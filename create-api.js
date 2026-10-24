@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -1463,6 +1463,14 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const st=require('./project-secrets').status(id);
    return send(res,200,{secrets:Object.entries(st).filter(([k])=>k.startsWith('app_')).map(([k,v])=>({name:k.slice(4).toUpperCase(),hint:v.hint,at:v.at}))}),true;
   }
+  // The app's data in the owner's own Supabase (app-database.js).
+  if(action==='/database'&&method==='GET')return send(res,200,{database:require('./app-database').status(id)}),true;
+  if(action==='/database'&&method==='POST'){
+   limitedKey('database:'+id,10,3600000);
+   const b=await readJson(req,40000);
+   return send(res,200,{database:await require('./app-database').connect(id,{url:b.url,ca:b.ca})}),true;
+  }
+  if(action==='/database'&&method==='DELETE')return send(res,200,{database:require('./app-database').disconnect(id)}),true;
   if(action==='/settings'&&method==='GET'){
    const secrets=require('./project-secrets');
    return send(res,200,{settings:{secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;

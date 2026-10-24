@@ -6,14 +6,14 @@ const pg=require('pg');
 // Counts and ids come back as numbers, as they do from SQLite (they stay far below 2^53).
 pg.types.setTypeParser(20,v=>Number(v));
 pg.types.setTypeParser(1700,v=>Number(v));
-const {url,port,signal}=workerData;
+const {url,ca,port,signal}=workerData;
 const flag=new Int32Array(signal);
 const clients=new Map(),primaryKeys=new Map();
 
 async function client(handle){
  let c=clients.get(handle.id);
  if(c)return c;
- c=new pg.Client({connectionString:url,application_name:'kairoq'});
+ c=new pg.Client(require('./pg-sync').clientConfig(url,{ca}));
  c.on('error',()=>{if(clients.get(handle.id)===c)clients.delete(handle.id)});
  await c.connect();
  if(handle.schema){await c.query('CREATE SCHEMA IF NOT EXISTS '+ident(handle.schema));await c.query('SET search_path TO '+ident(handle.schema))}

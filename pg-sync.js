@@ -9,25 +9,29 @@ const path=require('path');
 const {Worker,MessageChannel,receiveMessageOnPort}=require('worker_threads');
 
 const TIMEOUT_MS=Number(process.env.KAIROQ_PG_TIMEOUT_MS||30000);
-let bridge=null,nextHandle=1;
+// One worker per database: Kairoq's own (DATABASE_URL) and any app database an owner connected
+// (their own Supabase, see app-database.js).
+const bridges=new Map();let nextHandle=1;
 function url(){return String(process.env.DATABASE_URL||'').trim()}
 // On when DATABASE_URL is set (Railway's Postgres) unless KAIROQ_POSTGRES=off.
 function enabled(){return Boolean(url())&&process.env.KAIROQ_POSTGRES!=='off'}
 
-function start(){
- if(bridge&&bridge.url===url())return bridge;
+function start(u=url(),ca=null){
+ let bridge=bridges.get(u);
+ if(bridge)return bridge;
  const {port1,port2}=new MessageChannel(),signal=new SharedArrayBuffer(4);
- const worker=new Worker(path.join(__dirname,'pg-sync-worker.js'),{workerData:{url:url(),port:port2,signal},transferList:[port2]});
+ const worker=new Worker(path.join(__dirname,'pg-sync-worker.js'),{workerData:{url:u,ca,port:port2,signal},transferList:[port2]});
  worker.unref();port1.unref();
- worker.on('error',()=>{if(bridge&&bridge.worker===worker)bridge=null});
- worker.on('exit',()=>{if(bridge&&bridge.worker===worker)bridge=null});
- return bridge={url:url(),worker,port:port1,flag:new Int32Array(signal)};
+ const drop=()=>{if(bridges.get(u)&&bridges.get(u).worker===worker)bridges.delete(u)};
+ worker.on('error',drop);worker.on('exit',drop);
+ bridge={url:u,worker,port:port1,flag:new Int32Array(signal)};bridges.set(u,bridge);
+ return bridge;
 }
-function call(msg){
- const b=start();
+function call(msg,u=url(),ca=null){
+ const b=start(u,ca);
  Atomics.store(b.flag,0,0);
  b.port.postMessage(msg);
- if(Atomics.wait(b.flag,0,0,TIMEOUT_MS)==='timed-out'){b.worker.terminate();bridge=null;throw Error('Postgres did not answer in '+TIMEOUT_MS/1000+' s')}
+ if(Atomics.wait(b.flag,0,0,TIMEOUT_MS)==='timed-out'){b.worker.terminate();bridges.delete(u);throw Error('Postgres did not answer in '+TIMEOUT_MS/1000+' s')}
  const got=receiveMessageOnPort(b.port);
  if(!got)throw Error('Postgres bridge lost its answer');
  const r=got.message;
@@ -38,6 +42,24 @@ function pgError(r){
  const what=r.table?r.table+(r.constraint?' ('+r.constraint+')':''):r.constraint||'';
  const msg=r.code==='23505'?'UNIQUE constraint failed: '+what+(r.detail?' — '+r.detail:''):r.code==='23502'?'NOT NULL constraint failed: '+what+' — '+r.message:r.code==='23503'?'FOREIGN KEY constraint failed: '+what:r.code==='23514'?'CHECK constraint failed: '+what:r.message;
  return Object.assign(Error(msg),{code:r.code,pg:true});
+}
+
+// Connection settings for a database address. Supabase signs its database certificates with
+// its own root certificate (the same for every project), so a Supabase address is checked
+// against that certificate: the one the owner gave with the address, else KAIROQ_SUPABASE_CA
+// (the PEM text) or KAIROQ_SUPABASE_CA_FILE.
+// The check is never switched off; sslmode in the address is dropped so it cannot change it.
+function supabaseCa(){
+ if(process.env.KAIROQ_SUPABASE_CA)return String(process.env.KAIROQ_SUPABASE_CA).replace(/\\n/g,'\n');
+ const f=process.env.KAIROQ_SUPABASE_CA_FILE||path.join(__dirname,'certs','supabase-prod-ca-2021.crt');
+ try{return require('fs').readFileSync(f,'utf8')}catch{return null}
+}
+function clientConfig(u,{ca:own=null}={}){
+ let parsed;try{parsed=new URL(u)}catch{return{connectionString:u,application_name:'kairoq'}}
+ if(!/\.supabase\.(co|com)$/i.test(parsed.hostname))return{connectionString:u,application_name:'kairoq'};
+ parsed.searchParams.delete('sslmode');
+ const ca=own||supabaseCa();
+ return{connectionString:parsed.toString(),application_name:'kairoq',connectionTimeoutMillis:10000,ssl:ca?{ca,rejectUnauthorized:true}:{rejectUnauthorized:true}};
 }
 
 // ---------- SQLite → Postgres ----------
@@ -85,22 +107,23 @@ function values(args){return args.map(v=>v===undefined?null:typeof v==='boolean'
 const AUTO='t'+require('crypto').randomBytes(5).toString('hex');
 function namespace(){const v=String(process.env.KAIROQ_PG_NAMESPACE||'').toLowerCase(),n=v==='auto'?AUTO:v;return /^[a-z][a-z0-9_]{0,15}$/.test(n)?n:''}
 function schemaName(name){const n=namespace();return n?n+'_'+name:name}
+// url: another database (an app's own Supabase); its schema is used as given, without namespace.
 class Database{
- constructor({schema=null}={}){this.handle={id:nextHandle++,schema:schema||namespace()||null};this.open=true}
+ constructor({schema=null,url:u=null,ca=null}={}){this.url=u||url();this.ca=ca;this.external=Boolean(u);this.handle={id:nextHandle++,schema:schema||(u?null:namespace())||null};this.open=true}
  exec(sql){
   const t=translated(sql);
-  if(t.text)call({op:'exec',handle:this.handle,sql:t.text});
+  if(t.text)call({op:'exec',handle:this.handle,sql:t.text},this.url,this.ca);
  }
  prepare(sql){
   const t=translated(sql),h=this.handle;
-  const q=args=>call({op:'query',handle:h,sql:t.text,params:values(args),replace:t.replace});
+  const q=args=>call({op:'query',handle:h,sql:t.text,params:values(args),replace:t.replace},this.url,this.ca);
   return{
    get:(...a)=>{const r=q(a);return r.rows[0]},
    all:(...a)=>q(a).rows,
    run:(...a)=>{const r=q(a);return{changes:r.changes,lastInsertRowid:r.rows&&r.rows[0]&&r.rows[0].id!==undefined?r.rows[0].id:undefined}},
   };
  }
- close(){if(!this.open)return;this.open=false;try{call({op:'close',handle:this.handle})}catch{}}
+ close(){if(!this.open)return;this.open=false;try{call({op:'close',handle:this.handle},this.url,this.ca)}catch{}}
 }
 function open(opts){return new Database(opts)}
 
@@ -162,4 +185,4 @@ function exportToSqlite(db,file,tables){
   out.exec('COMMIT');
  }finally{out.close()}
 }
-module.exports={enabled,open,translate,copyFromSqlite,exportToSqlite,schemaName,namespace,Database};
+module.exports={clientConfig,enabled,open,translate,copyFromSqlite,exportToSqlite,schemaName,namespace,Database};
