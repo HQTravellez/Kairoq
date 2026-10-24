@@ -444,6 +444,17 @@ async function renderData(){
  for(const u of d.users){const li=document.createElement('li');li.textContent=u.email+' · '+when(u.created_at);users.append(li)}
  const records=$('records');records.replaceChildren();
  text($('records-title'),state.collection?'Records in '+state.collection:'Records');
+ const nutritionCollections=new Set(['food_logs','food_log','food_entries','food_diary','meal_entries','meal_logs','nutrition_entries','nutrition_logs','daily_foods','logged_foods']);
+ if(nutritionCollections.has(state.collection)){
+  const clear=document.createElement('button');clear.type='button';clear.className='ghost';clear.textContent='Clear nutrition entries in '+state.collection;
+  clear.onclick=async()=>{
+   if(!confirm('Delete ALL nutrition records in '+state.collection+' for this app? This cannot be undone. Accounts, goals, and weight history will be kept.'))return;
+   clear.disabled=true;
+   try{const result=await api('/projects/'+state.project.id+'/nutrition',{method:'DELETE',body:{collection:state.collection,confirm:true}});alert(result.deleted+' nutrition records deleted. Other data was kept.');await renderData()}
+   catch(err){alert('Nothing was deleted: '+err.message);clear.disabled=false}
+  };
+  records.append(clear);
+ }
  renderSql().catch(()=>{});renderLogs().catch(()=>{});renderAutomations().catch(()=>{});renderAssistant().catch(()=>{});
  if(!state.collection)return;
  const {items}=await api('/projects/'+state.project.id+'/records?collection='+encodeURIComponent(state.collection));
