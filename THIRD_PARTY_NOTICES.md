@@ -64,6 +64,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 `builder-method.js` (find the cause before fixing, honest claims about what was verified, checking review findings before applying them) is adapted from the systematic-debugging, verification-before-completion and receiving-code-review skills of superpowers by Jesse Vincent, https://github.com/obra/superpowers, licensed under the MIT License (full text in `licenses/superpowers-LICENSE.txt`).
 
+The complete Superpowers skill library (all skills in its `skills/` folder, unmodified, revision `2ce8aa1`) is also shipped to Kairoq's Hermes chat service in `hermes/skills/superpowers/`, with its MIT license in `hermes/skills/superpowers/LICENSE`.
+
 ## Harvey: email gate and Find customers
 
 `email-gate.js` and the pipeline in `outreach.js` (listing businesses, reading their sites without AI, owner-confirmed signals, an outbox the owner approves, the bounce kill switch) follow Harvey by Ethan Rogers, https://github.com/ethanplusai/harvey, licensed under the MIT License (full text in `licenses/harvey-LICENSE.txt`). Kairoq's version is its own JavaScript implementation; Harvey's code, its subscription-based model calls, LinkedIn automation and "humanizer" are not used. Business listings come from OpenStreetMap (© OpenStreetMap contributors, ODbL), used through Nominatim and Overpass under their usage policies.
