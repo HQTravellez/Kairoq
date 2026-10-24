@@ -796,6 +796,7 @@ function cleanText(value){
 
 function modelInfo(id){
   if(!id) return {id:"",name:"Unknown",provider:"",isFree:false};
+  if(id==="hermes/agent") return {id,name:"Hermes Agent",provider:"Hermes",isFree:true,supportsVision:true,supportsReasoning:true,context_length:null};
   if(id==="smart-auto") return {id,name:"Smart Auto",provider:"OpenRouter",isFree:false,supportsVision:true,supportsReasoning:true,context_length:null};
   const exact = allModels.find(m=>m.id===id);
   const [providerRaw,...rest]=id.split("/");
@@ -1103,6 +1104,7 @@ function fillModelSelect(){
   if(local.length)modelSelect.appendChild(option("local/auto","Ollama auto"));
   modelSelect.appendChild(option("openrouter/free","Auto (free)"));
   modelSelect.appendChild(option("smart-auto","Auto (best)"));
+  modelSelect.appendChild(option("hermes/agent","Hermes Agent"));
   if(local.length){
     const g=document.createElement("optgroup");g.label="Ollama · on your server";
     local.forEach(m=>g.appendChild(option(m.id,cleanText(m.name))));
@@ -1155,12 +1157,26 @@ const PROVIDER_NAMES={anthropic:"Anthropic",openai:"OpenAI",google:"Google","met
 // Shown by default; everything else is one switch away in Edit models.
 const DEFAULT_PROVIDERS=["anthropic","openai","google","meta-llama","deepseek","qwen","mistralai","x-ai","moonshotai","z-ai","nousresearch"];
 const AUTO_MODELS=[{id:"openrouter/free",name:"Auto (free)",hint:"Kairoq picks an available free model"},{id:"smart-auto",name:"Auto (best)",hint:"Kairoq picks the best model for the question"}];
+// Hermes Agent runs as its own service (docs/HERMES.md); the picker shows whether it is connected.
+let hermesState={configured:false,ok:false,checked:false};
+async function loadHermesState(){
+  try{const r=await fetch("/api/hermes/status");if(r.ok)hermesState={...(await r.json()),checked:true}}catch{}
+  if(hermesState.configured&&["openrouter/free","smart-auto"].includes(modelSelect.value)&&!ui.pickedModel){pickModel("hermes/agent")}
+  renderModelPicker();
+}
+// Keep the list short, like Hermes: no batch/dated copies, a handful of current models per provider.
+const PER_PROVIDER=6;
+function isCopyVariant(m){
+  const id=String(m.id||""),name=String(m.name||"");
+  return /\(batch\)|\bbatch\b/i.test(name)||/[:-]batch\b/i.test(id)||/-(19|20)\d{2}-?\d{2}(-?\d{2})?\b/.test(id)||/:extended$|:nitro$|:floor$|:online$|:beta$/.test(id);
+}
 let modelVisibility={};
 try{modelVisibility=JSON.parse(localStorage.getItem("kq-model-visibility")||"{}")||{}}catch{modelVisibility={}}
 function saveModelVisibility(){try{localStorage.setItem("kq-model-visibility",JSON.stringify(modelVisibility))}catch{}}
 function providerKey(m){return m.local?"ollama":String(m.id||"").split("/")[0]||"other"}
 function providerName(key){return key==="ollama"?"Ollama":PROVIDER_NAMES[key]||key.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase())}
 function pickerLabel(id){
+  if(id==="hermes/agent")return"Hermes Agent";
   const auto=AUTO_MODELS.find(a=>a.id===id);if(auto)return auto.name;
   if(id==="local/auto")return"Ollama auto";
   const m=allModels.find(x=>x.id===id);
@@ -1178,7 +1194,7 @@ function modelShown(m){
 }
 function pickModel(id,name){
   const m=allModels.find(x=>x.id===id);
-  if(freeOnlyEl.checked&&m&&!m.isFree&&!m.local){setStatus("Free Only is on. Choose a free model or turn Free Only off in settings.",true);return false}
+  if(freeOnlyEl.checked&&m&&!m.isFree&&!m.local){freeOnlyEl.checked=false;updateRouting()} // picking a paid model by search means "allow paid"
   if(![...modelSelect.options].some(o=>o.value===id))modelSelect.appendChild(option(id,name||pickerLabel(id)));
   modelSelect.value=id;updateModelUI();return true;
 }
@@ -1191,9 +1207,9 @@ function pickerRow(m,{hint="",auto=false}={}){
   const name=document.createElement("span");name.className="kq-row-name";name.textContent=m.label||pickerLabel(m.id);
   row.append(star,name);
   if(hint){const h=document.createElement("span");h.className="kq-row-hint";h.textContent=hint;row.appendChild(h)}
-  if(m.isFree&&!m.local&&!auto){const b=document.createElement("span");b.className="kq-badge";b.textContent="Free";row.appendChild(b)}
-  if(m.supportsReasoning&&!auto){const b=document.createElement("span");b.className="kq-badge";b.textContent="Thinks";b.title="Shares its thinking";row.appendChild(b)}
-  row.onclick=()=>{if(pickModel(m.id,m.label))closeModelPicker()};
+  if(m.isFree&&!m.local&&!auto&&!freeOnlyEl.checked){const b=document.createElement("span");b.className="kq-badge";b.textContent="Free";row.appendChild(b)}
+  if(m.disabled){row.classList.add("disabled");row.setAttribute("aria-disabled","true");const h=document.createElement("span");h.className="kq-row-note";h.textContent=m.disabled;row.appendChild(h);row.onclick=null;return row}
+  row.onclick=()=>{ui.pickedModel=true;if(pickModel(m.id,m.label))closeModelPicker()};
   return row;
 }
 function renderModelPicker(){
@@ -1202,17 +1218,20 @@ function renderModelPicker(){
   const match=m=>!q||`${pickerLabel(m.id)} ${m.id} ${providerName(providerKey(m))}`.toLowerCase().includes(q);
   host.replaceChildren();
   const section=(title,rows)=>{if(!rows.length)return;const h=document.createElement("div");h.className="kq-group";h.textContent=title;host.append(h,...rows)};
+  const hermesRow={id:"hermes/agent",label:"Hermes Agent",disabled:hermesState.configured?(hermesState.ok===false&&hermesState.checked?"Not reachable":""):"Not connected"};
+  if(!q||"hermes agent".includes(q))section("Hermes",[pickerRow(hermesRow,{auto:true})]);
   section("Auto",AUTO_MODELS.filter(a=>!q||a.name.toLowerCase().includes(q)).map(a=>pickerRow({id:a.id,label:a.name},{hint:a.hint,auto:true})));
   const fav=allModels.filter(m=>favorites.includes(m.id)&&match(m));
   section("Favourites",fav.map(m=>pickerRow(m)));
   const groups=new Map();
   for(const m of allModels){
     if(m.id==="local/auto"||favorites.includes(m.id)||!match(m))continue;
-    if(!q&&!modelShown(m))continue;
+    if(freeOnlyEl.checked&&!m.isFree&&!m.local)continue; // Free Only: paid models just aren't listed
+    if(!q&&(!modelShown(m)||isCopyVariant(m)))continue;
     const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
   }
   const order=[...groups.keys()].sort((a,b)=>(a==="ollama"?-1:b==="ollama"?1:0)||((DEFAULT_PROVIDERS.indexOf(a)+1||99)-(DEFAULT_PROVIDERS.indexOf(b)+1||99))||a.localeCompare(b));
-  for(const k of order)section(providerName(k),groups.get(k).slice(0,q?60:40).map(m=>pickerRow(m)));
+  for(const k of order)section(providerName(k),groups.get(k).slice(0,q?60:PER_PROVIDER).map(m=>pickerRow(m)));
   if(!host.querySelector(".kq-row")){const e=document.createElement("div");e.className="kq-empty";e.textContent=q?`No models match “${$("#modelPickerSearch").value}”.`:"No models yet. Use Refresh models.";host.appendChild(e)}
 }
 function openModelPicker(){
@@ -1226,7 +1245,7 @@ function closeModelPicker(focusButton=false){
 function renderModelsEdit(){
   const host=$("#modelsEditList");const q=$("#modelsEditSearch").value.trim().toLowerCase();host.replaceChildren();
   const groups=new Map();
-  for(const m of allModels){if(m.id==="local/auto")continue;if(q&&!`${pickerLabel(m.id)} ${m.id}`.toLowerCase().includes(q))continue;const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m)}
+  for(const m of allModels){if(m.id==="local/auto"||isCopyVariant(m))continue;if(q&&!`${pickerLabel(m.id)} ${m.id}`.toLowerCase().includes(q))continue;const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m)}
   const keys=[...groups.keys()].sort((a,b)=>(a==="ollama"?-1:b==="ollama"?1:0)||((DEFAULT_PROVIDERS.indexOf(a)+1||99)-(DEFAULT_PROVIDERS.indexOf(b)+1||99))||a.localeCompare(b));
   const toggle=(label,checked,onchange,cls="")=>{const l=document.createElement("label");l.className="kq-toggle-row "+cls;const t=document.createElement("span");t.textContent=label;const i=document.createElement("input");i.type="checkbox";i.className="kq-switch";i.checked=checked;i.setAttribute("role","switch");i.onchange=()=>onchange(i.checked);l.append(t,i);return l};
   for(const k of keys){
@@ -1943,7 +1962,7 @@ async function send(regenerateFrom=null){
       if(event==="status")setStatus(data.message||"");
       if(event==="browser")showBrowserFrame(box,data);
       if(event==="meta"){finalModel=data.model||finalModel;usage=data.usage||usage}
-      if(event==="error"){streamError=data.message||"Request failed";setStatus(streamError,true)}
+      if(event==="error"){streamError=data.message||"Request failed";}
       if(event==="done")setStatus(data.fallbackUsed?"Answered using free fallback":"Complete");
     });
 
@@ -1972,7 +1991,7 @@ async function send(regenerateFrom=null){
     if(smoothRenderer)smoothRenderer.flush();
     cursor.remove();
     if(err.name==="AbortError"){setStatus("Stopped");if(text){chat.messages.push({role:"assistant",content:text,model:finalModel||modelSelect.value,usage});saveAll();}}
-    else{setStatus(err.message,true);contentEl.textContent=text||`Error: ${err.message}`;}
+    else{setStatus("");if(text)contentEl.innerHTML=renderMarkdown(text);const note=document.createElement("div");note.className="kq-error";note.setAttribute("role","alert");note.textContent=err.message;box.appendChild(note);}
     if(!text && usedAttachments.length)attachments=usedAttachments;
   }finally{
     streamIsActive=false;
@@ -2964,6 +2983,7 @@ async function loadModels(){
     if(!res.ok)throw new Error(data.error||"Could not load models");
     allModels=data.models||[];
     fillModelSelect();
+    loadHermesState();
     populateAgentModels();
     populateBotModels();
     setStatus(`${allModels.filter(m=>m.local).length} local · ${allModels.filter(m=>m.isFree&&!m.local).length} cloud-free models available`);
