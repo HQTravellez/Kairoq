@@ -7,7 +7,7 @@ function config(env=process.env){
  const url=new URL(base);
  if(!["http:","https:"].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw Error("Invalid OpenCode URL");
  const host=url.hostname.toLowerCase();
- if(!["127.0.0.1","localhost","::1"].includes(host)&&env.KAIROQ_OPENCODE_V2_TRUSTED_REMOTE!=="true")throw Error("Remote OpenCode servers must be explicitly trusted");
+ if(!["127.0.0.1","localhost","::1"].includes(host)&&(env.KAIROQ_OPENCODE_V2_TRUSTED_REMOTE!=="true"||url.protocol!=="https:"||!env.KAIROQ_OPENCODE_V2_TOKEN))throw Error("Remote OpenCode servers must be explicitly trusted");
  return {base:url.href.replace(/\/$/,""),key:env.KAIROQ_OPENCODE_V2_TOKEN||""};
 }
 function makeClient({env=process.env,fetchImpl=fetch}={}){
@@ -19,7 +19,7 @@ function makeClient({env=process.env,fetchImpl=fetch}={}){
   return data.data??data;
  }
  return {
-  health:()=>request("GET","/api/session?limit=1"),
+  health:()=>request("GET","/api/info"),
   models:()=>request("GET","/api/provider"),
   createSession:(directory)=>request("POST","/api/session",{location:{directory}}),
   setModel:(sessionID,model)=>request("POST","/api/session/"+encodeURIComponent(sessionID)+"/model",{model}),
