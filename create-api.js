@@ -225,7 +225,16 @@ function supportAnswer(meta){
  ].join('\n');
 }
 function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,designShots,generateImage}){
- for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
+ const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
+ if(active){
+  // A greeting must never enter the build queue or block the chat UI.
+  if(!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
+   const answer='Hello! A build is currently '+active.status+'. You can watch or stop the active job; no new build was started.';
+   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true}};
+   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
+  }
+  throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
+ }
  if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
  // An answer to the builder's open question ("ok", "yes", an option or its number) builds with
  // that answer, even from Discuss: the chat shows what the owner typed, the model gets a clear instruction.
