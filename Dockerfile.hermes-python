@@ -1,6 +1,5 @@
-# Kairoq Python agent, runs the *whole* unmodified MIT Hermes source.
-# Pin git commit, retain upstream LICENSE and repository history.
-FROM python:3.14-slim
+# Kairoq Python agent, runs the full MIT Hermes source.
+FROM python:3.13-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git build-essential curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt
 RUN git clone https://github.com/NousResearch/hermes-agent.git hermes \
