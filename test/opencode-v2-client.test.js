@@ -17,5 +17,5 @@ test("calls direct OpenCode V2 session routes without Hermes",async()=>{
  assert.match(seen[0].url,/\/api\/session$/);
  assert.match(seen[2].url,/\/api\/session\/ses_1\/prompt$/);
  assert.match(seen[3].url,/\/wait$/);
- assert.ok(seen.every(s=>s.opts.headers.Authorization==="Bearer test-token"));
+ assert.ok(seen.every(s=>s.opts.headers.Authorization==="Basic "+Buffer.from("opencode:test-token").toString("base64")));
 });
