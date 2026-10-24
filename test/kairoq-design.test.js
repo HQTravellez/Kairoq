@@ -52,3 +52,11 @@ test("the builder's check report doesn't mention another project's features", ()
   const js = read("public/create.js");
   assert.doesNotMatch(js, /food search|calorie|macro targets/i);
 });
+
+test("the builder's chat report uses the Kairoq look: no colour dots, neutral check card, wine mark", () => {
+  const css = read("public/create-kairoq.css");
+  assert.match(css, /\.design-chip i\{display:none!important\}/);
+  assert.match(css, /\.verified,\.verified\.ok\{background:#fff!important/);
+  assert.match(css, /--grad:#8a2d3b/);
+  assert.match(read("public/create.js"), /'Style: '\+m\.design\.name/);
+});

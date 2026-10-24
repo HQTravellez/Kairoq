@@ -1,6 +1,6 @@
 /* The app builder (/create) in the approved Kairoq look: wine accent, no glow,
    the same plain message box as chat. Loaded last on create.html. */
-:root{--accent:#8a2d3b;--accent-2:#a8475a;--accent-3:#e7cfd4;--accent-ink:#fff;--bg:#ffffff;--panel:#ffffff;--side:#f6f4f0;--border:#e8e3dc;--hover:#eee8e3;--grad:none}
+:root{--accent:#8a2d3b;--accent-2:#a8475a;--accent-3:#e7cfd4;--accent-ink:#fff;--bg:#ffffff;--panel:#ffffff;--side:#f6f4f0;--border:#e8e3dc;--hover:#eee8e3;--grad:#8a2d3b}
 body::before,.home-hero::before,.home-hero::after,.aurora,.mock-glow{display:none!important;background:none!important}
 .home-hero{padding-top:14vh!important}
 .home h1,.hero h1{background:none!important;-webkit-text-fill-color:currentColor!important;color:#1d1d1f!important;font-weight:600!important;letter-spacing:-.02em!important}
@@ -10,3 +10,15 @@ body::before,.home-hero::before,.home-hero::after,.aurora,.mock-glow{display:non
 .hero-chip,.home .chips button,.suggestions button{border-color:#e8e3dc!important;background:#fff!important;color:#1d1d1f!important}
 .hero-chip:hover,.home .chips button:hover{background:#f8f5f1!important}
 .work{background:#f8f5f1!important;border-color:#ece6df!important}
+
+/* Builder chat panel, approved Kairoq look: wine "K" mark, no colour dots, neutral check card */
+#editor .messages .assistant::before,.messages .assistant::before{content:"K"!important;background:#8a2d3b!important;color:#fff!important;font:600 11px/18px Geist,sans-serif!important;text-align:center;border-radius:5px!important;box-shadow:none!important}
+.design-chip i{display:none!important}
+.design-chip{font-size:12px!important;color:#8e8e93!important;margin-top:8px!important}
+.verified,.verified.ok{background:#fff!important;border:1px solid #e8e3dc!important;border-radius:10px!important;padding:12px 14px!important;font-size:13px!important;color:#1d1d1f!important}
+.verified.bad{background:#fff!important;border-color:#e7d2d6!important}
+.verified-head{font-weight:600!important;font-size:13px!important;margin-bottom:8px!important}
+.verified li.ok .vmark{color:#1d1d1f!important}
+.verified li.bad .vmark{color:#8a2d3b!important}
+.verified .verification-scope{color:#6e6e73!important;font-size:12.5px!important;margin:10px 0 0!important;padding-top:10px;border-top:1px solid #f0ece7}
+.messages .user .msg-text,.messages .user>.bubble,.messages li.user{background:#f8f5f1!important;border-color:#ece6df!important}
