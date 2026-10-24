@@ -4301,12 +4301,34 @@ async function handleChat(req, res) {
     });
     sseStarted=true;
 
+    // "/last30days <topic>": what people said in the last 30 days (last30days.js). The evidence
+    // replaces the request, and the chat model below (Hermes or the picked model) writes it up.
+    const research=require("./last30days");
+    const researchAsk=research.command(String([...messages].reverse().find(x=>x.role==="user")?.content||""));
+    let researched=false;
+    if(researchAsk&&isAuthenticated(req)){
+      writeSSE(res,"status",{message:"Researching the last 30 days…"});
+      writeSSE(res,"step",{text:"Searching Reddit, Hacker News, YouTube, GitHub and the web"+(researchAsk.deep?" (deep)":"")});
+      try{
+        const found=await research.run(researchAsk.topic,{deep:researchAsk.deep});
+        const prompt=research.synthesisPrompt(researchAsk.topic,found);
+        for(const list of [messages,Array.isArray(body.messages)?body.messages:[]]){const m=[...list].reverse().find(x=>x&&x.role==="user");if(m)m.content=prompt}
+        researched=true;
+        writeSSE(res,"step",{text:found.sources&&found.sources!=="none"?"Found posts from "+found.sources:"Found little recent discussion; the answer will say so"});
+        writeSSE(res,"status",{message:"Writing it up…"});
+      }catch(researchErr){
+        writeSSE(res,"token",{text:researchErr.message});
+        writeSSE(res,"done",{ok:false,provider:"last30days"});
+        return res.end();
+      }
+    }
+
     // Browser use: "find/check/do X on <site>" opens the site in headless Chromium and works
     // through it with the browser agent, streaming each step and a live screenshot. A plain
     // link or "summarise this" still goes to the page readers below.
     const askText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
     const browseUrl=require("./chat-url").extractWebsite(askText);
-    if(browseUrl&&isAuthenticated(req)&&require("./chat-browser").wantsBrowser(askText)){
+    if(!researched&&browseUrl&&isAuthenticated(req)&&require("./chat-browser").wantsBrowser(askText)){
       const browserController=new AbortController();
       const stopBrowser=()=>{if(!res.writableEnded)browserController.abort()};
       res.on("close",stopBrowser);
@@ -4360,7 +4382,7 @@ async function handleChat(req, res) {
 
     const lastUserText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
     const siteUrlFromMessage=require("./chat-url").extractWebsite(lastUserText);
-    if(siteUrlFromMessage && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about|api|docs|documentation|integrat|build|clone|analy[sz]e|read|explore|compare/i.test(lastUserText))){
+    if(!researched&&siteUrlFromMessage && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about|api|docs|documentation|integrat|build|clone|analy[sz]e|read|explore|compare/i.test(lastUserText))){
       const siteUrl=siteUrlFromMessage;
       writeSSE(res,"status",{message:"Reading public website directly…"});
       try{
@@ -4393,7 +4415,7 @@ async function handleChat(req, res) {
     }
     const wantsApiResearch=/\b(api|apis|sdk|swagger|openapi|endpoint|integration|integrate)\b/i.test(lastUserText)&&/\b(sabre|documentation|docs|developer|read|research|browse|find|build|connect|integration|integrate)\b/i.test(lastUserText);
     const needsOnlineResearch=webSearch||wantsApiResearch||/\b(latest|current|today|recent|news|online|search (?:the )?(?:web|internet|online)|look up|research online|as of 20\d{2}|this week|right now|live prices?|compare.*(?:prices|providers))\b/i.test(lastUserText);
-    if(!siteUrlFromMessage && needsOnlineResearch){
+    if(!researched&&!siteUrlFromMessage && needsOnlineResearch){
       writeSSE(res,"status",{message:"Searching public web sources…"});
       try{
         const urls=await searchPublicWeb(lastUserText);
@@ -6624,6 +6646,7 @@ function pluginStatus(env = process.env) {
       { id: "supabase", name: "Supabase", source: "supabase/supabase", about: "Keep an app's sign-ups and saved data in your own Supabase. Connect it per app in the app builder: Settings → Database.", kairoq: { on: true, note: "Per app" }, hermes: null },
       { id: "crawl4ai", name: "Crawl4AI", source: "unclecode/crawl4ai", about: "Reads hard, script-built websites as clean text when you share a link, without sending the page to an outside reader.", kairoq: require("./crawl4ai").configured(env) ? { on: true } : off("Set KAIROQ_CRAWL4AI_URL to a Crawl4AI server"), hermes: null },
       { id: "stirling-pdf", name: "Stirling PDF", source: "Stirling-Tools/Stirling-PDF", about: "PDF tools in the chat's + menu: merge, split, make smaller, read scanned pages, pages to images.", kairoq: require("./stirling-pdf").configured(env) ? { on: true } : off("Set KAIROQ_STIRLING_URL to a Stirling PDF server"), hermes: null },
+      { id: "last30days", name: "last30days", source: "mvanhorn/last30days-skill", about: "Type /last30days and a topic in chat: what people said about it in the last 30 days on Reddit, Hacker News, YouTube, GitHub and the web, with links. Add deep for a wider search.", kairoq: require("./last30days").available() ? { on: true, note: [env.BRAVE_API_KEY ? "web search on" : "free sources; BRAVE_API_KEY adds web search", env.SCRAPECREATORS_API_KEY ? "TikTok and Instagram on" : ""].filter(Boolean).join(" · ") } : off("Not installed on this server"), hermes: hermesOn ? { on: true, note: "Hermes writes it up" } : null },
       { id: "dashi", name: "dashi-ppt", about: "Makes slide decks. Kairoq's own slide maker is used until dashi's licence is reviewed.", kairoq: off("Waiting on licence review"), hermes: null },
     ],
     catalog: [
