@@ -27,3 +27,20 @@ test('API learning requires verified executions and holdout improvement',async()
  await loop.approveApiSkill({projectId:'demo',skillId:'records',version:1,benchmark},db);
  assert.equal((await loop.recalledApiSkill({projectId:'demo',skillId:'records'},db)).version,1);
 });
+
+test('lessons survive a fresh Node process and remain isolated on disk',()=>{
+ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-hermes-durable-'));
+ const modulePath=path.resolve(__dirname,'../hermes-learning-loop.js');
+ const env={...process.env,KAIROQ_AUTONOMY_DIR:root};
+ const run=source=>{const child=cp.spawnSync(process.execPath,['-e',source],{env,encoding:'utf8',timeout:12000,cwd:path.resolve(__dirname,'..')});assert.equal(child.status,0,child.stderr||child.stdout);return child.stdout.trim();};
+ try{
+  run(`const loop=require(${JSON.stringify(modulePath)});(async()=>{await loop.observe({projectId:'tenant_A',task:'Housing API forms',diagnostic:'Form submission returned 422',correction:'Correct the documented required fields',passed:true,evidenceDigest:'${DIGEST}'});await loop.observe({projectId:'tenant_A',task:'Housing API forms',diagnostic:'Unverified payment update',correction:'Skip payment validation',passed:false,evidenceDigest:'${DIGEST}'});})().catch(e=>{console.error(e);process.exitCode=1})`);
+  const observed=JSON.parse(run(`const loop=require(${JSON.stringify(modulePath)});(async()=>{console.log(JSON.stringify({own:await loop.recall({projectId:'tenant_A',query:'Housing API forms'}),other:await loop.recall({projectId:'tenant_B',query:'Housing API forms'})}))})().catch(e=>{console.error(e);process.exitCode=1})`));
+  assert.equal(observed.own.length,1);
+  assert.equal(observed.own[0].correction,'Correct the documented required fields');
+  assert.deepEqual(observed.other,[]);
+  assert.ok(fs.existsSync(path.join(root,'tenant_A.jsonl')),'A real append-only memory file must exist');
+  assert.ok(!fs.existsSync(path.join(root,'tenant_B.jsonl')),'Recall must not create a tenant memory file');
+ }finally{fs.rmSync(root,{recursive:true,force:true})}
+});
