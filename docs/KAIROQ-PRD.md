@@ -68,3 +68,35 @@ Kairoq must not claim that reading API documentation alone is unique. Lovable sh
 **Design implication:** Three clear top-level areas only: Create, Integrations, Projects. Advanced controls remain in context-sensitive panels, not permanently crowded into the chat composer.
 
 **Acceptance demo:** paste a public OpenAPI document, inspect parsed operations and auth, connect authorized sandbox key, execute one GET and one safely approved write operation, generate a UI backed by those calls, verify in Chromium, simulate one API error and confirm user-facing recovery, then save reusable connector knowledge. Missing sandbox credentials must yield a transparent blocked status, not fabricated success.
+
+## Business model: affordable agent + revenue-bearing builder (proposal, not launched)
+
+### Two products sharing a common engine
+- **Kairoq Agent:** persistent, tool-using assistant, conversational search, personal/workspace memory, website research, recurring tasks, skill packs, tool integrations. Available on Free and paid plans, with explicit limits and permission gates.
+- **Kairoq Studio:** premium app creation, project previews, visual editing, API Integration Studio, build/test/repair jobs, deployments and team workspaces. Meter resource-heavy compute separately.
+
+### Proposed pricing (USD, subject to cost validation)
+| Tier | Price | Included | Control |
+| Free | $0 | basic chat, free/BYOK models, single project, basic docs import | strict concurrency and fair-use limits; no guaranteed unlimited inference |
+| Starter | $12/month | saved memory, basic agent tools, 3 projects, bounded build credits | hard monthly spend cap and usage dashboard |
+| Pro | $29/month | advanced design studio, API research, 10 projects, build credits | published price per extra build/credit |
+| Team | $79/month + usage | shared projects, connectors, versioned knowledge, team approvals | org-level caps and audit logs |
+| Business | custom | private deployment, enterprise security, dedicated integration support | contracted usage and SLO |
+
+A BYOK model mode must let customers configure their own supported inference providers. Platform-paid models, browser automation minutes and sandbox compute are separate metered costs; disclose price before any billable action. No unlimited agent execution on the free tier.
+
+### Monetization and cost safeguards
+- Revenue: subscriptions, incremental build/test credits, hosted previews, managed connector subscriptions, verified connector templates and enterprise deployment/support.
+- Costs: model tokens, hosting/compute, browser QA minutes, egress, deployment environments, storage, support, payment processing. Establish actual unit costs and minimum positive contribution margin before public pricing.
+- Each job has an estimated price, hard budget limit, maximum repair loops and cancellation. Show source of charge. No implicit fallback from free/local to paid inference.
+- Never promise that Hermes' subscription figures imply profitability or that its publicly reported prices demonstrate revenue; actual company revenue is not publicly verified.
+
+### Launch gates
+1. Free chat, exact model selection and basic tools reliably work.
+2. One complete real app build+repair+deploy passes with evidence.
+3. Cost ledger meters per-model, per-browser-run and per-build resource use.
+4. Payment/billing gates enforce user approval, caps, cancellations and retries without double charges.
+5. Only then launch public paid plans.
+
+### Metrics
+Activation = user successfully sends 3 messages and creates a verified app preview. Core conversion = 7-day users completing a real API-connected workflow. Track first-build success, repair success, latency p95, cost per accepted project, churn, paid conversion, and contribution margin by tier.
