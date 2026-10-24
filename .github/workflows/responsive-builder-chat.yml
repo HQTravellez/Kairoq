@@ -1,0 +1,30 @@
+name: Responsive Kairoq builder chat
+on:
+  push:
+    paths:
+      - 'create-api.js'
+      - 'react-backend.js'
+      - 'public/create.js'
+      - 'test/responsive-builder-chat.test.js'
+      - '.github/workflows/responsive-builder-chat.yml'
+  pull_request:
+    paths:
+      - 'create-api.js'
+      - 'react-backend.js'
+      - 'public/create.js'
+      - 'test/responsive-builder-chat.test.js'
+      - '.github/workflows/responsive-builder-chat.yml'
+permissions:
+  contents: read
+jobs:
+  responsive-chat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --check create-api.js && node --check react-backend.js && node --check public/create.js
+      - run: node --test test/responsive-builder-chat.test.js
