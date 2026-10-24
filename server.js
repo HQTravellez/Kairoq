@@ -4259,9 +4259,9 @@ async function handleChat(req, res) {
     sseStarted=true;
 
     const lastUserText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
-    const websiteUrlMatch=lastUserText.match(/https:\/\/[^\s<>\])"'\x60]+/i);
-    if(websiteUrlMatch && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about|api|docs|documentation|integrat|build|clone|analy[sz]e|read|explore|compare/i.test(lastUserText))){
-      const siteUrl=websiteUrlMatch[0].replace(/[.,;!?]+$/,"");
+    const siteUrlFromMessage=require("./chat-url").extractWebsite(lastUserText);
+    if(siteUrlFromMessage && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about|api|docs|documentation|integrat|build|clone|analy[sz]e|read|explore|compare/i.test(lastUserText))){
+      const siteUrl=siteUrlFromMessage;
       writeSSE(res,"status",{message:"Reading public website directly…"});
       try{
         const page=await readPublicWebsiteForChat(siteUrl);
@@ -4293,7 +4293,7 @@ async function handleChat(req, res) {
     }
     const wantsApiResearch=/\b(api|apis|sdk|swagger|openapi|endpoint|integration|integrate)\b/i.test(lastUserText)&&/\b(sabre|documentation|docs|developer|read|research|browse|find|build|connect|integration|integrate)\b/i.test(lastUserText);
     const needsOnlineResearch=webSearch||wantsApiResearch||/\b(latest|current|today|recent|news|online|search (?:the )?(?:web|internet|online)|look up|research online|as of 20\d{2}|this week|right now|live prices?|compare.*(?:prices|providers))\b/i.test(lastUserText);
-    if(!websiteUrlMatch && needsOnlineResearch){
+    if(!siteUrlFromMessage && needsOnlineResearch){
       writeSSE(res,"status",{message:"Searching public web sources…"});
       try{
         const urls=await searchPublicWeb(lastUserText);
