@@ -4,6 +4,9 @@ on:
     paths:
       - 'public/app.js'
       - 'test/app-intent-routing.test.js'
+      - 'chat-model-eligibility.js'
+      - 'test/chat-model-eligibility.test.js'
+      - 'server.js'
       - '.github/workflows/app-intent-routing.yml'
   pull_request:
     paths:
@@ -22,5 +25,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check public/app.js
-      - run: node --test test/app-intent-routing.test.js
+      - run: node --check public/app.js && node --check server.js
+      - run: node --test test/app-intent-routing.test.js test/chat-model-eligibility.test.js
