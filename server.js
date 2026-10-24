@@ -4215,6 +4215,7 @@ async function handleChat(req, res) {
     const map=new Map(models.map(m=>[m.id,m]));
     let requestedModel=typeof body.model==="string"&&body.model?body.model:"openrouter/free";
     requestedModel=resolveAutoModel(requestedModel,{freeOnly:body.freeOnly!==false});
+    if(!require('./chat-model-eligibility').isConversationalModel({id:requestedModel,name:map.get(requestedModel)?.name}))requestedModel='openrouter/free';
     const freeOnly=body.freeOnly!==false;
     const smartFallback=body.smartFallback!==false;
     const webSearch=body.webSearch===true;
