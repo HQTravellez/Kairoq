@@ -50,3 +50,21 @@ Engineering owns implementation and internal verification; user conducts final a
 
 ## Known debt to reconcile
 Existing branches #141–#146 contain overlapping provider, OpenCode, and selector fixes; reconcile into one tested mainline. A separate OpenCode Railway service is staged without a proven safe auth/workspace connection; do not activate it. Use existing isolated child-process OpenCode engine when verified, or provide secure shared workspace before separate service is made default.
+
+## Competitive positioning: integration-first app builder
+Kairoq must not claim that reading API documentation alone is unique. Lovable ships reusable custom connectors; Pipedream and Composio offer existing integration/auth infrastructure. Instead differentiate through the entire **documentation-to-verified-business-application** lifecycle.
+
+**Hero feature: Integration Studio**
+- Ingest HTML documentation URLs (including linked pages and versioned docs), OpenAPI JSON/YAML, Postman collections, MCP server descriptions and a GitHub repository. Use provenance and last-verified timestamps.
+- Parse auth and environment requirements, endpoint parameters, pagination, rate limits, webhooks, error codes, idempotency and billing caveats; present a reviewable spec with uncertainties.
+- Obtain credentials via secure per-workspace vault (never log secrets); classify read/write/destructive operations; require approval to perform real external writes.
+- Run schema checks and authorized sandbox requests; save request/response shapes after redaction, evidence, exact endpoints, and test status. Never mark an untested API as 'working.'
+- Generate typed client, server-side proxy/routes, UI screens, relevant storage schema and integration tests for actual user flows.
+- Use existing build/QA agent to detect failures, repair code using the same project context, and show before/after evidence.
+- Retain reusable versioned provider knowledge, sandbox behavior, auth recipes and safe regression cases for future projects, isolated by organization/project.
+- Expose clear lifecycle statuses: Imported → Parsed → Credentials needed → Sandbox verified → App generated → Browser verified → Published.
+- First vertical: travel/housing workflows with search, inventory, booking/enquiry and account management; generic API support expands only after one complete vertical passes.
+
+**Design implication:** Three clear top-level areas only: Create, Integrations, Projects. Advanced controls remain in context-sensitive panels, not permanently crowded into the chat composer.
+
+**Acceptance demo:** paste a public OpenAPI document, inspect parsed operations and auth, connect authorized sandbox key, execute one GET and one safely approved write operation, generate a UI backed by those calls, verify in Chromium, simulate one API error and confirm user-facing recovery, then save reusable connector knowledge. Missing sandbox credentials must yield a transparent blocked status, not fabricated success.
