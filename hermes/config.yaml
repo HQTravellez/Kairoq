@@ -1,0 +1,48 @@
+# Kairoq-managed Hermes configuration.
+#
+# hermes/entrypoint.sh copies this file into $HERMES_HOME on EVERY boot, so the
+# tool lockdown below always wins over anything written at runtime. ${VAR}
+# placeholders are expanded by Hermes itself; entrypoint.sh supplies defaults.
+
+# Schema version of the pinned Hermes release (see hermes/UPSTREAM.md). Update
+# together with the image digest.
+_config_version: 46
+
+model:
+  provider: "${KAIROQ_HERMES_PROVIDER}"
+  default: "${KAIROQ_HERMES_MODEL}"
+  base_url: "${KAIROQ_HERMES_BASE_URL}"
+
+agent:
+  # Kairoq chat is a conversation, not an unattended job: keep tool loops short.
+  max_turns: 12
+  # Hard removal, applied after every per-platform setting. Kairoq users must
+  # never reach a shell, the container's files, a real browser, the desktop,
+  # scheduled jobs, connected accounts, code execution or sub-agents.
+  disabled_toolsets:
+    - terminal
+    - file
+    - browser
+    - computer_use
+    - cronjob
+    - connections
+    - code_execution
+    - delegation
+    - kanban
+    - project
+    - desktop_ui
+    - image_gen
+    - video_gen
+    - tts
+
+# What chat requests coming through the API server may use: web search and page
+# reading, image understanding, long-term memory, recall of past chats, a to-do
+# planner and skills (instruction documents Hermes can read and refine).
+platform_toolsets:
+  api_server: [web, vision, memory, session_search, todo, skills]
+
+# Listen on every interface (IPv4 and, where available, IPv6) so Railway's
+# private network and health check both reach it. Access still needs the key.
+platforms:
+  api_server:
+    host: ""

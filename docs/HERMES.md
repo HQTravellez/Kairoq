@@ -1,0 +1,89 @@
+# Hermes chat
+
+Kairoq's chat is answered by **Hermes Agent** (Nous Research, MIT), running as its own
+private Railway service from the official image. Kairoq talks to it through Hermes' built-in
+OpenAI-compatible API server — no custom Python gateway, no copied Hermes code.
+
+```
+Browser ──► Kairoq (Node) ──private network──► Hermes service ──► model (OpenRouter by default)
+             /api/chat/stream    POST /v1/chat/completions (SSE)
+```
+
+- **Who gets Hermes:** the signed-in owner. Anyone else, or a request for a local model, uses
+  Kairoq's existing routes.
+- **Fallback:** if Hermes can't start a reply (down, wrong key, busy, 20 s with no answer),
+  Kairoq shows "Hermes unavailable — using backup model…" and uses the existing routes. If
+  Hermes fails after text has appeared, the error is shown instead of mixing two answers.
+- **History:** Kairoq sends the visible conversation every time, so edit/regenerate keep working.
+- **Memory:** all requests share `X-Hermes-Session-Key: kairoq:owner`, so Hermes' long-term
+  memory follows the owner across chats. Stored on the service's volume.
+- **Tool progress** from Hermes (e.g. 🔍 Searching "…") appears in the chat status line.
+
+## What Hermes is allowed to do
+
+Set in `hermes/config.yaml`, which is re-installed on every boot so nothing at runtime can
+widen it.
+
+| Allowed | Removed |
+|---|---|
+| web search and page reading, image understanding, long-term memory, past-chat recall, to-do planning, skills | terminal, files, browser automation, desktop control, code execution, sub-agents, scheduled jobs, connected accounts, image/video/speech generation, kanban, projects |
+
+Checked locally against Hermes v2026.9.24 with a fake model that tried to run shell commands
+and write files, directly and through Hermes' `tool_call`: every attempt was refused and
+nothing was executed.
+
+Web search needs no key: Hermes uses its free search providers unless you add one
+(see Hermes' web-search docs).
+
+## Railway setup
+
+### 1. Hermes service
+
+Reuse the existing **Kairoq Hermes Python** service or create a new one from this repo.
+
+- **Settings → Config-as-code file:** `hermes/railway.json` (builds `hermes/Dockerfile`
+  from the repo root, health check on `/health`).
+- **Volume:** mount at **`/opt/data`** (Hermes' home: memory, sessions, skills). If the
+  service already has a volume at `/data`, change its mount path to `/opt/data`.
+- **No public domain.** Only the private network address is used.
+- **Variables:**
+
+| Variable | Value |
+|---|---|
+| `API_SERVER_KEY` | a new random secret, at least 32 characters (`openssl rand -hex 32`) |
+| `OPENROUTER_API_KEY` | your OpenRouter key (reference the Kairoq service's variable) |
+| `KAIROQ_HERMES_MODEL` | optional; default `openrouter/free`. A model with reliable tool calling gives better web answers |
+| `PORT` | `8642` |
+
+Optional: `KAIROQ_HERMES_PROVIDER` and `KAIROQ_HERMES_BASE_URL` to use another
+OpenAI-compatible provider instead of OpenRouter.
+
+The service refuses to start if `API_SERVER_KEY` is missing or shorter than 32 characters.
+
+### 2. Kairoq service
+
+| Variable | Value |
+|---|---|
+| `KAIROQ_HERMES_URL` | `http://<hermes-service-private-domain>:8642` (Railway shows the `….railway.internal` name) |
+| `KAIROQ_HERMES_KEY` | the same value as `API_SERVER_KEY` |
+
+Remove `KAIROQ_PYTHON_AGENT_URL` / `KAIROQ_PYTHON_AGENT_TOKEN` if they were set for the
+earlier experiment; this integration doesn't use them.
+
+### 3. Check it
+
+1. Hermes service logs show `API server listening on http://:8642`.
+2. Signed in to Kairoq, open `/api/hermes/status` → `{"configured":true,"ok":true}`.
+3. Send a chat message. The status line shows "Hermes is thinking…" and the reply streams in.
+4. Ask something current ("what's in the news about Railway today?") and watch for the
+   search status line.
+
+To turn Hermes off, delete `KAIROQ_HERMES_URL` on the Kairoq service. Chat goes back to the
+existing routes immediately.
+
+## Code
+
+- `hermes-chat.js` — streaming client, timeouts, error handling, attachment conversion.
+- `server.js` → `handleChat` — routing and fallback; `GET /api/hermes/status`.
+- `hermes/` — Dockerfile, `config.yaml`, `entrypoint.sh`, `railway.json`, `UPSTREAM.md`.
+- `test/hermes-chat.test.js` — runs without Hermes, against a fake of its API server.

@@ -4266,6 +4266,34 @@ async function handleChat(req, res) {
     });
     sseStarted=true;
 
+    // Hermes Agent (separate private service, see docs/HERMES.md) answers owner chats
+    // when configured. It has its own web search/reading and long-term memory, so it
+    // runs before Kairoq's older website-reader and web-research shortcuts. If Hermes
+    // cannot start a reply, chat falls back to the existing model routes below.
+    const hermes=require("./hermes-chat");
+    if(hermes.configured()&&isAuthenticated(req)&&!isLocalModelId(requestedModel)){
+      const hermesSystem=[presetSystem,customPresetPrompt,memorySystem,userSystem].filter(Boolean).join("\n\n");
+      const hermesController=new AbortController();
+      const stopHermes=()=>{if(!res.writableEnded)hermesController.abort()};
+      res.on("close",stopHermes);
+      writeSSE(res,"status",{message:"Hermes is thinking…"});
+      try{
+        const reply=await hermes.streamChat({
+          messages:hermesSystem?[{role:"system",content:hermesSystem},...messages]:messages,
+          signal:hermesController.signal,
+          onToken:text=>writeSSE(res,"token",{text}),
+          onStatus:message=>writeSSE(res,"status",{message})
+        });
+        writeSSE(res,"meta",{model:"hermes/agent",usage:{...(reply.usage||{}),cost:null}});
+        writeSSE(res,"done",{ok:true,provider:"hermes",finishReason:reply.finishReason});
+        return res.end();
+      }catch(hermesErr){
+        if(hermesErr.afterPartial||hermesController.signal.aborted)throw hermesErr;
+        await audit("hermes.chat_fallback",{error:String(hermesErr.message).slice(0,300),status:hermesErr.status||0});
+        writeSSE(res,"status",{message:"Hermes unavailable — using backup model…"});
+      }finally{res.off("close",stopHermes)}
+    }
+
     const lastUserText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
     const siteUrlFromMessage=require("./chat-url").extractWebsite(lastUserText);
     if(siteUrlFromMessage && (lastUserText.trim().length<350 || /website|site|browse|review|research|check|look at|about|api|docs|documentation|integrat|build|clone|analy[sz]e|read|explore|compare/i.test(lastUserText))){
@@ -7188,6 +7216,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/media/jobs") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobsList(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/create") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobCreate(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/retry") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobRetry(req,res); }
+  if (req.method === "GET" && url === "/api/hermes/status") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,await require("./hermes-chat").health()); }
   if (req.method === "POST" && url === "/api/chat/stream") return handleChat(req, res);
   if (req.method === "GET") return serveStatic(req, res);
 
