@@ -32,7 +32,7 @@ ${images?`- {"tool":"generate_images","images":[{"name":"hero-terrace.jpg","prom
 - {"tool":"web_act","steps":[{"action":"click","target":12},{"action":"click","target":"Pricing"},{"action":"fill","target":"Search","value":"..."},{"action":"select","target":9,"value":"..."},{"action":"scroll","value":"down"},{"action":"back"}]}: click around the page that is open (by number or by its text) and read the result. Reading only: nothing is sent to other sites.
 - {"tool":"fetch_url","url":"https://..."}: read a raw page or a JSON API response as text (no JavaScript).
 `:''}- {"tool":"finish","message":"for the user: what you built and how to use it"}: end when the request is done and the last build_and_test or test_ui passed.
-Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. For a big app, write the files over two or three steps (a few files per write_files) so no reply gets too long. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors, and keep the saved checks passing. Be economical: you have at most ${maxSteps} steps.`;
+Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. For an initial app or a cohesive feature, put all needed files in ONE write_files action and then build_and_test; do not spend one model/tool round trip per file. Only split over two or three steps when the complete source cannot fit the response limit. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors, and keep the saved checks passing. Be economical: you have at most ${maxSteps} steps.`;
 }
 
 // Never throws: a reply that is not valid JSON comes back as {invalid} so the loop can ask again.
@@ -47,7 +47,17 @@ function parseStep(content){
  let actions=Array.isArray(v.actions)?v.actions:v.tool?[v]:[];
  // Accept a plain build-mode answer too.
  if(!actions.length&&((v.files&&typeof v.files==='object')||(v.edits&&typeof v.edits==='object')))actions=[...(v.files?[{tool:'write_files',files:v.files,delete:v.delete}]:[]),...(v.edits?[{tool:'edit_files',edits:v.edits}]:[]),{tool:'build_and_test'}];
- actions=actions.filter(a=>a&&typeof a==='object'&&typeof a.tool==='string').slice(0,8);
+ // Coalesce adjacent independent file writes before applying the per-turn tool limit.
+ // Reads, edits, deletes and overlapping paths retain their explicit ordering.
+ const batched=[];
+ for(const action of actions.filter(a=>a&&typeof a==='object'&&typeof a.tool==='string').slice(0,64)){
+  const previous=batched.at(-1),map=action.files;
+  if(action.tool==='write_files'&&previous?.tool==='write_files'&&!action.delete&&!previous.delete&&
+    map&&typeof map==='object'&&!Array.isArray(map)&&previous.files&&typeof previous.files==='object'&&!Array.isArray(previous.files)&&
+    Object.keys(map).every(k=>!Object.hasOwn(previous.files,k))){previous.files={...previous.files,...map};}
+  else batched.push({...action,...(map&&typeof map==='object'&&!Array.isArray(map)?{files:{...map}}:{})});
+ }
+ actions=batched.slice(0,8);
  if(!actions.length)throw Error('Agent reply needs an "actions" list');
  return{thought:String(v.thought||v.message||'').slice(0,1000),actions};
 }
