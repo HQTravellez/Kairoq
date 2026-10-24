@@ -41,6 +41,12 @@ agent:
 platform_toolsets:
   api_server: [web, vision, memory, session_search, todo, skills]
 
+# Skill libraries shipped in the image (read-only for Hermes). Superpowers by Jesse
+# Vincent (MIT) lives in /opt/kairoq/skills/superpowers; see hermes/UPSTREAM.md.
+skills:
+  external_dirs:
+    - "${KAIROQ_SKILLS_DIR}"
+
 # Listen on every interface (IPv4 and, where available, IPv6) so Railway's
 # private network and health check both reach it. Access still needs the key.
 platforms:

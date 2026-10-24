@@ -11,6 +11,10 @@ FROM nousresearch/hermes-agent:${HERMES_TAG}
 USER root
 COPY hermes/config.yaml /opt/kairoq/config.yaml
 COPY --chmod=0755 hermes/entrypoint.sh /opt/kairoq/entrypoint.sh
+# Skill libraries (Superpowers). Root-owned and read-only: Hermes runs as the hermes
+# user, so it can read and follow them but cannot rewrite them.
+COPY hermes/skills /opt/kairoq/skills
+RUN chown -R root:root /opt/kairoq/skills && chmod -R a+rX,go-w /opt/kairoq/skills && find /opt/kairoq/skills -type f -exec chmod a-w {} +
 
 ENV HERMES_HOME=/opt/data
 EXPOSE 8642

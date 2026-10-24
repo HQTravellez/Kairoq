@@ -1,7 +1,8 @@
 # Hermes Agent (upstream)
 
 Kairoq's chat runs on Hermes Agent by Nous Research, used unmodified from its
-official container image. Kairoq adds only `config.yaml` and `entrypoint.sh`.
+official container image. Kairoq adds `config.yaml`, `entrypoint.sh` and the skill
+libraries in `skills/`.
 
 | | |
 |---|---|
@@ -11,6 +12,19 @@ official container image. Kairoq adds only `config.yaml` and `entrypoint.sh`.
 | Source revision | `f97608f178d1ffeca59860195ab7da295f7c8e5f` (tag `v2026.9.24`, Hermes 0.21.5) |
 | Config schema | `_config_version: 46` |
 | Interface used | OpenAI-compatible API server: `POST /v1/chat/completions` (streamed), `GET /health` |
+
+## Superpowers (skills)
+
+| | |
+|---|---|
+| Project | https://github.com/obra/superpowers |
+| License | MIT, © 2025 Jesse Vincent (`skills/superpowers/LICENSE`) |
+| Source revision | `2ce8aa15d05bd57213e6f746f953aafb7ded7a8b` (2026-10-21) |
+| Contents | all 15 skills from `skills/`, unmodified, in `skills/superpowers/` |
+
+Shipped read-only at `/opt/kairoq/skills/superpowers` and listed in `skills.external_dirs`.
+To update: replace `skills/superpowers/` with the `skills/` folder of a newer revision, keep
+`LICENSE`, and update the revision above.
 
 ## Upgrading
 

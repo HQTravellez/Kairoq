@@ -149,3 +149,17 @@ test("Hermes service config keeps dangerous toolsets off", () => {
     assert.match(disabled, new RegExp(`- ${name}\\b`), `${name} must be disabled`);
   assert.match(cfg, /api_server: \[web, vision, memory, session_search, todo, skills\]/);
 });
+
+test("the Superpowers skill library ships with Hermes, complete and licensed", () => {
+  const root = path.join(__dirname, "../hermes/skills/superpowers");
+  const skills = fs.readdirSync(root, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name);
+  for (const name of ["using-superpowers", "brainstorming", "writing-plans", "systematic-debugging", "verification-before-completion", "test-driven-development", "receiving-code-review"])
+    assert.ok(skills.includes(name), `${name} is shipped`);
+  for (const name of skills) assert.match(fs.readFileSync(path.join(root, name, "SKILL.md"), "utf8"), new RegExp(`^---\\nname: ${name}\\n`), `${name}/SKILL.md has front matter`);
+  assert.match(fs.readFileSync(path.join(root, "LICENSE"), "utf8"), /MIT License[\s\S]*Jesse Vincent/);
+  const cfg = fs.readFileSync(path.join(__dirname, "../hermes/config.yaml"), "utf8");
+  assert.match(cfg, /skills:\n  external_dirs:\n    - "\$\{KAIROQ_SKILLS_DIR\}"/);
+  const docker = fs.readFileSync(path.join(__dirname, "../hermes/Dockerfile"), "utf8");
+  assert.match(docker, /COPY hermes\/skills \/opt\/kairoq\/skills/);
+  assert.match(docker, /chmod -R a\+rX,go-w \/opt\/kairoq\/skills/);
+});

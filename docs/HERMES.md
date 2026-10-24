@@ -19,6 +19,17 @@ Browser ──► Kairoq (Node) ──private network──► Hermes service �
   memory follows the owner across chats. Stored on the service's volume.
 - **Tool progress** from Hermes (e.g. 🔍 Searching "…") appears in the chat status line.
 
+## Skills: Superpowers
+
+All 15 skills from [Superpowers](https://github.com/obra/superpowers) (Jesse Vincent, MIT)
+ship in the Hermes image, unmodified, in `hermes/skills/superpowers/`. Hermes lists them in
+its prompt and opens one when a request matches (e.g. *systematic-debugging* for a bug,
+*brainstorming* before designing a feature, *writing-plans* for a multi-step job,
+*verification-before-completion* before claiming something works). They are read-only to
+Hermes. Skills that assume a terminal, git or sub-agents (worktrees, subagent-driven
+development, finishing a branch) can only be followed as advice here, because chat Hermes
+has no shell. Hermes' own bundled skills are also available.
+
 ## What Hermes is allowed to do
 
 Set in `hermes/config.yaml`, which is re-installed on every boot so nothing at runtime can

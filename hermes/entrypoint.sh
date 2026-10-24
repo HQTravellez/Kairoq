@@ -12,6 +12,7 @@ export HERMES_HOME
 export KAIROQ_HERMES_PROVIDER="${KAIROQ_HERMES_PROVIDER:-openrouter}"
 export KAIROQ_HERMES_MODEL="${KAIROQ_HERMES_MODEL:-openrouter/free}"
 export KAIROQ_HERMES_BASE_URL="${KAIROQ_HERMES_BASE_URL:-https://openrouter.ai/api/v1}"
+export KAIROQ_SKILLS_DIR="${KAIROQ_SKILLS_DIR:-/opt/kairoq/skills}"
 
 # The API server is the only way in. It listens on every interface (set in
 # config.yaml) on Railway's PORT; Kairoq still has to present API_SERVER_KEY.
