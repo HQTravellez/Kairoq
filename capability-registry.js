@@ -7,7 +7,6 @@ const CAPABILITIES = Object.freeze([
   {id:"headless_chromium",label:"Chromium browser rendering",group:"Research",status:"available-not-universal",entry:"browser-reader.js",tools:[]},
   {id:"api_docs",label:"OpenAPI, Swagger, Postman documentation extraction",group:"API",status:"separate-workflow",entry:"api-docs.js",tools:[]},
   {id:"api_execution",label:"Approved API operation testing",group:"API",status:"allowlist-gated",entry:"api-adapter.js",tools:[]},
-  {id:"knowledge_studio",label:"Document ingestion and knowledge search",group:"Knowledge",status:"separate-workflow",entry:"knowledge-http.js",tools:[]},
   {id:"learning",label:"Verified procedural learning",group:"Knowledge",status:"partially-wired",entry:"hermes-learning-loop.js",tools:[]},
   {id:"design_skills",label:"Design, accessibility, animation, dashboards",group:"Design",status:"skill-library",entry:"design-skills/",tools:[]},
   {id:"test_repair",label:"Browser QA, synthetic customers and repair",group:"Quality",status:"workflow-wired",entry:"react-agent.js",tools:["test_ui","view_logs"]},
@@ -15,11 +14,8 @@ const CAPABILITIES = Object.freeze([
   {id:"automation",label:"Application automation testing",group:"Build",status:"wired-in-agent-mode",entry:"react-agent.js",tools:["run_automation"]},
   {id:"mcp",label:"External MCP tool interface",group:"Integration",status:"exposed",entry:"kairoq-mcp.js",tools:[]},
   {id:"mem0",label:"Mem0 optional memory enrichment",group:"Knowledge",status:"disabled-by-default",entry:"integrations/agent-stack/mem0.js",tools:[]},
-  {id:"ruflo",label:"Ruflo MCP capability discovery",group:"Agents",status:"experimental-discovery-only",entry:"integrations/agent-stack/ruflo.js",tools:[]},
-  {id:"autoharness",label:"AutoHarness skill staging",group:"Agents",status:"review-candidates-only",entry:"integrations/agent-stack/autoharness.js",tools:[]},
-  {id:"understand",label:"Static code dependency graph",group:"Engineering",status:"graph-export",entry:"integrations/agent-stack/understand.js",tools:[]},
   {id:"ecc",label:"Project context recall",group:"Knowledge",status:"concept-adaptation",entry:"ecc-context-recall.js",tools:[]},
-  {id:"media",label:"AI media and Remotion workflows",group:"Creative",status:"feature-specific",entry:"hyperframes-video.js",tools:[]},
+  {id:"media",label:"AI media and Remotion workflows",group:"Creative",status:"feature-specific",entry:"video-gen.js",tools:[]},
   {id:"sales",label:"Sales lead research and outreach drafting",group:"Business",status:"feature-specific",entry:"agent-brain.js",tools:[]},
   {id:"marketing",label:"Marketing content and approved publishing",group:"Business",status:"feature-specific",entry:"server.js",tools:[]}
 ]);

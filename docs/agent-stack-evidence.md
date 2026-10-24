@@ -1,5 +1,7 @@
 # Verification evidence — 2026-10-23 (Toronto)
 
+> **October 2026:** the Understand-Anything, Ruflo and AutoHarness adapters described below were removed because the running app never called them. ECC and Mem0 remain. This page is kept as a historical record.
+
 Base: `de948bddbadff744d8395b06927a85648359b95c` on `HQTravellez/Kairoq/main`.
 Draft integration work only. No merge or deployment performed.
 
