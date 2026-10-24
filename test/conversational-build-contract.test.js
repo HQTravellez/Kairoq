@@ -17,3 +17,12 @@ test('verification never means only login page opened',()=>{
  assert.deepEqual(c.evidence({browser:{passed:true}}),{browser:'passed',savedChecks:'unverified',features:'unverified'});
  assert.equal(c.evidence({browser:{passed:true},checks:{ran:1,failed:[]},features:[{passed:false}]}).features,'unverified');
 });
+
+test('actual React builder integrates and saves owner requirements per project',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const source=fs.readFileSync(path.join(__dirname,'../react-builder.js'),'utf8');
+ assert.match(source,/buildContract\.merge\(meta\.owner_requirements\|\|\[\],text\)/);
+ assert.match(source,/buildContract\.prompt\(ownerRequirements\)/);
+ assert.match(source,/fresh\.owner_requirements=ownerRequirements/);
+ assert.match(source,/feature_verification:featureVerification/);
+});
