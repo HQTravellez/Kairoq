@@ -54,6 +54,23 @@ class HermesGatewayTests(unittest.TestCase):
             answer = module.generate([{"role": "user", "content": "Hi"}], "conversation-1")
             self.assertEqual(answer, "Hello from Hermes")
 
+    def test_hermes_agent_is_closed_even_if_provider_fails(self):
+        instances = []
+        class FailingAgent:
+            def __init__(self, **kwargs):
+                self.closed = False
+                instances.append(self)
+            def run_conversation(self, prompt):
+                raise RuntimeError("provider down")
+            def close(self):
+                self.closed = True
+        with mock.patch.object(module, "configured", return_value=True), \
+             mock.patch.object(module, "TOKEN", "test-token"), \
+             mock.patch.dict(sys.modules, {"run_agent": types.SimpleNamespace(AIAgent=FailingAgent)}):
+            with self.assertRaises(RuntimeError):
+                module.generate([{"role": "user", "content": "Hi"}], "conversation-1")
+        self.assertTrue(instances[0].closed)
+
     def test_iteration_cap_is_bounded(self):
         self.assertGreaterEqual(module.MAX_ITERATIONS, 1)
         self.assertLessEqual(module.MAX_ITERATIONS, 20)
