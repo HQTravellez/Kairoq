@@ -18,7 +18,7 @@ class HermesGatewayTests(unittest.TestCase):
     def test_generation_needs_real_runtime_and_credentials(self):
         with mock.patch.object(module, "MODEL", ""), mock.patch.object(module, "TOKEN", ""):
             with self.assertRaises(RuntimeError):
-                module.generate([{"role":"user","content":"hello"}])
+                module.generate([{"role":"user","content":"hello"}], "ci-session")
 
     def test_scoped_sessions_are_stable_and_distinct(self):
         with mock.patch.object(module, "TOKEN", "example-long-secret"):
