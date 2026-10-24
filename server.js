@@ -450,6 +450,10 @@ async function callFreeLlmText({messages,temperature=0.2,webSearch=false}={}){
       if(!OPENROUTER_FREE_FALLBACK_ENABLED||!openRouterConfigured())throw localErr;
     }
   }
+  if(require('./free-provider-router').candidates().length){
+    try{return (await require('./free-provider-router').complete(messages,{temperature})).text}
+    catch(e){if(!openRouterConfigured())throw e}
+  }
   if(require('./opencode-free').configured()){
     try{return (await require('./opencode-free').complete(messages,{temperature})).text}
     catch(e){if(!openRouterConfigured())throw Error("Independent free provider unavailable: "+e.message)}
@@ -4333,15 +4337,26 @@ async function handleChat(req, res) {
         }catch(localErr){
           if(localErr.afterPartial)throw localErr;
           await audit("local_llm.chat_fallback",{model:preferredLocal,error:localErr.message});
-          if((!OPENROUTER_FREE_FALLBACK_ENABLED||!openRouterConfigured())&&!require("./opencode-free").configured())throw localErr;
+          if((!OPENROUTER_FREE_FALLBACK_ENABLED||!openRouterConfigured())&&!require("./opencode-free").configured()&&!require("./free-provider-router").candidates().length)throw localErr;
           writeSSE(res,"status",{message:"Local model unavailable — checking independent free providers…"});
         }
-      }else if((openRouterConfigured()&&OPENROUTER_FREE_FALLBACK_ENABLED)||require("./opencode-free").configured()){
+      }else if((openRouterConfigured()&&OPENROUTER_FREE_FALLBACK_ENABLED)||require("./opencode-free").configured()||require("./free-provider-router").candidates().length){
         writeSSE(res,"status",{message:"No local model detected — checking configured free providers…"});
       }else{
         throw new Error("Zero Cost mode needs either a local Ollama/llama.cpp model or an OpenRouter key for the free fallback.");
       }
 
+      if(require('./free-provider-router').candidates().length){
+        writeSSE(res,"status",{message:"Trying configured free-tier providers…"});
+        try{
+          const reply=await require('./free-provider-router').complete(finalMessages,{
+            temperature,onAttempt:p=>writeSSE(res,"status",{message:"Free provider: "+p})
+          });
+          writeSSE(res,"token",{text:reply.text});
+          writeSSE(res,"done",{ok:true,provider:reply.provider,model:reply.model,zeroCost:true});
+          return res.end();
+        }catch(e){await audit("free_provider.failed",{error:String(e.message).slice(0,300)})}
+      }
       // Independent provider is attempted before the account-limited OpenRouter route.
       if(require('./opencode-free').configured()){
         writeSSE(res,"status",{message:"Trying independent free inference provider…"});
