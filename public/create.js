@@ -331,6 +331,17 @@ function messageItem(m,last,index){
   li.append(f);
  }
  if(m.role==='assistant'&&(m.verified||m.tests_added))li.append(verifiedCard(m.verified||{},m.checks,m.tests_added));
+ if(m.role==='assistant'&&m.feature_acceptance?.requested){
+  const a=m.feature_acceptance,box=el('div','verified '+(a.allPassed?'ok':'bad'));
+  box.append(el('div','verified-head',a.passed+' of '+a.requested+' requested features verified'));
+  const ul=el('ul');
+  for(const result of a.results||[]){const pass=result.status==='passed',item=el('li',pass?'ok':'bad');
+   item.append(el('span','vmark',pass?'✓':'?'),el('span',null,result.label+': '+(pass?'browser journey passed':'not verified')));
+   if(!pass&&result.reason)item.title=result.reason;
+   ul.append(item);
+  }
+  box.append(ul);li.append(box);
+ }
  if(m.checks&&!tl.some(e=>e.t==='check')){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
  if(m.steps&&m.steps.length&&!tl.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
  if(m.role==='assistant'&&m.mode==='discuss'&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{setChatMode('build');send('Implement the plan you just described.','build')};li.append(b)}

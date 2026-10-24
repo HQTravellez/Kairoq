@@ -1,0 +1,29 @@
+name: Feature acceptance evidence
+on:
+  push:
+    paths:
+      - 'feature-acceptance.js'
+      - 'react-builder.js'
+      - 'public/create.js'
+      - 'test/feature-acceptance.test.js'
+      - '.github/workflows/feature-acceptance.yml'
+  pull_request:
+    paths:
+      - 'feature-acceptance.js'
+      - 'react-builder.js'
+      - 'public/create.js'
+      - 'test/feature-acceptance.test.js'
+      - '.github/workflows/feature-acceptance.yml'
+permissions:
+  contents: read
+jobs:
+  acceptance-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check feature-acceptance.js && node --check react-builder.js && node --check public/create.js
+      - run: node --test test/feature-acceptance.test.js
