@@ -1,0 +1,27 @@
+name: Engineering verification gate
+on:
+  push:
+    paths:
+      - 'engineering-completion-gate.js'
+      - 'react-agent.js'
+      - 'test/engineering-completion-gate.test.js'
+      - '.github/workflows/engineering-verification.yml'
+  pull_request:
+    paths:
+      - 'engineering-completion-gate.js'
+      - 'react-agent.js'
+      - 'test/engineering-completion-gate.test.js'
+      - '.github/workflows/engineering-verification.yml'
+permissions:
+  contents: read
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check engineering-completion-gate.js && node --check react-agent.js
+      - run: node --test test/engineering-completion-gate.test.js
