@@ -44,5 +44,6 @@ test("the approved palette and the builder page restyle are loaded", () => {
   const css = read("public/kairoq-ui.css");
   assert.match(css, /--k-wine:#8a2d3b/);
   assert.match(css, /\.kh-composer-slot::before/);
+  assert.match(css, /\.main \.messages\{max-width:none!important/, "full width like Hermes");
   assert.match(read("public/create.html"), /create-kairoq\.css/);
 });

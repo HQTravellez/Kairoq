@@ -259,8 +259,9 @@ function setMainView(view="command"){
   // On the home view the chat box sits under the headline; everywhere else it is docked at the bottom.
   const shell=$(".composer-shell"), slot=$("#khComposerSlot");
   if(shell && slot){
-    if(mainView==="command"){ if(shell.parentElement!==slot) slot.appendChild(shell); }
-    else if(shell.parentElement===slot) $(".main").appendChild(shell);
+    // The message box stays docked full width at the bottom on every screen (like Hermes),
+    // including Home and "Build an app"; it no longer floats as a box in the middle.
+    if(shell.parentElement===slot) $(".main").appendChild(shell);
   }
 
   $("#commandCenterBtn")?.classList.toggle("active", mainView === "command");

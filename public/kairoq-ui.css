@@ -441,3 +441,16 @@ input.kq-switch:checked{background:var(--k-wine)!important}
 .kh-hero h1{font-weight:600!important}
 .kh-pill,.kh-modes button{border-color:#e8e3dc!important}
 .kh-modes button[aria-pressed=true],.kh-modes .active{background:#fff!important;color:#1d1d1f!important}
+/* Home / Build start: headline in the middle, message box docked at the bottom like chat */
+.main[data-view=command]{display:flex!important;flex-direction:column}
+.main[data-view=command] #commandCenter{flex:1;min-height:0;overflow-y:auto}
+.main[data-view=command] .kh-hero{padding-top:18vh!important}
+.main[data-view=command] .composer-shell{position:static!important;padding:12px 48px 14px!important}
+.kh-composer-slot:empty{display:none!important}
+/* Full width like Hermes: messages and the message box use the whole main area, with side margins only */
+.main .messages{max-width:none!important;padding:24px 40px 0!important}
+.main .messages .message-row{max-width:none!important}
+.main .composer-shell{max-width:none!important;padding:12px 40px 14px!important}
+.main .composer-shell .composer,.main .composer-shell>.status-bar{max-width:none!important}
+.main[data-view=command] .composer-shell{padding:12px 40px 14px!important}
+@media (max-width:640px){.main .messages{padding:16px 16px 0!important}.main .composer-shell{padding:8px 12px 12px!important}}
