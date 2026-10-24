@@ -47,3 +47,8 @@ test("the approved palette and the builder page restyle are loaded", () => {
   assert.match(css, /\.main \.messages\{max-width:none!important/, "full width like Hermes");
   assert.match(read("public/create.html"), /create-kairoq\.css/);
 });
+
+test("the builder's check report doesn't mention another project's features", () => {
+  const js = read("public/create.js");
+  assert.doesNotMatch(js, /food search|calorie|macro targets/i);
+});
