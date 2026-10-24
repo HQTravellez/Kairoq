@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kairoq capabilities</title>
+<style>:root{font-family:system-ui,-apple-system,sans-serif;color-scheme:dark;background:#0c111b;color:#f5f7fb}body{max-width:1080px;margin:0 auto;padding:28px 18px}a{color:#9ccaff}header{display:flex;justify-content:space-between;align-items:center;gap:15px}input{width:100%;box-sizing:border-box;background:#172131;color:inherit;border:1px solid #364455;border-radius:10px;padding:14px;font:inherit}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;margin-top:22px}.card{border:1px solid #303d50;border-radius:14px;padding:16px;background:#121b29}.tag{font-size:12px;color:#a8b6c9}.status{font-size:12px;border:1px solid #4c5d74;border-radius:99px;padding:4px 8px;display:inline-block;margin:9px 0}h1{margin-bottom:7px}h3{margin:4px 0}p{line-height:1.5;color:#b8c4d3}.empty{display:none}code{overflow-wrap:anywhere;font-size:12px;color:#afbecf}</style></head><body>
+<header><div><h1>Capabilities</h1><p>Discover what Kairoq contains and which parts are enabled. Listed does not mean executable.</p></div><a href="/">Back to Kairoq</a></header>
+<label for="q">Find a capability</label><input id="q" type="search" placeholder="Search: browser, API, skills, memory, tests…">
+<p id="count" role="status"></p><div id="cards" class="grid"></div>
+<script>
+const capabilities = [
+["Build","React app builder","wired","react-agent.js"],
+["Research","Browser research and interaction","wired-in-agent-mode","react-agent.js"],
+["Research","Headless Chromium","available-not-universal","browser-reader.js"],
+["API","OpenAPI, Swagger and Postman parsing","separate-workflow","api-docs.js"],
+["API","Approved API operations","allowlist-gated","api-adapter.js"],
+["Knowledge","Knowledge Studio","separate-workflow","knowledge-http.js"],
+["Knowledge","Verified procedural learning","partially-wired","hermes-learning-loop.js"],
+["Knowledge","ECC context recall","concept-adaptation","ecc-context-recall.js"],
+["Knowledge","Mem0","disabled-by-default","integrations/agent-stack/mem0.js"],
+["Agents","Ruflo MCP discovery","experimental-discovery-only","integrations/agent-stack/ruflo.js"],
+["Agents","AutoHarness skills","review-candidates-only","integrations/agent-stack/autoharness.js"],
+["Engineering","Understand-Anything graph","graph-export","integrations/agent-stack/understand.js"],
+["Design","Design skills library","skill-library","design-skills/"],
+["Quality","Browser QA and repair","workflow-wired","react-agent.js"],
+["Build","SQL inspection","wired-in-agent-mode","react-agent.js"],
+["Build","Automation testing","wired-in-agent-mode","react-agent.js"],
+["Integration","MCP server","exposed","kairoq-mcp.js"],
+["Creative","AI media and Remotion","feature-specific","hyperframes-video.js"],
+["Business","Sales and marketing agents","feature-specific","server.js"]
+];
+const cards=document.getElementById("cards"),q=document.getElementById("q"),count=document.getElementById("count");
+function draw(){const search=q.value.trim().toLowerCase();const rows=capabilities.filter(x=>x.join(" ").toLowerCase().includes(search));cards.replaceChildren();for(const [group,name,status,entry] of rows){const e=document.createElement("article");e.className="card";const section=document.createElement("div");section.className="tag";section.textContent=group;const heading=document.createElement("h3");heading.textContent=name;const badge=document.createElement("div");badge.className="status";badge.textContent=status;const file=document.createElement("code");file.textContent=entry;e.append(section,heading,badge,document.createElement("div"),file);cards.append(e)}count.textContent=rows.length+" of "+capabilities.length+" capability families. Inventory snapshot, not a live health check."}q.addEventListener("input",draw);draw();
+</script></body></html>
