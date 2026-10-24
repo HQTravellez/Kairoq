@@ -1004,27 +1004,6 @@ function bindCodeButtons(root=document){
   });
 }
 
-function addAnswerBadge(box, modelId, usage){
-  const info=modelInfo(modelId);
-  const wrap=document.createElement("div");
-  wrap.className="answer-badge";
-
-  const n=document.createElement("span"); n.className="badge-chip model-name"; n.textContent=info.name; wrap.appendChild(n);
-  if(info.provider){ const p=document.createElement("span");p.className="badge-chip";p.textContent=info.provider;wrap.appendChild(p); }
-  const f=document.createElement("span");f.className=`badge-chip ${info.isFree?"free":"paid"}`;f.textContent=info.isFree?"FREE":"PAID";wrap.appendChild(f);
-
-  if(usage?.cost!==undefined){
-    const c=document.createElement("span");c.className="badge-chip cost";c.textContent=`Cost ${money(usage.cost)}`;wrap.appendChild(c);
-  }
-  const inTok=usage?.prompt_tokens ?? usage?.input_tokens;
-  const outTok=usage?.completion_tokens ?? usage?.output_tokens;
-  if(Number.isFinite(inTok)||Number.isFinite(outTok)){
-    const t=document.createElement("span");t.className="badge-chip";t.textContent=`${inTok||0} in · ${outTok||0} out`;wrap.appendChild(t);
-  }
-
-  box.appendChild(wrap);
-}
-
 function addAnswerActions(box,msgIndex){
   const actions=document.createElement("div");actions.className="answer-actions";
   const copy=document.createElement("button");copy.textContent="Copy";
@@ -1040,7 +1019,6 @@ function appendMessage(msg,index,scroll=true){
   const box=document.createElement("div");box.className="message";
   if(msg.role==="assistant"){
     const content=document.createElement("div");content.className="assistant-content";content.innerHTML=renderMarkdown(msg.content);box.appendChild(content);bindCodeButtons(content);
-    if(msg.model) addAnswerBadge(box,msg.model,msg.usage);
     addAnswerActions(box,index);
   }else{
     box.textContent=msg.contentText || (typeof msg.content==="string"?msg.content:"[Attachment message]");
