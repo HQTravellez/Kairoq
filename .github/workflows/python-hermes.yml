@@ -35,6 +35,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the pinned complete Hermes Python image
         run: docker build --progress=plain -f Dockerfile.hermes-python -t kairoq-hermes-ci .
+      - name: Import actual upstream Hermes runtime in container
+        run: |
+          docker run --rm kairoq-hermes-ci python -c 'from run_agent import AIAgent; from toolsets import TOOLSETS; assert "safe" in TOOLSETS; print("Hermes AIAgent import and safe toolset verified")'
       - name: Start isolated Hermes gateway and verify health
         run: |
           docker run -d --rm --name kairoq-hermes-ci -e KAIROQ_PYTHON_AGENT_TOKEN=ci-only-strong-token -p 127.0.0.1:18090:8090 kairoq-hermes-ci
