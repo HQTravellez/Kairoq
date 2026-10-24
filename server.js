@@ -4243,15 +4243,26 @@ async function handleChat(req, res) {
       const endpoint=new URL("/chat",process.env.KAIROQ_PYTHON_AGENT_URL);
       if(!["http:","https:"].includes(endpoint.protocol)||endpoint.username||endpoint.password)
         return json(res,503,{error:"Invalid Hermes service configuration"});
+      // Bind Hermes memory to a signed, HttpOnly browser session; conversation IDs
+      // alone are user-controlled and must not permit cross-user history access.
+      const hermesSecret=process.env.KAIROQ_PYTHON_AGENT_TOKEN;
+      const cookieMatch=String(req.headers.cookie||"").match(/(?:^|;\\s*)kairoq_hermes_session=([a-f0-9]{32})\\.([a-f0-9]{64})(?:;|$)/);
+      const cookieId=cookieMatch?.[1];
+      const cookieSig=cookieId?crypto.createHmac("sha256",hermesSecret).update(cookieId).digest("hex"):"";
+      const validCookie=!!(cookieMatch&&crypto.timingSafeEqual(Buffer.from(cookieSig),Buffer.from(cookieMatch[2])));
+      const browserSession=validCookie?cookieId:crypto.randomBytes(16).toString("hex");
+      const signedSession=crypto.createHmac("sha256",hermesSecret).update(browserSession).digest("hex");
+      const hermesCookie="kairoq_hermes_session="+browserSession+"."+signedSession+"; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000"+(req.headers["x-forwarded-proto"]==="https"?"; Secure":"");
+      const scopedConversationId=browserSession+":"+String(body.conversationId||"default").slice(0,90);
       let upstream;
       try {
         upstream=await fetch(endpoint,{method:"POST",headers:{
           "Content-Type":"application/json",
           "Authorization":"Bearer "+process.env.KAIROQ_PYTHON_AGENT_TOKEN
-        },body:JSON.stringify({messages,conversationId:String(body.conversationId||"default").slice(0,128)}),signal:AbortSignal.timeout(120000)});
+        },body:JSON.stringify({messages,conversationId:scopedConversationId}),signal:AbortSignal.timeout(120000)});
         const data=await upstream.json().catch(()=>({}));
         if(!upstream.ok)throw Error(data.error||"Hermes Python engine unavailable.");
-        res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","Connection":"keep-alive"});
+        res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","Connection":"keep-alive","Set-Cookie":hermesCookie});
         sseStarted=true;
         writeSSE(res,"token",{text:String(data.message||"")});
         writeSSE(res,"done",{ok:true,provider:"hermes-python",model:data.model,zeroCost:false});
