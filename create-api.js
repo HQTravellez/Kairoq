@@ -268,7 +268,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
    return job;
   }
-  if(mode==='build'&&S.questionOnly(message)&&!supportQuestion(message))mode='discuss';
+  if(mode==='build'&&(S.questionOnly(message)||S.conversation(message))&&!supportQuestion(message))mode='discuss';
  }
  if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&supportQuestion(message)){
   const meta=builder.loadMeta(id),answer=supportAnswer(meta);
