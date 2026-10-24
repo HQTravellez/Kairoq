@@ -95,7 +95,7 @@ function createSseParser(onFrame) {
  * Streams one chat turn from Hermes.
  * @returns {Promise<{text:string, usage:object|null, finishReason:string, model:string}>}
  */
-async function streamChat({ messages, onToken = () => {}, onStatus = () => {}, signal, env = process.env, fetchImpl = fetch }) {
+async function streamChat({ messages, onToken = () => {}, onStatus = () => {}, onReasoning = () => {}, signal, env = process.env, fetchImpl = fetch }) {
   const s = settings(env);
   if (!configured(env)) throw new HermesError("Hermes is not configured.");
   const controller = new AbortController();
@@ -145,6 +145,8 @@ async function streamChat({ messages, onToken = () => {}, onStatus = () => {}, s
       if (payload.usage) usage = payload.usage;
       const choice = payload.choices?.[0];
       if (!choice) return;
+      const thought = choice.delta?.reasoning_content ?? choice.delta?.reasoning;
+      if (typeof thought === "string" && thought) onReasoning(thought); // shown in chat's collapsible "Thought" panel
       const piece = choice.delta?.content;
       if (typeof piece === "string" && piece) { text += piece; onToken(piece); }
       if (choice.finish_reason) finishReason = choice.finish_reason;

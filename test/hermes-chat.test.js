@@ -54,12 +54,13 @@ test("streams reply text and tool progress, ignoring keepalives", async () => {
     res.end("data: [DONE]\n\n");
   });
   try {
-    const tokens = [], statuses = [];
+    const tokens = [], statuses = [], thoughts = [];
     const reply = await hermes.streamChat({
       env: fake.env,
       messages: [{ role: "system", content: "Be brief." }, { role: "user", content: "hi" }],
-      onToken: t => tokens.push(t), onStatus: s => statuses.push(s),
+      onToken: t => tokens.push(t), onStatus: s => statuses.push(s), onReasoning: t => thoughts.push(t),
     });
+    assert.deepEqual(thoughts, ["thinking privately"], "thinking goes to the Thought panel, not the answer");
     assert.equal(reply.text, "Hello Ka");
     assert.deepEqual(tokens, ["Hello ", "Ka"]);
     assert.deepEqual(statuses, ['🔍 Searching "Railway pricing"…']);

@@ -1014,11 +1014,32 @@ function addAnswerActions(box,msgIndex){
   box.appendChild(actions);
 }
 
+// "Thought" panel: the model's thinking and tool steps, live while it works, then folded away
+// as "Thought for Ns" once the answer starts (like Hermes). Answers never include the thinking.
+const MAX_SAVED_THOUGHT=20000;
+function thoughtSeconds(ms){const s=Math.max(1,Math.round((ms||0)/1000));return s<60?`${s}s`:`${Math.floor(s/60)}m ${s%60}s`}
+function buildThoughtPanel(box,{open=false,thinking="",steps=[],ms=0}={}){
+  const panel=document.createElement("details");panel.className="thought";panel.open=open;
+  panel.innerHTML='<summary><span class="thought-label"></span></summary><div class="thought-body"><div class="thought-steps"></div><div class="thought-text"></div></div>';
+  panel.querySelector(".thought-label").textContent=open?"Thinking…":`Thought for ${thoughtSeconds(ms)}`;
+  for(const st of steps){const d=document.createElement("div");d.className="thought-step";d.textContent=st;panel.querySelector(".thought-steps").appendChild(d)}
+  panel.querySelector(".thought-text").textContent=thinking;
+  box.insertBefore(panel,box.firstChild);
+  return panel;
+}
+// Some models (Gemma, Qwen, DeepSeek via Ollama) put their thinking inside <think>…</think> in the answer itself.
+function splitThinkTags(raw){
+  const m=/^\s*<think>([\s\S]*?)(<\/think>|$)/.exec(raw);
+  if(!m)return{thought:"",answer:raw,thinking:false};
+  return{thought:m[1],answer:m[2]?raw.slice(m[0].length).replace(/^\s+/,""):"",thinking:!m[2]};
+}
+
 function appendMessage(msg,index,scroll=true){
   const row=document.createElement("div");row.className=`message-row ${msg.role}`;
   const box=document.createElement("div");box.className="message";
   if(msg.role==="assistant"){
     const content=document.createElement("div");content.className="assistant-content";content.innerHTML=renderMarkdown(msg.content);box.appendChild(content);bindCodeButtons(content);
+    if(msg.thinking||msg.thoughtSteps?.length)buildThoughtPanel(box,{thinking:msg.thinking||"",steps:msg.thoughtSteps||[],ms:msg.thoughtMs});
     addAnswerActions(box,index);
   }else{
     box.textContent=msg.contentText || (typeof msg.content==="string"?msg.content:"[Attachment message]");
@@ -1751,6 +1772,11 @@ async function send(regenerateFrom=null){
   const cursor=document.createElement("span");cursor.className="cursor";box.appendChild(cursor);
 
   let text="";let finalModel="";let usage=null;let streamError=null;let smoothRenderer=null;
+  // rawAnswer = everything the model sent as answer text (may start with <think>…</think>); text = the answer shown.
+  let rawAnswer="",thinking="",tagThinking="",thoughtSteps=[],thoughtPanel=null,thoughtStart=0,thoughtMs=0,answerStarted=false;
+  const ensureThought=()=>{if(!thoughtPanel){thoughtStart=performance.now();thoughtPanel=buildThoughtPanel(box,{open:true})}return thoughtPanel};
+  const showThinking=()=>{if(!thoughtPanel)return;thoughtPanel.querySelector(".thought-text").textContent=thinking+tagThinking;const b=thoughtPanel.querySelector(".thought-body");b.scrollTop=b.scrollHeight;if(!userPausedAutoScroll)followLatest(false)};
+  const foldThought=()=>{if(!thoughtPanel||answerStarted)return;answerStarted=true;thoughtMs=performance.now()-thoughtStart;thoughtPanel.open=false;thoughtPanel.querySelector(".thought-label").textContent=`Thought for ${thoughtSeconds(thoughtMs)}`};
 
   try{
     const response=await fetch("/api/chat/stream",{
@@ -1792,10 +1818,18 @@ async function send(regenerateFrom=null){
 
     await readSSE(response,(event,data)=>{
       if(event==="token"){
-        const token=data.text||"";
-        text+=token;
-        smoothRenderer.push(token);
+        rawAnswer+=data.text||"";
+        const split=splitThinkTags(rawAnswer);
+        if(split.thought&&split.thought!==tagThinking){ensureThought();tagThinking=split.thought;showThinking()}
+        if(split.answer.length>text.length){
+          foldThought();
+          const delta=split.answer.slice(text.length);
+          text=split.answer;
+          smoothRenderer.push(delta);
+        }
       }
+      if(event==="thinking"&&!answerStarted){ensureThought();thinking+=data.text||"";showThinking()}
+      if(event==="step"&&data.text&&!answerStarted){ensureThought();thoughtSteps.push(String(data.text).slice(0,200));const d=document.createElement("div");d.className="thought-step";d.textContent=data.text;thoughtPanel.querySelector(".thought-steps").appendChild(d)}
       if(event==="status")setStatus(data.message||"");
       if(event==="browser")showBrowserFrame(box,data);
       if(event==="meta"){finalModel=data.model||finalModel;usage=data.usage||usage}
@@ -1807,10 +1841,15 @@ async function send(regenerateFrom=null){
 
     if(streamError && !text)throw new Error(streamError);
     cursor.remove();
+    foldThought();
     if(!text)text="(No text returned)";
     contentEl.innerHTML=renderMarkdown(text);bindCodeButtons(contentEl);
 
     const finalMsg={role:"assistant",content:text,model:finalModel||modelSelect.value,usage};
+    const allThinking=(thinking+tagThinking).trim();
+    if(allThinking)finalMsg.thinking=allThinking.slice(-MAX_SAVED_THOUGHT);
+    if(thoughtSteps.length)finalMsg.thoughtSteps=thoughtSteps.slice(-30);
+    if(thoughtPanel)finalMsg.thoughtMs=Math.round(thoughtMs);
     chat.messages.push(finalMsg);
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory();loadUsage();

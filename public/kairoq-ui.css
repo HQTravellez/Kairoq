@@ -136,4 +136,35 @@ body,.app,.main,.main[data-view=chat],.main[data-view=command]{background:var(--
 .main[data-view=chat]:has(.welcome) .composer-shell>:not(.composer){color:var(--k-faint)!important}
 .main[data-view=chat]:has(.welcome){background:var(--k-bg)!important}
 /* Tables hug their columns rather than stretching a white box. */
-.assistant-content table{width:max-content!important}
+
+/* ---------- model + thinking effort, side by side (like Hermes) ---------- */
+.composer .compact-inline:has(#effortSelect){display:flex!important}
+.composer #effortSelect{background:transparent!important;border:0!important;box-shadow:none!important;color:var(--k-muted)!important;font-size:13px!important;padding:4px 6px!important;cursor:pointer;max-width:none!important}
+.composer #effortSelect:hover{color:var(--k-ink)!important}
+.composer .model-inline select{border:0!important;color:var(--k-muted)!important;padding-left:6px!important}
+.composer .model-inline select:hover{color:var(--k-ink)!important}
+
+/* ---------- Thought panel: live thinking, folded once the answer starts ---------- */
+.thought{margin:0 0 10px!important;font-size:13.5px;color:var(--k-muted)}
+.thought>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--k-muted);font-weight:500;padding:2px 0;user-select:none}
+.thought>summary::-webkit-details-marker{display:none}
+.thought>summary::after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .15s ease}
+.thought[open]>summary::after{transform:rotate(225deg) translateY(-1px)}
+.thought>summary:hover{color:var(--k-ink)}
+.thought[open] .thought-label{background:linear-gradient(90deg,var(--k-muted) 0%,var(--k-ink) 50%,var(--k-muted) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:k-shimmer 1.6s linear infinite}
+@keyframes k-shimmer{to{background-position:-200% 0}}
+.thought-body{margin-top:6px;padding-left:12px;border-left:2px solid var(--k-line);max-height:260px;overflow:auto;line-height:1.55}
+.thought-text{white-space:pre-wrap;color:var(--k-faint)}
+.thought-text:empty{display:none}
+.thought-step{color:var(--k-muted);margin-bottom:4px}
+.thought:not(:has(.thought-step)) .thought-steps{display:none}
+/* Model and effort sit together; selects size to their text. */
+.composer .model-inline,.composer .model-inline select,.composer #effortSelect{width:auto!important;min-width:0!important;field-sizing:content}
+.composer .model-inline{max-width:240px!important}
+/* The composer card shows focus; the textarea inside it doesn't need its own ring. */
+.main #prompt:focus-visible{outline:none!important}
+/* Tables: the wrapper is the box and scrolls; it hugs the columns instead of a fixed 520px. */
+.assistant-content .md-table-wrap{width:fit-content!important;max-width:100%!important;border-color:var(--k-line)!important;border-radius:10px!important}
+.assistant-content .md-table-wrap table{display:table!important;min-width:0!important;width:auto!important;border:0!important;border-radius:0!important}
+/* Phone: keep the model and effort on one row. */
+@media (max-width:640px){.composer .composer-tools{flex-wrap:nowrap!important;gap:2px!important}.composer .model-inline{max-width:120px!important}}
