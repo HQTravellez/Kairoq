@@ -3,12 +3,14 @@ on:
   push:
     paths:
       - 'react-builder.js'
+      - 'react-agent.js'
       - 'conversational-build-contract.js'
       - 'test/conversational-build-contract.test.js'
       - '.github/workflows/conversational-build.yml'
   pull_request:
     paths:
       - 'react-builder.js'
+      - 'react-agent.js'
       - 'conversational-build-contract.js'
       - 'test/conversational-build-contract.test.js'
       - '.github/workflows/conversational-build.yml'
@@ -24,5 +26,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check react-builder.js && node --check conversational-build-contract.js
+      - run: node --check react-builder.js && node --check react-agent.js && node --check conversational-build-contract.js
       - run: node --test test/conversational-build-contract.test.js
