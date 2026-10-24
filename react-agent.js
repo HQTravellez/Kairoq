@@ -103,7 +103,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=await require('./decision-router').suggest(text);
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
- const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./ecc-context-recall').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
+ const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
 
@@ -262,7 +262,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   builder.saveMeta(fresh);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
   const failedChecks=require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.enabled!==false&&c.last&&c.last.version===built.n&&!c.last.ok).map(c=>({name:c.name,step:c.last.step||'',error:c.last.error||''}));
-  return{version:built.n,message,changed,steps:steps.length,timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
+  return{version:built.n,message,changed,verification:completion,steps:steps.length,timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
  }
  function noChange(message){
   if(built)fs.rmSync(built.dir,{recursive:true,force:true});

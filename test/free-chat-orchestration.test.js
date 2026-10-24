@@ -10,7 +10,7 @@ t('Discuss saves owner message before inference and never duplicates it after in
  const start=builder.indexOf('async function discuss('),end=builder.indexOf('// Validates, builds',start),body=builder.slice(start,end);
  assert.ok(body.indexOf("addMessages(id,[{role:'user'")<body.indexOf("await callModel("));
  assert.match(body,/addMessages\(id,\[\{role:'assistant'/);
- assert.match(body,/tier:'chat'/);
+ assert.match(body,/discussionTier\(images,tier\)/);
  assert.match(body,/maxOutputTokens:1200/);
 });
 t('normal conversations receive summary rather than full project files',()=>{

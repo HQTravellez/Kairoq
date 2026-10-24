@@ -6716,7 +6716,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       // One request; a reply cut off at the output limit is continued (model-continue.js).
       let lastData=null;
       const ask=async(msgs,onTok)=>{
-        const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(stream?(premium?900000:300000):110000)]):AbortSignal.timeout(stream?(premium?900000:300000):110000),body:JSON.stringify({model,messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
+        const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:require("./builder-response-policy").requestSignal(opts,{premium,stream}),body:JSON.stringify({model,messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
         const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{}),opts.onReasoning):await response.json().catch(()=>({}));
         if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
         const message=data.choices?.[0]?.message||{};

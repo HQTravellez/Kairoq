@@ -21,7 +21,10 @@ test('nutrition records are separate from users and not deleted without confirma
  assert.match(backend,/NUTRITION_COLLECTIONS=new Set/);
  assert.match(backend,/if\(confirm!==true\)/);
  assert.match(backend,/DELETE FROM records WHERE collection=\?/);
- assert.doesNotMatch(backend.slice(backend.indexOf('function ownerClearNutritionRecords'),backend.indexOf('function ownerDelete(')),/DELETE FROM users/);
+ const ast=require('@babel/parser').parse(backend,{sourceType:'script'});
+ const fn=ast.program.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='ownerClearNutritionRecords');
+ assert.ok(fn,'nutrition deletion function must exist');
+ assert.doesNotMatch(backend.slice(fn.start,fn.end),/DELETE FROM users/);
 });
 
 test('missing camera complaint is routed to real feature diagnosis, not preview help',()=>{

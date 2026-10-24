@@ -1697,3 +1697,11 @@ requires its own login. A failed or interrupted run is not retried automatically
 on restart. Read the report, correct its blocker, and choose a new run ID when
 explicitly starting another attempt. Passing this scenario proves this build,
 not arbitrary applications, external OAuth providers or universal design quality.
+
+### Modular agent stack
+
+[Agent-stack integration guide](docs/agent-stack.md) documents ECC-inspired local recall,
+Understand-Anything graph interchange, isolated Ruflo capability discovery, default-off
+Mem0 enrichment, and inert AutoHarness review candidates. These modules preserve Kairoq's
+native agent and approval boundaries. [Verification evidence](docs/agent-stack-evidence.md)
+separates verified behavior from experimental and unverified upstream functionality.
