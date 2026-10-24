@@ -21,6 +21,17 @@ RUN if [ "$KAIROQ_LIGHTPANDA" = "on" ]; then \
       if [ -n "$LIGHTPANDA_SHA256" ]; then echo "$LIGHTPANDA_SHA256  /usr/local/bin/lightpanda" | sha256sum -c -; fi && \
       chmod +x /usr/local/bin/lightpanda && LIGHTPANDA_DISABLE_TELEMETRY=true /usr/local/bin/lightpanda version; fi
 ENV LIGHTPANDA_DISABLE_TELEMETRY=true
+# last30days research (last30days.js, vendor/last30days, MIT) needs Python 3.12+; Debian bookworm
+# has 3.11, so uv installs a standalone 3.12. yt-dlp lets it read YouTube. Set the Railway
+# variable KAIROQ_LAST30DAYS=off to leave both out of the image.
+ARG KAIROQ_LAST30DAYS=on
+COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /usr/local/bin/uv
+RUN if [ "$KAIROQ_LAST30DAYS" = "on" ]; then \
+      UV_PYTHON_INSTALL_DIR=/opt/python uv python install 3.12 && \
+      ln -sf "$(UV_PYTHON_INSTALL_DIR=/opt/python uv python find 3.12)" /usr/local/bin/python3.12 && \
+      UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/python uv tool install --python 3.12 yt-dlp && \
+      python3.12 --version && yt-dlp --version; fi
+ENV KAIROQ_PYTHON=/usr/local/bin/python3.12
 COPY . .
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV NODE_ENV=production TZ=UTC
