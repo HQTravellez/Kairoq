@@ -238,7 +238,7 @@ function applyShellMode(){
 
 function setMainView(view="command"){
   if(view==="command") document.body.classList.remove("history-focus");
-  mainView = ["chat","command","studio","build"].includes(view) ? view : "command";
+  mainView = ["chat","command","studio","build","plugins"].includes(view) ? view : "command";
   localStorage.setItem("pai-main-view", mainView);
   $(".main").dataset.view = mainView;
   document.body.classList.remove("nav-open");
@@ -251,13 +251,17 @@ function setMainView(view="command"){
   messages?.classList.toggle("hidden", mainView !== "chat");
   studio?.classList.toggle("hidden", mainView !== "studio");
   $("#buildView")?.classList.toggle("hidden", mainView !== "build");
+  $("#pluginsView")?.classList.toggle("hidden", mainView !== "plugins");
+  $("#pluginsNavBtn")?.classList.toggle("active", mainView === "plugins");
+  if(mainView==="plugins")loadPlugins();
   $("#buildNavBtn")?.classList.toggle("active", mainView === "build");
   if(mainView!=="command") $("#commandCenter")?.classList.remove("show-work");
   // On the home view the chat box sits under the headline; everywhere else it is docked at the bottom.
   const shell=$(".composer-shell"), slot=$("#khComposerSlot");
   if(shell && slot){
-    if(mainView==="command"){ if(shell.parentElement!==slot) slot.appendChild(shell); }
-    else if(shell.parentElement===slot) $(".main").appendChild(shell);
+    // The message box stays docked full width at the bottom on every screen (like Hermes),
+    // including Home and "Build an app"; it no longer floats as a box in the middle.
+    if(shell.parentElement===slot) $(".main").appendChild(shell);
   }
 
   $("#commandCenterBtn")?.classList.toggle("active", mainView === "command");
@@ -265,7 +269,7 @@ function setMainView(view="command"){
   $("#studioNavBtn")?.classList.toggle("active", mainView === "studio");
   $("#studioSideBtn")?.classList.toggle("active", mainView === "studio");
 
-  if($("#mainViewTitle")) $("#mainViewTitle").textContent = mainView === "build" ? "Build an app" : mainView === "command" ? "Home" : mainView === "studio" ? "Studio" : (getChat()?.title || "Ask Kairoq");
+  if($("#mainViewTitle")) $("#mainViewTitle").textContent = mainView === "build" ? "Build an app" : mainView === "plugins" ? "Plugins" : mainView === "command" ? "Home" : mainView === "studio" ? "Studio" : (getChat()?.title || "Ask Kairoq");
   if($("#mainViewSubtitle")) $("#mainViewSubtitle").textContent = mainView === "command"
     ? ""
     : mainView === "studio" ? "Create images, videos, avatars, and UGC from one place."
@@ -1005,11 +1009,17 @@ function bindCodeButtons(root=document){
   });
 }
 
+const ICON_COPY='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
+const ICON_REGEN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>';
+function clockTime(at){try{return new Date(at).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}catch{return""}}
+// Under each answer: when it arrived, then small Copy / Regenerate icon buttons (like Hermes).
 function addAnswerActions(box,msgIndex){
   const actions=document.createElement("div");actions.className="answer-actions";
-  const copy=document.createElement("button");copy.textContent="Copy";
-  copy.onclick=async()=>{await navigator.clipboard.writeText(getChat()?.messages?.[msgIndex]?.content||"");copy.textContent="Copied";setTimeout(()=>copy.textContent="Copy",1200)};
-  const regen=document.createElement("button");regen.textContent="Regenerate";
+  const at=getChat()?.messages?.[msgIndex]?.at;
+  if(at){const t=document.createElement("time");t.className="answer-time";t.dateTime=new Date(at).toISOString();t.textContent=clockTime(at);actions.appendChild(t)}
+  const copy=document.createElement("button");copy.type="button";copy.className="icon-action";copy.innerHTML=ICON_COPY;copy.setAttribute("aria-label","Copy answer");copy.title="Copy";
+  copy.onclick=async()=>{await navigator.clipboard.writeText(getChat()?.messages?.[msgIndex]?.content||"");copy.title="Copied";copy.classList.add("done");setTimeout(()=>{copy.title="Copy";copy.classList.remove("done")},1200)};
+  const regen=document.createElement("button");regen.type="button";regen.className="icon-action";regen.innerHTML=ICON_REGEN;regen.setAttribute("aria-label","Regenerate answer");regen.title="Regenerate";
   regen.onclick=()=>regenerate(msgIndex);
   actions.append(copy,regen);
   box.appendChild(actions);
@@ -1069,12 +1079,32 @@ function renderChat(){
   requestAnimationFrame(()=>followLatest(true));
 }
 
+// "now", "5m", "3h", "2d" — like the Hermes session list.
+function shortAgo(t){
+  const s=Math.max(0,(Date.now()-Number(t||0))/1000);
+  if(!t||s<60)return"now";if(s<3600)return Math.floor(s/60)+"m";if(s<86400)return Math.floor(s/3600)+"h";return Math.floor(s/86400)+"d";
+}
+function chatTime(c){return Number(c.updatedAt||c.messages?.at?.(-1)?.at||c.createdAt||0)}
 function renderHistory(){
   historyList.innerHTML="";
-  chats.slice(0,40).forEach(chat=>{
-    const row=document.createElement("div");row.className="history-item";
-    const open=document.createElement("button");open.className="history-open";open.textContent=chat.title||"New chat";
-    open.onclick=()=>{currentChatId=chat.id;saveAll();renderChat();setMainView("chat")};
+  const pinnedList=$("#pinnedList");if(pinnedList)pinnedList.innerHTML="";
+  const q=String($("#chatSearch")?.value||"").trim().toLowerCase();
+  const visible=chats.filter(c=>!q||String(c.title||"New chat").toLowerCase().includes(q));
+  const pinned=visible.filter(c=>c.pinned),rest=visible.filter(c=>!c.pinned).slice(0,40);
+  $("#pinnedHint")?.classList.toggle("hidden",pinned.length>0);
+  const DAY=86400000,startToday=new Date().setHours(0,0,0,0);
+  const group=c=>{const t=chatTime(c);return t>=startToday?"Today":t>=startToday-6*DAY?"This week":"Earlier this month"};
+  let lastGroup="";
+  const draw=(chat,host,withGroup)=>{
+    if(withGroup){const g=group(chat);if(g!==lastGroup&&g!=="Today"){const h=document.createElement("div");h.className="history-group";h.textContent=g;host.appendChild(h)}lastGroup=g}
+    const row=document.createElement("div");row.className="history-item"+(chat.id===currentChatId?" active":"");
+    const open=document.createElement("button");open.className="history-open";open.title="Shift-click to "+(chat.pinned?"unpin":"pin");
+    const dot=document.createElement("span");dot.className="history-dot";dot.setAttribute("aria-hidden","true");
+    const name=document.createElement("span");name.className="history-name";name.textContent=chat.title||"New chat";
+    const when=document.createElement("span");when.className="history-when";when.textContent=shortAgo(chatTime(chat));
+    open.append(dot,name,when);
+    if(chat.id===currentChatId)open.setAttribute("aria-current","page");
+    open.onclick=e=>{if(e.shiftKey){chat.pinned=!chat.pinned;saveAll();renderHistory();return}currentChatId=chat.id;saveAll();renderChat();setMainView("chat");renderHistory()};
     const menu=document.createElement("button");menu.className="history-menu";menu.textContent="⋯";
     menu.onclick=()=>{
       const action=prompt("Type 'rename' or 'delete'");
@@ -1087,8 +1117,11 @@ function renderHistory(){
         if(!currentChatId)newChat();else{saveAll();renderHistory();renderChat();}
       }
     };
-    row.append(open,menu);historyList.appendChild(row);
-  });
+    row.append(open,menu);host.appendChild(row);
+  };
+  pinned.forEach(c=>draw(c,pinnedList||historyList,false));
+  rest.forEach(c=>draw(c,historyList,true));
+  if(!visible.length&&q){const e=document.createElement("div");e.className="kn-hint";e.textContent="No chats match.";historyList.appendChild(e)}
 }
 
 function option(value,label){
@@ -1162,6 +1195,8 @@ let hermesState={configured:false,ok:false,checked:false};
 async function loadHermesState(){
   try{const r=await fetch("/api/hermes/status");if(r.ok)hermesState={...(await r.json()),checked:true}}catch{}
   if(hermesState.configured&&["openrouter/free","smart-auto"].includes(modelSelect.value)&&!ui.pickedModel){pickModel("hermes/agent")}
+  const ft=$("#hermesFooterText"),fd=$("#hermesFooter .status-dot");
+  if(ft){ft.textContent=!hermesState.checked?"Hermes status unknown":hermesState.configured?(hermesState.ok?"Hermes ready":"Hermes not reachable"):"Hermes not connected";fd?.classList.toggle("off",!(hermesState.configured&&hermesState.ok))}
   renderModelPicker();
 }
 // Keep the list short, like Hermes: no batch/dated copies, a handful of current models per provider.
@@ -1270,6 +1305,29 @@ $("#modelPickerEdit").onclick=()=>{closeModelPicker();$("#modelsEditSearch").val
 $("#modelsEditSearch").oninput=renderModelsEdit;
 $("#modelsEditReset").onclick=()=>{modelVisibility={};saveModelVisibility();renderModelsEdit()};
 $("#modelsEditDone").onclick=$("#modelsEditClose").onclick=()=>$("#modelsEditDialog").close();
+
+// ---- Plugins page: the real on/off state of each add-on (GET /api/plugins).
+function pluginSwitch(state,label){
+  if(!state)return'<span class="pv-none" aria-label="Not part of this plugin">—</span>';
+  const why=state.on?"On":state.why||"Off";
+  return `<span class="pv-switch${state.on?" on":""}" role="switch" aria-checked="${state.on}" aria-disabled="true" aria-label="${escapeHTML(label)}: ${escapeHTML(why)}" title="${escapeHTML(why)}"></span>`;
+}
+let pluginData=null;
+async function loadPlugins(){
+  const host=$("#pvInstalled");if(!host)return;
+  try{const r=await fetch("/api/plugins");if(r.status===401){await checkSession(true);return}pluginData=await r.json()}catch{host.innerHTML='<div class="kn-hint">Couldn\'t load plugins.</div>';return}
+  $("#pvSkillCount").textContent=pluginData.skills||"";
+  host.innerHTML=pluginData.installed.map(p=>`<div class="pv-row" role="row"><div role="cell" class="pv-info"><div class="pv-name">${escapeHTML(p.name)}${p.source?` <span class="pv-src">${escapeHTML(p.source)}</span>`:""}${p.tag?` <span class="pv-tag">${escapeHTML(p.tag)}</span>`:""}</div><div class="pv-about">${escapeHTML(p.about)}</div>${[p.kairoq,p.hermes].filter(x=>x&&!x.on&&x.why).map(x=>`<div class="pv-why">${escapeHTML(x.why)}</div>`).join("")}</div><div role="cell" class="pv-cell">${pluginSwitch(p.kairoq,p.name+" in Kairoq")}</div><div role="cell" class="pv-cell">${pluginSwitch(p.hermes,p.name+" in Hermes")}</div></div>`).join("");
+  renderPluginCatalog();
+}
+function renderPluginCatalog(){
+  const q=String($("#pvSearch")?.value||"").trim().toLowerCase();
+  const list=(pluginData?.catalog||[]).filter(p=>!q||`${p.name} ${p.about}`.toLowerCase().includes(q));
+  $("#pvCatalog").innerHTML=list.length?list.map(p=>`<div class="pv-card"><div class="pv-card-head"><span class="pv-name">${escapeHTML(p.name)}</span><span class="pv-tag plain">${escapeHTML(p.for)}</span></div><div class="pv-about">${escapeHTML(p.about)}</div><a class="pv-add" href="${escapeHTML(p.url)}" target="_blank" rel="noopener">View on GitHub</a></div>`).join(""):'<div class="kn-hint">No plugins match.</div>';
+}
+$("#pluginsNavBtn")&&($("#pluginsNavBtn").onclick=()=>setMainView("plugins"));
+$("#pvSearch")&&($("#pvSearch").oninput=renderPluginCatalog);
+$("#chatSearch")&&($("#chatSearch").oninput=renderHistory);
 
 function renderModelResults(){
   const q=$("#modelSearch").value.trim().toLowerCase();
@@ -1877,7 +1935,7 @@ async function send(regenerateFrom=null){
   }
 
   const chat=ensureChat();
-  const userMsg=buildUserMessage(raw);
+  const userMsg={...buildUserMessage(raw),at:Date.now()};
 
   if(regenerateFrom===null){
     chat.messages.push(userMsg);
@@ -1974,7 +2032,8 @@ async function send(regenerateFrom=null){
     if(!text)text="(No text returned)";
     contentEl.innerHTML=renderMarkdown(text);bindCodeButtons(contentEl);
 
-    const finalMsg={role:"assistant",content:text,model:finalModel||modelSelect.value,usage};
+    const finalMsg={role:"assistant",content:text,model:finalModel||modelSelect.value,usage,at:Date.now()};
+    chat.updatedAt=finalMsg.at;
     const allThinking=(thinking+tagThinking).trim();
     if(allThinking)finalMsg.thinking=allThinking.slice(-MAX_SAVED_THOUGHT);
     if(thoughtSteps.length)finalMsg.thoughtSteps=thoughtSteps.slice(-30);
@@ -3060,7 +3119,11 @@ $$("[data-cc-open]").forEach(btn=>btn.onclick=()=>{
 });
 $$(".cc-quick").forEach(btn=>btn.onclick=()=>useCommandPrompt(btn));
 $("#clearChats").onclick=()=>{if(confirm("Delete all local chats?")){chats=[];currentChatId=null;newChat()}};
-$("#attachBtn").onclick=()=>$("#fileInput").click();
+// "+" opens a small menu (file, image, video), like Hermes' single "+" in the message box.
+$("#attachBtn").onclick=e=>{e.stopPropagation();const m=$("#plusMenu");m.hidden=!m.hidden;$("#attachBtn").setAttribute("aria-expanded",String(!m.hidden));if(!m.hidden)m.querySelector("button")?.focus()};
+$$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
+document.addEventListener("click",e=>{if(!e.target.closest(".kq-plus")){const m=$("#plusMenu");if(m&&!m.hidden){m.hidden=true;$("#attachBtn").setAttribute("aria-expanded","false")}}});
+$("#plusMenu")?.addEventListener("keydown",e=>{if(e.key==="Escape"){$("#plusMenu").hidden=true;$("#attachBtn").focus()}});
 $("#imageModeBtn").onclick=()=>setImageMode(!imageMode);
 $("#videoModeBtn").onclick=()=>setVideoMode(!videoMode);
 $("#fileInput").onchange=e=>{handleFiles(e.target.files);e.target.value=""};

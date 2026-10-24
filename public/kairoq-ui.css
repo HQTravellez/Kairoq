@@ -249,3 +249,208 @@ input.kq-switch::after{content:""!important;display:block!important}
 .kq-row-note{font-size:12px;color:var(--k-faint);flex:none}
 .kq-error{margin-top:4px;padding:10px 12px;border-radius:10px;background:#fbf1ef;color:#8a2c1d;font-size:14px;line-height:1.5;max-width:640px}
 .status-bar.error{color:var(--k-muted)!important;background:none!important;border:0!important}
+
+/* =====================================================================
+   Kairoq design (approved mockup "Kairoq chat redesign", Oct 2026)
+   Hermes-style layout in Kairoq's own wine + amber.
+   ===================================================================== */
+:root{
+  --k-bg:#ffffff; --k-panel:#f6f4f0; --k-line:#e8e3dc; --k-soft:#f8f5f1; --k-soft-line:#ece6df;
+  --k-hover:#eee8e3; --k-ink:#1d1d1f; --k-muted:#6e6e73; --k-faint:#8e8e93;
+  --k-wine:#8a2d3b; --k-wine-dark:#6e2330; --k-wine-tint:#f7eef0; --k-amber:#c98a1c; --k-amber-ink:#8a5a0e;
+  --k-accent:var(--k-wine); --k-bubble:var(--k-soft);
+}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+body,.main,.main[data-view]{background:var(--k-bg)!important}
+
+/* Sidebar: always visible on a desktop, a drawer on phones. */
+@media (min-width:1024px){
+  .app{grid-template-columns:296px minmax(0,1fr)!important}
+  .app>.sidebar.kn{display:flex!important;position:sticky!important;top:0;height:100vh;box-shadow:none!important;inset:auto!important;width:auto!important}
+  .topbar #sidebarToggle{display:none!important}
+  .nav-open .main::after{display:none}
+}
+.sidebar.kn{background:var(--k-panel)!important;border-right:1px solid var(--k-line)!important;padding:14px 12px 10px!important}
+.sidebar.kn .brand{padding:4px 8px 14px!important}
+.sidebar.kn .brand-mark{width:26px!important;height:26px!important;border-radius:7px!important;background:var(--k-wine)!important;color:#fff!important;font-size:14px!important}
+.sidebar.kn .brand-title{font-size:15px!important;font-weight:600!important}
+.sidebar.kn .kn-new{background:transparent!important;border:0!important;box-shadow:none!important;justify-content:flex-start!important;height:36px!important;min-height:36px!important;padding:0 10px!important;font-weight:400!important;font-size:14.5px!important;margin:0!important;border-radius:8px!important}
+.sidebar.kn .kn-new:hover,.sidebar.kn .kn-item:hover{background:var(--k-hover)!important}
+.sidebar.kn .kn-item{height:36px!important;min-height:36px!important;font-size:14.5px!important;gap:12px!important}
+.sidebar.kn .kn-item.active{background:var(--k-hover)!important;box-shadow:none!important;font-weight:500!important}
+.sidebar.kn .kn-ico{stroke:var(--k-muted)!important;width:18px!important;height:18px!important}
+.kn-search{display:flex;align-items:center;gap:8px;margin:16px 4px 4px;padding:0 8px;height:34px;border-radius:8px;color:var(--k-muted)}
+.kn-search .kn-ico{width:15px!important;height:15px!important}
+.kn-search input{border:0!important;background:transparent!important;box-shadow:none!important;outline:none;font:13.5px var(--k-font);color:var(--k-ink);width:100%;padding:0!important}
+.kn-search:focus-within{background:#fff;box-shadow:0 0 0 1px var(--k-line)}
+.sidebar.kn .kn-chats{border-top:0!important;margin-top:4px!important;padding-top:0!important}
+.sidebar.kn .kn-cap,.sidebar.kn .kn-label.kn-cap{font-size:11px!important;font-weight:600!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:var(--k-wine)!important;padding:14px 12px 6px!important}
+.sidebar.kn .kn-label-row{padding:0!important}
+.kn-hint{font-size:13px;color:var(--k-faint);padding:2px 12px 6px}
+.sidebar.kn .history-group{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--k-faint);padding:12px 12px 4px}
+.sidebar.kn .history-item{display:flex;align-items:center;border-radius:8px}
+.sidebar.kn .history-item:hover{background:var(--k-hover)}
+.sidebar.kn .history-item.active{background:var(--k-hover)}
+.sidebar.kn .history-open{flex:1;min-width:0;display:flex!important;align-items:center;gap:10px;height:34px;padding:0 6px 0 12px!important;background:transparent!important;border:0!important;font-size:14px!important;color:var(--k-ink)!important;text-align:left;cursor:pointer}
+.history-dot{width:5px;height:5px;border-radius:50%;background:#c7c7cc;flex:none}
+.history-item.active .history-dot{background:var(--k-wine)}
+.history-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-when{font-size:12px;color:var(--k-muted);flex:none}
+.sidebar.kn .history-menu{opacity:0;border:0;background:none;color:var(--k-muted);width:26px;height:26px;border-radius:6px;cursor:pointer}
+.sidebar.kn .history-item:hover .history-menu,.sidebar.kn .history-menu:focus-visible{opacity:1}
+.sidebar.kn .sidebar-footer{display:flex;gap:14px;align-items:center;border-top:1px solid var(--k-line)!important;padding:10px 8px 2px!important;font-size:12.5px!important;color:var(--k-muted)!important}
+.sidebar.kn .sidebar-footer .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#2f9e5b;margin-right:6px;vertical-align:1px}
+.sidebar.kn .sidebar-footer .status-dot.off{background:#c7c7cc}
+
+/* Top bar: the open chat as a tab, like Hermes. */
+.topbar.simple-topbar{height:44px!important;min-height:44px!important;padding:0 20px!important;border-bottom:1px solid #ececef!important;align-items:flex-end!important;justify-content:space-between!important}
+.topbar.simple-topbar>div:not(.topbar-actions){display:flex;align-items:flex-end;text-align:left!important;flex:1;justify-content:flex-start!important}
+.topbar-title{font-size:12.5px!important;font-weight:600!important;letter-spacing:.04em!important;text-transform:uppercase!important;padding:0 14px 10px!important;border-bottom:2px solid var(--k-wine);max-width:min(560px,60vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-subtitle{display:none!important}
+.topbar #settingsBtn{margin-bottom:8px}
+
+/* Conversation: full-width column, your message in a warm box, answers plain. */
+.message-row{max-width:980px!important;padding:0 48px!important}
+.message-row.user{display:block!important}
+.message-row.user .message{max-width:none!important;width:100%;box-sizing:border-box;background:var(--k-soft)!important;border:1px solid var(--k-soft-line)!important;border-radius:8px!important;padding:14px 18px!important;font-size:15.5px!important}
+.thought>summary{color:var(--k-muted)}
+.thought-text{color:var(--k-faint)}
+.assistant-content .md-table-wrap{border-color:#e5e5e7!important;border-radius:8px!important}
+.assistant-content th{background:#fafafa!important}
+.answer-actions{justify-content:flex-end;align-items:center;gap:4px!important;opacity:1!important;margin-top:8px!important}
+.answer-time{font-size:12.5px;color:var(--k-faint);margin-right:8px}
+.answer-actions .icon-action{width:28px!important;height:28px!important;padding:0!important;display:grid!important;place-items:center;border-radius:6px!important}
+.answer-actions .icon-action svg{width:15px;height:15px;fill:none;stroke:var(--k-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.answer-actions .icon-action:hover svg{stroke:var(--k-ink)}
+.answer-actions .icon-action.done svg{stroke:#2f9e5b}
+.kq-error{background:#fbf1f2!important;color:var(--k-wine-dark)!important}
+
+/* Message box: one row — + · text · model · effort · send. */
+.composer-shell{padding:12px 48px 10px!important}
+.composer{max-width:980px!important;display:flex!important;align-items:center!important;gap:6px!important;border:1px solid #dcdce0!important;border-radius:10px!important;padding:6px 8px 6px 6px!important;box-shadow:none!important;background:#fff!important}
+.composer:focus-within{border-color:#b9b9bf!important;box-shadow:0 0 0 3px #8a2d3b14!important}
+.composer .composer-bottom,.composer .composer-tools{display:contents!important}
+.composer #prompt{order:1;flex:1;min-width:0;min-height:24px!important;max-height:200px;padding:7px 6px!important;margin:0!important;font-size:15.5px!important;resize:none}
+.composer .kq-plus{order:0}
+.composer .kq-model{order:2}
+.composer .compact-inline:has(#effortSelect){order:3}
+.composer .send-actions{order:4;display:flex;align-items:center;gap:6px}
+.composer #imageModeBtn,.composer #videoModeBtn,.composer #composerMascot,.composer #agentQuickBtn,.composer #modelSearchBtn,.composer .compact-inline:has(#purposeSelect){display:none!important}
+.composer .send-btn,#sendBtn{width:36px!important;height:36px!important;background:var(--k-ink)!important}
+.kq-plus{position:relative}
+.kq-plus #attachBtn{width:32px!important;height:32px!important}
+.kq-plus-menu{position:absolute;left:0;bottom:calc(100% + 10px);z-index:60;min-width:190px;background:#fff;border:1px solid #e5e5e7;border-radius:10px;box-shadow:0 12px 36px rgba(29,29,31,.14);padding:4px;display:flex;flex-direction:column}
+.kq-plus-menu[hidden]{display:none}
+.kq-plus-menu button{height:34px;padding:0 10px;border:0;background:none;border-radius:7px;text-align:left;font:14px var(--k-font);color:var(--k-ink);cursor:pointer}
+.kq-plus-menu button:hover,.kq-plus-menu button:focus-visible{background:var(--k-hover)}
+.status-bar{max-width:980px!important;text-align:right;padding:8px 4px 0!important;margin:0 auto!important;order:5}
+.composer-shell{display:flex;flex-direction:column}
+.composer-shell>.status-bar{order:2}
+.composer-shell>.composer{order:1;width:100%;margin:0 auto!important}
+.fineprint{display:none!important}
+
+/* Model picker in Kairoq colours. */
+.kq-picker{width:380px!important;border-radius:12px!important}
+.kq-group{font-size:11px!important;letter-spacing:.08em!important;text-transform:uppercase;color:var(--k-wine)!important}
+.kq-row.selected{background:var(--k-wine-tint)!important}
+.kq-star.on{color:var(--k-amber)!important}
+input.kq-switch:checked{background:var(--k-wine)!important}
+
+/* Plugins page */
+.main[data-view=plugins] .composer-shell{display:none!important}
+.plugins-view{overflow-y:auto;padding:0 40px 40px;font-family:var(--k-font)}
+.pv-tabs{display:flex;justify-content:center;gap:28px;border-bottom:1px solid #ececef;margin:0 -40px;padding-top:22px;font-size:15px;color:var(--k-muted)}
+.pv-tabs span{padding-bottom:12px}
+.pv-tabs small{font-size:12px}
+.pv-tabs .active{color:var(--k-ink);font-weight:600;border-bottom:2px solid var(--k-wine);padding-bottom:10px}
+.pv-intro{font-size:14.5px;color:var(--k-muted);margin:20px 0 16px;max-width:820px}
+.pv-table{border:1px solid #ececef;border-radius:10px;overflow:hidden}
+.pv-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 120px;align-items:center;border-bottom:1px solid #f0f0f2}
+.pv-row:last-child{border-bottom:0}
+.pv-head{background:#faf8f5;font-size:13px;color:var(--k-muted);font-weight:500;border-bottom:1px solid #ececef}
+.pv-head span{padding:10px 16px}.pv-head span+span{text-align:center;padding:10px 0}
+.pv-info{padding:14px 16px}
+.pv-name{font-size:15px;font-weight:600}
+.pv-src{font-size:12px;color:var(--k-muted);font-weight:400;margin-left:6px}
+.pv-tag{font-size:11px;color:var(--k-wine);border:1px solid #e7d2d6;border-radius:5px;padding:1px 6px;margin-left:6px;font-weight:400}
+.pv-tag.plain{color:var(--k-muted);border-color:#e5e5e7}
+.pv-about{font-size:13.5px;color:var(--k-muted);margin-top:4px;line-height:1.5}
+.pv-why{font-size:12.5px;color:var(--k-amber-ink);margin-top:4px}
+.pv-cell{display:flex;justify-content:center}
+.pv-none{color:#c7c7cc}
+.pv-switch{width:36px;height:20px;border-radius:999px;background:#d6d1ca;position:relative;display:block;cursor:help}
+.pv-switch::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.pv-switch.on{background:var(--k-wine)}.pv-switch.on::after{left:auto;right:2px}
+.pv-more-head{display:flex;align-items:center;gap:12px;margin:26px 0 10px}
+.pv-more-head h2{margin:0;font-size:15px;font-weight:600;flex:1}
+.pv-search{display:flex;align-items:center;gap:8px;height:34px;width:280px;max-width:100%;padding:0 10px;border:1px solid #e5e5e7;border-radius:8px}
+.pv-search input{border:0;outline:none;font:14px var(--k-font);width:100%;background:transparent}
+.pv-catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.pv-card{border:1px solid #ececef;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.pv-card-head{display:flex;align-items:center;gap:8px}.pv-card-head .pv-name{flex:1}
+.pv-add{margin-top:4px;height:34px;display:grid;place-items:center;border:1px solid #e0cfd3;border-radius:8px;font-size:14px;font-weight:500;color:var(--k-wine)!important;text-decoration:none!important}
+.pv-add:hover{background:var(--k-wine-tint)}
+
+/* Phone */
+@media (max-width:640px){
+  .message-row{padding:0 16px!important}
+  .composer-shell{padding:8px 12px 12px!important}
+  .composer{flex-wrap:wrap!important;border-radius:12px!important;padding:8px!important}
+  .composer #prompt{flex-basis:100%;order:0}
+  .composer .kq-plus{order:1}
+  .composer .send-actions{margin-left:auto}
+  .plugins-view{padding:0 16px 32px}
+  .pv-tabs{margin:0 -16px;gap:18px;font-size:14px}
+  .pv-row{grid-template-columns:minmax(0,1fr) 64px 64px}
+  .pv-head span{font-size:11.5px}
+  .topbar-title{max-width:60vw}
+}
+:focus-visible{outline:2px solid var(--k-wine)!important;outline-offset:2px}
+.composer #prompt:focus-visible,.kn-search input:focus-visible,.pv-search input:focus-visible,.kq-picker-search:focus-visible{outline:none!important}
+/* fixes after first screenshots */
+.sidebar.kn button#newChat.kn-new{background:transparent!important;color:var(--k-ink)!important}
+.sidebar.kn button#newChat.kn-new .kn-ico{stroke:var(--k-muted)!important}
+.sidebar.kn button#newChat.kn-new:hover{background:var(--k-hover)!important}
+.topbar #settingsBtn{margin-left:auto!important}
+.sidebar.kn #pinnedList:empty{display:none!important}
+.sidebar.kn #pinnedList,.sidebar.kn #historyList{min-height:0!important;flex:none!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+.sidebar.kn .history-item{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important}
+.sidebar.kn .history-item.active,.sidebar.kn .history-item:hover{background:var(--k-hover)!important}
+.sidebar.kn .kn-chats{display:flex!important;flex-direction:column!important;gap:1px!important;background:transparent!important}
+.pv-search .kn-ico,.kn-search .kn-ico{fill:none!important;stroke:var(--k-faint)!important;stroke-width:1.8;width:14px!important;height:14px!important;flex:none}
+.pv-search input,.kn-search input{border:0!important;box-shadow:none!important;background:transparent!important;height:auto!important;padding:0!important;min-height:0!important}
+/* the reading column and message box match the mockup width (980px of text) */
+.main .messages{max-width:1076px!important;width:100%!important;margin:0 auto!important;padding:24px 48px 0!important;box-sizing:border-box}
+.main .messages .message-row{max-width:980px!important;padding:0!important;margin-left:auto!important;margin-right:auto!important}
+.main .composer-shell{max-width:1076px!important;width:100%!important;margin:0 auto!important;box-sizing:border-box}
+.main .composer-shell .composer{max-width:980px!important}
+#historyList .history-item,#pinnedList .history-item{padding:0!important;height:34px;background:transparent!important}
+#historyList .history-item.active,#historyList .history-item:hover,#pinnedList .history-item:hover{background:var(--k-hover)!important}
+#historyList .history-open,#pinnedList .history-open{background:transparent!important;box-shadow:none!important;width:100%;padding:0 6px 0 12px!important}
+.sidebar.kn button#newChat.kn-new{box-shadow:none!important;border:0!important}
+@media (max-width:640px){.main .messages{padding:16px 16px 0!important}.main .composer-shell{padding:8px 12px 12px!important}}
+/* the model button sits at the right of the message box, so its list opens leftwards */
+.composer .kq-picker{left:auto!important;right:0!important}
+.main{overflow-x:hidden!important}
+
+/* Builder view: keep the tab title (home.css hid it) and Kairoq's plain white ground */
+.main[data-view=build] .topbar>div:first-of-type{visibility:visible!important}
+.main[data-view=build]{background:#fff!important}
+/* Home + "Build an app" start screen: no glow behind the message box */
+.kh-composer-slot::before,.kh-composer-slot::after{content:none!important;display:none!important;background:none!important}
+.kh-hero h1{font-weight:600!important}
+.kh-pill,.kh-modes button{border-color:#e8e3dc!important}
+.kh-modes button[aria-pressed=true],.kh-modes .active{background:#fff!important;color:#1d1d1f!important}
+/* Home / Build start: headline in the middle, message box docked at the bottom like chat */
+.main[data-view=command]{display:flex!important;flex-direction:column}
+.main[data-view=command] #commandCenter{flex:1;min-height:0;overflow-y:auto}
+.main[data-view=command] .kh-hero{padding-top:18vh!important}
+.main[data-view=command] .composer-shell{position:static!important;padding:12px 48px 14px!important}
+.kh-composer-slot:empty{display:none!important}
+/* Full width like Hermes: messages and the message box use the whole main area, with side margins only */
+.main .messages{max-width:none!important;padding:24px 40px 0!important}
+.main .messages .message-row{max-width:none!important}
+.main .composer-shell{max-width:none!important;padding:12px 40px 14px!important}
+.main .composer-shell .composer,.main .composer-shell>.status-bar{max-width:none!important}
+.main[data-view=command] .composer-shell{padding:12px 40px 14px!important}
+@media (max-width:640px){.main .messages{padding:16px 16px 0!important}.main .composer-shell{padding:8px 12px 12px!important}}

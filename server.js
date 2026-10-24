@@ -483,7 +483,7 @@ async function callFreeLlmJSON({messages,temperature=0.1}={}){
       const local=await localChatCompletion({messages,temperature,responseFormat:{type:"json_object"}});
       const content=local.message?.content||"{}";
       try{return JSON.parse(content)}catch{
-        const m=String(content).match(/\\{[\\s\\S]*\\}/);
+        const m=String(content).match(/\{[\s\S]*\}/);
         if(m)return JSON.parse(m[0]);
       }
     }catch(localErr){
@@ -499,7 +499,7 @@ async function callFreeLlmJSON({messages,temperature=0.1}={}){
   if(!response.ok)throw new Error(data?.error?.message||data?.message||`OpenRouter free route error (${response.status})`);
   const content=data?.choices?.[0]?.message?.content||"{}";
   try{return JSON.parse(content)}catch{
-    const m=String(content).match(/\\{[\\s\\S]*\\}/);
+    const m=String(content).match(/\{[\s\S]*\}/);
     if(m)return JSON.parse(m[0]);
     throw new Error("Free model did not return valid JSON.");
   }
@@ -6597,6 +6597,34 @@ async function handleMediaStatus(_req, res) {
 }
 
 
+// What the Plugins page shows: the real on/off state of each add-on, read from configuration.
+// null = that half doesn't exist for this plugin.
+function pluginStatus(env = process.env) {
+  const hermesOn = require("./hermes-chat").configured(env);
+  const fs = require("fs"), path = require("path");
+  let skillCount = 0;
+  try { skillCount = fs.readdirSync(path.join(__dirname, "hermes/skills/superpowers"), { withFileTypes: true }).filter(d => d.isDirectory()).length; } catch {}
+  const jev = require("./api-intelligence-pipeline").aiSettings(env);
+  const jevOn = Boolean(jev.enabled && jev.jevKey && jev.scaleDownKey);
+  let videoOn = false; try { videoOn = require("./hyperframes-video").configured(env); } catch {}
+  const off = why => ({ on: false, why });
+  return {
+    skills: skillCount,
+    installed: [
+      { id: "superpowers", name: "Superpowers", source: "obra/superpowers", tag: "bundled", about: `${skillCount} working methods Hermes follows: brainstorming, planning, debugging, verifying before saying "done".`, kairoq: null, hermes: hermesOn ? { on: true } : off("Hermes isn't connected") },
+      { id: "memory", name: "Memory", tag: "built in", about: "Remembers you across chats and searches every past conversation.", kairoq: { on: true }, hermes: hermesOn ? { on: true } : off("Hermes isn't connected") },
+      { id: "jev", name: "Jev API pipeline", source: "claude-x-jev", about: "Reads API docs and suggests the next step in API Studio.", kairoq: jevOn ? { on: true } : off(jev.enabled ? "Needs TYPESAFE_API_KEY and SCALEDOWN_API_KEY" : "Set KAIROQ_API_INTELLIGENCE=on and the Typesafe and ScaleDown keys"), hermes: null },
+      { id: "hyperframes", name: "HyperFrames", about: "Turns a script into a short video made from HTML scenes.", kairoq: videoOn ? { on: true } : off("Needs KAIROQ_HYPERFRAMES=on and the renderer installed"), hermes: null },
+      { id: "dashi", name: "dashi-ppt", about: "Makes slide decks. Kairoq's own slide maker is used until dashi's licence is reviewed.", kairoq: off("Waiting on licence review"), hermes: null },
+    ],
+    catalog: [
+      { id: "understand-anything", name: "Understand-Anything", for: "Hermes", about: "Maps a codebase or a folder of documents so you can ask questions about it.", url: "https://github.com/search?q=Understand-Anything&type=repositories" },
+      { id: "mem0", name: "Mem0", for: "Hermes", about: "A second, larger memory store for facts about customers and projects.", url: "https://github.com/mem0ai/mem0" },
+      { id: "ruflo", name: "Ruflo", for: "Kairoq + Hermes", about: "Runs several agents together on one bigger task.", url: "https://github.com/search?q=ruflo&type=repositories" },
+    ],
+  };
+}
+
 async function handleModels(_req, res) {
   try {
     const models = await getModels();
@@ -7302,6 +7330,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/media/jobs") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobsList(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/create") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobCreate(req,res); }
   if (req.method === "POST" && url === "/api/media/jobs/retry") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return handleMediaJobRetry(req,res); }
+  if (req.method === "GET" && url === "/api/plugins") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,pluginStatus()); }
   if (req.method === "GET" && url === "/api/hermes/status") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,await require("./hermes-chat").health()); }
   if (req.method === "POST" && url === "/api/chat/stream") return handleChat(req, res);
   if (req.method === "GET") return serveStatic(req, res);
