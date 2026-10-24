@@ -30,6 +30,28 @@ Hermes. Skills that assume a terminal, git or sub-agents (worktrees, subagent-dr
 development, finishing a branch) can only be followed as advice here, because chat Hermes
 has no shell. Hermes' own bundled skills are also available.
 
+## Memory and self-learning
+
+Hermes keeps its own long-term memory and learns new skills by itself. Both live on the
+service's volume (`/opt/data`), so they survive restarts and redeploys.
+
+- **Memory:** `memories/USER.md` (what it knows about you) and `memories/MEMORY.md` (its own
+  notes). Every 4 messages a background review saves anything worth remembering. Saying
+  "remember that…" makes it save right away. Every new chat starts with this memory loaded.
+- **Self-learning:** when a reply takes 5 or more tool steps, a background review decides
+  whether the approach is worth keeping and writes it as a new skill in `/opt/data/skills`.
+  Learned skills show up in later chats next to Superpowers and Hermes' bundled skills.
+- Settings: `memory.nudge_interval` and `skills.creation_nudge_interval` in
+  `hermes/config.yaml`. Writes are not held for approval (`write_approval: false`), because
+  nobody is at a terminal to approve them.
+- Memory is shared by all of the owner's chats (one Hermes home, one owner). Ask Hermes
+  "what do you remember about me?" to see it.
+
+Checked locally on Hermes v2026.9.24 with a scripted model, using Kairoq's own client:
+after 4 turns the review saved a fact to `USER.md`, and a brand-new chat had it in its
+prompt; a 6-step reply triggered a skill review that saved `booking-inquiry-triage`, which
+the next chat listed. Real models decide for themselves what is worth saving.
+
 ## What Hermes is allowed to do
 
 Set in `hermes/config.yaml`, which is re-installed on every boot so nothing at runtime can

@@ -46,6 +46,19 @@ platform_toolsets:
 skills:
   external_dirs:
     - "${KAIROQ_SKILLS_DIR}"
+  # Self-learning: after a reply that took 5+ tool steps, a background review decides whether
+  # the approach is worth saving as a new skill (written to /opt/data/skills, which persists).
+  creation_nudge_interval: 5
+  write_approval: false
+
+# Long-term memory (MEMORY.md = Hermes' notes, USER.md = what it knows about the owner), kept
+# on the volume and loaded into every new chat. Every 4 messages a background review saves
+# anything worth remembering; Hermes can also save on its own when asked to remember.
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  write_approval: false
+  nudge_interval: 4
 
 # Listen on every interface (IPv4 and, where available, IPv6) so Railway's
 # private network and health check both reach it. Access still needs the key.

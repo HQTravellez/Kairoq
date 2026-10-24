@@ -163,3 +163,17 @@ test("the Superpowers skill library ships with Hermes, complete and licensed", (
   assert.match(docker, /COPY hermes\/skills \/opt\/kairoq\/skills/);
   assert.match(docker, /chmod -R a\+rX,go-w \/opt\/kairoq\/skills/);
 });
+
+test("Hermes remembers and learns on its own, without approvals nobody can give", () => {
+  const yaml = fs.readFileSync(path.join(__dirname, "../hermes/config.yaml"), "utf8");
+  const memory = yaml.split("\nmemory:\n")[1].split("\n\n")[0];
+  assert.match(memory, /memory_enabled: true/);
+  assert.match(memory, /user_profile_enabled: true/);
+  assert.match(memory, /write_approval: false/);
+  assert.match(memory, /nudge_interval: [1-9]\b/);
+  const skills = yaml.split("\nskills:\n")[1].split("\n\n")[0];
+  assert.match(skills, /creation_nudge_interval: [1-9]\b/);
+  assert.match(skills, /write_approval: false/);
+  const allowed = /api_server: \[([^\]]+)\]/.exec(yaml)[1];
+  for (const t of ["memory", "session_search", "skills"]) assert.match(allowed, new RegExp(`\\b${t}\\b`));
+});
