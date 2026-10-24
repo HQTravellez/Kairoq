@@ -1,0 +1,32 @@
+name: Gallery and Python integration lab
+on:
+  push:
+    paths:
+      - 'public/app.js'
+      - 'public/home.css'
+      - 'integration-lab/python-bridges.js'
+      - 'test/python-bridges.test.js'
+      - 'test/gallery-card.test.js'
+      - '.github/workflows/gallery-python-bridges.yml'
+  pull_request:
+    paths:
+      - 'public/app.js'
+      - 'public/home.css'
+      - 'integration-lab/python-bridges.js'
+      - 'test/python-bridges.test.js'
+      - 'test/gallery-card.test.js'
+      - '.github/workflows/gallery-python-bridges.yml'
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --check public/app.js && node --check integration-lab/python-bridges.js
+      - run: node --test test/gallery-card.test.js test/python-bridges.test.js test/integration-lab.test.js
