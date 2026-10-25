@@ -28,7 +28,7 @@ function exportFiles(id){
  const source=builder.loadFiles(id,meta.current_version),pkg=require('./package.json').dependencies;
  const out={
   'package.json':JSON.stringify({name:slug(meta.name),private:true,version:'1.0.0',type:'module',scripts:{dev:'vite',build:'vite build',preview:'vite preview'},
-   dependencies:usedDependencies(source,pkg),
+   dependencies:Object.fromEntries(Object.entries({...usedDependencies(source,pkg),'react-router-dom':pkg['react-router-dom']}).sort()), // kairoq.js uses react-router-dom (Router)
    devDependencies:{vite:pkg.vite,'@vitejs/plugin-react':pkg['@vitejs/plugin-react'],tailwindcss:pkg.tailwindcss}},null,2)+'\n',
   'vite.config.js':"import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nimport { fileURLToPath } from 'node:url';\n\nexport default defineConfig({\n  base: './',\n  plugins: [react()],\n  resolve: { alias: [\n    { find: /^kairoq\\/3d$/, replacement: fileURLToPath(new URL('./src/kairoq-3d.js', import.meta.url)) },\n    { find: /^kairoq\\/scene$/, replacement: fileURLToPath(new URL('./src/kairoq-scene.js', import.meta.url)) },\n    { find: /^kairoq$/, replacement: fileURLToPath(new URL('./src/kairoq.js', import.meta.url)) }\n  ] }\n});\n",
   'tailwind.config.js':"export default {\n  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],\n  // Colours, fonts, radius and shadows come from the CSS variables in src/index.css.\n  theme: "+JSON.stringify(require('./react-design').THEME,null,2).replace(/\n/g,'\n  ')+",\n  plugins: []\n};\n",

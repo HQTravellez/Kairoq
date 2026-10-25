@@ -43,6 +43,8 @@ function withContent(html,meta,rel){
  if(!page||!page.html)return html;
  return html.replace('<div id="root"></div>',()=>'<div id="root">'+page.html+'</div>');
 }
+// The title and description a page showed (for that page's own search result).
+function pageMeta(meta,rel){const s=read(meta);const page=s&&s.pages.find(p=>p.path===normalPath(rel));return page?{title:page.title,description:page.description}:null}
 function pages(meta){const s=read(meta);return s?s.pages.map(p=>p.path):[]}
 // The live pages' text, for writing about the business (suggestions, launch kit).
 function pageText(meta,max=9000){const s=read(meta);return s&&s.pages.length?s.pages.map(p=>'## '+(p.h1||p.title||p.path)+'\n'+p.text).join('\n\n').slice(0,max):''}
@@ -120,4 +122,4 @@ function save(id,{business,faq}){
  builder.saveMeta(meta);
  return meta;
 }
-module.exports={snapshot,withContent,pages,pageText,jsonLd,llmsTxt,status,suggest,save,cleanBusiness,cleanFaq,cleanHtml,normalPath,TYPES};
+module.exports={snapshot,withContent,pageMeta,pages,pageText,jsonLd,llmsTxt,status,suggest,save,cleanBusiness,cleanFaq,cleanHtml,normalPath,TYPES};

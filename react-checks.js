@@ -23,7 +23,8 @@ function normalize(c){
  if(!steps.length)throw Object.assign(Error('A check needs at least one step'),{status:400});
  if(!steps.some(s=>s.action==='expect'))throw Object.assign(Error('A check needs at least one "expect" step that proves the flow worked'),{status:400});
  const p=String(c.path||'');
- return{name,path:/^#[\w\-/?=&%.]*$/.test(p)?p.slice(0,200):'',steps};
+ // "#/booking" (older apps) or a real page address "/booking" (opened inside the app's folder).
+ return{name,path:/^#[\w\-/?=&%.]*$/.test(p)?p.slice(0,200):/^\/?[\w\-/]+$/.test(p)?p.replace(/^\/+/,'').slice(0,200):'',steps};
 }
 function list(meta){return Array.isArray(meta.checks)?meta.checks:[]}
 // Adds a check, or replaces the one with the same name.
@@ -109,7 +110,7 @@ function promptNote(meta){
 
 // Turns a plain-English description into check steps using the model, from the app's visible text.
 const WRITE_PROMPT=`You write automated browser checks for a web app. Given a description of a flow and the app's current source, return the steps a test browser should take, ending with "expect" steps that prove the flow worked.
-Respond with ONLY JSON: {"name":"short name","path":"#/optional-hash-route","steps":[...]}
+Respond with ONLY JSON: {"name":"short name","path":"optional page address like /booking","steps":[...]}
 Steps: {"action":"click","text":"Book now"} {"action":"fill","label":"Email","value":"ana@example.com"} {"action":"select","label":"Room","value":"Suite"} {"action":"press","key":"Enter"} {"action":"expect","text":"Thank you"} {"action":"goto","path":"#/rooms"} {"action":"wait","ms":500}. Target elements by the exact visible text, label or placeholder in the source. Use realistic test data (test-<word>@example.com emails). At most 20 steps.`;
 async function write(id,description,{callModel,tier='standard',signal,version}){
  const meta=builder.loadMeta(id),files=builder.loadFiles(id,version||meta.current_version);

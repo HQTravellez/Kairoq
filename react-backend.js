@@ -591,7 +591,9 @@ function ownerDelete(id,recordId){const d=database(id),row=d.prepare('SELECT col
 
 // ---------- browser client (virtual module "kairoq") ----------
 function clientSource(projectId,apiOrigin='',version=0,appUrl=''){
- return `const BASE=${JSON.stringify(apiOrigin.replace(/\/$/,'')+'/api/apps/'+projectId)};
+ return `import * as React from 'react';
+import { BrowserRouter } from 'react-router-dom';
+const BASE=${JSON.stringify(apiOrigin.replace(/\/$/,'')+'/api/apps/'+projectId)};
 const APP_URL=${JSON.stringify(String(appUrl||''))};
 // Inside a native (Capacitor) app the page is https://localhost, so links that come back to
 // the app (password reset, Google sign-in) go to its published web address instead.
@@ -746,7 +748,24 @@ export const ai={
   // A visitor's thumbs-down: the question goes on the owner's "could not answer" list.
   async feedback(question,helpful){return call('/ai/feedback',{method:'POST',body:{question,helpful}})}
 };
-export default{auth,collection,storage,email,payments,functions,ai};
+// Real page addresses (site.com/services), so search engines see every page. The app can live
+// under a folder (the preview, /sites/<name>/) or at the root of its own domain: basename is
+// worked out from where this file was loaded (<base>/assets/...), so links work everywhere.
+export const basename=(()=>{try{return new URL('..',import.meta.url).pathname.replace(/\\/+$/,'')}catch{return''}})();
+// <Router> wraps the routes: React Router with the right basename. Old "#/services" links
+// (from before real addresses) are moved to "/services" before the first page shows.
+export function Router({children}){
+ try{const h=location.hash;if(/^#\\/./.test(h))history.replaceState(history.state,'',basename+h.slice(1))}catch{}
+ return React.createElement(BrowserRouter,{basename},children);
+}
+// Each page sets its own title and description for search results and link previews.
+export function usePageMeta({title,description}={}){
+ React.useEffect(()=>{
+  if(title)document.title=title;
+  if(description){let m=document.querySelector('meta[name="description"]');if(!m){m=document.createElement('meta');m.setAttribute('name','description');document.head.appendChild(m)}m.setAttribute('content',description)}
+ },[title,description]);
+}
+export default{auth,collection,storage,email,payments,functions,ai,Router,usePageMeta,basename};
 `;
 }
 

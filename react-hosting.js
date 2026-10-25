@@ -116,8 +116,10 @@ function siteBase(req,basePath){
 }
 // Adds title, description, canonical and social share tags to the published page.
 function withSeo(html,meta,base,rel=''){
- const seo=meta.seo||{},title=seo.title||meta.name,desc=seo.description||'';
  const search=require('./site-search');
+ // Each page keeps the title and description it set itself (usePageMeta); the home page uses the SEO settings.
+ const own=rel&&rel!=='index.html'?search.pageMeta(meta,rel):null;
+ const seo=meta.seo||{},title=own&&own.title||seo.title||meta.name,desc=own&&own.description||seo.description||'';
  const ogFile=path.join(builder.projectDir(meta.id),'og.png');
  const image=seo.image?new URL(seo.image,base).toString():fs.existsSync(ogFile)?base+'og-image.png':'';
  const pageUrl=base+(rel&&rel!=='index.html'?String(rel).replace(/^\/+/,''):'');
@@ -154,7 +156,7 @@ function serveProject(req,res,id,rest,sandbox,basePath='/'){
  const page=(req.method==='GET'||req.method==='HEAD')&&(!path.extname(rel)||rel.endsWith('.html'));
  if(page&&fs.existsSync(path.join(dist,'index.html'))&&(!rel||rel==='index.html'||!fs.existsSync(path.join(dist,rel)))){
   require('./react-analytics').record(id,req);
-  const html=withPwa(withSeo(fs.readFileSync(path.join(dist,'index.html'),'utf8'),meta,base,rel),meta);
+  const html=builder.absoluteAssets(withPwa(withSeo(fs.readFileSync(path.join(dist,'index.html'),'utf8'),meta,base,rel),meta),basePath);
   builder.sendText(req,res,200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Content-Security-Policy':builder.contentPolicy(sandbox)},html);
   return true;
  }
