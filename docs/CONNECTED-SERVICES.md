@@ -61,3 +61,24 @@ The following go into the product plan as features to build in Kairoq's own way:
 
 Their code is not used. Dify's licence forbids running it as a multi-user online service without
 written permission, and Maxun's AGPL licence would require publishing Kairoq's own code.
+
+## 3D models (Blender and Poly Haven)
+
+In the app builder: **Design → 3D models**.
+
+- **Upload** a `.glb` (up to 25 MB), or with Blender on the server a `.fbx`, `.obj`, `.stl`,
+  `.ply`, `.blend` or a `.zip` holding a `.gltf` with its files (up to 60 MB). Blender turns it
+  into one GLB, makes models over 200,000 triangles lighter, shrinks textures to 2048 px and
+  renders a preview picture. Scripts inside files never run.
+- **Poly Haven**: search free (CC0) models and HDRI lighting and add one with a tap. Kairoq packs
+  the model into one GLB and uses Poly Haven's picture as its preview.
+- **3D style**: the look step before the first build asks "Add 3D?" (product viewer, room
+  walkthrough, scroll story, 3D background). With a style and no model, Kairoq adds a fitting
+  Poly Haven model before the build.
+- Apps show models with `import { Model3D } from 'kairoq/3d'` (Google model-viewer): drag to
+  turn, pinch to zoom, "View in your room" (AR) on phones, the preview picture while loading,
+  on phones without 3D, and for people who prefer reduced motion.
+
+Railway: Blender is in the image by default (about 1 GB). Build with `KAIROQ_BLENDER_INSTALL=off`
+to leave it out; uploads are then `.glb` only and previews are made in the owner's browser.
+`KAIROQ_POLYHAVEN=off` hides Poly Haven.

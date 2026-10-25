@@ -7,7 +7,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {DatabaseSync}=require('node:sqlite');
 const builder=require('./react-builder');
 
-const ACCESS=['private','shared','public-read','public','submit-only'];
+const ACCESS=['private','shared','public-read','public','submit-only','managed'];
 const MAX_RECORD_BYTES=20000,MAX_RECORDS=10000,MAX_USERS=10000,LIST_LIMIT=200,SESSION_DAYS=30;
 const dbs=new Map();
 
@@ -25,7 +25,13 @@ function normalizeConfig(cfg){
   if(!/^[a-z][a-z0-9_]{0,39}$/.test(name))throw Error('Collection name "'+name+'" must be lowercase letters, numbers or _ (max 40).');
   const access=typeof def==='string'?def:def&&def.access;
   if(!ACCESS.includes(access))throw Error('Collection "'+name+'" needs "access": one of '+ACCESS.join(', ')+'.');
-  collections[name]={access};
+  // submit-only forms may name a few fields anyone can read back (never names, emails or
+  // phones), e.g. the date and time of each booking, so a booking page can grey out taken slots.
+  const pub=def&&typeof def==='object'&&Array.isArray(def.public_fields)?def.public_fields:[];
+  if(pub.length&&access!=='submit-only')throw Error('Collection "'+name+'": public_fields only applies to "submit-only" collections.');
+  if(pub.length>6||pub.some(f=>typeof f!=='string'||!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(f)))throw Error('Collection "'+name+'": public_fields is a list of up to 6 field names, e.g. ["date","time"].');
+  if(pub.some(f=>/name|email|phone|mobile|address|note|message|card|password/i.test(f)))throw Error('Collection "'+name+'": public_fields must not include personal details (name, email, phone, address, notes).');
+  collections[name]=pub.length?{access,public_fields:pub}:{access};
  }
  if(Object.keys(collections).length>30)throw Error('src/backend.json can declare up to 30 collections.');
  return{collections,...require('./react-backend-extras').normalizeExtras(cfg,collections)};
@@ -144,8 +150,19 @@ function currentUser(db,req){
 }
 
 // ---------- records ----------
-function canRead(access,user){if(access==='submit-only')return false;return access==='public'||access==='public-read'||!!user}
-function canCreate(access,user){return access==='public'||access==='submit-only'||!!user}
+function canRead(access,user){if(access==='submit-only')return false;return access==='public'||access==='public-read'||access==='managed'||!!user}
+function canCreate(access,user,manager=false){if(access==='managed')return manager;return access==='public'||access==='submit-only'||!!user}
+// "managed" collections (menus, prices, services, opening hours): anyone reads, only the app's
+// managers add, change or delete. Managers are the emails in the project's app_managers, or the
+// Kairoq account that owns the app (KAIROQ_OWNER_EMAIL for the server owner's apps).
+function managerEmails(meta){
+ const list=Array.isArray(meta&&meta.app_managers)?meta.app_managers:[];
+ if(list.length)return list.map(e=>String(e).toLowerCase());
+ let owner='';
+ try{owner=meta.owner==='owner'?String(process.env.KAIROQ_OWNER_EMAIL||''):String((require('./builder-accounts').database().prepare('SELECT email FROM accounts WHERE id=?').get(meta.owner)||{}).email||'')}catch{}
+ return owner?[owner.toLowerCase()]:[];
+}
+function isManager(meta,user){return Boolean(user&&user.email&&managerEmails(meta).includes(String(user.email).toLowerCase()))}
 function visibleWhere(access,user){return access==='private'?{sql:' AND owner_id=?',args:[user.id]}:{sql:'',args:[]}}
 function cleanData(data){
  if(!data||typeof data!=='object'||Array.isArray(data))throw fail(400,'Record data must be an object');
@@ -168,6 +185,10 @@ function list(db,access,collection,user,query){
   items=items.filter(it=>Object.entries(where).every(([k,val])=>JSON.stringify(it[k])===JSON.stringify(val))).slice(0,limit)}
  return items;
 }
+// Only the named fields of each record, newest first, without ids or who sent them.
+function publicFields(db,collection,fields){
+ return db.prepare('SELECT data FROM records WHERE collection=? ORDER BY created_at DESC LIMIT ?').all(collection,MAX_RECORDS).map(r=>{let d={};try{d=JSON.parse(r.data)}catch{}const o={};for(const f of fields)if(d[f]!==undefined&&(typeof d[f]!=='object'||d[f]===null))o[f]=d[f];return o}).filter(o=>Object.keys(o).length);
+}
 function getOne(db,access,collection,user,id){
  if(access==='submit-only')throw fail(403,'Entries in this collection are private to the app owner');
  if(!canRead(access,user))throw fail(401,'Sign in to view this record');
@@ -175,8 +196,8 @@ function getOne(db,access,collection,user,id){
  if(!r||(access==='private'&&r.owner_id!==user.id))throw fail(404,'Record not found');
  return record(r);
 }
-function create(db,access,collection,user,data){
- if(!canCreate(access,user))throw fail(401,'Sign in to add records');
+function create(db,access,collection,user,data,manager=false){
+ if(!canCreate(access,user,manager))throw fail(access==='managed'?403:401,access==='managed'?'Only the app\'s managers can add these':'Sign in to add records');
  if(db.prepare('SELECT COUNT(*) n FROM records WHERE collection=?').get(collection).n>=MAX_RECORDS)throw fail(403,'This collection is full');
  const id=crypto.randomUUID(),at=new Date().toISOString();
  db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id,collection,user?user.id:null,cleanData(data),at,at);
@@ -184,22 +205,23 @@ function create(db,access,collection,user,data){
  publish(db,collection,'created',created,user?user.id:null);
  return created;
 }
-function ownRecord(db,collection,user,id){
+function ownRecord(db,collection,user,id,{access,manager=false}={}){
  if(!user)throw fail(401,'Sign in first');
  const r=db.prepare('SELECT * FROM records WHERE id=? AND collection=?').get(id,collection);
  if(!r)throw fail(404,'Record not found');
+ if(access==='managed'){if(!manager)throw fail(403,'Only the app\'s managers can change these');return r}
  if(r.owner_id!==user.id)throw fail(403,'You can only change your own records');
  return r;
 }
-function update(db,collection,user,id,data){
- const r=ownRecord(db,collection,user,id);
+function update(db,collection,user,id,data,opts={}){
+ const r=ownRecord(db,collection,user,id,opts);
  const merged={...JSON.parse(r.data),...JSON.parse(cleanData(data))};
  db.prepare('UPDATE records SET data=?,updated_at=? WHERE id=?').run(cleanData(merged),new Date().toISOString(),id);
  const updated=record(db.prepare('SELECT * FROM records WHERE id=?').get(id));
  publish(db,collection,'updated',updated,r.owner_id);
  return updated;
 }
-function remove(db,collection,user,id){const r=ownRecord(db,collection,user,id);db.prepare('DELETE FROM records WHERE id=?').run(id);publish(db,collection,'deleted',{id},r.owner_id);return{deleted:id}}
+function remove(db,collection,user,id,opts={}){const r=ownRecord(db,collection,user,id,opts);db.prepare('DELETE FROM records WHERE id=?').run(id);publish(db,collection,'deleted',{id},r.owner_id);return{deleted:id}}
 
 // ---------- HTTP: /api/apps/<id>/... ----------
 const hits=new Map();
@@ -384,7 +406,7 @@ async function handle(req,res,{onlyProject}={}){
   if(route==='/referrals/claim'&&req.method==='POST'){if(!user)throw fail(401,'Sign in first');return send(res,200,{claimed:require('./app-referrals').claim(db,user.id,(await readJson(req,1000)).code)}),true}
   if(route==='/auth/signin'&&req.method==='POST')return send(res,200,await signIn(db,await readJson(req))),true;
   if(route==='/auth/signout'&&req.method==='POST'){const t=/^Bearer (.+)$/.exec(String(req.headers.authorization||''));if(t)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(t[1]));return send(res,200,{ok:true}),true}
-  if(route==='/auth/user'&&req.method==='GET')return send(res,200,{user:publicUser(user)}),true;
+  if(route==='/auth/user'&&req.method==='GET')return send(res,200,{user:user?{...publicUser(user),manager:isManager(meta,user)}:null}),true;
   if(route==='/auth/google/start'&&req.method==='GET'){
    const back=require('./react-backend-extras').allowedReturn(u.searchParams.get('return'),req,meta);
    const url=require('./google-oauth').startUrl({kind:'app',appId:id,returnUrl:back.toString()},'http://'+String(req.headers.host||'localhost'));
@@ -467,11 +489,14 @@ async function handle(req,res,{onlyProject}={}){
   const collection=c[1],rid=c[2],def=Object.hasOwn(cfg.collections,collection)?cfg.collections[collection]:undefined;
   if(!def)throw fail(404,'Collection "'+collection+'" is not declared in src/backend.json');
   const q=Object.fromEntries(u.searchParams);
+  const manager=def.access==='managed'&&isManager(meta,user),opts={access:def.access,manager};
+  // A submit-only form with public_fields: anyone lists only those fields (e.g. taken slots).
+  if(!rid&&req.method==='GET'&&def.access==='submit-only'&&def.public_fields)return send(res,200,{items:publicFields(db,collection,def.public_fields)}),true;
   if(!rid&&req.method==='GET')return send(res,200,{items:list(db,def.access,collection,user,q)}),true;
-  if(!rid&&req.method==='POST')return send(res,201,{item:create(db,def.access,collection,user,(await readJson(req)).data)}),true;
+  if(!rid&&req.method==='POST')return send(res,201,{item:create(db,def.access,collection,user,(await readJson(req)).data,manager)}),true;
   if(rid&&req.method==='GET')return send(res,200,{item:getOne(db,def.access,collection,user,rid)}),true;
-  if(rid&&req.method==='PATCH')return send(res,200,{item:update(db,collection,user,rid,(await readJson(req)).data)}),true;
-  if(rid&&req.method==='DELETE')return send(res,200,remove(db,collection,user,rid)),true;
+  if(rid&&req.method==='PATCH')return send(res,200,{item:update(db,collection,user,rid,(await readJson(req)).data,opts)}),true;
+  if(rid&&req.method==='DELETE')return send(res,200,remove(db,collection,user,rid,opts)),true;
   throw fail(405,'Method not allowed');
  }catch(e){
   const status=Number.isInteger(e.status)?e.status:422;
@@ -736,4 +761,4 @@ async function runAllSchedules(options){
 }
 // Every due automation on every app (called every minute by the server).
 function runAllAutomations(options){return require('./react-automations').tick(options)}
-module.exports={hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,ownerClearNutritionRecords,ownerRemoveAppUser,database,close,ACCESS};
+module.exports={managerEmails,isManager,publicFields,hasTable,pgSchema,functionDb,openFile,closeFile,googleAppSignIn,configure,appAi,runAllSchedules,runAllAutomations,runFunction,liveConfig,handle,parseConfig,configErrors,clientSource,overview,ownerRecords,ownerDelete,ownerClearNutritionRecords,ownerRemoveAppUser,database,close,ACCESS};

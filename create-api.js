@@ -64,6 +64,7 @@ function ownedProject(v,id,need='owner'){
 }
 const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
+ 'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
@@ -341,13 +342,15 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    else if(mode==='agent'){
     let extra='';
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
-    const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',context,extra].filter(Boolean).join('\n\n');
+    const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra].filter(Boolean).join('\n\n');
     job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
      onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
    else{
-    const assetNote=[images.length||context?require('./react-assets').note(id):'',context].filter(Boolean).join('\n\n');
+    // A 3D style was picked without a model: add a fitting free one first (react-models.js).
+    if(mode==='build'){const meta3=builder.loadMeta(id);if(meta3.three_d&&meta3.three_d.style!=='none'&&!meta3.three_d.auto_tried){update({status:'assets'});await require('./react-models').autoModel(id,message,{callModel,signal}).catch(e=>{if(signal.aborted)throw e;console.warn('[3d] auto model: '+String(e.message||e).slice(0,200))})}}
+    const assetNote=[images.length||context?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context].filter(Boolean).join('\n\n');
     const fast=quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
     job.result=await builder.edit(id,message,{...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // The first build of a new project on Pro or Max gets a free design review.
@@ -1166,6 +1169,8 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const b=await readJson(req,12000),meta=builder.loadMeta(id);
    if(meta.design)throw Object.assign(Error('This app already has its look. Ask for colour or font changes in the chat.'),{status:409});
    meta.planned_design=require('./looks').toDesign(b.look,{request:String(b.prompt||'').slice(0,4000),projectName:meta.name});
+   // The 3D style picked with the look (react-models.js STYLES).
+   const style=String(b.three_d||'');if(style&&style!=='none'&&require('./react-models').STYLES[style])meta.three_d={style,at:new Date().toISOString()};
    builder.saveMeta(meta);
    return send(res,200,{design:meta.planned_design}),true;
   }
@@ -1219,6 +1224,31 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}
   if(action==='/asset'&&method==='GET'){const file=require('./react-assets').read(id,new URL(req.url,'http://x').searchParams.get('name'));if(!file)throw Object.assign(Error('Unknown image'),{status:404});res.writeHead(200,{'Content-Type':file.type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'});res.end(file.bytes);return true}
+  // 3D models (react-models.js): upload (raw bytes, ?op=upload&name=), Poly Haven search and add,
+  // a preview picture made in the browser, the chosen 3D style, remove, and the files themselves.
+  if(action==='/models'){
+   const M=require('./react-models'),q=new URL(req.url,'http://x').searchParams;
+   const state=()=>{const meta=builder.loadMeta(id);return{models:M.list(id),style:(meta.three_d&&meta.three_d.style)||'none',styles:Object.entries(M.STYLES).map(([k,s])=>({id:k,label:s.label})),blender:require('./blender').available(),polyhaven:process.env.KAIROQ_POLYHAVEN!=='off'}};
+   if(method==='GET')return send(res,200,state()),true;
+   if(method==='DELETE'){const b=await readJson(req,2000);M.remove(id,String(b.file||''));return send(res,200,state()),true}
+   const op=q.get('op')||'';
+   if(op==='upload'){
+    if(limited(req,'model-upload',30,3600000))throw Object.assign(Error('Too many uploads. Wait a while.'),{status:429});
+    const bytes=await readRaw(req,61*1024*1024);const model=await M.upload(id,String(q.get('name')||'model.glb').slice(0,140),bytes);
+    return send(res,201,{added:model,...state()}),true;
+   }
+   if(op==='poster'){const bytes=await readRaw(req,3*1024*1024+1);return send(res,200,{model:M.setPoster(id,String(q.get('file')||''),bytes),...state()}),true}
+   const b=await readJson(req,4000);
+   if(op==='style'){if(!M.STYLES[b.style])throw Object.assign(Error('Unknown 3D style'),{status:400});const meta=builder.loadMeta(id);meta.three_d={style:b.style,at:new Date().toISOString()};builder.saveMeta(meta);return send(res,200,state()),true}
+   if(process.env.KAIROQ_POLYHAVEN==='off')throw Object.assign(Error('Poly Haven is switched off on this server'),{status:409});
+   if(op==='search')return send(res,200,{results:await M.searchPolyHaven(b.query,{kind:b.kind==='environment'?'environment':'model'})}),true;
+   if(op==='polyhaven'){
+    if(limited(req,'model-polyhaven',40,3600000))throw Object.assign(Error('Too many downloads. Wait a while.'),{status:429});
+    return send(res,201,{added:await M.addPolyHaven(id,b.id,{kind:b.kind==='environment'?'environment':'model'}),...state()}),true;
+   }
+   throw Object.assign(Error('Unknown 3D action'),{status:400});
+  }
+  if(action==='/model'&&method==='GET'){const file=require('./react-models').read(id,new URL(req.url,'http://x').searchParams.get('file'));if(!file)throw Object.assign(Error('Unknown 3D file'),{status:404});res.writeHead(200,{'Content-Type':file.type,'Content-Length':file.bytes.length,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'});res.end(file.bytes);return true}
   if(action==='/sql'&&method==='GET')return send(res,200,require('./react-sql').overview(builder.projectDir(id))),true;
   if(action==='/sql'&&method==='POST'){
    // The owner's SQL console. Queries run in a SQL process that is killed if they overrun.
@@ -1494,7 +1524,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/database'&&method==='DELETE')return send(res,200,{database:require('./app-database').disconnect(id)}),true;
   if(action==='/settings'&&method==='GET'){
    const secrets=require('./project-secrets');
-   return send(res,200,{settings:{secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;
+   return send(res,200,{settings:{app_managers:backend.managerEmails(builder.loadMeta(id)),secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;
   }
   if(action==='/settings'&&method==='POST'){
    const b=await readJson(req,8000),secrets=require('./project-secrets');
@@ -1505,6 +1535,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(value&&!re.test(value))throw Object.assign(Error('That '+name.replace(/_/g,' ')+' does not look right'),{status:400});
     secrets.set(id,name,value||null);
    }
+   // Who can change the app's "managed" collections (menus, prices, services): their emails.
+   if(b.app_managers!==undefined){
+    const list=String(b.app_managers||'').split(/[\s,;]+/).map(e=>e.trim().toLowerCase()).filter(Boolean);
+    if(list.length>20||list.some(e=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)))throw Object.assign(Error('App managers: up to 20 email addresses, separated by commas'),{status:400});
+    const m=builder.loadMeta(id);if(list.length)m.app_managers=[...new Set(list)];else delete m.app_managers;builder.saveMeta(m);
+   }
    // Which engine writes this app's changes: Kairoq's own, or OpenCode (beta) when it is installed.
    if(b.engine!==undefined){
     const engine=String(b.engine);
@@ -1512,7 +1548,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(engine==='opencode'&&!require('./opencode-engine').available())throw Object.assign(Error('OpenCode is not installed on this server (Railway variable KAIROQ_OPENCODE=on).'),{status:409});
     const m=builder.loadMeta(id);if(engine==='opencode')m.engine='opencode';else delete m.engine;builder.saveMeta(m);
    }
-   return send(res,200,{settings:{secrets:secrets.status(id),engine:builder.loadMeta(id).engine||'kairoq'}}),true;
+   return send(res,200,{settings:{secrets:secrets.status(id),engine:builder.loadMeta(id).engine||'kairoq',app_managers:backend.managerEmails(builder.loadMeta(id))}}),true;
   }
   if(action==='/download'&&method==='GET'){
    const meta=builder.loadMeta(id),bytes=require('./react-export').zip(id);
