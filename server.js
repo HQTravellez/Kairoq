@@ -6886,7 +6886,7 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
       onFallback?.(err);opts=rest;
     }
   }
-  if(opts.tier==="chat")return callOpenRouterBuilder(opts,parse);
+  if(opts.tier==="chat")return callChatAnswer(opts,parse);
   // A fast model (Ollama Cloud, see fastBuilder) writes Standard builds first: it streams at
   // once, where the free OpenRouter models wait in line and think silently for minutes.
   const fb=fastBuilder();
@@ -6899,6 +6899,31 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   }
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   return callOpenRouterBuilder(opts,parse);
+}
+// Questions in the builder (Discuss) are answered by chat models, not the code builder chain:
+// the fast model (Ollama Cloud) when set, then the configured free providers, then the free
+// OpenRouter models. One slow or broken provider never leaves a question without an answer.
+async function callChatAnswer(opts,parse){
+  const errors=[],fb=fastBuilder();
+  // Kairoq Agent first when it is connected: the same answers as the main chat.
+  const hermes=require("./hermes-chat");
+  if(hermes.configured()&&process.env.KAIROQ_BUILDER_AGENT_ANSWERS!=="off"){
+    try{
+      const r=await hermes.streamChat({messages:opts.messages,onToken:opts.onToken?(d=>{opts._all=(opts._all||"")+d;opts.onToken(d,opts._all)}):undefined,signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(90000)]):AbortSignal.timeout(90000)});
+      return parse(r.text,"kairoq-agent");
+    }catch(err){if(opts.signal?.aborted)throw err;errors.push("Kairoq Agent: "+String(err.message||err).slice(0,120))}
+  }
+  if(fb){
+    try{return await callFastBuilder(fb,{...opts,maxOutputTokens:Math.min(4000,Number(opts.maxOutputTokens)||1200),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(90000)]):AbortSignal.timeout(90000)},parse)}
+    catch(err){if(opts.signal?.aborted)throw err;errors.push("fast model: "+String(err.message||err).slice(0,120))}
+  }
+  const router=require("./free-provider-router");
+  if(router.candidates().length){
+    try{const r=await router.complete(opts.messages,{temperature:opts.temperature??0.4});opts.onToken?.(r.text,r.text);return parse(r.text,r.provider+"/"+r.model)}
+    catch(err){if(opts.signal?.aborted)throw err;errors.push(String(err.message||err).slice(0,160))}
+  }
+  try{return await callOpenRouterBuilder(opts,parse)}
+  catch(err){if(errors.length)err.message=String(err.message||err)+" | "+errors.join(" | ");throw err}
 }
 // The fast builder model: KAIROQ_BUILDER_FAST_URL/KEY/MODEL, or Ollama Cloud when the chat's
 // OpenAI-compatible route already points there (LOCAL_LLM_BASE_URL=https://ollama.com/v1 with
@@ -6927,7 +6952,7 @@ async function callFastBuilder(fb,opts,parse){
 async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
-  const freeCandidates=[String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free"];
+  const freeCandidates=[...new Set([String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free",...String(process.env.KAIROQ_BUILDER_FREE_FALLBACKS||"").split(",").map(m=>m.trim()).filter(m=>m.endsWith(":free"))])];
   const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
   const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
   let allowPaid=(mode==="premium"||mode==="paid-first") && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";

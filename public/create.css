@@ -780,3 +780,10 @@ body.embed #side,body.embed #side-open-btn{display:none!important}
 .ref-quotes blockquote a{white-space:nowrap;font-size:12px}
 .ref-angle{margin:8px 0 0;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08);font-weight:500}
 .ref-angle:empty{display:none}
+/* Suggested ideas under an answer: one click builds that idea. */
+.idea-list{display:grid;gap:6px;margin-top:10px}
+.q-opt.idea::after{content:"Build";font-size:12px;font-weight:600;color:#6b675e;flex:none}
+.q-opt.idea:hover::after{color:#15140f}
+/* A failed message keeps a Try again button. */
+li.failed .retry{margin-top:8px;padding:6px 12px;border:1px solid #e3e0d8;border-radius:10px;background:#fff;font:600 13px/1 inherit;cursor:pointer}
+li.failed .retry:hover{border-color:#15140f}

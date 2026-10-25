@@ -379,6 +379,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    // so there only browser errors make it free.
    const notWorking=hooks?problem==='errors':problem||(job.result&&job.result.unchanged);
    const unchanged=Boolean(job.result&&job.result.unchanged)&&!problem;
+   // An answer instead of a change (a question that reached the builder) is always free.
+   if(job.result&&job.result.answered&&!job.refunded){job.refunded=true;if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: an answer, nothing was changed','refund:'+job.id)}catch{}}
    if(mode!=='discuss'&&!job.refunded&&payWhenWorks()&&notWorking&&(payMode()==='refund'||unchanged)){
     // Refund mode (or a change that changed nothing): the change itself is free.
     job.free=problem==='checks'?'This change broke a saved check, so it was free.':problem==='errors'?'This change still shows errors in the browser, so it was free.':'Nothing changed, so it was free.';
@@ -423,7 +425,10 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    if(mode!=='discuss')require('./project-thumbs').later(id);
    update({status:'complete'});
   }catch(e){
-   update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
+   const said=require('./builder-errors').plain(e);
+   if(said.busy)console.log('[builder] '+mode+' failed: '+said.raw.slice(0,300));
+   if(!controller.signal.aborted)require('./builder-errors').remember(builder,id,{message,mode,text:said.text});
+   update({status:'failed',error:controller.signal.aborted?'Stopped.':said.text,retry:!controller.signal.aborted,saved:!controller.signal.aborted});
    if(mode!=='discuss'&&!controller.signal.aborted&&e.status===422)try{require('./build-lessons').recordBuild(id,{mode,result:null,error:e.message})}catch{}
    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund for failed '+(mode==='discuss'?'message':'edit'),'refund:'+job.id)}catch{}
   }
@@ -488,7 +493,7 @@ function startAnalysis(v,id,{source,images=[],note='',tier='standard'},{callMode
    job.result={reference:run.view(builder.loadMeta(id))};
    update({status:'complete'});
   }catch(e){
-   update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
+   update({status:'failed',error:signal.aborted?'Stopped.':require('./builder-errors').plain(e).text,retry:!signal.aborted});
    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund for failed reference analysis','refund:'+job.id)}catch{}
   }
   controllers.delete(job.id);job.finished_at=new Date().toISOString();
@@ -553,7 +558,7 @@ async function startSynthetic(v,id,{audience,goal,count,path:start,tier='standar
    }
    update({status:'complete',progress:null});
   }catch(e){
-   update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
+   update({status:'failed',error:signal.aborted?'Stopped.':require('./builder-errors').plain(e).text,retry:!signal.aborted});
    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund: synthetic test did not finish','refund:'+job.id)}catch{}
   }
   controllers.delete(job.id);job.finished_at=new Date().toISOString();
@@ -661,7 +666,7 @@ function startRepair(v,id,{report:rid,rounds=2,rerun=false,tier='standard'},{cal
    job.result={repair:out};
    update({status:'complete',progress:null});
   }catch(e){
-   update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)});
+   update({status:'failed',error:signal.aborted?'Stopped.':require('./builder-errors').plain(e).text,retry:!signal.aborted});
   }
   controllers.delete(job.id);job.finished_at=new Date().toISOString();
   setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
@@ -716,7 +721,7 @@ function startLaunch(v,id,{idea,target,visitors,tier='standard'},{callModel,chec
    }
    job.result={launch:launchView(builder.loadMeta(id))};
    update({status:'complete',progress:null});
-  }catch(e){update({status:'failed',error:signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)})}
+  }catch(e){update({status:'failed',error:signal.aborted?'Stopped.':require('./builder-errors').plain(e).text,retry:!signal.aborted})}
   controllers.delete(job.id);job.finished_at=new Date().toISOString();
   setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
  });
@@ -778,7 +783,7 @@ function startWatch(v,id,deps){
  const controller=new AbortController();controllers.set(job.id,controller);jobs.set(job.id,job);
  setImmediate(async()=>{
   try{update({status:'watching'});const entry=await runWatch(id,{...deps,signal:controller.signal,onProgress:p=>update({status:p.status,progress:p.text})});job.result={watch:entry};update({status:'complete',progress:null})}
-  catch(e){update({status:'failed',error:controller.signal.aborted?'Stopped.':String(e.message||e).slice(0,1200)})}
+  catch(e){update({status:'failed',error:controller.signal.aborted?'Stopped.':require('./builder-errors').plain(e).text,retry:!controller.signal.aborted})}
   controllers.delete(job.id);job.finished_at=new Date().toISOString();
   setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
  });

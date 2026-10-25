@@ -93,7 +93,7 @@ async function waitJob(s,cookie,id){for(let i=0;i<200;i++){const r=await request
 
 test('customers sign up with free credits, spend one per edit and get refunds for failures',async()=>{
  const bad={message:'bad',files:{'src/App.jsx':'export default (\n'}};
- const s=await server((opts,parse)=>reply(/break it/.test([...opts.messages].reverse().find(m=>m.role==='user'&&m.content.includes('Request: ')).content.split('Request: ').pop())?bad:good)(opts,parse));
+ const s=await server((opts,parse)=>reply(/break it/.test([...opts.messages].reverse().find(m=>m.role==='user'&&m.content.includes('Request: ')).content.split('Request: ').pop())?bad:/again/.test([...opts.messages].reverse().find(m=>m.role==='user'&&m.content.includes('Request: ')).content.split('Request: ').pop())?{...good,files:{...good.files,'src/App.jsx':good.files['src/App.jsx']+'\n// again'}}:good)(opts,parse));
  try{
   assert.equal((await request(s,'GET','/api/create/projects')).status,401);
   const signup=await request(s,'POST','/api/create/signup',{body:{email:'Ana@Example.com',password:'correct horse'}});
