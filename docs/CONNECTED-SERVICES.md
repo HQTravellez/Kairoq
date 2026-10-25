@@ -82,3 +82,13 @@ In the app builder: **Design → 3D models**.
 Railway: Blender is in the image by default (about 1 GB). Build with `KAIROQ_BLENDER_INSTALL=off`
 to leave it out; uploads are then `.glb` only and previews are made in the owner's browser.
 `KAIROQ_POLYHAVEN=off` hides Poly Haven.
+
+## three.js pieces (`kairoq/scene`)
+
+Apps import tested 3D pieces built on three.js, React Three Fiber 8 and drei 9:
+`Configurator` (a model with colour or material swatches and prices; only fabric/paint-like
+materials change), `Globe` (dotted continents, places and animated routes), `Particles` (hero
+background), `MiniGame` (a catch game with keyboard, drag and touch) and `Scene3D` (a safe stage
+for custom React Three Fiber scenes). All use studio lighting made on the device (no downloads),
+show a fallback without WebGL, pause off screen and hold still for reduced motion. The browser
+check confirms each one draws.

@@ -100,7 +100,7 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false,fast=false}={}){
 // 3D models (Model3D from 'kairoq/3d', marked data-kq-model): each one must really show, not
 // just its picture, and have a height. Skipped when this browser has no WebGL.
 async function models3d(page){
- if(!await page.locator('[data-kq-model]').count())return null;
+ if(!await page.locator('[data-kq-model],[data-kq-scene]').count())return null;
  const webgl=await page.evaluate(()=>{try{const c=document.createElement('canvas');return Boolean(c.getContext('webgl2')||c.getContext('webgl'))}catch{return false}});
  if(!webgl)return{facts:{webgl:false},problems:[]};
  // Viewers start when they come into view, so bring each one on screen once.
@@ -113,7 +113,20 @@ async function models3d(page){
   else if(!r.viewer)problems.push('3D model '+r.src+' did not load, so only its picture shows. Check the src is one of the project\'s ./models/ files.');
   else if(!r.loaded)problems.push('3D model '+r.src+' took more than 25 seconds to show.');
  }
- return{facts:{webgl:true,models:rows.length,shown:rows.filter(r=>r.loaded).length},problems};
+ // Scenes from kairoq/scene (Scene3D, Configurator, Globe, Particles, MiniGame) must draw a frame.
+ const scenes=await page.evaluate(async()=>{
+  const all=[...document.querySelectorAll('[data-kq-scene]')];
+  for(const e of all){e.scrollIntoView({block:'center'});await new Promise(r=>setTimeout(r,120))}scrollTo(0,0);
+  const t=Date.now();while(Date.now()-t<15000&&all.some(e=>e.dataset.kqScene==='canvas'&&e.dataset.kqDrawn!=='true'))await new Promise(r=>setTimeout(r,250));
+  return all.map(e=>({kind:e.dataset.kqScene,drawn:e.dataset.kqDrawn==='true',height:Math.round(e.getBoundingClientRect().height),hidden:Boolean(e.closest('[aria-hidden=true]'))}));
+ });
+ scenes.forEach((r,k)=>{
+  const name='3D scene '+(k+1);
+  if(r.kind==='fallback')problems.push(name+' showed its fallback although this browser has WebGL. Use the kairoq/scene pieces as documented.');
+  else if(!r.hidden&&r.height<80)problems.push(name+' is only '+r.height+'px tall: give it a fixed height.');
+  else if(!r.drawn)problems.push(name+' did not draw within 15 seconds (check the console errors and the model path).');
+ });
+ return{facts:{webgl:true,models:rows.length,shown:rows.filter(r=>r.loaded).length,scenes:scenes.length,drawn:scenes.filter(r=>r.drawn).length},problems};
 }
 // Whether the page fits a 390 px phone screen without scrolling sideways.
 async function phoneFits(url,sandbox){
