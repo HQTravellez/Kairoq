@@ -1256,12 +1256,14 @@ function renderModelPicker(){
   const hermesRow={id:"hermes/agent",label:"Hermes Agent",disabled:hermesState.configured?(hermesState.ok===false&&hermesState.checked?"Not reachable":""):"Not connected"};
   if(!q||"hermes agent".includes(q))section("Hermes",[pickerRow(hermesRow,{auto:true})]);
   section("Auto",AUTO_MODELS.filter(a=>!q||a.name.toLowerCase().includes(q)).map(a=>pickerRow({id:a.id,label:a.name},{hint:a.hint,auto:true})));
+  // Paid models the owner chose to try (Hermes 4), within their own monthly cap.
+  section("Try (paid, capped)",allModels.filter(m=>m.allowedPaid&&!favorites.includes(m.id)&&match(m)).map(m=>pickerRow(m)));
   const fav=allModels.filter(m=>favorites.includes(m.id)&&match(m));
   section("Favourites",fav.map(m=>pickerRow(m)));
   const groups=new Map();
   for(const m of allModels){
-    if(m.id==="local/auto"||favorites.includes(m.id)||!match(m))continue;
-    if(freeOnlyEl.checked&&!m.isFree&&!m.local)continue; // Free Only: paid models just aren't listed
+    if(m.id==="local/auto"||favorites.includes(m.id)||m.allowedPaid||!match(m))continue;
+    if(freeOnlyEl.checked&&!m.isFree&&!m.local&&!m.allowedPaid)continue; // Free Only: paid models just aren't listed (except the few the owner chose to try)
     if(!q&&(!modelShown(m)||isCopyVariant(m)))continue;
     const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
   }
