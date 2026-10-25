@@ -316,6 +316,8 @@ function messageItem(m,last,index){
   li.append(f);
  }
  if(m.role==='assistant'&&(m.verified||m.tests_added))li.append(verifiedCard(m.verified||{},m.checks,m.tests_added));
+ // What the screenshot review saw (look-check.js): it matched, or what it fixed.
+ if(m.role==='assistant'&&m.look){const d=el('p','look-note');d.append(el('span','vmark',m.look.ok?'✓':'↻'),el('span',null,m.look.ok?'Checked the screenshots: it looks the way you asked.':m.look.fixed?'Checked the screenshots and fixed: '+m.look.problems.join(' '):'The screenshots show: '+m.look.problems.join(' ')+' Ask again to fix it.'));li.append(d)}
  if(m.role==='assistant'&&m.feature_acceptance?.requested){
   const a=m.feature_acceptance,box=el('div','verified '+(a.allPassed?'ok':'bad'));
   box.append(el('div','verified-head',a.passed+' of '+a.requested+' requested features verified'));
