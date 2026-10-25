@@ -258,6 +258,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   const Q=require('./builder-question'),a=Q.answer(message,Q.pending(builder.loadMeta(id)));
   if(a){shownText=String(message).trim();message=a.message;mode='build'}
  }
+ // "Tidy up the code" (a button in Code): reorganise the project into the code structure, same behaviour.
+ if(!hooks&&mode==='build'&&require('./code-structure').isTidy(message)){shownText='Tidy up the code';message=require('./code-structure').TIDY}
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
  if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&!shownText){
