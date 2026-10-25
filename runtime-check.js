@@ -15,6 +15,51 @@ async function browser(){
  if(!b.isConnected()){browserPromise=null;return browser()}
  return b;
 }
+// Safari's engine (WebKit, via Playwright) for "iPhone Safari" checks. Installed in the Docker
+// image unless built with KAIROQ_WEBKIT=off; without it those checks are skipped, not failed.
+let webkitPromise=null;
+function webkitAvailable(){
+ if(process.env.KAIROQ_WEBKIT==='off')return false;
+ try{return fs.existsSync(require('playwright-core').webkit.executablePath())}catch{return false}
+}
+async function webkitBrowser(){
+ if(!webkitPromise)webkitPromise=require('playwright-core').webkit.launch().catch(e=>{webkitPromise=null;throw e});
+ const b=await webkitPromise;if(!b.isConnected()){webkitPromise=null;return webkitBrowser()}
+ return b;
+}
+// A screenshot of a page in Safari's engine at a phone or tablet size (the editor's "Real Safari").
+async function safariShot(url,{width=393,height=659,ipad=false,timeoutMs=20000}={}){
+ if(!webkitAvailable())throw Object.assign(Error('Safari\'s engine (WebKit) is not installed on this server.'),{status:409});
+ const w=Math.max(320,Math.min(1024,Number(width)||393)),hgt=Math.max(400,Math.min(1366,Number(height)||659));
+ const context=await (await webkitBrowser()).newContext({viewport:{width:w,height:hgt},deviceScaleFactor:2,isMobile:true,hasTouch:true,
+  userAgent:ipad?'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1':DEVICES_UA});
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>{if(errors.length<5)errors.push('Uncaught error: '+String(e.message||e).slice(0,200))});
+ try{
+  await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
+  await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
+  await page.waitForTimeout(400);
+  return{screenshot:(await page.screenshot({type:'jpeg',quality:70})).toString('base64'),errors,width:w,height:hgt};
+ }finally{await context.close().catch(()=>{})}
+}
+const DEVICES_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+// How each device is opened. "slow" is a mid-range phone on a slow 3G connection: 400 ms
+// round trips, 400 kbit/s each way, and a processor 4 times slower (Chrome DevTools' Slow 3G).
+const DEVICES={
+ desktop:{label:'Desktop',options:{viewport:{width:1280,height:800}}},
+ phone:{label:'Phone',phone:true,options:{viewport:{width:390,height:844},isMobile:true,hasTouch:true}},
+ iphone:{label:'iPhone Safari',phone:true,webkit:true,options:{viewport:{width:390,height:664},deviceScaleFactor:3,isMobile:true,hasTouch:true,
+  userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'}},
+ slow:{label:'Slow phone',phone:true,slow:true,options:{viewport:{width:390,height:844},isMobile:true,hasTouch:true}},
+};
+const SLOW_READY_MS=Number(process.env.KAIROQ_SLOW_READY_MS)||10000;
+function devicesAvailable(){return available()?['desktop','phone',...(webkitAvailable()?['iphone']:[]),'slow']:[]}
+async function slowDown(context,page){
+ const cdp=await context.newCDPSession(page);
+ await cdp.send('Network.enable');
+ await cdp.send('Network.emulateNetworkConditions',{offline:false,latency:400,downloadThroughput:400*1024/8,uploadThroughput:400*1024/8});
+ await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
+}
 const IGNORED=/favicon\.ico|Download the React DevTools|net::ERR_ABORTED/;
 // ---------- fast lane: Lightpanda ----------
 // Lightpanda (a light headless browser, AGPL-3.0, run unmodified as its own process and driven
@@ -408,10 +453,14 @@ async function designShots(url,{timeoutMs=20000}={}){
 // viewport 'phone' tests the page at 390x844 with touch, like a phone.
 // scan: also return what a browsing agent would see (the interactive elements), e.g. to repair a check.
 async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,viewport,scan=false}={}){
- if(!available())return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
- const phone=viewport==='phone';
- const context=await (await browser()).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
- const page=await context.newPage(),errors=[],results=[],external=[];
+ const device=DEVICES[viewport]||DEVICES.desktop;
+ if(!available()||(device.webkit&&!webkitAvailable()))return{skipped:true,errors:[],steps:[],text:'',screenshot:null};
+ const phone=Boolean(device.phone),slow=Boolean(device.slow),wait=slow?3:1;
+ if(slow)timeoutMs*=3;
+ const context=await (await (device.webkit?webkitBrowser():browser())).newContext(device.options);
+ const page=await context.newPage(),errors=[],results=[],external=[],sizes=[];
+ if(slow){await slowDown(context,page);page.on('requestfinished',async q=>{const z=await q.sizes().catch(()=>null);const n=z?z.responseBodySize+z.responseHeadersSize:0;if(n>150000)sizes.push({url:q.url(),bytes:n})})}
+ let readyMs=null;
  const add=e=>{const text=String(e).slice(0,500);if(!IGNORED.test(text)&&!errors.includes(text)&&errors.length<15)errors.push(text)};
  // Files from other sites that fail to load (blocked images, fonts) are listed separately:
  // they are not code errors and must not stop the agent from finishing.
@@ -425,18 +474,25 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,vie
  await guard(context,url,{sandbox});
  let text='',shot=null,scanned=null;
  try{
+  const t0=Date.now();
   await page.goto(url,{waitUntil:'load',timeout:timeoutMs});
-  await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
+  // On the slow phone: how long until something can be used (a visible button, link or field).
+  if(slow){
+   await page.waitForFunction(()=>[...document.querySelectorAll('#root button,#root a[href],#root input,#root select,#root textarea')].some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.top<innerHeight}),null,{timeout:timeoutMs}).catch(()=>{});
+   readyMs=Date.now()-t0;
+   if(readyMs>SLOW_READY_MS){const big=sizes.sort((a,b)=>b.bytes-a.bytes).slice(0,3).map(x=>(x.url.split('/').pop().split('?')[0]||'page')+' ('+(x.bytes>=1048576?(x.bytes/1048576).toFixed(1)+' MB':Math.round(x.bytes/1024)+' KB')+')');add('Slow phone: the page took '+(readyMs/1000).toFixed(1)+' s to be usable on a slow 3G connection (aim for under '+SLOW_READY_MS/1000+' s).'+(big.length?' Biggest files: '+big.join(', ')+'.':''))}
+  }
+  await page.waitForLoadState('networkidle',{timeout:5000*wait}).catch(()=>{});
   for(const step of (Array.isArray(steps)?steps:[]).slice(0,MAX_STEPS)){
    const s=step&&typeof step==='object'?step:{};
    const label=JSON.stringify(s).slice(0,200);
    try{
     const target=()=>s.selector?page.locator(String(s.selector)).first():s.label?page.getByLabel(String(s.label),{exact:false}).first():s.placeholder?page.getByPlaceholder(String(s.placeholder),{exact:false}).first():s.role?page.getByRole(String(s.role),s.text?{name:String(s.text),exact:false}:{}).first():page.getByText(String(s.text??''),{exact:false}).first();
-    if(s.action==='click')await target().click({timeout:4000});
-    else if(s.action==='fill')await target().fill(String(s.value??''),{timeout:4000});
-    else if(s.action==='select')await target().selectOption(String(s.value??''),{timeout:4000});
+    if(s.action==='click')await target().click({timeout:4000*wait});
+    else if(s.action==='fill')await target().fill(String(s.value??''),{timeout:4000*wait});
+    else if(s.action==='select')await target().selectOption(String(s.value??''),{timeout:4000*wait});
     else if(s.action==='press')await page.keyboard.press(String(s.key||'Enter'));
-    else if(s.action==='expect'){if(s.absent)await page.getByText(String(s.text),{exact:false}).first().waitFor({state:'hidden',timeout:4000});else await target().waitFor({state:'visible',timeout:4000})}
+    else if(s.action==='expect'){if(s.absent)await page.getByText(String(s.text),{exact:false}).first().waitFor({state:'hidden',timeout:4000*wait});else await target().waitFor({state:'visible',timeout:4000*wait})}
     else if(s.action==='goto'){const next=new URL(String(s.path||''),url);if(next.origin!==origin||!next.pathname.startsWith(root))throw Error('goto must stay inside the app');await page.goto(next.href,{waitUntil:'load',timeout:timeoutMs})}
     else if(s.action==='wait')await page.waitForTimeout(Math.min(3000,Math.max(0,Number(s.ms)||500)));
     else throw Error('Unknown action (use click, fill, select, press, expect, goto, wait)');
@@ -449,12 +505,12 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,vie
   text=await page.evaluate(()=>document.body?document.body.innerText:'').catch(()=>'');
   const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))}).catch(()=>false);
   if(blank)add('Blank page: nothing rendered inside #root.');
-  if(phone&&await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2).catch(()=>false))add('Layout overflow: the page scrolls sideways on a 390px phone screen.');
+  if(phone&&await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2).catch(()=>false))add('Layout overflow: the page scrolls sideways on a 390px phone screen'+(device.webkit?' in Safari':'')+'.');
   if(screenshot)shot=(await page.screenshot({type:'jpeg',quality:60})).toString('base64');
   if(scan)scanned=(await page.evaluate(SCAN,{max:MAX_ELEMENTS}).catch(()=>null)||{}).elements||null;
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
- return{skipped:false,errors,external,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot,...(scanned?{elements:scanned}:{})};
+ return{skipped:false,device:viewport||'desktop',errors,external,steps:results,text:String(text||'').replace(/\n{3,}/g,'\n\n').slice(0,4000),screenshot:shot,...(readyMs!=null?{ready_ms:readyMs}:{}),...(scanned?{elements:scanned}:{})};
 }
 // ---------- other websites (synthetic customers on any public link) ----------
 // A public website someone has permission to test, e.g. the same app built elsewhere. Chromium
@@ -750,5 +806,5 @@ async function renderHtml(html,{width,height}){
   return await page.screenshot({type:'png',clip:{x:0,y:0,width,height}});
  }finally{await context.close().catch(()=>{})}
 }
-async function close(){if(fastPromise){const b=await fastPromise.catch(()=>null);fastPromise=null;await b?.close().catch(()=>{})}try{fastProc&&fastProc.kill()}catch{}for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
-module.exports={fastStats:()=>({...fastStats,installed:Boolean(lightpandaPath())}),renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
+async function close(){if(webkitPromise){const w=await webkitPromise.catch(()=>null);webkitPromise=null;await w?.close().catch(()=>{})}if(fastPromise){const b=await fastPromise.catch(()=>null);fastPromise=null;await b?.close().catch(()=>{})}try{fastProc&&fastProc.kill()}catch{}for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
+module.exports={safariShot,DEVICES,devicesAvailable,webkitAvailable,fastStats:()=>({...fastStats,installed:Boolean(lightpandaPath())}),renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};

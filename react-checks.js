@@ -58,16 +58,42 @@ async function run(id,versionUrl,{inspect,checks,record=true,version,viewport}={
   const r=await sandbox.withSandbox(id,async box=>inspect(versionUrl+(c.path||''),{steps:c.steps,screenshot:false,sandbox:box.token,...(viewport?{viewport}:{})}));
   if(r.skipped)return{ran:0,passed:0,failed:[],skipped:true};
   const bad=r.steps.find(s=>!s.ok);
-  const crash=r.errors.find(e=>/^(Uncaught error|Blank page|Page did not load|Layout overflow)/.test(e));
-results.push({id:c.id,name:c.name+(viewport==='phone'?' (phone)':''),ok:!bad&&!crash,step:bad?stepLabel(bad.step):'',...(bad?{index:r.steps.indexOf(bad)}:{}),error:bad?String(bad.error).replace(/^locator\.\w+: /,''):crash||''});
+  const crash=r.errors.find(e=>/^(Uncaught error|Blank page|Page did not load|Layout overflow|Slow phone)/.test(e));
+results.push({id:c.id,name:c.name+(viewport&&viewport!=='desktop'?' ('+SUFFIX[viewport]+')':''),device:viewport||'desktop',...(r.ready_ms!=null?{ready_ms:r.ready_ms}:{}),ok:!bad&&!crash,step:bad?stepLabel(bad.step):'',...(bad?{index:r.steps.indexOf(bad)}:{}),error:bad?String(bad.error).replace(/^locator\.\w+: /,''):crash||''});
  }
- if(record&&viewport!=='phone'){
+ if(record&&(!viewport||viewport==='desktop')){
   const fresh=builder.loadMeta(id),at=new Date().toISOString();
   for(const r of results){const c=list(fresh).find(x=>x.id===r.id);if(c)c.last={ok:r.ok,at,version:version||null,...(r.ok?{}:{step:r.step,error:String(r.error).slice(0,300)})}}
   builder.saveMeta(fresh);
  }
  const failed=results.filter(r=>!r.ok).map(({ok,...r})=>r);
- return{ran:results.length,passed:results.length-failed.length,failed,skipped:false};
+ return{ran:results.length,passed:results.length-failed.length,failed,skipped:false,results};
+}
+const SUFFIX={phone:'phone',iphone:'iPhone Safari',slow:'slow phone'};
+// Every saved check on every device this server can open: desktop and phone in Chrome, iPhone in
+// Safari's engine, and a phone on slow 3G. Desktop results are recorded as before; each check
+// also keeps its per-device results (c.last.devices) for the editor.
+async function runDevices(id,versionUrl,{inspect,checks,version,devices}={}){
+ const list_=devices||require('./runtime-check').devicesAvailable();
+ if(!list_.length)return{ran:0,passed:0,failed:[],skipped:true,devices:[]};
+ const by={};let skipped=false;
+ for(const d of list_){
+  const r=await run(id,versionUrl,{inspect,checks,version,record:d==='desktop',viewport:d==='desktop'?undefined:d});
+  if(r.skipped){if(d==='desktop'){skipped=true;break}continue}
+  by[d]=r;
+ }
+ if(skipped)return{ran:0,passed:0,failed:[],skipped:true,devices:[]};
+ const ran=Object.values(by).reduce((n,r)=>n+r.ran,0),failed=Object.values(by).flatMap(r=>r.failed);
+ // Per check: how it did on each device.
+ const matrix={};
+ for(const [d,r] of Object.entries(by)){
+  const all=r.results||[];
+  for(const x of all){(matrix[x.id]=matrix[x.id]||{})[d]={ok:x.ok,...(x.ok?{}:{step:x.step,error:String(x.error||'').slice(0,240)}),...(x.ready_ms!=null?{ready_ms:x.ready_ms}:{})}}
+ }
+ if(version||!checks){const fresh=builder.loadMeta(id);for(const c of list(fresh))if(matrix[c.id]&&c.last)c.last.devices=matrix[c.id];builder.saveMeta(fresh)}
+ // Counted per check: a check passes only when it works on every device.
+ const ids=Object.keys(matrix),ok=ids.filter(i=>Object.values(matrix[i]).every(x=>x.ok)).length;
+ return{ran:ids.length,passed:ok,runs:ran,failed,skipped:false,devices:Object.keys(by),matrix};
 }
 // A readable step, e.g. click "Book now" (inspect reports steps as JSON).
 function stepLabel(raw){let s;try{s=JSON.parse(raw)}catch{return String(raw).slice(0,120)}const target=s.text?'"'+s.text+'"':s.label?'the "'+s.label+'" field':s.placeholder?'"'+s.placeholder+'"':s.selector||s.path||s.key||'';return(s.action==='expect'?(s.absent?'expect not to see ':'expect to see '):s.action+' ')+target+(s.action==='fill'&&s.value?' with "'+s.value+'"':'')}
@@ -162,4 +188,4 @@ async function suggestRepairs(id,versionUrl,result,{inspect,limit=3}={}){
  }
  return out;
 }
-module.exports={repair,suggestRepairs,applyRepair,similarity,monitorAll,normalize,list,save,remove,setEnabled,run,failureText,promptNote,write,MAX_CHECKS};
+module.exports={runDevices,SUFFIX,repair,suggestRepairs,applyRepair,similarity,monitorAll,normalize,list,save,remove,setEnabled,run,failureText,promptNote,write,MAX_CHECKS};

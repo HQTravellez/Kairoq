@@ -110,14 +110,8 @@ requirements. API/schema compatibility and offline tests do not establish produc
   downloaded on request through api.polyhaven.com. Kairoq keeps the source and credit with
   each model.
 
-## Fonts
+## Real-device checks
 
-- Fira Code — https://github.com/tonsky/FiraCode — SIL Open Font License 1.1. Loaded from Google
-  Fonts for Kairoq's code views and offered to apps as a code font (`react-design.js`).
-## Replica method (build from a reference)
-
-- Replica skill pack — https://github.com/Jakeschincariol/replica-skill — MIT. Its review themes
-  (`vendor/replica/themes.json`, with its licence) and its ranking, parity and sweep methods are
-  used in `react-reviews.js`, `react-parity.js` and `react-sweep.js`, rewritten in JavaScript.
-- Reviews are read only through official public APIs: Apple's iTunes Search API and App Store
-  customer-reviews feed, and the Hacker News (Algolia) search API.
+- WebKit (Safari's engine) as built by Playwright — https://playwright.dev — Apache-2.0 (Playwright)
+  and LGPL/BSD (WebKit). Installed unmodified in the Docker image and run as a separate browser
+  for the "iPhone Safari" checks and the editor's "Real Safari" screenshot (`runtime-check.js`).

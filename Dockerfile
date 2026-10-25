@@ -43,6 +43,12 @@ RUN if [ "$KAIROQ_BLENDER_INSTALL" = "on" ]; then \
       UV_PYTHON_INSTALL_DIR=/opt/python uv pip install --no-cache --python /opt/blender/bin/python bpy==5.2.3 && \
       /opt/blender/bin/python -c "import bpy; print('Blender', bpy.app.version_string)"; fi
 ENV KAIROQ_BPY_PYTHON=/opt/blender/bin/python
+# Safari's engine (WebKit, through Playwright) for the "iPhone Safari" checks and the editor's
+# "Real Safari" button (runtime-check.js). About 300 MB with its system libraries; build with
+# KAIROQ_WEBKIT=off to leave it out (Safari checks are then skipped, not failed).
+ARG KAIROQ_WEBKIT=on
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN if [ "$KAIROQ_WEBKIT" = "on" ]; then npx playwright-core install --with-deps webkit && rm -rf /var/lib/apt/lists/*; fi
 COPY . .
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV NODE_ENV=production TZ=UTC
