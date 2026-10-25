@@ -33,13 +33,14 @@ function questionOnly(message){
  if(t.length>400)return false;
  // Asking for ideas or an explanation is never a build, with or without "?" or "can you":
  // "can you suggest what else", "any ideas", "what would you recommend", "explain the booking flow".
- if(ASKING.test(t)&&!CHANGE_ASK.test(t))return true;
+ // "Add something else to the footer" starts with a change: it builds.
+ if(ASKING.test(t)&&!CHANGE_ASK.test(t)&&!/^\s*(please\s+)?(add|change|make|create|build|remove|update|fix|put|replace|move|use|rename|delete|turn|set|show|hide)\b/i.test(t))return true;
  if(!t.endsWith('?'))return false;
  if(/\b(can|could|would|will) you\b|\bplease\b|\bi want\b|\blet'?s\b/i.test(t))return false;
  // "why did the build fail?": the build, the update, the design are nouns here, not change requests.
  return!CHANGE.test(t.replace(/\b(the|this|that|my|your|last) (build|update|design|fix|change|style)s?\b/gi,''));
 }
-const ASKING=/\b(suggest(ions?)?|ideas?|recommend(ations?)?|advice|advise|explain|thoughts|opinion|what else|what next|what more|what should (i|we)|tell me (about|why|how|what)|feedback)\b/i;
+const ASKING=/\b(suggest(ions?)?|ideas?|recommend(ations?)?|advice|advise|explain|thoughts|opinion|what else|what next|what more|(any|some)\s*th\w*\s+(else|more)|else|what should (i|we)|tell me (about|why|how|what)|feedback)\b/i;
 // "suggest a gallery and add it" still asks for a change.
 const CHANGE_ASK=/\b(and|then) (add|build|make|create|change|put|implement)\b|\b(add|build|make|create|change|implement) (it|them|that|those|a|an|the)\b/i;
 
