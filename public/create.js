@@ -793,9 +793,9 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={researching:'Looking things up on the web…',pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
+const LABELS={researching:'Looking things up on the web…',pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',reviews:'Reading what its users say in public reviews…',scoring:'Checking each planned feature against the code…',sweeping:'Checking nothing of the original is left…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
-const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
+const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 function secs(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'}
@@ -1108,11 +1108,33 @@ function referenceReport(r){
  if(r.last_run){const d=r.last_run.desktop,p=r.last_run.phone;L.push('Journeys: '+d.passed+'/'+d.ran+' pass on desktop, '+p.passed+'/'+p.ran+' on phone'+(r.repairs?' after '+r.repairs+' repair round'+(r.repairs>1?'s':''):'')+'.');for(const f of r.last_run.failed||[])L.push('• Still failing: '+f.name+(f.step?' (at '+f.step+')':'')+(f.error?': '+f.error:''))}
  else if(!r.checks.length)L.push('No journeys were tested (the browser is not available or the plan had none).');
  if(r.design)L.push('Design compared with the reference: '+r.design.score+'/10'+(r.polished?', then polished.':'.')+(r.design.improvements.length&&!r.polished?' Ideas: '+r.design.improvements.slice(0,3).join('; '):''));
+ if(r.match&&r.match.score!=null){L.push('Match score: '+r.match.score+'% of the planned features'+(r.match.musts?' ('+r.match.musts_done+' of '+r.match.musts+' must-haves done)':'')+'.');for(const m of r.match.missing.slice(0,5))L.push('• '+(m.status==='partial'?'Partly done: ':'Missing: ')+m.name+(m.why?' ('+m.why+')':''));if(r.match.missing.length)L.push('Ask "build the missing features" to finish them.');if((r.match.added||[]).length)L.push('Your improvements: '+r.match.added.map(a=>a.name+(a.status==='yes'?' ✓':a.status==='partial'?' (partly)':' (not yet)')).join(', ')+'.')}
+ if(r.leftovers&&!r.leftovers.length&&r.match)L.push('Nothing of the original\'s name, address or brand colours is left.');
  if(r.published)L.push((r.published.ok?'Published and verified: ':'Published, but the live check found problems: ')+r.published.url+(r.published.errors.length?' ('+r.published.errors.join('; ')+')':''));
  if(r.github)L.push('Pushed to GitHub: '+(r.github.url||r.github.repo)+(r.github.warning?' ('+r.github.warning+')':''));
  for(const p of r.problems||[])L.push('• '+p);
  return L.join('\n');
 }
+// What its users complain about (react-reviews.js): real reviews, counts and linked quotes, then
+// the fixes the owner can tick into their version.
+const SOURCE_NAMES={'app-store':'App Store','hacker-news':'Hacker News'};
+function showReviews(rv){
+ const box=$('ref-reviews-box');box.classList.toggle('hidden',!rv);if(!rv)return;
+ const tried=(rv.sources_tried||[]).map(s=>s.source+(s.count?' ('+s.count+')':s.note?' ('+s.note+')':' (none)')).join(', ');
+ text($('ref-reviews-sources'),rv.error?rv.error:rv.reviews?'Read '+rv.reviews+' public review'+(rv.reviews===1?'':'s')+' and comments about '+rv.name+': '+tried+'. Every quote is copied exactly, with its link.':'No public reviews found for '+rv.name+(tried?': '+tried:'')+'.');
+ const tl=$('ref-themes');tl.replaceChildren();
+ for(const t of rv.themes||[]){
+  const head=refSpan(t.label+' · '+t.count+' mention'+(t.count===1?'':'s')+(t.avg_rating!=null?' · '+t.avg_rating+'★ average':'')+(t.thin?' · few mentions':''));head.className='ref-theme-head'+(t.kind==='request'?' req':'');
+  const quotes=document.createElement('div');quotes.className='ref-quotes';
+  for(const q of t.quotes.slice(0,2)){const bq=document.createElement('blockquote');bq.append(refSpan('“'+q.quote+'” '));const a=document.createElement('a');a.href=q.url;a.target='_blank';a.rel='noopener nofollow';a.textContent=(SOURCE_NAMES[q.source]||q.source)+(q.rating?' '+q.rating+'★':'');bq.append(a);quotes.append(bq)}
+  tl.append(refItem([head,quotes]));
+ }
+ const fl=$('ref-fixes');fl.replaceChildren();
+ (rv.fixes||[]).forEach((f,i)=>{const l=document.createElement('label');l.className='check';const c=document.createElement('input');c.type='checkbox';c.dataset.fix=i;c.checked=i<2;l.append(c,refSpan(' '+f.title));fl.append(refItem([l,refSpan('Because '+f.count+' mention'+(f.count===1?'':'s')+': '+f.theme_label.toLowerCase()+'. Adds: '+f.feature.name,'muted')]))});
+ $('ref-fixes-box').classList.toggle('hidden',!(rv.fixes||[]).length);
+ text($('ref-angle'),rv.angle?'How to sell it: '+rv.angle:'');
+}
+function pickedFixes(){return[...document.querySelectorAll('#ref-fixes input[data-fix]')].filter(c=>c.checked).map(c=>Number(c.dataset.fix))}
 function refStep(n){$('ref-step1').classList.toggle('hidden',n!==1);$('ref-step2').classList.toggle('hidden',n!==2)}
 function priceFor(kind){const p=(refState.info&&refState.info.prices||[]).find(x=>x.tier===state.tier);return p?p[kind]:null}
 async function openReference(){
@@ -1143,6 +1165,8 @@ function showPlan(ref){
  for(const e of plan.entities)dl.append(refItem([refSpan('Data: '+e.name+' ('+e.access+')'),refSpan(e.fields.join(', '),'muted')]));
  dl.append(refItem([refSpan(plan.auth.required?'Sign-in: '+(plan.auth.methods.join(', ')||'email')+(plan.auth.roles.length?' · roles: '+plan.auth.roles.join(', '):''):'No sign-in in the first version')]));
  for(const x of plan.integrations)dl.append(refItem([refSpan('Integration: '+x.name),refSpan(x.purpose+' — '+x.how,'muted')]));
+ showReviews(ref.reviews);
+ const sk=$('ref-skip');sk.replaceChildren();for(const o of plan.out_of_scope||[])sk.append(refItem([refSpan(o.what),refSpan(o.why,'muted')]));$('ref-skip-box').classList.toggle('hidden',!(plan.out_of_scope||[]).length);
  const jl=$('ref-journeys');jl.replaceChildren();for(const j of plan.journeys)jl.append(refItem([refSpan(j.name),refSpan(j.steps,'muted')]));
  if(!plan.journeys.length)jl.append(refItem([refSpan('None planned','muted')]));
  const d=$('ref-design');d.replaceChildren();
@@ -1180,7 +1204,7 @@ $('ref-build').onclick=async()=>{
  $('ref-build').disabled=true;
  try{
   const github=$('ref-github').checked?{repo:$('ref-github-repo').value.trim()||undefined}:undefined;
-  const r=await api('/projects/'+state.project.id+'/reference',{method:'POST',body:{step:'build',plan,tier:state.tier,publish:$('ref-publish').checked,github}});
+  const r=await api('/projects/'+state.project.id+'/reference',{method:'POST',body:{step:'build',plan,fixes:pickedFixes(),tier:state.tier,publish:$('ref-publish').checked,github}});
   $('ref-dialog').close();
   $('messages').append(messageItem({role:'user',text:'Build "'+plan.name+'" from the approved plan'+($('ref-publish').checked?', then publish':'')}));
   watch(r.job);

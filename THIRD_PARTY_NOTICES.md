@@ -114,3 +114,10 @@ requirements. API/schema compatibility and offline tests do not establish produc
 
 - Fira Code — https://github.com/tonsky/FiraCode — SIL Open Font License 1.1. Loaded from Google
   Fonts for Kairoq's code views and offered to apps as a code font (`react-design.js`).
+## Replica method (build from a reference)
+
+- Replica skill pack — https://github.com/Jakeschincariol/replica-skill — MIT. Its review themes
+  (`vendor/replica/themes.json`, with its licence) and its ranking, parity and sweep methods are
+  used in `react-reviews.js`, `react-parity.js` and `react-sweep.js`, rewritten in JavaScript.
+- Reviews are read only through official public APIs: Apple's iTunes Search API and App Store
+  customer-reviews feed, and the Hacker News (Algolia) search API.

@@ -348,6 +348,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
    else{
+    // "Build the missing features" after a reference build: the match score's list (react-parity.js).
+    if(mode==='build'&&/\bmissing (features?|ones?|parts?)\b|\bfinish (the )?(plan|features)\b/i.test(message)){const mm=builder.loadMeta(id).reference;const todo=mm&&mm.match?require('./react-parity').missingMessage(mm.match):'';if(todo)context=[context,todo].filter(Boolean).join('\n\n')}
     // A 3D style was picked without a model: add a fitting free one first (react-models.js).
     if(mode==='build'){const meta3=builder.loadMeta(id);if(meta3.three_d&&meta3.three_d.style!=='none'&&!meta3.three_d.auto_tried){update({status:'assets'});await require('./react-models').autoModel(id,message,{callModel,signal}).catch(e=>{if(signal.aborted)throw e;console.warn('[3d] auto model: '+String(e.message||e).slice(0,200))})}}
     const assetNote=[images.length||context?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context].filter(Boolean).join('\n\n');
@@ -474,6 +476,15 @@ function startAnalysis(v,id,{source,images=[],note='',tier='standard'},{callMode
    const plan=await ref.createPlan(analysis,{callModel,tier,images:[...uploads,...crawled].slice(0,4),note,signal});
    const names=run.saveShots(id,[...crawled,...uploads]);
    run.save(id,{source:{type:source.type,value:String(source.value||'').slice(0,300)},analysis,plan,shots:names});
+   // What its users hate (react-reviews.js): real public reviews, themes, fixes and an angle.
+   // Optional: a problem here never fails the analysis.
+   if(source.type==='url'&&process.env.KAIROQ_REFERENCE_REVIEWS!=='off'&&!signal.aborted){
+    update({status:'reviews'});
+    let reviews;
+    try{const R=require('./react-reviews');reviews=await R.study({name:R.productName(analysis),appLinks:(analysis.pages||[]).flatMap(p=>p.app_links||[]),summary:plan.summary},{callModel,fetchImpl,signal})}
+    catch(e){if(signal.aborted)throw Error('Stopped.');reviews={error:'Reviews could not be read: '+String(e.message||e).slice(0,200),themes:[],fixes:[]}}
+    const m=builder.loadMeta(id);if(m.reference){m.reference.reviews=reviews;builder.saveMeta(m)}
+   }
    job.result={reference:run.view(builder.loadMeta(id))};
    update({status:'complete'});
   }catch(e){
@@ -1340,6 +1351,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     const meta=builder.loadMeta(id);
     if(!meta.reference)throw Object.assign(Error('Analyze a reference first'),{status:409});
     const plan=ref.normalizePlan(b.plan&&typeof b.plan==='object'?b.plan:meta.reference.plan);
+    // Fixes the owner ticked from the reviews become must-have features, marked as added.
+    const fixes=(meta.reference.reviews&&meta.reference.reviews.fixes)||[];
+    for(const i of (Array.isArray(b.fixes)?b.fixes:[]).map(Number).filter(i=>Number.isInteger(i)&&fixes[i]).slice(0,5)){
+     const f=fixes[i];if(plan.features.some(x=>x.name.toLowerCase()===f.feature.name.toLowerCase()))continue;
+     plan.features.push({name:f.feature.name,description:f.feature.description+' (Users of the original complain about: '+f.theme_label+'.)',priority:1,area:'frontend',enabled:true,added:f.theme_label});
+    }
     meta.reference.plan=plan;
     // The plan's design direction becomes the project's colours and fonts (see prepareDesign).
     if(plan.design&&!meta.design)meta.planned_design={...plan.design,created_at:new Date().toISOString()};
