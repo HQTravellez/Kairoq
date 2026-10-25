@@ -674,14 +674,48 @@ async function renderLogs(){
  for(const l of logs.slice(-60).reverse()){const li=document.createElement('li');li.className='log '+l.level;li.textContent=when(l.at)+' · '+l.source+' · '+l.message;ol.append(li)}
 }
 $('logs-refresh').onclick=()=>renderLogs().catch(()=>{});
+// ---------- Code: the files as a folder tree, like an editor ----------
+// The app's own files first (pages, components, hooks, lib, data), the shared UI kit folded away.
+const DIR_ORDER=['src','functions','sql','public'],SRC_ORDER=['pages','components','hooks','lib','data','styles','assets'];
+function fileTree(paths){
+ const root={dirs:new Map(),files:[]};
+ for(const p of paths){const parts=p.split('/');let node=root;for(const d of parts.slice(0,-1)){if(!node.dirs.has(d))node.dirs.set(d,{dirs:new Map(),files:[]});node=node.dirs.get(d)}node.files.push(p)}
+ return root;
+}
+function dirRank(path,name){const order=path===''?DIR_ORDER:path==='src'?SRC_ORDER:path==='src/components'?[]:[];const i=order.indexOf(name);return path==='src/components'&&name==='ui'?99:i<0?50:i}
+function fileRank(path){const n=path.split('/').pop();return/^(App|main)\.jsx$/.test(n)?0:/^index\.css$/.test(n)?2:/\.json$/.test(n)?3:1}
+function renderTree(list,paths){
+ if(!state.openDirs){state.openDirs=new Set(['src','src/pages','src/components','src/hooks','src/lib','src/data','functions','sql']);for(const p of paths){const parts=p.split('/');for(let i=1;i<parts.length;i++){const d=parts.slice(0,i).join('/');if(d!=='src/components/ui')state.openDirs.add(d)}}}
+ if(state.file){const parts=state.file.split('/');for(let i=1;i<parts.length;i++)state.openDirs.add(parts.slice(0,i).join('/'))}
+ list.classList.add('file-tree');list.setAttribute('role','tree');
+ const walk=(node,path,depth)=>{
+  const dirs=[...node.dirs.entries()].sort((a,b)=>dirRank(path,a[0])-dirRank(path,b[0])||a[0].localeCompare(b[0]));
+  for(const [name,child] of dirs){
+   const full=path?path+'/'+name:name,open=state.openDirs.has(full),count=countFiles(child);
+   const li=el('li','dir'),b=el('button','tree-row');b.type='button';b.style.setProperty('--depth',depth);b.setAttribute('aria-expanded',String(open));b.title=full;
+   b.append(icon(open?'down':'chev','tree-chev'),el('span','tree-name',name),el('span','tree-count',String(count)));
+   b.onclick=()=>{open?state.openDirs.delete(full):state.openDirs.add(full);list.replaceChildren();renderTree(list,paths)};
+   li.append(b);list.append(li);
+   if(open)walk(child,full,depth+1);
+  }
+  for(const f of [...node.files].sort((a,b)=>fileRank(a)-fileRank(b)||a.localeCompare(b))){
+   const li=el('li','file'),b=el('button','tree-row');b.type='button';b.style.setProperty('--depth',depth);b.title=f;b.setAttribute('aria-current',String(f===state.file));
+   b.append(el('span','tree-ext tree-ext-'+(f.split('.').pop()||'').toLowerCase(),fileBadge(f)),el('span','tree-name',f.split('/').pop()));
+   b.onclick=()=>{state.file=f;renderFiles()};li.append(b);list.append(li);
+  }
+ };
+ walk(fileTree(paths),'',0);
+}
+function countFiles(node){let n=node.files.length;for(const c of node.dirs.values())n+=countFiles(c);return n}
+function fileBadge(f){const e=(f.split('.').pop()||'').toLowerCase();return{jsx:'JSX',js:'JS',ts:'TS',tsx:'TSX',css:'CSS',json:'{ }',sql:'SQL',md:'MD',html:'<>'}[e]||'·'}
 async function renderFiles(){
  const list=$('file-list');list.replaceChildren();
  const files=state.project.files;
  if(!files.includes(state.file))state.file=files.includes('src/App.jsx')?'src/App.jsx':files[0];
- for(const f of files){const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.textContent=f;b.setAttribute('aria-current',String(f===state.file));b.onclick=()=>{state.file=f;renderFiles()};li.append(b);list.append(li)}
+ renderTree(list,files);
  if(state.file){const {content}=await api('/projects/'+state.project.id+'/file?path='+encodeURIComponent(state.file));state.fileContent=content;text($('file-view').firstChild,content)}
  text($('file-name'),state.file||'');setEditing(false);
- const editor=state.project.role!=='viewer';$('file-edit').classList.toggle('hidden',!editor||!state.file);$('file-new').classList.toggle('hidden',!editor);
+ const editor=state.project.role!=='viewer';$('file-edit').classList.toggle('hidden',!editor||!state.file);$('file-new').classList.toggle('hidden',!editor);$('file-tidy').classList.toggle('hidden',!editor||!state.project.current_version);
 }
 // Editing code by hand: Save checks, builds and keeps it as a new version (undo with the version menu).
 function setEditing(on){
@@ -704,6 +738,7 @@ async function saveSourceFile(body,done){
  }catch(err){text($('file-status'),err.message)}finally{save.disabled=false}
 }
 $('file-save').onclick=()=>saveSourceFile({path:state.file,content:$('file-editor').value});
+$('file-tidy').onclick=()=>{if(state.job){text($('file-status'),'Wait for the current change to finish.');return}send('Tidy up the code','build')};
 $('file-new').onclick=()=>{
  const name=prompt('New file path, for example src/components/Hero.jsx');if(!name)return;
  saveSourceFile({path:name.trim(),content:name.endsWith('.css')?'/* '+name+' */\n':name.endsWith('.json')?'{}\n':'export default function Component(){\n  return null;\n}\n',create:true},()=>{state.file=name.trim()});
