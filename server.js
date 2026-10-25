@@ -6892,6 +6892,7 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
   if(opts.model){
     const {model,onFallback,...rest}=opts;
     try{
+      if(model==="meta/muse-spark"){const r=await callMuse(rest);return parse(r.text,r.model)}
       if(!process.env.OPENROUTER_API_KEY)throw Error("OpenRouter is not set up");
       return await callOpenRouterBuilder({...rest,only:model},parse);
     }catch(err){
@@ -6912,17 +6913,36 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
     }
   }
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
+  // Muse Spark writes Standard builds before the free models when paid builds are on (its own cap).
+  if(museReady()&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&(!opts.tier||opts.tier==="standard"||opts.tier==="vision")){
+    try{const r=await callMuse(opts);return parse(r.text,r.model)}
+    catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[builder] Muse failed, using the usual models: "+String(err.message||err).slice(0,200))}
+  }
   return callOpenRouterBuilder(opts,parse);
 }
+// Meta's Muse Spark (muse.js): its own monthly cap, and the app-wide AI budget.
+async function callMuse(opts){
+  await enforceBudget();
+  const muse=require("./muse");
+  return muse.chat({messages:opts.messages,temperature:opts.temperature??0.2,maxTokens:Math.min(131072,Number(opts.maxOutputTokens)||16000),signal:opts.signal,
+    onToken:typeof opts.onToken==="function"?opts.onToken:undefined,onReasoning:opts.onReasoning,readStream:readChatStream,
+    spentThisMonth:async()=>(await usageTotals({purpose:"muse"})).monthly,
+    record:(usage,cost)=>recordUsage({...usage,cost},{purpose:"muse",model:"meta/"+muse.model()})});
+}
+function museReady(){return require("./muse").configured()}
 // "Look before replying" (look-check.js): an AI that can see compares screenshots after a visual
 // change with what the owner asked. Free vision models from OpenRouter's list by default;
 // KAIROQ_LOOK_MODELS names others. Returns {ok,problems,model} or null when no model could judge.
 async function reviewLook({request,pictures,signal}){
-  if(!openRouterConfigured()||!pictures||!pictures.length||process.env.KAIROQ_LOOK_CHECK==="off")return null;
+  if((!openRouterConfigured()&&!museReady())||!pictures||!pictures.length||process.env.KAIROQ_LOOK_CHECK==="off")return null;
   const look=require("./look-check");
   const chosen=String(process.env.KAIROQ_LOOK_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
   const free=chosen.length?[]:(await getModels().catch(()=>[])).filter(m=>m.isFree&&m.supportsVision&&!m.local&&m.id!=="openrouter/free").sort((a,b)=>(b.context_length||0)-(a.context_length||0)).map(m=>m.id).slice(0,3);
   const content=[{type:"text",text:look.prompt(request)},...pictures.slice(0,2).map(p=>({type:"image_url",image_url:{url:"data:"+(p.mime||"image/jpeg")+";base64,"+p.data}}))];
+  if(museReady()){
+    try{const r=await callMuse({messages:[{role:"user",content}],temperature:0.1,maxOutputTokens:800,signal});const v=look.verdict(r.text);if(v)return{...v,model:r.model}}
+    catch(err){if(signal?.aborted)throw err;console.log("[look-check] Muse: "+String(err.message||err).slice(0,160))}
+  }
   for(const model of [...chosen,...free]){
     try{
       const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(60000)]):AbortSignal.timeout(60000),body:JSON.stringify({model,messages:[{role:"user",content}],temperature:0.1,max_tokens:600})});
@@ -6947,6 +6967,10 @@ async function callChatAnswer(opts,parse){
       const r=await hermes.streamChat({messages:opts.messages,onToken:opts.onToken?(d=>{opts._all=(opts._all||"")+d;opts.onToken(d,opts._all)}):undefined,signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(90000)]):AbortSignal.timeout(90000)});
       return parse(r.text,"kairoq-agent");
     }catch(err){if(opts.signal?.aborted)throw err;errors.push("Kairoq Agent: "+String(err.message||err).slice(0,120))}
+  }
+  if(museReady()){
+    try{const r=await callMuse({...opts,maxOutputTokens:Math.min(4000,Number(opts.maxOutputTokens)||2500)});return parse(r.text,r.model)}
+    catch(err){if(opts.signal?.aborted)throw err;errors.push("Muse: "+String(err.message||err).slice(0,120))}
   }
   if(fb){
     try{return await callFastBuilder(fb,{...opts,maxOutputTokens:Math.min(4000,Number(opts.maxOutputTokens)||1200),signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(90000)]):AbortSignal.timeout(90000)},parse)}
