@@ -22,3 +22,12 @@ body::before,.home-hero::before,.home-hero::after,.aurora,.mock-glow{display:non
 .verified li.bad .vmark{color:#8a2d3b!important}
 .verified .verification-scope{color:#6e6e73!important;font-size:12.5px!important;margin:10px 0 0!important;padding-top:10px;border-top:1px solid #f0ece7}
 .messages .user .msg-text,.messages .user>.bubble,.messages li.user{background:#f8f5f1!important;border-color:#ece6df!important}
+
+/* Browser checks that all passed: one quiet line under the reply; the list opens on a click. */
+.verified-quiet{margin-top:8px;font-size:12.5px;color:#6e6e73}
+.verified-quiet>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;padding:2px 0;border-radius:6px}
+.verified-quiet>summary::-webkit-details-marker{display:none}
+.verified-quiet>summary:hover{color:#1d1d1f}
+.verified-quiet>summary:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.verified-quiet .vmark{color:#2f7d4f;font-weight:700}
+.verified-quiet[open]>.verified{margin-top:6px}
