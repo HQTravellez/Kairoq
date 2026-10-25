@@ -4451,6 +4451,18 @@ async function handleChat(req, res) {
       }
       const selected=models.find(m=>m.id===requestedModel);
       if(!selected)throw Object.assign(new Error(`${requestedModel} isn't available right now. Use Refresh models, or choose Auto (free).`),{status:400});
+      // A few paid models the owner chose to try (KAIROQ_PAID_CHAT_MODELS, Hermes 4 by default) run
+      // even in Zero Cost mode, within their own monthly cap (KAIROQ_PAID_CHAT_MONTHLY_USD).
+      if(!selected.isFree&&paidChatAllowed(requestedModel)){
+        await enforceBudget();
+        const cap=paidChatCap(),spent=(await usageTotals({purpose:"chat-paid"})).monthly;
+        if(cap>0&&spent>=cap)throw Object.assign(new Error(`${selected.name||requestedModel} has used this month's $${cap.toFixed(2)} limit for paid chat models. Pick a free model, or raise KAIROQ_PAID_CHAT_MONTHLY_USD on Railway.`),{status:402});
+        writeSSE(res,"status",{message:`${selected.name||requestedModel} · paid`});
+        const result=await streamOpenRouter({messages:finalMessages,temperature,reasoning_effort:effort,model:requestedModel,stream:true,usage:{include:true}},res);
+        if(result.usage)await recordUsage(result.usage,{purpose:"chat-paid",model:result.finalModel,kind:"chat_selected_paid"});
+        writeSSE(res,"done",{ok:true,provider:"openrouter",model:result.finalModel});
+        return res.end();
+      }
       if(!selected.isFree)throw Object.assign(new Error(`${selected.name||requestedModel} is a paid model, and paid models are switched off (Zero Cost mode). Choose a free model or Auto (free).`),{status:400});
       writeSSE(res,"status",{message:`Free · ${selected.name||requestedModel}`});
       const result=await streamOpenRouter({messages:finalMessages,temperature,reasoning_effort:effort,model:requestedModel,stream:true,usage:{include:true}},res);
@@ -6661,9 +6673,13 @@ function pluginStatus(env = process.env) {
   };
 }
 
+// Paid chat models the owner allows to try (Hermes 4 by default), with their own monthly cap.
+function paidChatModels(env=process.env){return String(env.KAIROQ_PAID_CHAT_MODELS??"nousresearch/hermes-4-405b,nousresearch/hermes-4-70b").split(",").map(s=>s.trim()).filter(Boolean)}
+function paidChatAllowed(id,env=process.env){return Boolean(env.OPENROUTER_API_KEY)&&paidChatModels(env).includes(String(id))}
+function paidChatCap(env=process.env){const n=Number(env.KAIROQ_PAID_CHAT_MONTHLY_USD??20);return Number.isFinite(n)&&n>=0?n:20}
 async function handleModels(_req, res) {
   try {
-    const models = await getModels();
+    const models = (await getModels()).map(m=>paidChatAllowed(m.id)?{...m,allowedPaid:true}:m);
     return json(res, 200, { models });
   } catch (err) {
     return json(res, 500, { error: err.message || "Could not load models." });
