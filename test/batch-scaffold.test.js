@@ -24,7 +24,7 @@ test('one model file batch builds multiple modules and proves an interaction in 
   await require('../account-memory').settled();
   const learning=require('../verified-learning'),lessons=await learning.entries(builder.loadMeta(meta.id));
   assert.equal(lessons.length,1);assert.ok(lessons[0].actions.includes('write_files'));
-  let received='';await builder.discuss(meta.id,'How should the counter be verified?',{callModel:async(o,parse)=>{received=o.messages[0].content;return parse('Test a click and assert the increment.');}});
+  let received='';await builder.discuss(meta.id,'How should the counter be verified?',{callModel:async(o,parse)=>{received=o.messages.map(m=>typeof m.content==='string'?m.content:JSON.stringify(m.content)).join('\n');return parse('Test a click and assert the increment.');}});
   assert.match(received,/VERIFIED PROJECT PROCEDURES/);
   assert.equal((await learning.trainingExamples(builder.loadMeta(meta.id))).length,0,'no training export before review');
   for(const [name,content] of Object.entries(files))assert.equal(builder.loadFiles(meta.id,result.version)[name],content);
