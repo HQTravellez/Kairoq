@@ -1,5 +1,7 @@
 "use strict";
 const test=require('node:test'),assert=require('node:assert/strict');
+// The fixtures below name exact source lines (src/App.jsx:3:4); formatting would move them.
+process.env.KAIROQ_FORMAT_CODE='off';
 const fs=require('fs'),os=require('os'),path=require('path'),http=require('http'),crypto=require('crypto'),zlib=require('zlib');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-tier2-'));
 process.env.NODE_ENV='test';
