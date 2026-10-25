@@ -13,6 +13,12 @@ It runs on Railway at kairoq-production.up.railway.app. Read this file before ev
      left out) before writing code.
   3. **Build**, then **check**: tests, plus a real browser screenshot for anything visual.
      Look at the screenshot critically before showing it; "it renders" is not "it looks good".
+- **Four coding habits** (from andrej-karpathy-skills, MIT; the same rules Kairoq's builder
+  follows in `builder-method.js`):
+  1. **Think before coding**: read the code, state assumptions, ask only when truly blocked.
+  2. **Keep it simple**: the smallest solution that works; no speculative extras.
+  3. **Change only what's needed**: touch only the files and lines the task needs.
+  4. **Prove it**: define what "done" means first, then run the tests and report real results.
 - **Crisp, plain answers.** Short replies, plain words, no jargon. Lead with the answer.
 - **Wire things in for real.** When Ka shares a GitHub project, say honestly whether it fits;
   if it does, integrate it properly (not hidden behind a flag nobody turns on). Check the
