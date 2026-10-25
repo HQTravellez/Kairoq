@@ -110,6 +110,10 @@ requirements. API/schema compatibility and offline tests do not establish produc
   downloaded on request through api.polyhaven.com. Kairoq keeps the source and credit with
   each model.
 
+## Fonts
+
+- Fira Code — https://github.com/tonsky/FiraCode — SIL Open Font License 1.1. Loaded from Google
+  Fonts for Kairoq's code views and offered to apps as a code font (`react-design.js`).
 ## Replica method (build from a reference)
 
 - Replica skill pack — https://github.com/Jakeschincariol/replica-skill — MIT. Its review themes
