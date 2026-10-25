@@ -937,7 +937,7 @@ function renderWork(j){
  if(detailState.source==='live')renderDetail();
  if(stick)list.scrollTop=list.scrollHeight;
 }
-function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');if(r)text(r,'Thinking…')}if(detailState.source==='live')renderDetail()}
+function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');const waited=Date.now()-work.started;if(r)text(r,waited>45000?'Planning the app… (a slow free model can take a few minutes; the fast model streams at once)':waited>15000?'Planning the app…':'Thinking…')}if(detailState.source==='live')renderDetail()}
 // ---------- the Details panel (over the preview) ----------
 const detailState={source:null,tab:'timeline'};
 function openDetail(source,tab){detailState.source=source;if(tab)detailState.tab=tab;$('detail').classList.remove('hidden');document.querySelector('.stage').classList.add('show-detail');renderDetail()}
@@ -1369,6 +1369,7 @@ $('settings-open').onclick=async()=>{
   text($('stripe-hook-url'),settings.stripe_webhook_url);text($('stripe-events'),settings.stripe_events.join(', '));
   text($('email-status'),settings.email?'Email is set up. Apps can notify you with email.send({to:"owner", …}).':'Email is not set up on this server yet (KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM).');
   const engines=settings.engines||['kairoq'];$('engine-row').classList.toggle('hidden',engines.length<2);$('engine-note').classList.toggle('hidden',engines.length<2);$('engine-select').value=settings.engine||'kairoq';
+  $('app-managers').value=(settings.app_managers||[]).join(', ');text($('app-managers-status'),'');
   $('gh-repo').value=gh.github?.repo||'';
   if(gh.github?.last_push)text($('gh-status'),'Last push: version '+gh.github.last_push.version+' · '+when(gh.github.last_push.at));
   if(!settings.encryption)text($('settings-error'),'Saving keys needs APP_ENCRYPTION_KEY on the server.');
@@ -1393,6 +1394,11 @@ $('db-connect').onclick=async()=>{
 $('db-disconnect').onclick=async()=>{
  if(!confirm('Disconnect Supabase? Your data stays in Supabase. The app goes back to Kairoq\'s own copy, as it was when you connected.'))return;
  try{const {database}=await api('/projects/'+state.project.id+'/database',{method:'DELETE'});showDatabase(database)}catch(err){text($('settings-error'),err.message)}
+};
+$('app-managers-save').onclick=async()=>{
+ text($('settings-error'),'');
+ try{const {settings}=await api('/projects/'+state.project.id+'/settings',{method:'POST',body:{app_managers:$('app-managers').value}});$('app-managers').value=(settings.app_managers||[]).join(', ');text($('app-managers-status'),'Saved')}
+ catch(err){text($('settings-error'),err.message)}
 };
 async function saveSecrets(fields){
  const body={};for(const [id,name] of fields){const v=$(id).value.trim();if(v)body[name]=v}
