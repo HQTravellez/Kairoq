@@ -46,6 +46,7 @@
     "pdfjs-dist": "4.10.38",
     "pg": "8.23.1",
     "playwright-core": "^1.56.0",
+    "prettier": "3.9.10",
     "pyodide": "314.0.7",
     "qrcode.react": "4.2.0",
     "quickjs-emscripten": "0.31.0",
