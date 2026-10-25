@@ -92,3 +92,15 @@ background), `MiniGame` (a catch game with keyboard, drag and touch) and `Scene3
 for custom React Three Fiber scenes). All use studio lighting made on the device (no downloads),
 show a fallback without WebGL, pause off screen and hold still for reduced motion. The browser
 check confirms each one draws.
+
+## Meta Muse Spark (Meta Model API)
+
+A paid model from Meta, reached at `https://api.meta.ai/v1` (https://dev.meta.ai/docs/quickstart).
+- Kairoq uses it for builds picked as "Muse Spark" in the model menu (3 credits), for Auto builds when `KAIROQ_BUILDER_PAID_APPROVED=true`, for answers to questions in the builder, and for the screenshot check after visual changes.
+- Railway variables:
+  - `META_MODEL_API_KEY`: the key. Add it in Railway, never in code.
+  - `KAIROQ_MUSE_MODEL`: default `muse-spark-1.3`.
+  - `KAIROQ_MUSE_MONTHLY_USD`: monthly cap, default 20; 0 means no cap.
+  - `KAIROQ_MUSE=off`: turns it off.
+- Cost is worked out from token counts at $1.25 per million input tokens and $4.25 per million output tokens, and recorded as `muse` in the usage ledger.
+

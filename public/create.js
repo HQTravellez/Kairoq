@@ -776,7 +776,7 @@ function renderTiers(){
   if(m.top)name.append(el('i','model-tag top','Top pick'));
   const credits=m.credits?m.credits+' credit'+(m.credits===1?'':'s')+' a message':'';
   const bits=[m.note,credits].filter(Boolean).join(' · ');
-  const line=el('span',null,bits+(m.enabled?'':' · needs OpenRouter and paid builds switched on'));
+  const line=el('span',null,bits+(m.enabled?'':m.provider==='meta'?' · needs the Muse key (META_MODEL_API_KEY) on the server':' · needs OpenRouter and paid builds switched on'));
   if(m.costlier&&m.enabled)line.append(el('i','model-tag cost','costlier'));
   b.append(name,line);
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};

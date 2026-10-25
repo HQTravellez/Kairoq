@@ -9,7 +9,7 @@ test('Auto comes first; named models are listed but off until OpenRouter and pai
  assert.equal(choices.pick('anthropic/claude-opus-5.5',{}),null,'a named model without OpenRouter means Auto');
  const env={OPENROUTER_API_KEY:'x',KAIROQ_BUILDER_PAID_APPROVED:'true'};
  const on=choices.list(env);
- assert.ok(on.slice(1).every(m=>m.enabled));
+ assert.ok(on.slice(1).every(m=>m.enabled||m.provider==='meta'),'Muse Spark needs its own key (META_MODEL_API_KEY)');
  const fable=on.find(m=>m.id==='anthropic/claude-fable-5.1');
  assert.ok(fable.top&&fable.costlier,'the strongest model is marked top pick and costlier');
  assert.equal(choices.pick('anthropic/claude-opus-5.5',env).credits,10);
