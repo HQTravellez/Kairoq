@@ -97,7 +97,7 @@ function createSseParser(onFrame) {
  */
 async function streamChat({ messages, onToken = () => {}, onStatus = () => {}, onReasoning = () => {}, signal, env = process.env, fetchImpl = fetch }) {
   const s = settings(env);
-  if (!configured(env)) throw new HermesError("Hermes is not configured.");
+  if (!configured(env)) throw new HermesError("Kairoq Agent is not configured.");
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort(signal?.reason);
   if (signal) { if (signal.aborted) abortFromCaller(); else signal.addEventListener("abort", abortFromCaller, { once: true }); }
@@ -125,13 +125,13 @@ async function streamChat({ messages, onToken = () => {}, onStatus = () => {}, o
         body: JSON.stringify({ model: "hermes-agent", stream: true, messages: toHermesMessages(messages) }),
       });
     } catch (e) {
-      throw new HermesError(controller.signal.reason?.message || `Hermes is unreachable (${e.cause?.code || e.message}).`);
+      throw new HermesError(controller.signal.reason?.message || `Kairoq Agent is unreachable (${e.cause?.code || e.message}).`);
     }
     if (!response.ok || !response.body) {
       let detail = "";
       try { const body = await response.json(); detail = body?.error?.message || body?.error || ""; } catch {}
       const hint = response.status === 401 ? " Check that KAIROQ_HERMES_KEY matches API_SERVER_KEY." : response.status === 429 ? " Hermes is busy." : "";
-      throw new HermesError(`Hermes returned HTTP ${response.status}${detail ? `: ${String(detail).slice(0, 200)}` : ""}.${hint}`, { status: response.status });
+      throw new HermesError(`Kairoq Agent returned HTTP ${response.status}${detail ? `: ${String(detail).slice(0, 200)}` : ""}.${hint}`, { status: response.status });
     }
 
     const parse = createSseParser(frame => {
@@ -161,13 +161,13 @@ async function streamChat({ messages, onToken = () => {}, onStatus = () => {}, o
       }
     } catch (e) {
       const reason = controller.signal.reason;
-      throw new HermesError(reason?.message || (signal?.aborted ? "Request cancelled." : `Hermes stream failed (${e.message}).`), { afterPartial: Boolean(text) });
+      throw new HermesError(reason?.message || (signal?.aborted ? "Request cancelled." : `Kairoq Agent stream failed (${e.message}).`), { afterPartial: Boolean(text) });
     }
 
-    if (finishReason === "error" || failure) throw new HermesError(`Hermes could not finish this reply${failure ? `: ${failure}` : "."}`, { afterPartial: Boolean(text) });
-    if (finishReason === "cancelled") throw new HermesError("Hermes cancelled this reply.", { afterPartial: Boolean(text) });
-    if (!finishReason) throw new HermesError("Hermes ended the reply unexpectedly.", { afterPartial: Boolean(text) });
-    if (!text.trim()) throw new HermesError("Hermes returned an empty reply.");
+    if (finishReason === "error" || failure) throw new HermesError(`Kairoq Agent could not finish this reply${failure ? `: ${failure}` : "."}`, { afterPartial: Boolean(text) });
+    if (finishReason === "cancelled") throw new HermesError("Kairoq Agent cancelled this reply.", { afterPartial: Boolean(text) });
+    if (!finishReason) throw new HermesError("Kairoq Agent ended the reply unexpectedly.", { afterPartial: Boolean(text) });
+    if (!text.trim()) throw new HermesError("Kairoq Agent returned an empty reply.");
     return { text, usage, finishReason, model: "hermes-agent" };
   } finally {
     clearTimeout(timer);
