@@ -199,7 +199,7 @@ async function crawlSite(raw,{maxPages=MAX_PAGES,fetchImpl=fetch,har,timeoutMs=2
     if(await resolvesPrivate(here.hostname))break;
     // A redirect on the first page (example.com → www.example.com) moves the crawl to the new site.
     if(!pages.length&&here.origin!==origin){if(!allowPrivate())await safeUrl(here.href);origin=here.origin;rules=await robots(origin,{fetchImpl});if(!robotsAllows(rules,here.pathname))throw fail(403,'This website asks automated tools not to read that page (robots.txt), so Kairoq will not analyze it.')}
-    pages.push({url:here.href,path:here.pathname+(here.hash.startsWith('#/')?here.hash:''),...facts,links:undefined,nav:facts.links.filter(l=>l.nav).map(l=>({text:l.text,href:l.href})).slice(0,30),footer:facts.links.filter(l=>l.footer).map(l=>l.text).filter(Boolean).slice(0,30),link_count:facts.links.length});
+    pages.push({url:here.href,path:here.pathname+(here.hash.startsWith('#/')?here.hash:''),...facts,links:undefined,nav:facts.links.filter(l=>l.nav).map(l=>({text:l.text,href:l.href})).slice(0,30),app_links:facts.links.map(l=>l.href).filter(h=>/^https:\/\/(apps\.apple\.com|play\.google\.com)\//.test(h)).slice(0,4),footer:facts.links.filter(l=>l.footer).map(l=>l.text).filter(Boolean).slice(0,30),link_count:facts.links.length});
     if(shots.length<2)shots.push({name:'reference-'+(shots.length?'page-2':'home')+'-desktop',page:here.pathname,mime:'image/jpeg',data:await shoot(page,1280,800,2600)});
     // Same-site pages, navigation first.
     const next=[...facts.links.filter(l=>l.nav),...facts.links.filter(l=>!l.nav&&!l.footer),...facts.links.filter(l=>l.footer)];
@@ -408,6 +408,7 @@ Respond with ONLY a JSON object:
 "design":{"name":"style name","summary":"","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"","body":""},"radius":"0.75rem","layout":"","imagery":"","details":["5-8 concrete rules: spacing, cards, motion, responsive behaviour"]},
 "assets":[{"kind":"image|audio|model","query":"search words for openly licensed stock","use":"where it goes"}],
 "steps":["ordered build steps"],
+"out_of_scope":[{"what":"something the reference has that cannot be copied","why":"its users and network, licensed content, data it owns, partner deals, regulated licences or hardware"}],
 "notes":"what you could not observe and the assumptions you made"}
 The design palette may follow the measured colours where they suit an original brand; choose fonts only from: FONTS. At most 5 journeys and 6 assets.`;
 function cleanText(v,n){return String(v??'').replace(/[\u0000-\u001f]+/g,' ').trim().slice(0,n)}
@@ -416,7 +417,7 @@ function normalizePlan(v){
  if(!v||typeof v!=='object')throw fail(422,'The plan was not an object');
  const plan={
   name:cleanText(v.name,60)||'New app',summary:cleanText(v.summary,800),audience:cleanText(v.audience,300),
-  features:list(v.features,16,f=>f&&cleanText(f.name,80)&&{name:cleanText(f.name,80),description:cleanText(f.description,400),priority:[1,2,3].includes(Number(f.priority))?Number(f.priority):2,area:['frontend','backend','integration'].includes(f.area)?f.area:'frontend',enabled:f.enabled!==false}),
+  features:list(v.features,16,f=>f&&cleanText(f.name,80)&&{name:cleanText(f.name,80),description:cleanText(f.description,400),priority:[1,2,3].includes(Number(f.priority))?Number(f.priority):2,area:['frontend','backend','integration'].includes(f.area)?f.area:'frontend',enabled:f.enabled!==false,...(f.added?{added:cleanText(f.added,60)||'yes'}:{})}),
   pages:list(v.pages,10,p=>p&&{path:/^\/[\w\-/:]*$/.test(String(p.path||''))?String(p.path):'/',name:cleanText(p.name,60),purpose:cleanText(p.purpose,300),sections:list(p.sections,12,s=>cleanText(s,160))}),
   entities:list(v.entities,12,e=>e&&/^[a-z][a-z0-9_]{0,39}$/i.test(String(e.name||'').trim())&&{name:String(e.name).trim().toLowerCase(),fields:list(e.fields,20,f=>cleanText(f,80)),access:['public','signed-in','owner'].includes(e.access)?e.access:'signed-in'}),
   auth:{required:Boolean(v.auth&&v.auth.required),methods:list(v.auth&&v.auth.methods,4,m=>['email','google','magic-link'].includes(String(m).toLowerCase())?String(m).toLowerCase():null),roles:list(v.auth&&v.auth.roles,5,r=>cleanText(r,30))},
@@ -424,7 +425,9 @@ function normalizePlan(v){
   api:list(v.api,30,a=>a&&{method:/^(GET|POST|PUT|PATCH|DELETE)$/.test(String(a.method||'').toUpperCase())?String(a.method).toUpperCase():'GET',path:cleanText(a.path,120),purpose:cleanText(a.purpose,200)}),
   journeys:list(v.journeys,6,j=>j&&cleanText(j.name,80)&&cleanText(j.steps,800)&&{name:cleanText(j.name,80),steps:cleanText(j.steps,800)}),
   assets:list(v.assets,6,a=>a&&cleanText(a.query,80)&&{kind:['image','audio','model'].includes(a.kind)?a.kind:'image',query:cleanText(a.query,80),use:cleanText(a.use,160)}),
-  steps:list(v.steps,15,s=>cleanText(s,300)),notes:cleanText(v.notes,1500)
+  steps:list(v.steps,15,s=>cleanText(s,300)),notes:cleanText(v.notes,1500),
+  // What cannot be copied at all (Replica's skip rows): its users and network, licensed content, data it owns, partner deals.
+  out_of_scope:list(v.out_of_scope,8,o=>o&&cleanText(o.what,120)&&{what:cleanText(o.what,120),why:cleanText(o.why,240)})
  };
  if(!plan.features.length)throw fail(422,'The plan has no features');
  try{plan.design=require('./react-design').normalize(v.design||{})}catch{plan.design=null}

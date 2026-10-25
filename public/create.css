@@ -755,3 +755,11 @@ body.embed #side,body.embed #side-open-btn{display:none!important}
 .q-opt:disabled{opacity:.5;cursor:default}
 .q-tag{flex-shrink:0;font-size:11px;font-weight:600;color:#fff;background:#15140f;border-radius:999px;padding:2px 8px}
 .q-hint{margin:6px 0 0;font-size:12px;color:#857f74}
+/* Build from a reference: what its users complain about (react-reviews.js) */
+.ref-themes .ref-theme-head{font-weight:600}
+.ref-themes .ref-theme-head.req::before{content:"Asked for: ";font-weight:500;opacity:.7}
+.ref-quotes{display:grid;gap:6px;margin:6px 0 2px}
+.ref-quotes blockquote{margin:0;padding:6px 10px;border-left:3px solid var(--border);font-size:13px;line-height:1.45;opacity:.9}
+.ref-quotes blockquote a{white-space:nowrap;font-size:12px}
+.ref-angle{margin:8px 0 0;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08);font-weight:500}
+.ref-angle:empty{display:none}

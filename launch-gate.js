@@ -37,13 +37,15 @@ async function check(id,n,{callModel,inspect}={}){
   const files=builder.loadFiles(id,n);let cfg={collections:{}};try{cfg=require('./react-backend').parseConfig(files)}catch{}
   for(const x of require('./react-security').scan(files,cfg))if(x.severity==='high'&&x.file!=='src/backend.json')blockers.push({kind:'security',name:x.title,why:(x.file?x.file+': ':'')+x.fix});
  }catch{}
+ // 4. An app built from a reference must not still carry the original's name, address or colours.
+ try{const sweep=require('./react-sweep'),found=sweep.check(id,n);if(found.length)blockers.push({kind:'leftover',name:'the original\'s '+[...new Set(found.map(f=>f.kind))].join(', '),why:sweep.message(found)})}catch{}
  const result={ok:!blockers.length,version:n,at:new Date().toISOString(),blockers:blockers.slice(0,12),warnings:warnings.slice(0,8),ran:r.ran,protected:checks.list(builder.loadMeta(id)).filter(c=>c.enabled!==false).map(c=>c.name),...(notes.length?{notes}:{})};
  const fresh=builder.loadMeta(id);fresh.launch_gate=result;builder.saveMeta(fresh);
  return result;
 }
 // One message for the owner.
 function message(g){
- const kinds={check:'Not working',unchecked:'Not checked',security:'Security'};
+ const kinds={check:'Not working',unchecked:'Not checked',security:'Security',leftover:'Still has'};
  return'Before this goes live, Kairoq found:\n'+g.blockers.map(b=>'- '+kinds[b.kind]+': '+b.name+' ('+b.why+')').join('\n')+'\n\nFix these first (ask the chat, or use Fix it), or publish anyway: the live guard will then check the app every hour.';
 }
 module.exports={check,message,enabled};
