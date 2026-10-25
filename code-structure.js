@@ -11,6 +11,7 @@ const RULES=`Code structure (write it the way a senior engineer sets up a projec
 - src/hooks/use<Thing>.js: loading and saving data (useBookings.js wraps collection('bookings')), so pages never repeat backend calls.
 - src/lib/: helpers and backend access (lib/format.js, lib/api.js). src/data/: copy, menus, prices, FAQs, sample records and constants.
 - functions/ and sql/ hold the backend; src/backend.json declares collections.
+- Page addresses: in App.jsx, import { Router } from 'kairoq' and wrap <Routes> in <Router> (real addresses like /services that search engines list; never HashRouter or BrowserRouter). Link with <Link to="/services">, never href="#/services". Every page calls usePageMeta({ title: "Prices – Joe's Barbers", description: "One sentence about this page." }) from 'kairoq'.
 - Size: a page under 200 lines, a component under 250, App.jsx under 120. When a file grows past that, split it into smaller components in the same feature folder.
 - Names say what things are (BookingForm, useBookings, formatPrice), never Component1, utils2 or temp. Imports use relative paths, in the order: packages, then app files.
 - A small change touches only the files it needs, with "edits" where possible.
@@ -24,7 +25,7 @@ Readable code (a teammate should understand any file in a minute):
 - The code is formatted automatically (Prettier, 2 spaces, single quotes), so do not hand-align anything.`;
 
 // The request behind "Tidy up the code": reorganise without changing what the app does.
-const TIDY=`Tidy up the code: reorganise this project into the code structure below without changing what the app does or how it looks. Move page content out of App.jsx into src/pages/, split long files into components grouped by feature under src/components/<feature>/, move data loading into hooks in src/hooks/, move copy, menus, prices and sample data into src/data/, and rename unclear files and names, add a one-line comment at the top of each file saying what it is for, split long functions, and remove console.log lines and commented-out code. Update every import. Do not change copy, styles, routes, collections, backend functions or behaviour. In "message", list what moved where in a few short lines.\n\n`+RULES;
+const TIDY=`Tidy up the code: reorganise this project into the code structure below without changing what the app does or how it looks. Move page content out of App.jsx into src/pages/, split long files into components grouped by feature under src/components/<feature>/, move data loading into hooks in src/hooks/, move copy, menus, prices and sample data into src/data/, and switch HashRouter or BrowserRouter to <Router> from 'kairoq' and "#/page" links to <Link to="/page">, give every page usePageMeta with its own title and description, rename unclear files and names, add a one-line comment at the top of each file saying what it is for, split long functions, and remove console.log lines and commented-out code. Update every import. Do not change copy, styles, routes, collections, backend functions or behaviour. In "message", list what moved where in a few short lines.\n\n`+RULES;
 
 const LIMITS=[[/^src\/App\.jsx$/,120,'App.jsx should only wire the app (layout and routes)'],[/^src\/pages\//,200,'a page'],[/^src\/components\/(?!ui\/)/,250,'a component'],[/^src\/(hooks|lib)\//,250,'a helper']];
 function lines(s){return String(s||'').split('\n').length}
@@ -56,6 +57,7 @@ function check(files,changed=Object.keys(files||{}),base={}){
   const n=lines(src),lim=LIMITS.find(([re])=>re.test(f));
   const was=typeof base[f]==='string'?base[f]:null;
   if(lim&&n>lim[1]&&(was===null||lines(was)<=lim[1]))problems.push(f+' has '+n+' lines; '+lim[2]+' should stay under '+lim[1]+'. Split it into smaller files.');
+  if(/\b(HashRouter|BrowserRouter)\b/.test(src)&&(was===null||!/\b(HashRouter|BrowserRouter)\b/.test(was)))problems.push(f+' uses '+(/HashRouter/.test(src)?'HashRouter':'BrowserRouter')+'; wrap the routes in <Router> from \'kairoq\' so every page has a real address search engines can list.');
   if(was===null&&/^src\/[^/]+\.jsx$/.test(f)&&!/^src\/(App|main)\.jsx$/.test(f))problems.push(f+' sits at the top of src/; move it to src/pages/ or src/components/<feature>/.');
   if(/^src\/(pages|components)\//.test(f)){const c=components(src);if(c.length>3&&(was===null||components(was).length<=3))problems.push(f+' defines '+c.length+' components ('+c.slice(0,6).join(', ')+'); keep one component per file (small private helpers are fine).')}
   if(!f.startsWith('src/data/')&&/\.jsx$/.test(f)){const a=longestArray(src);if(a>40&&(was===null||longestArray(was)<=40))problems.push(f+' holds a '+a+'-line list of data; move it to src/data/ and import it.')}

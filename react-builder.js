@@ -6,7 +6,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const ROOT=()=>process.env.KAIROQ_REACT_PROJECTS_DIR||path.join(__dirname,'workspace','react-projects');
 // Packages generated apps may import (and their sub-paths). All are installed with Kairoq.
 const APP_PACKAGES={react:'UI',
- 'react-dom':'UI','lucide-react':'icons','react-router-dom':'routing (use HashRouter)',
+ 'react-dom':'UI','lucide-react':'icons','react-router-dom':'routing (Routes, Route, Link, useNavigate; wrap the routes in <Router> from kairoq, never HashRouter or BrowserRouter)',
  recharts:'charts','framer-motion':'animation','date-fns':'dates',clsx:'class names','tailwind-merge':'merging Tailwind classes','class-variance-authority':'component variants',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
@@ -876,6 +876,10 @@ function sendText(req,res,status,headers,body){
  res.writeHead(status,{...headers,...(enc?{'Content-Encoding':enc,'Vary':'Accept-Encoding'}:{})});
  res.end(req.method==='HEAD'?undefined:out);
 }
+// Pages have real addresses (/services/details), so index.html can be served from any depth.
+// Its "./assets/..." links are made absolute from the app's folder, so they load everywhere.
+function absoluteAssets(html,prefix){const p=String(prefix||'/').replace(/\/*$/,'/');return String(html).replace(/(\s(?:src|href)=["'])\.\//g,'$1'+p)}
+function servedPrefix(req,rest){const full=String(req.url||'/').split('?')[0],r=String(rest||'').split('?')[0];return(full.endsWith(r)?full.slice(0,full.length-r.length):full).replace(/\/*$/,'/')}
 function serveDist(req,res,distDir,rest,{sandbox}){
  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);return res.end()}
  let decoded;try{decoded=decodeURIComponent(String(rest||'').split('?')[0])}catch{res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Bad request');return true}
@@ -895,6 +899,8 @@ function serveDist(req,res,distDir,rest,{sandbox}){
   // Other files opened directly (an SVG, say) must not run script on Kairoq's origin either.
   if(sandbox)headers['Content-Security-Policy']="sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:";
  }
+ // A page at a deeper address gets index.html with absolute asset links.
+ if(html&&rel.includes('/')&&path.basename(target)==='index.html'&&target===path.join(distDir,'index.html'))return sendText(req,res,200,headers,absoluteAssets(fs.readFileSync(target,'utf8'),servedPrefix(req,rest)));
  let body=target;
  const enc=COMPRESSIBLE.has(ext)?encodingFor(req):null,packed=enc?compressedFile(target,enc):null;
  if(packed){body=packed;headers['Content-Encoding']=enc;headers.Vary='Accept-Encoding'}
@@ -947,4 +953,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
