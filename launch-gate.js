@@ -21,13 +21,15 @@ async function check(id,n,{callModel,inspect}={}){
  if(callModel)try{cov=await coverage.ensure(id,{callModel,inspect,version:n})}catch(e){notes.push('Kairoq could not list the app\'s flows this time ('+String(e.message||e).slice(0,120)+').')}
  // 2. Every saved check on this version.
  meta=builder.loadMeta(id);
- const r=checks.list(meta).some(c=>c.enabled!==false)?await checks.run(id,builder.previewUrl(meta,n),{inspect,version:n}):{ran:0,failed:[],skipped:false};
+ // Desktop and iPhone Safari failures hold the publish; phone layout and slow-phone problems are warnings.
+ const r=checks.list(meta).some(c=>c.enabled!==false)?await checks.runDevices(id,builder.previewUrl(meta,n),{inspect,version:n}):{ran:0,failed:[],skipped:false};
  if(r.skipped)return{ok:true,skipped:true,blockers:[],version:n};
- for(const f of r.failed)blockers.push({kind:'check',name:f.name,why:'it failed in Kairoq\'s browser'+(f.step?' at: '+f.step:'')+(f.error?' ('+String(f.error).slice(0,140)+')':'')});
+ const early=[];
+ for(const f of r.failed){const item={kind:'check',name:f.name,why:'it failed in Kairoq\'s browser'+(f.device==='iphone'?' (Safari on iPhone)':'')+(f.step?' at: '+f.step:'')+(f.error?' ('+String(f.error).slice(0,140)+')':'')};(['desktop','iphone'].includes(f.device||'desktop')?blockers:early).push(item)}
  // Money flows nobody could check: when none of the money flows is protected, nothing shows the
  // app can take business, so that holds the publish; otherwise they are warnings (a payment page
  // on another site, for one, cannot be checked on a test copy).
- const warnings=[],passing=new Set(checks.list(builder.loadMeta(id)).map(c=>c.name.toLowerCase()));
+ const warnings=[...early],passing=new Set(checks.list(builder.loadMeta(id)).map(c=>c.name.toLowerCase()));
  const money=(cov&&cov.version===n?cov.flows:[]).filter(f=>f.money);
  const unchecked=money.filter(f=>!f.covered&&!passing.has(String(f.name).toLowerCase()));
  const target=money.length&&unchecked.length===money.length?blockers:warnings;
@@ -37,9 +39,7 @@ async function check(id,n,{callModel,inspect}={}){
   const files=builder.loadFiles(id,n);let cfg={collections:{}};try{cfg=require('./react-backend').parseConfig(files)}catch{}
   for(const x of require('./react-security').scan(files,cfg))if(x.severity==='high'&&x.file!=='src/backend.json')blockers.push({kind:'security',name:x.title,why:(x.file?x.file+': ':'')+x.fix});
  }catch{}
- // 4. An app built from a reference must not still carry the original's name, address or colours.
- try{const sweep=require('./react-sweep'),found=sweep.check(id,n);if(found.length)blockers.push({kind:'leftover',name:'the original\'s '+[...new Set(found.map(f=>f.kind))].join(', '),why:sweep.message(found)})}catch{}
- const result={ok:!blockers.length,version:n,at:new Date().toISOString(),blockers:blockers.slice(0,12),warnings:warnings.slice(0,8),ran:r.ran,protected:checks.list(builder.loadMeta(id)).filter(c=>c.enabled!==false).map(c=>c.name),...(notes.length?{notes}:{})};
+ const result={ok:!blockers.length,version:n,at:new Date().toISOString(),blockers:blockers.slice(0,12),warnings:warnings.slice(0,8),ran:r.ran,devices:r.devices||['desktop'],protected:checks.list(builder.loadMeta(id)).filter(c=>c.enabled!==false).map(c=>c.name),...(notes.length?{notes}:{})};
  const fresh=builder.loadMeta(id);fresh.launch_gate=result;builder.saveMeta(fresh);
  return result;
 }

@@ -114,7 +114,7 @@ requirements. API/schema compatibility and offline tests do not establish produc
 - World land map for the globe (`vendor/land-1deg.b64`, 1-degree land/sea bits) — generated with
   global-land-mask (MIT) from GSHHG/Natural Earth data (public domain).
 
-## Fonts
+## Real-device checks
 
 - Fira Code — https://github.com/tonsky/FiraCode — SIL Open Font License 1.1. Loaded from Google
   Fonts for Kairoq's code views and offered to apps as a code font (`react-design.js`).
@@ -126,3 +126,6 @@ requirements. API/schema compatibility and offline tests do not establish produc
   used in `react-reviews.js`, `react-parity.js` and `react-sweep.js`, rewritten in JavaScript.
 - Reviews are read only through official public APIs: Apple's iTunes Search API and App Store
   customer-reviews feed, and the Hacker News (Algolia) search API.
+- WebKit (Safari's engine) as built by Playwright — https://playwright.dev — Apache-2.0 (Playwright)
+  and LGPL/BSD (WebKit). Installed unmodified in the Docker image and run as a separate browser
+  for the "iPhone Safari" checks and the editor's "Real Safari" screenshot (`runtime-check.js`).
