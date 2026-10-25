@@ -41,10 +41,8 @@ test("the picker is short like Hermes: no batch or dated copies, a few models pe
   assert.equal(isCopyVariant({ id: "anthropic/claude-opus-5.5", name: "Claude Opus 5.5" }), false);
   assert.equal(isCopyVariant({ id: "google/gemma-4-31b-it:free", name: "Gemma 4 31B (free)" }), false);
   assert.match(app, /const PER_PROVIDER=6;/);
-  assert.match(app, /section\("Hermes"/);
   assert.match(app, /if\(freeOnlyEl\.checked&&!m\.isFree&&!m\.local&&!m\.allowedPaid\)continue;/, "Free Only hides paid models instead of a red error");
   assert.match(app, /section\("Agent"/);
-  assert.match(app, /if\(freeOnlyEl\.checked&&!m\.isFree&&!m\.local\)continue;/, "Free Only hides paid models instead of a red error");
   assert.doesNotMatch(app, /Free Only is on\. Choose a free model/);
 });
 
@@ -71,6 +69,8 @@ test("Hermes 4 can be tried as a paid model within its own monthly cap, even in 
   assert.match(server, /if\(cap>0&&spent>=cap\)throw/);
   assert.match(server, /recordUsage\(result\.usage,\{purpose:"chat-paid"/);
   assert.match(app, /section\("Try \(paid, capped\)"/);
+});
+
 test("users see Kairoq Agent, never the Hermes name; the open-source credit stays on the licences page", () => {
   const app = read("public/app.js"), html = read("public/index.html"), server = read("server.js"), chat = read("hermes-chat.js");
   assert.doesNotMatch(app, /"Hermes Agent"|"Hermes ready"|"Hermes not connected"/);
