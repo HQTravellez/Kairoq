@@ -8,7 +8,8 @@ function available(){return process.env.KAIROQ_RUNTIME_CHECK!=='off'&&Boolean(ch
 async function browser(){
  if(!browserPromise){
   const {chromium}=require('playwright-core');
-  browserPromise=chromium.launch({executablePath:chromiumPath(),args:['--no-sandbox','--disable-dev-shm-usage']}).catch(e=>{browserPromise=null;throw e});
+  // Software WebGL (SwiftShader), so apps that show 3D can be checked on a server with no GPU.
+  browserPromise=chromium.launch({executablePath:chromiumPath(),args:['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader']}).catch(e=>{browserPromise=null;throw e});
  }
  const b=await browserPromise;
  if(!b.isConnected()){browserPromise=null;return browser()}
@@ -86,6 +87,7 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false,fast=false}={}){
   const blank=await page.evaluate(()=>{const root=document.getElementById('root');return!root||(!root.innerText.trim()&&!root.querySelector('img,svg,canvas,video,input,button'))});
   if(blank)add('Blank page: nothing rendered inside #root.');
   facts.opened=!blank;
+  if(!blank){const m=await models3d(page).catch(()=>null);if(m){facts.models3d=m.facts;for(const p of m.problems)add(p)}}
   if(!blank&&process.env.KAIROQ_DEAD_CLICKS!=='off'){const dead=await deadClicks(page,url).catch(()=>[]);for(const d of dead)add(d);facts.menus={checked:dead.checked||0,dead:dead.length}}
   // The full check after a build: the phone layout, and a customer adding a record.
   if(!blank&&journey){facts.phone=await phoneFits(url,sandbox).catch(()=>null);if(facts.phone===false)add('Layout overflow: the page scrolls sideways on a 390px phone screen. Make every section fit the phone width.')}
@@ -94,6 +96,24 @@ async function check(url,{timeoutMs=15000,sandbox,journey=false,fast=false}={}){
  }catch(e){add('Page did not load: '+e.message)}
  finally{await context.close().catch(()=>{})}
  return{skipped:false,errors,facts,...(saved?{journey:saved}:{})};
+}
+// 3D models (Model3D from 'kairoq/3d', marked data-kq-model): each one must really show, not
+// just its picture, and have a height. Skipped when this browser has no WebGL.
+async function models3d(page){
+ if(!await page.locator('[data-kq-model]').count())return null;
+ const webgl=await page.evaluate(()=>{try{const c=document.createElement('canvas');return Boolean(c.getContext('webgl2')||c.getContext('webgl'))}catch{return false}});
+ if(!webgl)return{facts:{webgl:false},problems:[]};
+ // Viewers start when they come into view, so bring each one on screen once.
+ await page.evaluate(async()=>{for(const e of document.querySelectorAll('[data-kq-model]')){e.scrollIntoView({block:'center'});await new Promise(r=>setTimeout(r,150))}scrollTo(0,0)});
+ await page.waitForFunction(()=>[...document.querySelectorAll('[data-kq-model]')].every(e=>{const mv=e.querySelector('model-viewer');return mv?mv.dataset.kqLoaded==='true':true}),null,{timeout:25000}).catch(()=>{});
+ const rows=await page.evaluate(()=>[...document.querySelectorAll('[data-kq-model]')].map(e=>{const mv=e.querySelector('model-viewer');return{src:e.getAttribute('data-kq-model'),height:Math.round(e.getBoundingClientRect().height),viewer:Boolean(mv),loaded:Boolean(mv&&mv.dataset.kqLoaded==='true')}}));
+ const problems=[];
+ for(const r of rows){
+  if(r.height<80)problems.push('3D viewer for '+r.src+' is only '+r.height+'px tall: give the Model3D a fixed height (for example className="h-[60vh] w-full").');
+  else if(!r.viewer)problems.push('3D model '+r.src+' did not load, so only its picture shows. Check the src is one of the project\'s ./models/ files.');
+  else if(!r.loaded)problems.push('3D model '+r.src+' took more than 25 seconds to show.');
+ }
+ return{facts:{webgl:true,models:rows.length,shown:rows.filter(r=>r.loaded).length},problems};
 }
 // Whether the page fits a 390 px phone screen without scrolling sideways.
 async function phoneFits(url,sandbox){

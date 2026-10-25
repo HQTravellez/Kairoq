@@ -11,10 +11,10 @@ const APP_PACKAGES={react:'UI',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
- 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'3D scenes (glTF models via three/examples/jsm/loaders/GLTFLoader.js)',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
-const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq'];
+ 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'custom 3D scenes; for showing a 3D model use Model3D from kairoq/3d instead',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
+const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq','kairoq/3d'];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
-function allowedImport(spec){if(spec==='kairoq')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
+function allowedImport(spec){if(spec==='kairoq'||spec==='kairoq/3d')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -50,7 +50,7 @@ Rules:
   auth.signInWithGoogle() offers "Continue with Google" (it works on the published app; in the preview show its error message). Password reset: auth.requestPasswordReset(email) emails a link back to the app; when auth.resetToken() is set, show a "choose a new password" form that calls auth.resetPassword(newPassword).
   Live updates: const stop = collection('messages').subscribe(({type,item}) => ...) delivers created/updated/deleted events to everyone allowed to read them (chats, live dashboards, presence); call stop() on unmount.
   collection('name').list({limit,order:'asc'|'desc',mine:true,where:{field:value}}) / .get(id) / .create(data) / .update(id,data) / .remove(id). Records come back as {id,...data,_owner,_created_at}.
-  Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (guestbooks, public comments); "submit-only" = anyone can add but nobody can read them back, only the owner sees them in Kairoq (use this for contact, booking, reservation, order and waitlist forms; show a thank-you message after create). Only a record's creator can update or delete it.
+  Declare every collection in src/backend.json, e.g. {"collections":{"tasks":{"access":"private"},"messages":{"access":"public"}}}. Access: "private" = each signed-in user sees only their own records; "shared" = signed-in users see all records; "public-read" = anyone reads, signed-in users add; "public" = anyone reads and adds (guestbooks, public comments); "submit-only" = anyone can add but nobody can read them back, only the owner sees them in Kairoq (use this for contact, booking, reservation, order and waitlist forms; show a thank-you message after create); "managed" = anyone reads, only the app's managers add, change or delete (use this for the business's own content the public must not edit: services, menus, prices, staff, opening hours, products). Only a record's creator can update or delete it, except in "managed" collections, where any manager can. Show edit controls only when (await auth.user())?.manager is true; managers are set by the owner in Kairoq. Booking and reservation forms: add "public_fields" with the slot fields only, e.g. {"bookings":{"access":"submit-only","public_fields":["date","time","service"]}}; then listing the collection returns just those fields for everyone, so the page greys out taken slots and checks the slot is still free before submitting. Never put names, emails, phones or notes in public_fields.
   Show loading and error states, and a sign-in form when a collection needs a signed-in user. Use localStorage only for small UI preferences, inside try/catch.
   email.send() returns {sent:false, saved:true} when email is not set up on the server yet: treat that as done (the message is kept for the owner), never show it as an error to the customer.
   Invite a friend (only when the owner asks for referrals or invites): import { referrals } from 'kairoq'; const r = await referrals.mine() (signed-in users only) gives {link, code, joined, people:[{name, joined_at}]}. Show the link with a Copy button and a share button (navigator.share when available), how many friends joined, and the reward the owner chose. Visitors who open the link and then create an account are counted automatically; nothing else is needed.
@@ -159,7 +159,7 @@ function undeclaredCollections(files){
  try{declared=(JSON.parse(files['src/backend.json']||'{}')||{}).collections||{}}catch(e){return['src/backend.json is not valid JSON: '+e.message]}
  const missing=[...used].filter(c=>!Object.hasOwn(declared,c));
  if(!missing.length)return[];
- return[(files['src/backend.json']?'src/backend.json does not declare':'src/backend.json is missing, so it does not declare')+' the collections the app uses: '+missing.map(c=>'"'+c+'"').join(', ')+'. Without them nothing is saved (every read and save fails with 404). Add each under "collections" with its access: "private" for a signed-in user\'s own records, "shared" for a signed-in team, "public-read", "public", or "submit-only" for public forms.'];
+ return[(files['src/backend.json']?'src/backend.json does not declare':'src/backend.json is missing, so it does not declare')+' the collections the app uses: '+missing.map(c=>'"'+c+'"').join(', ')+'. Without them nothing is saved (every read and save fails with 404). Add each under "collections" with its access: "private" for a signed-in user\'s own records, "shared" for a signed-in team, "public-read", "public", "managed" for the business\'s own menus, services and prices, or "submit-only" for public forms.'];
 }
 // Everything checked before a change is built: the files themselves and the backend they need.
 function checkProject(files){const errors=validateFiles(files);return errors.length?errors:undeclaredCollections(files)}
@@ -214,7 +214,9 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
  try{
   fs.writeFileSync(path.join(work,'index.html'),INDEX_HTML);
   fs.copyFileSync(path.join(__dirname,'builder-runtime','kairoq-reporter.js'),path.join(work,'kairoq-reporter.js'));
-  if(projectId!=='000000000000'){require('./react-assets').copyInto(projectId,path.join(work,'public'));require('./video-gen').copyInto(projectId,path.join(work,'public'))}
+  if(projectId!=='000000000000'){require('./react-assets').copyInto(projectId,path.join(work,'public'));require('./video-gen').copyInto(projectId,path.join(work,'public'));require('./react-models').copyInto(projectId,path.join(work,'public'))}
+  // The 3D viewer script, only for apps that show 3D (react-model3d.js).
+  if(require('./react-models').usesViewer(files))require('./react-models').copyViewer(path.join(work,'public'));
   for(const [name,code] of Object.entries(files)){const file=path.join(work,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,code)}
   // Packages resolve from Kairoq's own installed modules (validated imports only).
   fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(work,'node_modules'),'dir');
@@ -248,7 +250,7 @@ function importGuard(work){
   resolveId(source,importer){
    const from=importer&&importer.split('?')[0];
    if(!project(from))return null;
-   if(source==='kairoq'||/^\0vite\//.test(source)||source==='vite/modulepreload-polyfill'||source==='vite/preload-helper.js')return null;
+   if(source==='kairoq'||source==='kairoq/3d'||/^\0vite\//.test(source)||source==='vite/modulepreload-polyfill'||source==='vite/preload-helper.js')return null;
    const deny=()=>this.error('Import "'+String(source).slice(0,120)+'" is not allowed: import project files under src/ or an available package.');
    if(/[?#\0\\]/.test(source))deny();
    if(source.startsWith('/')){
@@ -272,7 +274,8 @@ function importGuard(work){
   }};
 }
 function kairoqClient(projectId,version=0){
- return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':null},load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):null}};
+ return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':id==='kairoq/3d'?'\0kairoq-3d':null},
+  load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):id==='\0kairoq-3d'?require('./react-model3d').source():null}};
 }
 function cleanBuildError(e){
  const root=ROOT();
@@ -802,9 +805,9 @@ function rename(id,name){const meta=loadMeta(id);meta.name=String(name||meta.nam
 function remove(id){const dir=projectDir(id);loadMeta(id);require('./react-sql').closeEverywhere(dir);fs.rmSync(dir,{recursive:true,force:true});return{deleted:id}}
 
 // ---------- serving built files ----------
-const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm'};
+const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.glb':'model/gltf-binary','.hdr':'application/octet-stream'};
 // sandbox=true runs the page in an opaque origin so generated code cannot use the Kairoq session.
-function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
+function contentPolicy(sandbox){return "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
 // Compression for built files: each is compressed once (brotli, else gzip) and kept next to
 // it, so apps' JavaScript and CSS travel about 3 times smaller.
 const zlib=require('zlib');

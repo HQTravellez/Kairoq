@@ -800,7 +800,7 @@ function cleanText(value){
 
 function modelInfo(id){
   if(!id) return {id:"",name:"Unknown",provider:"",isFree:false};
-  if(id==="hermes/agent") return {id,name:"Hermes Agent",provider:"Hermes",isFree:true,supportsVision:true,supportsReasoning:true,context_length:null};
+  if(id==="hermes/agent") return {id,name:"Kairoq Agent",provider:"Kairoq",isFree:true,supportsVision:true,supportsReasoning:true,context_length:null};
   if(id==="smart-auto") return {id,name:"Smart Auto",provider:"OpenRouter",isFree:false,supportsVision:true,supportsReasoning:true,context_length:null};
   const exact = allModels.find(m=>m.id===id);
   const [providerRaw,...rest]=id.split("/");
@@ -1137,7 +1137,7 @@ function fillModelSelect(){
   if(local.length)modelSelect.appendChild(option("local/auto","Ollama auto"));
   modelSelect.appendChild(option("openrouter/free","Auto (free)"));
   modelSelect.appendChild(option("smart-auto","Auto (best)"));
-  modelSelect.appendChild(option("hermes/agent","Hermes Agent"));
+  modelSelect.appendChild(option("hermes/agent","Kairoq Agent"));
   if(local.length){
     const g=document.createElement("optgroup");g.label="Ollama · on your server";
     local.forEach(m=>g.appendChild(option(m.id,cleanText(m.name))));
@@ -1196,7 +1196,7 @@ async function loadHermesState(){
   try{const r=await fetch("/api/hermes/status");if(r.ok)hermesState={...(await r.json()),checked:true}}catch{}
   if(hermesState.configured&&["openrouter/free","smart-auto"].includes(modelSelect.value)&&!ui.pickedModel){pickModel("hermes/agent")}
   const ft=$("#hermesFooterText"),fd=$("#hermesFooter .status-dot");
-  if(ft){ft.textContent=!hermesState.checked?"Hermes status unknown":hermesState.configured?(hermesState.ok?"Hermes ready":"Hermes not reachable"):"Hermes not connected";fd?.classList.toggle("off",!(hermesState.configured&&hermesState.ok))}
+  if(ft){ft.textContent=!hermesState.checked?"Agent status unknown":hermesState.configured?(hermesState.ok?"Kairoq Agent ready":"Agent not reachable"):"Agent not connected";fd?.classList.toggle("off",!(hermesState.configured&&hermesState.ok))}
   renderModelPicker();
 }
 // Keep the list short, like Hermes: no batch/dated copies, a handful of current models per provider.
@@ -1211,7 +1211,7 @@ function saveModelVisibility(){try{localStorage.setItem("kq-model-visibility",JS
 function providerKey(m){return m.local?"ollama":String(m.id||"").split("/")[0]||"other"}
 function providerName(key){return key==="ollama"?"Ollama":PROVIDER_NAMES[key]||key.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase())}
 function pickerLabel(id){
-  if(id==="hermes/agent")return"Hermes Agent";
+  if(id==="hermes/agent")return"Kairoq Agent";
   const auto=AUTO_MODELS.find(a=>a.id===id);if(auto)return auto.name;
   if(id==="local/auto")return"Ollama auto";
   const m=allModels.find(x=>x.id===id);
@@ -1253,15 +1253,17 @@ function renderModelPicker(){
   const match=m=>!q||`${pickerLabel(m.id)} ${m.id} ${providerName(providerKey(m))}`.toLowerCase().includes(q);
   host.replaceChildren();
   const section=(title,rows)=>{if(!rows.length)return;const h=document.createElement("div");h.className="kq-group";h.textContent=title;host.append(h,...rows)};
-  const hermesRow={id:"hermes/agent",label:"Hermes Agent",disabled:hermesState.configured?(hermesState.ok===false&&hermesState.checked?"Not reachable":""):"Not connected"};
-  if(!q||"hermes agent".includes(q))section("Hermes",[pickerRow(hermesRow,{auto:true})]);
+  const hermesRow={id:"hermes/agent",label:"Kairoq Agent",disabled:hermesState.configured?(hermesState.ok===false&&hermesState.checked?"Not reachable":""):"Not connected"};
+  if(!q||"kairoq agent".includes(q))section("Agent",[pickerRow(hermesRow,{auto:true})]);
   section("Auto",AUTO_MODELS.filter(a=>!q||a.name.toLowerCase().includes(q)).map(a=>pickerRow({id:a.id,label:a.name},{hint:a.hint,auto:true})));
+  // Paid models the owner chose to try (Hermes 4), within their own monthly cap.
+  section("Try (paid, capped)",allModels.filter(m=>m.allowedPaid&&!favorites.includes(m.id)&&match(m)).map(m=>pickerRow(m)));
   const fav=allModels.filter(m=>favorites.includes(m.id)&&match(m));
   section("Favourites",fav.map(m=>pickerRow(m)));
   const groups=new Map();
   for(const m of allModels){
-    if(m.id==="local/auto"||favorites.includes(m.id)||!match(m))continue;
-    if(freeOnlyEl.checked&&!m.isFree&&!m.local)continue; // Free Only: paid models just aren't listed
+    if(m.id==="local/auto"||favorites.includes(m.id)||m.allowedPaid||!match(m))continue;
+    if(freeOnlyEl.checked&&!m.isFree&&!m.local&&!m.allowedPaid)continue; // Free Only: paid models just aren't listed (except the few the owner chose to try)
     if(!q&&(!modelShown(m)||isCopyVariant(m)))continue;
     const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
   }
@@ -1317,7 +1319,7 @@ async function loadPlugins(){
   const host=$("#pvInstalled");if(!host)return;
   try{const r=await fetch("/api/plugins");if(r.status===401){await checkSession(true);return}pluginData=await r.json()}catch{host.innerHTML='<div class="kn-hint">Couldn\'t load plugins.</div>';return}
   $("#pvSkillCount").textContent=pluginData.skills||"";
-  host.innerHTML=pluginData.installed.map(p=>`<div class="pv-row" role="row"><div role="cell" class="pv-info"><div class="pv-name">${escapeHTML(p.name)}${p.source?` <span class="pv-src">${escapeHTML(p.source)}</span>`:""}${p.tag?` <span class="pv-tag">${escapeHTML(p.tag)}</span>`:""}</div><div class="pv-about">${escapeHTML(p.about)}</div>${[p.kairoq,p.hermes].filter(x=>x&&!x.on&&x.why).map(x=>`<div class="pv-why">${escapeHTML(x.why)}</div>`).join("")}</div><div role="cell" class="pv-cell">${pluginSwitch(p.kairoq,p.name+" in Kairoq")}</div><div role="cell" class="pv-cell">${pluginSwitch(p.hermes,p.name+" in Hermes")}</div></div>`).join("");
+  host.innerHTML=pluginData.installed.map(p=>`<div class="pv-row" role="row"><div role="cell" class="pv-info"><div class="pv-name">${escapeHTML(p.name)}${p.source?` <span class="pv-src">${escapeHTML(p.source)}</span>`:""}${p.tag?` <span class="pv-tag">${escapeHTML(p.tag)}</span>`:""}</div><div class="pv-about">${escapeHTML(p.about)}</div>${[p.kairoq,p.hermes].filter(x=>x&&!x.on&&x.why).map(x=>`<div class="pv-why">${escapeHTML(x.why)}</div>`).join("")}</div><div role="cell" class="pv-cell">${pluginSwitch(p.kairoq,p.name+" in Kairoq")}</div><div role="cell" class="pv-cell">${pluginSwitch(p.hermes,p.name+" in Kairoq Agent")}</div></div>`).join("");
   renderPluginCatalog();
 }
 function renderPluginCatalog(){
