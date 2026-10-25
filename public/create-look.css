@@ -162,3 +162,6 @@ body.lk-open{overflow:hidden}
 .lk-seg button:hover:not(.on){background:rgba(255,255,255,.6)}
 .lk-lock:hover{background:rgba(0,0,0,.05)}
 .lk-switch:hover{filter:brightness(.97)}
+/* 3D style row in the look step */
+.ask-card .lk-3d-q{margin:6px 0 -2px;font-weight:600;color:var(--lk-ink,inherit);font-size:13.5px}
+.ask-card .lk-3d-tip{margin:-2px 0 0}

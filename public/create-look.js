@@ -224,13 +224,20 @@ function openSite(onUse,{name}={}){
  draw();
 }
 
+// 3D styles (react-models.js STYLES). Kairoq adds a free Poly Haven model if none is uploaded.
+const THREE_D=[
+ {id:'none',label:'No 3D',tip:'A normal app. You can add 3D any time in Design → 3D models.'},
+ {id:'product',label:'Product viewer',tip:'Visitors turn and zoom a 3D model; on phones they can place it in their room (AR).'},
+ {id:'walkthrough',label:'Room walkthrough',tip:'Move around a space with labelled spots, for a property, venue or showroom.'},
+ {id:'scroll',label:'Scroll story',tip:'The camera moves around your model as visitors scroll.'},
+ {id:'background',label:'3D background',tip:'A slow-turning model behind the top of the page.'}];
 // ---------- the step inside the chat ----------
 // card: the chat list item to draw into. count: "Question 3 of 3" or "One quick question".
 // onBuild(look|null): null means "Decide for me" without a pick (Kairoq's own design brief).
 async function step({card,count,name,onBuild,onBack,onSkip}){
  card.replaceChildren(h('p',{class:'ask-head'},'Loading looks…'));
  try{await loadData()}catch(e){return onBuild(null)}
- const st={feel:'calm',page:0,picked:null};
+ const st={feel:'calm',page:0,picked:null,three:'none'};
  const preview=previewPane();document.body.classList.add('picking-look');
  const done=()=>{document.body.classList.remove('picking-look');preview.remove()};
  // A look from the gallery, a website or Fine-tune joins the cards and is selected.
@@ -243,7 +250,8 @@ async function step({card,count,name,onBuild,onBack,onSkip}){
   const foot=h('div',{class:'ask-foot'});
   if(onBack)foot.append(h('button',{type:'button',class:'ask-link',onclick:()=>{done();onBack()}},'Back'));
   foot.append(h('button',{type:'button',class:'ask-ghost',onclick:()=>{const l=three[Math.floor(Math.random()*3)];st.picked=l;draw();}},'Decide for me'),
-   h('button',{type:'button',class:'ask-next',onclick:()=>{done();onBuild(copy(st.picked))}},'Build with '+st.picked.name));
+   h('button',{type:'button',class:'ask-next',onclick:()=>{done();onBuild({...copy(st.picked),three_d:st.three})}},'Build with '+st.picked.name));
+  const t3=THREE_D.find(x=>x.id===st.three)||THREE_D[0];
   card.replaceChildren(
    h('div',{class:'ask-top'},h('span',{class:'ask-count'},count),h('button',{type:'button',class:'ask-link',onclick:()=>{done();(onSkip||onBuild)(null)}},'Skip')),
    h('p',{class:'ask-q'},'How should it feel?'),
@@ -255,6 +263,9 @@ async function step({card,count,name,onBuild,onBack,onSkip}){
     h('button',{type:'button',class:'lk-btn',onclick:()=>openGallery(st.picked,use,{name})},'Browse all '+data.looks.length),
     h('button',{type:'button',class:'lk-btn',onclick:()=>openSite(use,{name})},'From a website'),
     h('button',{type:'button',class:'lk-link',onclick:()=>openTune(copy(st.picked),use,{name})},'Fine-tune colours and fonts')),
+   h('p',{class:'lk-sub lk-3d-q'},'Add 3D?'),
+   h('div',{class:'lk-feels lk-3d',role:'group','aria-label':'3D'},...THREE_D.map(x=>h('button',{type:'button',class:'lk-chip'+(st.three===x.id?' on':''),'aria-pressed':String(st.three===x.id),title:x.tip,onclick:()=>{st.three=x.id;draw()}},x.label))),
+   h('p',{class:'lk-sub lk-3d-tip'},t3.tip),
    foot);
  }
  draw();
