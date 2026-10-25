@@ -5,7 +5,7 @@
 
 /* While picking, the chat is wider so three looks fit side by side. */
 body.picking-look #editor{grid-template-columns:minmax(440px,600px) minmax(0,1fr)!important}
-body.picking-look #frame,body.picking-look #build-overlay{visibility:hidden}
+body.picking-look #frame,body.picking-look #device,body.picking-look #build-overlay{visibility:hidden}
 body.picking-look #errors,body.picking-look #preview-notice{display:none!important}
 
 .lk-sub{font-size:12.5px;color:var(--lk-muted)}

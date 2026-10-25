@@ -787,3 +787,49 @@ body.embed #side,body.embed #side-open-btn{display:none!important}
 /* A failed message keeps a Try again button. */
 li.failed .retry{margin-top:8px;padding:6px 12px;border:1px solid #e3e0d8;border-radius:10px;background:#fff;font:600 13px/1 inherit;cursor:pointer}
 li.failed .retry:hover{border-color:#15140f}
+/* ---------- the preview as a real device (iPhone, Pixel, iPad) ---------- */
+.device.desktop{display:contents}
+.device.desktop>:not(#frame){display:none}
+.device.phone{--dev-scale:1;position:relative;flex:none;align-self:flex-start;box-sizing:content-box;width:var(--dev-w);height:var(--dev-h);
+ padding:12px;border-radius:calc(var(--dev-radius) + 12px);background:#111;box-shadow:0 0 0 2px #2a2a2c,0 0 0 4px #4a4a4e,0 30px 60px -20px rgba(0,0,0,.45);
+ transform:scale(var(--dev-scale));transform-origin:top center;margin-bottom:calc((var(--dev-scale) - 1) * (var(--dev-h) + 24px));
+ display:grid;grid-template-rows:var(--dev-top) var(--dev-url) 1fr var(--dev-bottom);overflow:hidden}
+.device.phone::before{content:"";position:absolute;inset:12px;border-radius:var(--dev-radius);background:#fff;z-index:0}
+.device.phone>*{position:relative;z-index:1}
+.device.phone #frame,.canvas.mobile .device.phone #frame{width:100%!important;max-width:none!important;height:100%!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff;min-height:0}
+.device.phone .dev-top{display:flex;align-items:center;justify-content:space-between;padding:0 28px 0 34px;font:600 15px/1 -apple-system,"SF Pro Text",system-ui,sans-serif;color:#000;background:#fff;border-radius:var(--dev-radius) var(--dev-radius) 0 0}
+.device.phone .dev-icons{display:flex;gap:6px;align-items:center}
+.device.phone .dev-icons svg{height:11px;width:auto;fill:currentColor}
+.device.phone .dev-island{display:none}
+.device.phone.island .dev-island{display:block;position:absolute;left:50%;top:11px;transform:translateX(-50%);width:124px;height:36px;border-radius:20px;background:#000}
+.device.phone .dev-top-url{display:none}
+.device.phone.android .dev-top-url,.device.phone.ipados .dev-top-url{display:flex;align-items:center;justify-content:center;background:#f1f3f4;padding:0 12px}
+.device.phone .dev-bottom{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;padding-top:8px;background:rgba(248,248,248,.96);border-top:1px solid rgba(0,0,0,.08);border-radius:0 0 var(--dev-radius) var(--dev-radius)}
+.device.phone .dev-urlbar{display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);height:42px;border-radius:14px;background:rgba(118,118,128,.12);font:400 15px/1 -apple-system,system-ui,sans-serif;color:#000}
+.device.phone .dev-urlbar svg{height:12px;width:auto;fill:currentColor;opacity:.6}
+.device.phone .dev-top-url.dev-urlbar{width:auto;height:auto;border-radius:0;margin:0;font-size:14px;color:#3c4043}
+.device.phone .dev-home{width:134px;height:5px;border-radius:3px;background:#000;margin-top:auto;margin-bottom:8px}
+.device.phone.android .dev-bottom,.device.phone.ipados .dev-bottom{background:#fff;border-top:0;padding:0;justify-content:center}
+.device.phone.android .dev-bottom .dev-urlbar,.device.phone.ipados .dev-bottom .dev-urlbar{display:none}
+.device.phone.android .dev-home{width:108px;height:4px;margin:0;background:#202124;opacity:.6}
+.device.phone.ipados .dev-home{margin:0}
+/* iPhone SE: square screen, chin with a home button */
+.device.phone.homebutton{padding:64px 14px 72px;border-radius:52px}
+.device.phone.homebutton::before{inset:64px 14px 72px;border-radius:0}
+.device.phone.homebutton::after{content:"";position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:48px;height:48px;border-radius:50%;border:2px solid #3a3a3c}
+.device.phone.homebutton .dev-top,.device.phone.homebutton .dev-bottom{border-radius:0}
+.device.phone.homebutton .dev-home{display:none}
+.device.phone.homebutton .dev-top{padding:0 10px;font-size:12px}
+.canvas.mobile{align-items:flex-start;padding-top:18px}
+/* The real-Safari screenshot over the screen */
+.dev-shot{position:absolute!important;inset:12px;z-index:3!important;margin:0;display:flex;flex-direction:column;background:#fff;border-radius:var(--dev-radius);overflow:hidden}
+.device.phone.homebutton .dev-shot{inset:64px 14px 72px;border-radius:0}
+.dev-shot img{flex:1;min-height:0;width:100%;object-fit:cover;object-position:top}
+.dev-shot figcaption{padding:10px 12px 18px;font:500 12.5px/1.3 system-ui,sans-serif;text-align:center;background:#fffbe6;color:#5c4400}
+#device-model{height:32px;border-radius:8px;font-size:13px;padding:0 8px}
+.device.phone .dev-top{grid-row:1}.device.phone .dev-top-url{grid-row:2}.device.phone #frame{grid-row:3}.device.phone .dev-bottom{grid-row:4}
+.check-devices{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.dev-badge{font-size:11.5px;padding:2px 8px;border-radius:999px;background:rgba(22,163,74,.1);color:#166534}
+.dev-badge.bad{background:rgba(220,38,38,.1);color:#991b1b;cursor:help}
+.device.phone{margin-left:auto;margin-right:auto}
+.device.phone:not(.android):not(.ipados) .dev-top-url{display:none!important}
