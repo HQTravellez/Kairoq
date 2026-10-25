@@ -114,7 +114,7 @@ requirements. API/schema compatibility and offline tests do not establish produc
   downloaded on request through api.polyhaven.com. Kairoq keeps the source and credit with
   each model.
 - three.js 0.183 — https://github.com/mrdoob/three.js — MIT. React Three Fiber 8 and drei 9 —
-  https://github.com/pmndrs — MIT. Used by the `kairoq/scene` pieces (`react-scene.js`).
+  https://github.com/pmndrs — MIT. Used by the `kairoq/scene` pieces (`react-scene.js`) and `kairoq/story` (`app-modules/kairoq-story.js`).
 - World land map for the globe (`vendor/land-1deg.b64`, 1-degree land/sea bits) — generated with
   global-land-mask (MIT) from GSHHG/Natural Earth data (public domain).
 
