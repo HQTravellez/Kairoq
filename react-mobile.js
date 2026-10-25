@@ -196,7 +196,7 @@ function nativeFiles(meta,pkgJson){
 // The note added to the AI's instructions when the project is a mobile app.
 function promptNote(meta){
  if(!settings(meta).enabled)return'';
- return'\n\nThis project is a MOBILE APP (installed on phones as a native iOS/Android app and a home-screen web app). Design phone-first for a 390px wide screen: a sticky top bar and bottom tab navigation for the main sections, full-width cards and lists, touch targets at least 44px, 16px+ body text, no hover-only interactions, and safe-area padding (padding-top: env(safe-area-inset-top), padding-bottom: env(safe-area-inset-bottom)). Use Routes inside <Router> from 'kairoq' for screens. Keep it usable on tablets and desktop too (center the content with a max width).';
+ return'\n\nThis project is a MOBILE APP (installed on phones as a native iOS/Android app and a home-screen web app). Design phone-first for a 390px wide screen: a sticky top bar and bottom tab navigation for the main sections, full-width cards and lists, touch targets at least 44px, 16px+ body text, no hover-only interactions, and safe-area padding (padding-top: env(safe-area-inset-top), padding-bottom: env(safe-area-inset-bottom)). Use Routes inside <Router> from kairoq for screens. Keep it usable on tablets and desktop too (center the content with a max width).';
 }
 // QR code (SVG) for opening a URL on a phone, rendered with the bundled qrcode.react.
 function qrSvg(url){

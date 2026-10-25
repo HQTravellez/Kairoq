@@ -65,7 +65,7 @@ test('a published app: every page loads at its own address, is pre-built with it
  const meta=builder.create({name:"Joe's Barbers",owner:'owner'});
  await builder.initializeFrom(meta,FILES);
  hosting.publish(meta.id,{slug:'joe-test'});
- const server=http.createServer((req,res)=>{if(!hosting.handlePath(req,res)){res.writeHead(404);res.end()}});
+ const server=http.createServer((req,res)=>{if(!hosting.handlePath(req,res)&&!builder.handlePreview(req,res)){res.writeHead(404);res.end()}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const origin='http://127.0.0.1:'+server.address().port,base=origin+'/sites/joe-test/';
  try{
@@ -74,6 +74,10 @@ test('a published app: every page loads at its own address, is pre-built with it
   const asset=/src="(\/sites\/joe-test\/assets\/[^"]+\.js)"/.exec(deep);
   assert.ok(asset,'asset links are absolute: '+deep.slice(0,400));
   assert.equal((await fetch(origin+asset[1])).status,200);
+  // The preview works the same way, under its own folder.
+  const preview=builder.previewUrl(builder.loadMeta(meta.id));
+  const deepPreview=await (await fetch(origin+preview+'services/beard')).text();
+  assert.ok(deepPreview.includes('src="'+preview+'assets/'),'preview asset links are absolute');
   if(!runtime.available()){t.diagnostic('no browser here: crawl skipped');return}
   // Publishing pre-builds every page (the real crawler, in a browser).
   const snap=await search.snapshot(meta.id,{renderSite:(u,o)=>runtime.renderSite(origin+u,o),base:'/sites/joe-test/'});
@@ -81,11 +85,19 @@ test('a published app: every page loads at its own address, is pre-built with it
   const services=await (await fetch(base+'services')).text();
   assert.match(services,/<title>Haircut prices – Joe&#39;s Barbers<\/title>/);
   assert.match(services,/<meta name="description" content="Haircut 35 dollars, skin fade 40 dollars\.">/);
-  assert.match(services,/<div id="root">[\s\S]*<h1>Services and prices<\/h1>/,'the page content is in the HTML');
+  assert.match(services,/<div id="root">[\s\S]*<h1[^>]*>Services and prices<\/h1>/,'the page content is in the HTML');
   const sitemap=await (await fetch(base+'sitemap.xml')).text();
   for(const p of ['joe-test/services','joe-test/services/beard','joe-test/about'])assert.ok(sitemap.includes(p+'</loc>'),p);
   // Old "#/about" links land on /about.
-  const where=await runtime.session(base+'#/about',{}).catch(()=>null);
-  if(where&&where.page){await where.page.waitForTimeout(800);assert.match(where.page.url(),/\/sites\/joe-test\/about$/);await where.close?.()}
+  const ctx=await (await runtime.browser()).newContext(),tab=await ctx.newPage();
+  try{
+   await tab.goto(base+'#/about',{waitUntil:'load'});await tab.waitForSelector('h1');
+   assert.match(tab.url(),/\/sites\/joe-test\/about$/);
+   assert.equal(await tab.textContent('h1'),'About Joe');
+   // Clicking a link changes the address without reloading, and the new page shows.
+   await tab.click('text=Beard trim');await tab.waitForURL(/\/services\/beard$/);
+   assert.equal(await tab.textContent('h1'),'Beard trim');
+   assert.equal(await tab.title(),"Beard trim – Joe's Barbers");
+  }finally{await ctx.close()}
  }finally{server.close();await runtime.close()}
 });
