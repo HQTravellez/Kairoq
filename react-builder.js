@@ -11,10 +11,11 @@ const APP_PACKAGES={react:'UI',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
- 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'custom 3D scenes; for showing a 3D model use Model3D from kairoq/3d instead',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
-const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq','kairoq/3d'];
+ 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'custom 3D (prefer the ready pieces in kairoq/scene; for showing a model use Model3D from kairoq/3d)','@react-three/fiber':'three.js as React components (Canvas, useFrame); wrap custom scenes in Scene3D from kairoq/scene','@react-three/drei':'helpers for @react-three/fiber (OrbitControls, useGLTF, Html, Float, ContactShadows...)',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
+const KAIROQ_MODULES=['kairoq','kairoq/3d','kairoq/scene'];
+const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),...KAIROQ_MODULES];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
-function allowedImport(spec){if(spec==='kairoq'||spec==='kairoq/3d')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
+function allowedImport(spec){if(KAIROQ_MODULES.includes(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -74,6 +75,7 @@ Rules:
     request is a dict (method, query, headers, body, rawBody); ctx.user, ctx.db.collection(n).list/get/create/update/remove, await ctx.db.sql('SELECT ... WHERE id = ?', [id]), await ctx.secrets.get('KEY'), r = await ctx.fetch(url, method='POST', json={...}) then r.status, r.json(), r.text; await ctx.ai.chat(messages=[...]), await ctx.email.send(to='owner', subject=..., text=...), ctx.crypto.hmac_sha256_hex(key, msg), ctx.log(...). The standard library works (json, re, datetime, math, statistics, decimal, csv, hashlib, hmac, base64, urllib.parse); no pip packages, and never import js, pyodide or ctypes. It is called the same way from the app.
   - SQL database (relational data: tables, foreign keys, joins, reports, inventory, bookings with rooms and guests): write migrations sql/001_init.sql, sql/002_add_rooms.sql, ... (SQLite syntax: CREATE TABLE, indexes, REFERENCES, CHECK). Migrations run once, in order; never change one that already ran, add a new numbered file instead. Query only from server functions: const rows = await db.sql\`SELECT * FROM rooms WHERE price <= \${max}\` (tagged template, values become parameters) or db.sql('SELECT ... WHERE id = ?', [id]); writes return {changes,lastInsertRowid}; add RETURNING * to get rows back; db.batch([[sql, params], ...]) runs several statements in one transaction. Never build SQL by joining strings with user input. Check user before reads or writes of personal data. Use collections for simple per-user lists and SQL when the data has relations.
   - Automations (the app does things on its own): "automations":[{"name":"reminders","run":"send-reminders","every":"day","at":"09:00","tz":"Europe/London"},{"name":"welcome","run":"welcome","on":"created","collection":"bookings"}]. "run" names a file in functions/; "every" is hour, day (with "at") or week (with "at" and "day": mon..sun); or "on": created|updated|deleted with a "collection". The function gets request.body = { automation, trigger, at, collection?, record? } and user = null, and must work without a signed-in user. Use them for reminders, digests, follow-up emails, cleanups and syncing with other services; an automation cannot start another one. Simpler built-ins: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
+- 3D (only where it adds real value; give it a fixed height): show a project model with Model3D from 'kairoq/3d'. Otherwise use the tested pieces in 'kairoq/scene': <Configurator src="./models/x.glb" options={[{label,color,price}]} parts={['fabric']} /> (colour or material picker), <Globe points={[{lat,lng,label}]} arcs={[{from:[lat,lng],to:[lat,lng]}]} />, <Particles /> (inside a relative hero, behind the text), <MiniGame title items={[{color,points,label}]} seconds={30} />, or <Scene3D controls>custom @react-three/fiber elements</Scene3D> for anything else. Never create your own <Canvas> outside Scene3D.
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
 - Everything that looks clickable works: every nav item, tab, button, card and link leads somewhere visible (a page, a dialog, a panel, a filter, an action). No href="#" placeholders and no onClick that does nothing; a section listed in the navigation is built, or not listed.
@@ -250,7 +252,7 @@ function importGuard(work){
   resolveId(source,importer){
    const from=importer&&importer.split('?')[0];
    if(!project(from))return null;
-   if(source==='kairoq'||source==='kairoq/3d'||/^\0vite\//.test(source)||source==='vite/modulepreload-polyfill'||source==='vite/preload-helper.js')return null;
+   if(KAIROQ_MODULES.includes(source)||/^\0vite\//.test(source)||source==='vite/modulepreload-polyfill'||source==='vite/preload-helper.js')return null;
    const deny=()=>this.error('Import "'+String(source).slice(0,120)+'" is not allowed: import project files under src/ or an available package.');
    if(/[?#\0\\]/.test(source))deny();
    if(source.startsWith('/')){
@@ -274,8 +276,8 @@ function importGuard(work){
   }};
 }
 function kairoqClient(projectId,version=0){
- return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':id==='kairoq/3d'?'\0kairoq-3d':null},
-  load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):id==='\0kairoq-3d'?require('./react-model3d').source():null}};
+ return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':id==='kairoq/3d'?'\0kairoq-3d':id==='kairoq/scene'?'\0kairoq-scene.js':null},
+  load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):id==='\0kairoq-3d'?require('./react-model3d').source():id==='\0kairoq-scene.js'?require('./react-scene').source():null}};
 }
 function cleanBuildError(e){
  const root=ROOT();

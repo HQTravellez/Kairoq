@@ -146,15 +146,17 @@ if a.poster:
     cam = bpy.data.objects.new('KairoqCam', cam_data)
     scene.collection.objects.link(cam)
     fov = 2 * math.atan(cam_data.sensor_width / (2 * cam_data.lens))
-    dist = radius / math.sin(fov / 2) * 0.92
-    direction = Vector((0.8, -1.0, 0.55)).normalized()
+    dist = radius / math.sin(fov / 2) * 1.08
+    # glTF models face +Z, which is -Y in Blender: look at the front from three-quarters.
+    direction = Vector((0.75, -1.0, 0.42)).normalized()
     cam.location = center + direction * dist
     cam.rotation_euler = (center - cam.location).to_track_quat('-Z', 'Y').to_euler()
     cam_data.clip_start = dist / 100
     cam_data.clip_end = dist * 10
     scene.camera = cam
     sun_data = bpy.data.lights.new('KairoqSun', 'SUN')
-    sun_data.energy = 3
+    sun_data.energy = 2.2
+    sun_data.angle = math.radians(12)
     sun = bpy.data.objects.new('KairoqSun', sun_data)
     sun.rotation_euler = (math.radians(50), 0, math.radians(30))
     scene.collection.objects.link(sun)
@@ -163,8 +165,8 @@ if a.poster:
     world.use_nodes = True
     bg = world.node_tree.nodes.get('Background')
     if bg:
-        bg.inputs[0].default_value = (0.85, 0.86, 0.88, 1)
-        bg.inputs[1].default_value = 1.0
+        bg.inputs[0].default_value = (0.78, 0.8, 0.84, 1)
+        bg.inputs[1].default_value = 0.55
     scene.render.engine = 'CYCLES'
     scene.cycles.device = 'CPU'
     scene.cycles.samples = a.samples

@@ -35,7 +35,7 @@ function Poster({poster,alt,className,style}){
  return poster?h('img',{src:poster,alt,className,style:{objectFit:'contain',width:'100%',height:'100%',...style},loading:'lazy',decoding:'async'})
   :h('div',{role:'img','aria-label':alt,className,style:{background:'linear-gradient(160deg,rgba(127,127,127,.12),rgba(127,127,127,.04))',...style}});
 }
-export function Model3D({src,poster,alt='3D model',mode='product',environment,skybox,autoRotate,ar,hotspots=[],stops=[],cameraOrbit,cameraTarget,fieldOfView,exposure=1,shadow=1,className='',style,onLoad,children}){
+export function Model3D({src,poster,alt='3D model',mode='product',environment,skybox,autoRotate,ar,hotspots=[],stops=[],cameraOrbit,cameraTarget,fieldOfView,exposure=0.95,toneMapping='aces',shadow=1,className='',style,onLoad,children}){
  const ref=useRef(null);const [ready,setReady]=useState(false);const [failed,setFailed]=useState(false);
  const still=reduced();
  useEffect(()=>{let live=true;if(!webgl()){setFailed(true);return}loadViewer().then(()=>{if(live)setReady(true)}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[]);
@@ -48,17 +48,20 @@ export function Model3D({src,poster,alt='3D model',mode='product',environment,sk
   const on=()=>{if(!raf)raf=requestAnimationFrame(tick)};addEventListener('scroll',on,{passive:true});addEventListener('resize',on);tick();
   return()=>{removeEventListener('scroll',on);removeEventListener('resize',on);if(raf)cancelAnimationFrame(raf)};
  },[mode,ready,still,JSON.stringify(stops)]);
- const box={position:'relative',minHeight:240,...style};
+ // A softly shaded stage behind the model unless the app gives its own background.
+ const stage=mode!=='background'&&!/(^|\\s)bg-/.test(className)&&!(style&&(style.background||style.backgroundColor));
+ const box={position:'relative',minHeight:240,...(stage?{background:'radial-gradient(ellipse at 50% 38%,#ffffff 0%,#f1f3f6 55%,#e3e7ed 100%)',borderRadius:24,overflow:'hidden'}:{}),...style};
  if(failed||!ready)return h('div',{className,style:box,'data-kq-model':src},h(Poster,{poster,alt,style:{position:'absolute',inset:0}}),children);
  const bg=mode==='background',rotate=!still&&(autoRotate!==undefined?autoRotate:(mode==='product'||bg)),useAr=ar!==undefined?ar:mode==='product';
- const attrs={ref,src,alt,poster:poster||undefined,loading:'eager',reveal:'auto','shadow-intensity':String(shadow),exposure:String(exposure),'interaction-prompt':bg?'none':'auto',
+ const attrs={ref,src,alt,poster:poster||undefined,loading:'eager',reveal:'auto','shadow-intensity':String(shadow),exposure:String(exposure),'tone-mapping':toneMapping,'interaction-prompt':bg?'none':'auto',
   style:{width:'100%',height:'100%',background:'transparent','--poster-color':'transparent',pointerEvents:bg?'none':undefined}};
  if(!bg&&mode!=='scroll')attrs['camera-controls']='';
  if(mode==='scroll'){attrs['disable-zoom']='';attrs['interpolation-decay']='120'}
  if(bg){attrs['disable-zoom']='';attrs['rotation-per-second']='8deg';attrs['aria-hidden']='true'}
  if(rotate){attrs['auto-rotate']='';attrs['auto-rotate-delay']='0'}
  if(useAr){attrs.ar='';attrs['ar-modes']='webxr scene-viewer quick-look'}
- if(environment)attrs['environment-image']=environment;
+ // Soft studio light built into model-viewer (no download) unless an HDRI is given.
+ attrs['environment-image']=environment||'neutral';attrs['shadow-softness']='0.9';
  if(skybox)attrs['skybox-image']=skybox;
  if(cameraOrbit||(mode==='scroll'&&stops.length))attrs['camera-orbit']=cameraOrbit||orbitAt(stops,0);
  if(cameraTarget)attrs['camera-target']=cameraTarget;

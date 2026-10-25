@@ -5,11 +5,20 @@
 const path=require('path');
 
 // Babel plugin used by the Vite build.
+// Only real HTML and SVG elements are tagged: React Three Fiber's lowercase tags (<mesh>,
+// <torusKnotGeometry>...) would read data-kq as a nested property and crash.
+const HTML_TAGS=new Set('a abbr address area article aside audio b bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em embed fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr i iframe img input ins kbd label legend li main map mark menu meter nav noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp search section select slot small source span strong sub summary sup table tbody td template textarea tfoot th thead time tr track u ul var video wbr'.split(' '));
+const SVG_TAGS=new Set('svg g path circle ellipse polyline polygon rect text tspan defs stop use symbol mask pattern image marker filter'.split(' '));
+function taggable(p,name){
+ if(HTML_TAGS.has(name)||SVG_TAGS.has(name))return true;
+ // <line> is also a three.js object: tag it only inside an <svg>.
+ return name==='line'&&Boolean(p.findParent(x=>x.isJSXElement()&&x.node.openingElement.name.type==='JSXIdentifier'&&x.node.openingElement.name.name==='svg'));
+}
 function locatorPlugin(root){
  return function({types:t}){
   return{name:'kairoq-locator',visitor:{JSXOpeningElement(p,state){
    const name=p.node.name;
-   if(name.type!=='JSXIdentifier'||!/^[a-z]/.test(name.name)||!p.node.loc)return;
+   if(name.type!=='JSXIdentifier'||!/^[a-z]/.test(name.name)||!p.node.loc||!taggable(p,name.name))return;
    if(p.node.attributes.some(a=>a.type==='JSXAttribute'&&a.name&&a.name.name==='data-kq'))return;
    const file=path.relative(root,state.filename||'').split(path.sep).join('/');
    if(!file.startsWith('src/'))return;
