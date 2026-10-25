@@ -95,3 +95,8 @@ installing their hooks. Reviewed source commits are in `upstreams.json`.
 
 Upstream binaries/services carry their own dependencies, licenses and operational
 requirements. API/schema compatibility and offline tests do not establish production readiness.
+
+## Fonts
+
+- Fira Code — https://github.com/tonsky/FiraCode — SIL Open Font License 1.1. Loaded from Google
+  Fonts for Kairoq's code views and offered to apps as a code font (`react-design.js`).
