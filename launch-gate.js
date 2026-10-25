@@ -45,7 +45,7 @@ async function check(id,n,{callModel,inspect}={}){
 }
 // One message for the owner.
 function message(g){
- const kinds={check:'Not working',unchecked:'Not checked',security:'Security'};
+ const kinds={check:'Not working',unchecked:'Not checked',security:'Security',leftover:'Still has'};
  return'Before this goes live, Kairoq found:\n'+g.blockers.map(b=>'- '+kinds[b.kind]+': '+b.name+' ('+b.why+')').join('\n')+'\n\nFix these first (ask the chat, or use Fix it), or publish anyway: the live guard will then check the app every hour.';
 }
 module.exports={check,message,enabled};

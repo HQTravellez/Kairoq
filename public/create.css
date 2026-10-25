@@ -6,7 +6,7 @@ body{background:var(--bg);color:var(--text);font-size:14px;display:flex;flex-dir
 button,input,textarea,select{font:inherit;color:inherit}
 .hidden{display:none!important}
 .muted{color:var(--muted)}.small{font-size:12px}.error{color:var(--error);min-height:1em;margin:8px 0 0;white-space:pre-wrap}
-code{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+code{font-family:"Fira Code","Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-variant-ligatures:contextual}
 button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--panel);padding:8px 12px}
 button:hover{background:var(--hover)}
 button:disabled{opacity:.55;cursor:default}
@@ -376,7 +376,7 @@ dialog::backdrop{background:rgba(20,14,28,.32);backdrop-filter:blur(4px)}
 /* ===== Fonts and the live work card (thoughts, plan, steps, files) ===== */
 body{font-feature-settings:"ss01","cv11";letter-spacing:-.01em}
 .hero h1,.home>h1,.landing h2,.home h2,.dialog h2{letter-spacing:-.045em}
-pre,#file-view,.stream-code,.file-list button,#ref-plan{font-family:"Geist Mono",ui-monospace,Menlo,monospace}
+pre,#file-view,.stream-code,.file-list button,#ref-plan{font-family:"Fira Code","Geist Mono",ui-monospace,Menlo,monospace;font-variant-ligatures:contextual}
 .messages>li{line-height:1.55}
 .messages .assistant{white-space:normal}
 .msg-text{white-space:pre-wrap}

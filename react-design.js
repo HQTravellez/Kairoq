@@ -56,7 +56,9 @@ const FONTS={
  'Crimson Pro':['serif','400;500;600;700'],'Cormorant':['serif','400;500;600;700'],'Newsreader':['serif','400;500;600;700'],
  // From the type systems in design-library/type.json (taste-skill, MIT).
  'Schibsted Grotesk':['sans','400;600;800'],'Hanken Grotesk':['sans','400;500'],'Libre Franklin':['sans','400;600;700'],'Source Serif 4':['serif','400;600'],'Anton':['display','400'],'Big Shoulders':['display','400;800'],'Barlow Condensed':['display','400;700'],'Barlow':['sans','400;500'],'TikTok Sans':['sans','400;500;800'],'Onest':['sans','400;500'],'Chivo':['sans','400;700;900'],'Epilogue':['sans','400;500;900'],'Red Hat Display':['sans','400;900'],'Red Hat Text':['sans','400;500'],'Jost':['sans','400;500;700'],'Stack Sans Headline':['sans','300;400'],'Stack Sans Text':['sans','400;500'],'Albert Sans':['sans','400;500;600'],'League Spartan':['sans','400;700'],'Bodoni Moda':['serif','400;500'],'Imbue':['serif','400'],'Literata':['serif','400;500;600'],'STIX Two Text':['serif','400;600'],'Young Serif':['serif','400'],'Zilla Slab':['serif','400;500;600'],'Besley':['serif','400;800'],'Rokkitt':['serif','400;800'],
- 'JetBrains Mono':['mono','400;500;600;700'],'Space Mono':['mono','400;700']
+ 'JetBrains Mono':['mono','400;500;600;700'],'Space Mono':['mono','400;700'],
+ // Fira Code (github.com/tonsky/FiraCode, SIL OFL 1.1): joins -> => != into one shape in code blocks.
+ 'Fira Code':['mono','400;500;600;700']
 };
 const FALLBACK={sans:'ui-sans-serif, system-ui, sans-serif',display:'ui-sans-serif, system-ui, sans-serif',serif:'ui-serif, Georgia, serif',mono:'ui-monospace, monospace'};
 function fontStack(name){const f=FONTS[name];return"'"+name+"', "+FALLBACK[f?f[0]:'sans']}
@@ -110,6 +112,7 @@ function tokens(design={}){
   '--border':hsl(border),'--input':hsl(border),'--ring':hsl(primary),
   '--radius':radius,'--radius-sm':'calc(var(--radius) - 4px)','--radius-xl':'calc(var(--radius) + 4px)','--radius-2xl':'calc(var(--radius) + 8px)',
   '--font-sans':fontStack(body),'--font-display':fontStack(display),
+  ...(FONTS[design.fonts?.mono]&&FONTS[design.fonts.mono][0]==='mono'?{'--font-mono':fontStack(design.fonts.mono)}:{}),
   '--gradient-hero':'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',
   '--gradient-subtle':'linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%)',
   '--shadow-soft':'0 1px 2px hsl(var(--foreground) / 0.04), 0 8px 24px -12px hsl(var(--foreground) / 0.14)',
@@ -119,7 +122,7 @@ function tokens(design={}){
 const START='/* kairoq:tokens:start (design tokens; edit colours here, not in components) */',END='/* kairoq:tokens:end */';
 const FONT_MARK='/* kairoq:fonts */';
 function tokensBlock(design){return START+'\n@layer base {\n  :root {\n'+Object.entries(tokens(design)).map(([k,v])=>'    '+k+': '+v+';').join('\n')+'\n  }\n}\n'+END}
-function fontLine(design){const url=fontUrl([design.fonts?.display||'Inter',design.fonts?.body||'Inter']);return url?"@import url('"+url+"'); "+FONT_MARK:''}
+function fontLine(design){const url=fontUrl([design.fonts?.display||'Inter',design.fonts?.body||'Inter',...(FONTS[design.fonts?.mono]?[design.fonts.mono]:[])]);return url?"@import url('"+url+"'); "+FONT_MARK:''}
 const BASE_CSS=`@tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -153,7 +156,7 @@ const THEME={extend:{
  colors:Object.fromEntries([['border'],['input'],['ring'],['background'],['foreground']].map(([k])=>[k,'hsl(var(--'+k+') / <alpha-value>)']).concat(
   ['primary','secondary','muted','accent','destructive','card','popover'].map(k=>[k,{DEFAULT:'hsl(var(--'+k+') / <alpha-value>)',foreground:'hsl(var(--'+k+'-foreground) / <alpha-value>)'}]))),
  borderRadius:{sm:'var(--radius-sm, 0.125rem)',md:'calc(var(--radius, 0.5rem) - 2px)',lg:'var(--radius, 0.5rem)',xl:'var(--radius-xl, 0.75rem)','2xl':'var(--radius-2xl, 1rem)'},
- fontFamily:{sans:['var(--font-sans, ui-sans-serif, system-ui, sans-serif)'],display:['var(--font-display, var(--font-sans, ui-sans-serif, system-ui, sans-serif))']},
+ fontFamily:{mono:['var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)'],sans:['var(--font-sans, ui-sans-serif, system-ui, sans-serif)'],display:['var(--font-display, var(--font-sans, ui-sans-serif, system-ui, sans-serif))']},
  boxShadow:{soft:'var(--shadow-soft, 0 1px 3px rgb(0 0 0 / 0.1))',glow:'var(--shadow-glow, 0 20px 50px -20px rgb(0 0 0 / 0.35))'},
  backgroundImage:{'gradient-hero':'var(--gradient-hero, none)','gradient-subtle':'var(--gradient-subtle, none)'},
  keyframes:{
@@ -232,7 +235,7 @@ function designNote(design){
  if(!design||!design.palette)return'';
  const lines=['','','DESIGN BRIEF for this project (follow it in every change; the tokens in src/index.css already match it):'];
  lines.push('Style: '+(design.name||'Custom')+'. '+(design.summary||''));
- lines.push('Palette: '+Object.entries(design.palette).map(([k,v])=>k+' '+v).join(', ')+'. Fonts: '+(design.fonts?.display||'Inter')+' for headings (font-display), '+(design.fonts?.body||'Inter')+' for text (font-sans). Corner radius '+(design.radius||'0.75rem')+'.');
+ lines.push('Palette: '+Object.entries(design.palette).map(([k,v])=>k+' '+v).join(', ')+'. Fonts: '+(design.fonts?.display||'Inter')+' for headings (font-display), '+(design.fonts?.body||'Inter')+' for text (font-sans)'+(design.fonts?.mono?', '+design.fonts.mono+' for code (font-mono; it joins -> and => into one shape)':'')+'. Corner radius '+(design.radius||'0.75rem')+'.');
  if(design.layout)lines.push('Layout: '+design.layout);
  if(design.imagery)lines.push('Imagery: '+design.imagery);
  if(Array.isArray(design.details)&&design.details.length)lines.push('Details:\n'+design.details.map(d=>'- '+d).join('\n'));
@@ -266,7 +269,7 @@ function normalize(v){
  for(const k of ['background','foreground','primary'])if(!palette[k])throw Object.assign(Error('The palette needs a valid '+k+' colour (#rrggbb)'),{status:400});
  const font=n=>{const name=Object.keys(FONTS).find(f=>f.toLowerCase()===String(n||'').trim().toLowerCase());return name||'Inter'};
  const radius=/^(0|0?\.\d+|1(\.\d+)?)rem$/.test(String(v.radius||'').trim())?String(v.radius).trim():'0.75rem';
- return{name:cleanText(v.name,60)||'Custom',summary:cleanText(v.summary,600),palette,fonts:{display:font(v.fonts?.display),body:font(v.fonts?.body)},radius,
+ return{name:cleanText(v.name,60)||'Custom',summary:cleanText(v.summary,600),palette,fonts:{display:font(v.fonts?.display),body:font(v.fonts?.body),...(FONTS[font(v.fonts?.mono)]&&FONTS[font(v.fonts?.mono)][0]==='mono'&&v.fonts?.mono?{mono:font(v.fonts.mono)}:{})},radius,
   layout:cleanText(v.layout,600),imagery:cleanText(v.imagery,400),details:(Array.isArray(v.details)?v.details:[]).map(d=>cleanText(d,200)).filter(Boolean).slice(0,10),
   notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):''};
 }
