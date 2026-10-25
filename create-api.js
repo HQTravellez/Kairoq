@@ -63,7 +63,7 @@ function ownedProject(v,id,need='owner'){
  return{meta,role};
 }
 const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
- 'POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
+ 'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
@@ -1219,6 +1219,13 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}
   if(action==='/asset'&&method==='GET'){const file=require('./react-assets').read(id,new URL(req.url,'http://x').searchParams.get('name'));if(!file)throw Object.assign(Error('Unknown image'),{status:404});res.writeHead(200,{'Content-Type':file.type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'});res.end(file.bytes);return true}
+  // The editor's "Real Safari": the current preview opened in Safari's engine at the chosen phone size.
+  if(action==='/safari'&&method==='POST'){
+   const b=await readJson(req,2000),meta=builder.loadMeta(id),url=builder.previewUrl(meta);
+   if(!url)throw Object.assign(Error('Build the app first'),{status:400});
+   if(limited(req,'safari-shot',40,600000))throw Object.assign(Error('Too many Safari screenshots. Wait a few minutes.'),{status:429});
+   return send(res,200,await require('./runtime-check').safariShot(url,{width:b.width,height:b.height,ipad:Boolean(b.ipad)})),true;
+  }
   if(action==='/sql'&&method==='GET')return send(res,200,require('./react-sql').overview(builder.projectDir(id))),true;
   if(action==='/sql'&&method==='POST'){
    // The owner's SQL console. Queries run in a SQL process that is killed if they overrun.
@@ -1452,7 +1459,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const meta=builder.loadMeta(id),url=builder.previewUrl(meta);
    if(!url)throw Object.assign(Error('Build the app first'),{status:400});
    if(b.repair){checks.applyRepair(id,String(b.repair));return send(res,200,{checks:checks.list(builder.loadMeta(id))}),true}
-   if(b.run){const r=await checks.run(id,url,{inspect,version:meta.current_version});if(!r.skipped&&r.failed.length)r.repairs=await checks.suggestRepairs(id,url,r,{inspect});if(r.skipped)throw Object.assign(Error('Checks need a browser on the server (Chromium), which is not available here.'),{status:503});return send(res,200,{result:r,checks:checks.list(builder.loadMeta(id))}),true}
+   if(b.run){const r=await checks.runDevices(id,url,{inspect,version:meta.current_version});if(!r.skipped&&r.failed.length)r.repairs=await checks.suggestRepairs(id,url,r,{inspect});if(r.skipped)throw Object.assign(Error('Checks need a browser on the server (Chromium), which is not available here.'),{status:503});return send(res,200,{result:r,checks:checks.list(builder.loadMeta(id))}),true}
    let draft;
    if(typeof b.describe==='string'&&b.describe.trim()){
     // The AI writes the steps (priced like a Discuss message); the check is kept only if it passes now.

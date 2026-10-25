@@ -32,6 +32,12 @@ RUN if [ "$KAIROQ_LAST30DAYS" = "on" ]; then \
       UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/python uv tool install --python 3.12 yt-dlp && \
       python3.12 --version && yt-dlp --version; fi
 ENV KAIROQ_PYTHON=/usr/local/bin/python3.12
+# Safari's engine (WebKit, through Playwright) for the "iPhone Safari" checks and the editor's
+# "Real Safari" button (runtime-check.js). About 300 MB with its system libraries; build with
+# KAIROQ_WEBKIT=off to leave it out (Safari checks are then skipped, not failed).
+ARG KAIROQ_WEBKIT=on
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN if [ "$KAIROQ_WEBKIT" = "on" ]; then npx playwright-core install --with-deps webkit && rm -rf /var/lib/apt/lists/*; fi
 COPY . .
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV NODE_ENV=production TZ=UTC

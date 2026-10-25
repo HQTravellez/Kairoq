@@ -95,3 +95,9 @@ installing their hooks. Reviewed source commits are in `upstreams.json`.
 
 Upstream binaries/services carry their own dependencies, licenses and operational
 requirements. API/schema compatibility and offline tests do not establish production readiness.
+
+## Real-device checks
+
+- WebKit (Safari's engine) as built by Playwright — https://playwright.dev — Apache-2.0 (Playwright)
+  and LGPL/BSD (WebKit). Installed unmodified in the Docker image and run as a separate browser
+  for the "iPhone Safari" checks and the editor's "Real Safari" screenshot (`runtime-check.js`).

@@ -77,21 +77,22 @@ async function finish(id,result,{plan,publish=false,github=null,slug},ctx){
   // 2. Run them on desktop and phone; repair what fails (up to two rounds).
   for(let round=0;report.checks.length&&!(signal&&signal.aborted);round++){
    const meta=builder.loadMeta(id),url=builder.previewUrl(meta),n=meta.current_version;
-   const desk=await checks.run(id,url,{inspect,version:n});
-   const phone=desk.skipped?{ran:0,passed:0,failed:[]}:await checks.run(id,url,{inspect,version:n,viewport:'phone',record:false});
-   const failed=[...desk.failed,...phone.failed];
-   report.last_run={version:n,desktop:{ran:desk.ran,passed:desk.passed},phone:{ran:phone.ran,passed:phone.passed},failed:failed.map(f=>({name:f.name,step:f.step,error:f.error}))};
-   if(desk.skipped||!failed.length||round>=2)break;
+   // Desktop, phone, iPhone Safari and a slow phone (react-checks.runDevices).
+   const all=await checks.runDevices(id,url,{inspect,version:n});
+   const count=d=>{const m=Object.values(all.matrix||{}).map(x=>x[d]).filter(Boolean);return{ran:m.length,passed:m.filter(x=>x.ok).length}};
+   const failed=all.failed;
+   report.last_run={version:n,desktop:count('desktop'),phone:count('phone'),...((all.devices||[]).includes('iphone')?{iphone:count('iphone')}:{}),...((all.devices||[]).includes('slow')?{slow:count('slow')}:{}),failed:failed.map(f=>({name:f.name,step:f.step,error:f.error}))};
+   if(all.skipped||!failed.length||round>=2)break;
    progress('repairing');report.repairs++;
    try{
-    const r=await builder.edit(id,'These user journeys from the approved plan fail when tested in a browser. Find the root cause of each and fix the app so every journey works end to end on desktop and on a 390px phone (no sideways scrolling; navigation reachable from a menu button):\n'+checks.failureText(failed),{...editOpts,displayText:'Fix the failing journeys ('+failed.length+')'});
+    const r=await builder.edit(id,'These user journeys from the approved plan fail when tested in a browser. Find the root cause of each and fix the app so every journey works end to end on desktop, on a 390px phone, in Safari on iPhone (e.g. dates must be ISO like 2026-11-02T15:00, not "2026-11-02 15:00") and on a slow 3G phone (usable within 10 seconds: lazy-load big images and videos) (no sideways scrolling; navigation reachable from a menu button):\n'+checks.failureText(failed),{...editOpts,displayText:'Fix the failing journeys ('+failed.length+')'});
     result={...result,...keep(r)};
    }catch(e){if(signal&&signal.aborted)break;problem('Repair',e.message);break}
    progress('verifying');
   }
   // A journey that still fails on desktop is switched off, so it does not block later
   // changes and publishing, and reported to the owner.
-  const still=(report.last_run&&report.last_run.failed||[]).filter(f=>!/ \(phone\)$/.test(f.name));
+  const still=(report.last_run&&report.last_run.failed||[]).filter(f=>!/ \((phone|iPhone Safari|slow phone)\)$/.test(f.name));
   if(still.length){const meta=builder.loadMeta(id);for(const f of still){const c=checks.list(meta).find(x=>x.name===f.name);if(c)try{checks.setEnabled(id,c.id,false)}catch{}}result={...result,check_failures:still}}
  }
  // 3. Compare the design with the reference and polish once when it falls short.

@@ -384,15 +384,53 @@ $('restore').onclick=async()=>{
 };
 $('back').onclick=()=>{closeDetail();state.project=null;loadHome()};
 $('project-name').onchange=async()=>{try{const {project}=await api('/projects/'+state.project.id,{method:'PATCH',body:{name:$('project-name').value}});state.project.name=project.name}catch{}};
-function device(mobile){$('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile))}
+// The preview as a real device: iPhone (Dynamic Island, status bar, Safari's address bar, home bar),
+// iPhone SE, a Pixel or an iPad, at its true size in CSS pixels and scaled down to fit the screen.
+// "Real Safari" opens the page in Safari's own engine (WebKit) on the server and shows that screenshot.
+const MODELS={
+ iphone16:{label:'iPhone 16',w:393,h:852,top:54,urlTop:0,bottom:84,radius:55,island:true,os:'ios'},
+ iphone16max:{label:'iPhone 16 Pro Max',w:440,h:956,top:62,urlTop:0,bottom:84,radius:62,island:true,os:'ios'},
+ iphonese:{label:'iPhone SE',w:375,h:667,top:20,urlTop:0,bottom:74,radius:0,island:false,os:'ios',home:true},
+ pixel:{label:'Pixel 9',w:412,h:923,top:32,urlTop:56,bottom:24,radius:42,island:false,os:'android'},
+ ipad:{label:'iPad mini',w:744,h:1133,top:24,urlTop:50,bottom:20,radius:22,island:false,os:'ipados'}};
+state.deviceModel=(()=>{try{return localStorage.getItem('kq-device')||'iphone16'}catch{return'iphone16'}})();
+if(!MODELS[state.deviceModel])state.deviceModel='iphone16';
+function fitDevice(){
+ const d=$('device'),m=MODELS[state.deviceModel];if(!d||d.classList.contains('desktop')||!m)return;
+ const c=$('canvas'),pad=28,bez=m.home?72:24;
+ const scale=Math.min(1,(c.clientHeight-pad)/(m.h+bez),(c.clientWidth-pad)/(m.w+24));
+ d.style.setProperty('--dev-scale',String(Math.max(0.3,scale)));
+}
+function device(mobile){
+ const m=MODELS[state.deviceModel],d=$('device');
+ $('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile));
+ const hidden=d.classList.contains('hidden');
+ d.className='device '+(hidden?'hidden ':'')+(mobile?'phone '+m.os+(m.island?' island':'')+(m.home?' homebutton':''):'desktop');
+ for(const [k,v] of Object.entries({'--dev-w':m.w+'px','--dev-h':m.h+'px','--dev-top':m.top+'px','--dev-url':m.urlTop+'px','--dev-bottom':m.bottom+'px','--dev-radius':m.radius+'px'}))d.style.setProperty(k,v);
+ $('device-model').classList.toggle('hidden',!mobile);$('device-model').value=state.deviceModel;
+ $('safari-shot').classList.toggle('hidden',!mobile||m.os==='android');
+ $('dev-shot').classList.add('hidden');
+ try{const host=new URL($('frame').src||location.href).host;for(const h of d.querySelectorAll('.dev-host'))h.textContent=state.project&&state.project.published&&state.project.published.slug?state.project.published.slug+'.kairoq.app':host}catch{}
+ fitDevice();
+}
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
+$('device-model').onchange=()=>{state.deviceModel=$('device-model').value;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
+addEventListener('resize',fitDevice);
+$('safari-shot').onclick=async()=>{
+ const b=$('safari-shot'),m=MODELS[state.deviceModel];b.disabled=true;const was=b.textContent;b.textContent='Opening in Safari…';
+ try{const r=await api('/projects/'+state.project.id+'/safari',{method:'POST',body:{width:m.w,height:m.h-m.top-m.bottom-m.urlTop,ipad:m.os==='ipados'}});
+  $('dev-shot-img').src='data:image/jpeg;base64,'+r.screenshot;text($('dev-shot-model'),m.label);$('dev-shot').classList.remove('hidden');
+  if(r.errors&&r.errors.length)text($('chat-error'),'Safari reported: '+r.errors.slice(0,2).join(' · '));
+ }catch(err){text($('chat-error'),err.message)}finally{b.disabled=false;b.textContent=was}
+};
+$('dev-shot-close').onclick=()=>$('dev-shot').classList.add('hidden');
 // Reload; when the preview had not loaded, rebuild it first.
 $('refresh').onclick=()=>{if(!$('preview-notice').classList.contains('hidden'))return rebuildPreview();const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
 $('share-open').onclick=()=>$('team-open').click();
 function view(mode){
  state.code=mode==='code';state.data=mode==='data';
  for(const m of ['preview','code','data'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
- $('frame').classList.toggle('hidden',mode!=='preview');$('code').classList.toggle('hidden',mode!=='code');$('data').classList.toggle('hidden',mode!=='data');
+ $('device').classList.toggle('hidden',mode!=='preview');$('frame').classList.toggle('hidden',mode!=='preview');$('code').classList.toggle('hidden',mode!=='code');$('data').classList.toggle('hidden',mode!=='data');
  if(mode==='code')renderFiles();
  if(mode==='data')renderData();
 }
@@ -2264,6 +2302,10 @@ async function renderChecks(){
   const act=document.createElement('div');act.className='skill-actions';
   const on=document.createElement('label'),cb=document.createElement('input');cb.type='checkbox';cb.checked=c.enabled!==false;cb.disabled=!editor;cb.onchange=async()=>{try{await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{id:c.id,enabled:cb.checked}})}catch(err){text($('checks-error'),err.message)}};on.append(cb,document.createTextNode(' on'));act.append(on);
   if(editor){const del=document.createElement('button');del.type='button';del.className='ghost link-btn';del.textContent='Remove';del.onclick=async()=>{if(!confirm('Remove the check "'+c.name+'"?'))return;try{await api('/projects/'+state.project.id+'/checks',{method:'DELETE',body:{id:c.id}});renderChecks()}catch(err){text($('checks-error'),err.message)}};act.append(del)}
+  // How the check did on each device (react-checks.runDevices).
+  if(c.last&&c.last.devices){const row=el('div','check-devices');const L={desktop:'Desktop',phone:'Phone',iphone:'iPhone Safari',slow:'Slow phone'};
+   for(const k of ['desktop','phone','iphone','slow']){const r=c.last.devices[k];if(!r)continue;const b=el('span','dev-badge '+(r.ok?'ok':'bad'),L[k]+' '+(r.ok?'✓':'✗')+(k==='slow'&&r.ready_ms?' '+(r.ready_ms/1000).toFixed(1)+' s':''));if(!r.ok)b.title=(r.step?'At: '+r.step+'. ':'')+(r.error||'');row.append(b)}
+   t.append(row)}
   li.append(st,t,act);
   // A renamed button or field: the check found the likely new one and proved the flow still works with it.
   if(c.last&&!c.last.ok&&c.last.repair){
@@ -2575,7 +2617,7 @@ $('apikey-create').onclick=async()=>{
  }catch(err){text($('apikey-status'),err.message)}
 };
 $('checks-open').onclick=async()=>{text($('checks-error'),'');text($('checks-status'),'');$('checks-save-anyway').classList.add('hidden');try{await renderChecks();$('checks-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
-$('checks-run').onclick=async()=>{const btn=$('checks-run');btn.disabled=true;text($('checks-status'),'Running the checks on a test copy of your data…');text($('checks-error'),'');
+$('checks-run').onclick=async()=>{const btn=$('checks-run');btn.disabled=true;text($('checks-status'),'Running the checks on a test copy of your data: desktop, phone, iPhone Safari and a slow phone…');text($('checks-error'),'');
  try{const {result}=await api('/projects/'+state.project.id+'/checks',{method:'POST',body:{run:true}});text($('checks-status'),result.failed.length?result.failed.length+' of '+result.ran+' failed.'+(result.repairs&&result.repairs.length?' '+result.repairs.length+' look like a renamed button or field: see “Likely fix” below.':' Use Fix it in the chat, or describe what changed.'):'All '+result.ran+' passed.');await renderChecks()}
  catch(err){text($('checks-status'),'');text($('checks-error'),err.message)}finally{btn.disabled=false}};
 let checkDraft=null;
