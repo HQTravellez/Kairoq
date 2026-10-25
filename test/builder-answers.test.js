@@ -5,7 +5,7 @@ const S=require('../builder-smalltalk'),B=require('../react-builder'),E=require(
 const route=m=>S.smallTalk(m)?'smalltalk':(S.questionOnly(m)||S.conversation(m))?'answer':'build';
 
 test('asking for ideas or explanations is answered; short change requests still build',()=>{
- for(const m of ['can you suggest what else','can you suggest what elsw?','any ideas?','what should we add next','ok but why','really?','is the form saving?','hi, why did the build fail?'])assert.equal(route(m),'answer',m);
+ for(const m of ['can you suggest what else','can you suggest what elsw?','anything else','anythign else','anything more','any ideas?','what should we add next','ok but why','really?','is the form saving?','hi, why did the build fail?'])assert.equal(route(m),'answer',m);
  for(const m of ['bigger','dark mode','more photos','booking form','navy and gold','add a gallery','suggest a gallery and add it'])assert.equal(route(m),'build',m);
  assert.equal(S.smallTalk('hello what can you do'),'help');
  assert.equal(S.smallTalk('hi how are you doing today'),'greeting');

@@ -314,7 +314,7 @@ function parseEdit(content){
  if(!value.files&&!Object.keys(edits).length&&!(Array.isArray(value.delete)&&value.delete.length)&&!question){
   // Only a message: the model answered instead of changing code. Show the answer.
   const said=String(value.message||value.answer||'').trim();
-  if(said.length>=20)return answerReply(said);
+  if(said.length>=12&&said!=='Updated the app.')return answerReply(said);
   throw Error('Response JSON needs a "files" object or "edits"');
  }
  const del=Array.isArray(value.delete)?value.delete.filter(x=>typeof x==='string'):[];
