@@ -25,7 +25,7 @@ test("the Plugins page reports real state, never a pretend switch", () => {
   const off = status({});
   const by = id => off.installed.find(p => p.id === id);
   assert.equal(by("superpowers").hermes.on, false);
-  assert.match(by("superpowers").hermes.why, /Hermes isn't connected/);
+  assert.match(by("superpowers").hermes.why, /The agent isn't connected/);
   assert.equal(by("jev").kairoq.on, false);
   assert.equal(by("dashi").kairoq.on, false);
   assert.ok(off.skills >= 10, "Superpowers skills are counted from disk");

@@ -674,7 +674,7 @@ function writeSSE(res, event, data) {
 function plainOpenRouterError(status, message = "") {
   const m = String(message);
   if (status === 402 || /insufficient credits|never purchased credits/i.test(m))
-    return "OpenRouter turned this down: your OpenRouter account has no credits, so even its free models are capped at a few requests a day. Add credits at openrouter.ai/settings/credits, or connect Hermes or Ollama Cloud (see docs/HERMES.md).";
+    return "OpenRouter turned this down: your OpenRouter account has no credits, so even its free models are capped at a few requests a day. Add credits at openrouter.ai/settings/credits, or connect Kairoq Agent or Ollama Cloud (see docs/HERMES.md).";
   if (status === 429 || /rate.?limit/i.test(m))
     return "The free models are busy or you've hit today's free limit. Try again in a minute, or pick another model.";
   if (status === 401 || /no auth|invalid api key|user not found/i.test(m))
@@ -4255,7 +4255,7 @@ async function handleChat(req, res) {
     // any other named model is used as picked and bypasses Hermes.
     const wantsHermes=body.model==="hermes/agent";
     const autoPick=!body.model||["openrouter/free","smart-auto","openrouter/auto"].includes(body.model);
-    if(wantsHermes&&!require("./hermes-chat").configured())return json(res,400,{error:"Hermes Agent isn't connected yet. Set up the Hermes service on Railway (see docs/HERMES.md), or pick another model."});
+    if(wantsHermes&&!require("./hermes-chat").configured())return json(res,400,{error:"Kairoq Agent isn't connected yet. Set up the agent service on Railway (see docs/HERMES.md), or pick another model."});
     let requestedModel=typeof body.model==="string"&&body.model&&!wantsHermes?body.model:"openrouter/free";
     requestedModel=resolveAutoModel(requestedModel,{freeOnly:body.freeOnly!==false});
     if(!require('./chat-model-eligibility').isConversationalModel({id:requestedModel,name:map.get(requestedModel)?.name}))requestedModel='openrouter/free';
@@ -4355,11 +4355,13 @@ async function handleChat(req, res) {
     // cannot start a reply, chat falls back to the existing model routes below.
     const hermes=require("./hermes-chat");
     if(hermes.configured()&&isAuthenticated(req)&&(wantsHermes||autoPick)){
-      const hermesSystem=[presetSystem,customPresetPrompt,memorySystem,userSystem].filter(Boolean).join("\n\n");
+      // The agent is Kairoq Agent to users. It is honest about what it is built on when asked.
+      const agentIdentity="You are Kairoq Agent, the assistant inside Kairoq. Introduce yourself as Kairoq Agent, never by another product name. If someone asks how you work or what you are built on, say plainly that Kairoq Agent is built on open-source software, including Hermes Agent by Nous Research, and the model the owner chose.";
+      const hermesSystem=[agentIdentity,presetSystem,customPresetPrompt,memorySystem,userSystem].filter(Boolean).join("\n\n");
       const hermesController=new AbortController();
       const stopHermes=()=>{if(!res.writableEnded)hermesController.abort()};
       res.on("close",stopHermes);
-      writeSSE(res,"status",{message:"Hermes is thinking…"});
+      writeSSE(res,"status",{message:"Kairoq Agent is thinking…"});
       try{
         const reply=await hermes.streamChat({
           // Hermes keeps the last 100 messages of this chat in view (other models get 50);
@@ -4376,7 +4378,7 @@ async function handleChat(req, res) {
       }catch(hermesErr){
         if(hermesErr.afterPartial||hermesController.signal.aborted)throw hermesErr;
         await audit("hermes.chat_fallback",{error:String(hermesErr.message).slice(0,300),status:hermesErr.status||0});
-        writeSSE(res,"status",{message:"Hermes unavailable — using backup model…"});
+        writeSSE(res,"status",{message:"Kairoq Agent unavailable — using backup model…"});
       }finally{res.off("close",stopHermes)}
     }
 
@@ -6639,20 +6641,20 @@ function pluginStatus(env = process.env) {
   return {
     skills: skillCount,
     installed: [
-      { id: "superpowers", name: "Superpowers", source: "obra/superpowers", tag: "bundled", about: `${skillCount} working methods Hermes follows: brainstorming, planning, debugging, verifying before saying "done".`, kairoq: null, hermes: hermesOn ? { on: true } : off("Hermes isn't connected") },
-      { id: "memory", name: "Memory", tag: "built in", about: "Remembers you across chats and searches every past conversation.", kairoq: { on: true }, hermes: hermesOn ? { on: true } : off("Hermes isn't connected") },
+      { id: "superpowers", name: "Superpowers", source: "obra/superpowers", tag: "bundled", about: `${skillCount} working methods the agent follows: brainstorming, planning, debugging, verifying before saying "done".`, kairoq: null, hermes: hermesOn ? { on: true } : off("The agent isn't connected") },
+      { id: "memory", name: "Memory", tag: "built in", about: "Remembers you across chats and searches every past conversation.", kairoq: { on: true }, hermes: hermesOn ? { on: true } : off("The agent isn't connected") },
       { id: "jev", name: "Jev API pipeline", source: "claude-x-jev", about: "Reads API docs and suggests the next step in API Studio.", kairoq: jevOn ? { on: true } : off(jev.enabled ? "Needs TYPESAFE_API_KEY and SCALEDOWN_API_KEY" : "Set KAIROQ_API_INTELLIGENCE=on and the Typesafe and ScaleDown keys"), hermes: null },
       { id: "hyperframes", name: "HyperFrames", about: "Turns a script into a short video made from HTML scenes.", kairoq: videoOn ? { on: true } : off("Needs KAIROQ_HYPERFRAMES=on and the renderer installed"), hermes: null },
       { id: "supabase", name: "Supabase", source: "supabase/supabase", about: "Keep an app's sign-ups and saved data in your own Supabase. Connect it per app in the app builder: Settings → Database.", kairoq: { on: true, note: "Per app" }, hermes: null },
       { id: "crawl4ai", name: "Crawl4AI", source: "unclecode/crawl4ai", about: "Reads hard, script-built websites as clean text when you share a link, without sending the page to an outside reader.", kairoq: require("./crawl4ai").configured(env) ? { on: true } : off("Set KAIROQ_CRAWL4AI_URL to a Crawl4AI server"), hermes: null },
       { id: "stirling-pdf", name: "Stirling PDF", source: "Stirling-Tools/Stirling-PDF", about: "PDF tools in the chat's + menu: merge, split, make smaller, read scanned pages, pages to images.", kairoq: require("./stirling-pdf").configured(env) ? { on: true } : off("Set KAIROQ_STIRLING_URL to a Stirling PDF server"), hermes: null },
-      { id: "last30days", name: "last30days", source: "mvanhorn/last30days-skill", about: "Type /last30days and a topic in chat: what people said about it in the last 30 days on Reddit, Hacker News, YouTube, GitHub and the web, with links. Add deep for a wider search.", kairoq: require("./last30days").available() ? { on: true, note: [env.BRAVE_API_KEY ? "web search on" : "free sources; BRAVE_API_KEY adds web search", env.SCRAPECREATORS_API_KEY ? "TikTok and Instagram on" : ""].filter(Boolean).join(" · ") } : off("Not installed on this server"), hermes: hermesOn ? { on: true, note: "Hermes writes it up" } : null },
+      { id: "last30days", name: "last30days", source: "mvanhorn/last30days-skill", about: "Type /last30days and a topic in chat: what people said about it in the last 30 days on Reddit, Hacker News, YouTube, GitHub and the web, with links. Add deep for a wider search.", kairoq: require("./last30days").available() ? { on: true, note: [env.BRAVE_API_KEY ? "web search on" : "free sources; BRAVE_API_KEY adds web search", env.SCRAPECREATORS_API_KEY ? "TikTok and Instagram on" : ""].filter(Boolean).join(" · ") } : off("Not installed on this server"), hermes: hermesOn ? { on: true, note: "The agent writes it up" } : null },
       { id: "dashi", name: "dashi-ppt", about: "Makes slide decks. Kairoq's own slide maker is used until dashi's licence is reviewed.", kairoq: off("Waiting on licence review"), hermes: null },
     ],
     catalog: [
-      { id: "understand-anything", name: "Understand-Anything", for: "Hermes", about: "Maps a codebase or a folder of documents so you can ask questions about it.", url: "https://github.com/search?q=Understand-Anything&type=repositories" },
-      { id: "mem0", name: "Mem0", for: "Hermes", about: "A second, larger memory store for facts about customers and projects.", url: "https://github.com/mem0ai/mem0" },
-      { id: "ruflo", name: "Ruflo", for: "Kairoq + Hermes", about: "Runs several agents together on one bigger task.", url: "https://github.com/search?q=ruflo&type=repositories" },
+      { id: "understand-anything", name: "Understand-Anything", for: "Agent", about: "Maps a codebase or a folder of documents so you can ask questions about it.", url: "https://github.com/search?q=Understand-Anything&type=repositories" },
+      { id: "mem0", name: "Mem0", for: "Agent", about: "A second, larger memory store for facts about customers and projects.", url: "https://github.com/mem0ai/mem0" },
+      { id: "ruflo", name: "Ruflo", for: "Kairoq + Agent", about: "Runs several agents together on one bigger task.", url: "https://github.com/search?q=ruflo&type=repositories" },
     ],
   };
 }
