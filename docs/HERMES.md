@@ -175,3 +175,20 @@ Models that share their thinking (`delta.reasoning`, `delta.reasoning_content`, 
 the reply. It folds to "Thought for Ns" when the answer starts and is saved with the chat.
 Hermes tool steps (searches, page reads) appear in the same panel. The **Low / Med / High**
 picker next to the model sets how hard the model thinks (`reasoning_effort`).
+
+
+## Fast app builds (Ollama Cloud)
+
+Standard app builds use the free OpenRouter models by default. They wait in line and think without
+showing anything, so a build takes about 4 minutes. With the same Ollama Cloud key, Kairoq sends
+Standard builds to a fast coding model first. It streams the plan and files straight away, and if it
+fails the usual models take over.
+
+| Variable on the Kairoq service | Value |
+|---|---|
+| `LOCAL_LLM_BASE_URL` | `https://ollama.com/v1` |
+| `LOCAL_LLM_API_KEY` | key from ollama.com/settings/keys |
+| `KAIROQ_BUILDER_FAST_MODEL` (optional) | default `qwen3-coder:480b`; any Ollama Cloud model name |
+| `KAIROQ_BUILDER_FAST` (optional) | `off` to turn it off |
+
+Any other OpenAI-compatible endpoint works too, set with `KAIROQ_BUILDER_FAST_URL` and `KAIROQ_BUILDER_FAST_KEY`.

@@ -6867,8 +6867,42 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
     }
   }
   if(opts.tier==="chat")return callOpenRouterBuilder(opts,parse);
+  // A fast model (Ollama Cloud, see fastBuilder) writes Standard builds first: it streams at
+  // once, where the free OpenRouter models wait in line and think silently for minutes.
+  const fb=fastBuilder();
+  if(fb&&(!opts.tier||opts.tier==="standard")){
+    try{return await callFastBuilder(fb,opts,parse)}
+    catch(err){
+      if(err.name==="AbortError"||opts.signal?.aborted)throw err;
+      console.log("[builder] fast model "+fb.model+" failed, using the usual models: "+String(err.message||err).slice(0,200));
+    }
+  }
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   return callOpenRouterBuilder(opts,parse);
+}
+// The fast builder model: KAIROQ_BUILDER_FAST_URL/KEY/MODEL, or Ollama Cloud when the chat's
+// OpenAI-compatible route already points there (LOCAL_LLM_BASE_URL=https://ollama.com/v1 with
+// LOCAL_LLM_API_KEY). KAIROQ_BUILDER_FAST=off turns it off.
+function fastBuilder(env=process.env){
+  if(String(env.KAIROQ_BUILDER_FAST||"").toLowerCase()==="off")return null;
+  const url=String(env.KAIROQ_BUILDER_FAST_URL||(/^https:\/\/ollama\.com\//.test(String(env.LOCAL_LLM_BASE_URL||""))?env.LOCAL_LLM_BASE_URL:"")).trim().replace(/\/+$/,"");
+  const key=String(env.KAIROQ_BUILDER_FAST_KEY||env.LOCAL_LLM_API_KEY||"").trim();
+  if(!/^https:\/\//.test(url)||!key)return null;
+  return{url,key,model:String(env.KAIROQ_BUILDER_FAST_MODEL||"qwen3-coder:480b").trim()};
+}
+async function callFastBuilder(fb,opts,parse){
+  let last=null;
+  const ask=async(msgs,onTok)=>{
+    const response=await fetch(fb.url+"/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+fb.key},signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(600000)]):AbortSignal.timeout(600000),
+      body:JSON.stringify({model:fb.model,messages:msgs,temperature:opts.temperature??0.2,max_tokens:Math.min(32000,Number(opts.maxOutputTokens)||16000),stream:true})});
+    if(!response.ok||!response.body){const d=await response.json().catch(()=>({}));throw Error(d.error?.message||d.error||"Fast model HTTP "+response.status)}
+    const data=await readChatStream(response.body,onTok||(()=>{}),opts.onReasoning);
+    last=data;
+    return{content:data.choices[0].message.content,finish:data.choices[0].finish_reason};
+  };
+  const {content}=await require("./model-continue").complete(ask,opts.messages,{onToken:typeof opts.onToken==="function"?opts.onToken:undefined});
+  if(!String(content||"").trim())throw Error("Empty response; finish="+(last&&last.choices[0].finish_reason));
+  return parse(content,fb.model);
 }
 async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
