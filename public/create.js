@@ -845,7 +845,7 @@ async function discussWhileBuilding(message){
   if(current.status==='failed'){if(current.saved){answer.remove();const k=(await api('/projects/'+projectId)).project.messages.at(-1);$('messages').append(messageItem(k&&k.failed?k:{role:'assistant',text:current.error,failed:true,retry:message,retry_mode:'discuss'}));return}throw Error(current.error)}
   // Re-render only this reply; never replace or stop the active build watcher.
   $('messages').append(messageItem({role:'assistant',text:current.result.message,ideas:current.result.ideas},true,-1));answer.remove();
- }catch(err){answer.remove();$('messages').append(messageItem({role:'assistant',text:/busy|timed|provider|failed to fetch|network/i.test(err.message)?'The AI is busy right now. Nothing was changed and no credits were used.':err.message,failed:true,retry:message,retry_mode:'discuss'}));}
+ }catch(err){answer.remove();$('messages').append(messageItem({role:'assistant',text:/busy|timed|provider|failed to fetch|network/i.test(err.message)?'The free models could not finish this one, even after trying again. Nothing was changed and no credits were used.':err.message,failed:true,retry:message,retry_mode:'discuss'}));}
  finally{state.sideChatPending=false;}
 }
 async function send(message,mode,path='/chat',extra={}){

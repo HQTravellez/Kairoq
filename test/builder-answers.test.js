@@ -49,3 +49,11 @@ test('saving a failure keeps the message and a retry',()=>{
  assert.equal(meta.messages.at(-1).retry,'can you suggest what else');
  assert.equal(meta.messages.at(-1).failed,true);
 });
+
+test('a failed model chain is tried once more before the owner sees anything, and never says "busy"',()=>{
+ const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8'),api=fs.readFileSync(path.join(__dirname,'../create-api.js'),'utf8'),ui=fs.readFileSync(path.join(__dirname,'../public/create.js'),'utf8');
+ assert.match(server,/opts\.onRetry\?\.\(\);[\s\S]{0,400}return callBuilderModelOnce\(opts,parse\)/);
+ assert.match(server,/Last: the same free route the main chat uses/);
+ assert.match(api,/progress:RETRY/);
+ assert.doesNotMatch(E.BUSY_TEXT+ui,/AI is busy/);
+});

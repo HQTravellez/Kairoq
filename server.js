@@ -6872,7 +6872,21 @@ function builderProvider(){
   if(chosen==="openrouter"&&process.env.OPENROUTER_API_KEY)return"openrouter";
   return experiential.configured()?"experiential":"openrouter";
 }
+// Free models often turn a request away for a moment (queue full, rate limit, a cut-off reply).
+// When every model fails, Kairoq waits a few seconds and goes through them once more before it
+// gives up, so the owner almost never sees a failure. Settings problems are not retried.
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
+  try{return await callBuilderModelOnce(opts,parse)}
+  catch(err){
+    if(err.name==="AbortError"||opts.signal?.aborted||!retryableModelError(err))throw err;
+    console.log("[builder] every model failed, trying again: "+String(err.message||err).slice(0,300));
+    opts.onRetry?.();
+    await new Promise((resolve,reject)=>{const t=setTimeout(resolve,Number(process.env.KAIROQ_BUILDER_RETRY_MS??5000));opts.signal?.addEventListener("abort",()=>{clearTimeout(t);reject(opts.signal.reason||Error("Stopped."))},{once:true})});
+    return callBuilderModelOnce(opts,parse);
+  }
+}
+function retryableModelError(err){return!/KAIROQ_|budget|switched off|needs an? |not set up|No free LLM route|Start a local model|configure/i.test(String(err&&err.message||err))}
+async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
   // A model the owner picked by name in the chat box (model-choices.js) goes through OpenRouter
   // first; when it cannot run (no key, paid builds off, budget, provider error) Auto takes over.
   if(opts.model){
@@ -6923,7 +6937,10 @@ async function callChatAnswer(opts,parse){
     catch(err){if(opts.signal?.aborted)throw err;errors.push(String(err.message||err).slice(0,160))}
   }
   try{return await callOpenRouterBuilder(opts,parse)}
-  catch(err){if(errors.length)err.message=String(err.message||err)+" | "+errors.join(" | ");throw err}
+  catch(err){if(opts.signal?.aborted)throw err;errors.push(String(err.message||err).slice(0,200))}
+  // Last: the same free route the main chat uses (local model, free providers, OpenRouter free).
+  try{const text=await callFreeLlmText({messages:opts.messages,temperature:opts.temperature??0.4});if(String(text||"").trim()){opts.onToken?.(text,text);return parse(text,"free-chat")}throw Error("empty reply")}
+  catch(err){err.message=String(err.message||err)+" | "+errors.join(" | ");throw err}
 }
 // The fast builder model: KAIROQ_BUILDER_FAST_URL/KEY/MODEL, or Ollama Cloud when the chat's
 // OpenAI-compatible route already points there (LOCAL_LLM_BASE_URL=https://ollama.com/v1 with

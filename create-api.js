@@ -295,6 +295,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // Every model call for this message goes to the chosen model first; if it cannot run, the
  // usual builder (Auto) does the work and the chat says so.
  if(chosen){const base=callModel;callModel=(o,p)=>base({...o,model:chosen.id,onFallback:e=>{if(!job.model_fallback)job.model_fallback=chosen.label+' was not available ('+String(e&&e.message||e).slice(0,140)+'), so Auto was used.'}},p)}
+ // When every model fails once, the server tries them all again; the chat says so meanwhile.
+ {const base=callModel,RETRY='Trying another model…';callModel=async(o,p)=>{try{return await base({...o,onRetry:()=>update({progress:RETRY})},p)}finally{if(job.progress===RETRY)update({progress:null})}}}
  // Customers pay up front, before anything is saved; credits are refunded if the job fails.
  if(v.kind==='customer'&&credits>0)accounts.charge(v.account.id,credits,(label?label:mode==='discuss'?'Discuss message':mode==='agent'?'Agent task':mode==='polish'?'Design review':'Chat edit')+(chosen?' ('+chosen.label+')':tier!=='standard'?' ('+tier[0].toUpperCase()+tier.slice(1)+')':''),'job:'+job.id);
  if(mode!=='discuss'&&mode!=='polish'&&images.length&&!referenceOnly){
