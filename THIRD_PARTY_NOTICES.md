@@ -109,3 +109,11 @@ requirements. API/schema compatibility and offline tests do not establish produc
 - Poly Haven — https://polyhaven.com — models, textures and HDRIs under CC0 (public domain),
   downloaded on request through api.polyhaven.com. Kairoq keeps the source and credit with
   each model.
+
+## Replica method (build from a reference)
+
+- Replica skill pack — https://github.com/Jakeschincariol/replica-skill — MIT. Its review themes
+  (`vendor/replica/themes.json`, with its licence) and its ranking, parity and sweep methods are
+  used in `react-reviews.js`, `react-parity.js` and `react-sweep.js`, rewritten in JavaScript.
+- Reviews are read only through official public APIs: Apple's iTunes Search API and App Store
+  customer-reviews feed, and the Hacker News (Algolia) search API.

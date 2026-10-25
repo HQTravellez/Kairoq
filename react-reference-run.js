@@ -23,7 +23,7 @@ function save(id,{source,analysis,plan,shots}){
  builder.saveMeta(meta);
  return meta.reference;
 }
-function view(meta){const r=meta.reference;if(!r)return null;return{source:r.source,plan:r.plan,shots:r.shots||[],created_at:r.created_at,built_at:r.built_at||null,last:r.last||null,analysis:summary(r.analysis)}}
+function view(meta){const r=meta.reference;if(!r)return null;return{source:r.source,plan:r.plan,shots:r.shots||[],created_at:r.created_at,built_at:r.built_at||null,last:r.last||null,analysis:summary(r.analysis),reviews:r.reviews||null,match:r.match||null}}
 // What the editor shows about the analysis.
 function summary(a){
  if(!a)return null;
@@ -107,10 +107,18 @@ async function finish(id,result,{plan,publish=false,github=null,slug},ctx){
    }
   }catch(e){if(!(signal&&signal.aborted))problem('Design comparison',e.message)}
  }
+ // 3b. Match score: each planned feature checked against the code (react-parity.js).
+ if(callModel&&!(signal&&signal.aborted)){
+  try{progress('scoring');const runs=report.last_run?[...report.checks.map(c=>({name:c.name,ok:!(report.last_run.failed||[]).some(f=>f.name===c.name)}))]:[];report.match=await require('./react-parity').judge(id,{plan,callModel,signal,journeys:runs})}
+  catch(e){if(!(signal&&signal.aborted))problem('Match score',e.message)}
+ }
+ // 3c. Nothing of the original left: its name, web address or brand colours (react-sweep.js).
+ try{progress('sweeping');const sweep=require('./react-sweep'),found=sweep.check(id);report.leftovers=found.slice(0,20);if(found.length)problem('Still has the original\'s '+[...new Set(found.map(f=>f.kind))].join(', '),sweep.message(found))}catch{}
  // 4. Publish and verify the public site (owners only, and only when the journeys pass).
  if(publish&&ctx.canPublish&&!(signal&&signal.aborted)){
   const broken=(result.check_failures||[]).length||(result.runtime_errors||[]).length;
   if(broken)problem('Not published','fix the failing journeys or errors first, then publish');
+  else if((report.leftovers||[]).length)problem('Not published','remove what is left of the original first (above), then publish');
   else try{
    progress('publishing');
    const p=require('./react-hosting').publish(id,{slug});

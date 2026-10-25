@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261025">
+<link rel="stylesheet" href="/create.css?v=20261116">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261112">
 <link rel="stylesheet" href="/chat-box.css?v=4">
@@ -1121,9 +1121,20 @@
       <p id="ref-summary"></p>
       <div id="ref-shots" class="ref-shots"></div>
       <h3>Features <span class="muted small">(untick what you don't want)</span></h3><ul id="ref-features" class="ref-list"></ul>
+      <section id="ref-reviews-box" class="hidden">
+        <h3>What its users complain about</h3>
+        <p class="muted small" id="ref-reviews-sources"></p>
+        <ul id="ref-themes" class="ref-list ref-themes"></ul>
+        <div id="ref-fixes-box" class="hidden">
+          <h3>Do better <span class="muted small">(tick what to add to your version)</span></h3>
+          <ul id="ref-fixes" class="ref-list"></ul>
+          <p class="ref-angle" id="ref-angle"></p>
+        </div>
+      </section>
       <h3>Pages</h3><ul id="ref-pages" class="ref-list"></ul>
       <h3>Data, sign-in and integrations</h3><ul id="ref-data" class="ref-list"></ul>
       <h3>Journeys tested on desktop and phone</h3><ul id="ref-journeys" class="ref-list"></ul>
+      <div id="ref-skip-box" class="hidden"><h3>Can't be copied</h3><ul id="ref-skip" class="ref-list"></ul></div>
       <h3>Design</h3><div id="ref-design" class="ref-design"></div>
       <details><summary class="small">Edit the full plan (JSON)</summary><textarea id="ref-plan" rows="12" spellcheck="false"></textarea></details>
       <div id="ref-owner-box">
@@ -1196,9 +1207,7 @@
   </form>
 </dialog>
 
-<script src="/create-look.js?v=2"></script>
-<script src="/create.js?v=20261025"></script>
-<script src="/create-look.js?v=1"></script>
-<script src="/create.js?v=20261115"></script>
+<script src="/create-look.js?v=4"></script>
+<script src="/create.js?v=20261117"></script>
 </body>
 </html>
