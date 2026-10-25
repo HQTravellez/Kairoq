@@ -5,7 +5,7 @@
 // them bookings. It only reports; nothing is blocked.
 const AREAS=[
  {name:'saved data and bookings',files:/^(src\/backend\.json|sql\/|functions\/)/,code:/\b(collection\(|db\.sql|db\.collection|functions\.invoke|\.create\(|\.update\(|\.remove\()/,asked:/\b(book|reserv|order|form|save|stor|data|database|backend|collection|table|sql|function|automat|schedul|email|enquir|contact|submit|record|field|stock|inventor|ai\b|chat|assistant|menu item|import)/i},
- {name:'payments',files:/^src\/backend\.json$/,code:/\b(payments\.|checkout|stripe|price_[A-Za-z0-9]+)/i,asked:/\b(pay|checkout|stripe|price|pricing|subscri|purchase|buy|shop|cart|plan|deposit|refund)/i},
+ {name:'payments',files:/^src\/backend\.json$/,code:/\bpayments\.|\bcheckout\s*\(|\bstripe\.|\bStripe\b|\bprice_[A-Za-z0-9]{6,}/,asked:/\b(pay|checkout|stripe|price|pricing|subscri|purchase|buy|shop|cart|plan|deposit|refund)/i},
  {name:'sign-in',files:/(login|signin|sign-in|signup|auth)/i,code:/\b(auth\.|signIn|signUp|signOut|resetPassword|password)\b/,asked:/\b(log ?in|sign|account|password|auth|user|member|google)/i}
 ];
 function changedLines(a='',b=''){
@@ -24,7 +24,8 @@ function check(message,before={},after={}){
    const diff=changedLines(before[f],after[f]);
    if(a.name==='payments'&&f==='src/backend.json')return/"payments"|price_/.test(diff);
    if(a.name==='saved data and bookings'&&f==='src/backend.json')return!/"payments"|price_/.test(diff)||/"collections"|"access"|"automations"|"schedules"/.test(diff);
-   return a.files.test(f)||a.code.test(diff);
+   // Stylesheets and other non-code files only count by name: CSS "stripes" are not Stripe.
+   return a.files.test(f)||(/\.(jsx?|tsx?|mjs|cjs|sql)$/.test(f)&&a.code.test(diff));
   });
   if(hit.length)out.push({area:a.name,files:hit.slice(0,5)});
  }

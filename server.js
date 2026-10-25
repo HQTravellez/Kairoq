@@ -6914,6 +6914,27 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   return callOpenRouterBuilder(opts,parse);
 }
+// "Look before replying" (look-check.js): an AI that can see compares screenshots after a visual
+// change with what the owner asked. Free vision models from OpenRouter's list by default;
+// KAIROQ_LOOK_MODELS names others. Returns {ok,problems,model} or null when no model could judge.
+async function reviewLook({request,pictures,signal}){
+  if(!openRouterConfigured()||!pictures||!pictures.length||process.env.KAIROQ_LOOK_CHECK==="off")return null;
+  const look=require("./look-check");
+  const chosen=String(process.env.KAIROQ_LOOK_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
+  const free=chosen.length?[]:(await getModels().catch(()=>[])).filter(m=>m.isFree&&m.supportsVision&&!m.local&&m.id!=="openrouter/free").sort((a,b)=>(b.context_length||0)-(a.context_length||0)).map(m=>m.id).slice(0,3);
+  const content=[{type:"text",text:look.prompt(request)},...pictures.slice(0,2).map(p=>({type:"image_url",image_url:{url:"data:"+(p.mime||"image/jpeg")+";base64,"+p.data}}))];
+  for(const model of [...chosen,...free]){
+    try{
+      const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(60000)]):AbortSignal.timeout(60000),body:JSON.stringify({model,messages:[{role:"user",content}],temperature:0.1,max_tokens:600})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(data?.error?.message||"HTTP "+response.status);
+      if(data.usage&&!model.endsWith(":free"))await recordUsage(data.usage,{purpose:"look-check",model});
+      const v=look.verdict(data?.choices?.[0]?.message?.content);
+      if(v)return{...v,model};
+    }catch(err){if(signal?.aborted)throw err;console.log("[look-check] "+model+": "+String(err.message||err).slice(0,160))}
+  }
+  return null;
+}
 // Questions in the builder (Discuss) are answered by chat models, not the code builder chain:
 // the fast model (Ollama Cloud) when set, then the configured free providers, then the free
 // OpenRouter models. One slow or broken provider never leaves a question without an answer.
@@ -7128,7 +7149,7 @@ const server = http.createServer(async (req, res) => {
   if(!/^(GET|HEAD|OPTIONS)$/.test(req.method)&&url.startsWith("/api/")&&!url.startsWith("/api/create/")&&!url.startsWith("/api/channels/")&&crossSiteRequest(req))return json(res,403,{error:"Cross-site request refused"});
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
   if(url==="/api/whatsapp/webhook"&&await require("./whatsapp").handle(req,res,{callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null}).catch(e=>{console.warn("[whatsapp]",e.message);if(!res.headersSent){res.writeHead(500);res.end()}}))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),reviewLook,generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24}|\/check\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;

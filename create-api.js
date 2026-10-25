@@ -233,7 +233,7 @@ function supportAnswer(meta){
   'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
  ].join('\n');
 }
-function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage}){
+function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
  const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
  if(active&&!concurrentDiscuss){
@@ -359,6 +359,25 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     const assetNote=[images.length||context?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context].filter(Boolean).join('\n\n');
     const fast=quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
     job.result=await builder.edit(id,message,{...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    // Look before replying (look-check.js): a change about layout or looks is compared with what
+    // the owner asked, on screenshots; if it does not match, the builder fixes it once, free.
+    if(mode==='build'&&!hooks&&!fast&&reviewLook&&designShots&&job.result&&job.result.version&&!job.result.unchanged&&!job.result.rolled_back&&!job.result.design&&require('./look-check').isVisual(message)&&process.env.KAIROQ_LOOK_CHECK!=='off'){
+     const first=job.result;
+     try{
+      update({status:'reviewing',progress:'Checking it looks the way you asked',stream:null});
+      const pictures=await designShots(builder.previewUrl(builder.loadMeta(id)));
+      const seen=pictures.length?await reviewLook({request:message,pictures,signal}):null;
+      if(seen)first.look={ok:seen.ok,problems:seen.problems};
+      if(seen&&!seen.ok){
+       update({progress:'Fixing how it looks'});
+       const fixed=await builder.edit(id,require('./look-check').fixMessage(message,seen.problems),{displayText:'Fix how it looks: '+seen.problems[0],callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});
+       if(fixed&&!fixed.unchanged)job.result={...fixed,look:{ok:false,problems:seen.problems,fixed:true},first_version:first.version};
+      }
+     }catch(e){if(signal.aborted)throw e;console.warn('[look-check]',String(e.message||e).slice(0,200))}
+     finally{update({progress:null})}
+     // The reply says what the screenshots showed.
+     if(job.result.look)try{const m=builder.loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.look=job.result.look;builder.saveMeta(m)}}catch{}
+    }
     // The first build of a new project on Pro or Max gets a free design review.
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
@@ -828,8 +847,8 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite}){
- const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage};
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook}){
+ const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
