@@ -41,18 +41,43 @@ test("the picker is short like Hermes: no batch or dated copies, a few models pe
   assert.equal(isCopyVariant({ id: "anthropic/claude-opus-5.5", name: "Claude Opus 5.5" }), false);
   assert.equal(isCopyVariant({ id: "google/gemma-4-31b-it:free", name: "Gemma 4 31B (free)" }), false);
   assert.match(app, /const PER_PROVIDER=6;/);
-  assert.match(app, /section\("Hermes"/);
-  assert.match(app, /if\(freeOnlyEl\.checked&&!m\.isFree&&!m\.local\)continue;/, "Free Only hides paid models instead of a red error");
+  assert.match(app, /if\(freeOnlyEl\.checked&&!m\.isFree&&!m\.local&&!m\.allowedPaid\)continue;/, "Free Only hides paid models instead of a red error");
+  assert.match(app, /section\("Agent"/);
   assert.doesNotMatch(app, /Free Only is on\. Choose a free model/);
 });
 
 test("Hermes Agent is an explicit choice, and OpenRouter errors are explained in plain words", () => {
   const server = read("server.js");
   assert.match(server, /const wantsHermes=body\.model==="hermes\/agent";/);
-  assert.match(server, /Hermes Agent isn't connected yet/);
+  assert.match(server, /Kairoq Agent isn.t connected yet/);
   assert.match(server, /if\(hermes\.configured\(\)&&isAuthenticated\(req\)&&\(wantsHermes\|\|autoPick\)\)/);
   const plain = new Function(`${/function plainOpenRouterError\([\s\S]*?\n\}/.exec(server)[0]}; return plainOpenRouterError;`)();
   assert.match(plain(402, "Insufficient credits. This account never purchased credits."), /no credits/);
   assert.match(plain(429, "Rate limit exceeded"), /busy/);
   assert.equal(plain(500, "Something else"), "Something else");
+});
+
+test("Hermes 4 can be tried as a paid model within its own monthly cap, even in Zero Cost mode", () => {
+  const server = read("server.js"), app = read("public/app.js");
+  const fns = new Function(`${/function paidChatModels[\s\S]*?\nfunction paidChatCap[^\n]*\n/.exec(server)[0]}; return {paidChatModels,paidChatAllowed,paidChatCap};`)();
+  assert.deepEqual(fns.paidChatModels({}), ["nousresearch/hermes-4-405b", "nousresearch/hermes-4-70b"]);
+  assert.equal(fns.paidChatAllowed("nousresearch/hermes-4-405b", {}), false, "needs an OpenRouter key");
+  assert.equal(fns.paidChatAllowed("nousresearch/hermes-4-405b", { OPENROUTER_API_KEY: "k" }), true);
+  assert.equal(fns.paidChatAllowed("anthropic/claude-opus-5.5", { OPENROUTER_API_KEY: "k" }), false, "other paid models stay off");
+  assert.equal(fns.paidChatCap({}), 20);
+  assert.equal(fns.paidChatCap({ KAIROQ_PAID_CHAT_MONTHLY_USD: "5" }), 5);
+  assert.match(server, /if\(cap>0&&spent>=cap\)throw/);
+  assert.match(server, /recordUsage\(result\.usage,\{purpose:"chat-paid"/);
+  assert.match(app, /section\("Try \(paid, capped\)"/);
+});
+
+test("users see Kairoq Agent, never the Hermes name; the open-source credit stays on the licences page", () => {
+  const app = read("public/app.js"), html = read("public/index.html"), server = read("server.js"), chat = read("hermes-chat.js");
+  assert.doesNotMatch(app, /"Hermes Agent"|"Hermes ready"|"Hermes not connected"/);
+  assert.doesNotMatch(html, />Hermes agent<|Checking Hermes/);
+  assert.doesNotMatch(server, /message:"Hermes is thinking/);
+  assert.doesNotMatch(chat, /new HermesError\("Hermes /);
+  assert.match(server, /You are Kairoq Agent, the assistant inside Kairoq/);
+  assert.match(server, /built on open-source software, including Hermes Agent by Nous Research/);
+  assert.match(read("public/licenses.html"), /Hermes Agent<\/a> · Nous Research[\s\S]*MIT/);
 });

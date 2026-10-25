@@ -32,6 +32,17 @@ RUN if [ "$KAIROQ_LAST30DAYS" = "on" ]; then \
       UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/python uv tool install --python 3.12 yt-dlp && \
       python3.12 --version && yt-dlp --version; fi
 ENV KAIROQ_PYTHON=/usr/local/bin/python3.12
+# Blender (blender.org, GPL; unmodified, as the "bpy" Python module) for 3D in Create
+# (blender.js, scripts/blender-kairoq.py): converts uploaded FBX/OBJ/STL/PLY/.blend/zipped glTF
+# to GLB, makes heavy models lighter and renders preview pictures, without a screen. About 1 GB;
+# set the Railway variable KAIROQ_BLENDER_INSTALL=off to leave it out (then only .glb uploads).
+ARG KAIROQ_BLENDER_INSTALL=on
+RUN if [ "$KAIROQ_BLENDER_INSTALL" = "on" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends libgl1 libglx0 libsm6 libice6 libx11-6 libxext6 libxfixes3 libxi6 libxkbcommon0 libxrender1 && rm -rf /var/lib/apt/lists/* && \
+      UV_PYTHON_INSTALL_DIR=/opt/python uv venv --python 3.13 /opt/blender && \
+      UV_PYTHON_INSTALL_DIR=/opt/python uv pip install --no-cache --python /opt/blender/bin/python bpy==5.2.3 && \
+      /opt/blender/bin/python -c "import bpy; print('Blender', bpy.app.version_string)"; fi
+ENV KAIROQ_BPY_PYTHON=/opt/blender/bin/python
 # Safari's engine (WebKit, through Playwright) for the "iPhone Safari" checks and the editor's
 # "Real Safari" button (runtime-check.js). About 300 MB with its system libraries; build with
 # KAIROQ_WEBKIT=off to leave it out (Safari checks are then skipped, not failed).
