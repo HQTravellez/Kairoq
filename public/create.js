@@ -189,7 +189,7 @@ async function askThenBuild(prompt){
  const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
  // The picked look (if any) becomes the project's colours and fonts before the build starts.
  const build=async(answers,look)=>{
-  if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt}}).catch(err=>console.warn('look',err.message));
+  if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
   mine.remove();card.remove();
   send(answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt,'build')};
  const picked=questions.map(()=>new Set());let at=0;
@@ -937,7 +937,7 @@ function renderWork(j){
  if(detailState.source==='live')renderDetail();
  if(stick)list.scrollTop=list.scrollHeight;
 }
-function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');if(r)text(r,'Thinking…')}if(detailState.source==='live')renderDetail()}
+function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');const waited=Date.now()-work.started;if(r)text(r,waited>45000?'Planning the app… (a slow free model can take a few minutes; the fast model streams at once)':waited>15000?'Planning the app…':'Thinking…')}if(detailState.source==='live')renderDetail()}
 // ---------- the Details panel (over the preview) ----------
 const detailState={source:null,tab:'timeline'};
 function openDetail(source,tab){detailState.source=source;if(tab)detailState.tab=tab;$('detail').classList.remove('hidden');document.querySelector('.stage').classList.add('show-detail');renderDetail()}
@@ -1393,6 +1393,7 @@ $('settings-open').onclick=async()=>{
   text($('stripe-hook-url'),settings.stripe_webhook_url);text($('stripe-events'),settings.stripe_events.join(', '));
   text($('email-status'),settings.email?'Email is set up. Apps can notify you with email.send({to:"owner", …}).':'Email is not set up on this server yet (KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM).');
   const engines=settings.engines||['kairoq'];$('engine-row').classList.toggle('hidden',engines.length<2);$('engine-note').classList.toggle('hidden',engines.length<2);$('engine-select').value=settings.engine||'kairoq';
+  $('app-managers').value=(settings.app_managers||[]).join(', ');text($('app-managers-status'),'');
   $('gh-repo').value=gh.github?.repo||'';
   if(gh.github?.last_push)text($('gh-status'),'Last push: version '+gh.github.last_push.version+' · '+when(gh.github.last_push.at));
   if(!settings.encryption)text($('settings-error'),'Saving keys needs APP_ENCRYPTION_KEY on the server.');
@@ -1417,6 +1418,11 @@ $('db-connect').onclick=async()=>{
 $('db-disconnect').onclick=async()=>{
  if(!confirm('Disconnect Supabase? Your data stays in Supabase. The app goes back to Kairoq\'s own copy, as it was when you connected.'))return;
  try{const {database}=await api('/projects/'+state.project.id+'/database',{method:'DELETE'});showDatabase(database)}catch(err){text($('settings-error'),err.message)}
+};
+$('app-managers-save').onclick=async()=>{
+ text($('settings-error'),'');
+ try{const {settings}=await api('/projects/'+state.project.id+'/settings',{method:'POST',body:{app_managers:$('app-managers').value}});$('app-managers').value=(settings.app_managers||[]).join(', ');text($('app-managers-status'),'Saved')}
+ catch(err){text($('settings-error'),err.message)}
 };
 async function saveSecrets(fields){
  const body={};for(const [id,name] of fields){const v=$(id).value.trim();if(v)body[name]=v}
@@ -2625,6 +2631,7 @@ async function renderDesign(){
  $('design-radius').value=['0rem','0.375rem','0.75rem','1.25rem'].includes(ds.radius)?ds.radius:'0.75rem';
  renderSkills();
  text($('herovideo-status'),'');loadVideos('hero').catch(err=>text($('herovideo-status'),err.message));
+ text($('models-status'),'');$('models-results').replaceChildren();loadModels().catch(err=>text($('models-status'),err.message));
  $('genimage-section').classList.toggle('hidden',!state.me.image_generation?.enabled);
  const c=state.me.image_generation?.credits;text($('genimage-status'),state.me.viewer?.kind==='customer'&&c?c+' credits per image. Saved to the project images; then ask the chat to use it.':'Saved to the project images; then ask the chat to use it.');
  for(const el of ['design-name','design-summary','design-notes','design-display','design-body','design-radius','design-save','design-direction','design-regenerate','design-add-system','genimage-go'])$(el).disabled=!editor;
@@ -2680,6 +2687,78 @@ $('genimage-go').onclick=async()=>{
  catch(err){text($('genimage-status'),'');text($('design-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
  finally{btn.disabled=false}
 };
+// ---------- 3D models (react-models.js) ----------
+let modelsData=null;const posterTried=new Set();
+const sizeMb=n=>(n/1048576).toFixed(n<10485760?1:0)+' MB';
+async function loadModels(){modelsData=await api('/projects/'+state.project.id+'/models');renderModels()}
+function renderModels(){
+ const d=modelsData,id=state.project.id,editor=state.project.role!=='viewer',list=$('models-list');list.replaceChildren();
+ text($('models-formats'),d.blender?'.glb, .fbx, .obj, .stl, .ply, .blend or a zipped glTF, up to 60 MB':'.glb up to 25 MB');
+ $('models-file').accept=d.blender?'.glb,.gltf,.fbx,.obj,.stl,.ply,.blend,.zip':'.glb,.gltf';
+ $('models-ph').classList.toggle('hidden',!d.polyhaven);
+ if(!d.models.length)list.append(el('p','muted small','No 3D models yet.'));
+ for(const m of d.models){
+  const card=el('div','model-card'),pic=el('div','model-pic');
+  if(m.poster){const img=el('img');img.alt=m.title;img.loading='lazy';img.src='/api/create/projects/'+id+'/model?file='+encodeURIComponent(m.poster);pic.append(img)}
+  else{pic.append(el('span','muted small',m.kind==='model'?'Making a preview…':'Lighting'));if(m.kind==='model'&&editor)makePoster(m)}
+  const info=el('div','model-info'),src=m.source||{};
+  info.append(el('b',null,m.title),el('span','muted small',(m.kind==='environment'?'Lighting · ':'')+sizeMb(m.bytes)+(src.provider==='polyhaven'?' · Poly Haven (CC0)':m.converted?' · converted '+m.converted:'')),el('code','small',m.path));
+  const act=el('div','row');
+  const copy=el('button','link-btn','Copy path');copy.type='button';copy.onclick=()=>{try{navigator.clipboard.writeText(m.path)}catch{}text($('models-status'),'Copied '+m.path+'. Use it in the chat, for example "show '+m.path+' as a 3D viewer".')};act.append(copy);
+  if(editor){const del=el('button','link-btn','Remove');del.type='button';del.onclick=async()=>{if(!confirm('Remove "'+m.title+'"? Pages that show it will need a new model.'))return;try{modelsData=await api('/projects/'+id+'/models',{method:'DELETE',body:{file:m.file}});renderModels()}catch(err){text($('models-status'),err.message)}};act.append(del)}
+  info.append(act);card.append(pic,info);list.append(card);
+ }
+ const sel=$('models-style');sel.replaceChildren();for(const s of d.styles)sel.append(new Option(s.label,s.id));sel.value=d.style;sel.disabled=!editor;
+ for(const b of ['models-upload','models-search'])$(b).disabled=!editor;
+}
+// Without Blender on the server, the preview picture is made here: the model is shown once,
+// out of the way, and photographed with model-viewer's toBlob.
+let viewerLoad=null;
+function loadViewerScript(){if(customElements.get('model-viewer'))return Promise.resolve();if(!viewerLoad)viewerLoad=new Promise((ok,bad)=>{const s=document.createElement('script');s.type='module';s.src='/vendor/model-viewer/model-viewer-4.4.0.min.js';s.onload=()=>customElements.whenDefined('model-viewer').then(ok);s.onerror=()=>{viewerLoad=null;bad(Error('3D viewer did not load'))};document.head.append(s)});return viewerLoad}
+async function makePoster(m){
+ if(posterTried.has(m.file))return;posterTried.add(m.file);
+ const id=state.project.id;let mv=null;
+ try{
+  await loadViewerScript();
+  mv=document.createElement('model-viewer');mv.setAttribute('src','/api/create/projects/'+id+'/model?file='+encodeURIComponent(m.file));mv.setAttribute('camera-orbit','35deg 70deg auto');mv.setAttribute('shadow-intensity','1');mv.setAttribute('interaction-prompt','none');
+  Object.assign(mv.style,{position:'fixed',right:'0',bottom:'0',width:'640px',height:'480px',opacity:'0.01',pointerEvents:'none',zIndex:'-1',background:'transparent'});
+  document.body.append(mv);
+  await new Promise((ok,bad)=>{const t=setTimeout(()=>bad(Error('timeout')),45000);mv.addEventListener('load',()=>{clearTimeout(t);ok()},{once:true});mv.addEventListener('error',()=>{clearTimeout(t);bad(Error('could not open the model'))},{once:true})});
+  await new Promise(r=>setTimeout(r,600));
+  const blob=await mv.toBlob({mimeType:'image/png',idealAspect:false});
+  const r=await fetch('/api/create/projects/'+id+'/models?op=poster&file='+encodeURIComponent(m.file),{method:'POST',body:blob,headers:{'Content-Type':'image/png'},credentials:'same-origin'});
+  if(r.ok){modelsData=await r.json();renderModels()}
+ }catch(err){console.warn('3D preview',err.message)}finally{if(mv)mv.remove()}
+}
+$('models-upload').onclick=()=>$('models-file').click();
+$('models-file').onchange=async()=>{
+ const f=$('models-file').files[0];$('models-file').value='';if(!f)return;
+ if(f.size>61*1024*1024){text($('models-status'),'3D files up to 60 MB');return}
+ const b=$('models-upload');b.disabled=true;text($('models-status'),/\.glb$/i.test(f.name)?'Uploading '+f.name+'…':'Uploading and converting '+f.name+' with Blender… (up to a few minutes)');
+ try{
+  const r=await fetch('/api/create/projects/'+state.project.id+'/models?op=upload&name='+encodeURIComponent(f.name),{method:'POST',body:f,headers:{'Content-Type':'application/octet-stream'},credentials:'same-origin'});
+  const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Upload failed ('+r.status+')');
+  modelsData=d;renderModels();text($('models-status'),'Added '+d.added.title+' ('+d.added.path+'). Ask the chat to show it.');
+ }catch(err){text($('models-status'),err.message)}finally{b.disabled=false}
+};
+async function searchModels(){
+ const q=$('models-query').value.trim(),kind=$('models-kind').value,box=$('models-results');
+ if(q.length<2){text($('models-status'),'Type what to look for, for example chair');return}
+ text($('models-status'),'Searching Poly Haven…');box.replaceChildren();
+ try{
+  const {results}=await api('/projects/'+state.project.id+'/models?op=search',{method:'POST',body:{query:q,kind}});
+  text($('models-status'),results.length?'Tap one to add it. All Poly Haven models are free to use (CC0).':'Nothing found for "'+q+'". Try a simpler word.');
+  for(const x of results){
+   const b=el('button','model-result');b.type='button';b.title='Add '+x.title;
+   const img=el('img');img.alt='';img.loading='lazy';img.src=x.thumb;b.append(img,el('span',null,x.title));
+   b.onclick=async()=>{b.disabled=true;text($('models-status'),'Adding '+x.title+'…');try{const d=await api('/projects/'+state.project.id+'/models?op=polyhaven',{method:'POST',body:{id:x.id,kind}});modelsData=d;renderModels();text($('models-status'),'Added '+d.added.title+' ('+d.added.path+'). Ask the chat to show it.')}catch(err){b.disabled=false;text($('models-status'),err.message)}};
+   box.append(b);
+  }
+ }catch(err){text($('models-status'),err.message)}
+}
+$('models-search').onclick=searchModels;
+$('models-query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchModels()}};
+$('models-style').onchange=async()=>{try{modelsData=await api('/projects/'+state.project.id+'/models?op=style',{method:'POST',body:{style:$('models-style').value}});renderModels();text($('models-status'),$('models-style').value==='none'?'Saved.':'Saved. Ask the chat to "add the 3D" to put it on the pages.')}catch(err){text($('models-status'),err.message)}};
 $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The design review needs a browser on the server (Chromium), which is not available here.');return}const note=$('chat-input').value.trim();send(note?'Polish the design: '+note:'Polish the design','polish',undefined,{message:note})};
 
 })();
