@@ -25,6 +25,10 @@ Kairoq can invoke a separately installed OpenEnrich CLI and can call the Postiz 
 
 `design-skills/frontend-design/SKILL.md` is the "frontend-design" skill from https://github.com/anthropics/skills, licensed under the Apache License 2.0 (full text in `design-skills/frontend-design/LICENSE.txt`). Kairoq changed only its front matter (display name, `default: on`).
 
+## Prettier
+
+Prettier 3.9 (MIT, https://github.com/prettier/prettier) formats the code the app builder writes (`code-format.js`). It runs on the server only; generated apps do not include it.
+
 ## Packages for generated apps
 
 - gsap 3.13 (GreenSock standard no-charge license, https://gsap.com/standard-license), lenis 1.3 (MIT), three 0.169 (MIT).

@@ -13,10 +13,18 @@ const RULES=`Code structure (write it the way a senior engineer sets up a projec
 - functions/ and sql/ hold the backend; src/backend.json declares collections.
 - Size: a page under 200 lines, a component under 250, App.jsx under 120. When a file grows past that, split it into smaller components in the same feature folder.
 - Names say what things are (BookingForm, useBookings, formatPrice), never Component1, utils2 or temp. Imports use relative paths, in the order: packages, then app files.
-- A small change touches only the files it needs, with "edits" where possible.`;
+- A small change touches only the files it needs, with "edits" where possible.
+
+Readable code (a teammate should understand any file in a minute):
+- Every file starts with a one-line comment saying what it is for (// Booking form: lets a guest pick a service, a day and a time.).
+- Each function does one job and stays short (under about 60 lines; a component's render can be longer). Name things by what they mean: handleBookingSubmit, availableSlots, isLoading, formatPrice. Never data2, temp, foo, obj, arr, handleClick2.
+- Inside a component, keep the same order: state, then data loading, then derived values, then event handlers, then the JSX.
+- Simple, flat logic: early returns instead of deep nesting, no clever one-liners, no nested ternaries. Name numbers and strings that mean something (const MAX_GUESTS = 8).
+- Comments explain why something is done, not what the code plainly says. No leftover console.log, debugger or commented-out code.
+- The code is formatted automatically (Prettier, 2 spaces, single quotes), so do not hand-align anything.`;
 
 // The request behind "Tidy up the code": reorganise without changing what the app does.
-const TIDY=`Tidy up the code: reorganise this project into the code structure below without changing what the app does or how it looks. Move page content out of App.jsx into src/pages/, split long files into components grouped by feature under src/components/<feature>/, move data loading into hooks in src/hooks/, move copy, menus, prices and sample data into src/data/, and rename unclear files. Update every import. Do not change copy, styles, routes, collections, backend functions or behaviour. In "message", list what moved where in a few short lines.\n\n`+RULES;
+const TIDY=`Tidy up the code: reorganise this project into the code structure below without changing what the app does or how it looks. Move page content out of App.jsx into src/pages/, split long files into components grouped by feature under src/components/<feature>/, move data loading into hooks in src/hooks/, move copy, menus, prices and sample data into src/data/, and rename unclear files and names, add a one-line comment at the top of each file saying what it is for, split long functions, and remove console.log lines and commented-out code. Update every import. Do not change copy, styles, routes, collections, backend functions or behaviour. In "message", list what moved where in a few short lines.\n\n`+RULES;
 
 const LIMITS=[[/^src\/App\.jsx$/,120,'App.jsx should only wire the app (layout and routes)'],[/^src\/pages\//,200,'a page'],[/^src\/components\/(?!ui\/)/,250,'a component'],[/^src\/(hooks|lib)\//,250,'a helper']];
 function lines(s){return String(s||'').split('\n').length}
@@ -54,7 +62,43 @@ function check(files,changed=Object.keys(files||{}),base={}){
  }
  return problems;
 }
+// Readability problems this change brings in (only new or newly added issues count).
+const VAGUE=/\b(?:const|let|var|function)\s+(data\d+|temp\d*|tmp\d*|foo|bar|baz|stuff|thing\d*|obj\d*|arr\d*|val\d+|handleClick\d+|Component\d+|myFunction\d*)\b/g;
+const DEBUG=/^\s*(console\.log\(|debugger;)/m;
+const COMMENTED_CODE=/^\s*\/\/\s*(?:const|let|var|return|import|export|if\s*\(|for\s*\(|function\b|await\b|<[A-Za-z])/m;
+function headerComment(src){const first=String(src).split('\n').find(l=>l.trim());return Boolean(first)&&/^\s*(\/\/|\/\*)/.test(first)}
+// Functions with a lowercase name (helpers and handlers) and how many lines each body has.
+function longFunctions(src,max=60){
+ const L=String(src).split('\n'),out=[];
+ for(let i=0;i<L.length;i++){
+  const m=/^\s*(?:export\s+)?(?:async\s+)?(?:function\s+([a-z]\w*)\s*\(|const\s+([a-z]\w*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>\s*\{)/.exec(L[i]);
+  if(!m)continue;
+  let depth=0,started=false,j=i;
+  for(;j<L.length;j++){for(const c of L[j]){if(c==='{'){depth++;started=true}else if(c==='}')depth--}if(started&&depth<=0)break}
+  if(j-i+1>max)out.push([m[1]||m[2],j-i+1]);
+ }
+ return out;
+}
+function readability(files,changed=Object.keys(files||{}),base={}){
+ const problems=[];
+ for(const f of changed){
+  const src=files[f];if(typeof src!=='string'||!/^(src|functions)\/.*\.(jsx?|mjs)$/.test(f)||f.startsWith('src/components/ui/')||f==='src/main.jsx')continue;
+  const was=typeof base[f]==='string'?base[f]:null,isNew=was===null;
+  if(isNew&&!headerComment(src))problems.push(f+' has no first-line comment saying what the file is for.');
+  const longOld=new Set(isNew?[]:longFunctions(was).map(x=>x[0]));
+  for(const [name,n] of longFunctions(src))if(!longOld.has(name))problems.push(f+': '+name+'() is '+n+' lines; split it into smaller, well-named functions.');
+  const vague=[...new Set([...src.matchAll(VAGUE)].map(m=>m[1]))].filter(v=>isNew||!new RegExp('\\b'+v+'\\b').test(was));
+  if(vague.length)problems.push(f+' uses unclear names ('+vague.slice(0,5).join(', ')+'); name them by what they hold or do.');
+  if(DEBUG.test(src)&&(isNew||!DEBUG.test(was)))problems.push(f+' has leftover console.log or debugger lines; remove them.');
+  if(COMMENTED_CODE.test(src)&&(isNew||!COMMENTED_CODE.test(was)))problems.push(f+' has commented-out code; delete it (the version history keeps old code).');
+ }
+ return problems;
+}
+// Small things (a missing top comment, a stray console.log) do not cost a round trip on their own:
+// they go back only together with a real problem, so builds stay fast.
+function isMinor(problem){return/no first-line comment|console\.log or debugger|commented-out code/.test(problem)}
+function needsRework(problems){return problems.some(p=>!isMinor(p))}
 // What goes back to the builder when a change breaks the rules.
-function fixMessage(problems){return'The change works, but its code is not organised the way this project needs (nothing was applied yet):\n'+problems.slice(0,10).map(p=>'- '+p).join('\n')+'\nReturn the same change again, split into well-named files that follow the code structure rules. Keep behaviour, copy and styles exactly the same.'}
+function fixMessage(problems){return'The change works, but its code is not as clear and organised as this project needs (nothing was applied yet):\n'+problems.slice(0,12).map(p=>'- '+p).join('\n')+'\nReturn the same change again, following the code structure and readable code rules. Keep behaviour, copy and styles exactly the same.'}
 function isTidy(message){return/^\s*tidy up the code\.?\s*$/i.test(String(message||''))}
-module.exports={RULES,TIDY,check,fixMessage,isTidy,components,longestArray};
+module.exports={RULES,TIDY,check,readability,isMinor,needsRework,fixMessage,isTidy,components,longestArray,longFunctions,headerComment};

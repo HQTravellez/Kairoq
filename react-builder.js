@@ -606,6 +606,10 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   // Serious mistakes in code this change adds (a secret in the page, SQL built from strings) go
   // back to the AI once, like a failed build. Who may read a collection can be a deliberate choice
   // (a public guestbook), so that stays a finding in the security scan instead.
+  // Every file this change wrote is formatted (Prettier), so the code reads the same whichever model
+  // wrote it. The checks look at the formatted code; it is kept once they pass, so a retry still
+  // sees the files exactly as the model wrote them.
+  const formatted=await require('./code-format').format(next,Object.keys(next).filter(f=>next[f]!==base[f]));
   const unsafe=securityTries<1&&process.env.KAIROQ_SECURITY_GATE!=='off'?newSecurityProblems(base,next):[];
   if(unsafe.length){
    securityTries++;lastError=unsafe.join('\n');work=next;
@@ -614,13 +618,19 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   }
   // Code that is hard to work on (a 600-line page, five components in one file, data inside a page)
   // goes back to the AI once to be split up, like a failed build. Only what this change adds counts.
-  const messy=structureTries<1&&process.env.KAIROQ_STRUCTURE_GATE!=='off'?require('./code-structure').check(next,Object.keys(next).filter(f=>next[f]!==base[f]),base):[];
-  if(messy.length){
+  // Never on the last try: a change that works is never lost over tidiness.
+  const messy=structureTries<1&&attempt<MAX_ATTEMPTS&&process.env.KAIROQ_STRUCTURE_GATE!=='off'?(({check,readability},changed)=>[...check(formatted,changed,base),...readability(formatted,changed,base)])(require('./code-structure'),Object.keys(formatted).filter(f=>formatted[f]!==base[f])):[];
+  if(require('./code-structure').needsRework(messy)){
    structureTries++;lastError=messy.join('\n');work=next;
-   tl.add({t:'fix',text:'Splitting the code into clear, smaller files',detail:lastError});
+   tl.add({t:'fix',text:'Making the code clearer and better organised',detail:lastError});
    messages.push({role:'user',content:require('./code-structure').fixMessage(messy)});continue;
   }
   // The reply changed nothing (the same files back): it was an answer. No version, no checks, no charge.
+  // From here the formatted files are the project. The model's own reply in the conversation is
+  // replaced by the formatted files, so later fixes in this change match what is really there.
+  const reformatted=Object.keys(formatted).filter(f=>formatted[f]!==next[f]);
+  next=formatted;
+  if(reformatted.length&&messages.at(-1)?.role==='assistant')messages[messages.length-1]={role:'assistant',content:JSON.stringify({message:reply.message,files:Object.fromEntries(Object.keys(next).filter(f=>next[f]!==base[f]).map(f=>[f,next[f]])),delete:reply.delete})};
   if(attempt===1&&sameFiles(base,next))return saveAnswer(id,{instruction,displayText,images,message:reply.message,tl,thoughtMs});
   tl.edits(base,next);
   onProgress('building');
