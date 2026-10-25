@@ -1494,7 +1494,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/database'&&method==='DELETE')return send(res,200,{database:require('./app-database').disconnect(id)}),true;
   if(action==='/settings'&&method==='GET'){
    const secrets=require('./project-secrets');
-   return send(res,200,{settings:{secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;
+   return send(res,200,{settings:{app_managers:backend.managerEmails(builder.loadMeta(id)),secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;
   }
   if(action==='/settings'&&method==='POST'){
    const b=await readJson(req,8000),secrets=require('./project-secrets');
@@ -1505,6 +1505,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(value&&!re.test(value))throw Object.assign(Error('That '+name.replace(/_/g,' ')+' does not look right'),{status:400});
     secrets.set(id,name,value||null);
    }
+   // Who can change the app's "managed" collections (menus, prices, services): their emails.
+   if(b.app_managers!==undefined){
+    const list=String(b.app_managers||'').split(/[\s,;]+/).map(e=>e.trim().toLowerCase()).filter(Boolean);
+    if(list.length>20||list.some(e=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)))throw Object.assign(Error('App managers: up to 20 email addresses, separated by commas'),{status:400});
+    const m=builder.loadMeta(id);if(list.length)m.app_managers=[...new Set(list)];else delete m.app_managers;builder.saveMeta(m);
+   }
    // Which engine writes this app's changes: Kairoq's own, or OpenCode (beta) when it is installed.
    if(b.engine!==undefined){
     const engine=String(b.engine);
@@ -1512,7 +1518,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(engine==='opencode'&&!require('./opencode-engine').available())throw Object.assign(Error('OpenCode is not installed on this server (Railway variable KAIROQ_OPENCODE=on).'),{status:409});
     const m=builder.loadMeta(id);if(engine==='opencode')m.engine='opencode';else delete m.engine;builder.saveMeta(m);
    }
-   return send(res,200,{settings:{secrets:secrets.status(id),engine:builder.loadMeta(id).engine||'kairoq'}}),true;
+   return send(res,200,{settings:{secrets:secrets.status(id),engine:builder.loadMeta(id).engine||'kairoq',app_managers:backend.managerEmails(builder.loadMeta(id))}}),true;
   }
   if(action==='/download'&&method==='GET'){
    const meta=builder.loadMeta(id),bytes=require('./react-export').zip(id);
