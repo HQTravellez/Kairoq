@@ -8,13 +8,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="/create.css?v=20261111">
+<link rel="stylesheet" href="/create.css?v=20261025">
 <link rel="stylesheet" href="/landing.css?v=20261021">
 <link rel="stylesheet" href="/workspace.css?v=20261112">
 <link rel="stylesheet" href="/chat-box.css?v=4">
 <link rel="stylesheet" href="/builder.css?v=8">
 <link rel="stylesheet" href="/create-kairoq.css?v=3">
-<link rel="stylesheet" href="/create-look.css?v=1">
+<link rel="stylesheet" href="/create-look.css?v=2">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -1025,6 +1025,16 @@
     <h3>New direction from the AI</h3>
     <div class="row"><input id="design-direction" maxlength="1500" placeholder="Darker and more luxurious, like a five-star hotel"><button class="ghost" id="design-regenerate" type="button">Create</button></div>
     <p class="muted small" id="design-regenerate-note">Picks new colours and fonts. Ask the chat afterwards to restyle pages that need more than new colours.</p>
+    <section id="models-section">
+      <h3>3D models</h3>
+      <p class="muted small">Add a model, then ask the chat to show it, for example "show the sofa as a 3D viewer on the home page". Phones get "View in your room" (AR).</p>
+      <div class="models-list" id="models-list"></div>
+      <div class="row wrap"><button class="ghost" id="models-upload" type="button">Upload a model</button><input type="file" id="models-file" class="hidden" accept=".glb,.gltf,.fbx,.obj,.stl,.ply,.blend,.zip"><span class="muted small" id="models-formats"></span></div>
+      <div class="models-search" id="models-ph"><input id="models-query" maxlength="80" placeholder="Find free models: chair, lamp, plant"><select id="models-kind" aria-label="What to find"><option value="model">Models</option><option value="environment">Lighting (HDRI)</option></select><button class="ghost" id="models-search" type="button">Search</button></div>
+      <div class="model-results" id="models-results"></div>
+      <label>3D style for the app<select id="models-style"></select></label>
+      <p class="muted small" id="models-status" role="status"></p>
+    </section>
     <h3>Design skills</h3>
     <p class="muted small">Design instructions the AI follows when it builds this app. Turn a skill on for this project, or for all your projects.</p>
     <ul class="skills" id="skills-list"></ul>
@@ -1186,6 +1196,8 @@
   </form>
 </dialog>
 
+<script src="/create-look.js?v=2"></script>
+<script src="/create.js?v=20261025"></script>
 <script src="/create-look.js?v=1"></script>
 <script src="/create.js?v=20261115"></script>
 </body>

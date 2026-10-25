@@ -11,10 +11,10 @@ const APP_PACKAGES={react:'UI',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
- 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'3D scenes (glTF models via three/examples/jsm/loaders/GLTFLoader.js)',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
-const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq'];
+ 'embla-carousel-react':'carousels','qrcode.react':'QR codes',three:'custom 3D scenes; for showing a 3D model use Model3D from kairoq/3d instead',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
+const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),'kairoq','kairoq/3d'];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
-function allowedImport(spec){if(spec==='kairoq')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
+function allowedImport(spec){if(spec==='kairoq'||spec==='kairoq/3d')return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -214,7 +214,9 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
  try{
   fs.writeFileSync(path.join(work,'index.html'),INDEX_HTML);
   fs.copyFileSync(path.join(__dirname,'builder-runtime','kairoq-reporter.js'),path.join(work,'kairoq-reporter.js'));
-  if(projectId!=='000000000000'){require('./react-assets').copyInto(projectId,path.join(work,'public'));require('./video-gen').copyInto(projectId,path.join(work,'public'))}
+  if(projectId!=='000000000000'){require('./react-assets').copyInto(projectId,path.join(work,'public'));require('./video-gen').copyInto(projectId,path.join(work,'public'));require('./react-models').copyInto(projectId,path.join(work,'public'))}
+  // The 3D viewer script, only for apps that show 3D (react-model3d.js).
+  if(require('./react-models').usesViewer(files))require('./react-models').copyViewer(path.join(work,'public'));
   for(const [name,code] of Object.entries(files)){const file=path.join(work,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,code)}
   // Packages resolve from Kairoq's own installed modules (validated imports only).
   fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(work,'node_modules'),'dir');
@@ -248,7 +250,7 @@ function importGuard(work){
   resolveId(source,importer){
    const from=importer&&importer.split('?')[0];
    if(!project(from))return null;
-   if(source==='kairoq'||/^\0vite\//.test(source)||source==='vite/modulepreload-polyfill'||source==='vite/preload-helper.js')return null;
+   if(source==='kairoq'||source==='kairoq/3d'||/^\0vite\//.test(source)||source==='vite/modulepreload-polyfill'||source==='vite/preload-helper.js')return null;
    const deny=()=>this.error('Import "'+String(source).slice(0,120)+'" is not allowed: import project files under src/ or an available package.');
    if(/[?#\0\\]/.test(source))deny();
    if(source.startsWith('/')){
@@ -272,7 +274,8 @@ function importGuard(work){
   }};
 }
 function kairoqClient(projectId,version=0){
- return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':null},load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):null}};
+ return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':id==='kairoq/3d'?'\0kairoq-3d':null},
+  load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):id==='\0kairoq-3d'?require('./react-model3d').source():null}};
 }
 function cleanBuildError(e){
  const root=ROOT();
@@ -802,9 +805,9 @@ function rename(id,name){const meta=loadMeta(id);meta.name=String(name||meta.nam
 function remove(id){const dir=projectDir(id);loadMeta(id);require('./react-sql').closeEverywhere(dir);fs.rmSync(dir,{recursive:true,force:true});return{deleted:id}}
 
 // ---------- serving built files ----------
-const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm'};
+const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.glb':'model/gltf-binary','.hdr':'application/octet-stream'};
 // sandbox=true runs the page in an opaque origin so generated code cannot use the Kairoq session.
-function contentPolicy(sandbox){return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
+function contentPolicy(sandbox){return "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
 // Compression for built files: each is compressed once (brotli, else gzip) and kept next to
 // it, so apps' JavaScript and CSS travel about 3 times smaller.
 const zlib=require('zlib');

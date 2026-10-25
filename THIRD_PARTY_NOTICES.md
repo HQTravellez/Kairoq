@@ -95,3 +95,17 @@ installing their hooks. Reviewed source commits are in `upstreams.json`.
 
 Upstream binaries/services carry their own dependencies, licenses and operational
 requirements. API/schema compatibility and offline tests do not establish production readiness.
+
+## 3D in the app builder
+
+- Google model-viewer 4.4.0 — https://github.com/google/model-viewer — Apache-2.0. Its bundled
+  build (which contains three.js, MIT) is vendored unmodified at
+  `public/vendor/model-viewer/model-viewer-4.4.0.min.js` with its licence next to it, and is
+  copied into apps that show 3D (`react-model3d.js`).
+- Blender — https://www.blender.org — GPL-2.0-or-later. Installed unmodified in the Docker image
+  as the `bpy` Python module (PyPI `bpy`) and run as a separate process (`blender.js`,
+  `scripts/blender-kairoq.py`) to convert and render 3D files. Kairoq does not link it or ship it
+  in apps; GLB files Blender writes are the owner's own content.
+- Poly Haven — https://polyhaven.com — models, textures and HDRIs under CC0 (public domain),
+  downloaded on request through api.polyhaven.com. Kairoq keeps the source and credit with
+  each model.

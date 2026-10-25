@@ -39,7 +39,12 @@ async function gather(id,needs,{fetchImpl=fetch,maxImages=6}={}){
  const assets=require('./react-assets');
  for(const need of needs.slice(0,8)){
   try{
-   if(need.kind==='model'){const m=(await searchModels(need.query,{fetchImpl}))[0];if(m)out.linked.push({...m,use:need.use});continue}
+   // 3D models are saved into the project (react-models.js) so they work offline, in AR and with a preview picture.
+   if(need.kind==='model'){
+    const M=require('./react-models'),hit=(await M.searchPolyHaven(need.query,{fetchImpl,limit:3}))[0];
+    if(hit){const m=await M.addPolyHaven(id,hit.id,{fetchImpl}).catch(e=>{if(e.status===409)return M.list(id).find(x=>x.source&&x.source.id===hit.id)||null;throw e});if(m)(out.models=out.models||[]).push({...m,use:need.use})}
+    continue;
+   }
    if(need.kind==='audio'){const a=(await searchOpenverse('audio',need.query,{fetchImpl,limit:5}))[0];if(a)out.linked.push({...a,use:need.use});continue}
    if(out.saved.length>=maxImages)continue;
    for(const img of await searchOpenverse('image',need.query,{fetchImpl})){
@@ -63,10 +68,12 @@ async function gather(id,needs,{fetchImpl=fetch,maxImages=6}={}){
 }
 // What the model is told about the assets it may use.
 function note(result){
- if(!result||(!result.saved.length&&!result.linked.length))return'';
+ const models=(result&&result.models)||[];
+ if(!result||(!result.saved.length&&!result.linked.length&&!models.length))return'';
  const L=['OPENLY LICENSED ASSETS found for this app:'];
  for(const s of result.saved)L.push('- ./uploads/'+s.file+' — '+s.title+' by '+s.creator+' ('+s.license+')'+(s.use?' — use: '+s.use:''));
- for(const l of result.linked)L.push('- '+l.kind+' '+l.url+' — '+l.title+' by '+l.creator+' ('+l.license+')'+(l.use?' — use: '+l.use:'')+(l.kind==='model'?' (glTF; show it with three and GLTFLoader from three/examples/jsm/loaders/GLTFLoader.js only where 3D adds real value)':''));
+ for(const m of models)L.push('- 3D model '+m.path+(m.poster_path?' (poster '+m.poster_path+')':'')+' — '+m.title+' (Poly Haven, CC0)'+(m.use?' — use: '+m.use:'')+'. Show it with <Model3D> from \'kairoq/3d\' only where 3D adds real value.');
+ for(const l of result.linked)L.push('- '+l.kind+' '+l.url+' — '+l.title+' by '+l.creator+' ('+l.license+')'+(l.use?' — use: '+l.use:''));
  const credits=[...result.saved,...result.linked].filter(x=>x.attribution_required);
  if(credits.length)L.push('Some of these need attribution: add a small "Photo credits" line in the footer (or a credits page) with title, creator and license for: '+credits.map(c=>c.title+' by '+c.creator+' ('+c.license+')').join('; ')+'.');
  L.push('Icons: use lucide-react (ISC license).');
