@@ -281,12 +281,24 @@ function messageItem(m,last,index){
    });
    li.append(q,el('p','q-hint','Pick one, or type your own answer. "ok" goes with the recommended option.'));
   }
+  // Suggested next steps: one click builds that idea.
+  if(last&&Array.isArray(m.ideas)&&m.ideas.length){
+   const q=el('div','idea-list');
+   for(const idea of m.ideas){
+    const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
+    const b=el('button','q-opt idea',idea);b.type='button';b.title='Build this: '+ask;
+    b.onclick=()=>{q.querySelectorAll('button').forEach(x=>{x.disabled=true});send(ask,'build')};
+    q.append(b);
+   }
+   li.append(q,el('p','q-hint','Pick an idea to build it, or tell me what you want.'));
+  }
   const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan');
   if(acts.length){
    const d=el('details','acts'),s=el('summary');s.append(icon('down','toggle'),el('span',null,summarize(tl)||acts.length+' steps'));
    d.append(s,rail(acts.slice(0,30),{}));li.append(d);
   }
  }else{const body=el('div','msg-text');body.textContent=m.text;li.append(body)}
+ if(m.role==='assistant'&&m.failed&&m.retry&&(last||index==null)){const b=el('button','ghost retry','Try again');b.type='button';b.onclick=()=>{b.disabled=true;send(m.retry,m.retry_mode==='discuss'?'discuss':m.retry_mode==='agent'?'agent':'build')};li.append(b)}
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Attached: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Style: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
  if(m.generated&&m.generated.length&&state.project){const g=document.createElement('div');g.className='generated';for(const n of m.generated){const img=document.createElement('img');img.alt=n;img.title='./uploads/'+n;img.loading='lazy';img.src='/api/create/projects/'+state.project.id+'/asset?name='+encodeURIComponent(n);g.append(img)}li.append(g)}
@@ -338,7 +350,7 @@ function verifiedCard(v,checks,added){
  const ul=el('ul');for(const [ok,t] of rows){const li=el('li',ok?'ok':'bad');li.append(el('span','vmark',ok?'✓':'✗'),el('span',null,t));ul.append(li)}
  box.append(ul);
  const actualFlows=checks&&checks.ran>0&&Array.isArray(checks.failed)&&checks.failed.length===0;
- const note=el('p','verification-scope',actualFlows?'Only the listed browser checks and saved flows were tested. Other requested features may still be unverified.':'These checks show the app opens and fits a phone. The features you asked for have NOT been verified by these checks.');
+ const note=el('p','verification-scope',actualFlows?'Kairoq tested the basics above and your saved checks. Anything else in this change was not tested, so try it in the preview.':'Kairoq opened the app in a browser and checked the basics above. It did not test the new feature itself, so try it in the preview.');
  box.append(note);
  box.title='Browser check scope only; this is not certification that the whole application is complete.';
  return box;
@@ -793,12 +805,12 @@ async function discussWhileBuilding(message){
    if(Date.now()>deadline)throw Error('The discussion is taking longer than expected. Your build continues; reopen the project to retrieve the reply.');
    await new Promise(r=>setTimeout(r,300));
    current=(await api('/jobs/'+job.id)).job;
-   if(current.stream?.text){const next=messageItem({role:'assistant',text:current.stream.text});answer.replaceWith(next);answer=next;}
+   const said=current.stream?.text?'Writing the answer…':'Thinking about your question…';if(answer.textContent!==said){const next=messageItem({role:'assistant',text:said});answer.replaceWith(next);answer=next;}
   }
-  if(current.status==='failed')throw Error(current.error);
+  if(current.status==='failed'){if(current.saved){answer.remove();const k=(await api('/projects/'+projectId)).project.messages.at(-1);$('messages').append(messageItem(k&&k.failed?k:{role:'assistant',text:current.error,failed:true,retry:message,retry_mode:'discuss'}));return}throw Error(current.error)}
   // Re-render only this reply; never replace or stop the active build watcher.
-  $('messages').append(messageItem({role:'assistant',text:current.result.message}));answer.remove();
- }catch(err){answer.remove();$('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));}
+  $('messages').append(messageItem({role:'assistant',text:current.result.message,ideas:current.result.ideas},true,-1));answer.remove();
+ }catch(err){answer.remove();$('messages').append(messageItem({role:'assistant',text:/busy|timed|provider|failed to fetch|network/i.test(err.message)?'The AI is busy right now. Nothing was changed and no credits were used.':err.message,failed:true,retry:message,retry_mode:'discuss'}));}
  finally{state.sideChatPending=false;}
 }
 async function send(message,mode,path='/chat',extra={}){
@@ -827,7 +839,7 @@ async function send(message,mode,path='/chat',extra={}){
  $('chat-input').value='';state.attachments=[];renderAttachments();
  try{const {job}=await api('/projects/'+state.project.id+path,{method:'POST',body:{message,mode,tier:state.tier,...(state.model&&state.model!=='auto'?{model:state.model}:{}),images:images.length?images:undefined,files:files.length?files:undefined,...extra}});watch(job)}
  catch(err){
-  $('messages').append(messageItem({role:'assistant',text:err.message,failed:true}));
+  $('messages').append(messageItem({role:'assistant',text:err.message,failed:true,retry:err.status===402?null:message,retry_mode:mode}));
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
@@ -929,7 +941,15 @@ function stageList(j){
  return ol;
 }
 // The latest thought, in plain words, while the AI works out what to build.
-function thinkingLine(){const t=String(work.thinking||'').replace(/\s+/g,' ').trim();if(!t)return'';const parts=t.split(/(?<=[.!?])\s+/).filter(x=>x.length>12);return(parts.at(-1)||t).slice(-180)}
+// Only finished, readable sentences (no code, JSON or half words), and it changes at most every 3 seconds.
+function plainSentence(x){const letters=(x.match(/[a-z]/gi)||[]).length;return x.length>=20&&x.length<=200&&/[.!?]$/.test(x)&&letters/x.length>0.7&&!/[{}<>`=;$\\]|\b(const|function|import|return|null|undefined|json)\b|\w+\.(jsx?|tsx?|css)\b/i.test(x)}
+function thinkingLine(){
+ const t=String(work.thinking||'').replace(/\s+/g,' ').trim();if(!t)return work.thought||'';
+ if(work.thought&&Date.now()-(work.thoughtAt||0)<3000)return work.thought;
+ const next=t.split(/(?<=[.!?])\s+/).filter(plainSentence).at(-1);
+ if(next&&next!==work.thought){work.thought=next;work.thoughtAt=Date.now()}
+ return work.thought||'';
+}
 function renderBuildOverlay(j){
  const overlay=$('build-overlay');
  if(overlay)overlay.classList.add('hidden');
@@ -937,6 +957,7 @@ function renderBuildOverlay(j){
 }
 function liveStatus(j){
  const p=phaseOf(j);
+ if(j.mode==='discuss')return j.stream&&j.stream.text?'Writing the answer':/\b(suggest|ideas?|recommend|what else|what next)\b/i.test(work.asked||'')?'Thinking about ideas for your app':'Thinking about your question';
  if(j.mode==='agent'&&j.agent&&j.agent.step){const last=(j.events||[]).at(-1);return'Step '+j.agent.step+' · '+(p==='thinking'?'Thinking':last&&last.t==='edit'?'Editing '+last.file.replace(/^src\//,''):PHASES[p]||'Working')}
  if(p==='writing'&&work.current)return'Writing '+work.current.replace(/^src\//,'');
  return PHASES[p]||'Working';
@@ -960,15 +981,16 @@ function renderWork(j){
  if(st&&st.tail)work.tail=st.tail;
  if(j.thinking)work.thinking=j.thinking;
  text(li.querySelector('.status-text'),liveStatus(j));
- li.querySelector('.stages').replaceWith(stageList(j));
- const th=li.querySelector('.work-think'),thought=stageOf(phaseOf(j))==='thinking'?thinkingLine():'';th.classList.toggle('hidden',!thought);text(th,thought);
+ const ask=j.mode==='discuss';
+ li.querySelector('.stages').replaceWith(ask?el('ol','stages hidden'):stageList(j));
+ const th=li.querySelector('.work-think'),thought=!ask&&stageOf(phaseOf(j))==='thinking'?thinkingLine():'';th.classList.toggle('hidden',!thought);text(th,thought);
  renderBuildOverlay(j);
  const r=li.querySelector('.rail.live');r.replaceChildren();
  // Only the files it is changing and the problems it is fixing show here; notes (the design pick,
  // engine switches) and the rest stay in Details.
  for(const e of liveEvents(j).filter(e=>e.t==='edit'||e.t==='fix'||(e.t==='build'&&e.ok===false)).slice(-6))r.append(eventRow(e,{live:true}));
  const msg=li.querySelector('.work-msg');
- const said=j.mode==='discuss'?(st&&st.text)||'':j.mode==='agent'&&j.agent&&j.agent.steps.length?'':work.message;
+ const said=j.mode==='discuss'?'':j.mode==='agent'&&j.agent&&j.agent.steps.length?'':work.message;
  const planText=j.mode!=='discuss'&&work.plan&&work.plan.length?work.plan.map(x=>'- '+x).join('\n'):'';
  const body=[said,planText].filter(Boolean).join('\n\n');
  msg.classList.toggle('hidden',!body);msg.replaceChildren(body?renderMarkdown(body):'');
@@ -1047,7 +1069,7 @@ function renderDetail(){
 async function watch(job){
  state.job=job;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
- Object.assign(work,{started:Date.now(),files:[],current:null,message:'',tail:'',thinking:'',plan:[],seen:new Set()});if(detailState.source!==null)closeDetail();
+ Object.assign(work,{started:Date.now(),files:[],current:null,message:'',tail:'',thinking:'',thought:'',thoughtAt:0,asked:state.lastSent||'',plan:[],seen:new Set()});if(detailState.source!==null)closeDetail();
  clearInterval(work.timer);work.timer=setInterval(tickWork,1000);
  const done=await new Promise(resolve=>{
   let finished=false;
@@ -1081,8 +1103,9 @@ async function watch(job){
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
   // A message that could not be built stays in the chat and goes back in the box to try again.
-  if(done.status==='failed'&&state.lastSent&&!state.project.messages.some(m=>m.role==='user'&&m.text===state.lastSent)){$('messages').append(messageItem({role:'user',text:state.lastSent}));if(!$('chat-input').value.trim()){$('chat-input').value=state.lastSent;syncSend()}}
-  if(done.status==='failed')$('messages').append(messageItem({role:'assistant',text:done.error+(done.credits&&state.me.viewer.kind==='customer'?(done.mode==='repair'?'\nRounds that did not finish were refunded.':'\nYour credits were refunded.'):''),failed:true}));
+  const saved=done.status==='failed'&&done.saved;
+  if(done.status==='failed'&&!saved&&state.lastSent&&!state.project.messages.some(m=>m.role==='user'&&m.text===state.lastSent)){$('messages').append(messageItem({role:'user',text:state.lastSent}));if(!$('chat-input').value.trim()){$('chat-input').value=state.lastSent;syncSend()}}
+  if(done.status==='failed'&&!saved)$('messages').append(messageItem({role:'assistant',retry:done.retry?state.lastSent:null,retry_mode:done.mode,text:done.error+(done.credits&&state.me.viewer.kind==='customer'?(done.mode==='repair'?'\nRounds that did not finish were refunded.':'\nYour credits were refunded.'):''),failed:true}));
   if(state.code)renderFiles();
   if(state.data)renderData();
  }

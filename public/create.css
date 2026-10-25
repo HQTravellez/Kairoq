@@ -772,6 +772,21 @@ body.embed #side,body.embed #side-open-btn{display:none!important}
 .models-search input{flex:1;min-width:0}
 .models-search select{flex:none;width:auto}
 @media (max-width:520px){.models-search{flex-wrap:wrap}.models-search input{flex-basis:100%}}
+/* Build from a reference: what its users complain about (react-reviews.js) */
+.ref-themes .ref-theme-head{font-weight:600}
+.ref-themes .ref-theme-head.req::before{content:"Asked for: ";font-weight:500;opacity:.7}
+.ref-quotes{display:grid;gap:6px;margin:6px 0 2px}
+.ref-quotes blockquote{margin:0;padding:6px 10px;border-left:3px solid var(--border);font-size:13px;line-height:1.45;opacity:.9}
+.ref-quotes blockquote a{white-space:nowrap;font-size:12px}
+.ref-angle{margin:8px 0 0;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08);font-weight:500}
+.ref-angle:empty{display:none}
+/* Suggested ideas under an answer: one click builds that idea. */
+.idea-list{display:grid;gap:6px;margin-top:10px}
+.q-opt.idea::after{content:"Build";font-size:12px;font-weight:600;color:#6b675e;flex:none}
+.q-opt.idea:hover::after{color:#15140f}
+/* A failed message keeps a Try again button. */
+li.failed .retry{margin-top:8px;padding:6px 12px;border:1px solid #e3e0d8;border-radius:10px;background:#fff;font:600 13px/1 inherit;cursor:pointer}
+li.failed .retry:hover{border-color:#15140f}
 /* ---------- the preview as a real device (iPhone, Pixel, iPad) ---------- */
 .device.desktop{display:contents}
 .device.desktop>:not(#frame){display:none}

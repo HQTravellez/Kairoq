@@ -13,11 +13,14 @@ function smallTalk(message){
  const t=String(message||'').trim().replace(/[\s!.?,:)😊🙂👋🙏]+$/u,'');
  if(!t)return null;
  if(t.length>80||t.split(/\s+/).length>10)return null;
- const rest=t.replace(GREETING,'').replace(THANKS,'').replace(HELP,'').trim();
+ const lead=s=>s.replace(/^[\s,!.:-]+/,'');
+ const afterHi=lead(t.replace(GREETING,'')),help=HELP.test(afterHi);
+ const rest=lead(lead(afterHi.replace(THANKS,'')).replace(HELP,'')).trim();
  if(rest&&CHANGE.test(rest))return null;
+ if(/\b(why|what|how|when|where|which|who)\b|\?/i.test(rest)&&!/\b(how are (you|things)|how'?s it going|how is (it|everything)|are you (there|around|ok|okay|well)|how have you been|what'?s up)\b/i.test(rest))return null;
  // "hi how are you doing today": a greeting followed by chit-chat is still a greeting.
  if(rest.split(/\s+/).filter(Boolean).length>(GREETING.test(t)?6:3))return null;
- if(HELP.test(t))return'help';
+ if(help)return'help';
  if(GREETING.test(t))return'greeting';
  if(THANKS.test(t))return'thanks';
  return null;
@@ -27,10 +30,18 @@ function smallTalk(message){
 // "Can you add…", "please…" and anything that names a change stay build requests.
 function questionOnly(message){
  const t=String(message||'').trim();
- if(!t.endsWith('?')||t.length>400)return false;
+ if(t.length>400)return false;
+ // Asking for ideas or an explanation is never a build, with or without "?" or "can you":
+ // "can you suggest what else", "any ideas", "what would you recommend", "explain the booking flow".
+ if(ASKING.test(t)&&!CHANGE_ASK.test(t))return true;
+ if(!t.endsWith('?'))return false;
  if(/\b(can|could|would|will) you\b|\bplease\b|\bi want\b|\blet'?s\b/i.test(t))return false;
- return!CHANGE.test(t);
+ // "why did the build fail?": the build, the update, the design are nouns here, not change requests.
+ return!CHANGE.test(t.replace(/\b(the|this|that|my|your|last) (build|update|design|fix|change|style)s?\b/gi,''));
 }
+const ASKING=/\b(suggest(ions?)?|ideas?|recommend(ations?)?|advice|advise|explain|thoughts|opinion|what else|what next|what more|what should (i|we)|tell me (about|why|how|what)|feedback)\b/i;
+// "suggest a gallery and add it" still asks for a change.
+const CHANGE_ASK=/\b(and|then) (add|build|make|create|change|put|implement)\b|\b(add|build|make|create|change|implement) (it|them|that|those|a|an|the)\b/i;
 
 function reply(kind,meta){
  const name=meta&&meta.name||'your app';
@@ -53,7 +64,9 @@ function conversation(message){
  const t=String(message||'').trim();
  if(!t||t.length>300||/https?:\/\//i.test(t))return false;
  if(t.split(/\s+/).length>25)return false;
- return CONVERSATION.test(t)&&!CHANGE.test(t);
+ // A short message with no change in it ("ok but why", "really?", "not sure") is conversation too.
+ const shortTalk=t.split(/\s+/).length<=6&&(/\?$/.test(t)||/\b(why|what|how|really|sure|huh|hmm+|mean|meaning|confused|understand)\b/i.test(t));
+ return(CONVERSATION.test(t)||shortTalk)&&!CHANGE.test(t);
 }
 
 module.exports={smallTalk,questionOnly,conversation,reply};
