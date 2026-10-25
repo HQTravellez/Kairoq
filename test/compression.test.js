@@ -17,7 +17,8 @@ test('built files and published pages are compressed, and come back identical',a
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;
  try{
   const html=(await get(port,'/sites/zip-test/')).body.toString();
-  const js='/sites/zip-test/'+/src="\/?([^"]*assets\/[^"]+\.js)"/.exec(html)[1].replace(/^\.?\//,'');
+  // Asset links are absolute on published pages (real page addresses); older builds used "./assets/".
+  const src=/src="([^"]*assets\/[^"]+\.js)"/.exec(html)[1],js=src.startsWith('/')?src:'/sites/zip-test/'+src.replace(/^\.?\//,'');
   const plain=await get(port,js);
   assert.equal(plain.status,200);assert.equal(plain.headers['content-encoding'],undefined);
   const br=await get(port,js,'gzip, deflate, br');

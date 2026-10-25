@@ -171,7 +171,7 @@ test('published sites get SEO tags, robots and sitemap, and count visitors witho
  await request(server,'GET','/sites/northstar/',{headers:ua});
  await request(server,'GET','/sites/northstar/',{headers:{'user-agent':'Googlebot/2.1'}});
  await request(server,'GET','/sites/northstar/',{headers:{'user-agent':'Mozilla/5.0 Safari','x-forwarded-for':'203.0.113.9'}});
- const js=/src="\.\/(assets\/[^"]+\.js)"/.exec(page.text)[1];
+ const js=/src="(?:\.\/|\/sites\/northstar\/)(assets\/[^"]+\.js)"/.exec(page.text)[1]; // asset links are absolute on published pages (real page addresses)
  await request(server,'GET','/sites/northstar/'+js,{headers:ua});
  const a=(await request(server,'GET','/api/create/projects/'+id+'/analytics',{headers:{cookie}})).json.analytics;
  assert.equal(a.totals.views,3,'bots and asset requests are not counted');
