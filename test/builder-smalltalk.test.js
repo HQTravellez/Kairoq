@@ -41,3 +41,12 @@ test('everyday messages get an answer, not a build that reports "Updated the app
  const api=require('fs').readFileSync(require('path').join(__dirname,'../create-api.js'),'utf8');
  assert.match(api,/S\.questionOnly\(message\)\|\|S\.conversation\(message\)/);
 });
+
+test('"what can you do" with a topic gets a real answer, not the help menu',()=>{
+ const S=require('../builder-smalltalk');
+ for(const m of ['what can you do 3d int his','what can you do with 3d?','what can you do with payments','help with the booking form']){
+  assert.equal(S.smallTalk(m),null,m);
+ }
+ for(const m of ['what can you do 3d int his','what can you do with 3d?'])assert.equal(S.conversation(m),true,m);
+ for(const m of ['what can you do','what can you do for me?','hi, what can you do','help please','help'])assert.equal(S.smallTalk(m),'help',m);
+});
