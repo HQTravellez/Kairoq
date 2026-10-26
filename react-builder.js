@@ -169,8 +169,18 @@ function checkProject(files){const errors=validateFiles(files);return errors.len
 function workerCount(){const n=Number(process.env.KAIROQ_BUILD_WORKERS??2);return Number.isInteger(n)&&n>=0?Math.min(n,8):2}
 let inlineQueue=Promise.resolve();
 function build(files,outDir,options={}){
- if(workerCount()===0){const task=inlineQueue.then(()=>runBuild(files,outDir,options));inlineQueue=task.catch(()=>{});return task}
- return new Promise((resolve,reject)=>{pool.queue.push({files,outDir,options,resolve,reject});pump()});
+ const built=workerCount()===0?inlineQueue.then(()=>runBuild(files,outDir,options)):new Promise((resolve,reject)=>{pool.queue.push({files,outDir,options,resolve,reject});pump()});
+ if(workerCount()===0)inlineQueue=built.catch(()=>{});
+ return built.then(result=>{copyStoryProps(files,outDir);return result});
+}
+// Apps that use kairoq/story get its Blender-made models (app-modules/props) next to their
+// build, served at <app>/props/, so the 3D scenes look finished.
+const PROPS_DIR=path.join(__dirname,'app-modules','props');
+function usesStory(files){return Object.values(files||{}).some(c=>typeof c==='string'&&/['"]kairoq\/story['"]/.test(c))}
+function copyStoryProps(files,outDir){
+ if(!usesStory(files)||!fs.existsSync(PROPS_DIR))return;
+ const dest=path.join(outDir,'props');fs.mkdirSync(dest,{recursive:true});
+ for(const f of fs.readdirSync(PROPS_DIR))if(f.endsWith('.glb'))fs.copyFileSync(path.join(PROPS_DIR,f),path.join(dest,f));
 }
 function spawnWorker(){
  const {Worker}=require('worker_threads');
@@ -871,7 +881,7 @@ function remove(id){const dir=projectDir(id);loadMeta(id);require('./react-sql')
 // ---------- serving built files ----------
 const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.ico':'image/x-icon','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.glb':'model/gltf-binary','.hdr':'application/octet-stream'};
 // sandbox=true runs the page in an opaque origin so generated code cannot use the Kairoq session.
-function contentPolicy(sandbox){return "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
+function contentPolicy(sandbox){return "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https: blob: data:; media-src 'self' https: data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'self'"+(sandbox?'; sandbox allow-scripts allow-forms allow-popups allow-modals':'')}
 // Compression for built files: each is compressed once (brotli, else gzip) and kept next to
 // it, so apps' JavaScript and CSS travel about 3 times smaller.
 const zlib=require('zlib');
@@ -967,4 +977,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

@@ -7,11 +7,46 @@
 // Built on React Three Fiber 8 and drei 9 (MIT) through kairoq/scene's Scene3D, so it shows a
 // still fallback without WebGL, only animates while on screen, holds still for people who prefer
 // reduced motion, and marks itself as drawn for Kairoq's browser check.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, RoundedBox } from '@react-three/drei';
+import { ContactShadows, RoundedBox, useGLTF } from '@react-three/drei';
 import { Scene3D, prefersStill, themeColor } from 'kairoq/scene';
+import { basename } from 'kairoq';
+
+// ---------- Blender-made models ----------
+// The props are modelled in Blender (scripts/props/ in Kairoq) and copied into every app that
+// uses kairoq/story, under <app>/props/. While one loads, the code-built version stands in.
+export const PROPS = {
+  machine: 'espresso-machine.glb', cup: 'espresso-cup.glb',
+  oven: 'pizza-oven.glb', pizza: 'pizza.glb', peel: 'pizza-peel.glb', box: 'pizza-box.glb',
+};
+const propUrl = (file) => (basename || '') + '/props/' + file;
+
+// One Blender model. nodes: { name: ref } fills refs with named parts (a box's "Lid", a pizza's
+// "Cheese") so the story can move or colour them; materials are copied so changes stay local.
+function Model({ file, position, nodes }) {
+  const { scene } = useGLTF(propUrl(file));
+  const copy = useMemo(() => {
+    const clone = scene.clone(true);
+    clone.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.castShadow = o.receiveShadow = true; } });
+    return clone;
+  }, [scene]);
+  useLayoutEffect(() => {
+    for (const [name, ref] of Object.entries(nodes || {})) ref.current = copy.getObjectByName(name) || null;
+  }, [copy, nodes]);
+  return h('primitive', { object: copy, position });
+}
+
+// The Blender model, with the code-built prop shown until it has loaded (or if it cannot load).
+export function Prop({ file, fallback, position, nodes }) {
+  return h(PropBoundary, { fallback }, h(Suspense, { fallback }, h(Model, { file, position, nodes })));
+}
+class PropBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
 
 const h = React.createElement;
 
@@ -86,7 +121,7 @@ export function EspressoMachine({ materials, position = [0, 0, 0] }) {
 }
 
 // A cup on its saucer, turned from a profile; fill (0 to 1) raises the coffee, crema on top.
-export function Cup({ materials, fill = 0, cupRef, coffeeRef, cremaRef }) {
+export function Cup({ materials, fill = 0, cupRef, coffeeRef, cremaRef, model = true }) {
   const m = materials;
   const cupGeometry = useMemo(() => {
     const outline = [[0, 0], [0.07, 0], [0.085, 0.01], [0.105, 0.11], [0.112, 0.13], [0.1, 0.13], [0.093, 0.12], [0.078, 0.02], [0, 0.02]];
@@ -97,14 +132,18 @@ export function Cup({ materials, fill = 0, cupRef, coffeeRef, cremaRef }) {
     return new THREE.LatheGeometry(outline.map(([x, y]) => new THREE.Vector2(x, y)), 48);
   }, []);
   const level = 0.025 + 0.085 * fill;
+  // The cup and saucer: the Blender model, or the code-built shape while it loads.
+  const shell = h('group', null,
+    h('mesh', { geometry: saucerGeometry, material: m.ceramic, castShadow: true, receiveShadow: true }),
+    h('mesh', { geometry: cupGeometry, material: m.ceramic, castShadow: true, position: [0, 0.012, 0] }),
+    h('mesh', { position: [0.118, 0.082, 0], rotation: [0, 0, Math.PI / 2], material: m.ceramic, castShadow: true }, h('torusGeometry', { args: [0.03, 0.009, 12, 24, Math.PI] })));
   return h(
     'group',
     { ref: cupRef },
-    h('mesh', { geometry: saucerGeometry, material: m.ceramic, castShadow: true, receiveShadow: true }),
+    model ? h(Prop, { file: PROPS.cup, fallback: shell }) : shell,
+    // The coffee and crema stay live, so the cup can fill as the shot pours.
     h('group', { position: [0, 0.012, 0] },
-      h('mesh', { geometry: cupGeometry, material: m.ceramic, castShadow: true }),
-      h('mesh', { position: [0.118, 0.07, 0], rotation: [0, 0, Math.PI / 2], material: m.ceramic, castShadow: true }, h('torusGeometry', { args: [0.03, 0.009, 12, 24, Math.PI] })),
-      h('mesh', { ref: coffeeRef, position: [0, level / 2 + 0.01, 0], scale: [1, Math.max(0.001, fill), 1], material: m.coffee }, h('cylinderGeometry', { args: [0.084, 0.078, 0.09, 40] })),
+      h('mesh', { ref: coffeeRef, position: [0, level / 2 + 0.01, 0], scale: [1, Math.max(0.001, fill), 1], material: m.coffee }, h('cylinderGeometry', { args: [0.082, 0.072, 0.09, 40] })),
       h('mesh', { ref: cremaRef, position: [0, level + 0.012, 0], rotation: [-Math.PI / 2, 0, 0], visible: fill > 0.6, material: m.crema }, h('circleGeometry', { args: [0.086, 40] }))
     )
   );
@@ -279,7 +318,7 @@ function CoffeeScene({ step, accent }) {
     h('directionalLight', { position: [-2, 4, 3], intensity: 1.2, color: '#ffe4c4' }),
     h('pointLight', { position: [1.5, 1.8, 1.5], intensity: 6, color: '#ffb36b', distance: 6 }),
     h(Counter, { materials }),
-    h(EspressoMachine, { materials, position: [MACHINE_X, 0, 0] }),
+    h(Prop, { file: PROPS.machine, position: [MACHINE_X, 0, 0], fallback: h(EspressoMachine, { materials, position: [MACHINE_X, 0, 0] }) }),
     h('group', { position: [MACHINE_X + SPOUT[0], SPOUT[1] - 0.025, SPOUT[2]] }, h(PourStream, { materials, height: 0.28, streamRef: stream })),
     // The cup stack waiting by the machine.
     h('group', { position: [-0.35, 0, -0.25] }, h(Cup, { materials, fill: 0 })),
@@ -316,7 +355,7 @@ function usePizzaMaterials() {
 
 // A wood-fired dome oven: stone base, brick dome, arched mouth with a live fire inside.
 const MOUTH = 0.46; // half the width of the mouth, as an angle around the dome
-export function StoneOven({ pizzaMaterials, position = [0, 0, 0], fireRef }) {
+export function StoneOven({ pizzaMaterials, position = [0, 0, 0] }) {
   const m = pizzaMaterials;
   return h(
     'group',
@@ -330,11 +369,20 @@ export function StoneOven({ pizzaMaterials, position = [0, 0, 0], fireRef }) {
     h('mesh', { position: [0, 0.36, 0.6], material: m.brick, castShadow: true }, h('torusGeometry', { args: [0.3, 0.06, 16, 40, Math.PI] })),
     h('mesh', { position: [0, 0.362, 0], rotation: [-Math.PI / 2, 0, 0], material: m.soot }, h('circleGeometry', { args: [0.66, 48] })),
     h('mesh', { position: [0, 1.05, -0.15], material: m.brick, castShadow: true }, h('cylinderGeometry', { args: [0.09, 0.11, 0.4, 20] })),
-    // Fire at the back: glowing embers, logs and a flickering light (fireRef).
-    h('mesh', { position: [-0.18, 0.42, 0.15], material: m.ember }, h('sphereGeometry', { args: [0.13, 20, 16] })),
-    h('mesh', { position: [0.05, 0.4, 0.1], material: m.ember }, h('sphereGeometry', { args: [0.1, 20, 16] })),
-    h('mesh', { position: [-0.1, 0.39, 0.12], rotation: [0, 0.6, Math.PI / 2], material: m.log }, h('cylinderGeometry', { args: [0.035, 0.035, 0.32, 12] })),
-    h('mesh', { position: [-0.05, 0.39, 0.18], rotation: [0, -0.5, Math.PI / 2], material: m.log }, h('cylinderGeometry', { args: [0.03, 0.03, 0.28, 12] })),
+  );
+}
+
+// The fire inside the oven (glowing embers, logs and a flickering light), kept live in code so it
+// can flicker, whichever oven model is showing.
+export function OvenFire({ pizzaMaterials, position = [0, 0, 0], fireRef }) {
+  const m = pizzaMaterials;
+  return h(
+    'group',
+    { position },
+    h('mesh', { position: [-0.18, 0.42, 0.05], material: m.ember }, h('sphereGeometry', { args: [0.13, 20, 16] })),
+    h('mesh', { position: [0.05, 0.4, 0.0], material: m.ember }, h('sphereGeometry', { args: [0.1, 20, 16] })),
+    h('mesh', { position: [-0.1, 0.39, 0.02], rotation: [0, 0.6, Math.PI / 2], material: m.log }, h('cylinderGeometry', { args: [0.035, 0.035, 0.32, 12] })),
+    h('mesh', { position: [-0.05, 0.39, 0.08], rotation: [0, -0.5, Math.PI / 2], material: m.log }, h('cylinderGeometry', { args: [0.03, 0.03, 0.28, 12] })),
     h('pointLight', { ref: fireRef, position: [0, 0.5, 0.45], intensity: 4, color: '#ff8a3a', distance: 2.6 })
   );
 }
@@ -405,6 +453,7 @@ function PizzaScene({ step }) {
   const pm = usePizzaMaterials();
   const progress = useStoryProgress(step);
   const pizza = useRef(), cheese = useRef(), peel = useRef(), box = useRef(), lid = useRef(), hand = useRef(), fire = useRef();
+  const cheeseNode = useMemo(() => ({ Cheese: cheese }), []), lidNode = useMemo(() => ({ Lid: lid }), []);
   const [steaming, setSteaming] = useState(false);
   const { camera, size } = useThree();
   const look = useMemo(() => new THREE.Vector3(), []), at = useMemo(() => new THREE.Vector3(), []);
@@ -443,10 +492,11 @@ function PizzaScene({ step }) {
     h('directionalLight', { position: [-2, 4, 3], intensity: 1.1, color: '#ffe0c0' }),
     h('pointLight', { position: [1.6, 1.8, 1.6], intensity: 5, color: '#ffb36b', distance: 6 }),
     h(Counter, { materials, width: 5.8 }),
-    h(StoneOven, { pizzaMaterials: pm, position: [OVEN_X, 0, -0.1], fireRef: fire }),
-    h('group', { ref: pizza }, h(Pizza, { pizzaMaterials: pm, cheeseRef: cheese }), steaming ? h('group', { position: [0, 0.04, 0] }, h(Steam, { strength: 0.8 })) : null),
-    h(Peel, { pizzaMaterials: pm, materials, peelRef: peel }),
-    h(PizzaBox, { pizzaMaterials: pm, boxRef: box, lidRef: lid }),
+    h(Prop, { file: PROPS.oven, position: [OVEN_X, 0, -0.1], fallback: h(StoneOven, { pizzaMaterials: pm, position: [OVEN_X, 0, -0.1] }) }),
+    h(OvenFire, { pizzaMaterials: pm, position: [OVEN_X, 0, -0.1], fireRef: fire }),
+    h('group', { ref: pizza }, h(Prop, { file: PROPS.pizza, nodes: cheeseNode, fallback: h(Pizza, { pizzaMaterials: pm, cheeseRef: cheese }) }), steaming ? h('group', { position: [0, 0.04, 0] }, h(Steam, { strength: 0.8 })) : null),
+    h('group', { ref: peel }, h(Prop, { file: PROPS.peel, fallback: h(Peel, { pizzaMaterials: pm, materials }) })),
+    h('group', { ref: box }, h(Prop, { file: PROPS.box, nodes: lidNode, fallback: h(PizzaBox, { pizzaMaterials: pm, lidRef: lid }) })),
     h(Hand, { materials, handRef: hand, position: [2.5, 0.12, 0.36] }),
     h(ContactShadows, { position: [0, 0.002, 0], opacity: 0.45, scale: 7, blur: 2.4, far: 1.2, resolution: 512, color: '#1a0f08' })
   );
