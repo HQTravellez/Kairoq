@@ -104,3 +104,20 @@ A paid model from Meta, reached at `https://api.meta.ai/v1` (https://dev.meta.ai
   - `KAIROQ_MUSE=off`: turns it off.
 - Cost is worked out from token counts at $1.25 per million input tokens and $4.25 per million output tokens, and recorded as `muse` in the usage ledger.
 
+
+## Product explode films (Google Gemini Omni Flash)
+
+Design → **Product explode film**: the owner picks one product photo; Kairoq makes two stills
+with the builder's image model (the product whole on a dark studio stage, and the same shot
+exploded into its parts); after the owner approves them, Gemini Omni Flash
+(`gemini-omni-1.1-flash`, Gemini API `interactions`) films from the first still to the last.
+ffmpeg cuts the film into WebP frames that go into every build at `./uploads/explode-<id>/`;
+`<ScrollVideo>` from `kairoq/scroll` plays them as the page scrolls. A 9:16 reel is optional.
+
+- Railway: `GEMINI_API_KEY` (billing on in Google AI Studio; there is no free tier for video)
+  and the builder's image generation (`OPENROUTER_API_KEY`, `KAIROQ_BUILDER_PAID_APPROVED=true`).
+- Cost to Kairoq: about $0.10 per second of film at 720p (about $0.80 for one film) plus two images.
+- Credits: `KAIROQ_EXPLODE_STILLS_CREDITS` (3), `KAIROQ_EXPLODE_CREDITS` (25),
+  `KAIROQ_EXPLODE_REEL_CREDITS` (25). Off with `KAIROQ_EXPLODE=off`.
+  `KAIROQ_EXPLODE_RESOLUTION=1080p` for sharper films (about $0.15 a second).
+- The Docker image installs `ffmpeg` (Debian package) to cut the frames.

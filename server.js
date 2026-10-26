@@ -7080,16 +7080,18 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
 // Generates one image for a Create project (hero photos, illustrations) with an OpenRouter
 // image model. Returns {mime, data(base64)}. Counts against the builder budget.
 function builderImagesEnabled(){return Boolean(process.env.OPENROUTER_API_KEY)&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&process.env.KAIROQ_IMAGE_GENERATION!=="off"}
-async function generateBuilderImage({prompt,aspect="16:9",signal}={}){
+// references: data: URLs of images to work from (a product photo to restage), sent with the prompt.
+async function generateBuilderImage({prompt,aspect="16:9",signal,references=[]}={}){
   if(!builderImagesEnabled())throw Error("Image generation needs OPENROUTER_API_KEY and KAIROQ_BUILDER_PAID_APPROVED=true");
-  const model=String(process.env.KAIROQ_IMAGE_MODEL||"google/gemini-2.5-flash-image");
+  const refs=(Array.isArray(references)?references:[]).filter(u=>/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(u))).slice(0,3);
+  const model=refs.length?OPENROUTER_IMAGE_EDIT_MODEL:String(process.env.KAIROQ_IMAGE_MODEL||"google/gemini-2.5-flash-image");
   const reserve=Number(process.env.KAIROQ_IMAGE_COST_USD||0.05);
   const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
   const totals=await enforceBudget();
   if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
   if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
   const timeout=AbortSignal.timeout(120000);
-  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:signal?AbortSignal.any([signal,timeout]):timeout,body:JSON.stringify({model,modalities:["image","text"],image_config:{aspect_ratio:aspect},messages:[{role:"user",content:"Create one high-quality image for a website or app. "+String(prompt).slice(0,2000)+"\nPhotographic and natural unless an illustration is asked for. No text, captions, watermarks or logos in the image."}]})});
+  const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:signal?AbortSignal.any([signal,timeout]):timeout,body:JSON.stringify({model,modalities:["image","text"],image_config:{aspect_ratio:aspect},messages:[{role:"user",content:(t=>refs.length?[...refs.map(url=>({type:"image_url",image_url:{url}})),{type:"text",text:t}]:t)("Create one high-quality image for a website or app. "+String(prompt).slice(0,2000)+"\nPhotographic and natural unless an illustration is asked for. "+(refs.length?"Keep any printing or logo that is on the product itself; add no other text, captions or watermarks.":"No text, captions, watermarks or logos in the image."))}]})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw Error(data.error?.message||"Image provider HTTP "+response.status);
   const url=data.choices?.[0]?.message?.images?.[0]?.image_url?.url||"";
