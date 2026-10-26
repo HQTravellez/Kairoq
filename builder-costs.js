@@ -31,7 +31,7 @@ function summarize(rows,{since,creditPrice=Number(process.env.KAIROQ_CREDIT_PRIC
  const from=since||new Date(Date.now()-30*86400000).toISOString();
  const groups=new Map();
  for(const r of rows||[]){
-  if(!r||r.context?.purpose!=='developer-build'||String(r.at||'')<from)continue;
+  if(!r||!['developer-build','muse'].includes(r.context?.purpose)||String(r.at||'')<from)continue;
   const tier=r.context.design?'design':r.context.image?'image':r.context.tier||'standard';
   const key=tier+'|'+(r.context.model||'?');
   const g=groups.get(key)||{tier,model:r.context.model||'?',calls:0,cost:0,prompt_tokens:0,cached_tokens:0,completion_tokens:0};

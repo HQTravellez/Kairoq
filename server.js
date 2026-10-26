@@ -6924,7 +6924,7 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
 async function callMuse(opts){
   await enforceBudget();
   const muse=require("./muse");
-  return muse.chat({messages:opts.messages,temperature:opts.temperature??0.2,maxTokens:Math.min(131072,Number(opts.maxOutputTokens)||16000),signal:opts.signal,
+  return muse.chat({messages:opts.messages,temperature:opts.temperature??0.2,maxTokens:Math.min(131072,Number(opts.maxOutputTokens)||16000),promptCacheKey:opts.cacheKey,signal:opts.signal,
     onToken:typeof opts.onToken==="function"?opts.onToken:undefined,onReasoning:opts.onReasoning,readStream:readChatStream,
     spentThisMonth:async()=>(await usageTotals({purpose:"muse"})).monthly,
     record:(usage,cost)=>recordUsage({...usage,cost},{purpose:"muse",model:"meta/"+muse.model()})});
@@ -7057,7 +7057,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       // One request; a reply cut off at the output limit is continued (model-continue.js).
       let lastData=null;
       const ask=async(msgs,onTok)=>{
-        const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:require("./builder-response-policy").requestSignal(opts,{premium,stream}),body:JSON.stringify({model,messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
+        const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:require("./builder-response-policy").requestSignal(opts,{premium,stream}),body:JSON.stringify({model,...(opts.cacheKey?{session_id:String(opts.cacheKey).slice(0,128)}:{}),messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
         const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{}),opts.onReasoning):await response.json().catch(()=>({}));
         if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
         const message=data.choices?.[0]?.message||{};

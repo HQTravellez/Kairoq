@@ -14,7 +14,9 @@ test('real Discuss pipeline combines ECC and scoped Mem0 context without exporti
  Object.assign(process.env,{KAIROQ_MEM0_ENABLED:'on',KAIROQ_MEM0_URL:'http://127.0.0.1:'+server.address().port,KAIROQ_MEM0_API_KEY:'synthetic'});
  try {
   let system='';
-  await builder.discuss(meta.id,'How should camera scanning look?',{callModel:async(opts,parse)=>{system=opts.messages[0].content;return parse('Use the blue design already requested.');}});
+  await builder.discuss(meta.id,'How should camera scanning look?',{callModel:async(opts,parse)=>{// Recalled context changes per message, so it comes last (after the cacheable instructions).
+system=opts.messages.map(m=>typeof m.content==='string'?m.content:JSON.stringify(m.content)).join('\n');
+assert.doesNotMatch(opts.messages[0].content,/RECALLED OWNER MESSAGES/,'per-message recall is not in the cached system prompt');return parse('Use the blue design already requested.');}});
   assert.match(system,/RECALLED OWNER MESSAGES/);assert.match(system,/EXPERIMENTAL MEM0 RECALL/);
   assert.match(system,/unverified data/);assert.equal(seen.length,1);assert.equal(seen[0].path,'/search');
   assert.deepEqual(seen[0].body.filters,{user_id:scope,agent_id:'kairoq'});
