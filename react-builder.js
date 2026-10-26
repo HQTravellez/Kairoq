@@ -546,7 +546,7 @@ async function runtimeProblems(id,url,checkRuntime){
 }
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
