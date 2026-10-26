@@ -850,3 +850,13 @@ li.failed .retry:hover{border-color:#15140f}
 .code .file-tree .tree-ext-css{color:#2563eb}
 .code .file-tree .tree-ext-sql{color:#7c3aed}
 @media (max-width:820px){.code .file-list.file-tree{max-height:260px;border-right:0;border-bottom:1px solid var(--border)}}
+.explodes{display:flex;flex-direction:column;gap:10px}
+.explode-card{border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--panel);display:flex;flex-direction:column;gap:8px;font-size:13px}
+.explode-stills{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.explode-stills figure{margin:0}
+.explode-stills img,.explode-card video{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#000;display:block}
+.explode-stills figcaption{margin-top:4px;color:var(--muted,#6b7280)}
+.explode-card .row{gap:8px;flex-wrap:wrap;align-items:center}
+.explode-card .explode-reel{display:inline-flex;align-items:center;gap:6px;margin:0;font-weight:400}
+.explode-card .explode-reel input{width:auto;margin:0}
+.explode-card .link-btn{align-self:flex-start}

@@ -68,7 +68,7 @@ const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DE
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,thumb:require('./project-thumbs').url(p),role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -860,7 +860,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},explode_generation:{enabled:require('./explode-video').configured(process.env,{images:Boolean(generateImage)}),credits:require('./explode-video').prices()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -1535,6 +1535,30 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const q=new URL(req.url,'http://x').searchParams,vg=require('./video-gen'),name=q.get('name'),file=vg.read(id,name);
    if(!file)throw Object.assign(Error('Unknown video'),{status:404});
    vg.sendFile(req,res,file,{download:q.get('download')==='1'?name:null});return true;
+  }
+  // Product explode films (explode-video.js): a product photo, two stills to approve, then a film
+  // whose frames play on scroll in <ScrollVideo> (and a 9:16 reel to post).
+  if(action==='/explodes'&&method==='GET'){
+   const ev=require('./explode-video');ev.sweep(id,{refund:refundVideo(v)});
+   return send(res,200,{explodes:ev.list(id),enabled:ev.configured(process.env,{images:Boolean(generateImage)}),credits:ev.prices(),photos:require('./react-assets').list(id).filter(a=>/\.(png|jpe?g|webp)$/.test(a.name))}),true;
+  }
+  if(action==='/explodes'&&method==='POST'){
+   const ev=require('./explode-video'),b=await readJson(req,4000);
+   limitedKey('explodes:'+id,20,3600000);
+   const charge=(n,ref,label)=>{if(v.kind==='customer')accounts.charge(v.account.id,n,label,ref)},refund=refundVideo(v);
+   const op=String(b.op||'start');
+   const e=op==='film'?ev.film(id,String(b.id||''),{reel:b.reel===true,charge,refund})
+    :op==='redo'?ev.redo(id,String(b.id||''),{note:b.note===undefined?undefined:String(b.note),charge,refund,generateImage})
+    :ev.start(id,{photo:String(b.photo||''),note:String(b.note||''),charge,refund,generateImage});
+   return send(res,202,{explode:e,explodes:ev.list(id)}),true;
+  }
+  if(action==='/explodes'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{explodes:require('./explode-video').remove(id,String(b.id||''))}),true}
+  if(action==='/explodefile'&&method==='GET'){
+   const q=new URL(req.url,'http://x').searchParams,ev=require('./explode-video'),f=ev.read(id,q.get('id'),q.get('name'));
+   if(!f)throw Object.assign(Error('Unknown file'),{status:404});
+   if(f.type==='video/mp4'){require('./video-gen').sendFile(req,res,f.file,{download:q.get('download')==='1'?q.get('name'):null});return true}
+   res.writeHead(200,{'Content-Type':f.type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff',...(q.get('download')==='1'?{'Content-Disposition':'attachment; filename="'+q.get('name')+'"'}:{})});
+   res.end(require('fs').readFileSync(f.file));return true;
   }
   // Saved checks: list, add (steps or a plain-English description), switch on/off, run now, remove.
   if(action==='/checks'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{checks:require('./react-checks').list(meta),monitor:meta.monitor||null}),true}
