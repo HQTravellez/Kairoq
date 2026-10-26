@@ -29,6 +29,10 @@ Kairoq can invoke a separately installed OpenEnrich CLI and can call the Postiz 
 
 Prettier 3.9 (MIT, https://github.com/prettier/prettier) formats the code the app builder writes (`code-format.js`). It runs on the server only; generated apps do not include it.
 
+## yaml
+
+yaml 2.9.1 (ISC, https://github.com/eemeli/yaml) reads YAML API specs when the owner adds an outside API (`api-samples.js`). It runs on the server only.
+
 ## Packages for generated apps
 
 - gsap 3.13 (GreenSock standard no-charge license, https://gsap.com/standard-license), lenis 1.3 (MIT), three 0.169 (MIT).
