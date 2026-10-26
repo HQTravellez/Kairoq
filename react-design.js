@@ -35,7 +35,12 @@ const KIT_API={
  'src/components/ui/skeleton.jsx':'Skeleton (loading placeholder)',
  'src/components/ui/separator.jsx':'Separator {orientation}',
  'src/components/ui/toaster.jsx':'Toaster (render once), toast (toast.success("Saved"))',
- 'src/components/ui/section.jsx':'Container (max-w-6xl page width), Section (vertical rhythm), Eyebrow (small label above headings)'
+ 'src/components/ui/section.jsx':'Container (max-w-6xl page width), Section (vertical rhythm), Eyebrow (small label above headings)',
+ 'src/components/ui/data-table.jsx':'DataTable {columns: [{key, header, cell?: (row)=>node, sortable?, align?: "right"}], data, filters?: [{key, label, options?}], searchPlaceholder, pageSize, onRowClick?: (row)=>void, empty, toolbar?} (sort, search, filter by field, pages; TanStack Table 8): use it for any list of records',
+ 'src/components/ui/kanban.jsx':'Kanban {columns: [{id, title}], items: [{id, column, ...}], renderCard: (item)=>node, onMove: (itemId, toColumnId)=>void, columnTotal?: (items)=>node, columnFooter?: (column)=>node} (drag between columns with mouse, touch or keyboard; dnd-kit): pipelines, deals, orders, tasks by stage',
+ 'src/components/ui/command-menu.jsx':'CommandMenu {items: [{label, group?, icon?, shortcut?, keywords?, onSelect}], open?, onOpenChange?} (opens on Cmd/Ctrl+K by itself; render once in the app shell)',
+ 'src/components/ui/stat-card.jsx':'StatGrid (responsive grid), StatCard {label, value, change?: percent, note?, goodWhen?: "up"|"down", icon?} (dashboard KPIs)',
+ 'src/components/ui/motion.jsx':'Marquee {reverse, pauseOnHover, vertical}, NumberTicker {value, decimals, prefix, suffix}, BentoGrid, BentoCard {name, description, icon, href, cta, background, className}, BorderBeam {duration} (inside a card with className="relative"), ShimmerButton, AnimatedList {delay} (Magic UI; respects reduced motion; one or two per page)'
 };
 function isKitFile(name,code){const k=kit();return Object.hasOwn(k,name)&&k[name]===code}
 
@@ -60,6 +65,9 @@ const FONTS={
  // Fira Code (github.com/tonsky/FiraCode, SIL OFL 1.1): joins -> => != into one shape in code blocks.
  'Fira Code':['mono','400;500;600;700']
 };
+// More families from the business presets (design-presets.json, from ui-ux-pro-max-skill, MIT),
+// with the weights each really has. The list above wins where both name a family.
+for(const [name,[kind,weights]] of Object.entries(require('./design-presets.json').families||{}))if(!FONTS[name]&&/^(sans|serif|display|mono)$/.test(kind)&&/^\d{3}(;\d{3})*$/.test(weights))FONTS[name]=[kind,weights];
 const FALLBACK={sans:'ui-sans-serif, system-ui, sans-serif',display:'ui-sans-serif, system-ui, sans-serif',serif:'ui-serif, Georgia, serif',mono:'ui-monospace, monospace'};
 function fontStack(name){const f=FONTS[name];return"'"+name+"', "+FALLBACK[f?f[0]:'sans']}
 function fontUrl(names){
@@ -165,9 +173,13 @@ const THEME={extend:{
   'scale-in':{from:{opacity:'0',transform:'translate(-50%, -48%) scale(0.96)'},to:{opacity:'1',transform:'translate(-50%, -50%) scale(1)'}},
   'slide-up':{from:{transform:'translateY(100%)'},to:{transform:'translateY(0)'}},
   'slide-in-right':{from:{transform:'translateX(100%)'},to:{transform:'translateX(0)'}},
-  'slide-in-left':{from:{transform:'translateX(-100%)'},to:{transform:'translateX(0)'}}
+  'slide-in-left':{from:{transform:'translateX(-100%)'},to:{transform:'translateX(0)'}},
+  // Motion kit (src/components/ui/motion.jsx, from Magic UI, MIT).
+  marquee:{from:{transform:'translateX(0)'},to:{transform:'translateX(calc(-100% - var(--gap)))'}},
+  'marquee-vertical':{from:{transform:'translateY(0)'},to:{transform:'translateY(calc(-100% - var(--gap)))'}},
+  'shimmer-slide':{from:{transform:'translateX(0)'},to:{transform:'translateX(400%)'}}
  },
- animation:{'fade-in':'fade-in 0.3s ease-out both','fade-up':'fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both','scale-in':'scale-in 0.2s ease-out both','slide-up':'slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-right':'slide-in-right 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-left':'slide-in-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)'}
+ animation:{'fade-in':'fade-in 0.3s ease-out both','fade-up':'fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both','scale-in':'scale-in 0.2s ease-out both','slide-up':'slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-right':'slide-in-right 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-left':'slide-in-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)',marquee:'marquee var(--duration, 40s) linear infinite','marquee-vertical':'marquee-vertical var(--duration, 40s) linear infinite','shimmer-slide':'shimmer-slide 3s ease-in-out infinite'}
 }};
 
 function starterApp(name){
@@ -229,7 +241,8 @@ DESIGN (as important as working code; the app must look like a polished product 
 - Avoid the generic AI look: no gradient text, aurora/mesh gradients or glowing blobs; no row of identical icon-in-a-tinted-square cards (show a small slice of the real product instead); no vague copy ("seamless", "revolutionize", "unlock", "all-in-one"); no invented customer logos, testimonials or user counts; no centred-everything pages or sections that all share one layout; no plain grey boxes, emoji icons, lorem ipsum or default blue buttons. Use specific names, places, times and amounts as clearly sample data, one confident brand colour and a different layout for each section.
 - Make the kit yours: adapt the UI kit's components to this app's brand (shape, spacing, weight) rather than shipping them looking like everyone else's. Let typography carry character (a distinctive display font, confident sizes). Do not build text-only walls: break long text with imagery, icons, numbers or cards.
 - Contrast: body text must be easily readable on its background (dark text on light, light on dark; never light grey on white or mid-grey on a photo without an overlay). Use one primary colour confidently; do not use pure black as the primary colour.
-- Motion: a few coordinated entrance animations and hover feedback, not everything moving.`;
+- Motion: a few coordinated entrance animations and hover feedback, not everything moving.
+- Ready pieces in the UI kit (use them instead of building your own): any list of records (customers, orders, deals, bookings) is a DataTable with search and the useful filters; work that moves through stages (a sales pipeline, orders, tasks) is a Kanban whose onMove saves the new stage; a dashboard opens with a StatGrid of three or four StatCards built from the real data; an app with several pages gets one CommandMenu (Cmd/Ctrl+K) to jump between them. On landing pages the motion pieces (Marquee, NumberTicker, BentoGrid, BorderBeam, ShimmerButton, AnimatedList) are spice: one or two per page where they show something real, never a NumberTicker for an invented number or a Marquee of invented customer logos.`;
 
 function designNote(design){
  if(!design||!design.palette)return'';
@@ -243,13 +256,15 @@ function designNote(design){
  if(design.idea)lines.push('The idea: '+design.idea);
  if(design.direction){const b=require('./design-directions').blueprint(design,{seed:design.created_at||''});if(b)lines.push(b)}
  if(design.style){const t=require('./design-styles').text(design.style);if(t)lines.push(t)}
+ if(design.playbook){const presets=require('./design-presets'),t=presets.playbookText(presets.byType(design.playbook),{layout:!design.direction&&!design.style});if(t)lines.push(t)}
+ if(design.hero3d){const t=require('./design-hero3d').text(design.hero3d);if(t)lines.push(t)}
  return lines.join('\n');
 }
 
 // ---------- the design brief ----------
 const BRIEF_PROMPT=`You are the art director of an app builder like Lovable. Before any code is written, decide the visual direction for the app the user describes. Be specific and bold: pick a direction that suits the audience and brand (for example warm Mediterranean editorial for a boutique hotel, crisp dark technical for a developer tool, soft playful pastels for a kids' app), not a generic blue SaaS look.
 Respond with ONLY a JSON object, no markdown:
-{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty"}
+{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty","playbook":"the page playbook's business type if one is given below and it fits, or empty","hero3d":{"recipe":"a 3D hero recipe from the list below, or none","object":"an object from the list, when the recipe takes one","mood":"studio, sunset or neon"}}
 Rules: background and foreground must have strong contrast; primary must stand out on the background; secondary is a quiet surface colour; muted is a subtle background tint; accent is a second highlight. radius is between 0rem and 1.5rem. Choose fonts only from this list: FONTS.`;
 function briefPrompt(skills){
  const list=Object.keys(FONTS).filter(n=>FONTS[n][0]!=='mono').map(n=>n+' ('+FONTS[n][0]+')').join(', ');
@@ -271,15 +286,23 @@ function normalize(v){
  const radius=/^(0|0?\.\d+|1(\.\d+)?)rem$/.test(String(v.radius||'').trim())?String(v.radius).trim():'0.75rem';
  return{name:cleanText(v.name,60)||'Custom',summary:cleanText(v.summary,600),palette,fonts:{display:font(v.fonts?.display),body:font(v.fonts?.body),...(FONTS[font(v.fonts?.mono)]&&FONTS[font(v.fonts?.mono)][0]==='mono'&&v.fonts?.mono?{mono:font(v.fonts.mono)}:{})},radius,
   layout:cleanText(v.layout,600),imagery:cleanText(v.imagery,400),details:(Array.isArray(v.details)?v.details:[]).map(d=>cleanText(d,200)).filter(Boolean).slice(0,10),
-  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):''};
+  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):'',...(require('./design-presets').byType(String(v.playbook||''))?{playbook:String(v.playbook)}:v.playbook===''?{playbook:''}:{}),...(require('./design-hero3d').normalize(v.hero3d)?{hero3d:require('./design-hero3d').normalize(v.hero3d)}:{})};
 }
 // Three directions are dealt from the design library (design-directions.js); the brief picks one.
-async function createBrief(request,{callModel,tier,signal,skills=[],projectName='',avoid=[]}){
+async function createBrief(request,{callModel,tier,signal,skills=[],projectName='',avoid=[],hasScreenshot=false}){
  const directions=require('./design-directions'),dealt=directions.deal(projectName+' '+request,{seed:projectName,avoid});
  const styles=require('./design-styles'),styleOptions=styles.options(request),named=styles.named(request);
- const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)}];
+ const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)+(dealt.kind==='app'?'':require('./design-hero3d').note(projectName+' '+request,{hasScreenshot}))}];
  const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier,design:true},parseBrief);
  if(brief.skill&&!skills.some(s=>s.id===brief.skill))brief.skill='';
+ // The page playbook must be the one offered; a model that left the field out gets it anyway,
+ // one that said "" (it does not fit) gets none.
+ const offered=require('./design-presets').playbook(projectName+' '+request);
+ // App screens people work in get no 3D hero.
+ if(dealt.kind==='app'&&brief.hero3d)delete brief.hero3d;
+ if(brief.hero3d&&brief.hero3d.recipe==='DeviceMockup'&&!hasScreenshot)brief.hero3d={recipe:'GlassShapes',mood:brief.hero3d.mood||'studio'};
+ if(!offered||brief.playbook==='')delete brief.playbook;
+ else if(brief.playbook!==offered.type)brief.playbook=offered.type;
  // The direction must be one of those dealt; otherwise the first one is used.
  if(dealt.options.length){if(!dealt.options.some(o=>o.id===brief.direction))brief.direction=dealt.options[0].id;brief.sector=dealt.sector}
  // A style the owner named is always used; otherwise only one of those offered.

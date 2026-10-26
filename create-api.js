@@ -368,7 +368,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
      try{
       update({status:'reviewing',progress:'Checking it looks the way you asked',stream:null});
       const pictures=await designShots(builder.previewUrl(builder.loadMeta(id)));
-      const seen=pictures.length?await reviewLook({request:message,pictures,signal}):null;
+      const seen=pictures.length?await reviewLook({request:message,pictures,signal,avoid:(require('./design-presets').byType(builder.loadMeta(id).design?.playbook||'')||{}).avoid}):null;
       if(seen)first.look={ok:seen.ok,problems:seen.problems};
       if(seen&&!seen.ok){
        update({progress:'Fixing how it looks'});
@@ -1277,6 +1277,15 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(limited(req,'model-upload',30,3600000))throw Object.assign(Error('Too many uploads. Wait a while.'),{status:429});
     const bytes=await readRaw(req,61*1024*1024);const model=await M.upload(id,String(q.get('name')||'model.glb').slice(0,140),bytes);
     return send(res,201,{added:model,...state()}),true;
+   }
+   // "Make a 3D model of …": Kairoq's Blender modelling agent (model-agent.js) builds one, checks
+   // its preview with an AI that can see, and adds it to the project's 3D files.
+   if(op==='make'){
+    if(limited(req,'model-make',10,3600000))throw Object.assign(Error('Too many models made in the last hour. Wait a while.'),{status:429});
+    if(!require('./blender').available())throw Object.assign(Error('Blender is not set up on this server, so Kairoq cannot make 3D models here.'),{status:409});
+    const b=await readJson(req,4000);
+    const made=await require('./model-agent').make(String(b.description||''),{callModel:deps.callModel,review:deps.reviewLook,save:(glb,poster,title)=>M.saveMade(id,glb,poster,title)});
+    return send(res,201,{added:made.model,rounds:made.rounds,parts:made.parts,review:made.review,...state()}),true;
    }
    if(op==='poster'){const bytes=await readRaw(req,3*1024*1024+1);return send(res,200,{model:M.setPoster(id,String(q.get('file')||''),bytes),...state()}),true}
    const b=await readJson(req,4000);
