@@ -366,7 +366,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
      try{
       update({status:'reviewing',progress:'Checking it looks the way you asked',stream:null});
       const pictures=await designShots(builder.previewUrl(builder.loadMeta(id)));
-      const seen=pictures.length?await reviewLook({request:message,pictures,signal}):null;
+      const seen=pictures.length?await reviewLook({request:message,pictures,signal,avoid:(require('./design-presets').byType(builder.loadMeta(id).design?.playbook||'')||{}).avoid}):null;
       if(seen)first.look={ok:seen.ok,problems:seen.problems};
       if(seen&&!seen.ok){
        update({progress:'Fixing how it looks'});

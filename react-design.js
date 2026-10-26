@@ -60,6 +60,9 @@ const FONTS={
  // Fira Code (github.com/tonsky/FiraCode, SIL OFL 1.1): joins -> => != into one shape in code blocks.
  'Fira Code':['mono','400;500;600;700']
 };
+// More families from the business presets (design-presets.json, from ui-ux-pro-max-skill, MIT),
+// with the weights each really has. The list above wins where both name a family.
+for(const [name,[kind,weights]] of Object.entries(require('./design-presets.json').families||{}))if(!FONTS[name]&&/^(sans|serif|display|mono)$/.test(kind)&&/^\d{3}(;\d{3})*$/.test(weights))FONTS[name]=[kind,weights];
 const FALLBACK={sans:'ui-sans-serif, system-ui, sans-serif',display:'ui-sans-serif, system-ui, sans-serif',serif:'ui-serif, Georgia, serif',mono:'ui-monospace, monospace'};
 function fontStack(name){const f=FONTS[name];return"'"+name+"', "+FALLBACK[f?f[0]:'sans']}
 function fontUrl(names){
@@ -243,13 +246,14 @@ function designNote(design){
  if(design.idea)lines.push('The idea: '+design.idea);
  if(design.direction){const b=require('./design-directions').blueprint(design,{seed:design.created_at||''});if(b)lines.push(b)}
  if(design.style){const t=require('./design-styles').text(design.style);if(t)lines.push(t)}
+ if(design.playbook){const presets=require('./design-presets'),t=presets.playbookText(presets.byType(design.playbook));if(t)lines.push(t)}
  return lines.join('\n');
 }
 
 // ---------- the design brief ----------
 const BRIEF_PROMPT=`You are the art director of an app builder like Lovable. Before any code is written, decide the visual direction for the app the user describes. Be specific and bold: pick a direction that suits the audience and brand (for example warm Mediterranean editorial for a boutique hotel, crisp dark technical for a developer tool, soft playful pastels for a kids' app), not a generic blue SaaS look.
 Respond with ONLY a JSON object, no markdown:
-{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty"}
+{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty","playbook":"the page playbook's business type if one is given below and it fits, or empty"}
 Rules: background and foreground must have strong contrast; primary must stand out on the background; secondary is a quiet surface colour; muted is a subtle background tint; accent is a second highlight. radius is between 0rem and 1.5rem. Choose fonts only from this list: FONTS.`;
 function briefPrompt(skills){
  const list=Object.keys(FONTS).filter(n=>FONTS[n][0]!=='mono').map(n=>n+' ('+FONTS[n][0]+')').join(', ');
@@ -271,7 +275,7 @@ function normalize(v){
  const radius=/^(0|0?\.\d+|1(\.\d+)?)rem$/.test(String(v.radius||'').trim())?String(v.radius).trim():'0.75rem';
  return{name:cleanText(v.name,60)||'Custom',summary:cleanText(v.summary,600),palette,fonts:{display:font(v.fonts?.display),body:font(v.fonts?.body),...(FONTS[font(v.fonts?.mono)]&&FONTS[font(v.fonts?.mono)][0]==='mono'&&v.fonts?.mono?{mono:font(v.fonts.mono)}:{})},radius,
   layout:cleanText(v.layout,600),imagery:cleanText(v.imagery,400),details:(Array.isArray(v.details)?v.details:[]).map(d=>cleanText(d,200)).filter(Boolean).slice(0,10),
-  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):''};
+  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):'',...(require('./design-presets').byType(String(v.playbook||''))?{playbook:String(v.playbook)}:v.playbook===''?{playbook:''}:{})};
 }
 // Three directions are dealt from the design library (design-directions.js); the brief picks one.
 async function createBrief(request,{callModel,tier,signal,skills=[],projectName='',avoid=[]}){
@@ -280,6 +284,11 @@ async function createBrief(request,{callModel,tier,signal,skills=[],projectName=
  const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)}];
  const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier,design:true},parseBrief);
  if(brief.skill&&!skills.some(s=>s.id===brief.skill))brief.skill='';
+ // The page playbook must be the one offered; a model that left the field out gets it anyway,
+ // one that said "" (it does not fit) gets none.
+ const offered=require('./design-presets').playbook(projectName+' '+request);
+ if(!offered||brief.playbook==='')delete brief.playbook;
+ else if(brief.playbook!==offered.type)brief.playbook=offered.type;
  // The direction must be one of those dealt; otherwise the first one is used.
  if(dealt.options.length){if(!dealt.options.some(o=>o.id===brief.direction))brief.direction=dealt.options[0].id;brief.sector=dealt.sector}
  // A style the owner named is always used; otherwise only one of those offered.
