@@ -1570,7 +1570,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   }
   // Outside APIs (api-samples.js): the owner adds a spec and its key's name; preview and checks get
   // sample answers while the key is missing; the call log shows what the app's functions sent.
-  if(action==='/apis'&&method==='GET'){const s=require('./api-samples');return send(res,200,{apis:s.list(id),log:s.log(id).slice(0,100)}),true}
+  if(action==='/apis'&&method==='GET'){const s=require('./api-samples');return send(res,200,{apis:s.list(id),suggested:s.suggestions(id),log:s.log(id).slice(0,100)}),true}
   if(action==='/apis'&&method==='POST'){
    const s=require('./api-samples'),b=await readJson(req,2100000);limitedKey('apis:'+id,30,3600000);
    let spec=b.spec;
@@ -1579,7 +1579,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(r.status<200||r.status>=300)throw Object.assign(Error('Could not load the spec ('+r.status+')'),{status:400});
     spec=r.body;
    }
-   if(!spec)throw Object.assign(Error('Paste the API spec (OpenAPI or Swagger JSON) or give its link'),{status:400});
+   // The one box: a name or website; Kairoq finds the spec or drafts one from the docs.
+   if(!spec&&b.name){const api=await s.addByName(id,{name:String(b.name),secret:b.secret,webSearch,callModel:deps.callModel});return send(res,201,{api,apis:s.list(id),suggested:s.suggestions(id)}),true}
+   if(!spec)throw Object.assign(Error('Type the service\'s name or website'),{status:400});
    const api=s.add(id,{spec,secret:b.secret,baseUrl:b.base_url});
    return send(res,201,{api,apis:s.list(id)}),true;
   }

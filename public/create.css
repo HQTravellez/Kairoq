@@ -870,6 +870,12 @@ li.failed .retry:hover{border-color:#15140f}
 .api-log-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
 .api-log-table th,.api-log-table td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);vertical-align:top}
 .api-log-table td:nth-child(2){word-break:break-all}
+.api-offer{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border:1px dashed var(--border);border-radius:10px;margin:6px 0}
+.key-dialog{max-width:440px}
+.key-lock{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted,#6b7280);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.key-lock .ico{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;margin-top:1px}
+.key-dialog label{display:block;margin-top:12px;font-family:ui-monospace,monospace;font-size:12px}
+.key-dialog input{width:100%;margin-top:4px}
 .canvas{position:relative}
 .sample-pill{position:absolute;top:8px;right:12px;z-index:3;font-size:12px;padding:3px 10px;border-radius:999px;background:#fff7e6;color:#8a5a00;border:1px solid #f3d9a4;cursor:help}
 .explode-card video.reel{width:auto;max-width:220px;aspect-ratio:9/16}

@@ -514,11 +514,13 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
  const extras=require('./react-backend-extras');
  let fdb=db;
  if(automation){fdb=Object.create(db);fdb.prepare=db.prepare.bind(db);fdb.exec=db.exec.bind(db);fdb.__automation=true}
+ // Keys the function reads are hidden from its logs and errors (seen), so a console.log(key) never shows one.
+ const seen=new Set(),hide=t=>{let x=String(t);for(const v of seen)x=x.split(v).join('•••');return x};
  // Outside calls: sample answers for the owner's added APIs in preview and checks (api-samples.js).
  const samples=require('./api-samples'),fetchMode=samples.modeOf(meta,req,sb);
  const host={
   fetch:a=>samples.fetchFor(id,a,{mode:fetchMode}),
-  secret:async n=>require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
+  secret:async n=>{const v=require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50));if(v&&String(v).length>=4)seen.add(String(v));return v},
   db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
   ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},
   extract:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-extract').extract(a,o=>appAi(meta,db,o))},
@@ -534,9 +536,9 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
  fnRunning.set(id,running+1);
  let out;
  try{out=fnFile.endsWith('.py')?await require('./python-functions').invoke({key:id+(sb?':'+sb.dir:''),source,request,user:publicUser(user),host}):await require('./react-functions').invoke({source,request,user:publicUser(user),host})}
- catch(e){applog.add(id,{level:'error',source:fnFile,message:request.method+' '+request.path+': '+(e.message||e)});throw e}
+ catch(e){const msg=hide(e.message||e);applog.add(id,{level:'error',source:fnFile,message:request.method+' '+request.path+': '+msg});if(e&&typeof e==='object'&&seen.size)try{e.message=msg}catch{}throw e}
  finally{const n=(fnRunning.get(id)||1)-1;if(n>0)fnRunning.set(id,n);else fnRunning.delete(id)}
- for(const line of out.logs||[])applog.add(id,{level:'log',source:fnFile,message:line});
+ for(const line of out.logs||[])applog.add(id,{level:'log',source:fnFile,message:hide(line)});
  return out;
 }
 
