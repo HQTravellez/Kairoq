@@ -14,17 +14,32 @@ function changedLines(a='',b=''){
 }
 // message: what was asked. before/after: the app's files. Returns [{area, files}] for areas the
 // change touched that the request did not mention.
+// Code that only moved (cut from one file and pasted into another, or re-indented) is not a change:
+// splitting OwnerMenuPanel into smaller files must not read as "changed sign-in".
+function movedAway(files,before,after){
+ const lines=t=>String(t||'').split('\n').map(l=>l.trim()).filter(Boolean);
+ const added=new Set(),removed=new Set();
+ for(const f of files){const a=new Set(lines(before[f])),b=new Set(lines(after[f]));for(const l of b)if(!a.has(l))added.add(l);for(const l of a)if(!b.has(l))removed.add(l)}
+ // What is left of a file's change once moved lines are taken out.
+ return f=>{const a=new Set(lines(before[f])),b=new Set(lines(after[f]));return[...[...b].filter(l=>!a.has(l)&&!removed.has(l)),...[...a].filter(l=>!b.has(l)&&!added.has(l))].join('\n')};
+}
 function check(message,before={},after={}){
  const files=[...new Set([...Object.keys(before),...Object.keys(after)])].filter(f=>before[f]!==after[f]);
  if(!files.length)return[];
+ const netChange=movedAway(files,before,after);
  const out=[];
  for(const a of AREAS){
   if(a.asked.test(String(message||'')))continue;
   const hit=files.filter(f=>{
-   const diff=changedLines(before[f],after[f]);
+   const diff=netChange(f);
+   if(!diff.trim())return false;
    if(a.name==='payments'&&f==='src/backend.json')return/"payments"|price_/.test(diff);
    if(a.name==='saved data and bookings'&&f==='src/backend.json')return!/"payments"|price_/.test(diff)||/"collections"|"access"|"automations"|"schedules"/.test(diff);
    // Stylesheets and other non-code files only count by name: CSS "stripes" are not Stripe.
+   // App code (src/) counts only when the changed lines themselves do sign-in, payments or saving;
+   // a new file merely named "OwnerSignInForm" that holds moved code does not. Backend files
+   // (functions/, sql/, backend.json) count by name.
+   if(/^src\/.*\.(jsx?|tsx?|mjs|cjs)$/.test(f))return a.code.test(diff);
    return a.files.test(f)||(/\.(jsx?|tsx?|mjs|cjs|sql)$/.test(f)&&a.code.test(diff));
   });
   if(hit.length)out.push({area:a.name,files:hit.slice(0,5)});
