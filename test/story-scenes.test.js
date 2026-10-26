@@ -53,7 +53,8 @@ test('a downloaded app that uses the story gets the module and the scene pieces 
 });
 
 test('apps that use the story get the Blender-made props; other apps do not',()=>{
- const want=fs.readdirSync(path.join(__dirname,'../app-modules/props')).filter(f=>f.endsWith('.glb')).sort();
+ const want=[...require('../react-hero3d').STORY].sort();
+ for(const f of want)assert.ok(fs.existsSync(path.join(__dirname,'../app-modules/props',f)),f);
  assert.deepEqual(want,['espresso-cup.glb','espresso-machine.glb','pizza-box.glb','pizza-oven.glb','pizza-peel.glb','pizza.glb']);
  const withStory=fs.mkdtempSync(path.join(tmp,'dist-')),without=fs.mkdtempSync(path.join(tmp,'dist-'));
  builder.copyStoryProps({'src/App.jsx':APP},withStory);
