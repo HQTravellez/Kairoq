@@ -14,12 +14,12 @@ from kit import box, build, cylinder, lathe, tube, torus  # noqa: E402  (kit loa
 import bpy  # noqa: E402
 
 ESPRESSO = {
-    'polished': dict(color='#d9dce0', metallic=1, roughness=0.16),
-    'brushed': dict(color='#c4c8cd', metallic=1, roughness=0.34),
+    'polished': dict(color='#e4e7ea', metallic=0.85, roughness=0.3),
+    'brushed': dict(color='#cfd3d8', metallic=0.85, roughness=0.42),
     'dark': dict(color='#2a2c30', metallic=0.85, roughness=0.32),
     'bakelite': dict(color='#121212', roughness=0.38, clearcoat=0.4),
     'rubber': dict(color='#0d0d0d', roughness=0.8),
-    'copper': dict(color='#b8734a', metallic=1, roughness=0.26),
+    'copper': dict(color='#c8845a', metallic=0.75, roughness=0.38),
     'face': dict(color='#f3eee4', roughness=0.4),
     'glass': dict(color='#ffffff', roughness=0.04, transmission=1),
     'needle': dict(color='#b3261e', roughness=0.4),
