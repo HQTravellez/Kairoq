@@ -24,6 +24,16 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 function prefersStill() {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
 }
+// Sticky pinning stops working inside a parent with overflow: hidden (a common wrapper for rounded
+// boxes). Such parents get overflow: clip instead, which looks the same and keeps pinning working.
+function keepPinned(el) {
+  try {
+    for (let p = el && el.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+      const s = getComputedStyle(p);
+      if (s.overflowX === 'hidden' || s.overflowY === 'hidden') p.style.overflow = 'clip';
+    }
+  } catch {}
+}
 // Where the film is (0..1) for a scroll progress (0..1).
 export function filmAt(p, mode) {
   if (mode === 'once') return clamp(p, 0, 1);
@@ -95,6 +105,7 @@ export function ScrollVideo({ src, frames = 96, screens = 3, mode: modeProp, cap
   // Scroll and size.
   useEffect(() => {
     if (still) return;
+    keepPinned(section.current);
     let raf = 0;
     const fitCanvas = () => {
       const c = canvas.current; if (!c) return;

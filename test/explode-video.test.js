@@ -172,7 +172,9 @@ test('ScrollVideo: pinned, plays forward to the parts and back as the page scrol
 export default function App(){return(<main>
  <section className="h-[70vh] grid place-items-center"><h1 className="text-5xl font-semibold">Stack House</h1></section>
  <ScrollVideo src="./uploads/explode-${eid}/" frames={${frames}} alt="Our burger, layer by layer" captions={[{title:'Brioche bun',text:'Baked every morning.'},{title:'Smashed patty',text:'Two thin patties.'},{title:'Aged cheddar'}]} />
+ <div className="overflow-hidden rounded-2xl">{/* a wrapper like builders sometimes add: the scene must still pin */}
  <ScrollVideo layout="split" src="./uploads/explode-${eid}/" frames={${frames}} title="Stacked to order" text="Every layer, built when you order." cta={{label:'Order now',href:'#order'}} />
+ </div>
  <section id="order" className="h-[80vh] grid place-items-center"><p>Order now</p></section>
 </main>)}
 `;
@@ -206,6 +208,7 @@ export default function App(){return(<main>
   const s0=await sceneFrame(0.05),s1=await sceneFrame(0.5),s2=await sceneFrame(1);
   assert.ok(s0<s1&&s1<s2&&s2===frames-1,'plays once: '+[s0,s1,s2]);
   await sceneFrame(0.5);
+  assert.equal(Math.round(await page.evaluate(()=>document.querySelectorAll('[data-kq-scroll-video] [data-kq-scene]')[1].getBoundingClientRect().top)),0,'the scene stays pinned inside an overflow-hidden wrapper');
   const box=await page.evaluate(()=>{const t=document.querySelector('[data-kq-scene-text] h2').getBoundingClientRect(),c=document.querySelectorAll('[data-kq-scroll-video] canvas')[1].getBoundingClientRect();return{textRight:t.right,canvasLeft:c.left,top:t.top}});
   assert.ok(box.textRight<=box.canvasLeft+1&&box.top>0,'headline beside the film: '+JSON.stringify(box));
   assert.equal(await page.locator('[data-kq-scene-text] a').getAttribute('href'),'#order');
