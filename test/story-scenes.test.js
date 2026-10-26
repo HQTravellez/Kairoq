@@ -51,3 +51,24 @@ test('a downloaded app that uses the story gets the module and the scene pieces 
  assert.match(src,/kairoq\\\\\/story\$\/, replacement/);
  assert.match(src,/if\(usesStory\|\|/);
 });
+
+test('apps that use the story get the Blender-made props; other apps do not',()=>{
+ const want=fs.readdirSync(path.join(__dirname,'../app-modules/props')).filter(f=>f.endsWith('.glb')).sort();
+ assert.deepEqual(want,['espresso-cup.glb','espresso-machine.glb','pizza-box.glb','pizza-oven.glb','pizza-peel.glb','pizza.glb']);
+ const withStory=fs.mkdtempSync(path.join(tmp,'dist-')),without=fs.mkdtempSync(path.join(tmp,'dist-'));
+ builder.copyStoryProps({'src/App.jsx':APP},withStory);
+ builder.copyStoryProps({'src/App.jsx':'export default () => null;\n'},without);
+ assert.deepEqual(fs.readdirSync(path.join(withStory,'props')).sort(),want);
+ assert.equal(fs.existsSync(path.join(without,'props')),false);
+ // Each file is a real binary glTF.
+ for(const f of want)assert.equal(fs.readFileSync(path.join(withStory,'props',f)).subarray(0,4).toString(),'glTF',f);
+});
+
+test('a missing model falls back to the code-built prop, and downloads carry the models',()=>{
+ const src=require('../react-story').source();
+ assert.match(src,/h\(PropBoundary, \{ fallback \}, h\(Suspense, \{ fallback \}/);
+ assert.match(src,/static getDerivedStateFromError/);
+ const exp=fs.readFileSync(path.join(__dirname,'../react-export.js'),'utf8');
+ assert.match(exp,/out\['public\/props\/'\+f\]/);
+ assert.match(builder.contentPolicy(false),/connect-src 'self' https: blob: data:/);
+});
