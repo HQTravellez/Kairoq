@@ -103,15 +103,19 @@ test('ScrollAssembly: pinned while scrolling, apart in the middle with labels, t
     const geo = await page.evaluate(() => { const el = document.querySelector('[data-kq-assembly]'); return { top: el.getBoundingClientRect().top + scrollY, span: el.offsetHeight - innerHeight }; });
     assert.ok(geo.span >= 1500, 'a tall section (about three screens)');
     const label = () => page.evaluate(() => { const d = [...document.querySelectorAll('[data-kq-assembly] div')].find((x) => x.textContent === 'Sapphire crystal' && x.style.borderRadius); return d ? d.style.opacity : null; });
+    // The camera and parts ease towards each shot, so wait until they settle (slow on test machines).
+    const settled = (want) => page.waitForFunction((w) => { const d = [...document.querySelectorAll('[data-kq-assembly] div')].find((x) => x.textContent === 'Sapphire crystal' && x.style.borderRadius); return d && d.style.opacity === w; }, want, { timeout: 30000 }).then(() => true, () => false);
     const at = async (f) => { await page.evaluate((y) => scrollTo(0, y), geo.top + geo.span * f); await page.mouse.wheel(0, 2); await page.waitForTimeout(1500); };
     await at(0.52);
     await page.locator('[data-kq-assembly] [data-kq-drawn="true"]').waitFor({ timeout: 20000 });
     // Pinned: the scene stays at the top of the window while the section scrolls.
     assert.equal(Math.round(await page.evaluate(() => document.querySelector('[data-kq-assembly] [data-kq-scene]').getBoundingClientRect().top)), 0);
-    assert.equal(await label(), '1', 'the named part is labelled while apart');
+    assert.ok(await settled('1'), 'the named part is labelled while apart');
     assert.equal(await page.locator('text=Hand-finished dial').count(), 1);
+    // Captions arrive with their shots.
+    assert.ok(await page.locator('[data-kq-caption]').count() >= 3);
     await at(1);
-    assert.equal(await label(), '0', 'together again at the end');
+    assert.ok(await settled('0'), 'together again at the end (label was ' + (await label()) + ')');
     assert.deepEqual(errors, []);
   } finally { await ctx.close(); server.close(); }
 });

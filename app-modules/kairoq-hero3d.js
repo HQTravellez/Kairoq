@@ -17,6 +17,7 @@ import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows, Environment, Float, Html, Lightformer, MeshTransmissionMaterial, RoundedBox, useGLTF } from '@react-three/drei';
+import { Bloom, DepthOfField, EffectComposer, Vignette } from '@react-three/postprocessing';
 import { Scene3D, prefersStill, themeColor } from 'kairoq/scene';
 import { basename } from 'kairoq';
 
@@ -360,57 +361,122 @@ function TreeClump({ x, z, colors }) {
     h(Tree, { position: [0.2, 0, -0.22], colors, scale: 0.8 }));
 }
 
-// ---------- ScrollAssembly ----------
-// A tall section whose scene stays pinned while the page scrolls through it. Parts are taken
-// apart in layers: a part's name starting with a number ("03 Dial") is its layer, front to back;
-// without numbers, parts are layered by how far forward they sit. The timeline: assembled, apart
-// (one layer after another), a pause with labels, then back together.
+// ---------- ScrollAssembly: a directed scroll scene ----------
+// A tall section whose scene stays pinned while the page scrolls through it, directed like a
+// product film: the camera travels a shot list (a close-up, round the side, behind, over the top,
+// back to the front) while the object comes apart in layers and assembles again. Parts leave front
+// first, travel on arcs and settle with a little overshoot; spinning layers (gears, rotors) turn.
+// Depth of field, a soft glow and a darkening backdrop give it a cinematic look; big captions
+// arrive with their shots. A part's name starting with a number ("03 Dial") is its layer.
+
+// Camera positions around the object: azimuth and elevation in degrees, distance as a factor.
+export const VIEWS = {
+  front: { az: 0, el: 6, dist: 1 },
+  'front-close': { az: -10, el: 4, dist: 0.6 },
+  'three-quarter': { az: -40, el: 14, dist: 1.05 },
+  left: { az: -88, el: 8, dist: 1.15 },
+  right: { az: 88, el: 8, dist: 1.15 },
+  behind: { az: 180, el: 14, dist: 1.05 },
+  top: { az: 30, el: 68, dist: 1.1 },
+  low: { az: -25, el: -14, dist: 0.95 },
+};
+// The default film: close on the face, open up round the side, look at the back, rise over the
+// top, and come back to the front as it closes.
+export const DEFAULT_SHOTS = [
+  { at: 0, view: 'front-close', apart: 0 },
+  { at: 0.2, view: 'three-quarter', apart: 0.3 },
+  { at: 0.38, view: 'left', apart: 1 },
+  { at: 0.54, view: 'behind', apart: 1 },
+  { at: 0.7, view: 'top', apart: 0.9 },
+  { at: 0.88, view: 'front', apart: 0.05 },
+  { at: 1, view: 'front', apart: 0 },
+];
+
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
-function apartAt(t, layer, layers) {
-  const stagger = layers > 1 ? (layer / (layers - 1)) * 0.12 : 0;
-  const out = ease((t - 0.12 - stagger) / 0.2);
-  const back = ease((t - 0.68 - (0.12 - stagger)) / 0.2);
-  return Math.max(0, out - back);
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+// Out with a small overshoot, then settle (a part "landing" in its place).
+const settle = (x) => { if (x <= 0) return 0; if (x >= 1) return 1; const c = 1.4; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+
+// The shot list with views resolved and azimuths unwrapped, so the camera keeps travelling the
+// same way round (left, then behind, goes round the back rather than swinging through the front).
+function planShots(shots) {
+  const list = (shots && shots.length ? shots : DEFAULT_SHOTS).map((s) => ({ ...(VIEWS[s.view] || VIEWS.front), ...s })).sort((x, y) => x.at - y.at);
+  let prevAz = null, prevApart = 0;
+  for (const s of list) {
+    if (prevAz !== null) { const k = Math.round((prevAz - s.az) / 360); s.az += 360 * k; }
+    prevAz = s.az;
+    if (typeof s.apart !== 'number') s.apart = prevApart;
+    prevApart = s.apart;
+  }
+  return list;
 }
-// "03_Hour_marker.001" (three.js turns spaces into _) reads as "Hour marker".
+// The camera and the "apart" amount at a point of the scroll.
+function shotAt(plan, t) {
+  if (t <= plan[0].at) return plan[0];
+  for (let i = 1; i < plan.length; i++) {
+    const a = plan[i - 1], b = plan[i];
+    if (t <= b.at) {
+      const k = ease((t - a.at) / Math.max(0.0001, b.at - a.at));
+      const mix = (x, y) => x + (y - x) * k;
+      return { az: mix(a.az, b.az), el: mix(a.el, b.el), dist: mix(a.dist, b.dist), apart: mix(a.apart, b.apart) };
+    }
+  }
+  return plan[plan.length - 1];
+}
+
+const SPINS = /gear|rotor|wheel|fan|propell|turbine|disc|reel|movement/i;
 const labelOf = (name) => String(name || '').replace(/^\d+[\s_]*/, '').replace(/[._]\d+$/, '').replace(/_/g, ' ').trim();
 
-function Assembly({ url, colors, size, progress, gap, labels, still }) {
+function Assembly({ url, colors, size, state, gap, labels, still }) {
   const model = useModel(url, { colors, size });
   const layers = useMemo(() => {
     const groups = new Map();
     const meshes = [];
     model.traverse((o) => { if (o.isMesh) meshes.push(o); });
     const numbered = meshes.some((m) => /^\d+/.test(m.name) || /^\d+/.test(m.parent?.name || ''));
+    const holder = meshes[0]?.parent;
+    const centre = holder ? new THREE.Box3().setFromObject(holder).getCenter(new THREE.Vector3()) : new THREE.Vector3();
+    const axis = holder ? holder.worldToLocal(centre.clone()) : new THREE.Vector3();
     for (const m of meshes) {
       const name = /^\d+/.test(m.name) ? m.name : m.parent?.name || m.name;
       const key = numbered ? Number((/^(\d+)/.exec(name) || [0, 99])[1]) : Math.round(-new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).z * 20);
-      if (!groups.has(key)) groups.set(key, { key, meshes: [], label: '', biggest: 0 });
+      if (!groups.has(key)) groups.set(key, { key, meshes: [], label: '', biggest: 0, spins: false });
       const g = groups.get(key);
-      g.meshes.push({ mesh: m, home: m.position.clone() });
+      g.meshes.push({ mesh: m, home: m.position.clone(), turn: m.rotation.z });
+      if (SPINS.test(name)) g.spins = true;
       // A layer is named after its biggest part (the dial, not one of its markers).
       const s3 = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
       const v = s3.x * s3.y + s3.y * s3.z + s3.x * s3.z;
       if (v > g.biggest) { g.biggest = v; g.label = labelOf(name); }
     }
-    return [...groups.values()].sort((a, b) => a.key - b.key);
+    const list = [...groups.values()].sort((a, b) => a.key - b.key);
+    list.axis = axis;
+    return list;
   }, [model]);
   const labelRefs = useRef([]);
   const scale = model.children[0]?.scale?.x || 1;
+  const n = layers.length, mid = (n - 1) / 2;
+  // How far one layer is out for an overall "apart" amount: the front layer leaves first and goes
+  // back last (the crystal comes off before the dial, and goes on after it).
+  const layerApart = (A, i) => settle(clamp01(A * 1.6 - (n > 1 ? i / (n - 1) : 0) * 0.6));
   useFrame(() => {
-    const t = still ? 0.5 : progress.current;
-    const mid = (layers.length - 1) / 2;
+    const A = still ? 1 : state.current.apart;
     layers.forEach((layer, i) => {
-      const a = still ? 1 : apartAt(t, i, layers.length);
-      const dz = (mid - i) * gap * a / scale;
-      for (const { mesh, home } of layer.meshes) mesh.position.set(home.x, home.y, home.z + dz);
+      const a = layerApart(A, i);
+      const dz = ((mid - i) * gap * a) / scale;
+      const dy = (Math.sin(Math.PI * Math.min(1, a)) * gap * 0.35 * (i % 2 ? 1 : -1)) / scale;
+      const spin = layer.spins ? a * Math.PI * 0.7 * (i % 2 ? 1 : -1) : 0;
+      const c = Math.cos(spin), s = Math.sin(spin), ax = layers.axis;
+      for (const { mesh, home, turn } of layer.meshes) {
+        const x = home.x - ax.x, y = home.y - ax.y;
+        mesh.position.set(ax.x + x * c - y * s, ax.y + x * s + y * c + dy, home.z + dz);
+        mesh.rotation.z = turn + spin;
+      }
       // A label shows only while its part is fully out.
       const el = labelRefs.current[i];
       if (el) el.style.opacity = String(ease((a - 0.85) / 0.15));
     });
   });
-  const mid = (layers.length - 1) / 2;
-  // Where each layer's label sits: just right of the part, at its height, where it ends up.
   const spots = useMemo(() => layers.map((layer) => {
     const box = new THREE.Box3();
     for (const { mesh } of layer.meshes) box.expandByObject(mesh);
@@ -429,48 +495,82 @@ function Assembly({ url, colors, size, progress, gap, labels, still }) {
     }));
 }
 
-function AssemblyCamera({ progress, size, still }) {
+// The camera: travels the shot list round the object, keeping it framed on any screen.
+function DirectedCamera({ plan, progress, state, size, still }) {
   const { camera, size: view } = useThree();
-  useFrame(() => {
-    const t = still ? 0.5 : progress.current;
-    const apart = ease((t - 0.1) / 0.3) * (1 - ease((t - 0.7) / 0.25));
-    const angle = -0.25 - apart * 0.85;
+  const look = useMemo(() => new THREE.Vector3(0, size * 0.48, 0), [size]);
+  useFrame((_, dt) => {
+    const target = still ? { ...VIEWS['three-quarter'], apart: 1 } : shotAt(plan, progress.current);
+    // A little lag makes the move feel filmed rather than glued to the scroll wheel.
+    const k = still ? 1 : 1 - Math.exp(-6 * Math.min(dt, 0.1));
+    const cur = state.current;
+    for (const key of ['az', 'el', 'dist', 'apart']) cur[key] = cur[key] === undefined ? target[key] : cur[key] + (target[key] - cur[key]) * k;
     const aspect = view.width / Math.max(1, view.height);
-    const d = (size * 2.6) / Math.min(1, aspect) + apart * size * 0.5;
-    camera.position.set(Math.sin(angle) * d, size * 0.55 + apart * size * 0.15, Math.cos(angle) * d);
-    camera.lookAt(0, size * 0.48, 0);
+    const d = ((size * 2.4) / Math.min(1, aspect)) * cur.dist * (1 + cur.apart * 0.25);
+    const az = THREE.MathUtils.degToRad(cur.az), el = THREE.MathUtils.degToRad(cur.el);
+    camera.position.set(Math.sin(az) * Math.cos(el) * d, look.y + Math.sin(el) * d, Math.cos(az) * Math.cos(el) * d);
+    camera.lookAt(look);
   });
   return null;
 }
 
-export function ScrollAssembly({ object = 'watch', src, screens = 3, gap = 0.16, labels, colors: colorsProp, mood = 'studio', className, style, alt, children }) {
+// Depth of field on the object, a soft glow on bright metal, a vignette: off on small screens and
+// for reduced motion (they cost the most there).
+function Film({ size, enabled }) {
+  if (!enabled) return null;
+  return h(EffectComposer, { multisampling: 0, disableNormalPass: true },
+    h(DepthOfField, { target: [0, size * 0.48, 0], focalLength: 0.02, bokehScale: 2.2, height: 480 }),
+    h(Bloom, { luminanceThreshold: 0.85, luminanceSmoothing: 0.2, intensity: 0.35, mipmapBlur: true }),
+    h(Vignette, { offset: 0.3, darkness: 0.45 }));
+}
+
+export function ScrollAssembly({ object = 'watch', src, shots, screens = 4, gap = 0.16, labels, colors: colorsProp, mood = 'studio', effects = true, className, style, alt, children }) {
   const colors = useBrandColors(colorsProp);
   const url = urlOf(object, src);
-  const outer = useRef(null);
+  const outer = useRef(null), sticky = useRef(null), captionRefs = useRef([]);
   const progress = useRef(0);
+  const state = useRef({});
   const still = prefersStill();
+  const plan = useMemo(() => planShots(shots), [JSON.stringify(shots || null)]);
+  const captions = plan.filter((s) => s.caption);
   useEffect(() => {
+    let frame = 0;
     const update = () => {
       const el = outer.current;
       if (!el) return;
       const r = el.getBoundingClientRect(), vh = window.innerHeight || 1;
-      progress.current = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - vh)));
+      const t = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - vh)));
+      progress.current = t;
+      // The backdrop darkens towards the "inside" moment; captions arrive with their shots.
+      const apart = shotAt(plan, t).apart;
+      if (sticky.current) sticky.current.style.setProperty('--kq-dark', String(Math.round(apart * 100) / 100));
+      captions.forEach((c, i) => {
+        const node = captionRefs.current[i];
+        if (node) node.style.opacity = String(ease(1 - Math.abs(t - c.at) / 0.07));
+      });
     };
+    const onScroll = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(update); };
     update();
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => { window.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
-  }, []);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); };
+  }, [plan]);
   const size = 1.4;
+  const wide = typeof window === 'undefined' || window.innerWidth >= 640;
   const scene = h(Scene3D, { alt: alt || 'The ' + String(object).replace(/-/g, ' ') + ' taken apart and put back together', lights: false, camera: { position: [0, 1, 4], fov: 30 }, style: { width: '100%', height: '100%', minHeight: 0 } },
     h(Lighting, { mood, colors }),
-    h(AssemblyCamera, { progress, size, still }),
-    h(Safe, { fallback: h(Placeholder, { colors, size }) }, h(Suspense, { fallback: null }, h(Assembly, { url, colors, size, progress, gap, labels, still }))),
-    h(ContactShadows, { position: [0, -0.02, 0], opacity: 0.3, scale: 5, blur: 2.8, far: 3, resolution: 512 }));
+    h(DirectedCamera, { plan, progress, state, size, still }),
+    h(Safe, { fallback: h(Placeholder, { colors, size }) }, h(Suspense, { fallback: null }, h(Assembly, { url, colors, size, state, gap, labels, still }))),
+    h(ContactShadows, { position: [0, -0.02, 0], opacity: 0.3, scale: 5, blur: 2.8, far: 3, resolution: 512 }),
+    h(Film, { size, enabled: effects && wide && !still }));
+  const captionNodes = captions.map((c, i) => h('div', { key: i, ref: (el) => (captionRefs.current[i] = el), 'data-kq-caption': 'true', style: { position: 'absolute', left: 'max(16px, 6%)', bottom: '9%', maxWidth: 'min(520px, 80%)', textAlign: 'left', opacity: 0, pointerEvents: 'none', transition: 'opacity .2s' } },
+    h('div', { style: { font: '600 clamp(28px, 4.6vw, 56px)/1.05 var(--font-display, var(--font-sans, system-ui))', letterSpacing: '-0.02em', color: 'hsl(var(--foreground))' } }, c.caption),
+    c.text ? h('div', { style: { marginTop: 10, font: '400 clamp(15px, 1.4vw, 18px)/1.5 var(--font-sans, system-ui)', color: 'hsl(var(--muted-foreground))' } }, c.text) : null));
+  const backdrop = 'radial-gradient(ellipse at 50% 45%, hsl(var(--background)) 0%, color-mix(in srgb, hsl(var(--background)), #000 calc(var(--kq-dark, 0) * 14%)) 100%)';
   // Reduced motion: one ordinary-height section, shown taken apart with its labels.
   if (still) return h('div', { className, style: { position: 'relative', height: 560, ...style } }, scene, children || null);
   return h('div', { ref: outer, className, style: { position: 'relative', height: screens * 100 + 'vh', ...style }, 'data-kq-assembly': 'true' },
-    h('div', { style: { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' } }, scene, children || null));
+    h('div', { ref: sticky, style: { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', background: backdrop } }, scene, ...captionNodes, children || null));
 }
 
 // Preload the library objects a page names, so the hero appears quickly.
