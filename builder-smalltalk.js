@@ -6,6 +6,7 @@
 const GREETING=/^(hi+|hello|hey+|hiya|yo|howdy|hola|namaste|good (morning|afternoon|evening|day)|hi there|hello there|hey there)\b/i;
 const THANKS=/^(thanks|thank you|thx|ty|cheers|great|awesome|nice|cool|perfect|love it|looks good|wow|ok|okay|k|yes|yep|sure|alright|fine)\b/i;
 const HELP=/^(help|what can you do|what do you do|who are you|how does this work|how do i (start|use this)|what is this)\b/i;
+const HELP_FILLER=/^(please|pls|me|for|here|now|today|exactly|then|again|guys|mate|buddy|kairoq|agent)$/i;
 const CHANGE=/\b(add|change|make|create|build|remove|update|fix|put|replace|move|use|rename|delete|turn|set|show|hide|let|allow|connect|design|redesign|style|translate|generate|write|publish)\b/i;
 
 // 'greeting' | 'thanks' | 'help' | null. Only short messages with nothing else to do count.
@@ -20,6 +21,8 @@ function smallTalk(message){
  if(/\b(why|what|how|when|where|which|who)\b|\?/i.test(rest)&&!/\b(how are (you|things)|how'?s it going|how is (it|everything)|are you (there|around|ok|okay|well)|how have you been|what'?s up)\b/i.test(rest))return null;
  // "hi how are you doing today": a greeting followed by chit-chat is still a greeting.
  if(rest.split(/\s+/).filter(Boolean).length>(GREETING.test(t)?6:3))return null;
+ // "what can you do with 3d here" names a topic: it gets a real answer (Discuss), not the menu.
+ if(help&&rest.split(/\s+/).some(w=>w&&!HELP_FILLER.test(w)))return null;
  if(help)return'help';
  if(GREETING.test(t))return'greeting';
  if(THANKS.test(t))return'thanks';
