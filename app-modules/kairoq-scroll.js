@@ -17,6 +17,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const h = React.createElement;
+// The film's edges fade into the page, so a scene never looks like a box pasted on it.
+const FADE = 'radial-gradient(ellipse 50% 50% at 50% 50%, #000 68%, transparent 100%)';
 const pad = (n) => String(n).padStart(3, '0');
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 function prefersStill() {
@@ -121,7 +123,7 @@ export function ScrollVideo({ src, frames = 96, screens = 3, mode: modeProp, cap
   const label = { position: 'absolute', left: 'clamp(16px, 5vw, 64px)', bottom: 'clamp(28px, 8vh, 80px)', maxWidth: 'min(420px, 80vw)', color: ink };
 
   const words = split ? h('div', { 'data-kq-scene-text': '', style: { maxWidth: 520 } },
-    title ? h('h2', { className: 'font-display', style: { margin: 0, fontSize: 'clamp(2.25rem, 5vw, 4.25rem)', lineHeight: 1.02, fontWeight: 600, letterSpacing: '-0.02em' } }, title) : null,
+    title ? h('h2', { className: 'font-display', style: { margin: 0, fontSize: 'clamp(2.5rem, 5.5vw, 4.75rem)', lineHeight: 1.02, fontWeight: 500, letterSpacing: '-0.02em' } }, title) : null,
     text ? h('p', { style: { margin: '18px 0 0', fontSize: '1.0625rem', lineHeight: 1.6, opacity: 0.72, maxWidth: 440 } }, text) : null,
     cta && cta.label ? h('a', { href: cta.href || '#', className: 'bg-primary text-primary-foreground', style: { display: 'inline-block', marginTop: 28, padding: '12px 22px', borderRadius: 999, fontWeight: 600, textDecoration: 'none' } }, cta.label) : null) : null;
   if (split && still) {
@@ -131,9 +133,9 @@ export function ScrollVideo({ src, frames = 96, screens = 3, mode: modeProp, cap
   }
   if (split) {
     return h('section', { ref: section, className: 'bg-background text-foreground ' + className, 'data-kq-scroll-video': '', style: { position: 'relative', height: Math.max(1.5, Number(screens) || 2.5) * 100 + 'vh' } },
-      h('div', { 'data-kq-scene': '', style: { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', display: 'grid', gridTemplateColumns: wide ? 'minmax(0,5fr) minmax(0,7fr)' : '1fr', gridTemplateRows: wide ? '1fr' : 'auto auto', alignItems: 'center', alignContent: 'center', gap: wide ? 32 : 8, padding: wide ? '0 clamp(24px, 5vw, 72px)' : '0 20px' } },
+      h('div', { 'data-kq-scene': '', style: { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', display: 'grid', gridTemplateColumns: wide ? 'minmax(0,5fr) minmax(0,7fr)' : '1fr', gridTemplateRows: wide ? '1fr' : 'auto auto', alignItems: 'center', alignContent: 'center', gap: wide ? 32 : 20, padding: wide ? '0 clamp(24px, 5vw, 72px)' : '0 20px' } },
         h('div', { style: { order: wide && side === 'right' ? 2 : 0 } }, words),
-        h('canvas', { ref: canvas, role: 'img', 'aria-label': alt, 'data-kq-drawn': drawn ? 'true' : 'false', style: { width: '100%', height: wide ? '78vh' : '46vh', minHeight: 0, display: 'block', opacity: drawn ? 1 : 0, transition: 'opacity .6s ease' } }),
+        h('canvas', { ref: canvas, role: 'img', 'aria-label': alt, 'data-kq-drawn': drawn ? 'true' : 'false', style: { width: '100%', height: wide ? '78vh' : 'min(56vh, 110vw)', minHeight: 0, display: 'block', opacity: drawn ? 1 : 0, transition: 'opacity .6s ease', WebkitMaskImage: FADE, maskImage: FADE } }),
         broken ? h('p', { style: { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: 0.6, margin: 0 } }, alt) : null));
   }
   if (still) {
