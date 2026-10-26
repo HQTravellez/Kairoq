@@ -237,6 +237,7 @@ async function openProject(id,{pendingText,job}={}){
  renderVersions();
  device(Boolean(project.mobile&&project.mobile.enabled));
  setPreview(project.preview_url);
+ renderSamplePill();
  if(state.code)await renderFiles();
  if(state.data)await renderData();
  if(job||active_job)watch(job||active_job);
@@ -1521,6 +1522,7 @@ $('settings-open').onclick=async()=>{
  $('memory-box').open=false;text($('memory-text'),'');
  $('memory-box').ontoggle=async()=>{if(!$('memory-box').open||$('memory-text').textContent)return;try{const {memory}=await api('/projects/'+state.project.id+'/memory');text($('memory-text'),memory||'Nothing yet: it starts with your first request.')}catch(err){text($('memory-text'),err.message)}};
  renderSecrets().catch(err=>text($('settings-error'),err.message));
+ renderApis().catch(err=>text($('api-status'),err.message));
  renderDatabase().catch(err=>text($('settings-error'),err.message));
  $('download').href='/api/create/projects/'+state.project.id+'/download';
  try{
@@ -2027,18 +2029,55 @@ async function renderSecrets(){
   const li=document.createElement('li'),row=document.createElement('div');row.className='row';row.style.marginTop='0';
   const name=Object.assign(document.createElement('code'),{textContent:sec.name});name.style.flex='1';
   const rm=Object.assign(document.createElement('button'),{type:'button',className:'ghost',textContent:'Delete'});
-  rm.onclick=async()=>{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:sec.name,value:null}});renderSecrets()};
+  rm.onclick=async()=>{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:sec.name,value:null}});renderSecrets();renderApis().catch(()=>{})};
   row.append(name,Object.assign(document.createElement('span'),{className:'muted small',textContent:sec.hint}),rm);li.append(row);list.append(li);
  }
 }
 $('secret-add').onclick=async()=>{
  text($('settings-error'),'');
- try{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:$('secret-name').value,value:$('secret-value').value}});$('secret-name').value='';$('secret-value').value='';renderSecrets()}
+ try{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:$('secret-name').value,value:$('secret-value').value}});$('secret-name').value='';$('secret-value').value='';renderSecrets();renderApis().catch(()=>{})}
  catch(err){text($('settings-error'),err.message)}
 };
 $('knowledge-save').onclick=async()=>{
  try{const {project}=await api('/projects/'+state.project.id+'/knowledge',{method:'POST',body:{text:$('knowledge').value}});state.project=project;text($('knowledge-status'),'Saved. The AI will follow this from the next message.')}
  catch(err){text($('knowledge-status'),err.message)}
+};
+
+// ---------- outside APIs (settings) ----------
+// Above the preview: which outside APIs answer with sample data because their key is missing.
+function renderSamplePill(apis){
+ const pill=$('sample-pill'),id=state.project&&state.project.id;if(!id)return;
+ const show=list=>{const m=list.filter(a=>a.secret&&!a.key_added);pill.classList.toggle('hidden',!m.length);pill.textContent=m.length?'Sample data: '+m.map(a=>a.title).join(', '):'';pill.title=m.length?'Add '+m.map(a=>a.secret).join(', ')+' in Settings, Server secrets, for real answers. The live site always calls the real API.':''};
+ if(apis)return show(apis);
+ api('/projects/'+id+'/apis').then(d=>{if(state.project&&state.project.id===id)show(d.apis)}).catch(()=>pill.classList.add('hidden'));
+}
+async function renderApis(){
+ const id=state.project.id,{apis,log}=await api('/projects/'+id+'/apis'),editor=(state.project.role||'owner')!=='viewer';
+ renderSamplePill(apis);
+ const list=$('apis-list');list.replaceChildren();
+ if(!apis.length)list.append(el('li','muted small','No outside APIs yet.'));
+ for(const a of apis){
+  const li=el('li'),row=el('div','row');row.style.marginTop='0';
+  const name=el('div','api-name');name.append(el('strong','',a.title),el('span','muted small',' '+a.base_url));
+  const key=el('span','api-key '+(a.key_added?'real':'sample'),!a.secret?'No key needed':a.key_added?a.secret+' added: real answers':'No '+a.secret+' yet: sample answers in the preview');
+  row.append(name,key);
+  if(editor){const rm=el('button','ghost','Remove');rm.type='button';rm.onclick=async()=>{try{await api('/projects/'+id+'/apis',{method:'DELETE',body:{slug:a.slug}});renderApis()}catch(err){text($('api-status'),err.message)}};row.append(rm)}
+  li.append(row);list.append(li);
+ }
+ const box=$('api-log');box.replaceChildren();
+ if(!log.length)box.append(el('p','muted small','No calls yet. Calls your server functions make to other services show here.'));
+ else{
+  const t=el('table','api-log-table'),head=el('tr');for(const h of ['When','Call','Answer','Status','Time'])head.append(el('th','',h));t.append(head);
+  for(const c of log.slice(0,50)){const tr=el('tr');tr.append(el('td','',new Date(c.at).toLocaleTimeString()),el('td','',c.method+' '+c.url),el('td','',c.sample?'Sample':'Real'),el('td','',c.status?String(c.status):(c.error||'failed')),el('td','',c.ms+' ms'));t.append(tr)}
+  box.append(t);
+ }
+ $('api-add').disabled=!editor;
+}
+$('api-add').onclick=async()=>{
+ const b=$('api-add');b.disabled=true;text($('api-status'),'Reading the spec…');
+ try{const r=await api('/projects/'+state.project.id+'/apis',{method:'POST',body:{spec_url:$('api-spec-url').value.trim()||undefined,spec:$('api-spec').value.trim()||undefined,secret:$('api-secret').value.trim(),base_url:$('api-base').value.trim()||undefined}});
+  text($('api-status'),'Added '+r.api.title+' ('+r.api.operations+' endpoints). Ask the chat to use it.');for(const f of ['api-spec-url','api-spec','api-secret','api-base'])$(f).value='';await renderApis()}
+ catch(err){text($('api-status'),err.message)}finally{b.disabled=false}
 };
 
 // ---------- free website check ----------

@@ -514,7 +514,10 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
  const extras=require('./react-backend-extras');
  let fdb=db;
  if(automation){fdb=Object.create(db);fdb.prepare=db.prepare.bind(db);fdb.exec=db.exec.bind(db);fdb.__automation=true}
+ // Outside calls: sample answers for the owner's added APIs in preview and checks (api-samples.js).
+ const samples=require('./api-samples'),fetchMode=samples.modeOf(meta,req,sb);
  const host={
+  fetch:a=>samples.fetchFor(id,a,{mode:fetchMode}),
   secret:async n=>require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50)),
   db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
   ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},

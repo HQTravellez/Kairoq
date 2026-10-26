@@ -76,7 +76,7 @@ function processFor(key){
 function hostCalls(job){
  const {host,user}=job,guarded=require('./react-functions').guardedFetch;
  const io={
-  fetch:async a=>{if(++job.fetches>MAX_FETCHES)throw fail(429,'fetch: at most '+MAX_FETCHES+' requests per call');return guarded(a)},
+  fetch:async a=>{if(++job.fetches>MAX_FETCHES)throw fail(429,'fetch: at most '+MAX_FETCHES+' requests per call');return host.fetch?host.fetch(a):guarded(a)},
   secret:a=>host.secret(String(a.name||'')),
   'db.list':a=>host.db('list',a,user),'db.get':a=>host.db('get',a,user),'db.create':a=>host.db('create',a,user),'db.update':a=>host.db('update',a,user),'db.remove':a=>host.db('remove',a,user),
   sql:a=>{if(!host.sql)throw fail(501,'SQL is not available here');return host.sql(String(a.query||''),Array.isArray(a.params)?a.params:[])},

@@ -137,7 +137,7 @@ async function run({source,request,user,host}){
  runtime.setInterruptHandler(deadline(stop));
  const context=runtime.newContext(),logs=[];let fetches=0,hostCalls=0,inflight=0,disposed=false;
  const io={
-  fetch:async a=>{if(++fetches>MAX_FETCHES)throw fail(429,'fetch: at most '+MAX_FETCHES+' requests per call');return guardedFetch(a)},
+  fetch:async a=>{if(++fetches>MAX_FETCHES)throw fail(429,'fetch: at most '+MAX_FETCHES+' requests per call');return host.fetch?host.fetch(a):guardedFetch(a)},
   secret:async a=>host.secret(a.name),
   'db.list':a=>host.db('list',a,user),'db.get':a=>host.db('get',a,user),'db.create':a=>host.db('create',a,user),'db.update':a=>host.db('update',a,user),'db.remove':a=>host.db('remove',a,user),
   sql:a=>{if(!host.sql)throw fail(501,'SQL is not available here');return host.sql(a.query,a.params)},
@@ -246,7 +246,7 @@ function spawn(){
    try{
     // A call that arrives after its function's time is up is refused without doing the work.
     if(Date.now()>job.deadline)throw fail(504,'Function timed out');
-    const value=msg.op==='secret'?await job.host.secret(msg.args.name):msg.op==='db'?await job.host.db(msg.args.op,msg.args.args,msg.user):msg.op==='ai'?await job.host.ai(msg.args,msg.user):msg.op==='ai.ask'?await need(job.host.ask)(msg.args,msg.user):msg.op==='ai.extract'?await need(job.host.extract)(msg.args,msg.user):msg.op==='email'?await job.host.email(msg.args,msg.user):msg.op==='sql'?await need(job.host.sql)(msg.args.query,msg.args.params):msg.op==='sqlBatch'?await need(job.host.sqlBatch)(msg.args.steps):(()=>{throw Error('Unknown host call')})();
+    const value=msg.op==='fetch'?await(job.host.fetch?job.host.fetch(msg.args):guardedFetch(msg.args)):msg.op==='secret'?await job.host.secret(msg.args.name):msg.op==='db'?await job.host.db(msg.args.op,msg.args.args,msg.user):msg.op==='ai'?await job.host.ai(msg.args,msg.user):msg.op==='ai.ask'?await need(job.host.ask)(msg.args,msg.user):msg.op==='ai.extract'?await need(job.host.extract)(msg.args,msg.user):msg.op==='email'?await job.host.email(msg.args,msg.user):msg.op==='sql'?await need(job.host.sql)(msg.args.query,msg.args.params):msg.op==='sqlBatch'?await need(job.host.sqlBatch)(msg.args.steps):(()=>{throw Error('Unknown host call')})();
     reply={type:'hostReply',callId:msg.callId,value:value===undefined?null:value};
    }catch(e){reply={type:'hostReply',callId:msg.callId,error:String(e.message||e),status:e.status}}
    if(w.job===job)w.thread.postMessage(reply);
