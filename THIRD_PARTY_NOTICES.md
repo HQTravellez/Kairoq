@@ -56,6 +56,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 `design-library/` (directions, heroes, sections, motions, palettes, type systems and the app-screen styles, with the study's site references removed), the dated "tells" added to `design-slop.js`, the page-frame checks in `design-frame.js`, the look-and-fix polish rounds and the `app-screens` design skill are adapted from taste-skill by Leonxlnx, https://github.com/Leonxlnx/taste-skill (commit 63aba5f), licensed under the MIT License (full text in `design-library/LICENSE-taste-skill`). The `redesign` design skill is that author's redesign skill (MIT), as bundled in open-design.
 
+## ui-ux-pro-max-skill: business palettes, font pairings and page playbooks
+
+`design-presets.json` (palettes, font pairings and font families by kind of business, and a page playbook per business: page pattern, section order, main button placement, style, effects and what to avoid) is adapted from ui-ux-pro-max-skill by Next Level Builder, https://github.com/nextlevelbuilder/ui-ux-pro-max-skill (commit d14efff), licensed under the MIT License (full text in `licenses/ui-ux-pro-max-skill-LICENSE.txt`). Rebuilt with `scripts/design-data/import-pro-max.js`.
+
 ## open-design: style systems, craft rulebooks and skills
 
 `design-library/styles/` (59 generic style systems; the packages that copy real brands were left out), the `craft-*` design skills and the `faq-page` design skill are from open-design by nexu-io, https://github.com/nexu-io/open-design (commit 3b0df90), licensed under the Apache License 2.0 (full text in `design-library/LICENSE-open-design`). Its craft rulebooks are themselves adapted from refero_skill by Refero Design (MIT). Kairoq added front matter and a credit line to each skill.

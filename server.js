@@ -6933,12 +6933,12 @@ function museReady(){return require("./muse").configured()}
 // "Look before replying" (look-check.js): an AI that can see compares screenshots after a visual
 // change with what the owner asked. Free vision models from OpenRouter's list by default;
 // KAIROQ_LOOK_MODELS names others. Returns {ok,problems,model} or null when no model could judge.
-async function reviewLook({request,pictures,signal}){
+async function reviewLook({request,pictures,signal,avoid}){
   if((!openRouterConfigured()&&!museReady())||!pictures||!pictures.length||process.env.KAIROQ_LOOK_CHECK==="off")return null;
   const look=require("./look-check");
   const chosen=String(process.env.KAIROQ_LOOK_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
   const free=chosen.length?[]:(await getModels().catch(()=>[])).filter(m=>m.isFree&&m.supportsVision&&!m.local&&m.id!=="openrouter/free").sort((a,b)=>(b.context_length||0)-(a.context_length||0)).map(m=>m.id).slice(0,3);
-  const content=[{type:"text",text:look.prompt(request)},...pictures.slice(0,2).map(p=>({type:"image_url",image_url:{url:"data:"+(p.mime||"image/jpeg")+";base64,"+p.data}}))];
+  const content=[{type:"text",text:look.prompt(request,avoid)},...pictures.slice(0,2).map(p=>({type:"image_url",image_url:{url:"data:"+(p.mime||"image/jpeg")+";base64,"+p.data}}))];
   if(museReady()){
     try{const r=await callMuse({messages:[{role:"user",content}],temperature:0.1,maxOutputTokens:800,signal});const v=look.verdict(r.text);if(v)return{...v,model:r.model}}
     catch(err){if(signal?.aborted)throw err;console.log("[look-check] Muse: "+String(err.message||err).slice(0,160))}
