@@ -322,8 +322,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   const onThinking=text=>update({thinking:String(text).slice(-1800)});
   // The timeline (thoughts, files read and edited, builds, tests, fixes), streamed to the editor.
   const onEvent=events=>update({events:events.slice(-80)});
-  // A bespoke 3D object the design brief asks for, made by the Blender modelling agent.
-  const makeModel=require('./blender').available()?description=>require('./model-agent').make(description,{callModel,review:reviewLook,signal:controller.signal,onProgress:p=>update({progress:p}),save:(glb,poster,title)=>require('./react-models').saveMade(id,glb,poster,title)}).then(r=>r.model):null;
+  // A new version that builds and opens: the preview switches to it while the slower checks go on.
+  const onVersion=v=>update({preview:{version:v.version,url:v.preview_url,changed:(v.changed||[]).slice(0,20)}});
   try{
    const signal=controller.signal;
    // Build and Discuss look things up first when the message asks for it (links, "search", "latest", docs...).
@@ -344,7 +344,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     if(recalled)context=[context,recalled.note].filter(Boolean).join('\n\n');
    }
    if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
-   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
+   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onVersion,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
     let extra='';
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
@@ -360,7 +360,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     if(mode==='build'){const meta3=builder.loadMeta(id);if(meta3.three_d&&meta3.three_d.style!=='none'&&!meta3.three_d.auto_tried){update({status:'assets'});await require('./react-models').autoModel(id,message,{callModel,signal}).catch(e=>{if(signal.aborted)throw e;console.warn('[3d] auto model: '+String(e.message||e).slice(0,200))})}}
     const assetNote=[images.length||context?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context].filter(Boolean).join('\n\n');
     const fast=quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
-    job.result=await builder.edit(id,message,{makeModel,...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{onVersion,...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // Look before replying (look-check.js): a change about layout or looks is compared with what
     // the owner asked, on screenshots; if it does not match, the builder fixes it once, free.
     if(mode==='build'&&!hooks&&!fast&&reviewLook&&designShots&&job.result&&job.result.version&&!job.result.unchanged&&!job.result.rolled_back&&!job.result.design&&require('./look-check').isVisual(message)&&process.env.KAIROQ_LOOK_CHECK!=='off'){
@@ -372,7 +372,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
       if(seen)first.look={ok:seen.ok,problems:seen.problems};
       if(seen&&!seen.ok){
        update({progress:'Fixing how it looks'});
-       const fixed=await builder.edit(id,require('./look-check').fixMessage(message,seen.problems),{displayText:'Fix how it looks: '+seen.problems[0],callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});
+       const fixed=await builder.edit(id,require('./look-check').fixMessage(message,seen.problems),{onVersion,displayText:'Fix how it looks: '+seen.problems[0],callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});
        if(fixed&&!fixed.unchanged)job.result={...fixed,look:{ok:false,problems:seen.problems,fixed:true},first_version:first.version};
       }
      }catch(e){if(signal.aborted)throw e;console.warn('[look-check]',String(e.message||e).slice(0,200))}
@@ -383,7 +383,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     // The first build of a new project on Pro or Max gets a free design review.
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
-     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onStream,onThinking,onEvent,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
+     try{job.result={...await builder.polish(id,{shots:designShots,callModel,onVersion,onStream,onThinking,onEvent,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
      catch(e){job.result={...first,polish_error:signal.aborted?'Stopped before the design review.':'The design review did not finish: '+String(e.message||e).slice(0,300)}}
     }
    }

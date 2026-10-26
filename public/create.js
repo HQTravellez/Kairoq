@@ -365,7 +365,31 @@ function renderVersions(){
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.broken?'⚠ did not load · ':'')+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
-function setPreview(url){if(!url)return;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
+function setPreview(url){if(!url)return;$('frame-next')?.remove();state.previewBase=url;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
+// A new version is loaded behind the one on screen and swapped in once it has drawn, so the
+// preview never flashes white, and it opens on the page the owner was looking at.
+function routeFor(url){const r=state.previewRoute||'';return r&&/\/v\/\d+\/$/.test(url)?url+r:url}
+function swapPreview(url){
+ const old=$('frame');
+ if(!url||url===state.previewBase)return;
+ if(!old||!old.getAttribute('src')||old.classList.contains('hidden')||!old.offsetWidth)return setPreview(url);
+ $('frame-next')?.remove();
+ const next=document.createElement('iframe');
+ next.id='frame-next';next.title=old.title;next.setAttribute('sandbox',old.getAttribute('sandbox'));next.setAttribute('aria-hidden','true');next.tabIndex=-1;
+ Object.assign(next.style,{position:'absolute',left:old.offsetLeft+'px',top:old.offsetTop+'px',width:old.offsetWidth+'px',height:old.offsetHeight+'px',opacity:'0',pointerEvents:'none',border:'0'});
+ old.after(next);state.previewBase=url;
+ let shown=false;
+ const show=()=>{
+  if(shown||!next.isConnected)return;shown=true;clearTimeout(timer);
+  old.remove();for(const a of ['style','aria-hidden','tabindex'])next.removeAttribute(a);next.id='frame';
+  state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();
+  $('open').href=url;$('preview-open').href=url;state.previewReady=true;clearTimeout(state.previewTimer);$('preview-notice').classList.add('hidden');
+ };
+ // "load" fires when the files are in; a short wait lets React draw the first screen.
+ next.addEventListener('load',()=>setTimeout(show,350));
+ const timer=setTimeout(show,8000);
+ next.src=routeFor(url);
+}
 // The preview reports "ready" once it has rendered; when nothing arrives, say so instead of showing a blank frame.
 function watchPreview(){state.previewReady=false;$('preview-notice').classList.add('hidden');text($('preview-diagnosis'),'');clearTimeout(state.previewTimer);state.previewTimer=setTimeout(()=>{if(!state.previewReady&&!$('frame').classList.contains('hidden')){$('preview-notice').classList.remove('hidden');diagnosePreview()}},9000)}
 // When the preview does not load, Kairoq opens it in its own browser on the server: either the
@@ -932,8 +956,8 @@ function eventRow(e,{expand=false,version=null,live=false}={}){
  }else if(e.t==='plan'){head.append(el('span','ev-label','Plan'));const ol=el('ol','ev-plan');for(const it of e.items||[]){const x=el('li');inlineMd(x,it);ol.append(x)}main.append(ol)}
  else if(e.t==='read'){head.append(el('span','ev-label','Read'));for(const f of e.files||[])head.append(fileChip(f))}
  else if(e.t==='edit'){head.append(el('span','ev-label',editVerb(e.kind)),fileChip(e.file,live&&e.file===work.current));if(version&&expand)more=()=>diffFor(version,e.file)}
- else if(e.t==='build'){head.append(el('span','ev-label',e.ok?'Built the preview':'The build failed'));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
- else if(e.t==='test'){head.append(el('span','ev-label',(e.text||'Tested in a browser')+(e.ok?' · no errors':' · found problems')));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
+ else if(e.t==='build'){head.append(el('span','ev-label',e.ok?'Built the preview'+secs(e.ms):'The build failed'));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
+ else if(e.t==='test'){head.append(el('span','ev-label',(e.text||'Tested in a browser')+(e.ok?' · no errors':' · found problems')+secs(e.ms)));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
  else if(e.t==='check'){head.append(el('span','ev-label',e.text||'Saved checks'));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
  else{head.append(el('span','ev-label',e.text||''));if(e.detail)more=()=>el('pre','ev-detail',e.detail)}
  if(more&&expand){
@@ -990,10 +1014,23 @@ function thinkingLine(){
  if(next&&next!==work.thought){work.thought=next;work.thoughtAt=Date.now()}
  return work.thought||'';
 }
+// A slim pill over the preview says what is happening while the AI works; once the new version is
+// on screen, it says the remaining checks are still running.
+// How long a step took, for the timeline (" in 3.4 s").
+function secs(ms){return typeof ms==='number'&&ms>=0?' in '+(ms<10000?(ms/1000).toFixed(1):Math.round(ms/1000))+' s':''}
 function renderBuildOverlay(j){
  const overlay=$('build-overlay');
- if(overlay)overlay.classList.add('hidden');
- // The current preview remains visible; progress lives in the chat timeline.
+ if(!overlay)return;
+ if(!j||j.mode==='discuss'||j.status==='complete'||j.status==='failed'){overlay.classList.add('hidden');return}
+ const card=overlay.querySelector('.bo-card');
+ const shown=j.preview&&j.preview.version;
+ const files=work.files.length;
+ const label=shown?'v'+j.preview.version+' is showing · '+(PHASES[phaseOf(j)]&&phaseOf(j)!=='verifying'?PHASES[phaseOf(j)]:'still checking it')+'…':liveStatus(j)+(phaseOf(j)==='writing'&&files>1?' · '+files+' files':'')+'…';
+ const spin=card.querySelector('.bo-spin')||el('span','bo-spin');spin.setAttribute('aria-hidden','true');
+ const line=card.querySelector('.bo-line')||el('span','bo-line');
+ if(line.textContent!==label)line.textContent=label;
+ if(!card.contains(spin))card.replaceChildren(spin,line);
+ overlay.classList.remove('first');overlay.classList.remove('hidden');
 }
 function liveStatus(j){
  const p=phaseOf(j);
@@ -1114,7 +1151,7 @@ async function watch(job){
  const done=await new Promise(resolve=>{
   let finished=false;
   const finish=j=>{if(!finished){finished=true;resolve(j)}};
-  const apply=j=>{text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(j.progress||LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  const apply=j=>{if(j.preview&&j.preview.url&&j.mode!=='discuss')swapPreview(j.preview.url);renderBuildOverlay(j);text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(j.progress||LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
   if(window.EventSource){
    const es=new EventSource('/api/create/jobs/'+job.id+'/events');
    es.onmessage=e=>{const j=JSON.parse(e.data);apply(j);if(j.status==='complete'||j.status==='failed')es.close()};
@@ -1136,7 +1173,7 @@ async function watch(job){
   state.runtimeErrors=[];
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
-  if(done.mode!=='discuss')setPreview(project.preview_url);
+  if(done.mode!=='discuss'){if(project.preview_url!==state.previewBase)swapPreview(project.preview_url)}
   if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')+(done.fix_on_us?' The fix is on us: the next Fix costs nothing.':'')}));
   else if(done.free)$('messages').append(messageItem({role:'assistant',text:done.free}));
   if(done.model_fallback)$('messages').append(messageItem({role:'assistant',text:done.model_fallback}));
@@ -1369,6 +1406,7 @@ $('visual-panel').onsubmit=async e=>{
 window.addEventListener('message',e=>{
  if(e.source!==$('frame').contentWindow||!e.data||e.data.source!=='kairoq-app')return;
  if(e.data.type==='select'&&state.selecting){api('/projects/'+state.project.id+'/inspect',{method:'POST',body:{loc:e.data.loc,version:previewVersion()}}).then(({element})=>{state.selected={...element,loc:e.data.loc};renderVisual()}).catch(err=>{state.selected=null;renderVisual();text($('visual-error'),err.message)});return}
+ if(e.data.type==='route'){const m=/\/v\/\d+\/(.*)$/.exec(String(e.data.path||''));const r=m?m[1]:'';state.previewRoute=r.length<300&&!r.includes('..')&&/^[\w\-./?=&#%~+]*$/.test(r)?r:''}
  if(e.data.type==='ready'){state.previewReady=true;clearTimeout(state.previewTimer);$('preview-notice').classList.add('hidden')}
  if(e.data.type==='runtime-error'){const msg=String(e.data.message||'').slice(0,800);if(msg&&!state.runtimeErrors.includes(msg)&&state.runtimeErrors.length<10){state.runtimeErrors.push(msg);renderErrors()}}
 });
