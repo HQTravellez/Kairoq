@@ -789,7 +789,7 @@ li.failed .retry{margin-top:8px;padding:6px 12px;border:1px solid #e3e0d8;border
 li.failed .retry:hover{border-color:#15140f}
 /* ---------- the preview as a real device (iPhone, Pixel, iPad) ---------- */
 .device.desktop{display:contents}
-.device.desktop>:not(#frame){display:none}
+.device.desktop>:not(#frame):not(#frame-next){display:none}
 .device.phone{--dev-scale:1;position:relative;flex:none;align-self:flex-start;box-sizing:content-box;width:var(--dev-w);height:var(--dev-h);
  padding:12px;border-radius:calc(var(--dev-radius) + 12px);background:#111;box-shadow:0 0 0 2px #2a2a2c,0 0 0 4px #4a4a4e,0 30px 60px -20px rgba(0,0,0,.45);
  transform:scale(var(--dev-scale));transform-origin:top center;margin-bottom:calc((var(--dev-scale) - 1) * (var(--dev-h) + 24px));

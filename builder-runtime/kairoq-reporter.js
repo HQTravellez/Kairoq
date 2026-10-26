@@ -6,6 +6,10 @@ const report=(kind,message)=>send('runtime-error',{kind,message:String(message||
 // code problems, so only the app's own files are reported.
 const ownUrl=u=>{try{return new URL(u,location.href).origin===location.origin}catch{return false}};
 window.addEventListener('error',e=>{if(e.target&&e.target!==window&&e.target.tagName){const src=e.target.src||e.target.href||'';if(ownUrl(src))report('resource','Failed to load '+e.target.tagName.toLowerCase()+' '+src);return}report('error',(e.error&&e.error.stack)||e.message)},true);
+// The page the owner is looking at, so the editor can open a new version on the same page.
+const route=()=>send('route',{path:location.pathname+location.search+location.hash});
+for(const k of ['pushState','replaceState']){const f=history[k];if(typeof f==='function')history[k]=function(...a){const r=f.apply(this,a);route();return r}}
+window.addEventListener('popstate',route);window.addEventListener('hashchange',route);window.addEventListener('load',route);
 window.addEventListener('unhandledrejection',e=>report('promise',(e.reason&&(e.reason.stack||e.reason.message))||e.reason));
 const consoleError=console.error.bind(console);
 console.error=(...args)=>{report('console',args.map(a=>a instanceof Error?a.stack||a.message:typeof a==='object'?(()=>{try{return JSON.stringify(a)}catch{return String(a)}})():String(a)).join(' '));consoleError(...args)};

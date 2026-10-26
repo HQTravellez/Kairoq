@@ -546,7 +546,7 @@ async function runtimeProblems(id,url,checkRuntime){
 }
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,makeModel=null}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -668,20 +668,22 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   tl.edits(base,next);
   onProgress('building');
   const n=Math.max(0,...meta.versions.map(v=>v.n),...loadMeta(id).versions.map(v=>v.n))+1,dir=versionDir(id,n);
+  const buildStart=Date.now();
   try{await build(next,path.join(dir,'dist'),{projectId:id})}
   catch(e){if(!e.build)throw e;fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;tl.add({t:'build',ok:false,detail:lastError});tl.add({t:'fix',text:'Fixing the build error'});messages.push({role:'user',content:'The Vite build failed:\n'+lastError+'\n'+KEPT+' Fix the error and return corrected JSON.\n'+METHOD.DEBUG});continue}
-  tl.add({t:'build',ok:true});
+  tl.add({t:'build',ok:true,ms:Date.now()-buildStart});
   try{await applyMigrations(id,next)}catch(e){fs.rmSync(dir,{recursive:true,force:true});lastError=e.message;work=next;messages.push({role:'user',content:'A SQL migration failed:\n'+lastError+'\n'+KEPT+' Migrations that already ran cannot change; fix new ones or add another migration, and return corrected JSON.'});continue}
   runtimeErrors=[];checkResult=null;verified=null;
   if(checkRuntime||inspect){
    onProgress('testing');
    markTesting(id,n,next);
+   var testStart=Date.now();
    try{
     if(checkRuntime){try{const r=await runtimeProblems(id,previewUrl(meta,n),checkRuntime);runtimeErrors=r.errors;verified=r.verified}catch(e){runtimeErrors=[];verified=null}}
     // Saved checks: flows that worked before must still work (run on a test copy of the data).
     if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
    }finally{clearTesting(id,n)}
-   if(checkRuntime)tl.add({t:'test',ok:!runtimeErrors.length,detail:runtimeErrors});
+   if(checkRuntime)tl.add({t:'test',ok:!runtimeErrors.length,detail:runtimeErrors,ms:Date.now()-testStart});
    if(checkResult&&checkResult.ran)tl.add({t:'check',ok:!checkResult.failed.length,text:checkResult.failed.length?'Broke '+checkResult.failed.length+' of '+checkResult.ran+' saved checks':'All '+checkResult.ran+' saved check'+(checkResult.ran===1?'':'s')+' passed',detail:checkResult.failed.length?require('./react-checks').failureText(checkResult.failed):''});
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
@@ -718,6 +720,10 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const now=new Date().toISOString();
   fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{}),feature_verification:featureVerification});
   saveMeta(fresh);
+  // The new version works: show it now. The checks below (new checks, feature journeys) and the
+  // screenshot review run while the owner already looks at it.
+  if(!rollback&&onVersion)try{onVersion({version:n,preview_url:previewUrl(fresh,n),changed})}catch{}
+  if(!rollback)onProgress('verifying');
   // Checks the AI wrote for the flows it built: kept only when they pass on the new version.
   const adopted=!rollback&&inspect&&reply.checks.length&&!runtimeErrors.length?await adoptChecks(id,previewUrl(fresh,n),reply.checks,{inspect,version:n}).catch(()=>[]):[];
   // Independent feature-specific browser journeys use isolated sandbox data.
