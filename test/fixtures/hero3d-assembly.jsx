@@ -1,0 +1,20 @@
+// Scroll assembly showcase: a watch that comes apart as the page scrolls and assembles again.
+import React from 'react';
+import { ScrollAssembly } from 'kairoq/hero3d';
+
+export default function App() {
+  return (
+    <main className="bg-background text-foreground">
+      <section className="mx-auto max-w-3xl px-6 py-24 text-center">
+        <h1 className="font-display text-5xl font-semibold tracking-tight">Made to be seen</h1>
+        <p className="mt-4 text-lg text-muted-foreground">Scroll to look inside.</p>
+      </section>
+      <ScrollAssembly object="watch" labels={{ Crystal: 'Sapphire crystal', Dial: 'Hand-finished dial', Rotor: '22k gold rotor' }}>
+        <p className="pointer-events-none absolute bottom-8 left-0 right-0 text-center text-sm text-muted-foreground">117 parts, 11 layers</p>
+      </ScrollAssembly>
+      <section className="mx-auto max-w-3xl px-6 py-24 text-center" data-after>
+        <h2 className="font-display text-4xl font-semibold">Back in one piece.</h2>
+      </section>
+    </main>
+  );
+}

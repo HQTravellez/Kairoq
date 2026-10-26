@@ -76,7 +76,7 @@ ${require('./code-structure').RULES}
   - SQL database (relational data: tables, foreign keys, joins, reports, inventory, bookings with rooms and guests): write migrations sql/001_init.sql, sql/002_add_rooms.sql, ... (SQLite syntax: CREATE TABLE, indexes, REFERENCES, CHECK). Migrations run once, in order; never change one that already ran, add a new numbered file instead. Query only from server functions: const rows = await db.sql\`SELECT * FROM rooms WHERE price <= \${max}\` (tagged template, values become parameters) or db.sql('SELECT ... WHERE id = ?', [id]); writes return {changes,lastInsertRowid}; add RETURNING * to get rows back; db.batch([[sql, params], ...]) runs several statements in one transaction. Never build SQL by joining strings with user input. Check user before reads or writes of personal data. Use collections for simple per-user lists and SQL when the data has relations.
   - Automations (the app does things on its own): "automations":[{"name":"reminders","run":"send-reminders","every":"day","at":"09:00","tz":"Europe/London"},{"name":"welcome","run":"welcome","on":"created","collection":"bookings"}]. "run" names a file in functions/; "every" is hour, day (with "at") or week (with "at" and "day": mon..sun); or "on": created|updated|deleted with a "collection". The function gets request.body = { automation, trigger, at, collection?, record? } and user = null, and must work without a signed-in user. Use them for reminders, digests, follow-up emails, cleanups and syncing with other services; an automation cannot start another one. Simpler built-ins: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - 3D (only where it adds real value; give it a fixed height): show a project model with Model3D from 'kairoq/3d'. Otherwise use the tested pieces in 'kairoq/scene': <Configurator src="./models/x.glb" options={[{label,color,price}]} parts={['fabric']} /> (colour or material picker), <Globe points={[{lat,lng,label}]} arcs={[{from:[lat,lng],to:[lat,lng]}]} />, <Particles /> (inside a relative hero, behind the text), <MiniGame title items={[{color,points,label}]} seconds={30} />, or <Scene3D controls>custom @react-three/fiber elements</Scene3D> for anything else. Never create your own <Canvas> outside Scene3D.
-- A 3D hero (the one striking visual of a landing page, when the design brief names one): import from 'kairoq/hero3d' and put it in the hero's visual column; each piece takes the app's colours from the design tokens, lights itself like a studio, moves with the pointer and scroll, and holds still for reduced motion. <HeroObject object="suitcase" /> (one crafted object on a pedestal; objects: suitcase, house, key, shopping-bag, plane, gift-box, dumbbell, coffee-cup, pizza, espresso-machine, or src="./models/x.glb"), <GlassShapes /> (glass and glossy shapes in the brand colours, for software, AI and finance), <DeviceMockup device="phone" screenshot="./uploads/app.png" /> (only with a real screenshot of the product), <ExplodedView object="gift-box" /> (comes apart as the page scrolls), <Diorama objects={['house','tree','house','tree']} /> (a tiny isometric world). Props: height (default 480), mood="studio"|"sunset"|"neon", alt. One 3D hero per page at most, never inside app screens people work in; text stays beside it, not on top of it.
+- A 3D hero (the one striking visual of a landing page, when the design brief names one): import from 'kairoq/hero3d' and put it in the hero's visual column; each piece takes the app's colours from the design tokens, lights itself like a studio, moves with the pointer and scroll, and holds still for reduced motion. <HeroObject object="suitcase" /> (one crafted object on a pedestal; objects: suitcase, house, key, shopping-bag, plane, gift-box, dumbbell, coffee-cup, pizza, espresso-machine, or src="./models/x.glb"), <GlassShapes /> (glass and glossy shapes in the brand colours, for software, AI and finance), <DeviceMockup device="phone" screenshot="./uploads/app.png" /> (only with a real screenshot of the product), <ExplodedView object="gift-box" /> (comes apart as the page scrolls), <Diorama objects={['house','tree','house','tree']} /> (a tiny isometric world), <ScrollAssembly object="watch" labels={{ Crystal: 'Sapphire crystal' }} /> (a tall pinned section: the object comes apart layer by layer as the page scrolls, holds with labels for the parts named in labels, then assembles again; put it between sections, full width, not in a column). Props: height (default 480), mood="studio"|"sunset"|"neon", alt. One 3D hero per page at most, never inside app screens people work in; text stays beside it, not on top of it.
 - A process or journey told in 3D ("from machine to guest", "how your coffee is made"): import { CoffeeJourney } from 'kairoq/story' and give its section a real height (className="h-[460px] md:h-[540px]"). It is a detailed, finished scene (espresso machine, cup and saucer, pour, steam, counter, guest's hand) with its own step buttons and captions; it plays by itself and loops. Options: tone="dark" or "light" to match the section, accent="#hex" for the machine's panel, steps={[{title,text},...]} (three steps) to reword it. Do not build your own machine or cup from boxes and cylinders. For another journey, use <Story steps={[...]}>{(step, accent) => <YourScene step={step} />}</Story> with useStoryProgress(step) and useStoryMaterials(accent) from 'kairoq/story' for smooth motion and real materials (steel, ceramic, wood), never default grey.
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
@@ -377,7 +377,7 @@ async function materializeImages(id,reply,{imageGen,cache,design}){
 }
 // Before the first real build of a new project the AI picks a visual direction (the design
 // brief); Kairoq saves it on the project and writes its colours and fonts into src/index.css.
-async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress=()=>{}}){
+async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress=()=>{},makeModel=null}){
  const meta=loadMeta(id);
  // A design already chosen (from a reference build plan) is used instead of a new brief.
  const planned=meta.planned_design&&!meta.design?meta.planned_design:null;
@@ -391,6 +391,13 @@ async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress
   const hasScreenshot=(()=>{try{return require('./react-assets').list(id).some(a=>/\.(png|jpe?g|webp)$/i.test(a.name))}catch{return false}})();
   try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,hasScreenshot,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
   catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
+ }
+ // A bespoke 3D object the brief asked for: the Blender modelling agent makes it now, so the
+ // first build already uses it. If it cannot, the library object stands in.
+ if(brief.hero3d&&brief.hero3d.custom&&!brief.hero3d.src&&makeModel){
+  onProgress('modelling');
+  try{const made=await makeModel(brief.hero3d.custom);if(made&&made.path)brief={...brief,hero3d:{...brief.hero3d,src:made.path}}}
+  catch(e){if(signal?.aborted)throw e;console.warn('[model-agent]',String(e.message||e).slice(0,200))}
  }
  const fresh=loadMeta(id);
  delete fresh.planned_design;
@@ -539,7 +546,7 @@ async function runtimeProblems(id,url,checkRuntime){
 }
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,makeModel=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -548,7 +555,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const featureQA=require('./feature-acceptance');
  if(!meta.current_version)await initialize(meta);
  const tl=require('./react-timeline').create(onEvent);
- const brief=await prepareDesign(id,text,{callModel,tier,signal,images,onProgress});
+ const brief=await prepareDesign(id,text,{callModel,tier,signal,images,onProgress,makeModel});
  if(brief)tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'" ('+brief.fonts.display+' / '+brief.fonts.body+')'});
  meta=loadMeta(id);
  let base=loadFiles(id,meta.current_version);

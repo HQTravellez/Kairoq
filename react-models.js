@@ -88,6 +88,12 @@ function keep(id,entry,glb,poster){
  return view(item);
 }
 
+// A model Kairoq's Blender modelling agent made (model-agent.js), with its preview picture.
+function saveMade(id,glb,poster,title){
+ if(!isGlb(glb))throw fail(422,'The made model is not a valid GLB file');
+ return keep(id,{title:title||'Model',kind:'model',source:{provider:'kairoq-blender'}},glb,poster&&isPng(poster)?poster:null);
+}
+
 // An upload from the owner. name: the original file name; bytes: the file.
 async function upload(id,name,bytes,{blender=require('./blender')}={}){
  builder.loadMeta(id);
@@ -223,4 +229,4 @@ function note(id,meta){
  if(style!=='none')L.push('The owner chose the 3D style "'+STYLES[style].label+'". '+STYLES[style].hint+(models.length?'':' No model is in the project yet: say in "message" that they can add one in Design → 3D models (upload or Poly Haven), and lay the section out so the model drops in.'));
  return L.join('\n');
 }
-module.exports={STYLES,MAX_MODELS,MAX_GLB,VIEWER_FILE,VIEWER_SRC,list,upload,addPolyHaven,searchPolyHaven,autoModel,setPoster,remove,read,copyInto,copyViewer,usesViewer,note,packGlb,isGlb,dir};
+module.exports={saveMade,STYLES,MAX_MODELS,MAX_GLB,VIEWER_FILE,VIEWER_SRC,list,upload,addPolyHaven,searchPolyHaven,autoModel,setPoster,remove,read,copyInto,copyViewer,usesViewer,note,packGlb,isGlb,dir};

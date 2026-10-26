@@ -8,13 +8,14 @@
 const fs=require('fs'),path=require('path'),os=require('os');
 const {execFile}=require('child_process');
 const SCRIPT=path.join(__dirname,'scripts','blender-kairoq.py');
+const SPEC_SCRIPT=path.join(__dirname,'scripts','props','spec.py');
 const INPUTS=['glb','gltf','fbx','obj','stl','ply','blend','zip'];
 const TIMEOUT_MS=Number(process.env.KAIROQ_BLENDER_TIMEOUT_MS)||240000;
 
-function command(env=process.env){
+function command(env=process.env,script=SCRIPT){
  const app=String(env.KAIROQ_BLENDER||'').trim(),py=String(env.KAIROQ_BPY_PYTHON||'').trim();
- if(app&&fs.existsSync(app))return{file:app,args:extra=>['-b','--factory-startup','-noaudio','--python-exit-code','1','--python',SCRIPT,'--',...extra]};
- if(py&&fs.existsSync(py))return{file:py,args:extra=>['-I',SCRIPT,...extra]};
+ if(app&&fs.existsSync(app))return{file:app,args:extra=>['-b','--factory-startup','-noaudio','--python-exit-code','1','--python',script,'--',...extra]};
+ if(py&&fs.existsSync(py))return{file:py,args:extra=>['-I',script,...extra]};
  return null;
 }
 function available(env=process.env){return Boolean(command(env))}
@@ -55,5 +56,28 @@ function run(input,{out=true,poster=true,maxTris=200000,maxTexture=2048,size=800
   });
  }));
 }
+// Builds a model from a checked spec (model-spec.js) with scripts/props/spec.py: a GLB and a
+// preview picture. The spec is only data; the script interprets it.
+function runSpec(spec,{poster=true,bake=false,size=640,samples=16,env=process.env,execImpl=execFile}={}){
+ const cmd=command(env,SPEC_SCRIPT);
+ if(!cmd)return Promise.reject(Object.assign(Error('Blender is not set up on this server, so Kairoq cannot make 3D models here.'),{status:409}));
+ const clean=require('./model-spec').validate(spec);
+ return serial(()=>new Promise((resolve,reject)=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-blender-spec-'));
+  const specFile=path.join(dir,'spec.json'),glb=path.join(dir,'model.glb'),png=poster?path.join(dir,'preview.png'):'';
+  fs.writeFileSync(specFile,JSON.stringify(clean));
+  const args=cmd.args(['--spec',specFile,'--out',glb,'--poster',png,'--size',String(size),'--samples',String(samples),...(bake?['--bake']:[])]);
+  const childEnv={PATH:env.PATH||'/usr/bin:/bin',HOME:dir,TMPDIR:dir,LANG:'C.UTF-8',BLENDER_USER_CONFIG:dir,BLENDER_USER_SCRIPTS:dir,PYTHONNOUSERSITE:'1'};
+  execImpl(cmd.file,args,{env:childEnv,cwd:dir,timeout:TIMEOUT_MS,killSignal:'SIGKILL',maxBuffer:8*1024*1024,windowsHide:true},(err,stdout,stderr)=>{
+   const has=f=>Boolean(f)&&fs.existsSync(f)&&fs.statSync(f).size>0;
+   if(err||!has(glb)){
+    fs.rmSync(dir,{recursive:true,force:true});
+    if(err&&err.killed)return reject(Object.assign(Error('Blender took too long with this model.'),{status:422}));
+    return reject(Object.assign(Error(reason(stdout)),{status:422,detail:String(stderr||'').slice(-600)}));
+   }
+   resolve({dir,glb,poster:has(png)?png:null,parts:clean.total});
+  });
+ }));
+}
 function status(env=process.env){const c=command(env);return c?{on:true,via:env.KAIROQ_BLENDER&&c.file===env.KAIROQ_BLENDER?'app':'python'}:{on:false,why:'Set KAIROQ_BPY_PYTHON or KAIROQ_BLENDER'}}
-module.exports={INPUTS,available,run,status,command,SCRIPT};
+module.exports={INPUTS,available,run,runSpec,status,command,SCRIPT,SPEC_SCRIPT};

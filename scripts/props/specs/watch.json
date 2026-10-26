@@ -1,0 +1,555 @@
+{
+ "name": "Mechanical watch",
+ "parts": [
+  {
+   "shape": "cylinder",
+   "name": "00 Crystal",
+   "radius": 0.255,
+   "depth": 0.012,
+   "axis": "y",
+   "at": [
+    0,
+    -0.08,
+    0.55
+   ],
+   "material": "glass",
+   "vertices": 96
+  },
+  {
+   "shape": "torus",
+   "name": "01 Bezel",
+   "major": 0.268,
+   "minor": 0.022,
+   "axis": "y",
+   "at": [
+    0,
+    -0.06,
+    0.55
+   ],
+   "material": "chrome"
+  },
+  {
+   "shape": "ring",
+   "name": "01 Bezel marks",
+   "count": 12,
+   "radius": 0.268,
+   "axis": "y",
+   "centre": [
+    0,
+    -0.08,
+    0.55
+   ],
+   "part": {
+    "shape": "box",
+    "name": "01 Bezel mark",
+    "size": [
+     0.008,
+     0.006,
+     0.022
+    ],
+    "material": "dark",
+    "bevel": 0.002
+   }
+  },
+  {
+   "shape": "box",
+   "name": "02 Hour hand",
+   "size": [
+    0.016,
+    0.004,
+    0.12
+   ],
+   "at": [
+    -0.0346,
+    -0.04,
+    0.57
+   ],
+   "rotate": [
+    0,
+    300,
+    0
+   ],
+   "material": "chrome",
+   "bevel": 0.0015
+  },
+  {
+   "shape": "box",
+   "name": "02 Minute hand",
+   "size": [
+    0.011,
+    0.004,
+    0.19
+   ],
+   "at": [
+    0.065,
+    -0.04,
+    0.5875
+   ],
+   "rotate": [
+    0,
+    60,
+    0
+   ],
+   "material": "chrome",
+   "bevel": 0.0015
+  },
+  {
+   "shape": "box",
+   "name": "02 Seconds hand",
+   "size": [
+    0.004,
+    0.004,
+    0.21
+   ],
+   "at": [
+    0.0291,
+    -0.04,
+    0.4701
+   ],
+   "rotate": [
+    0,
+    160,
+    0
+   ],
+   "material": "ruby",
+   "bevel": 0.0015
+  },
+  {
+   "shape": "cylinder",
+   "name": "02 Hand cap",
+   "radius": 0.014,
+   "depth": 0.012,
+   "axis": "y",
+   "at": [
+    0,
+    -0.043000000000000003,
+    0.55
+   ],
+   "material": "chrome",
+   "vertices": 24
+  },
+  {
+   "shape": "cylinder",
+   "name": "03 Dial",
+   "radius": 0.245,
+   "depth": 0.006,
+   "axis": "y",
+   "at": [
+    0,
+    -0.02,
+    0.55
+   ],
+   "material": "brand",
+   "vertices": 96
+  },
+  {
+   "shape": "ring",
+   "name": "03 Hour markers",
+   "count": 12,
+   "radius": 0.2,
+   "axis": "y",
+   "centre": [
+    0,
+    -0.025,
+    0.55
+   ],
+   "part": {
+    "shape": "box",
+    "name": "03 Hour marker",
+    "size": [
+     0.012,
+     0.006,
+     0.04
+    ],
+    "material": "chrome",
+    "bevel": 0.002
+   }
+  },
+  {
+   "shape": "cylinder",
+   "name": "04 Gear",
+   "radius": 0.085,
+   "depth": 0.01,
+   "axis": "y",
+   "at": [
+    -0.08,
+    0.0,
+    0.6000000000000001
+   ],
+   "material": "brass",
+   "vertices": 48
+  },
+  {
+   "shape": "ring",
+   "name": "04 Gear teeth",
+   "count": 22,
+   "radius": 0.09000000000000001,
+   "axis": "y",
+   "centre": [
+    -0.08,
+    0.0,
+    0.6000000000000001
+   ],
+   "part": {
+    "shape": "box",
+    "name": "04 Gear tooth",
+    "size": [
+     0.012,
+     0.01,
+     0.014
+    ],
+    "material": "brass",
+    "bevel": 0.001
+   }
+  },
+  {
+   "shape": "cylinder",
+   "name": "04 Jewel",
+   "radius": 0.008,
+   "depth": 0.014,
+   "axis": "y",
+   "at": [
+    -0.08,
+    -0.004,
+    0.6000000000000001
+   ],
+   "material": "ruby",
+   "vertices": 16
+  },
+  {
+   "shape": "cylinder",
+   "name": "04 Gear",
+   "radius": 0.065,
+   "depth": 0.01,
+   "axis": "y",
+   "at": [
+    0.09,
+    0.0,
+    0.5
+   ],
+   "material": "brass",
+   "vertices": 48
+  },
+  {
+   "shape": "ring",
+   "name": "04 Gear teeth",
+   "count": 18,
+   "radius": 0.07,
+   "axis": "y",
+   "centre": [
+    0.09,
+    0.0,
+    0.5
+   ],
+   "part": {
+    "shape": "box",
+    "name": "04 Gear tooth",
+    "size": [
+     0.012,
+     0.01,
+     0.014
+    ],
+    "material": "brass",
+    "bevel": 0.001
+   }
+  },
+  {
+   "shape": "cylinder",
+   "name": "04 Jewel",
+   "radius": 0.008,
+   "depth": 0.014,
+   "axis": "y",
+   "at": [
+    0.09,
+    -0.004,
+    0.5
+   ],
+   "material": "ruby",
+   "vertices": 16
+  },
+  {
+   "shape": "cylinder",
+   "name": "05 Gear",
+   "radius": 0.05,
+   "depth": 0.01,
+   "axis": "y",
+   "at": [
+    0.02,
+    0.02,
+    0.43000000000000005
+   ],
+   "material": "brass",
+   "vertices": 48
+  },
+  {
+   "shape": "ring",
+   "name": "05 Gear teeth",
+   "count": 14,
+   "radius": 0.055,
+   "axis": "y",
+   "centre": [
+    0.02,
+    0.02,
+    0.43000000000000005
+   ],
+   "part": {
+    "shape": "box",
+    "name": "05 Gear tooth",
+    "size": [
+     0.012,
+     0.01,
+     0.014
+    ],
+    "material": "brass",
+    "bevel": 0.001
+   }
+  },
+  {
+   "shape": "cylinder",
+   "name": "05 Jewel",
+   "radius": 0.008,
+   "depth": 0.014,
+   "axis": "y",
+   "at": [
+    0.02,
+    0.016,
+    0.43000000000000005
+   ],
+   "material": "ruby",
+   "vertices": 16
+  },
+  {
+   "shape": "cylinder",
+   "name": "05 Gear",
+   "radius": 0.04,
+   "depth": 0.01,
+   "axis": "y",
+   "at": [
+    0.06,
+    0.02,
+    0.66
+   ],
+   "material": "brass",
+   "vertices": 48
+  },
+  {
+   "shape": "ring",
+   "name": "05 Gear teeth",
+   "count": 12,
+   "radius": 0.045,
+   "axis": "y",
+   "centre": [
+    0.06,
+    0.02,
+    0.66
+   ],
+   "part": {
+    "shape": "box",
+    "name": "05 Gear tooth",
+    "size": [
+     0.012,
+     0.01,
+     0.014
+    ],
+    "material": "brass",
+    "bevel": 0.001
+   }
+  },
+  {
+   "shape": "cylinder",
+   "name": "05 Jewel",
+   "radius": 0.008,
+   "depth": 0.014,
+   "axis": "y",
+   "at": [
+    0.06,
+    0.016,
+    0.66
+   ],
+   "material": "ruby",
+   "vertices": 16
+  },
+  {
+   "shape": "cylinder",
+   "name": "06 Movement plate",
+   "radius": 0.235,
+   "depth": 0.014,
+   "axis": "y",
+   "at": [
+    0,
+    0.04,
+    0.55
+   ],
+   "material": "steel",
+   "vertices": 96
+  },
+  {
+   "shape": "cylinder",
+   "name": "07 Rotor",
+   "radius": 0.22,
+   "depth": 0.008,
+   "axis": "y",
+   "at": [
+    0,
+    0.06,
+    0.55
+   ],
+   "material": "gold",
+   "vertices": 64
+  },
+  {
+   "shape": "cylinder",
+   "name": "08 Case",
+   "radius": 0.285,
+   "depth": 0.05,
+   "radius_top": 0.272,
+   "axis": "y",
+   "at": [
+    0,
+    0.08,
+    0.55
+   ],
+   "material": "chrome",
+   "vertices": 96,
+   "bevel": 0.01
+  },
+  {
+   "shape": "box",
+   "name": "08 Lug",
+   "size": [
+    0.05,
+    0.04,
+    0.09
+   ],
+   "at": [
+    -0.13,
+    0.08,
+    0.25
+   ],
+   "material": "chrome",
+   "bevel": 0.015
+  },
+  {
+   "shape": "box",
+   "name": "08 Lug",
+   "size": [
+    0.05,
+    0.04,
+    0.09
+   ],
+   "at": [
+    -0.13,
+    0.08,
+    0.85
+   ],
+   "material": "chrome",
+   "bevel": 0.015
+  },
+  {
+   "shape": "box",
+   "name": "08 Lug",
+   "size": [
+    0.05,
+    0.04,
+    0.09
+   ],
+   "at": [
+    0.13,
+    0.08,
+    0.25
+   ],
+   "material": "chrome",
+   "bevel": 0.015
+  },
+  {
+   "shape": "box",
+   "name": "08 Lug",
+   "size": [
+    0.05,
+    0.04,
+    0.09
+   ],
+   "at": [
+    0.13,
+    0.08,
+    0.85
+   ],
+   "material": "chrome",
+   "bevel": 0.015
+  },
+  {
+   "shape": "cylinder",
+   "name": "08 Crown",
+   "radius": 0.03,
+   "depth": 0.04,
+   "axis": "x",
+   "at": [
+    0.305,
+    0.08,
+    0.55
+   ],
+   "material": "chrome",
+   "vertices": 24
+  },
+  {
+   "shape": "cylinder",
+   "name": "09 Caseback",
+   "radius": 0.26,
+   "depth": 0.012,
+   "axis": "y",
+   "at": [
+    0,
+    0.1,
+    0.55
+   ],
+   "material": "chrome",
+   "vertices": 96
+  },
+  {
+   "shape": "cylinder",
+   "name": "09 Caseback window",
+   "radius": 0.17,
+   "depth": 0.014,
+   "axis": "y",
+   "at": [
+    0,
+    0.099,
+    0.55
+   ],
+   "material": "glass",
+   "vertices": 64
+  },
+  {
+   "shape": "box",
+   "name": "10 Strap",
+   "size": [
+    0.2,
+    0.025,
+    0.36
+   ],
+   "at": [
+    0,
+    0.085,
+    0.03
+   ],
+   "material": "leather",
+   "bevel": 0.012
+  },
+  {
+   "shape": "box",
+   "name": "10 Strap",
+   "size": [
+    0.2,
+    0.025,
+    0.36
+   ],
+   "at": [
+    0,
+    0.085,
+    1.07
+   ],
+   "material": "leather",
+   "bevel": 0.012
+  }
+ ]
+}

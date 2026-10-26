@@ -322,6 +322,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   const onThinking=text=>update({thinking:String(text).slice(-1800)});
   // The timeline (thoughts, files read and edited, builds, tests, fixes), streamed to the editor.
   const onEvent=events=>update({events:events.slice(-80)});
+  // A bespoke 3D object the design brief asks for, made by the Blender modelling agent.
+  const makeModel=require('./blender').available()?description=>require('./model-agent').make(description,{callModel,review:reviewLook,signal:controller.signal,onProgress:p=>update({progress:p}),save:(glb,poster,title)=>require('./react-models').saveMade(id,glb,poster,title)}).then(r=>r.model):null;
   try{
    const signal=controller.signal;
    // Build and Discuss look things up first when the message asks for it (links, "search", "latest", docs...).
@@ -358,7 +360,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     if(mode==='build'){const meta3=builder.loadMeta(id);if(meta3.three_d&&meta3.three_d.style!=='none'&&!meta3.three_d.auto_tried){update({status:'assets'});await require('./react-models').autoModel(id,message,{callModel,signal}).catch(e=>{if(signal.aborted)throw e;console.warn('[3d] auto model: '+String(e.message||e).slice(0,200))})}}
     const assetNote=[images.length||context?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context].filter(Boolean).join('\n\n');
     const fast=quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
-    job.result=await builder.edit(id,message,{...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{makeModel,...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // Look before replying (look-check.js): a change about layout or looks is compared with what
     // the owner asked, on screenshots; if it does not match, the builder fixes it once, free.
     if(mode==='build'&&!hooks&&!fast&&reviewLook&&designShots&&job.result&&job.result.version&&!job.result.unchanged&&!job.result.rolled_back&&!job.result.design&&require('./look-check').isVisual(message)&&process.env.KAIROQ_LOOK_CHECK!=='off'){
@@ -1275,6 +1277,15 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(limited(req,'model-upload',30,3600000))throw Object.assign(Error('Too many uploads. Wait a while.'),{status:429});
     const bytes=await readRaw(req,61*1024*1024);const model=await M.upload(id,String(q.get('name')||'model.glb').slice(0,140),bytes);
     return send(res,201,{added:model,...state()}),true;
+   }
+   // "Make a 3D model of …": Kairoq's Blender modelling agent (model-agent.js) builds one, checks
+   // its preview with an AI that can see, and adds it to the project's 3D files.
+   if(op==='make'){
+    if(limited(req,'model-make',10,3600000))throw Object.assign(Error('Too many models made in the last hour. Wait a while.'),{status:429});
+    if(!require('./blender').available())throw Object.assign(Error('Blender is not set up on this server, so Kairoq cannot make 3D models here.'),{status:409});
+    const b=await readJson(req,4000);
+    const made=await require('./model-agent').make(String(b.description||''),{callModel:deps.callModel,review:deps.reviewLook,save:(glb,poster,title)=>M.saveMade(id,glb,poster,title)});
+    return send(res,201,{added:made.model,rounds:made.rounds,parts:made.parts,review:made.review,...state()}),true;
    }
    if(op==='poster'){const bytes=await readRaw(req,3*1024*1024+1);return send(res,200,{model:M.setPoster(id,String(q.get('file')||''),bytes),...state()}),true}
    const b=await readJson(req,4000);
