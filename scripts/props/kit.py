@@ -110,6 +110,9 @@ def lathe(name, profile, mat, location=(0, 0, 0), thickness=0.0, subsurf=1):
     screw.steps = 64
     screw.render_steps = 64
     screw.use_merge_vertices = True
+    # A profile drawn bottom to top faces inwards once turned; a single surface (no wall) is
+    # flipped so it faces out and lights correctly.
+    screw.use_normal_flip = not thickness
     if thickness:
         obj.modifiers.new('Wall', 'SOLIDIFY').thickness = thickness
     return finish(obj, mat, subsurf=subsurf)
@@ -140,8 +143,11 @@ def bake_occlusion(parts, name):
     """Bakes soft shadows in creases (ambient occlusion) into one texture per part, wired so the
     glTF exporter writes it as the occlusion map."""
     scene = bpy.context.scene
+    # A part marked keep_uv (a phone or laptop screen) keeps its own 0..1 UVs, so the app's
+    # screenshot fills it exactly, and gets no shadow bake.
+    parts_to_bake = [o for o in parts if o.type == 'MESH' and not o.get('keep_uv')]
     for obj in parts:
-        if obj.type != 'MESH':
+        if obj.type != 'MESH' or obj.get('keep_uv'):
             continue
         bpy.ops.object.select_all(action='DESELECT')
         bpy.context.view_layer.objects.active = obj
@@ -151,7 +157,7 @@ def bake_occlusion(parts, name):
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.uv.smart_project(island_margin=0.02)
         bpy.ops.object.mode_set(mode='OBJECT')
-    for obj in [o for o in parts if o.type == 'MESH']:
+    for obj in parts_to_bake:
         mat = obj.data.materials[0].copy()
         obj.data.materials[0] = mat
         image = bpy.data.images.new(name + '-' + obj.name + '-ao', BAKE_SIZE // 2, BAKE_SIZE // 2)
@@ -189,6 +195,17 @@ def export(parts, filename):
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, filename), export_format='GLB', use_selection=True,
                               export_apply=True, export_yup=True, export_image_format='WEBP')
     print('wrote', os.path.join(OUT, filename))
+
+
+def screen(name, width, height, location, rotation=(0, 0, 0)):
+    """A flat screen with 0..1 UVs (the app's screenshot is shown on it in the browser)."""
+    bpy.ops.mesh.primitive_plane_add(size=1, location=location, rotation=rotation)
+    obj = bpy.context.object
+    obj.name = name
+    obj.scale = (width, height, 1)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    obj['keep_uv'] = True
+    return finish(obj, 'screen', smooth=False)
 
 
 def build(maker, filename, palette):

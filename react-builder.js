@@ -12,7 +12,7 @@ const APP_PACKAGES={react:'UI',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
  'embla-carousel-react':'carousels','@tanstack/react-table':'tables (use DataTable from the UI kit; TanStack Table 8 API)','@dnd-kit/core':'drag and drop (use Kanban from the UI kit)','qrcode.react':'QR codes',three:'custom 3D (prefer the ready pieces in kairoq/scene; for showing a model use Model3D from kairoq/3d)','@react-three/fiber':'three.js as React components (Canvas, useFrame); wrap custom scenes in Scene3D from kairoq/scene','@react-three/drei':'helpers for @react-three/fiber (OrbitControls, useGLTF, Html, Float, ContactShadows...)',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
-const KAIROQ_MODULES=['kairoq','kairoq/3d','kairoq/scene','kairoq/story'];
+const KAIROQ_MODULES=['kairoq','kairoq/3d','kairoq/scene','kairoq/story','kairoq/hero3d'];
 const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),...KAIROQ_MODULES];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
 function allowedImport(spec){if(KAIROQ_MODULES.includes(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
@@ -76,6 +76,7 @@ ${require('./code-structure').RULES}
   - SQL database (relational data: tables, foreign keys, joins, reports, inventory, bookings with rooms and guests): write migrations sql/001_init.sql, sql/002_add_rooms.sql, ... (SQLite syntax: CREATE TABLE, indexes, REFERENCES, CHECK). Migrations run once, in order; never change one that already ran, add a new numbered file instead. Query only from server functions: const rows = await db.sql\`SELECT * FROM rooms WHERE price <= \${max}\` (tagged template, values become parameters) or db.sql('SELECT ... WHERE id = ?', [id]); writes return {changes,lastInsertRowid}; add RETURNING * to get rows back; db.batch([[sql, params], ...]) runs several statements in one transaction. Never build SQL by joining strings with user input. Check user before reads or writes of personal data. Use collections for simple per-user lists and SQL when the data has relations.
   - Automations (the app does things on its own): "automations":[{"name":"reminders","run":"send-reminders","every":"day","at":"09:00","tz":"Europe/London"},{"name":"welcome","run":"welcome","on":"created","collection":"bookings"}]. "run" names a file in functions/; "every" is hour, day (with "at") or week (with "at" and "day": mon..sun); or "on": created|updated|deleted with a "collection". The function gets request.body = { automation, trigger, at, collection?, record? } and user = null, and must work without a signed-in user. Use them for reminders, digests, follow-up emails, cleanups and syncing with other services; an automation cannot start another one. Simpler built-ins: "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},{"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}].
 - 3D (only where it adds real value; give it a fixed height): show a project model with Model3D from 'kairoq/3d'. Otherwise use the tested pieces in 'kairoq/scene': <Configurator src="./models/x.glb" options={[{label,color,price}]} parts={['fabric']} /> (colour or material picker), <Globe points={[{lat,lng,label}]} arcs={[{from:[lat,lng],to:[lat,lng]}]} />, <Particles /> (inside a relative hero, behind the text), <MiniGame title items={[{color,points,label}]} seconds={30} />, or <Scene3D controls>custom @react-three/fiber elements</Scene3D> for anything else. Never create your own <Canvas> outside Scene3D.
+- A 3D hero (the one striking visual of a landing page, when the design brief names one): import from 'kairoq/hero3d' and put it in the hero's visual column; each piece takes the app's colours from the design tokens, lights itself like a studio, moves with the pointer and scroll, and holds still for reduced motion. <HeroObject object="suitcase" /> (one crafted object on a pedestal; objects: suitcase, house, key, shopping-bag, plane, gift-box, dumbbell, coffee-cup, pizza, espresso-machine, or src="./models/x.glb"), <GlassShapes /> (glass and glossy shapes in the brand colours, for software, AI and finance), <DeviceMockup device="phone" screenshot="./uploads/app.png" /> (only with a real screenshot of the product), <ExplodedView object="gift-box" /> (comes apart as the page scrolls), <Diorama objects={['house','tree','house','tree']} /> (a tiny isometric world). Props: height (default 480), mood="studio"|"sunset"|"neon", alt. One 3D hero per page at most, never inside app screens people work in; text stays beside it, not on top of it.
 - A process or journey told in 3D ("from machine to guest", "how your coffee is made"): import { CoffeeJourney } from 'kairoq/story' and give its section a real height (className="h-[460px] md:h-[540px]"). It is a detailed, finished scene (espresso machine, cup and saucer, pour, steam, counter, guest's hand) with its own step buttons and captions; it plays by itself and loops. Options: tone="dark" or "light" to match the section, accent="#hex" for the machine's panel, steps={[{title,text},...]} (three steps) to reword it. Do not build your own machine or cup from boxes and cylinders. For another journey, use <Story steps={[...]}>{(step, accent) => <YourScene step={step} />}</Story> with useStoryProgress(step) and useStoryMaterials(accent) from 'kairoq/story' for smooth motion and real materials (steel, ceramic, wood), never default grey.
 - Images: use uploaded images at the paths you are given (for example <img src="./uploads/logo.png">), https URLs (for example https://images.unsplash.com/...) or inline SVG. For background images use an inline style in JSX, not CSS url().
 - When the user attaches a screenshot or design, match its layout, spacing, colors and content as closely as you can.
@@ -173,14 +174,15 @@ function build(files,outDir,options={}){
  if(workerCount()===0)inlineQueue=built.catch(()=>{});
  return built.then(result=>{copyStoryProps(files,outDir);return result});
 }
-// Apps that use kairoq/story get its Blender-made models (app-modules/props) next to their
-// build, served at <app>/props/, so the 3D scenes look finished.
+// Apps that use kairoq/story or kairoq/hero3d get the Blender-made models they need
+// (app-modules/props) next to their build, served at <app>/props/, so the 3D scenes look finished.
 const PROPS_DIR=path.join(__dirname,'app-modules','props');
-function usesStory(files){return Object.values(files||{}).some(c=>typeof c==='string'&&/['"]kairoq\/story['"]/.test(c))}
+function usesStory(files){return require('./react-hero3d').neededModels(files).length>0}
 function copyStoryProps(files,outDir){
- if(!usesStory(files)||!fs.existsSync(PROPS_DIR))return;
+ const need=require('./react-hero3d').neededModels(files).filter(f=>fs.existsSync(path.join(PROPS_DIR,f)));
+ if(!need.length)return;
  const dest=path.join(outDir,'props');fs.mkdirSync(dest,{recursive:true});
- for(const f of fs.readdirSync(PROPS_DIR))if(f.endsWith('.glb'))fs.copyFileSync(path.join(PROPS_DIR,f),path.join(dest,f));
+ for(const f of need)fs.copyFileSync(path.join(PROPS_DIR,f),path.join(dest,f));
 }
 function spawnWorker(){
  const {Worker}=require('worker_threads');
@@ -287,8 +289,8 @@ function importGuard(work){
   }};
 }
 function kairoqClient(projectId,version=0){
- return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':id==='kairoq/3d'?'\0kairoq-3d':id==='kairoq/scene'?'\0kairoq-scene.js':id==='kairoq/story'?'\0kairoq-story.js':null},
-  load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):id==='\0kairoq-3d'?require('./react-model3d').source():id==='\0kairoq-scene.js'?require('./react-scene').source():id==='\0kairoq-story.js'?require('./react-story').source():null}};
+ return{name:'kairoq-client',resolveId(id){return id==='kairoq'?'\0kairoq':id==='kairoq/3d'?'\0kairoq-3d':id==='kairoq/scene'?'\0kairoq-scene.js':id==='kairoq/story'?'\0kairoq-story.js':id==='kairoq/hero3d'?'\0kairoq-hero3d.js':null},
+  load(id){return id==='\0kairoq'?require('./react-backend').clientSource(projectId,'',version):id==='\0kairoq-3d'?require('./react-model3d').source():id==='\0kairoq-scene.js'?require('./react-scene').source():id==='\0kairoq-story.js'?require('./react-story').source():id==='\0kairoq-hero3d.js'?require('./react-hero3d').source():null}};
 }
 function cleanBuildError(e){
  const root=ROOT();
@@ -385,7 +387,9 @@ async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress
  let brief=planned;
  if(!brief){
   onProgress('designing');
-  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
+  // A device mockup needs a real screenshot of the product: an image the owner uploaded earlier.
+  const hasScreenshot=(()=>{try{return require('./react-assets').list(id).some(a=>/\.(png|jpe?g|webp)$/i.test(a.name))}catch{return false}})();
+  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,hasScreenshot,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
   catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
  }
  const fresh=loadMeta(id);
