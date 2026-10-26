@@ -1,20 +1,23 @@
 "use strict";
-// Product explode films: from one product photo to a scroll section where the product comes
-// apart into its layers and goes back together as the visitor scrolls (the "Apple" technique).
-//  1. Stills: the image model (the builder's generateImage, with the photo as reference) makes the
-//     product whole on a dark studio stage, then the same shot exploded into its parts. The owner
-//     looks at both and approves them or asks for new ones.
-//  2. Film: Google's Gemini Omni Flash (gemini-omni-1.1-flash, Gemini API "interactions") moves
-//     from the first still to the last one. 16:9 for the site; a 9:16 reel too when asked.
-//  3. Frames: ffmpeg cuts the film into numbered WebP frames that go into every build at
-//     ./uploads/explode-<id>/001.webp..., played by <ScrollVideo> from 'kairoq/scroll'.
-// Credits are taken before each paid step and given back when it fails. Needs GEMINI_API_KEY
-// (with billing on in Google AI Studio) and the builder's image generation.
+// Product films: one product photo, one button ("Make it move"), and Kairoq does the rest.
+//  1. Motion: from the owner's line ("chocolate pouring over it") or the product: pour, splash,
+//     steam, explode (comes apart into its layers) or turn.
+//  2. Stills: the image model (the builder's generateImage, the photo as reference) makes the
+//     product on a stage in the site's own background colour, then the same shot at the end of the
+//     motion. Kairoq's vision check looks at both; when they look wrong it makes them once more.
+//  3. Film: Google's Gemini Omni Flash (gemini-omni-1.1-flash, Gemini API "interactions") moves
+//     from the first still to the last. ffmpeg cuts it into numbered WebP frames that go into
+//     every build at ./uploads/explode-<id>/, played by <ScrollVideo layout="split"> from
+//     'kairoq/scroll' beside a headline. A 9:16 reel to post is made from the same stills.
+//  4. Done: the scene is added to the site with a normal build (onDone).
+// Also the site reel: a screenshot of the site on a laptop on a cafe table, filmed in 9:16.
+// One price, taken first; given back when the film cannot be made (the reel's part when only the
+// reel fails). Needs GEMINI_API_KEY (billing on in Google AI Studio) and image generation.
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),{execFile}=require('child_process');
 const builder=require('./react-builder');
 
 const MODEL_DEFAULT='gemini-omni-1.1-flash';
-const MAX_FILM_BYTES=80*1024*1024,MAX_KEPT=8,STALE_MS=25*60000,MAX_FRAMES=144;
+const MAX_FILM_BYTES=80*1024*1024,MAX_KEPT=8,STALE_MS=30*60000,MAX_FRAMES=144;
 function fail(status,message){return Object.assign(Error(message),{status})}
 function key(env=process.env){return env.GEMINI_API_KEY||''}
 function apiBase(env=process.env){return String(env.KAIROQ_GEMINI_API_BASE||'https://generativelanguage.googleapis.com').replace(/\/+$/,'')}
@@ -22,26 +25,61 @@ function model(env=process.env){const m=String(env.KAIROQ_EXPLODE_MODEL||MODEL_D
 function resolution(env=process.env){return['720p','1080p'].includes(env.KAIROQ_EXPLODE_RESOLUTION)?env.KAIROQ_EXPLODE_RESOLUTION:'720p'}
 function configured(env=process.env,{images=true}={}){return Boolean(key(env))&&images&&env.KAIROQ_EXPLODE!=='off'}
 function intEnv(name,def){const raw=process.env[name],n=Number(raw);return raw!==undefined&&String(raw).trim()!==''&&Number.isInteger(n)&&n>=0?n:def}
-// Credits: the two stills; the film for the site; the 9:16 reel (another film).
-function prices(){return{stills:intEnv('KAIROQ_EXPLODE_STILLS_CREDITS',3),film:intEnv('KAIROQ_EXPLODE_CREDITS',25),reel:intEnv('KAIROQ_EXPLODE_REEL_CREDITS',25)}}
+// One price per product film (stills, film and reel) and one per site reel.
+function prices(){return{film:intEnv('KAIROQ_FILM_CREDITS',50),reel_part:intEnv('KAIROQ_FILM_REEL_PART',20),site_reel:intEnv('KAIROQ_SITE_REEL_CREDITS',25)}}
 function dir(id,eid){return path.join(builder.projectDir(id),'explodes',...(eid?[eid]:[]))}
 function sleep(ms,signal){return new Promise((resolve,reject)=>{const t=setTimeout(resolve,ms);signal&&signal.addEventListener('abort',()=>{clearTimeout(t);reject(fail(499,'Stopped'))},{once:true})})}
 const clean=s=>String(s||'').replace(/[\u0000-\u001f<>{}]/g,' ').replace(/\s+/g,' ').trim().slice(0,300);
 
-// ---------- prompts ----------
-// The photo decides what the product is; the owner's note says what it is and what is inside.
-function stillPrompts(note){
+// ---------- motion and prompts ----------
+const MOTIONS=['pour','splash','steam','explode','turn'];
+// The motion the owner's words ask for; otherwise one that suits most products.
+function motionOf(note){
+ const t=String(note||'').toLowerCase();
+ if(/\b(pour|pouring|drizzl\w*|sauce|syrup|melt\w*|caramel|honey|glaze)\b/.test(t))return'pour';
+ if(/\b(splash\w*|drop|droplet|drip\w*|wave)\b/.test(t))return'splash';
+ if(/\b(steam\w*|smok\w*|hot|sizzl\w*|rising|vapou?r)\b/.test(t))return'steam';
+ if(/\b(explod\w*|apart|layers?|inside|parts?|ingredients?|components?|stack\w*)\b/.test(t))return'explode';
+ if(/\b(turn\w*|spin\w*|rotat\w*|360)\b/.test(t))return'turn';
+ // A list of what is in it ("a burger: bun, patty, cheese") reads as its layers.
+ if(t.split(',').length>=3)return'explode';
+ return'turn';
+}
+// The stage: the site's own background colour (from the design brief), dark or light.
+function stageOf(design){
+ const hex=String(design&&design.palette&&design.palette.background||'#141414').toLowerCase();
+ const m=/^#([0-9a-f]{6})$/.exec(hex),n=m?parseInt(m[1],16):0x141414;
+ const lum=(0.2126*(n>>16&255)+0.7152*(n>>8&255)+0.0722*(n&255))/255;
+ return{hex:m?hex:'#141414',dark:lum<0.5};
+}
+function stillPrompts(note,motion,stage){
  const what=note?' The owner says: "'+note+'".':'';
+ const room='Seamless studio backdrop in the colour '+stage.hex+' ('+(stage.dark?'dark':'light')+'), soft key light from the upper left, a thin rim light along its edges, a soft shadow beneath it.';
+ const keep='Keep its shape, colours, materials, proportions and any printed details exactly as in the reference.';
+ const end={
+  pour:'The same shot, a moment later: a glossy, thick stream of the sauce or liquid that suits this product (as the owner says) pours onto it from above, mid-pour, with a few drips running down its side.',
+  splash:'The same shot, a moment later: a single drop of the liquid that suits this product lands beside it with a crisp crown splash, droplets frozen in the air.',
+  steam:'The same shot, a moment later: soft wisps of steam rise from the product and curl upward into the backdrop.',
+  explode:'The same shot as an exploded view: the product separated into its real components, each floating apart along the vertical axis in its real order, evenly spaced with clear gaps, every part fully visible and nothing cut off; the stack is centred. Only the parts this product really has.',
+  turn:'The same product, same backdrop and lighting, seen from a three-quarter angle after it has turned about 90 degrees on its own axis, still centred.',
+ }[motion];
  return{
-  start:'Studio product photograph made from the reference photo. Show exactly the same product, whole and assembled, centred in a wide 16:9 frame with generous empty space around it (the product fills about half the height). Deep charcoal seamless studio backdrop, soft key light from the upper left, a thin bright rim light along its edges, a soft shadow beneath it. Keep its shape, colours, materials, proportions and any printed details exactly as in the photo. Nothing else in the frame.'+what,
-  end:'Exploded-view studio photograph of exactly this product, from the same camera, same framing, same charcoal backdrop and same lighting as the reference. Separate it into its real components, each floating apart along the vertical axis in its real order, evenly spaced with clear gaps, every part fully visible inside the frame and nothing cut off; the whole stack is centred. Only the parts this product really has, each with the same shape, colour and material as in the reference. Photoreal, no labels, arrows or lines.'+what,
+  start:'Studio product photograph made from the reference photo. Exactly the same product, whole, centred in a wide 16:9 frame with generous empty space around it (it fills about half the height). '+room+' '+keep+' Nothing else in the frame.'+what,
+  end:end+' Same camera, framing, backdrop colour ('+stage.hex+') and lighting as the reference. '+keep+' Photoreal, no labels, arrows or lines.'+what,
  };
 }
-function filmPrompt(note,aspect){
+function filmPrompt(note,motion,aspect){
  const what=note?' The product: '+note+'.':'';
- return('<FIRST_FRAME> <LAST_FRAME> Cinematic studio product film.'+what+' It starts exactly on the first frame with the product whole. Its parts slowly and smoothly lift apart, each moving straight along its own axis with a gentle ease, into the exploded arrangement of the last frame, with a slow, slight camera push-in. One continuous shot, no cuts. The same charcoal backdrop and lighting throughout. Every part keeps its exact shape, colour and material; nothing new appears; no people, hands, text or logos are added.'+(aspect==='9:16'?' Framed vertically with the product centred.':'')+' It ends exactly on the last frame.').slice(0,1800);
+ const move={
+  pour:'The sauce or liquid begins to pour from above and flows slowly over the product, glossy and thick, in slow motion.',
+  splash:'A drop falls and lands beside the product with a slow-motion crown splash.',
+  steam:'Soft steam begins to rise from the product and drifts upward.',
+  explode:'Its parts slowly and smoothly lift apart, each moving straight along its own axis with a gentle ease, into the exploded arrangement of the last frame.',
+  turn:'The product turns slowly on its own axis.',
+ }[motion];
+ return('<FIRST_FRAME> <LAST_FRAME> Cinematic studio product film.'+what+' It starts exactly on the first frame. '+move+' A slow, slight camera push-in. One continuous shot, no cuts. The same backdrop and lighting throughout. The product keeps its exact shape, colour and material; nothing else appears; no people, hands, text or logos are added.'+(aspect==='9:16'?' Framed vertically with the product centred.':'')+' It ends exactly on the last frame.').slice(0,1800);
 }
-
+const REVIEW=(note,motion)=>'These two pictures are the first and last still of a short product film'+(note?' ("'+String(note).slice(0,200)+'")':'')+'; the film shows: '+motion+'. Judge them like an art director. Do both show the same product, clearly and in full (nothing cut off), on a clean studio backdrop, photoreal, with no text, labels or extra objects? Does the second clearly show the '+motion+' moment? Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":["...", "..."]} (at most 3).';
 // ---------- Gemini API (Omni Flash) ----------
 async function gJson(url,init,{signal,env}){
  const r=await fetch(url,{...init,signal,headers:{'x-goog-api-key':key(env),...(init&&init.body?{'Content-Type':'application/json'}:{})}});
@@ -71,11 +109,11 @@ async function downloadFile(uri,{signal,env,pollMs,until}){
  if(!r.ok)throw fail(502,'Could not download the film ('+r.status+').');
  return Buffer.from(await r.arrayBuffer());
 }
-// One film between two stills. first/last: {mime, data(base64)}.
+// One film from a first still (and a last still, when the motion has one). Stills: {mime, data(base64)}.
 async function render({first,last,prompt,aspect='16:9',signal,env=process.env,pollMs=Number(env.KAIROQ_VIDEO_POLL_MS||5000),timeoutMs=Number(env.KAIROQ_VIDEO_TIMEOUT_MS||15*60000)}){
- if(!key(env))throw fail(503,'Explode films need GEMINI_API_KEY in Railway (service, Variables), with billing on in Google AI Studio.');
+ if(!key(env))throw fail(503,'Product films need GEMINI_API_KEY in Railway (service, Variables), with billing on in Google AI Studio.');
  const until=Date.now()+timeoutMs,base=apiBase(env);
- const body={model:model(env),input:[{type:'image',data:first.data,mime_type:first.mime},{type:'image',data:last.data,mime_type:last.mime},{type:'text',text:prompt}],
+ const body={model:model(env),input:[{type:'image',data:first.data,mime_type:first.mime},...(last?[{type:'image',data:last.data,mime_type:last.mime}]:[]),{type:'text',text:prompt}],
   response_format:{type:'video',aspect_ratio:aspect,resolution:resolution(env),delivery:'uri'},store:false};
  const out=await gJson(base+'/v1beta/interactions',{method:'POST',body:JSON.stringify(body)},{signal,env});
  const video=findVideo(out);
@@ -97,19 +135,19 @@ async function cutFrames(film,out,{ffmpeg=process.env.FFMPEG_PATH||'ffmpeg'}={})
  return n;
 }
 
-// ---------- per-project explodes ----------
+// ---------- per-project films ----------
+// The message that adds a finished film to the site as a scene (a normal build).
 function heroMessage(e){
- return'Add a full-width scroll section between the hero and the next section that shows our product coming apart into its layers and going back together as the visitor scrolls: <ScrollVideo src="./uploads/explode-'+e.id+'/" frames={'+e.frames+'} alt="'+(e.note||'The product, exploded into its parts').replace(/"/g,"'")+'" /> from \'kairoq/scroll\'. Give it three or four captions (the captions prop) about what is inside, in our voice, drawn only from what the site already says about the product.';
+ return'Add a full-width scene section for our product between the hero and the next section: <ScrollVideo layout="split" src="./uploads/explode-'+e.id+'/" frames={'+e.frames+'} title="..." text="..." cta={{ label: "...", href: "..." }} alt="'+(e.note||'Our product').replace(/"/g,"'")+'" /> from \'kairoq/scroll\'. Write the title as a short, confident headline (three to five words) and the text as one sentence, in our voice, about '+(e.note?'"'+e.note.replace(/"/g,"'")+'"':'the product')+', using only what the site already says; the button goes to the main action of the site (order, book or shop).';
 }
 function view(e){
  const done=e.status==='done';
- return{id:e.id,photo:e.photo,note:e.note||'',status:e.status,error:e.error||null,at:e.at,credits:e.credits||0,
-  stills:e.stills?{start:'start.'+e.stills.start,end:'end.'+e.stills.end}:null,film:done?'film.mp4':null,reel:done&&e.reel?'reel.mp4':null,
-  frames:done?e.frames:0,...(done?{site_message:heroMessage(e)}:{})};
+ return{id:e.id,photo:e.photo,note:e.note||'',motion:e.motion,kind:e.kind||'product',status:e.status,step:e.step||null,error:e.error||null,at:e.at,credits:e.credits||0,
+  film:done&&e.kind!=='site'?'film.mp4':null,reel:done&&e.reel?'reel.mp4':null,frames:done?e.frames||0:0,on_site:Boolean(e.on_site),
+  ...(done&&e.kind!=='site'?{site_message:heroMessage(e)}:{})};
 }
 function list(id){return(builder.loadMeta(id).explodes||[]).map(view)}
 function update(id,eid,patch){const meta=builder.loadMeta(id);const e=(meta.explodes||[]).find(x=>x.id===eid);if(!e)return null;Object.assign(e,patch);builder.saveMeta(meta);return e}
-function find(id,eid){const e=(builder.loadMeta(id).explodes||[]).find(x=>x.id===String(eid));if(!e)throw fail(404,'Unknown explode film');return e}
 function photoOf(id,photo){
  const file=require('./react-assets').read(id,photo);
  if(!file||!/^image\/(png|jpeg|webp)$/.test(file.type))throw fail(400,'Pick a PNG, JPG or WebP photo of the product from your uploads.');
@@ -117,102 +155,104 @@ function photoOf(id,photo){
 }
 const EXT={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
 const MIME={png:'image/png',jpg:'image/jpeg',webp:'image/webp'};
-function readStill(id,e,which){const ext=e.stills[which],bytes=fs.readFileSync(path.join(dir(id,e.id),which+'.'+ext));return{mime:MIME[ext],data:bytes.toString('base64')}}
-
-// Makes the two stills in the background. generateImage({prompt, aspect, references}) is the
-// builder's image model; references are data: URLs.
-function makeStills(id,e,{generateImage,refund,note}){
- const price=prices().stills,ref=e.ref;
+function saveStill(d,name,pic){for(const f of fs.readdirSync(d))if(f.startsWith(name+'.'))fs.rmSync(path.join(d,f));fs.writeFileSync(path.join(d,name+'.'+(EXT[pic.mime]||'png')),Buffer.from(pic.data,'base64'))}
+function busy(id){return(builder.loadMeta(id).explodes||[]).some(x=>x.status==='making')}
+function begin(id,fields,{charge,price,label}){
+ if(busy(id))throw fail(409,'A film is still being made for this project. Wait for it to finish.');
+ const ref='film:'+id+':'+crypto.randomUUID();
+ if(price>0)charge(price,ref,label);
+ const meta=builder.loadMeta(id),e={id:crypto.randomBytes(6).toString('hex'),status:'making',step:'Starting',at:new Date().toISOString(),credits:price,ref,...fields};
+ meta.explodes=[e,...(meta.explodes||[])];builder.saveMeta(meta);prune(id);
+ fs.mkdirSync(dir(id,e.id),{recursive:true});
+ return e;
+}
+// "Make it move": photo (and the owner's line) to a film on the site and a reel to post.
+// review({request,pictures,prompt}) is the vision check; onDone(view) adds the scene to the site.
+function make(id,{photo,note='',charge=()=>{},refund=()=>{},generateImage,review,onDone=()=>{},env=process.env,render:renderFn=render,ffmpeg}){
+ if(!configured(env,{images:Boolean(generateImage)}))throw fail(503,'Product films need GEMINI_API_KEY and image generation on this server.');
+ const file=photoOf(id,String(photo||'')),text=clean(note),motion=motionOf(text),stage=stageOf(builder.loadMeta(id).design);
+ const p=prices(),e=begin(id,{kind:'product',photo:String(photo),note:text,motion},{charge,price:p.film,label:'Product film'});
+ const d=dir(id,e.id),step=s=>update(id,e.id,{step:s});
  Promise.resolve().then(async()=>{
-  const photo=photoOf(id,e.photo),p=stillPrompts(note);
-  const start=await generateImage({prompt:p.start,aspect:'16:9',references:['data:'+photo.type+';base64,'+photo.bytes.toString('base64')]});
-  const end=await generateImage({prompt:p.end,aspect:'16:9',references:['data:'+start.mime+';base64,'+start.data]});
-  const d=dir(id,e.id);fs.mkdirSync(d,{recursive:true});
-  for(const f of fs.readdirSync(d))if(/^(start|end)\./.test(f))fs.rmSync(path.join(d,f));
-  const stills={start:EXT[start.mime]||'png',end:EXT[end.mime]||'png'};
-  fs.writeFileSync(path.join(d,'start.'+stills.start),Buffer.from(start.data,'base64'));
-  fs.writeFileSync(path.join(d,'end.'+stills.end),Buffer.from(end.data,'base64'));
-  update(id,e.id,{status:'review',stills,error:null,ref:undefined,at:new Date().toISOString()});
- }).catch(err=>{
-  update(id,e.id,{status:'failed',error:String(err.message||err).slice(0,300),ref:undefined});
-  if(price>0)try{refund(price,ref)}catch{}
- });
-}
-// Step 1: a product photo (and the owner's note) to two stills for approval.
-function start(id,{photo,note='',charge=()=>{},refund=()=>{},generateImage,env=process.env}){
- if(!configured(env,{images:Boolean(generateImage)}))throw fail(503,'Explode films need GEMINI_API_KEY and image generation on this server.');
- photoOf(id,String(photo||''));
- const meta=builder.loadMeta(id),all=meta.explodes||[];
- if(all.some(x=>x.status==='stills'||x.status==='rendering'))throw fail(409,'An explode film is still being made for this project. Wait for it to finish.');
- const price=prices().stills,ref='explode:'+id+':'+crypto.randomUUID();
- if(price>0)charge(price,ref,'Explode stills');
- const e={id:crypto.randomBytes(6).toString('hex'),photo:String(photo),note:clean(note),status:'stills',at:new Date().toISOString(),credits:price,ref};
- meta.explodes=[e,...all];builder.saveMeta(meta);prune(id);
- makeStills(id,e,{generateImage,refund,note:e.note});
- return view(e);
-}
-// New stills for the same photo (a changed note is used from now on).
-function redo(id,eid,{note,charge=()=>{},refund=()=>{},generateImage,env=process.env}){
- if(!configured(env,{images:Boolean(generateImage)}))throw fail(503,'Explode films need GEMINI_API_KEY and image generation on this server.');
- const e=find(id,eid);
- if(e.status==='stills'||e.status==='rendering')throw fail(409,'This explode film is still being made.');
- const price=prices().stills,ref='explode:'+id+':'+crypto.randomUUID();
- if(price>0)charge(price,ref,'Explode stills');
- const patch={status:'stills',error:null,ref,credits:(e.credits||0)+price,...(note!==undefined?{note:clean(note)}:{})};
- const fresh=update(id,eid,patch);
- makeStills(id,fresh,{generateImage,refund,note:fresh.note});
- return view(fresh);
-}
-// Step 2: the owner approved the stills: the film (and the reel), then the frames.
-function film(id,eid,{reel=false,charge=()=>{},refund=()=>{},env=process.env,render:renderFn=render,ffmpeg}){
- if(!configured(env))throw fail(503,'Explode films need GEMINI_API_KEY in Railway (service, Variables).');
- const e=find(id,eid);
- if(e.status!=='review'&&e.status!=='done')throw fail(409,e.status==='failed'?'Make new stills first.':'Wait until the stills are ready.');
- if(!e.stills)throw fail(409,'Make the stills first.');
- const p=prices(),price=p.film+(reel?p.reel:0),ref='explode:'+id+':'+crypto.randomUUID();
- if(price>0)charge(price,ref,reel?'Explode film and reel':'Explode film');
- const fresh=update(id,eid,{status:'rendering',error:null,ref,reel:Boolean(reel),credits:(e.credits||0)+price,started:new Date().toISOString()});
- const first=readStill(id,e,'start'),last=readStill(id,e,'end'),d=dir(id,eid);
- Promise.resolve().then(async()=>{
-  const wide=await renderFn({first,last,prompt:filmPrompt(e.note,'16:9'),aspect:'16:9',env});
+  // Stills, checked; once more when the check finds problems.
+  const prompts=stillPrompts(text,motion,stage);let start,end,problems=[];
+  for(let round=1;round<=2;round++){
+   step(round===1?'Making the stills':'Making better stills');
+   const fix=problems.length?' Fix: '+problems.join('; '):'';
+   start=await generateImage({prompt:prompts.start+fix,aspect:'16:9',references:['data:'+file.type+';base64,'+file.bytes.toString('base64')]});
+   end=await generateImage({prompt:prompts.end+fix,aspect:'16:9',references:['data:'+start.mime+';base64,'+start.data]});
+   if(!review)break;
+   step('Checking the stills');
+   let v=null;try{v=await review({request:text||'a product film',pictures:[start,end].map(x=>({data:x.data,mime:x.mime})),prompt:REVIEW(text,motion)})}catch{v=null}
+   if(!v||v.ok)break;
+   problems=(v.problems||[]).map(String).slice(0,3);
+   if(round===2)throw fail(422,'The stills did not look right ('+problems.join('; ').slice(0,200)+'). Try a clearer photo of the product on its own.');
+  }
+  saveStill(d,'start',start);saveStill(d,'end',end);
+  step('Filming');
+  const wide=await renderFn({first:start,last:end,prompt:filmPrompt(text,motion,'16:9'),aspect:'16:9',env});
   fs.writeFileSync(path.join(d,'film.mp4'),wide.bytes);
   const frames=await cutFrames(path.join(d,'film.mp4'),path.join(d,'frames'),{ffmpeg});
-  fs.rmSync(path.join(d,'reel.mp4'),{force:true});
-  if(reel){const tall=await renderFn({first,last,prompt:filmPrompt(e.note,'9:16'),aspect:'9:16',env});fs.writeFileSync(path.join(d,'reel.mp4'),tall.bytes)}
-  update(id,eid,{status:'done',frames,model:wide.model,ref:undefined,done_at:new Date().toISOString()});
+  update(id,e.id,{frames,model:wide.model});
+  // The reel: when it fails, the film stays and the reel's part is given back.
+  step('Making the reel');
+  let reel=false;
+  try{const tall=await renderFn({first:start,last:end,prompt:filmPrompt(text,motion,'9:16'),aspect:'9:16',env});fs.writeFileSync(path.join(d,'reel.mp4'),tall.bytes);reel=true}
+  catch{if(p.reel_part>0)try{refund(Math.min(p.reel_part,p.film),e.ref+':reel')}catch{}}
+  const done=update(id,e.id,{status:'done',step:null,reel,ref:undefined,done_at:new Date().toISOString()});
+  try{await onDone(view(done))}catch{}
  }).catch(err=>{
-  // The stills stay, so the owner can try the film again.
-  update(id,eid,{status:'review',error:'The film was not made: '+String(err.message||err).slice(0,260)+(price?' Your credits were refunded.':''),ref:undefined});
-  if(price>0)try{refund(price,ref)}catch{}
+  update(id,e.id,{status:'failed',step:null,error:String(err.message||err).slice(0,300)+(p.film?' Your credits were refunded.':''),ref:undefined});
+  if(p.film>0)try{refund(p.film,e.ref)}catch{}
  });
- return view(fresh);
+ return view(e);
 }
-// Steps still running long after they started (a restart): refunded and set back.
+// "Make a reel of my site": the site's screenshot on a laptop on a cafe table, filmed in 9:16.
+// shot: {mime, data} of the site's screenshot.
+function siteReel(id,{shot,charge=()=>{},refund=()=>{},generateImage,env=process.env,render:renderFn=render}){
+ if(!configured(env,{images:Boolean(generateImage)}))throw fail(503,'Reels need GEMINI_API_KEY and image generation on this server.');
+ if(!shot||!/^image\/(png|jpeg)$/.test(shot.mime))throw fail(503,'Kairoq could not take a picture of the site.');
+ const p=prices(),e=begin(id,{kind:'site',note:'',motion:'site'},{charge,price:p.site_reel,label:'Site reel'});
+ const d=dir(id,e.id),step=s=>update(id,e.id,{step:s});
+ Promise.resolve().then(async()=>{
+  step('Making the picture');
+  const still=await generateImage({aspect:'9:16',references:['data:'+shot.mime+';base64,'+shot.data],prompt:'A modern silver laptop open on a warm wooden cafe table, seen from a slightly low angle, its screen showing exactly the website in the reference picture: the same layout, text, colours and images, sharp and readable. A cup of coffee and soft window light in a blurred cafe behind. Vertical 9:16 photo. Do not change or invent anything on the screen.'});
+  saveStill(d,'start',still);
+  step('Filming');
+  const out=await renderFn({first:still,prompt:'<FIRST_FRAME> A slow, smooth camera push-in towards the laptop screen on the cafe table; soft steam rises from the coffee; warm light shifts gently. One continuous shot. The website on the screen stays exactly as it is: no changes to its text, layout or images. No people, no hands.',aspect:'9:16',env});
+  fs.writeFileSync(path.join(d,'reel.mp4'),out.bytes);
+  update(id,e.id,{status:'done',step:null,reel:true,ref:undefined,model:out.model,done_at:new Date().toISOString()});
+ }).catch(err=>{
+  update(id,e.id,{status:'failed',step:null,error:String(err.message||err).slice(0,300)+(p.site_reel?' Your credits were refunded.':''),ref:undefined});
+  if(p.site_reel>0)try{refund(p.site_reel,e.ref)}catch{}
+ });
+ return view(e);
+}
+// Films still "making" long after they started (a restart): refunded and marked failed.
 function sweep(id,{refund=()=>{},now=Date.now()}={}){
  const meta=builder.loadMeta(id);let changed=false;
- for(const e of meta.explodes||[])if((e.status==='stills'||e.status==='rendering')&&now-Date.parse(e.started||e.at)>STALE_MS){
-  const back=e.status==='rendering'?'review':'failed';
-  e.error='This step was interrupted. Your credits were refunded.';changed=true;
-  if(e.ref)try{refund(e.status==='rendering'?prices().film+(e.reel?prices().reel:0):prices().stills,e.ref)}catch{}
-  e.status=back;e.ref=undefined;
+ for(const e of meta.explodes||[])if(e.status==='making'&&now-Date.parse(e.at)>STALE_MS){
+  if(e.ref&&e.credits)try{refund(e.credits,e.ref)}catch{}
+  Object.assign(e,{status:'failed',step:null,error:'This was interrupted. Your credits were refunded.',ref:undefined});changed=true;
  }
  if(changed)builder.saveMeta(meta);
 }
 function prune(id){
  const meta=builder.loadMeta(id),all=meta.explodes||[];
  if(all.length<=MAX_KEPT)return;
- const drop=all.slice(MAX_KEPT).filter(e=>e.status!=='stills'&&e.status!=='rendering');
+ const drop=all.slice(MAX_KEPT).filter(e=>e.status!=='making');
  for(const e of drop)fs.rmSync(dir(id,e.id),{recursive:true,force:true});
  meta.explodes=all.filter(e=>!drop.includes(e));builder.saveMeta(meta);
 }
 function remove(id,eid){
  const meta=builder.loadMeta(id),e=(meta.explodes||[]).find(x=>x.id===String(eid));
- if(!e)throw fail(404,'Unknown explode film');
- if(e.status==='stills'||e.status==='rendering')throw fail(409,'This explode film is still being made.');
+ if(!e)throw fail(404,'Unknown film');
+ if(e.status==='making')throw fail(409,'This film is still being made.');
  fs.rmSync(dir(id,e.id),{recursive:true,force:true});
  meta.explodes=meta.explodes.filter(x=>x!==e);builder.saveMeta(meta);
  return list(id);
 }
+function markOnSite(id,eid){update(id,String(eid),{on_site:true})}
 // The owner's files: the stills, the film and the reel.
 function read(id,eid,name){
  if(!/^[a-f0-9]{12}$/.test(String(eid))||!/^(start\.(png|jpg|webp)|end\.(png|jpg|webp)|film\.mp4|reel\.mp4)$/.test(String(name)))return null;
@@ -222,10 +262,10 @@ function read(id,eid,name){
 // Finished frames go into every build at ./uploads/explode-<id>/.
 function copyInto(id,publicDir){
  for(const e of builder.loadMeta(id).explodes||[]){
-  if(e.status!=='done'&&!(e.status==='review'&&e.frames))continue;
+  if(e.status!=='done'||!e.frames)continue;
   const src=path.join(dir(id,e.id),'frames');if(!fs.existsSync(src))continue;
   const out=path.join(publicDir,'uploads','explode-'+e.id);fs.mkdirSync(out,{recursive:true});
   for(const f of fs.readdirSync(src))if(/^\d{3}\.webp$/.test(f))fs.copyFileSync(path.join(src,f),path.join(out,f));
  }
 }
-module.exports={configured,prices,model,stillPrompts,filmPrompt,render,findVideo,cutFrames,start,redo,film,list,sweep,remove,read,copyInto,heroMessage};
+module.exports={MOTIONS,configured,prices,model,motionOf,stageOf,stillPrompts,filmPrompt,render,findVideo,cutFrames,make,siteReel,list,sweep,remove,read,copyInto,heroMessage,markOnSite};

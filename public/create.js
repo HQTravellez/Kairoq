@@ -1825,7 +1825,7 @@ $('guard-autofix').onchange=async()=>{try{const {guard}=await api('/projects/'+s
 async function loadGrow(){
  const p=state.project;$('grow').classList.toggle('hidden',!p.published);if(!p.published){$('guard-section').classList.add('hidden');return}
  $('kit-poster').href='/api/create/projects/'+p.id+'/poster';
- const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);renderKit(grow.kit);text($('grow-status'),'');text($('kit-status'),'');api('/projects/'+p.id+'/guard').then(r=>renderGuard(r.guard)).catch(()=>{});text($('clips-status'),'');loadVideos('launch').catch(err=>text($('clips-status'),err.message));
+ const {grow}=await api('/projects/'+p.id+'/grow');renderGrow(grow);fillGrowForm(grow.business,grow.faq);renderKit(grow.kit);text($('grow-status'),'');text($('kit-status'),'');api('/projects/'+p.id+'/guard').then(r=>renderGuard(r.guard)).catch(()=>{});text($('clips-status'),'');loadVideos('launch').catch(err=>text($('clips-status'),err.message));text($('sitereel-status'),'');loadFilms().catch(err=>text($('sitereel-status'),err.message));
 }
 // The launch kit: each text with a Copy button.
 function renderKit(kit){
@@ -1901,72 +1901,64 @@ for(const kind of ['launch','hero']){
   finally{videoPrice(kind)}
  };
 }
-// Product explode films (Design): a product photo, two stills to approve, then the film whose
-// frames play on scroll on the site, and a 9:16 reel to post.
+// Product films (Design, "Make it move") and the site reel (Grow): one button each; Kairoq picks
+// the motion, checks its stills, films, adds the scene to the site and makes the reel.
 let explodePick=null,explodeTimer=null;
-function explodeCredits(n){return state.me.viewer?.kind==='customer'&&n?' · '+n+' credits':''}
-async function loadExplodes(){
+function filmPrice(n){return state.me.viewer?.kind==='customer'&&n?' · '+n+' credits':''}
+async function loadFilms(){
  const g=state.me.explode_generation;
- $('explode-section').classList.toggle('hidden',!g?.enabled);
+ for(const sec of ['explode-section','sitereel-section'])$(sec).classList.toggle('hidden',!g?.enabled);
  if(!g?.enabled)return;
  const id=state.project.id,d=await api('/projects/'+id+'/explodes');
  const box=$('explode-photos');box.replaceChildren();
  if(explodePick&&!d.photos.some(p=>p.name===explodePick))explodePick=null;
  if(!d.photos.length)box.append(el('p','muted small','Add a photo of the product first (the image button in the chat). One product, well lit, nothing in front of it.'));
  for(const p of d.photos){
-  const b=el('button','photo-pick');b.type='button';b.title=p.name;b.setAttribute('aria-pressed',String(explodePick===p.name));
+  const b=el('button','photo-pick');b.type='button';b.title=p.name;
   const img=el('img');img.alt=p.name;img.loading='lazy';img.src='/api/create/projects/'+id+'/asset?name='+encodeURIComponent(p.name);b.append(img);
-  b.onclick=()=>{explodePick=explodePick===p.name?null:p.name;renderExplodes(d)};
+  b.onclick=()=>{explodePick=explodePick===p.name?null:p.name;renderFilms(d)};
   box.append(b);
  }
- renderExplodes(d);
+ renderFilms(d);
 }
-function renderExplodes(d){
- const id=state.project.id,editor=state.project.role!=='viewer',busy=d.explodes.some(e=>e.status==='stills'||e.status==='rendering');
- for(const b of $('explode-photos').querySelectorAll('.photo-pick'))b.setAttribute('aria-pressed',String(explodePick===b.title));
- $('explode-go').textContent='Make the stills'+explodeCredits(d.credits.stills);
- $('explode-go').disabled=!explodePick||!editor||busy;
- const file=(e,name,dl)=>'/api/create/projects/'+id+'/explodefile?id='+e.id+'&name='+encodeURIComponent(name)+(dl?'&download=1':'');
- const act=async(body,msg)=>{text($('explode-status'),msg);try{const r=await api('/projects/'+id+'/explodes',{method:'POST',body});refreshCredits();renderExplodes({...d,explodes:r.explodes});text($('explode-status'),'')}catch(err){text($('explode-status'),err.message);if(err.status===402&&state.me.purchases)openBuy()}};
- const list=$('explode-list');list.replaceChildren();
- for(const e of d.explodes){
-  const card=el('div','explode-card');
-  if(e.note)card.append(el('strong','',e.note));
-  if(e.stills){
-   const row=el('div','explode-stills');
-   for(const [k,cap] of [['start','Whole'],['end','Apart']]){const f=el('figure'),img=el('img');img.alt=cap;img.src=file(e,e.stills[k])+'&t='+encodeURIComponent(e.at);f.append(img,el('figcaption','',cap));row.append(f)}
-   if(e.status!=='done')card.append(row);
-  }
-  if(e.error)card.append(el('p','error',e.error));
-  if(e.status==='stills')card.append(el('span','muted','Making the stills… (about a minute)'));
-  if(e.status==='rendering')card.append(el('span','muted','Filming… (usually 2 to 5 minutes). You can close this window; it keeps going.'));
-  if(e.status==='review'&&editor){
-   const row=el('div','row'),go=el('button','primary','Looks right: make the film'+explodeCredits(d.credits.film));go.type='button';
-   const lab=el('label','muted small explode-reel'),reel=document.createElement('input');reel.type='checkbox';lab.append(reel,document.createTextNode(' Also a vertical reel to post'+(state.me.viewer?.kind==='customer'&&d.credits.reel?' (+'+d.credits.reel+' credits)':'')));
-   reel.onchange=()=>{go.textContent='Looks right: make the film'+explodeCredits(d.credits.film+(reel.checked?d.credits.reel:0))};
-   go.onclick=()=>act({op:'film',id:e.id,reel:reel.checked},'Starting the film…');
-   const again=el('button','ghost','New stills'+explodeCredits(d.credits.stills));again.type='button';again.onclick=()=>act({op:'redo',id:e.id},'Making new stills…');
-   row.append(go,lab,again);card.append(row);
-  }
-  if(e.status==='done'){
-   const vid=el('video');vid.controls=true;vid.muted=true;vid.loop=true;vid.playsInline=true;vid.preload='metadata';vid.src=file(e,e.film);card.append(vid);
-   const row=el('div','row');
-   if(editor){const put=el('button','primary','Put it on my site');put.type='button';put.onclick=()=>{for(const dlg of ['design-dialog','publish-dialog'])if($(dlg).open)$(dlg).close();send(e.site_message,'build')};row.append(put)}
-   const dl=el('a','ghost button-link','Download film');dl.href=file(e,e.film,true);row.append(dl);
-   if(e.reel){const r=el('a','ghost button-link','Download reel (9:16)');r.href=file(e,e.reel,true);row.append(r)}
-   card.append(row);
-  }
-  if(editor&&e.status!=='stills'&&e.status!=='rendering'){const del=el('button','link-btn','Remove');del.type='button';del.onclick=async()=>{try{const r=await api('/projects/'+id+'/explodes',{method:'DELETE',body:{id:e.id}});renderExplodes({...d,explodes:r.explodes})}catch(err){text($('explode-status'),err.message)}};card.append(del)}
-  list.append(card);
+function filmCard(d,e){
+ const id=state.project.id,editor=state.project.role!=='viewer',card=el('div','explode-card');
+ const file=(name,dl)=>'/api/create/projects/'+id+'/explodefile?id='+e.id+'&name='+encodeURIComponent(name)+(dl?'&download=1':'');
+ if(e.note)card.append(el('strong','',e.note));
+ if(e.status==='making')card.append(el('span','muted',(e.step||'Starting')+'… (usually 3 to 6 minutes; you can close this window)'));
+ if(e.status==='failed')card.append(el('p','error',e.error||'It was not made.'));
+ if(e.status==='done'){
+  if(e.film){const vid=el('video');vid.controls=true;vid.muted=true;vid.loop=true;vid.playsInline=true;vid.preload='metadata';vid.src=file(e.film);card.append(vid)}
+  else if(e.reel){const vid=el('video','reel');vid.controls=true;vid.muted=true;vid.loop=true;vid.playsInline=true;vid.preload='metadata';vid.src=file(e.reel);card.append(vid)}
+  if(e.film)card.append(el('span','muted small',e.on_site?'Added to your site as a scene.':'Not on the site yet.'));
  }
- clearTimeout(explodeTimer);
- if(d.explodes.some(e=>e.status==='stills'||e.status==='rendering'))explodeTimer=setTimeout(()=>{if(!$('explode-section').closest('dialog')?.open)return;loadExplodes().catch(()=>{})},8000);
+ const row=el('div','row');
+ if(e.status==='done'&&e.reel){const r=el('a','ghost button-link','Download reel (9:16)');r.href=file(e.reel,true);row.append(r)}
+ if(e.status==='done'&&e.film&&!e.on_site&&editor){const put=el('button','ghost','Put it on my site');put.type='button';put.onclick=()=>{for(const dlg of ['design-dialog','publish-dialog'])if($(dlg).open)$(dlg).close();send(e.site_message,'build')};row.append(put)}
+ if(e.status!=='making'&&e.kind!=='site'&&editor&&e.photo){const again=el('button','ghost','Try again'+filmPrice(d.credits.film));again.type='button';again.onclick=()=>startFilm({photo:e.photo,note:e.note});row.append(again)}
+ if(e.status!=='making'&&editor){const del=el('button','link-btn','Remove');del.type='button';del.onclick=async()=>{try{const r=await api('/projects/'+id+'/explodes',{method:'DELETE',body:{id:e.id}});renderFilms({...d,explodes:r.explodes})}catch(err){text($('explode-status'),err.message)}};row.append(del)}
+ if(row.childNodes.length)card.append(row);
+ return card;
 }
-$('explode-go').onclick=async()=>{
- const b=$('explode-go');b.disabled=true;text($('explode-status'),'Starting…');
- try{await api('/projects/'+state.project.id+'/explodes',{method:'POST',body:{photo:explodePick,note:$('explode-note').value}});$('explode-note').value='';text($('explode-status'),'');refreshCredits();await loadExplodes()}
- catch(err){text($('explode-status'),err.message);b.disabled=false;if(err.status===402&&state.me.purchases)openBuy()}
-};
+function renderFilms(d){
+ const editor=state.project.role!=='viewer',busy=d.explodes.some(e=>e.status==='making');
+ for(const b of $('explode-photos').querySelectorAll('.photo-pick'))b.setAttribute('aria-pressed',String(explodePick===b.title));
+ $('explode-go').textContent='Make it move'+filmPrice(d.credits.film);
+ $('explode-go').disabled=!explodePick||!editor||busy;
+ $('sitereel-go').textContent='Make a reel of my site'+filmPrice(d.credits.site_reel);
+ $('sitereel-go').disabled=!editor||busy||!state.project.current_version;
+ const films=$('explode-list'),reels=$('sitereel-list');films.replaceChildren();reels.replaceChildren();
+ for(const e of d.explodes)(e.kind==='site'?reels:films).append(filmCard(d,e));
+ clearTimeout(explodeTimer);
+ if(busy)explodeTimer=setTimeout(()=>{if(!$('explode-section').closest('dialog')?.open&&!$('sitereel-section').closest('dialog')?.open)return;loadFilms().catch(()=>{})},8000);
+}
+async function startFilm(body,status='explode-status'){
+ text($(status),'Starting…');
+ try{const r=await api('/projects/'+state.project.id+'/explodes',{method:'POST',body});text($(status),'');refreshCredits();await loadFilms()}
+ catch(err){text($(status),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+}
+$('explode-go').onclick=async()=>{$('explode-go').disabled=true;await startFilm({photo:explodePick,note:$('explode-note').value});$('explode-note').value=''};
+$('sitereel-go').onclick=async()=>{$('sitereel-go').disabled=true;await startFilm({op:'site'},'sitereel-status')};
 $('grow-suggest').onclick=async()=>{
  const b=$('grow-suggest');b.disabled=true;text($('grow-status'),'Reading your pages…');$('grow-details').open=true;
  try{const {suggestion:s,credits}=await api('/projects/'+state.project.id+'/grow',{method:'POST',body:{op:'suggest'}});fillGrowForm(s.business,s.faq);if(s.seo&&s.seo.title&&!$('seo-title').value)$('seo-title').value=s.seo.title;if(s.seo&&s.seo.description&&!$('seo-description').value)$('seo-description').value=s.seo.description;text($('grow-status'),'Filled in from what your pages say'+(credits?' ('+credits+' credit'+(credits===1?'':'s')+')':'')+'. Check it, add anything missing, then Save.')}
@@ -2880,7 +2872,7 @@ async function renderDesign(){
  $('design-radius').value=['0rem','0.375rem','0.75rem','1.25rem'].includes(ds.radius)?ds.radius:'0.75rem';
  renderSkills();
  text($('herovideo-status'),'');loadVideos('hero').catch(err=>text($('herovideo-status'),err.message));
- text($('explode-status'),'');loadExplodes().catch(err=>text($('explode-status'),err.message));
+ text($('explode-status'),'');loadFilms().catch(err=>text($('explode-status'),err.message));
  text($('models-status'),'');$('models-results').replaceChildren();loadModels().catch(err=>text($('models-status'),err.message));
  $('genimage-section').classList.toggle('hidden',!state.me.image_generation?.enabled);
  const c=state.me.image_generation?.credits;text($('genimage-status'),state.me.viewer?.kind==='customer'&&c?c+' credits per image. Saved to the project images; then ask the chat to use it.':'Saved to the project images; then ask the chat to use it.');

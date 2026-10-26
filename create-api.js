@@ -1542,14 +1542,22 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const ev=require('./explode-video');ev.sweep(id,{refund:refundVideo(v)});
    return send(res,200,{explodes:ev.list(id),enabled:ev.configured(process.env,{images:Boolean(generateImage)}),credits:ev.prices(),photos:require('./react-assets').list(id).filter(a=>/\.(png|jpe?g|webp)$/.test(a.name))}),true;
   }
+  // "Make it move" (a product photo to a film scene on the site and a reel) and "Make a reel of my
+  // site" (explode-video.js). One price each, taken first and refunded when the film is not made.
   if(action==='/explodes'&&method==='POST'){
    const ev=require('./explode-video'),b=await readJson(req,4000);
    limitedKey('explodes:'+id,20,3600000);
    const charge=(n,ref,label)=>{if(v.kind==='customer')accounts.charge(v.account.id,n,label,ref)},refund=refundVideo(v);
-   const op=String(b.op||'start');
-   const e=op==='film'?ev.film(id,String(b.id||''),{reel:b.reel===true,charge,refund})
-    :op==='redo'?ev.redo(id,String(b.id||''),{note:b.note===undefined?undefined:String(b.note),charge,refund,generateImage})
-    :ev.start(id,{photo:String(b.photo||''),note:String(b.note||''),charge,refund,generateImage});
+   if(b.op==='site'){
+    const meta=builder.loadMeta(id),file=path.join(builder.projectDir(id),'reel-shot.png');
+    const ok=screenshot?await screenshot(builder.previewUrl(meta,meta.published?meta.published.version:meta.current_version),file):false;
+    const shot=ok&&fs.existsSync(file)?{mime:'image/png',data:fs.readFileSync(file).toString('base64')}:null;
+    const e=ev.siteReel(id,{shot,charge,refund,generateImage});
+    return send(res,202,{explode:e,explodes:ev.list(id)}),true;
+   }
+   // When the film is ready, the scene goes on the site with a normal build (when no other build runs).
+   const onDone=f=>{try{startJob(v,id,{message:f.site_message,mode:'build',label:'Add the product film'},deps);ev.markOnSite(id,f.id)}catch(err){console.warn('[film] not added to the site:',String(err.message||err).slice(0,160))}};
+   const e=ev.make(id,{photo:String(b.photo||''),note:String(b.note||''),charge,refund,generateImage,review:reviewLook?r=>reviewLook(r):null,onDone});
    return send(res,202,{explode:e,explodes:ev.list(id)}),true;
   }
   if(action==='/explodes'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{explodes:require('./explode-video').remove(id,String(b.id||''))}),true}

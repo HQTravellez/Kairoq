@@ -8,9 +8,12 @@
 //   section and back again ("there-and-back"), so the product comes apart and assembles again.
 //
 // Props: src (folder of frames), frames (how many), screens (section height in screens, default 3),
-//   mode "there-and-back" | "once", captions [{ title, text }] shown one after another,
+//   mode "there-and-back" (default) | "once" (default for layout="split"), captions [{ title, text }] shown one after another,
 //   tone "dark" | "light" (the stage colour around the film), fit "contain" | "cover", alt.
-// People who prefer reduced motion see the last frame (the product apart) with all captions.
+// layout="split": a scene beside a headline (title, text and a cta button { label, href }), on the
+//   page's own background (bg-background, the colour Kairoq made the film's backdrop in); on phones
+//   the text sits above the film. side="right" puts the film on the left.
+// People who prefer reduced motion see the last frame with all captions (or the scene's text).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const h = React.createElement;
@@ -28,7 +31,7 @@ export function filmAt(p, mode) {
   return clamp(1 - (p - 0.55) / 0.45, 0, 1);
 }
 
-export function ScrollVideo({ src, frames = 96, screens = 3, mode = 'there-and-back', captions = [], tone = 'dark', fit = 'contain', alt = 'Product film', className = '' }) {
+export function ScrollVideo({ src, frames = 96, screens = 3, mode: modeProp, captions = [], tone = 'dark', fit = 'contain', alt = 'Product film', className = '', layout = 'full', title, text, cta, side = 'left' }) {
   const base = String(src || '').replace(/\/?$/, '/');
   const count = Math.max(2, Math.min(400, Math.round(Number(frames) || 0)));
   const url = (i) => base + pad(i + 1) + '.webp';
@@ -38,7 +41,14 @@ export function ScrollVideo({ src, frames = 96, screens = 3, mode = 'there-and-b
   const [drawn, setDrawn] = useState(false);
   const [broken, setBroken] = useState(false);
   const [still] = useState(prefersStill);
+  const split = layout === 'split';
+  // A scene plays once through its section; a full-width film plays there and back.
+  const mode = modeProp || (split ? 'once' : 'there-and-back');
+  const [wide, setWide] = useState(() => { try { return window.matchMedia('(min-width: 768px)').matches; } catch { return true; } });
+  useEffect(() => { if (!split) return; let m; try { m = window.matchMedia('(min-width: 768px)'); } catch { return; } const on = () => setWide(m.matches); m.addEventListener('change', on); return () => m.removeEventListener('change', on); }, [split]);
   const stage = tone === 'light' ? '#f4f4f2' : '#0b0b0c', ink = tone === 'light' ? '#111' : '#f5f5f4';
+  // A split scene sits on the page's own background, which is also the film's backdrop.
+  const fill = () => { if (!split) return stage; try { const c = getComputedStyle(section.current).backgroundColor; return c && c !== 'rgba(0, 0, 0, 0)' ? c : stage; } catch { return stage; } };
 
   // Draws the nearest loaded frame to the one wanted.
   const draw = () => {
@@ -52,7 +62,7 @@ export function ScrollVideo({ src, frames = 96, screens = 3, mode = 'there-and-b
     const ctx = c.getContext('2d'), W = c.width, H = c.height;
     const sc = fit === 'cover' ? Math.max(W / img.naturalWidth, H / img.naturalHeight) : Math.min(Math.max(W / img.naturalWidth, H / img.naturalHeight), Math.min(W / img.naturalWidth, H / img.naturalHeight) * 1.5);
     const w = img.naturalWidth * sc, hh = img.naturalHeight * sc;
-    ctx.fillStyle = stage; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = fill(); ctx.fillRect(0, 0, W, H);
     ctx.drawImage(img, (W - w) / 2, (H - hh) / 2, w, hh);
     shown.current = i; c.dataset.size = W + 'x' + H; c.dataset.kqFrame = String(i);
     if (!drawn) setDrawn(true);
@@ -104,12 +114,28 @@ export function ScrollVideo({ src, frames = 96, screens = 3, mode = 'there-and-b
     window.addEventListener('scroll', ask, { passive: true });
     window.addEventListener('resize', resize);
     return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', ask); window.removeEventListener('resize', resize); };
-  }, [count, mode, still]);
+  }, [count, mode, still, wide]);
 
   const list = Array.isArray(captions) ? captions.filter((c) => c && (c.title || c.text)).slice(0, 6) : [];
   const caption = list.length ? Math.min(list.length - 1, Math.floor(progress * list.length)) : -1;
   const label = { position: 'absolute', left: 'clamp(16px, 5vw, 64px)', bottom: 'clamp(28px, 8vh, 80px)', maxWidth: 'min(420px, 80vw)', color: ink };
 
+  const words = split ? h('div', { 'data-kq-scene-text': '', style: { maxWidth: 520 } },
+    title ? h('h2', { className: 'font-display', style: { margin: 0, fontSize: 'clamp(2.25rem, 5vw, 4.25rem)', lineHeight: 1.02, fontWeight: 600, letterSpacing: '-0.02em' } }, title) : null,
+    text ? h('p', { style: { margin: '18px 0 0', fontSize: '1.0625rem', lineHeight: 1.6, opacity: 0.72, maxWidth: 440 } }, text) : null,
+    cta && cta.label ? h('a', { href: cta.href || '#', className: 'bg-primary text-primary-foreground', style: { display: 'inline-block', marginTop: 28, padding: '12px 22px', borderRadius: 999, fontWeight: 600, textDecoration: 'none' } }, cta.label) : null) : null;
+  if (split && still) {
+    return h('section', { className: 'bg-background text-foreground ' + className, 'data-kq-scroll-video': '', style: { display: 'grid', gridTemplateColumns: wide ? 'minmax(0,5fr) minmax(0,7fr)' : '1fr', alignItems: 'center', gap: 32, padding: 'clamp(48px, 8vw, 96px) clamp(16px, 5vw, 64px)' } },
+      h('div', { style: { order: wide && side === 'right' ? 2 : 0 } }, words),
+      h('img', { src: url(count - 1), alt, style: { width: '100%', display: 'block' }, 'data-kq-drawn': 'true' }));
+  }
+  if (split) {
+    return h('section', { ref: section, className: 'bg-background text-foreground ' + className, 'data-kq-scroll-video': '', style: { position: 'relative', height: Math.max(1.5, Number(screens) || 2.5) * 100 + 'vh' } },
+      h('div', { 'data-kq-scene': '', style: { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', display: 'grid', gridTemplateColumns: wide ? 'minmax(0,5fr) minmax(0,7fr)' : '1fr', gridTemplateRows: wide ? '1fr' : 'auto auto', alignItems: 'center', alignContent: 'center', gap: wide ? 32 : 8, padding: wide ? '0 clamp(24px, 5vw, 72px)' : '0 20px' } },
+        h('div', { style: { order: wide && side === 'right' ? 2 : 0 } }, words),
+        h('canvas', { ref: canvas, role: 'img', 'aria-label': alt, 'data-kq-drawn': drawn ? 'true' : 'false', style: { width: '100%', height: wide ? '78vh' : '46vh', minHeight: 0, display: 'block', opacity: drawn ? 1 : 0, transition: 'opacity .6s ease' } }),
+        broken ? h('p', { style: { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: 0.6, margin: 0 } }, alt) : null));
+  }
   if (still) {
     return h('section', { className, 'data-kq-scroll-video': '', style: { background: stage, color: ink } },
       h('img', { src: url(count - 1), alt, style: { display: 'block', width: '100%', maxHeight: '80vh', objectFit: 'contain' }, 'data-kq-drawn': 'true' }),

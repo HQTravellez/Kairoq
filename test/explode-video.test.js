@@ -1,8 +1,8 @@
 "use strict";
-// Product explode films (explode-video.js) against a stand-in for Google's Gemini API: the photo
-// becomes two stills (whole, apart) for the owner to approve, Omni Flash films from the first to
-// the last, ffmpeg cuts the frames, builds carry them, and <ScrollVideo> plays them on scroll.
-// Credits are taken before each paid step and given back when one fails.
+// Product films (explode-video.js) against a stand-in for Google's Gemini API: one button turns a
+// photo into stills (checked by the vision check, made again once when they look wrong), an Omni
+// Flash film, frames for <ScrollVideo>, a reel, and a build that puts the scene on the site; the
+// site reel films a screenshot of the site on a laptop. One price, refunded when nothing is made.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('fs'),os=require('os'),path=require('path'),http=require('http'),{execFileSync}=require('child_process');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-explode-'));
@@ -34,10 +34,14 @@ function request(server,method,url,{body,headers={}}={}){
  });
 }
 // Google: POST /v1beta/interactions answers with a file; the file is PROCESSING once, then ACTIVE.
-const asked=[];let google,gBase,failNext=0;
+const asked=[];let google,gBase,failNext=0,failTall=0;
 const images=[];
 const generateImage=async(o)=>{images.push(o);await new Promise(r=>setTimeout(r,250));if(/FAILSTILL/.test(o.prompt))throw Error('image model down');return{mime:'image/png',data:Buffer.concat([PNG,Buffer.from([images.length])]).toString('base64')}};
 let server,ip=0;
+// The vision check: says no once when asked to, then yes. The screenshot: a small PNG.
+let reviewSaysNo=0;const reviews=[];
+const reviewLook=async r=>{reviews.push(r);if(reviewSaysNo>0){reviewSaysNo--;return{ok:false,problems:['The product is cut off at the top']}}return{ok:true,problems:[]}};
+const shots=[];const screenshot=async(u,file)=>{shots.push(u);fs.writeFileSync(file,PNG);return true};
 test.before(async()=>{
  const polls=new Map();
  google=http.createServer((req,res)=>{
@@ -47,6 +51,7 @@ test.before(async()=>{
    if(req.method==='POST'&&req.url==='/v1beta/interactions'){
     const body=JSON.parse(Buffer.concat(c).toString());asked.push(body);
     if(failNext>0){failNext--;return j(429,{error:{message:'Resource has been exhausted'}})}
+    if(failTall>0&&body.response_format.aspect_ratio==='9:16'){failTall--;return j(500,{error:{message:'reel failed'}})}
     const name='film'+asked.length;polls.set(name,0);
     return j(200,{id:'int-'+asked.length,status:'completed',steps:[{type:'model_output',content:[{type:'video',mime_type:'video/mp4',uri:gBase+'/v1beta/files/'+name}]}]});
    }
@@ -60,7 +65,7 @@ test.before(async()=>{
  await new Promise(r=>google.listen(0,'127.0.0.1',r));
  gBase='http://127.0.0.1:'+google.address().port;
  process.env.KAIROQ_GEMINI_API_BASE=gBase;
- server=http.createServer(async(req,res)=>{if(await createApi.handle(req,res,{isOwner:()=>false,callModel:()=>{throw Error('no model')},secure:false,generateImage}))return;res.writeHead(404);res.end()});
+   server=http.createServer(async(req,res)=>{if(await createApi.handle(req,res,{isOwner:()=>false,callModel:()=>{throw Error('no model')},secure:false,generateImage,reviewLook,screenshot}))return;res.writeHead(404);res.end()});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
 });
 test.after(()=>{server.close();google.close();runtime.close();fs.rmSync(tmp,{recursive:true,force:true})});
@@ -69,77 +74,79 @@ const credits=async cookie=>(await request(server,'GET','/api/create/me',{header
 async function until(fn,ms=8000){const t=Date.now();for(;;){const v=await fn();if(v)return v;if(Date.now()-t>ms)throw Error('timed out');await new Promise(r=>setTimeout(r,30))}}
 
 let project,owner;
-test('off until GEMINI_API_KEY is set; then a photo becomes two stills to approve, paid for first',async()=>{
+test('one button: the photo becomes checked stills, a film, frames, a reel and a scene on the site, for one price',async()=>{
  owner=await signup('burger@example.com');const {cookie}=owner;
  project=(await request(server,'POST','/api/create/projects',{headers:{cookie},body:{name:'Stack House'}})).json.project.id;
  await request(server,'POST','/api/create/projects/'+project+'/assets',{headers:{cookie},body:{images:[{name:'burger.png',dataUrl:'data:image/png;base64,'+PNG.toString('base64')}]}});
  let r=await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}});
  assert.equal(r.json.enabled,false);
  assert.equal((await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png'}})).status,503);
- assert.equal((await request(server,'GET','/api/create/me',{headers:{cookie}})).json.explode_generation.enabled,false);
-
  process.env.GEMINI_API_KEY='test-gemini';
  r=await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}});
- assert.equal(r.json.enabled,true);assert.deepEqual(r.json.credits,{stills:3,film:25,reel:25});
- assert.deepEqual(r.json.photos.map(p=>p.name),['burger.png']);
+ assert.equal(r.json.enabled,true);assert.deepEqual(r.json.credits,{film:50,reel_part:20,site_reel:25});
  assert.equal((await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'missing.png'}})).status,400);
- const before=await credits(cookie);
+ // The site's own background colour becomes the stage.
+ const m=builder.loadMeta(project);m.design={palette:{background:'#f4efe6'}};builder.saveMeta(m);
+ reviewSaysNo=1;const before=await credits(cookie),seen=images.length,asked0=asked.length;
  r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png',note:'a cheeseburger: <b>bun</b>, patty, cheese, lettuce'}});
  assert.equal(r.status,202,JSON.stringify(r.json));
- assert.equal(r.json.explode.status,'stills');
- assert.equal(await credits(cookie),before-3,'the stills are paid for before they start');
- // One at a time per project.
- assert.equal((await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png'}})).status,409);
- const e=await until(async()=>{const l=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes;return l[0].status==='review'&&l[0]});
- assert.equal(e.note,'a cheeseburger:  b bun /b , patty, cheese, lettuce'.replace(/\s+/g,' '));
- assert.deepEqual(e.stills,{start:'start.png',end:'end.png'});
- // The photo is the reference for the whole product; the whole product is the reference for the exploded one.
- const [whole,apart]=images.slice(-2);
- assert.equal(whole.references[0],'data:image/png;base64,'+PNG.toString('base64'));
- assert.equal(apart.references[0],'data:image/png;base64,'+Buffer.concat([PNG,Buffer.from([images.length-1])]).toString('base64'));
- assert.match(whole.prompt,/whole and assembled/);assert.match(apart.prompt,/Exploded-view/);assert.match(apart.prompt,/cheeseburger/);
- assert.equal(whole.aspect,'16:9');
- const still=await request(server,'GET','/api/create/projects/'+project+'/explodefile?id='+e.id+'&name=end.png',{headers:{cookie}});
- assert.equal(still.status,200);assert.equal(still.headers['content-type'],'image/png');
- assert.equal((await request(server,'GET','/api/create/projects/'+project+'/explodefile?id='+e.id+'&name=../../meta.json',{headers:{cookie}})).status,404);
- // Another account cannot see them.
- const other=await signup('other@example.com');
- assert.notEqual((await request(server,'GET','/api/create/projects/'+project+'/explodefile?id='+e.id+'&name=end.png',{headers:{cookie:other.cookie}})).status,200);
-});
-
-test('the film goes from the first still to the last, then becomes frames for the site; a failed film is refunded',async()=>{
- const {cookie}=owner;
- const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];
- // Google is busy: the credits come back and the stills stay for another try.
- failNext=1;let before=await credits(cookie);
- let r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{op:'film',id:e.id}});
- assert.equal(r.status,202,JSON.stringify(r.json));
- let back=await until(async()=>{const x=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return x.status==='review'&&x.error&&x});
- assert.match(back.error,/Resource has been exhausted.*refunded/);
- assert.equal(await credits(cookie),before,'refunded');
- // Now with the reel.
- before=await credits(cookie);
- r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{op:'film',id:e.id,reel:true}});
- assert.equal(r.status,202);assert.equal(r.json.explode.status,'rendering');
- assert.equal(await credits(cookie),before-50);
- const done=await until(async()=>{const x=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return x.status==='done'&&x},20000);
- const [wide,tall]=asked.slice(-2);
- assert.equal(wide.model,'gemini-omni-1.1-flash');
- assert.deepEqual(wide.input.slice(0,2).map(i=>[i.type,i.mime_type]),[['image','image/png'],['image','image/png']]);
- assert.match(wide.input[2].text,/^<FIRST_FRAME> <LAST_FRAME> /);assert.match(wide.input[2].text,/cheeseburger/);
- assert.deepEqual(wide.response_format,{type:'video',aspect_ratio:'16:9',resolution:'720p',delivery:'uri'});
- assert.equal(tall.response_format.aspect_ratio,'9:16');
- assert.ok(done.frames>=8,'frames: '+done.frames);
- assert.equal(done.film,'film.mp4');assert.equal(done.reel,'reel.mp4');
- assert.match(done.site_message,new RegExp('<ScrollVideo src="\\./uploads/explode-'+done.id+'/" frames=\\{'+done.frames+'\\}'));
+ assert.equal(r.json.explode.status,'making');assert.equal(r.json.explode.motion,'explode');
+ assert.equal(await credits(cookie),before-50,'one price, taken first');
+ assert.equal((await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png'}})).status,409,'one at a time');
+ const done=await until(async()=>{const x=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return x.status!=='making'&&x},20000);
+ assert.equal(done.status,'done',JSON.stringify(done));
+ // Stills: made twice, because the check found a problem the first time; the fix is in the prompt.
+ const made=images.slice(seen);
+ assert.equal(made.length,4);
+ assert.match(made[0].prompt,/#f4efe6 \(light\)/);assert.match(made[1].prompt,/exploded view/);
+ assert.equal(made[0].references[0],'data:image/png;base64,'+PNG.toString('base64'),'the photo is the reference');
+ assert.match(made[2].prompt,/Fix: The product is cut off at the top/);
+ assert.equal(reviews.at(-1).pictures.length,2);assert.match(reviews.at(-1).prompt,/explode/);
+ // The film and the reel: from the first still to the last.
+ const [wide,tall]=asked.slice(asked0);
+ assert.equal(asked.length-asked0,2);
+ assert.match(wide.input[2].text,/^<FIRST_FRAME> <LAST_FRAME> /);assert.match(wide.input[2].text,/lift apart/);
+ assert.equal(wide.response_format.aspect_ratio,'16:9');assert.equal(tall.response_format.aspect_ratio,'9:16');
+ assert.ok(done.frames>=8);assert.equal(done.film,'film.mp4');assert.equal(done.reel,'reel.mp4');
+ assert.match(done.site_message,new RegExp('<ScrollVideo layout="split" src="\\./uploads/explode-'+done.id+'/" frames=\\{'+done.frames+'\\}'));
+ // The scene went to the site as a build (the model here is a stand-in that fails, which is fine).
+ assert.equal(done.on_site,true);
  const part=await request(server,'GET','/api/create/projects/'+project+'/explodefile?id='+done.id+'&name=film.mp4',{headers:{cookie,range:'bytes=0-99'}});
  assert.equal(part.status,206);assert.equal(part.buf.length,100);
- const dl=await request(server,'GET','/api/create/projects/'+project+'/explodefile?id='+done.id+'&name=reel.mp4&download=1',{headers:{cookie}});
- assert.match(dl.headers['content-disposition'],/reel\.mp4/);
- // Builds carry the frames.
+ assert.equal((await request(server,'GET','/api/create/projects/'+project+'/explodefile?id='+done.id+'&name=../../meta.json',{headers:{cookie}})).status,404);
+ const other=await signup('other@example.com');
+ assert.notEqual((await request(server,'GET','/api/create/projects/'+project+'/explodefile?id='+done.id+'&name=film.mp4',{headers:{cookie:other.cookie}})).status,206);
  const out=fs.mkdtempSync(path.join(tmp,'pub-'));ev.copyInto(project,out);
  assert.equal(fs.readdirSync(path.join(out,'uploads','explode-'+done.id)).length,done.frames);
- assert.ok(fs.existsSync(path.join(out,'uploads','explode-'+done.id,'001.webp')));
+});
+
+test('when the film cannot be made everything is refunded; when only the reel fails its part is; the site reel films the site',async()=>{
+ const {cookie}=owner;
+ // Wait for the build that added the scene to finish, so the next film is not blocked by it.
+ await new Promise(r=>setTimeout(r,300));
+ failNext=1;let before=await credits(cookie);
+ let r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png',note:'chocolate pouring over it'}});
+ assert.equal(r.status,202,JSON.stringify(r.json));assert.equal(r.json.explode.motion,'pour');
+ let x=await until(async()=>{const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return e.status!=='making'&&e},20000);
+ assert.equal(x.status,'failed');assert.match(x.error,/Resource has been exhausted.*refunded/);
+ assert.equal(await credits(cookie),before,'all refunded');
+ failTall=1;before=await credits(cookie);
+ r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png',note:'steam rising'}});
+ x=await until(async()=>{const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return e.status!=='making'&&e},20000);
+ assert.equal(x.status,'done');assert.equal(x.reel,null);assert.ok(x.frames>0);
+ assert.equal(await credits(cookie),before-50+20,'the reel\'s part came back');
+ // The site reel: a screenshot of the site, on a laptop, filmed in 9:16 from one still.
+ const asked0=asked.length,seen=images.length;before=await credits(cookie);
+ r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{op:'site'}});
+ assert.equal(r.status,202,JSON.stringify(r.json));assert.equal(await credits(cookie),before-25);
+ x=await until(async()=>{const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return e.status!=='making'&&e},20000);
+ assert.equal(x.status,'done',JSON.stringify(x));assert.equal(x.kind,'site');assert.equal(x.reel,'reel.mp4');assert.equal(x.film,null);assert.equal(x.site_message,undefined);
+ assert.match(shots.at(-1),/^\/builder\/p\//);
+ assert.match(images[seen].prompt,/laptop/);assert.equal(images[seen].aspect,'9:16');assert.equal(images[seen].references[0],'data:image/png;base64,'+PNG.toString('base64'));
+ const reel=asked.slice(asked0);
+ assert.equal(reel.length,1);assert.equal(reel[0].input.filter(i=>i.type==='image').length,1,'one still');assert.match(reel[0].input[1].text,/^<FIRST_FRAME> /);assert.equal(reel[0].response_format.aspect_ratio,'9:16');
+ // Motions from the owner's words.
+ assert.deepEqual(['chocolate pouring over it','a splash of milk','sizzling steak','what is inside: bun, patty, cheese','a perfume bottle'].map(ev.motionOf),['pour','splash','steam','explode','turn']);
 });
 
 test('Google\'s answer: inline films are read, and file addresses off the API host are refused',async()=>{
@@ -165,7 +172,8 @@ test('ScrollVideo: pinned, plays forward to the parts and back as the page scrol
 export default function App(){return(<main>
  <section className="h-[70vh] grid place-items-center"><h1 className="text-5xl font-semibold">Stack House</h1></section>
  <ScrollVideo src="./uploads/explode-${eid}/" frames={${frames}} alt="Our burger, layer by layer" captions={[{title:'Brioche bun',text:'Baked every morning.'},{title:'Smashed patty',text:'Two thin patties.'},{title:'Aged cheddar'}]} />
- <section className="h-[80vh] grid place-items-center"><p>Order now</p></section>
+ <ScrollVideo layout="split" src="./uploads/explode-${eid}/" frames={${frames}} title="Stacked to order" text="Every layer, built when you order." cta={{label:'Order now',href:'#order'}} />
+ <section id="order" className="h-[80vh] grid place-items-center"><p>Order now</p></section>
 </main>)}
 `;
  await builder.initializeFrom(meta,{...design.starterFiles('Stack'),'src/App.jsx':app},'Stack');
@@ -180,7 +188,7 @@ export default function App(){return(<main>
   const geo=await page.evaluate(()=>{const el=document.querySelector('[data-kq-scroll-video]');return{top:el.getBoundingClientRect().top+scrollY,span:el.offsetHeight-innerHeight}});
   assert.ok(geo.span>=1500,'a tall section');
   const frameAt=async(f)=>{await page.evaluate(y=>scrollTo(0,y),geo.top+geo.span*f);await page.waitForTimeout(400);return page.evaluate(()=>Number(document.querySelector('[data-kq-scroll-video] canvas').dataset.kqFrame))};
-  await page.locator('[data-kq-scroll-video] canvas[data-kq-drawn="true"]').waitFor({timeout:20000});
+  await page.locator('[data-kq-scroll-video] canvas[data-kq-drawn="true"]').first().waitFor({timeout:20000});
   const start=await frameAt(0),quarter=await frameAt(0.22),middle=await frameAt(0.5),back=await frameAt(0.78),end=await frameAt(1);
   assert.equal(start,0);
   assert.ok(quarter>start&&quarter<middle,'plays forward: '+[start,quarter,middle]);
@@ -192,10 +200,26 @@ export default function App(){return(<main>
   const visible=await page.evaluate(()=>[...document.querySelectorAll('[data-kq-caption]')].filter(c=>getComputedStyle(c).opacity!=='0'&&!c.getAttribute('aria-hidden')).map(c=>c.textContent));
   assert.deepEqual(visible.length,1);
   if(process.env.KAIROQ_SHOT)await page.screenshot({path:process.env.KAIROQ_SHOT});
+  // The split scene: headline and button beside the film, which plays once through its section.
+  const scene=await page.evaluate(()=>{const el=document.querySelectorAll('[data-kq-scroll-video]')[1];return{top:el.getBoundingClientRect().top+scrollY,span:el.offsetHeight-innerHeight}});
+  const sceneFrame=async(f)=>{await page.evaluate(y=>scrollTo(0,y),scene.top+scene.span*f);await page.waitForTimeout(400);return page.evaluate(()=>Number(document.querySelectorAll('[data-kq-scroll-video] canvas')[1].dataset.kqFrame))};
+  const s0=await sceneFrame(0.05),s1=await sceneFrame(0.5),s2=await sceneFrame(1);
+  assert.ok(s0<s1&&s1<s2&&s2===frames-1,'plays once: '+[s0,s1,s2]);
+  await sceneFrame(0.5);
+  const box=await page.evaluate(()=>{const t=document.querySelector('[data-kq-scene-text] h2').getBoundingClientRect(),c=document.querySelectorAll('[data-kq-scroll-video] canvas')[1].getBoundingClientRect();return{textRight:t.right,canvasLeft:c.left,top:t.top}});
+  assert.ok(box.textRight<=box.canvasLeft+1&&box.top>0,'headline beside the film: '+JSON.stringify(box));
+  assert.equal(await page.locator('[data-kq-scene-text] a').getAttribute('href'),'#order');
+  if(process.env.KAIROQ_SHOT)await page.screenshot({path:process.env.KAIROQ_SHOT.replace(/\.png$/,'-split.png')});
+  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
+  await sceneFrame(0.5);
+  const phone=await page.evaluate(()=>{const t=document.querySelector('[data-kq-scene-text] h2').getBoundingClientRect(),c=document.querySelectorAll('[data-kq-scroll-video] canvas')[1].getBoundingClientRect();return{textBottom:t.bottom,canvasTop:c.top,width:document.documentElement.scrollWidth}});
+  assert.ok(phone.textBottom<=phone.canvasTop+1,'text above the film on a phone');assert.ok(phone.width<=390,'no sideways scroll');
+  if(process.env.KAIROQ_SHOT)await page.screenshot({path:process.env.KAIROQ_SHOT.replace(/\.png$/,'-phone.png')});
+  await page.setViewportSize({width:1280,height:800});
   // Reduced motion: the parts as a still, with every caption.
   const still=await ctx.newPage();await still.emulateMedia({reducedMotion:'reduce'});
   await still.goto(page.url(),{waitUntil:'networkidle'});
-  assert.equal(await still.locator('[data-kq-scroll-video] img').count(),1);
+  assert.equal(await still.locator('[data-kq-scroll-video] img').count(),2);
   assert.equal(await still.locator('[data-kq-scroll-video] h3').count(),3);
   assert.deepEqual(errors,[]);
  }finally{await ctx.close();srv.close()}
