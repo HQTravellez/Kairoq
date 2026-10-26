@@ -122,8 +122,11 @@ test('one button: the photo becomes checked stills, a film, frames, a reel and a
 
 test('when the film cannot be made everything is refunded; when only the reel fails its part is; the site reel films the site',async()=>{
  const {cookie}=owner;
- // Wait for the build that added the scene to finish, so the next film is not blocked by it.
- await new Promise(r=>setTimeout(r,300));
+ // Each finished film starts a build that adds its scene to the site (a normal, priced change).
+ // Credits are compared only once that build is over, so its own charge or refund is not counted.
+ const idle=()=>until(async()=>!(await request(server,'GET','/api/create/projects/'+project,{headers:{cookie}})).json.active_job,20000);
+ const spent=async start=>{await idle();return start-(await credits(cookie))};
+ await idle();
  failNext=1;let before=await credits(cookie);
  let r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png',note:'chocolate pouring over it'}});
  assert.equal(r.status,202,JSON.stringify(r.json));assert.equal(r.json.explode.motion,'pour');
@@ -134,9 +137,9 @@ test('when the film cannot be made everything is refunded; when only the reel fa
  r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png',note:'steam rising'}});
  x=await until(async()=>{const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return e.status!=='making'&&e},20000);
  assert.equal(x.status,'done');assert.equal(x.reel,null);assert.ok(x.frames>0);
- assert.equal(await credits(cookie),before-50+20,'the reel\'s part came back');
+ assert.equal(await spent(before),50-20,'the reel\'s part came back (the scene build here fails and is refunded)');
  // The site reel: a screenshot of the site, on a laptop, filmed in 9:16 from one still.
- const asked0=asked.length,seen=images.length;before=await credits(cookie);
+ const asked0=asked.length,seen=images.length;await idle();before=await credits(cookie);
  r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{op:'site'}});
  assert.equal(r.status,202,JSON.stringify(r.json));assert.equal(await credits(cookie),before-25);
  x=await until(async()=>{const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return e.status!=='making'&&e},20000);
