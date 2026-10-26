@@ -34,6 +34,8 @@ async function check(id,n,{callModel,inspect}={}){
  const unchecked=money.filter(f=>!f.covered&&!passing.has(String(f.name).toLowerCase()));
  const target=money.length&&unchecked.length===money.length?blockers:warnings;
  for(const f of unchecked)target.push({kind:'unchecked',name:f.name,why:f.why||'Kairoq could not check it'});
+ // Outside APIs whose key is missing: the live site gets no sample answers, so those calls would fail.
+ try{for(const a of require('./api-samples').missingKeys(id))blockers.push({kind:'key',name:a.title,why:'add '+a.secret+' in Settings, Server secrets; until then its calls fail on the live site'})}catch{}
  // 3. Serious mistakes in the code (collection access can be deliberate, so it is not counted).
  try{
   const files=builder.loadFiles(id,n);let cfg={collections:{}};try{cfg=require('./react-backend').parseConfig(files)}catch{}
@@ -45,7 +47,7 @@ async function check(id,n,{callModel,inspect}={}){
 }
 // One message for the owner.
 function message(g){
- const kinds={check:'Not working',unchecked:'Not checked',security:'Security',leftover:'Still has'};
+ const kinds={check:'Not working',unchecked:'Not checked',security:'Security',leftover:'Still has',key:'Missing key'};
  return'Before this goes live, Kairoq found:\n'+g.blockers.map(b=>'- '+kinds[b.kind]+': '+b.name+' ('+b.why+')').join('\n')+'\n\nFix these first (ask the chat, or use Fix it), or publish anyway: the live guard will then check the app every hour.';
 }
 module.exports={check,message,enabled};

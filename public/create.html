@@ -500,6 +500,7 @@
     </section>
     <div class="canvas" id="canvas">
       <div class="preview-notice hidden" id="preview-notice" role="status">The preview has not loaded yet. <a id="preview-open" href="#" target="_blank" rel="noopener">Open it in a new tab</a> · <button type="button" class="link-btn" id="preview-reload">Reload the preview</button> · <button type="button" class="link-btn" id="preview-rebuild">Rebuild the preview</button> <span id="preview-rebuild-status"></span><span class="preview-diagnosis" id="preview-diagnosis"></span> · If it stays blank, say "the preview is blank" in the chat: checking it costs nothing.</div>
+      <div class="sample-pill hidden" id="sample-pill" role="status"></div>
       <div class="device desktop" id="device">
         <div class="dev-top" aria-hidden="true"><span class="dev-time">9:41</span><span class="dev-island"></span><span class="dev-icons"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0zM3.4 6.8a6.5 6.5 0 0 1 9.2 0l-1.5 1.5a4.4 4.4 0 0 0-6.2 0zM1.2 4.6a9.6 9.6 0 0 1 13.6 0l-1.5 1.5a7.5 7.5 0 0 0-10.6 0z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="18" height="8" rx="1.8"/><rect x="25" y="4" width="1.6" height="4" rx=".8" opacity=".4"/></svg></span></div>
         <div class="dev-urlbar dev-top-url" aria-hidden="true"><span class="dev-host">app.kairoq.app</span></div>
@@ -836,6 +837,16 @@
     <p class="muted small">API keys your server functions read with secrets.get("NAME"). Values are encrypted and never shown again.</p>
     <ul class="domains" id="secrets-list"></ul>
     <div class="row"><input id="secret-name" placeholder="NAME" spellcheck="false" style="max-width:160px"><input id="secret-value" type="password" autocomplete="off" placeholder="value"><button class="ghost" id="secret-add" type="button">Save</button></div>
+    <h3>Outside APIs</h3>
+    <p class="muted small">Services your app calls, like a hotel supplier or a payment provider. Add the API's spec and the name of its key: the AI then uses its real paths and fields, and until the key is saved above, the preview gets sample answers shaped like the real ones. The live site always calls the real API.</p>
+    <ul class="domains apis-list" id="apis-list"></ul>
+    <details class="api-add"><summary>Add an outside API</summary>
+      <label>Link to its spec (OpenAPI or Swagger JSON)<input id="api-spec-url" type="url" placeholder="https://api.example.com/openapi.json"></label>
+      <label>Or paste the spec<textarea id="api-spec" rows="4" spellcheck="false" placeholder='{"openapi":"3.0.0", ...}'></textarea></label>
+      <div class="row"><label>Key name<input id="api-secret" placeholder="HOTELBEDS_KEY" spellcheck="false"></label><label>Address (if the spec has none)<input id="api-base" type="url" placeholder="https://api.example.com/v1"></label></div>
+      <div class="row"><button class="ghost" id="api-add" type="button">Add API</button><span class="muted small" id="api-status" role="status"></span></div>
+    </details>
+    <details class="api-log"><summary>Recent outside calls</summary><div id="api-log"></div></details>
     <h3>Code</h3>
     <div class="row"><a class="link" id="download" download>Download code (ZIP)</a></div>
     <details class="howto" id="gh-howto"><summary>How to connect GitHub (2 minutes)</summary>

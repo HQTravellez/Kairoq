@@ -68,7 +68,7 @@ const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DE
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/apis':'viewer','POST:/apis':'editor','DELETE:/apis':'editor','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,thumb:require('./project-thumbs').url(p),role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -1560,6 +1560,22 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    res.writeHead(200,{'Content-Type':f.type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff',...(q.get('download')==='1'?{'Content-Disposition':'attachment; filename="'+q.get('name')+'"'}:{})});
    res.end(require('fs').readFileSync(f.file));return true;
   }
+  // Outside APIs (api-samples.js): the owner adds a spec and its key's name; preview and checks get
+  // sample answers while the key is missing; the call log shows what the app's functions sent.
+  if(action==='/apis'&&method==='GET'){const s=require('./api-samples');return send(res,200,{apis:s.list(id),log:s.log(id).slice(0,100)}),true}
+  if(action==='/apis'&&method==='POST'){
+   const s=require('./api-samples'),b=await readJson(req,2100000);limitedKey('apis:'+id,30,3600000);
+   let spec=b.spec;
+   if(!spec&&b.spec_url){
+    const r=await require('./react-functions').guardedFetch({url:String(b.spec_url),method:'GET',headers:{Accept:'application/json'}}).catch(e=>{throw Object.assign(Error('Could not load the spec: '+String(e.message||e).slice(0,160)),{status:400})});
+    if(r.status<200||r.status>=300)throw Object.assign(Error('Could not load the spec ('+r.status+')'),{status:400});
+    spec=r.body;
+   }
+   if(!spec)throw Object.assign(Error('Paste the API spec (OpenAPI or Swagger JSON) or give its link'),{status:400});
+   const api=s.add(id,{spec,secret:b.secret,baseUrl:b.base_url});
+   return send(res,201,{api,apis:s.list(id)}),true;
+  }
+  if(action==='/apis'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{apis:require('./api-samples').remove(id,String(b.slug||''))}),true}
   // Saved checks: list, add (steps or a plain-English description), switch on/off, run now, remove.
   if(action==='/checks'&&method==='GET'){const meta=builder.loadMeta(id);return send(res,200,{checks:require('./react-checks').list(meta),monitor:meta.monitor||null}),true}
   if(action==='/checks'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{checks:require('./react-checks').remove(id,String(b.id||''))}),true}
