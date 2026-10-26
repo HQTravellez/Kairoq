@@ -10,12 +10,15 @@ const RECIPES = {
   DeviceMockup: { fits: 'an app or software product, only when the owner gave a real screenshot of it', needsScreenshot: true },
   ExplodedView: { fits: 'a physical product made of parts, or a gift or box that opens as the page scrolls', needsObject: true },
   Diorama: { fits: 'places and local businesses: stays, real estate, a neighbourhood, a campus (a tiny isometric world)' },
+  ScrollAssembly: { fits: 'a premium product people want to see inside (a watch, headphones, a gadget, a machine): pinned while the page scrolls, it comes apart layer by layer with labels and assembles again', needsObject: true },
 };
-const OBJECTS = ['suitcase', 'house', 'key', 'shopping-bag', 'plane', 'gift-box', 'dumbbell', 'phone', 'laptop', 'coffee-cup', 'espresso-machine', 'pizza', 'pizza-box', 'oven'];
+const OBJECTS = ['suitcase', 'house', 'key', 'shopping-bag', 'plane', 'gift-box', 'dumbbell', 'phone', 'laptop', 'coffee-cup', 'espresso-machine', 'pizza', 'pizza-box', 'oven', 'watch'];
 const MOODS = ['studio', 'sunset', 'neon'];
 
 // Words in a request, mapped to the recipe and object that suit them.
+// Most specific first: "a boutique watchmaker" is about watches, not shops.
 const HINTS = [
+  [/\b(watch|watches|watchmaker|horolog\w*|jewell?er\w*|timepiece)\b/i, 'ScrollAssembly', 'watch'],
   [/\b(travel|trips?|flights?|airline|luggage|tour|tours|visa|corporate travel)\b/i, 'HeroObject', 'suitcase'],
   [/\b(flight|airline|airport|aviation|pilot)\b/i, 'HeroObject', 'plane'],
   [/\b(stays?|apartments?|furnished|corporate housing|rentals?|airbnb|villa|real estate|realtor|propert(y|ies)|homes|housing)\b/i, 'Diorama', 'house'],
@@ -42,7 +45,8 @@ function note(request, { hasScreenshot = false } = {}) {
   for (const [id, r] of Object.entries(RECIPES)) if (!r.needsScreenshot || hasScreenshot) lines.push('- ' + id + ': ' + r.fits);
   lines.push('Objects for HeroObject and ExplodedView: ' + OBJECTS.join(', ') + '. Moods: studio (clean, bright), sunset (warm), neon (dark and vivid).');
   if (s) lines.push('Suggested for this request: ' + s.recipe + (s.object ? ' with "' + s.object + '"' : '') + '. Use it if it carries this business\'s idea.');
-  lines.push('Set "hero3d" in your JSON to {"recipe":"...","object":"...","mood":"..."}, or {"recipe":"none"} for a page that is better without 3D (content-led, editorial, or a screen people work in).');
+  lines.push('When no object in the list fits but this business has a signature object (a camera shop, a bike maker, a perfume brand), add "custom": "a short description of that object" and Kairoq models it in Blender (for HeroObject, ExplodedView or ScrollAssembly).');
+  lines.push('Set "hero3d" in your JSON to {"recipe":"...","object":"...","custom":"","mood":"..."}, or {"recipe":"none"} for a page that is better without 3D (content-led, editorial, or a screen people work in).');
   return lines.join('\n');
 }
 
@@ -54,9 +58,13 @@ function normalize(v) {
   if (!RECIPES[recipe]) return null;
   const out = { recipe };
   const object = String(v.object || '').toLowerCase().trim();
-  if (RECIPES[recipe].needsObject) out.object = OBJECTS.includes(object) ? object : recipe === 'ExplodedView' ? 'gift-box' : 'gift-box';
+  if (RECIPES[recipe].needsObject) out.object = OBJECTS.includes(object) ? object : recipe === 'ScrollAssembly' ? 'watch' : 'gift-box';
   if (recipe === 'Diorama') out.objects = OBJECTS.includes(object) ? [object, 'tree', object, 'tree'] : ['house', 'tree', 'house', 'tree'];
   if (recipe === 'DeviceMockup') out.device = object === 'laptop' ? 'laptop' : 'phone';
+  // A bespoke object for the Blender modelling agent (model-agent.js), and the model it made.
+  const custom = String(v.custom || '').replace(/[\u0000-\u001f"<>{}]/g, ' ').trim().slice(0, 120);
+  if (custom && RECIPES[recipe].needsObject) out.custom = custom;
+  if (/^\.\/models\/[\w.-]+\.glb$/.test(String(v.src || ''))) out.src = String(v.src);
   out.mood = MOODS.includes(String(v.mood)) ? String(v.mood) : 'studio';
   return out;
 }
@@ -65,7 +73,8 @@ function normalize(v) {
 function jsx(h) {
   if (!h || h.recipe === 'none' || !RECIPES[h.recipe]) return '';
   const attrs = [];
-  if (h.object) attrs.push('object="' + h.object + '"');
+  if (h.src) attrs.push('src="' + h.src + '"');
+  else if (h.object) attrs.push('object="' + h.object + '"');
   if (h.objects) attrs.push('objects={' + JSON.stringify(h.objects).replace(/"/g, "'") + '}');
   if (h.device) attrs.push('device="' + h.device + '" screenshot="(the owner\'s screenshot in ./uploads/)"');
   if (h.mood && h.mood !== 'studio') attrs.push('mood="' + h.mood + '"');

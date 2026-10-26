@@ -8,13 +8,15 @@
 // <DeviceMockup device="phone" screenshot="/uploads/app.png" />   the app's real screen on a device
 // <ExplodedView object="laptop" />      the object comes apart as the page scrolls
 // <Diorama objects={['house', 'house', 'tree']} />   a tiny isometric world
+// <ScrollAssembly object="watch" />    pinned while the page scrolls: the object comes apart layer by
+//                                       layer, holds with labels, then assembles again
 //
 // The objects are modelled in Blender (scripts/props/hero.py in Kairoq) and copied into every app
 // that uses this module, under <app>/props/. Built on React Three Fiber 8 and drei 9 (MIT).
 import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, Environment, Float, Lightformer, MeshTransmissionMaterial, RoundedBox, useGLTF } from '@react-three/drei';
+import { ContactShadows, Environment, Float, Html, Lightformer, MeshTransmissionMaterial, RoundedBox, useGLTF } from '@react-three/drei';
 import { Scene3D, prefersStill, themeColor } from 'kairoq/scene';
 import { basename } from 'kairoq';
 
@@ -25,7 +27,7 @@ export const OBJECTS = {
   suitcase: 'hero-suitcase.glb', house: 'hero-house.glb', key: 'hero-key.glb', 'shopping-bag': 'hero-shopping-bag.glb',
   plane: 'hero-plane.glb', 'gift-box': 'hero-gift-box.glb', dumbbell: 'hero-dumbbell.glb', phone: 'hero-phone.glb',
   laptop: 'hero-laptop.glb', 'coffee-cup': 'espresso-cup.glb', 'espresso-machine': 'espresso-machine.glb', pizza: 'pizza.glb',
-  'pizza-box': 'pizza-box.glb', oven: 'pizza-oven.glb',
+  'pizza-box': 'pizza-box.glb', oven: 'pizza-oven.glb', watch: 'hero-watch.glb',
 };
 const fileUrl = (file) => (basename || '') + '/props/' + file;
 function urlOf(object, src) {
@@ -356,6 +358,119 @@ function TreeClump({ x, z, colors }) {
     h(Tree, { position: [-0.18, 0, -0.1], colors, scale: 1.2 }),
     h(Tree, { position: [0.15, 0, 0.12], colors }),
     h(Tree, { position: [0.2, 0, -0.22], colors, scale: 0.8 }));
+}
+
+// ---------- ScrollAssembly ----------
+// A tall section whose scene stays pinned while the page scrolls through it. Parts are taken
+// apart in layers: a part's name starting with a number ("03 Dial") is its layer, front to back;
+// without numbers, parts are layered by how far forward they sit. The timeline: assembled, apart
+// (one layer after another), a pause with labels, then back together.
+const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+function apartAt(t, layer, layers) {
+  const stagger = layers > 1 ? (layer / (layers - 1)) * 0.12 : 0;
+  const out = ease((t - 0.12 - stagger) / 0.2);
+  const back = ease((t - 0.68 - (0.12 - stagger)) / 0.2);
+  return Math.max(0, out - back);
+}
+// "03_Hour_marker.001" (three.js turns spaces into _) reads as "Hour marker".
+const labelOf = (name) => String(name || '').replace(/^\d+[\s_]*/, '').replace(/[._]\d+$/, '').replace(/_/g, ' ').trim();
+
+function Assembly({ url, colors, size, progress, gap, labels, still }) {
+  const model = useModel(url, { colors, size });
+  const layers = useMemo(() => {
+    const groups = new Map();
+    const meshes = [];
+    model.traverse((o) => { if (o.isMesh) meshes.push(o); });
+    const numbered = meshes.some((m) => /^\d+/.test(m.name) || /^\d+/.test(m.parent?.name || ''));
+    for (const m of meshes) {
+      const name = /^\d+/.test(m.name) ? m.name : m.parent?.name || m.name;
+      const key = numbered ? Number((/^(\d+)/.exec(name) || [0, 99])[1]) : Math.round(-new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).z * 20);
+      if (!groups.has(key)) groups.set(key, { key, meshes: [], label: '', biggest: 0 });
+      const g = groups.get(key);
+      g.meshes.push({ mesh: m, home: m.position.clone() });
+      // A layer is named after its biggest part (the dial, not one of its markers).
+      const s3 = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
+      const v = s3.x * s3.y + s3.y * s3.z + s3.x * s3.z;
+      if (v > g.biggest) { g.biggest = v; g.label = labelOf(name); }
+    }
+    return [...groups.values()].sort((a, b) => a.key - b.key);
+  }, [model]);
+  const labelRefs = useRef([]);
+  const scale = model.children[0]?.scale?.x || 1;
+  useFrame(() => {
+    const t = still ? 0.5 : progress.current;
+    const mid = (layers.length - 1) / 2;
+    layers.forEach((layer, i) => {
+      const a = still ? 1 : apartAt(t, i, layers.length);
+      const dz = (mid - i) * gap * a / scale;
+      for (const { mesh, home } of layer.meshes) mesh.position.set(home.x, home.y, home.z + dz);
+      // A label shows only while its part is fully out.
+      const el = labelRefs.current[i];
+      if (el) el.style.opacity = String(ease((a - 0.85) / 0.15));
+    });
+  });
+  const mid = (layers.length - 1) / 2;
+  // Where each layer's label sits: just right of the part, at its height, where it ends up.
+  const spots = useMemo(() => layers.map((layer) => {
+    const box = new THREE.Box3();
+    for (const { mesh } of layer.meshes) box.expandByObject(mesh);
+    const c = box.getCenter(new THREE.Vector3());
+    return [box.max.x + 0.06, c.y, c.z];
+  }), [layers]);
+  return h('group', null,
+    h('primitive', { object: model }),
+    layers.map((layer, i) => {
+      // With labels given, only the parts they name are labelled; without, every layer is.
+      const text = labels ? labels[layer.label] || labels[layer.key] : layer.label;
+      if (!text) return null;
+      const [x, y, z] = spots[i];
+      return h(Html, { key: layer.key, position: [x, y, z + (mid - i) * gap], zIndexRange: [10, 0] },
+        h('div', { ref: (el) => (labelRefs.current[i] = el), style: { opacity: 0, transform: 'translateY(-50%)', transition: 'opacity .25s', whiteSpace: 'nowrap', font: '500 13px/1.2 var(--font-sans, system-ui)', color: 'hsl(var(--foreground))', background: 'hsl(var(--background) / .9)', border: '1px solid hsl(var(--border))', borderRadius: 999, padding: '4px 10px', pointerEvents: 'none', boxShadow: '0 4px 14px rgb(0 0 0 / .08)' } }, text));
+    }));
+}
+
+function AssemblyCamera({ progress, size, still }) {
+  const { camera, size: view } = useThree();
+  useFrame(() => {
+    const t = still ? 0.5 : progress.current;
+    const apart = ease((t - 0.1) / 0.3) * (1 - ease((t - 0.7) / 0.25));
+    const angle = -0.25 - apart * 0.85;
+    const aspect = view.width / Math.max(1, view.height);
+    const d = (size * 2.6) / Math.min(1, aspect) + apart * size * 0.5;
+    camera.position.set(Math.sin(angle) * d, size * 0.55 + apart * size * 0.15, Math.cos(angle) * d);
+    camera.lookAt(0, size * 0.48, 0);
+  });
+  return null;
+}
+
+export function ScrollAssembly({ object = 'watch', src, screens = 3, gap = 0.16, labels, colors: colorsProp, mood = 'studio', className, style, alt, children }) {
+  const colors = useBrandColors(colorsProp);
+  const url = urlOf(object, src);
+  const outer = useRef(null);
+  const progress = useRef(0);
+  const still = prefersStill();
+  useEffect(() => {
+    const update = () => {
+      const el = outer.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect(), vh = window.innerHeight || 1;
+      progress.current = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - vh)));
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => { window.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
+  }, []);
+  const size = 1.4;
+  const scene = h(Scene3D, { alt: alt || 'The ' + String(object).replace(/-/g, ' ') + ' taken apart and put back together', lights: false, camera: { position: [0, 1, 4], fov: 30 }, style: { width: '100%', height: '100%', minHeight: 0 } },
+    h(Lighting, { mood, colors }),
+    h(AssemblyCamera, { progress, size, still }),
+    h(Safe, { fallback: h(Placeholder, { colors, size }) }, h(Suspense, { fallback: null }, h(Assembly, { url, colors, size, progress, gap, labels, still }))),
+    h(ContactShadows, { position: [0, -0.02, 0], opacity: 0.3, scale: 5, blur: 2.8, far: 3, resolution: 512 }));
+  // Reduced motion: one ordinary-height section, shown taken apart with its labels.
+  if (still) return h('div', { className, style: { position: 'relative', height: 560, ...style } }, scene, children || null);
+  return h('div', { ref: outer, className, style: { position: 'relative', height: screens * 100 + 'vh', ...style }, 'data-kq-assembly': 'true' },
+    h('div', { style: { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' } }, scene, children || null));
 }
 
 // Preload the library objects a page names, so the hero appears quickly.
