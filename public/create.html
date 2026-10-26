@@ -825,6 +825,15 @@
   </form>
 </dialog>
 
+<dialog id="key-dialog" class="key-dialog">
+  <form method="dialog" class="dialog">
+    <h2 id="key-title">Add your key</h2>
+    <p class="key-lock"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Encrypted the moment you save it. Nobody can see it again, not you, your team or Kairoq's team: only your app's own server code uses it, at the moment it calls the service. It never goes into logs, code, exports or the AI.</span></p>
+    <label><span id="key-label">Key</span><input id="key-value" type="password" autocomplete="new-password" spellcheck="false" placeholder="Paste the key"></label>
+    <p class="error" id="key-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="cancel">Cancel</button><button class="primary" id="key-save" type="button">Save key</button></div>
+  </form>
+</dialog>
 <dialog id="settings-dialog">
   <form method="dialog" class="dialog">
     <h2>Project settings</h2>
@@ -838,13 +847,16 @@
     <ul class="domains" id="secrets-list"></ul>
     <div class="row"><input id="secret-name" placeholder="NAME" spellcheck="false" style="max-width:160px"><input id="secret-value" type="password" autocomplete="off" placeholder="value"><button class="ghost" id="secret-add" type="button">Save</button></div>
     <h3>Outside APIs</h3>
-    <p class="muted small">Services your app calls, like a hotel supplier or a payment provider. Add the API's spec and the name of its key: the AI then uses its real paths and fields, and until the key is saved above, the preview gets sample answers shaped like the real ones. The live site always calls the real API.</p>
+    <p class="muted small">Services your app calls, like a hotel supplier. Type its name or website: Kairoq finds how it works and the AI uses it. Until you add its key, the preview gets sample answers shaped like the real ones; the live site always calls the real service.</p>
+    <div class="row"><input id="api-name" maxlength="200" placeholder="Service name or website, e.g. Hotelbeds" spellcheck="false"><button class="ghost" id="api-add" type="button">Add</button></div>
+    <p class="muted small" id="api-status" role="status"></p>
+    <div class="api-suggested" id="api-suggested"></div>
     <ul class="domains apis-list" id="apis-list"></ul>
-    <details class="api-add"><summary>Add an outside API</summary>
-      <label>Link to its spec (OpenAPI or Swagger JSON)<input id="api-spec-url" type="url" placeholder="https://api.example.com/openapi.json"></label>
+    <details class="api-add"><summary>More options</summary>
+      <label>Link to its spec (OpenAPI or Swagger, JSON or YAML)<input id="api-spec-url" type="url" placeholder="https://api.example.com/openapi.json"></label>
       <label>Or paste the spec<textarea id="api-spec" rows="4" spellcheck="false" placeholder='{"openapi":"3.0.0", ...}'></textarea></label>
       <div class="row"><label>Key name<input id="api-secret" placeholder="HOTELBEDS_KEY" spellcheck="false"></label><label>Address (if the spec has none)<input id="api-base" type="url" placeholder="https://api.example.com/v1"></label></div>
-      <div class="row"><button class="ghost" id="api-add" type="button">Add API</button><span class="muted small" id="api-status" role="status"></span></div>
+      <div class="row"><button class="ghost" id="api-add-spec" type="button">Add from spec</button></div>
     </details>
     <details class="api-log"><summary>Recent outside calls</summary><div id="api-log"></div></details>
     <h3>Code</h3>

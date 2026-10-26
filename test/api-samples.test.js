@@ -97,7 +97,7 @@ test('a real server function gets the sample answer in the preview',{timeout:120
   return { json: { status: r.status, sample: r.headers.get('x-kairoq-sample'), names: data.results.map(h => h.name), keyMissing: !key } };
 }
 `;
- await builder.initializeFrom(meta,{...design.starterFiles('Stays'),'functions/hotels.js':js},'Stays');
+ await builder.initializeFrom(meta,{...design.starterFiles('Stays'),'functions/hotels.js':js,'functions/peek.js':"export default async function (request, { secrets }) {\n  const k = await secrets.get('HOTEL_KEY');\n  console.log('using key', k);\n  return { json: { ok: true } };\n}\n"},'Stays');
  const server=http.createServer(async(req,res)=>{try{if(await backend.handle(req,res))return}catch(e){res.writeHead(e.status||500);return res.end(String(e.message))}res.writeHead(404);res.end()});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  try{
@@ -106,5 +106,44 @@ test('a real server function gets the sample answer in the preview',{timeout:120
   const j=JSON.parse(out.body);
   assert.equal(j.status,200);assert.equal(j.sample,'1');assert.equal(j.names.length,3);assert.equal(j.keyMissing,true);
   assert.equal(samples.log(meta.id)[0].url,'https://api.samplehotels.test/v1/hotels?city=Toronto');
+  // With a key saved, a function that prints it never shows it in the app's logs.
+  secrets.set(meta.id,'app_hotel_key','kq-very-secret-9876');
+  await new Promise((resolve,reject)=>{const q=http.request({host:'127.0.0.1',port:server.address().port,method:'POST',path:'/api/apps/'+meta.id+'/functions/peek',headers:{'Content-Type':'application/json'}},res=>{res.resume();res.on('end',resolve)});q.on('error',reject);q.end('{}')});
+  const lines=require('../react-logs').list(meta.id).map(l=>l.message);
+  assert.ok(lines.some(l=>l==='using key •••'),lines.join(' | '));
+  assert.ok(lines.every(l=>!l.includes('kq-very-secret-9876')));
+  secrets.set(meta.id,'app_hotel_key',null);
  }finally{server.close()}
+});
+
+test('one box: a name finds the spec online (YAML on GitHub), or Kairoq reads the docs page; services the code calls are offered',async()=>{
+ const m2=builder.create({name:'Trips',owner:'owner'});
+ const yaml=require('yaml').stringify(SPEC);
+ const fetched=[];
+ const fetchUrl=async({url})=>{fetched.push(url);
+  if(url==='https://raw.githubusercontent.com/acme/specs/main/hotels.yaml')return{status:200,body:yaml};
+  if(url==='https://docs.rooms.test/api')return{status:200,body:'<html><head><script>evil()</script></head><body><h1>Rooms API</h1><p>Base URL https://api.rooms.test/v2. Send your key in the X-Rooms-Key header.</p><p>GET /rooms returns {"rooms":[{"id","name","price"}]}</p>'+'<p>More text.</p>'.repeat(60)+'</body></html>'};
+  return{status:404,body:''}};
+ const webSearch=async q=>/Sample Hotels/.test(q)&&/OpenAPI/.test(q)?['https://example.com/blog','https://github.com/acme/specs/blob/main/hotels.yaml']:/Rooms/.test(q)&&/documentation/.test(q)?['https://docs.rooms.test/api']:[];
+ const a=await samples.addByName(m2.id,{name:'Sample Hotels',webSearch,fetchUrl});
+ assert.equal(a.title,'Sample Hotels');assert.equal(a.secret,'SAMPLE_KEY');assert.equal(a.drafted,false);
+ assert.equal(a.source,'https://raw.githubusercontent.com/acme/specs/main/hotels.yaml');
+ assert.ok(!fetched.includes('https://example.com/blog'),'only spec-looking links are opened');
+ // Drafted from the docs page; the page goes to the AI as text, scripts removed.
+ const asked=[];
+ const callModel=async(o,parse)=>{asked.push(o.messages[1].content);return parse(JSON.stringify({openapi:'3.0.3',info:{title:'Rooms'},servers:[{url:'https://api.rooms.test/v2'}],components:{securitySchemes:{k:{type:'apiKey',in:'header',name:'X-Rooms-Key'}}},security:[{k:[]}],paths:{'/rooms':{get:{responses:{200:{description:'ok',content:{'application/json':{schema:{type:'object',properties:{rooms:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'},price:{type:'number'}}}}}}}}}}}}}}))};
+ const b=await samples.addByName(m2.id,{name:'Rooms',webSearch,fetchUrl,callModel});
+ assert.equal(b.drafted,true);assert.equal(b.secret,'ROOMS_KEY');assert.equal(b.base_url,'https://api.rooms.test/v2');assert.equal(b.source,'https://docs.rooms.test/api');
+ assert.match(asked[0],/Base URL https:\/\/api\.rooms\.test\/v2/);assert.doesNotMatch(asked[0],/evil\(\)/);
+ const r=await samples.fetchFor(m2.id,{url:'https://api.rooms.test/v2/rooms',method:'GET'},{mode:'preview'});
+ assert.equal(JSON.parse(r.body).rooms.length,3);
+ // A website typed in: the usual spec addresses on it are tried.
+ fetched.length=0;
+ await assert.rejects(samples.addByName(m2.id,{name:'api.nothing.test',webSearch:async()=>[],fetchUrl}),/could not find/);
+ assert.ok(fetched.includes('https://api.nothing.test/openapi.json'));
+ await assert.rejects(samples.addByName(m2.id,{name:'x'}),/Type the service/);
+ // The code calls a service with no key and no sample answers yet: offered.
+ await builder.initializeFrom(m2,{...design.starterFiles('Trips'),'functions/cars.js':"export default async function (request, { fetch, secrets }) {\n  const k = await secrets.get('CARS_KEY');\n  const r = await fetch('https://api.cars.test/v1/cars', { headers: { Authorization: 'Bearer ' + k } });\n  return { json: await r.json() };\n}\n",'functions/rooms.js':"export default async function (request, { fetch, secrets }) { const r = await fetch('https://api.rooms.test/v2/rooms', { headers: { 'X-Rooms-Key': await secrets.get('ROOMS_KEY') } }); return { json: await r.json() } }\n"},'Trips');
+ assert.deepEqual(samples.suggestions(m2.id),[{host:'api.cars.test',secret:'CARS_KEY'}]);
+ backend.close(m2.id);
 });

@@ -2052,17 +2052,23 @@ function renderSamplePill(apis){
  api('/projects/'+id+'/apis').then(d=>{if(state.project&&state.project.id===id)show(d.apis)}).catch(()=>pill.classList.add('hidden'));
 }
 async function renderApis(){
- const id=state.project.id,{apis,log}=await api('/projects/'+id+'/apis'),editor=(state.project.role||'owner')!=='viewer';
+ const id=state.project.id,{apis,log,suggested=[]}=await api('/projects/'+id+'/apis'),owner=(state.project.role||'owner')==='owner',editor=(state.project.role||'owner')!=='viewer';
  renderSamplePill(apis);
  const list=$('apis-list');list.replaceChildren();
- if(!apis.length)list.append(el('li','muted small','No outside APIs yet.'));
  for(const a of apis){
   const li=el('li'),row=el('div','row');row.style.marginTop='0';
-  const name=el('div','api-name');name.append(el('strong','',a.title),el('span','muted small',' '+a.base_url));
-  const key=el('span','api-key '+(a.key_added?'real':'sample'),!a.secret?'No key needed':a.key_added?a.secret+' added: real answers':'No '+a.secret+' yet: sample answers in the preview');
+  const name=el('div','api-name');name.append(el('strong','',a.title),el('span','muted small',' '+a.base_url+(a.drafted?' · read from its docs':'')));
+  const key=el('span','api-key '+(!a.secret||a.key_added?'real':'sample'),!a.secret?'No key needed':a.key_added?'Key added: real answers':'Sample answers until you add its key');
   row.append(name,key);
-  if(editor){const rm=el('button','ghost','Remove');rm.type='button';rm.onclick=async()=>{try{await api('/projects/'+id+'/apis',{method:'DELETE',body:{slug:a.slug}});renderApis()}catch(err){text($('api-status'),err.message)}};row.append(rm)}
+  if(a.secret&&owner){const add=el('button',a.key_added?'ghost':'primary',a.key_added?'Replace key':'Add key');add.type='button';add.onclick=()=>openKey(a);row.append(add)}
+  if(editor){const rm=el('button','link-btn','Remove');rm.type='button';rm.onclick=async()=>{try{await api('/projects/'+id+'/apis',{method:'DELETE',body:{slug:a.slug}});renderApis()}catch(err){text($('api-status'),err.message)}};row.append(rm)}
   li.append(row);list.append(li);
+ }
+ const sug=$('api-suggested');sug.replaceChildren();
+ for(const g of suggested){
+  const row=el('div','api-offer');row.append(el('span','','Your app calls '+g.host+' without a key.'));
+  if(editor){const b=el('button','ghost','Use sample answers');b.type='button';b.onclick=()=>addApi({name:g.host,secret:g.secret});row.append(b)}
+  sug.append(row);
  }
  const box=$('api-log');box.replaceChildren();
  if(!log.length)box.append(el('p','muted small','No calls yet. Calls your server functions make to other services show here.'));
@@ -2071,14 +2077,33 @@ async function renderApis(){
   for(const c of log.slice(0,50)){const tr=el('tr');tr.append(el('td','',new Date(c.at).toLocaleTimeString()),el('td','',c.method+' '+c.url),el('td','',c.sample?'Sample':'Real'),el('td','',c.status?String(c.status):(c.error||'failed')),el('td','',c.ms+' ms'));t.append(tr)}
   box.append(t);
  }
- $('api-add').disabled=!editor;
+ for(const b of ['api-add','api-add-spec'])$(b).disabled=!editor;
 }
-$('api-add').onclick=async()=>{
- const b=$('api-add');b.disabled=true;text($('api-status'),'Reading the spec…');
- try{const r=await api('/projects/'+state.project.id+'/apis',{method:'POST',body:{spec_url:$('api-spec-url').value.trim()||undefined,spec:$('api-spec').value.trim()||undefined,secret:$('api-secret').value.trim(),base_url:$('api-base').value.trim()||undefined}});
-  text($('api-status'),'Added '+r.api.title+' ('+r.api.operations+' endpoints). Ask the chat to use it.');for(const f of ['api-spec-url','api-spec','api-secret','api-base'])$(f).value='';await renderApis()}
- catch(err){text($('api-status'),err.message)}finally{b.disabled=false}
+async function addApi(body){
+ text($('api-status'),body.name?'Looking up '+body.name+'… (up to a minute)':'Reading the spec…');
+ for(const b of ['api-add','api-add-spec'])$(b).disabled=true;
+ try{const r=await api('/projects/'+state.project.id+'/apis',{method:'POST',body});
+  text($('api-status'),'Added '+r.api.title+(r.api.drafted?', read from its docs':'')+' ('+r.api.operations+' endpoints). Ask the chat to use it.');
+  for(const f of ['api-name','api-spec-url','api-spec','api-secret','api-base'])$(f).value='';
+  await renderApis();
+  if(r.api.secret&&!r.api.key_added&&(state.project.role||'owner')==='owner')openKey(r.api);
+ }catch(err){text($('api-status'),err.message)}
+ finally{for(const b of ['api-add','api-add-spec'])$(b).disabled=false}
+}
+$('api-add').onclick=()=>{const n=$('api-name').value.trim();if(n)addApi({name:n})};
+$('api-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('api-add').click()}};
+$('api-add-spec').onclick=()=>addApi({spec_url:$('api-spec-url').value.trim()||undefined,spec:$('api-spec').value.trim()||undefined,secret:$('api-secret').value.trim(),base_url:$('api-base').value.trim()||undefined});
+// The key pop-up: a hidden field, saved encrypted, never shown again. "Later" is fine: samples meanwhile.
+let keyFor=null;
+function openKey(a){keyFor=a;text($('key-title'),(a.key_added?'Replace your ':'Add your ')+a.title+' key');text($('key-label'),a.secret);text($('key-error'),'');$('key-value').value='';$('key-dialog').showModal();$('key-value').focus()}
+$('key-save').onclick=async()=>{
+ const value=$('key-value').value;if(!value.trim()){text($('key-error'),'Paste the key first.');return}
+ $('key-save').disabled=true;
+ try{await api('/projects/'+state.project.id+'/secrets',{method:'POST',body:{name:keyFor.secret,value}});$('key-value').value='';$('key-dialog').close();renderApis().catch(()=>{});if(typeof renderSecrets==='function')renderSecrets().catch(()=>{})}
+ catch(err){text($('key-error'),err.message)}
+ finally{$('key-save').disabled=false;$('key-value').value=''}
 };
+$('key-dialog').addEventListener('close',()=>{$('key-value').value=''});
 
 // ---------- free website check ----------
 const checkState={id:null,timer:null};
