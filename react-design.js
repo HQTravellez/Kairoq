@@ -40,7 +40,7 @@ const KIT_API={
  'src/components/ui/kanban.jsx':'Kanban {columns: [{id, title}], items: [{id, column, ...}], renderCard: (item)=>node, onMove: (itemId, toColumnId)=>void, columnTotal?: (items)=>node, columnFooter?: (column)=>node} (drag between columns with mouse, touch or keyboard; dnd-kit): pipelines, deals, orders, tasks by stage',
  'src/components/ui/command-menu.jsx':'CommandMenu {items: [{label, group?, icon?, shortcut?, keywords?, onSelect}], open?, onOpenChange?} (opens on Cmd/Ctrl+K by itself; render once in the app shell)',
  'src/components/ui/stat-card.jsx':'StatGrid (responsive grid), StatCard {label, value, change?: percent, note?, goodWhen?: "up"|"down", icon?} (dashboard KPIs)',
- 'src/components/ui/motion.jsx':'Marquee {reverse, pauseOnHover, vertical}, NumberTicker {value, decimals, prefix, suffix}, BentoGrid, BentoCard {name, description, icon, href, cta, background, className}, BorderBeam {size, duration} (inside a relative overflow-hidden card), ShimmerButton, AnimatedList {delay} (Magic UI; respects reduced motion; one or two per page)'
+ 'src/components/ui/motion.jsx':'Marquee {reverse, pauseOnHover, vertical}, NumberTicker {value, decimals, prefix, suffix}, BentoGrid, BentoCard {name, description, icon, href, cta, background, className}, BorderBeam {duration} (inside a card with className="relative"), ShimmerButton, AnimatedList {delay} (Magic UI; respects reduced motion; one or two per page)'
 };
 function isKitFile(name,code){const k=kit();return Object.hasOwn(k,name)&&k[name]===code}
 

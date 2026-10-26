@@ -60,7 +60,7 @@ function Column({ column, items, renderCard, columnFooter, columnTotal }) {
   return (
     <section
       aria-label={column.title}
-      className={cn('flex w-72 shrink-0 flex-col gap-3 rounded-xl border bg-muted/40 p-3 transition-colors sm:w-80', isOver && 'border-primary/60 bg-primary/5')}
+      className={cn('flex w-72 shrink-0 flex-col gap-3 rounded-xl border bg-muted/40 p-3 transition-colors lg:w-auto lg:min-w-[14rem] lg:flex-1', isOver && 'border-primary/60 bg-primary/5')}
     >
       <header className="flex items-center justify-between gap-2 px-1">
         <h3 className="font-display text-sm font-semibold">{column.title}</h3>

@@ -48,7 +48,12 @@ test('the brief keeps the playbook, and every later change sees it', async () =>
   assert.equal((await design.createBrief('website for our pizzeria', { projectName: 'Nonna', callModel: reply({ playbook: '' }) })).playbook, undefined);
   assert.equal((await design.createBrief('website for our pizzeria', { projectName: 'Nonna', callModel: reply({ playbook: 'Dental Practice' }) })).playbook, 'Restaurant/Food Service');
   const note = design.designNote(offered);
-  assert.match(note, /Section order: Full-bleed Hero/);
+  // The brief also got an art direction: its blueprints set the sections and the look, so the
+  // playbook adds the button, what visitors look for and what to avoid.
+  assert.ok(offered.direction);
+  assert.doesNotMatch(note, /Section order/);
+  assert.match(note, /Main button: /);
+  assert.match(design.designNote({ ...offered, direction: undefined, style: undefined }), /Section order: Full-bleed Hero/);
   assert.match(note, /Avoid: /);
   assert.match(note, /build features \(ordering, booking, sign-in\) only when the owner asked/);
   assert.match(note, /testimonials, ratings and counts appear only if the owner gives real ones/);

@@ -12,7 +12,7 @@ import { cn } from '../../lib/utils.js';
 // NumberTicker {value, decimals, prefix, suffix}: counts up to a real number when it scrolls into view.
 // BentoGrid / BentoCard {name, description, icon, href, cta, background, className}: a feature grid
 //   with cards of different sizes (className="lg:col-span-2" for a wide one).
-// BorderBeam {size, duration}: a light that runs around a card's border (the card needs
+// BorderBeam {duration, borderWidth}: a light that runs around a card's border (the card needs
 //   className="relative overflow-hidden"); for the one card that matters, such as a pricing plan.
 // ShimmerButton: the hero's main call to action, with a moving shine.
 // AnimatedList {delay}: items that arrive one by one, like live notifications or new orders.
@@ -71,61 +71,55 @@ export function NumberTicker({ value, startValue = 0, delay = 0, decimals = 0, p
 
 export function BentoGrid({ className, children, ...props }) {
   return (
-    <div className={cn('grid w-full auto-rows-[20rem] grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3', className)} {...props}>
+    <div className={cn('grid w-full auto-rows-[minmax(12rem,auto)] grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3', className)} {...props}>
       {children}
     </div>
   );
 }
 
+// background: a picture or a small piece of the real product shown at the top of the card.
 export function BentoCard({ name, description, icon: Icon, href, cta = 'Learn more', background, className, ...props }) {
   return (
     <div
-      className={cn('group relative flex flex-col justify-end overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-soft transition-shadow hover:shadow-glow', className)}
+      className={cn('group flex flex-col overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-glow', className)}
       {...props}
     >
-      {background && <div className="absolute inset-0">{background}</div>}
-      <div className="relative z-10 flex flex-col gap-1 bg-gradient-to-t from-card via-card/90 to-transparent p-6 pt-16 transition-transform duration-300 lg:group-hover:-translate-y-8">
-        {Icon && <Icon className="mb-2 h-10 w-10 origin-left text-primary transition-transform duration-300 group-hover:scale-75" aria-hidden="true" />}
+      {background && <div className="relative min-h-[10rem] flex-1 overflow-hidden border-b bg-muted/40">{background}</div>}
+      <div className={cn('flex flex-col gap-1 p-6', !background && 'h-full')}>
+        {Icon && <span className="mb-auto pb-4"><Icon className="h-9 w-9 text-primary" aria-hidden="true" /></span>}
         <h3 className="font-display text-xl font-semibold tracking-tight">{name}</h3>
         {description && <p className="max-w-lg text-sm text-muted-foreground">{description}</p>}
+        {href && (
+          <a href={href} className="mt-3 inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {cta}
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+          </a>
+        )}
       </div>
-      {href && (
-        <a
-          href={href}
-          className="absolute bottom-0 z-10 flex items-center gap-1 p-6 text-sm font-medium text-primary opacity-100 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:translate-y-8 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:focus-visible:translate-y-0 lg:focus-visible:opacity-100"
-        >
-          {cta}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </a>
-      )}
     </div>
   );
 }
 
-export function BorderBeam({ size = 80, duration = 6, delay = 0, borderWidth = 1.5, colorFrom = 'hsl(var(--primary))', colorTo = 'hsl(var(--accent))', className }) {
+// A light that runs around the border: a rotating gradient, masked so only the border shows.
+export function BorderBeam({ duration = 6, borderWidth = 2, colorFrom = 'hsl(var(--primary))', colorTo = 'hsl(var(--accent))', className }) {
   const still = useReducedMotion();
   if (still) return null;
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 rounded-[inherit]"
+      className={cn('pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]', className)}
       style={{
-        border: borderWidth + 'px solid transparent',
-        WebkitMask: 'linear-gradient(transparent, transparent) padding-box, linear-gradient(#000, #000) border-box',
-        WebkitMaskComposite: 'source-in',
-        mask: 'linear-gradient(transparent, transparent) padding-box exclude, linear-gradient(#000, #000) border-box',
+        padding: borderWidth,
+        WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+        WebkitMaskComposite: 'xor',
+        maskComposite: 'exclude',
       }}
     >
       <motion.div
-        className={cn('absolute aspect-square', className)}
-        style={{
-          width: size,
-          offsetPath: 'rect(0 auto auto 0 round ' + size + 'px)',
-          background: 'linear-gradient(to left, ' + colorFrom + ', ' + colorTo + ', transparent)',
-        }}
-        initial={{ offsetDistance: '0%' }}
-        animate={{ offsetDistance: ['0%', '100%'] }}
-        transition={{ repeat: Infinity, ease: 'linear', duration, delay: -delay }}
+        className="absolute left-1/2 top-1/2 aspect-square w-[200%]"
+        style={{ x: '-50%', y: '-50%', background: 'conic-gradient(from 0deg, transparent 0deg 280deg, ' + colorTo + ' 320deg, ' + colorFrom + ' 355deg, transparent 360deg)' }}
+        animate={{ rotate: 360 }}
+        transition={{ repeat: Infinity, ease: 'linear', duration }}
       />
     </div>
   );

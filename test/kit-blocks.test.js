@@ -12,6 +12,7 @@ const builder = require('../react-builder'), design = require('../react-design')
 
 const NEW = ['data-table', 'kanban', 'command-menu', 'stat-card', 'motion'].map((n) => 'src/components/ui/' + n + '.jsx');
 const shot = process.env.KAIROQ_KIT_SHOTS; // a folder: save screenshots there to look at them
+test.after(() => runtime.close());
 
 test('every new project gets the blocks, and the builder knows how and when to use them', () => {
   const files = design.starterFiles('Test');
@@ -72,6 +73,9 @@ test('a CRM made of the blocks builds, and its table, pipeline and command menu 
     assert.equal(await rows().first().locator('td').first().textContent(), 'Maple Dental Group');
     await page.click('[aria-label="Filter by Status"]');
     await page.getByRole('option', { name: 'Trial (2)' }).click();
+    // Wait until the dropdown has closed and handed focus back, as a person would.
+    await page.waitForSelector('[role="listbox"]', { state: 'detached' });
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Filter by Status');
     assert.equal(await rows().count(), 2);
     // Pipeline: move a card with the keyboard (Space, arrow right, Space).
     const lead = page.locator('[aria-label="Lead"]'), demo = page.locator('[aria-label="Demo booked"]');
@@ -87,18 +91,18 @@ test('a CRM made of the blocks builds, and its table, pipeline and command menu 
     assert.equal(await lead.getByText('Northwind Logistics').count(), 0, 'the card left Lead');
     // Command menu: type, Enter runs the action.
     if (shot) await page.screenshot({ path: path.join(shot, 'kit-crm-moved.png') });
-    await page.click('text=Search ⌘K', { timeout: 5000 });
-    await page.fill('[role="combobox"]', 'new');
+    await page.click('text=Search ⌘K');
+    await page.fill('input[role="combobox"]', 'new');
     assert.equal(await page.locator('[role="option"]').count(), 1);
     await page.keyboard.press('Enter');
-    await page.waitForSelector('[role="combobox"]', { state: 'detached' });
+    await page.waitForSelector('input[role="combobox"]', { state: 'detached' });
     assert.deepEqual(errors, []);
   } finally { await ctx.close(); server.close(); }
 });
 
 test('a landing page with the motion pieces builds and draws them', { timeout: 240000 }, async (t) => {
   const meta = await buildApp('Landing', 'kit-landing-app.jsx');
-  if (!runtime.available()) { t.diagnostic('no browser here: only the build was checked'); await runtime.close(); return; }
+  if (!runtime.available()) { t.diagnostic('no browser here: only the build was checked'); return; }
   const server = http.createServer((req, res) => { if (!builder.handlePreview(req, res)) { res.writeHead(404); res.end(); } });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const browser = await runtime.browser(), errors = [];
@@ -125,5 +129,5 @@ test('a landing page with the motion pieces builds and draws them', { timeout: 2
     if (shot) await p2.screenshot({ path: path.join(shot, 'kit-landing-phone.png'), fullPage: true });
     await still.close();
     assert.deepEqual(errors, []);
-  } finally { server.close(); await runtime.close(); }
+  } finally { server.close(); }
 });
