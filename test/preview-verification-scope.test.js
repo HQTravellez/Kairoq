@@ -9,7 +9,7 @@ test('Kairoq preview does not equate loading and signup with complete app verifi
  assert.match(src,/Anything else in this change was not tested/);
  assert.match(src,/this is not certification that the whole application is complete/);
 });
-test('when every check passed, the result is one quiet line that opens on a click',()=>{
- assert.match(src,/if\(all&&!\(added&&added\.length\)\)\{/);
- assert.match(src,/'Tested in a browser: '\+rows\.length\+' checks passed'/);
+test('when every check passed, nothing shows under the reply; problems still do',()=>{
+ assert.match(src,/if\(all\)return document\.createTextNode\(''\);/);
+ assert.match(src,/'Browser checks found problems'/);
 });
