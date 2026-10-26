@@ -35,7 +35,12 @@ const KIT_API={
  'src/components/ui/skeleton.jsx':'Skeleton (loading placeholder)',
  'src/components/ui/separator.jsx':'Separator {orientation}',
  'src/components/ui/toaster.jsx':'Toaster (render once), toast (toast.success("Saved"))',
- 'src/components/ui/section.jsx':'Container (max-w-6xl page width), Section (vertical rhythm), Eyebrow (small label above headings)'
+ 'src/components/ui/section.jsx':'Container (max-w-6xl page width), Section (vertical rhythm), Eyebrow (small label above headings)',
+ 'src/components/ui/data-table.jsx':'DataTable {columns: [{key, header, cell?: (row)=>node, sortable?, align?: "right"}], data, filters?: [{key, label, options?}], searchPlaceholder, pageSize, onRowClick?: (row)=>void, empty, toolbar?} (sort, search, filter by field, pages; TanStack Table 8): use it for any list of records',
+ 'src/components/ui/kanban.jsx':'Kanban {columns: [{id, title}], items: [{id, column, ...}], renderCard: (item)=>node, onMove: (itemId, toColumnId)=>void, columnTotal?: (items)=>node, columnFooter?: (column)=>node} (drag between columns with mouse, touch or keyboard; dnd-kit): pipelines, deals, orders, tasks by stage',
+ 'src/components/ui/command-menu.jsx':'CommandMenu {items: [{label, group?, icon?, shortcut?, keywords?, onSelect}], open?, onOpenChange?} (opens on Cmd/Ctrl+K by itself; render once in the app shell)',
+ 'src/components/ui/stat-card.jsx':'StatGrid (responsive grid), StatCard {label, value, change?: percent, note?, goodWhen?: "up"|"down", icon?} (dashboard KPIs)',
+ 'src/components/ui/motion.jsx':'Marquee {reverse, pauseOnHover, vertical}, NumberTicker {value, decimals, prefix, suffix}, BentoGrid, BentoCard {name, description, icon, href, cta, background, className}, BorderBeam {size, duration} (inside a relative overflow-hidden card), ShimmerButton, AnimatedList {delay} (Magic UI; respects reduced motion; one or two per page)'
 };
 function isKitFile(name,code){const k=kit();return Object.hasOwn(k,name)&&k[name]===code}
 
@@ -168,9 +173,13 @@ const THEME={extend:{
   'scale-in':{from:{opacity:'0',transform:'translate(-50%, -48%) scale(0.96)'},to:{opacity:'1',transform:'translate(-50%, -50%) scale(1)'}},
   'slide-up':{from:{transform:'translateY(100%)'},to:{transform:'translateY(0)'}},
   'slide-in-right':{from:{transform:'translateX(100%)'},to:{transform:'translateX(0)'}},
-  'slide-in-left':{from:{transform:'translateX(-100%)'},to:{transform:'translateX(0)'}}
+  'slide-in-left':{from:{transform:'translateX(-100%)'},to:{transform:'translateX(0)'}},
+  // Motion kit (src/components/ui/motion.jsx, from Magic UI, MIT).
+  marquee:{from:{transform:'translateX(0)'},to:{transform:'translateX(calc(-100% - var(--gap)))'}},
+  'marquee-vertical':{from:{transform:'translateY(0)'},to:{transform:'translateY(calc(-100% - var(--gap)))'}},
+  'shimmer-slide':{from:{transform:'translateX(0)'},to:{transform:'translateX(400%)'}}
  },
- animation:{'fade-in':'fade-in 0.3s ease-out both','fade-up':'fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both','scale-in':'scale-in 0.2s ease-out both','slide-up':'slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-right':'slide-in-right 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-left':'slide-in-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)'}
+ animation:{'fade-in':'fade-in 0.3s ease-out both','fade-up':'fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both','scale-in':'scale-in 0.2s ease-out both','slide-up':'slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-right':'slide-in-right 0.3s cubic-bezier(0.22, 1, 0.36, 1)','slide-in-left':'slide-in-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)',marquee:'marquee var(--duration, 40s) linear infinite','marquee-vertical':'marquee-vertical var(--duration, 40s) linear infinite','shimmer-slide':'shimmer-slide 3s ease-in-out infinite'}
 }};
 
 function starterApp(name){
@@ -232,7 +241,8 @@ DESIGN (as important as working code; the app must look like a polished product 
 - Avoid the generic AI look: no gradient text, aurora/mesh gradients or glowing blobs; no row of identical icon-in-a-tinted-square cards (show a small slice of the real product instead); no vague copy ("seamless", "revolutionize", "unlock", "all-in-one"); no invented customer logos, testimonials or user counts; no centred-everything pages or sections that all share one layout; no plain grey boxes, emoji icons, lorem ipsum or default blue buttons. Use specific names, places, times and amounts as clearly sample data, one confident brand colour and a different layout for each section.
 - Make the kit yours: adapt the UI kit's components to this app's brand (shape, spacing, weight) rather than shipping them looking like everyone else's. Let typography carry character (a distinctive display font, confident sizes). Do not build text-only walls: break long text with imagery, icons, numbers or cards.
 - Contrast: body text must be easily readable on its background (dark text on light, light on dark; never light grey on white or mid-grey on a photo without an overlay). Use one primary colour confidently; do not use pure black as the primary colour.
-- Motion: a few coordinated entrance animations and hover feedback, not everything moving.`;
+- Motion: a few coordinated entrance animations and hover feedback, not everything moving.
+- Ready pieces in the UI kit (use them instead of building your own): any list of records (customers, orders, deals, bookings) is a DataTable with search and the useful filters; work that moves through stages (a sales pipeline, orders, tasks) is a Kanban whose onMove saves the new stage; a dashboard opens with a StatGrid of three or four StatCards built from the real data; an app with several pages gets one CommandMenu (Cmd/Ctrl+K) to jump between them. On landing pages the motion pieces (Marquee, NumberTicker, BentoGrid, BorderBeam, ShimmerButton, AnimatedList) are spice: one or two per page where they show something real, never a NumberTicker for an invented number or a Marquee of invented customer logos.`;
 
 function designNote(design){
  if(!design||!design.palette)return'';
@@ -246,7 +256,7 @@ function designNote(design){
  if(design.idea)lines.push('The idea: '+design.idea);
  if(design.direction){const b=require('./design-directions').blueprint(design,{seed:design.created_at||''});if(b)lines.push(b)}
  if(design.style){const t=require('./design-styles').text(design.style);if(t)lines.push(t)}
- if(design.playbook){const presets=require('./design-presets'),t=presets.playbookText(presets.byType(design.playbook));if(t)lines.push(t)}
+ if(design.playbook){const presets=require('./design-presets'),t=presets.playbookText(presets.byType(design.playbook),{layout:!design.direction&&!design.style});if(t)lines.push(t)}
  return lines.join('\n');
 }
 

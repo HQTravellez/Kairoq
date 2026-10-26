@@ -51,13 +51,15 @@ function playbook(request){
 }
 function byType(type){return(data.playbooks||[]).find(p=>p.type===type)||null}
 // The playbook as lines for the builder (also kept in the design brief, so later edits follow it).
-function playbookText(p){
+// layout: false when an art direction already sets the sections and the look (its blueprints win;
+// the playbook then adds only the button, what visitors look for and what to avoid).
+function playbookText(p,{layout=true}={}){
  if(!p)return'';
  const lines=['Page playbook for a '+p.type+' (from a design library; follow it unless the owner asks otherwise):'];
  if(/^N\/A/i.test(p.pattern))lines.push('- This is a tool people work in, not a landing page: lead with the working screen, not a marketing hero.');
- else if(p.pattern)lines.push('- Page pattern: '+p.pattern+(p.sections?'. Section order: '+p.sections:'')+'.');
+ else if(layout&&p.pattern)lines.push('- Page pattern: '+p.pattern+(p.sections?'. Section order: '+p.sections:'')+'.');
  if(p.cta)lines.push('- Main button: '+p.cta+'.');
- if(p.style)lines.push('- Style: '+p.style+(p.also?' (or '+p.also+')':'')+'.');
+ if(layout&&p.style)lines.push('- Style: '+p.style+(p.also?' (or '+p.also+')':'')+'.');
  if(p.effects)lines.push('- Effects: '+p.effects+'.');
  if(p.considerations)lines.push('- What visitors look for: '+p.considerations+' Give these a clear place in the design, but build features (ordering, booking, sign-in) only when the owner asked for them.');
  if(p.avoid&&p.avoid.length)lines.push('- Avoid: '+p.avoid.join('; ')+'.');
