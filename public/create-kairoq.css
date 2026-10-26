@@ -34,3 +34,8 @@ body::before,.home-hero::before,.home-hero::after,.aurora,.mock-glow{display:non
 .verified-quiet>summary:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .verified-quiet .vmark{color:#2f7d4f;font-weight:700}
 .verified-quiet[open]>.verified{margin-top:6px}
+/* A reply stays calm: notes under it are small lines, not boxes. Only real problems stand out. */
+.memory-chip{background:none!important;border:0!important;padding:0!important;margin-top:4px!important;font-size:12px!important;color:#8e8e93!important;gap:5px!important}
+.memory-chip .ico{color:#8e8e93!important;width:12px!important;height:12px!important}
+.design-chip{margin-top:4px!important}
+.scope-chip{margin-top:6px!important;padding:6px 9px!important;font-size:12.5px!important;line-height:1.4!important}
