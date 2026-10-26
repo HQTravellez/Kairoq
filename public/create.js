@@ -355,13 +355,9 @@ function verifiedCard(v,checks,added){
  const note=el('p','verification-scope',actualFlows?'Kairoq tested the basics above and your saved checks. Anything else in this change was not tested, so try it in the preview.':'Kairoq opened the app in a browser and checked the basics above. It did not test the new feature itself, so try it in the preview.');
  box.append(note);
  box.title='Browser check scope only; this is not certification that the whole application is complete.';
- // When everything passed and nothing new was learned, it is one quiet line; the list opens on a click.
- // Problems, and a new saved check, stay open so they are seen.
- if(all&&!(added&&added.length)){
-  const d=el('details','verified-quiet'),sum=el('summary');
-  sum.append(el('span','vmark','✓'),el('span',null,'Tested in a browser: '+rows.length+' checks passed'));
-  box.querySelector('.verified-head').remove();d.append(sum,box);return d;
- }
+ // When everything passed, nothing shows under the reply: the results stay in Details.
+ // Only problems are shown, so they are seen.
+ if(all)return document.createTextNode('');
  return box;
 }
 function renderVersions(){
