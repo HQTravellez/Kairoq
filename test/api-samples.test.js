@@ -147,3 +147,48 @@ test('one box: a name finds the spec online (YAML on GitHub), or Kairoq reads th
  assert.deepEqual(samples.suggestions(m2.id),[{host:'api.cars.test',secret:'CARS_KEY'}]);
  backend.close(m2.id);
 });
+
+test('sample answers use the spec\'s own examples and follow the search (airports, date, arrival after departure)',()=>{
+ // A flight search shaped like Amadeus Flight Offers Search (Swagger 2, field examples only).
+ const flights={swagger:'2.0',info:{title:'Flight Offers Search',version:'2'},host:'test.api.flights.test',basePath:'/v2',schemes:['https'],
+  paths:{'/shopping/flight-offers':{get:{operationId:'getFlightOffers',parameters:[{name:'originLocationCode',in:'query',required:true,type:'string'},{name:'destinationLocationCode',in:'query',required:true,type:'string'},{name:'departureDate',in:'query',required:true,type:'string'}],responses:{200:{description:'ok',schema:{type:'object',properties:{data:{type:'array',items:{$ref:'#/definitions/Offer'}}}}}}}}},
+  definitions:{Offer:{type:'object',properties:{validatingAirlineCodes:{type:'array',items:{type:'string'}},price:{type:'object',properties:{currency:{type:'string',example:'EUR'},total:{type:'string',example:'632.30'}}},
+   itineraries:{type:'array',items:{type:'object',properties:{duration:{type:'string',example:'PT7H10M'},segments:{type:'array',items:{type:'object',properties:{carrierCode:{type:'string',example:'BA'},number:{type:'string',example:'178'},
+    departure:{$ref:'#/definitions/End'},arrival:{$ref:'#/definitions/End'}}}}}}}}},End:{type:'object',properties:{iataCode:{type:'string',example:'CDG'},at:{type:'string',format:'date-time',example:'2017-10-23T20:00:00'}}}}};
+ const plan=require('../api-learning').learn(flights),op=plan.operations[0];
+ const api={slug:'flights',title:plan.title,operations:plan.operations};
+ const a=samples.sampleAnswer(api,op,{method:'GET',url:'https://test.api.flights.test/v2/shopping/flight-offers?originLocationCode=YYZ&destinationLocationCode=LHR&departureDate=2026-12-03&adults=1'});
+ const data=JSON.parse(a.body).data;
+ assert.equal(data.length,3,'three offers');
+ const prices=data.map(o=>o.price.total);
+ assert.equal(prices[0],'632.30','the spec\'s own example price');assert.equal(new Set(prices).size,3,'the offers differ in price');
+ assert.ok(prices.every(p=>/^\d+\.\d{2}$/.test(p)));assert.equal(data[0].price.currency,'EUR');
+ for(const o of data){
+  assert.equal(o.itineraries.length,1);const [g]=o.itineraries[0].segments;assert.equal(o.itineraries[0].segments.length,1,'one leg, not three unrelated ones');
+  assert.equal(g.departure.iataCode,'YYZ');assert.equal(g.arrival.iataCode,'LHR');assert.equal(g.carrierCode,'BA');
+  assert.match(g.departure.at,/^2026-12-03T\d{2}:\d{2}:00$/,'on the day searched, with a real time');
+  assert.ok(new Date(g.arrival.at+'Z')>new Date(g.departure.at+'Z'),'arrival after departure');
+  assert.ok(/^[A-Z]{2}$/.test(o.validatingAirlineCodes[0]),'an airline code, not "sample valid"');
+ }
+ // A whole example answer in the spec is returned as it is.
+ const withExample={openapi:'3.0.3',info:{title:'Rates',version:'1'},servers:[{url:'https://api.rates.test'}],paths:{'/rates':{get:{responses:{200:{description:'ok',content:{'application/json':{schema:{type:'object'},example:{base:'CAD',rates:{USD:0.73}}}}}}}}}};
+ const p2=require('../api-learning').learn(withExample);
+ assert.deepEqual(JSON.parse(samples.sampleAnswer({slug:'rates',title:'Rates',operations:p2.operations},p2.operations[0],{method:'GET',url:'https://api.rates.test/rates'}).body),{base:'CAD',rates:{USD:0.73}});
+});
+
+test('a provider whose API details are not public gets a plain answer',async()=>{
+ const meta=builder.create({name:'Hidden',owner:'owner'});
+ const fetchUrl=async({url})=>({status:200,url,body:'<html><body>Contact your account representative.</body></html>'});
+ await assert.rejects(samples.addByName(meta.id,{name:'Sabre',webSearch:async()=>['https://developer.example.test/docs'],fetchUrl,callModel:async()=>{throw Error('Specification has no supported HTTP operations')}}),e=>{assert.match(e.message,/couldn't find the details of Sabre's API on its public pages\. Some providers keep them behind a partner sign-in/);assert.doesNotMatch(e.message,/Specification|HTTP operations/);return true});
+});
+
+test('an API that needs no key gets real answers in the preview; saved checks still get samples',async()=>{
+ const meta=builder.create({name:'Weather',owner:'owner'});
+ samples.add(meta.id,{spec:{openapi:'3.0.3',info:{title:'Open Weather Free',version:'1'},servers:[{url:'https://api.weather-free.test/v1'}],paths:{'/forecast':{get:{responses:{200:{description:'ok',content:{'application/json':{schema:{type:'object',properties:{temperature:{type:'number'}}}}}}}}}}}});
+ const real=async()=>({status:200,headers:{},body:'{"temperature":12.4}'});
+ const preview=await samples.fetchFor(meta.id,{url:'https://api.weather-free.test/v1/forecast?city=Lisbon',method:'GET'},{mode:'preview',real});
+ assert.equal(preview.body,'{"temperature":12.4}','the real answer');
+ const check=await samples.fetchFor(meta.id,{url:'https://api.weather-free.test/v1/forecast?city=Lisbon',method:'GET'},{mode:'check',real});
+ assert.equal(check.headers['x-kairoq-sample'],'1','checks never call the real service');
+ assert.deepEqual(samples.log(meta.id).map(e=>e.sample),[true,false]);
+});
