@@ -57,3 +57,9 @@ test('a failed model chain is tried once more before the owner sees anything, an
  assert.match(api,/progress:RETRY/);
  assert.doesNotMatch(E.BUSY_TEXT+ui,/AI is busy/);
 });
+
+test('a change the builder could not fit is told plainly, without file names or code',()=>{
+ const said=require('../builder-errors').plain(Error('The change could not be built after 3 attempts. Last problem: src/components/search/FlightSearchForm.jsx: edit 1 (find "Compare example fares") was not found'));
+ assert.equal(said.text,"I couldn't finish this change, even after several tries, so your app is as it was. Press Try again: it often works the second time.");
+ assert.match(said.raw,/FlightSearchForm/,'the details stay in the logs');
+});

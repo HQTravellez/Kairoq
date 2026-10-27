@@ -41,7 +41,7 @@ function add(id,{spec,secret,baseUrl,source=null,drafted=false}){
  let plan;try{plan=require('./api-learning').learn(typeof spec==='string'?specText(spec):spec)}catch(e){throw fail(400,'Could not read that spec: '+e.message)}
  const base=cleanBase(baseUrl||plan.baseUrl);
  const api={slug:slugOf(plan.title,all.map(a=>a.slug)),title:plan.title,version:plan.version,baseUrl:base,secret:key||null,auth:plan.auth,
-  operations:plan.operations.slice(0,300).map(o=>({id:o.id,method:o.method,path:o.path,summary:o.summary,requiredParameters:o.requiredParameters,bodyFields:o.bodyFields,successCodes:o.successCodes,responseSchemas:o.responseSchemas})),
+  operations:plan.operations.slice(0,300).map(o=>({id:o.id,method:o.method,path:o.path,summary:o.summary,requiredParameters:o.requiredParameters,bodyFields:o.bodyFields,successCodes:o.successCodes,responseSchemas:o.responseSchemas,...(o.responseExamples&&Object.keys(o.responseExamples).length?{responseExamples:o.responseExamples}:{})})),
   source:source?String(source).slice(0,300):null,drafted:Boolean(drafted),added_at:new Date().toISOString()};
  if(all.some(a=>a.baseUrl===api.baseUrl))throw fail(409,'This app already has an API at '+api.baseUrl+'. Remove it first to replace it.');
  writeJson(file(id,'apis.json'),[...all,api]);
@@ -74,6 +74,9 @@ Use ONLY what the documentation text says: its base address (servers, https), ho
 Reply with ONLY the JSON object: {"openapi":"3.0.3","info":{"title":"..."},"servers":[{"url":"https://..."}],"components":{"securitySchemes":{...}},"security":[...],"paths":{...}}`;
 // name: what the owner typed ("Hotelbeds", "api.liteapi.travel", a link to a spec or docs page).
 // webSearch(query) -> [urls]; callModel(opts, parse) for drafting; fetchUrl({url}) -> {status, body}.
+// When the provider's public pages do not describe the API (Sabre, for one, keeps it behind a
+// partner sign-in): say so plainly and what to do.
+const HIDDEN=t=>'Kairoq couldn\'t find the details of '+t+'\'s API on its public pages. Some providers keep them behind a partner sign-in. Paste the API spec file, or a link to it, under More options.';
 async function addByName(id,{name,secret,webSearch,callModel,fetchUrl=require('./react-functions').guardedFetch}){
  const text=String(name||'').trim().slice(0,200);
  if(text.length<2)throw fail(400,'Type the service\'s name or website, for example Hotelbeds');
@@ -101,11 +104,11 @@ async function addByName(id,{name,secret,webSearch,callModel,fetchUrl=require('.
  let docs=null;
  if(asUrl)docs=await get(asUrl);
  if(!docs&&webSearch){let hits=[];try{hits=await webSearch(text+' API documentation reference')}catch{}for(const u of (hits||[]).slice(0,3)){docs=await get(u);if(docs&&pageText(docs.body).length>400)break;docs=null}}
- if(!docs)throw fail(422,'Kairoq could not find '+text+'\'s API documentation. Paste its spec under More options.');
+ if(!docs)throw fail(422,HIDDEN(text));
  const parse=t=>{const m=String(t).replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');const a=m.indexOf('{'),b=m.lastIndexOf('}');const v=JSON.parse(m.slice(a,b+1));require('./api-learning').learn(v);return v};
  let spec;
  try{spec=await callModel({messages:[{role:'system',content:DRAFT},{role:'user',content:'Service: '+text+'\nDocumentation page: '+docs.url+'\n\n'+pageText(docs.body).slice(0,30000)}],temperature:0.1,maxOutputTokens:8000},parse)}
- catch(e){throw fail(422,'Kairoq could not read '+text+'\'s API from its docs ('+String(e.message||e).slice(0,120)+'). Paste its spec under More options.')}
+ catch(e){throw fail(422,HIDDEN(text))}
  const plan=require('./api-learning').learn(spec);
  return add(id,{spec,secret:secret||(plan.auth.length?keyName(plan.title||text):''),source:docs.url,drafted:true});
 }
@@ -159,21 +162,37 @@ function merge(s){
  for(const k of ['oneOf','anyOf'])if(Array.isArray(s[k])&&s[k].length)return merge({...s[k][0],...Object.fromEntries(Object.entries(s).filter(([x])=>x!==k))});
  return s;
 }
-function dateIn(days,r){const d=new Date(Date.UTC(2026,10,1));d.setUTCDate(d.getUTCDate()+days+Math.floor(r()*30));return d}
+function dateIn(days,r){const d=new Date(Date.UTC(2026,10,1));d.setUTCDate(d.getUTCDate()+days+Math.floor(r()*30));d.setUTCHours(6+Math.floor(r()*16),pick([0,10,25,40,55],r));return d}
+const MONEY=/price|amount|fare|(^|_)(total|grandtotal|grand_total|cost|fee|base|rate)$/;
+// The spec's own example value, made a little different per item so a list of three offers does
+// not show three identical prices, and dates moved to the coming weeks (keeping the format).
+function fromExample(ex,s,n,r,i){
+ if(typeof ex==='number')return MONEY.test(n)&&i?Math.round(ex*(0.8+r()*0.5)*100)/100:ex;
+ if(typeof ex!=='string')return ex;
+ if(/^\d+(\.\d+)?$/.test(ex)&&MONEY.test(n)&&i){const d=(ex.split('.')[1]||'').length;return(Number(ex)*(0.8+r()*0.5)).toFixed(d)}
+ const dt=/^(\d{4}-\d{2}-\d{2})(T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/.exec(ex);
+ if(dt){const d=dateIn(i,r).toISOString();if(!dt[2])return d.slice(0,10);return d.slice(0,10)+'T'+d.slice(11,16)+(dt[3]?':00':'')+(dt[5]||'')}
+ return ex;
+}
 function pick(list,r){return list[Math.floor(r()*list.length)]}
 function scalar(s,name,r,i){
  const n=String(name||'').toLowerCase(),t=s.type||(s.enum?typeof s.enum[0]:'string');
  if(s.enum&&s.enum.length)return pick(s.enum,r);
  if(s.const!==undefined)return s.const;
+ if(s.example!==undefined&&(typeof s.example!=='object'))return fromExample(s.example,s,n,r,i);
  if(t==='boolean')return r()<0.7;
  if(t==='integer'||t==='number'){
   const lo=Number.isFinite(s.minimum)?s.minimum:null,hi=Number.isFinite(s.maximum)?s.maximum:null;
-  let v=/price|amount|total|rate|cost|fare|fee/.test(n)?Math.round((80+r()*420)*100)/100:/(^|_)(lat|latitude)$/.test(n)?43.6+r()*0.1:/(^|_)(lng|lon|longitude)$/.test(n)?-79.4+r()*0.1:/rating|stars|score/.test(n)?Math.round((3+r()*2)*10)/10:/count|qty|quantity|guests|adults|rooms|nights/.test(n)?1+Math.floor(r()*4):/(^|_)id$|^id/.test(n)?1000+i*7+Math.floor(r()*900):Math.floor(r()*100);
+  let v=MONEY.test(n)?Math.round((80+r()*420)*100)/100:/(^|_)(lat|latitude)$/.test(n)?43.6+r()*0.1:/(^|_)(lng|lon|longitude)$/.test(n)?-79.4+r()*0.1:/rating|stars|score/.test(n)?Math.round((3+r()*2)*10)/10:/count|qty|quantity|guests|adults|rooms|nights/.test(n)?1+Math.floor(r()*4):/(^|_)id$|^id/.test(n)?1000+i*7+Math.floor(r()*900):Math.floor(r()*100);
   if(lo!==null&&v<lo)v=lo;if(hi!==null&&v>hi)v=hi;
   return t==='integer'?Math.round(v):v;
  }
  const f=String(s.format||'');
- if(f==='date-time'||/(_at|time|timestamp)$/.test(n))return dateIn(i,r).toISOString();
+ if(f==='date-time'||/(_at|time|timestamp)$|^at$/.test(n))return dateIn(i,r).toISOString().slice(0,19);
+ if(/iata|airport|(^|_)(origin|destination)(_?code)?$|locationcode/.test(n))return pick(['YYZ','YUL','YVR','LHR','JFK','CDG','LAX','ORD'],r);
+ if(/carrier|airline/.test(n))return pick(['AC','WS','BA','UA','DL','AF'],r);
+ if(/duration/.test(n))return'PT'+(2+Math.floor(r()*10))+'H'+pick(['05','20','35','50'],r)+'M';
+ if(MONEY.test(n))return(80+r()*620).toFixed(2);
  if(f==='date'||/date|check_?in|check_?out|arrival|departure|from|until/.test(n))return dateIn(i+(/out|departure|until/.test(n)?3:0),r).toISOString().slice(0,10);
  if(f==='email'||/email/.test(n))return pick(WORDS.first,r).toLowerCase()+'@example.com';
  if(f==='uuid'||/uuid|guid/.test(n))return[8,4,4,4,12].map(k=>Array.from({length:k},()=>Math.floor(r()*16).toString(16)).join('')).join('-');
@@ -192,26 +211,54 @@ function scalar(s,name,r,i){
  const len=Number.isFinite(s.maxLength)?Math.max(1,Math.min(s.maxLength,12)):12;
  return('sample '+(name||'value')).slice(0,len);
 }
-function sampleOf(schema,name,r,depth=0,i=0){
+// The main list has three items; lists inside an item (an offer's legs) have one, so a sample
+// offer is a plain trip rather than three unrelated legs.
+function sampleOf(schema,name,r,depth=0,i=0,inList=false){
  const s=merge(schema);
  if(depth>8)return null;
  if(s.$ref)return{};
  const type=s.type||(s.properties?'object':s.items?'array':null);
- if(type==='array'){const n=Math.min(5,Math.max(Number.isFinite(s.minItems)?s.minItems:3,1));return Array.from({length:n},(_,k)=>sampleOf(s.items||{},name,r,depth+1,k))}
+ if(type==='array'){const n=Math.min(5,Math.max(Number.isFinite(s.minItems)?s.minItems:inList?1:3,1));return Array.from({length:n},(_,k)=>sampleOf(s.items||{},name,r,depth+1,inList?i:k,true))}
  if(type==='object'||(!type&&s.additionalProperties)){
   const out={};
-  for(const [k,v] of Object.entries(s.properties||{}).slice(0,60))out[k]=sampleOf(v,k,r,depth+1,i);
+  for(const [k,v] of Object.entries(s.properties||{}).slice(0,60))out[k]=sampleOf(v,k,r,depth+1,i,inList);
   return out;
  }
  if(!type)return name?scalar({type:'string'},name,r,i):{};
  return scalar(s,name,r,i);
 }
 // The sample answer for one call: status, headers and JSON body.
+// Sample answers follow the request where it is obvious: the airports or places searched for go
+// on the departure and arrival, and an arrival comes after its departure.
+const FROM=/^(origin|from|origin_?location_?code|departure_?airport|fly_?from|origin_?code)$/i,TO=/^(destination|to|destination_?location_?code|arrival_?airport|fly_?to|destination_?code)$/i;
+function followRequest(body,url){
+ let q={};try{q=Object.fromEntries(new URL(url).searchParams)}catch{}
+ const from=Object.entries(q).find(([k])=>FROM.test(k))?.[1],to=Object.entries(q).find(([k])=>TO.test(k))?.[1];
+ const day=Object.entries(q).find(([k,v])=>/depart|outbound|^date$|start/i.test(k)&&/^\d{4}-\d{2}-\d{2}$/.test(v))?.[1];
+ const code=v=>typeof v==='string'&&/^[A-Z]{3}$/.test(v);
+ const walk=(o,d=0)=>{
+  if(!o||typeof o!=='object'||d>12)return;
+  if(Array.isArray(o)){o.forEach(x=>walk(x,d+1));return}
+  const dep=o.departure,arr=o.arrival;
+  if(dep&&arr&&typeof dep==='object'&&typeof arr==='object'){
+   for(const [side,val] of [[dep,from],[arr,to]])if(code(val))for(const k of Object.keys(side))if(/iata|code|airport/i.test(k)&&code(side[k]))side[k]=val;
+   for(const k of Object.keys(arr))if(typeof arr[k]==='string'&&typeof dep[k]==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(dep[k])){
+    if(day)dep[k]=day+dep[k].slice(10);
+    const t=new Date(dep[k].slice(0,19)+'Z');if(!Number.isNaN(+t)){t.setUTCMinutes(t.getUTCMinutes()+(5*60+((dep[k].length*37)%420)));arr[k]=t.toISOString().slice(0,19)+dep[k].slice(19)}
+   }
+  }
+  for(const v of Object.values(o))walk(v,d+1);
+ };
+ walk(body);return body;
+}
 function sampleAnswer(api,op,{method,url}){
  const r=rng(api.slug+' '+String(method).toUpperCase()+' '+String(url));
  const code=(op&&op.successCodes&&op.successCodes[0])||'200';
  const schema=op&&op.responseSchemas&&op.responseSchemas[code];
- const body=op?(schema&&Object.keys(schema).length?sampleOf(schema,'',r):{}):{error:'Not a documented path of '+api.title,sample:true};
+ // The spec's own example answer when it has one (as Prism and Beeceptor do), otherwise one built
+ // from the answer's shape using the spec's example values.
+ const example=op&&op.responseExamples&&op.responseExamples[code];
+ const body=op?(example!==undefined?example:schema&&Object.keys(schema).length?followRequest(sampleOf(schema,'',r),url):{}):{error:'Not a documented path of '+api.title,sample:true};
  return{status:op?Number(code):404,headers:{'content-type':'application/json','x-kairoq-sample':'1'},body:Number(code)===204?'':JSON.stringify(body)};
 }
 
