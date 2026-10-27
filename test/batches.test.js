@@ -135,7 +135,7 @@ test('side-effect guard: a change about looks that also touched data, payments o
  const after={'src/App.jsx':'<button className="bg-blue-500">Book</button>','src/backend.json':'{"collections":{"bookings":{"access":"public"}}}','src/Login.jsx':'await auth.signIn(email.trim(),password)'};
  const found=g.check('make the main button blue',before,after);
  assert.deepEqual(found.map(f=>f.area),['saved data and bookings','sign-in']);
- assert.match(g.note(found),/did not ask about/);
+ assert.equal(g.note(found),'I also changed how the app saves information (like enquiries or bookings) and a sign-in, which you didn\'t ask for. If you don\'t want that, undo this change.');
  assert.deepEqual(g.check('let guests sign in and book online',before,after),[]);
  assert.deepEqual(g.check('make the button blue',before,{...before,'src/App.jsx':after['src/App.jsx']}),[]);
 });

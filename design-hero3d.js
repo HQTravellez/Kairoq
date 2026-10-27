@@ -22,6 +22,7 @@ const HINTS = [
   [/\b(travel|trips?|flights?|airline|luggage|tour|tours|visa|corporate travel)\b/i, 'HeroObject', 'suitcase'],
   [/\b(flight|airline|airport|aviation|pilot)\b/i, 'HeroObject', 'plane'],
   [/\b(stays?|apartments?|furnished|corporate housing|rentals?|airbnb|villa|real estate|realtor|propert(y|ies)|homes|housing)\b/i, 'Diorama', 'house'],
+  [/\b(renovat\w*|contractor|interior\w*|remodel\w*|home builder|construction)\b/i, 'Diorama', 'house'],
   [/\b(keys?|lettings?|landlord|tenants?|locksmith)\b/i, 'HeroObject', 'key'],
   [/\b(shop|store|boutique|e-?commerce|retail|fashion|clothing)\b/i, 'HeroObject', 'shopping-bag'],
   [/\b(gifts?|events?|party|parties|wedding|birthday|celebrat\w*)\b/i, 'ExplodedView', 'gift-box'],

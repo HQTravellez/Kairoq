@@ -259,6 +259,12 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   if(a){shownText=String(message).trim();message=a.message;mode='build'}
  }
  // "Tidy up the code" (a button in Code): reorganise the project into the code structure, same behaviour.
+ // "The design sucks": a new look straight away (a new mood, fonts and signature moment), with an apology.
+ let redesign=false;
+ if(!hooks&&(mode==='build'||mode==='discuss')&&!images.length&&require('./react-design').isDesignComplaint(message)&&builder.loadMeta(id).current_version>1){
+  redesign=true;shownText=String(message).trim();mode='build';
+  message='The owner is not happy with how the app looks. Give it a completely new look following the NEW design brief (its colours and fonts are already in src/index.css): rebuild the layout and sections as the section recipes say and add the signature moment, keeping every page, feature, form and piece of real content. Start your message to the owner with one short, warm sentence saying sorry it was not right and that you have given it a completely new look, then say in plain words what changed.';
+ }
  if(!hooks&&mode==='build'&&require('./code-structure').isTidy(message)){shownText='Tidy up the code';message=require('./code-structure').TIDY}
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
@@ -360,7 +366,17 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     // A 3D style was picked without a model: add a fitting free one first (react-models.js).
     if(mode==='build'){const meta3=builder.loadMeta(id);if(meta3.three_d&&meta3.three_d.style!=='none'&&!meta3.three_d.auto_tried){update({status:'assets'});await require('./react-models').autoModel(id,message,{callModel,signal}).catch(e=>{if(signal.aborted)throw e;console.warn('[3d] auto model: '+String(e.message||e).slice(0,200))})}}
     const assetNote=[images.length||context?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context].filter(Boolean).join('\n\n');
-    const fast=quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
+    if(redesign){
+     update({status:'designing'});
+     const cur=builder.loadMeta(id),files=builder.loadFiles(id,cur.current_version),design=require('./react-design');
+     const recent=[cur.design,...builder.list(cur.owner).filter(p=>p.id!==id).slice(0,5).map(p=>{try{return builder.loadMeta(p.id).design}catch{return null}})].filter(Boolean);
+     try{
+      const next=await design.createBrief('The owner did not like the current look and wants a completely different one ('+shownText+').\nThe app today (its main page):\n'+String(files['src/App.jsx']||'').slice(0,4000),{callModel,tier:modelTier,signal,projectName:cur.name,recent,avoid:cur.design&&cur.design.direction?[cur.design.direction]:[]});
+      const m2=builder.loadMeta(id);m2.design=next;builder.saveMeta(m2);
+      if(design.hasTokens(files)){const css=design.applyToCss(files['src/index.css'],next);if(css!==files['src/index.css'])await builder.saveSource(id,{...files,'src/index.css':css},{summary:'New look: '+next.name,changed:['src/index.css']})}
+     }catch(e){if(signal.aborted)throw e;console.warn('[redesign]',String(e.message||e).slice(0,200))}
+    }
+    const fast=!redesign&&quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
     job.result=await builder.edit(id,message,{onVersion,makeModel,...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // Look before replying (look-check.js): a change about layout or looks is compared with what
     // the owner asked, on screenshots; if it does not match, the builder fixes it once, free.
@@ -430,7 +446,9 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    // Side-effect guard: a change about looks that also touched data, payments or sign-in says so.
    if(job.result&&!job.result.unchanged&&['build','agent'].includes(mode)&&!hooks&&versionBefore&&job.result.version&&job.result.version!==versionBefore){
     try{
-     const found=require('./scope-guard').check(message,builder.loadFiles(id,versionBefore),builder.loadFiles(id,job.result.version));
+     const before=builder.loadFiles(id,versionBefore);
+     // The first build turns the starter into the whole app: nothing else was touched.
+     const found=require('./react-design').isUntouchedStarter(before)?[]:require('./scope-guard').check(message,before,builder.loadFiles(id,job.result.version));
      if(found.length){job.result.scope=found;const m=builder.loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.scope=found;builder.saveMeta(m)}}
     }catch{}
    }

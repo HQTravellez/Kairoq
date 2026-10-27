@@ -114,4 +114,34 @@ function text(recipes){
  if(!chosen.length)return'';
  return'Section recipes (build these sections this way; real content only):\n'+chosen.map(r=>'- '+r.kind[0].toUpperCase()+r.kind.slice(1)+': '+r.name+'. '+r.look+(r.uses.length?' Kit: '+r.uses.join(', ')+'.':'')).join('\n');
 }
-module.exports={RECIPES,KINDS,suggest,note,normalize,text};
+// ---------- signature moments ----------
+// Every landing page gets one moment people remember, something that moves or answers the
+// pointer. Kairoq picks it (suited to the business, different from the owner's recent sites);
+// a 3D hero from kairoq/hero3d counts as one. After the first build Kairoq checks it is there.
+const S=(id,name,look,needs,fits)=>({id,name,look,needs,fits});
+const SIGNATURES=[
+ S('object-3d','3D object','The 3D object from the design brief (kairoq/hero3d) as the hero visual, moving with the pointer and scroll.',[/['"]kairoq\/hero3d['"]/],null),
+ S('flowing-lines','Flowing lines','A hero over fine flowing lines in the text colour that part around the cursor (BackgroundPaths), the headline revealed word by word (TextEffect).',[/\bui\/background-paths/,/\bui\/text-effect/],/\b(software|saas|consult\w*|studio|agency|law\w*|account\w*|finance|architect\w*|clinic|therap\w*)/i),
+ S('glow-hero','Glow hero','Soft moving glows in the brand colours behind the hero (AnimatedGradient), the headline revealed word by word (TextEffect), the main button pulling toward the pointer (Magnetic).',[/\bui\/animated-gradient/,/\bui\/text-effect/],/\b(app|ai|tech|startup|events?|music|beauty|salon|spa|fitness|gym)/i),
+ S('rotating-headline','Rotating headline','A very large headline whose last words rotate through the services or audiences (TextLoop), revealed word by word (TextEffect), with a magnetic main button (Magnetic).',[/\bui\/text-loop/,/\bui\/magnetic/],/\b(renovat\w*|contractor|trades?|cleaning|services?|agency|school|course|tours?|travel)/i),
+ S('tilt-cards','Living cards','The main offers as cards that arrive one after another (AnimatedGroup), tilt toward the pointer (Tilt) and glow under it (Spotlight).',[/\bui\/tilt/,/\bui\/spotlight/],/\b(restaurant|caf[eé]|cafe|menu|shop|store|products?|gym|hotel|stays?|florist|bakery)/i),
+];
+// The signature for a request: suited to it and not used by the owner's recent sites.
+function signature(request,{recent=[],seed=''}={}){
+ const used=new Set(recent.map(d=>d&&d.signature).filter(Boolean));
+ const pool=SIGNATURES.filter(x=>x.fits);
+ const fit=pool.filter(x=>x.fits.test(String(request||''))),rest=pool.filter(x=>!fit.includes(x));
+ let h=0;for(const c of String(seed+request))h=(h*31+c.charCodeAt(0))>>>0;
+ const turn=l=>l.length?[...l.slice(h%l.length),...l.slice(0,h%l.length)]:l;
+ const order=[...turn(fit),...turn(rest)];
+ return(order.find(x=>!used.has(x.id))||order[0]).id;
+}
+function signatureNote(id){const x=SIGNATURES.find(s=>s.id===id);return x?'\n\nSignature moment (required on the landing page; Kairoq checks it): '+x.name+'. '+x.look+' If you give the page a 3D hero ("hero3d"), that is the signature moment instead.':''}
+function signatureText(id){const x=SIGNATURES.find(s=>s.id===id);return x?'Signature moment (required; the page must have it): '+x.name+'. '+x.look:''}
+// After the first build: the signature's pieces must really be on the page.
+function signatureMissing(id,files){
+ const x=SIGNATURES.find(s=>s.id===id);if(!x)return null;
+ const code=Object.entries(files||{}).filter(([n,c])=>/^src\/.*\.(jsx?|tsx?)$/.test(n)&&!n.startsWith('src/components/ui/')&&typeof c==='string').map(([,c])=>c).join('\n');
+ return x.needs.every(re=>re.test(code))?null:'The design brief\'s signature moment is missing from the page: '+x.name+'. '+x.look+' Add it to the landing page (import the pieces from the UI kit), keeping everything else.';
+}
+module.exports={RECIPES,KINDS,suggest,note,normalize,text,SIGNATURES,signature,signatureNote,signatureText,signatureMissing};
