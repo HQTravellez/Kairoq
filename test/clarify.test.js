@@ -11,7 +11,7 @@ test('questions are cleaned: at most three, two to four options each, nothing as
  assert.equal(qs[1].options.length,4);assert.equal(qs[1].multi,true);
  const callModel=async(o,parse)=>parse(JSON.stringify(raw));
  assert.equal((await clarify.questions('A CRM',{callModel})).length,3);
- assert.deepEqual(await clarify.questions('x'.repeat(400),{callModel}),[]);
+ assert.deepEqual(await clarify.questions('x'.repeat(700),{callModel}),[]);
  // A failing or broken AI means no questions: the build simply starts.
  assert.deepEqual(await clarify.questions('A CRM',{callModel:async()=>{throw Error('down')}}),[]);
  assert.deepEqual(await clarify.questions('A CRM',{callModel:async(o,parse)=>parse('not json')}),[]);
@@ -20,4 +20,9 @@ test('answers are added to the request the builder reads',()=>{
  const p=clarify.withAnswers('A CRM',[{q:'Do your staff need to sign in?',a:['Yes']},{q:'Which parts?',a:['Contacts','Deals']},{q:'Empty?',a:[]}]);
  assert.equal(p,'A CRM\n\nDetails from the owner:\n- Do your staff need to sign in? Yes\n- Which parts? Contacts, Deals');
  assert.equal(clarify.withAnswers('A CRM',[]),'A CRM');
+});
+
+test('options can carry one sentence each and a recommended one',()=>{
+ const [q]=clarify.clean({questions:[{q:'Who is it for?',options:[{label:'Kids: watch and play',detail:'A child scans a page and taps the animal.'},{label:'Anyone: realistic AR',detail:'A life-size animal on the paper.'}],recommended:0}]});
+ assert.deepEqual(q,{q:'Who is it for?',options:['Kids: watch and play','Anyone: realistic AR'],details:['A child scans a page and taps the animal.','A life-size animal on the paper.'],recommended:0,multi:false});
 });

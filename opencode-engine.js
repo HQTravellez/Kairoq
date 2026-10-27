@@ -31,8 +31,18 @@ function model(){
  const exp=String(process.env.EXPLABS_API_KEY||process.env.EXPlabs_API_Key||'').trim();
  const useExp=exp&&String(process.env.KAIROQ_BUILDER_PROVIDER||'').toLowerCase()!=='openrouter';
  if(useExp)return{baseURL:process.env.KAIROQ_OPENCODE_BASE_URL||'https://api.experientiallabs.ai/v1',key:exp,id:process.env.KAIROQ_OPENCODE_MODEL||'gpt-6-luna',rates:[0.10,0.50]};
- if(process.env.OPENROUTER_API_KEY&&process.env.KAIROQ_BUILDER_PAID_APPROVED==='true')return{baseURL:process.env.KAIROQ_OPENCODE_BASE_URL||'https://openrouter.ai/api/v1',key:process.env.OPENROUTER_API_KEY,id:process.env.KAIROQ_OPENCODE_MODEL||process.env.KAIROQ_BUILDER_MODEL||'deepseek/deepseek-v3.2',rates:[0.5,1.5]};
+ if(process.env.OPENROUTER_API_KEY&&process.env.KAIROQ_BUILDER_PAID_APPROVED==='true')return{baseURL:process.env.KAIROQ_OPENCODE_BASE_URL||'https://openrouter.ai/api/v1',key:process.env.OPENROUTER_API_KEY,id:process.env.KAIROQ_OPENCODE_MODEL||process.env.KAIROQ_BUILDER_MODEL||'deepseek/deepseek-v3.2',get rates(){return rates(this.id)}};
  return null;
+}
+// Dollars per million tokens (input, output) when OpenCode reports no cost, so the budget counts
+// a Claude build at its real price (OpenRouter list prices, October 2026).
+function rates(id){
+ const m=String(id||'');
+ if(/claude-opus/.test(m))return[4,20];
+ if(/claude-sonnet/.test(m))return[2,10];
+ if(/claude-haiku/.test(m))return[0.1,0.5];
+ if(/gpt-6(?!-luna)/.test(m))return[5,25];
+ return[0.5,1.5];
 }
 function config(m){
  return{$schema:'https://opencode.ai/config.json',model:'kairoq/'+m.id,small_model:'kairoq/'+m.id,autoupdate:false,share:'disabled',
@@ -155,4 +165,4 @@ function rules(systemPrompt,note=''){
  const cut=systemPrompt.indexOf('Respond with ONLY a JSON object');
  return['# Kairoq app rules','','You work in a React 18 + Vite + Tailwind CSS 3 project. Edit the files in this folder with your file tools (read, edit, write, glob, grep). There is no shell: you cannot run commands, install packages or start the app; Kairoq builds the app, opens it in a browser and tells you about any error.','Before you finish, call the kairoq_check tool when you have it: it builds the app and tests it in a browser the way Kairoq will. Fix everything it reports and call it again, until it passes.','When you are done, reply in one or two plain sentences for the app owner saying what you changed.','',cut>0?systemPrompt.slice(0,cut).trim():systemPrompt,note?'\n'+note.trim():''].join('\n');
 }
-module.exports={enabled,available,chosenFor,configure,runCheck,binary,model,session,rules,sync,readTree,VERSION};
+module.exports={rates,enabled,available,chosenFor,configure,runCheck,binary,model,session,rules,sync,readTree,VERSION};

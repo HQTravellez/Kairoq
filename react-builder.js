@@ -523,7 +523,7 @@ async function adoptChecks(id,url,raw,{inspect,version}){
 // OpenCode's kairoq_check: the folder's files built and opened in the browser the same way as
 // a finished change (a scratch version, removed afterwards; SQL migrations wait for the change).
 let selfChecks=0;
-async function selfCheck(id,meta,files,checkRuntime){
+async function selfCheck(id,meta,files,checkRuntime,designShots=null){
  const errors=checkProject(files);
  if(errors.length)return'These problems stop the build:\n- '+errors.slice(0,12).join('\n- ');
  const n=900000+(++selfChecks),dir=versionDir(id,n);
@@ -533,9 +533,24 @@ async function selfCheck(id,meta,files,checkRuntime){
   markTesting(id,n,files);
   try{
    const r=await runtimeProblems(id,previewUrl(meta,n),checkRuntime);
+   // Eyes for the agent: on a designed site, the page is also measured for the "made by AI"
+   // giveaways (design-tells.js, the same list the craft check uses), so the agent fixes the look
+   // while it works instead of after.
+   if(!r.errors.length&&designShots){const look=await designProblems(meta,previewUrl(meta,n),designShots).catch(()=>'');if(look)return'The app builds and opens, but the page looks generated. Measured on the real page (desktop and phone):\n'+look+'\nFix these, then call kairoq_check again.'}
    return r.errors.length?'The app built, but opening it in a browser showed these problems:\n- '+r.errors.join('\n- '):'All checks passed: the app builds and opens on desktop and phone'+(r.verified&&r.verified.saves?', and a record added like a customer was saved':'')+'.';
   }finally{clearTesting(id,n)}
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
+}
+// The design giveaways measured on a test build (craft-check.js), as a numbered list; '' when the
+// page is clean or is not a designed site.
+async function designProblems(meta,url,designShots){
+ const d=loadMeta(meta.id).design;
+ if(!d||!d.signature||process.env.KAIROQ_CRAFT_CHECK==='off')return'';
+ const pictures=await designShots(url);
+ if(!pictures||!pictures.length)return'';
+ const facts=[...(loadMeta(meta.id).messages||[]).filter(m=>m.role==='user').map(m=>m.text),meta.knowledge||''].join('\n');
+ const craft=require('./craft-check'),list=craft.found(pictures,facts,d.norms||require('./craft-norms').typeOf(meta.name)).filter(i=>i.severity==='major');
+ return list.slice(0,8).map((i,n)=>(n+1)+'. '+i.issue+'. Fix: '+i.fix).join('\n');
 }
 // Errors that mean the app does not show at all.
 // High-severity findings in the new code that the old code did not have.
@@ -565,7 +580,7 @@ async function runtimeProblems(id,url,checkRuntime){
 }
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null,designShots=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -615,8 +630,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // files in a folder of its own; everything else below stays the same. Requests with images
  // and design reviews keep Kairoq's own model, which sees pictures.
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
- let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),check:files=>selfCheck(id,meta,files,checkRuntime),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
- let usedOpenCode=false,usedFallback=false;
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),check:files=>selfCheck(id,meta,files,checkRuntime,designShots),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
+ let usedOpenCode=false,usedFallback=false,usedModel=null;
  const ocRequest=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
@@ -632,10 +647,11 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    try{reply=await ocSession.reply({files:work,prompt:attempt===1?ocRequest:messages.at(-1).content,signal});if(!Object.keys(reply.files).length&&!reply.delete.length)throw Error('OpenCode made no change')}
    catch(e){signal?.throwIfAborted();tl.add({t:'note',icon:'code',text:'OpenCode could not do this ('+String(e.message||e).slice(0,160)+'); Kairoq\'s own engine takes over'});ocSession.close();ocSession=null;reply=null;usedFallback=true}
   }
-  if(ocSession)usedOpenCode=true;
+  if(ocSession){usedOpenCode=true;usedModel=(oc.model()||{}).id||usedModel}
   if(!reply)reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,cacheKey:'kairoq-'+id,...(design?{design:true}:{}),
    onToken:onStream?(_d,all)=>{if(firstToken===null)firstToken=Date.now();onStream(all,attempt)}:undefined,
-   onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},parseEdit);
+   onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},(c,m)=>{const r=parseEdit(c);if(m)r.model=String(m);return r});
+  if(reply.model)usedModel=reply.model;
   if(attempt===1){thoughtMs=(firstToken||Date.now())-started;firstPlan=reply.plan}
   tl.add({t:'think',ms:(firstToken||Date.now())-started,text:attempt===1?thinking:''});
   if(attempt===1&&reply.plan.length)tl.add({t:'plan',items:reply.plan});
@@ -749,13 +765,15 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   const fresh=loadMeta(id);
   const message=rollback?'I could not get this change to work: after '+attempt+' tries the app still did not show (a blank page in Kairoq\'s browser). Your preview stays on version '+working.n+', which works, and this change was free. The broken try is saved as version '+n+' if you want to look at it. Try describing the change another way, or in smaller steps.':reply.message+(imageNotes.length?'\n\n'+imageNotes.join('\n'):'');
   const generated=[...imageCache.values()];
+  // Which model wrote this version, with a warning when it was a cheaper one (quality.js).
+  const builtBy=require('./quality').builtBy({engine:usedOpenCode?'opencode':'kairoq',model:usedModel,fallback:usedFallback});
   const checks=checkResult&&checkResult.ran?{ran:checkResult.ran,passed:checkResult.passed,failed:checkResult.failed.map(f=>f.name)}:null;
   const featureVerification=buildContract.evidence({browser:verified,checks,features:[]});
   if(!rollback)fresh.owner_requirements=ownerRequirements;
-  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(usedOpenCode?{engine:'opencode'}:{}),...(usedFallback?{engine_fallback:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{}),feature_verification:featureVerification});
+  fresh.versions.push({n,at:new Date().toISOString(),summary:reply.message.slice(0,200),changed,tier,...extra,...(usedOpenCode?{engine:'opencode'}:{}),...(usedFallback?{engine_fallback:true}:{}),...(builtBy?{built_by:builtBy}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(rollback?{broken:true}:{}),...(verified?{verified}:{}),feature_verification:featureVerification});
   if(!rollback)fresh.current_version=n;
   const now=new Date().toISOString();
-  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{}),feature_verification:featureVerification});
+  fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(builtBy&&!rollback?{built_by:builtBy}:{}),...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{}),feature_verification:featureVerification});
   saveMeta(fresh);
   // The new version works: show it now. The checks below (new checks, feature journeys) and the
   // screenshot review run while the owner already looks at it.
@@ -788,7 +806,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   }
   if(adopted.length){const m=loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.tests_added=adopted;saveMeta(m)}tl.add({t:'check',ok:true,text:'Saved '+adopted.length+' new check'+(adopted.length===1?'':'s')+' for later changes: '+adopted.join(', ')})}
   if(rollback)return{version:working.n,message,changed:[],attempts:attempt,plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:[],rolled_back:{tried:n,kept:working.n,errors:runtimeErrors},preview_url:previewUrl(fresh)};
-  return{version:n,message,changed,attempts:attempt,engine:usedOpenCode?'opencode':'kairoq',...(usedFallback?{engine_fallback:true}:{}),plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),feature_verification:{...featureVerification,features:acceptance?.allPassed?'passed':'unverified'},...(acceptance?.requested?{feature_acceptance:acceptance}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
+  return{version:n,message,changed,attempts:attempt,engine:usedOpenCode?'opencode':'kairoq',...(builtBy?{built_by:builtBy}:{}),...(usedFallback?{engine_fallback:true}:{}),plan:firstPlan||[],timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:runtimeErrors,...(verified?{verified}:{}),feature_verification:{...featureVerification,features:acceptance?.allPassed?'passed':'unverified'},...(acceptance?.requested?{feature_acceptance:acceptance}:{}),...(adopted.length?{tests_added:adopted}:{}),...(checks?{checks,check_failures:checkResult.failed}:{}),preview_url:previewUrl(fresh),...(brief?{design:brief}:{}),...(generated.length?{generated}:{})};
  }
  throw Object.assign(Error('The change could not be built after '+MAX_ATTEMPTS+' attempts. Last problem: '+lastError.slice(0,600)),{status:422});
  }finally{if(ocSession)ocSession.close()}
@@ -1031,4 +1049,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={designProblems,usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

@@ -3,10 +3,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-liberation ca-certificates ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm install --omit=dev
-# OpenCode as the build engine (opencode-engine.js) when the Railway variable KAIROQ_OPENCODE=on;
-# then also set KAIROQ_BUILD_ENGINE=opencode to use it.
+# OpenCode as the build engine (opencode-engine.js) when the Railway variable KAIROQ_OPENCODE=on
+# or KAIROQ_QUALITY=top (quality.js then also makes it the engine).
 ARG KAIROQ_OPENCODE=off
-RUN if [ "$KAIROQ_OPENCODE" = "on" ]; then npm install -g --omit=dev opencode-ai@1.18.34; fi
+ARG KAIROQ_QUALITY=
+RUN if [ "$KAIROQ_OPENCODE" = "on" ] || [ "$KAIROQ_QUALITY" = "top" ]; then npm install -g --omit=dev opencode-ai@1.18.34; fi
 # Lightpanda, a light headless browser, as the fast lane for the live guard and for reading pages
 # for search engines (runtime-check.js), when the Railway variable KAIROQ_LIGHTPANDA=on. It runs
 # unmodified as its own process (AGPL-3.0, github.com/lightpanda-io/browser) with telemetry off;

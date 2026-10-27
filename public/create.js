@@ -183,17 +183,26 @@ async function askThenBuild(prompt){
  const {project}=await api('/projects',{method:'POST',body:{name}});
  await openProject(project.id);
  const list=$('messages');list.replaceChildren();
- const mine=messageItem({role:'user',text:prompt});list.append(mine);
+ let mine=messageItem({role:'user',text:prompt});list.append(mine);
  const card=document.createElement('li');card.className='assistant ask-card';
  card.append(el('p','ask-head','Reading your request…'));list.append(card);
  const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
- // The picked look (if any) becomes the project's colours and fonts before the build starts.
+ // The picked look (if any) becomes the project's colours and fonts; then the plan (build-plan.js)
+ // is shown with Review, Skip and Approve, and the build starts on Approve (or Skip).
+ const request=answers=>answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
+ const go=(answers,plan)=>{mine.remove();card.remove();planWaiting(false);send(plan?withPlan(request(answers),plan):request(answers),'build')};
  const build=async(answers,look)=>{
   if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
-  mine.remove();card.remove();
-  send(answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt,'build')};
- const picked=questions.map(()=>new Set());let at=0;
- const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i]]})).filter(x=>x.a.length);
+  if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
+  card.replaceChildren(el('p','ask-head','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.'));
+  planWaiting(true);
+  const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
+  if(!plan)return go(answers,null);
+  showBuildPlan(card,plan,{onApprove:()=>go(answers,plan),onSkip:()=>go(answers,null)});
+  list.scrollTop=list.scrollHeight;
+ };
+ const picked=questions.map(()=>new Set()),other=questions.map(()=>'');let at=0;
+ const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
  // The last question is always the look: "How should it feel?" (create-look.js).
  const total=questions.length+(window.KairoqLook?1:0);
  const lookStep=()=>window.KairoqLook.step({card,name,count:total>1?'Question '+total+' of '+total:'One quick question',
@@ -201,27 +210,86 @@ async function askThenBuild(prompt){
  if(!questions.length)return window.KairoqLook?lookStep():build([]);
  const draw=()=>{
   const q=questions[at];card.replaceChildren();
-  // Top: where you are and Skip. Middle: the question and its answers. Bottom: Back, Decide for me, Next.
+  // Like superapp: the question, option cards (a label and one sentence), "Other…", then
+  // Back and forward arrows, Skip all and Next.
   const head=el('div','ask-top');head.append(el('span','ask-count',total>1?'Question '+(at+1)+' of '+total:'One quick question'));
-  const skip=el('button','ask-link','Skip');skip.type='button';skip.onclick=()=>build(answers());head.append(skip);
   const opts=el('div','ask-opts');
-  (q.options||[]).forEach(o=>{
+  const mark=()=>{for(const r of opts.querySelectorAll('.ask-opt'))r.classList.toggle('on',r.querySelector('input').checked)};
+  (q.options||[]).forEach((o,i)=>{
    const row=el('label','ask-opt');const input=document.createElement('input');
    input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
-   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o);for(const r of opts.children)r.classList.toggle('on',r.querySelector('input').checked)};
-   row.classList.toggle('on',input.checked);
-   row.append(input,el('span',null,o));opts.append(row);
+   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o);mark()};
+   const words=el('span','ask-words');words.append(el('span','ask-label',o+(i===q.recommended?' (Recommended)':'')));
+   if(q.details&&q.details[i])words.append(el('span','ask-detail',q.details[i]));
+   row.append(input,words);opts.append(row);
   });
+  const own=document.createElement('input');own.className='ask-other';own.placeholder='Other…';own.value=other[at];own.setAttribute('aria-label','Another answer');
+  own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false;mark()}};
+  mark();
   const foot=el('div','ask-foot');
-  if(at>0){const back=el('button','ask-link','Back');back.type='button';back.onclick=()=>{at--;draw()};foot.append(back)}
-  const auto=el('button','ask-ghost','Decide for me');auto.type='button';auto.onclick=()=>build(answers());
+  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw()};
+  const fwd=el('button','ask-arrow','›');fwd.type='button';fwd.setAttribute('aria-label','Next question');fwd.disabled=at===questions.length-1&&!window.KairoqLook;
   const last=at===questions.length-1,final=last&&!window.KairoqLook;
-  const next=el('button','ask-next',final?'Build it':'Next');next.type='button';next.onclick=()=>{if(final)build(answers());else if(last)lookStep();else{at++;draw()}};
-  foot.append(auto,next);
-  card.append(head,el('p','ask-q',q.q),opts,foot);
+  const forward=()=>{if(final)build(answers());else if(last)lookStep();else{at++;draw()}};fwd.onclick=forward;
+  const skip=el('button','ask-link','Skip all');skip.type='button';skip.onclick=()=>build(answers());
+  const next=el('button','ask-next',final?'Submit':'Next');next.type='button';next.onclick=forward;
+  foot.append(back,fwd,el('span','ask-gap'),skip,next);
+  card.append(head,el('p','ask-q',q.q),opts,own,foot);
   list.scrollTop=list.scrollHeight;
  };
  draw();
+}
+// A first request with the owner's answers and the approved plan, shown like superapp: the request,
+// each question small with its answer under it, then the plan's title.
+function requestCard(t){
+ const box=el('div','req-card');
+ const [main,...rest]=String(t).split(/\n\n(?=Details from the owner:|Approved plan \(build exactly this first version\):)/);
+ box.append(el('div','msg-text',main));
+ for(const part of rest){
+  if(part.startsWith('Details from the owner:')){
+   const qa=el('div','req-answers');
+   for(const line of part.split('\n').slice(1)){const m=/^- (.*\?)\s*(.*)$/.exec(line);if(!m)continue;qa.append(el('p','req-q',m[1]),el('p','req-a',m[2]))}
+   box.append(qa);
+  }else{const title=(part.split('\n')[1]||'').split('. ')[0];if(title)box.append(el('p','req-plan','Plan approved: '+title))}
+ }
+ return box;
+}
+// The plan before the first build: a title, a short summary, Review (the screens, features, what
+// waits, what was looked up), Skip and Approve.
+function showBuildPlan(card,plan,{onApprove,onSkip}){
+ card.replaceChildren();card.classList.add('plan-card');
+ if(plan.searches)card.append(el('p','plan-research','✓ Looked up '+plan.searches+' source'+(plan.searches===1?'':'s')+' before planning'));
+ card.append(el('p','plan-kicker','Plan'),el('h3','plan-title',plan.title),el('p','plan-summary',plan.summary));
+ const more=el('div','plan-more hidden');
+ const part=(title,items)=>{if(!items.length)return;more.append(el('p','plan-part',title));const ul=el('ul');for(const x of items)ul.append(el('li',null,x));more.append(ul)};
+ part('Screens',(plan.screens||[]).map(x=>x.name+(x.what?': '+x.what:'')));
+ part('Features',plan.features||[]);
+ part('Left for later',plan.left_out||[]);
+ if((plan.sources||[]).length){more.append(el('p','plan-part','Looked up'));const ul=el('ul');for(const x of plan.sources){const li=el('li'),a=el('a',null,x.title);a.href=x.url;a.target='_blank';a.rel='noopener';li.append(a);ul.append(li)}more.append(ul)}
+ const foot=el('div','ask-foot');
+ const review=el('button','plan-review','Review');review.type='button';review.setAttribute('aria-expanded','false');
+ review.onclick=()=>{const open=more.classList.toggle('hidden');review.setAttribute('aria-expanded',String(!open));review.textContent=open?'Review':'Hide details'};
+ const skip=el('button','ask-link','Skip');skip.type='button';skip.title='Build without the plan';skip.onclick=onSkip;
+ const ok=el('button','ask-next plan-approve','Approve');ok.type='button';ok.onclick=()=>{ok.disabled=true;onApprove()};
+ foot.append(review,el('span','ask-gap'),skip,ok);
+ card.append(more,foot);
+ ok.focus({preventScroll:true});
+}
+// The approved plan, added to the request (the same words as build-plan.js withPlan).
+function withPlan(req,p){
+ return req.trim()+'\n\nApproved plan (build exactly this first version):\n'+p.title+'. '+p.summary
+  +((p.screens||[]).length?'\nScreens: '+p.screens.map(s=>s.name+(s.what?' ('+s.what+')':'')).join('; '):'')
+  +((p.features||[]).length?'\nFeatures: '+p.features.join('; '):'')
+  +((p.left_out||[]).length?'\nLeft out for now: '+p.left_out.join('; '):'');
+}
+// While the plan waits, the preview says so instead of showing the bare starter.
+function planWaiting(on){
+ let box=$('plan-wait');
+ if(!on){box?.remove();return}
+ if(box)return;
+ box=el('div','plan-wait');box.id='plan-wait';box.setAttribute('role','status');
+ box.append(el('p','plan-wait-title','Your app will appear here'),el('p','plan-wait-sub','Approve the plan to start building.'));
+ $('canvas').append(box);
 }
 // Run on your phone (react-native-app.js): Expo Snack gives a QR code the Expo Go app opens.
 $('run-phone').onclick=async()=>{
@@ -310,7 +378,8 @@ function messageItem(m,last,index){
    const d=el('details','acts'),s=el('summary');s.append(icon('down','toggle'),el('span',null,summarize(tl)||acts.length+' steps'));
    d.append(s,rail(acts.slice(0,30),{}));li.append(d);
   }
- }else{const body=el('div','msg-text');body.textContent=m.text;li.append(body)}
+ }else if(m.role==='user'&&/\n\n(Details from the owner|Approved plan \(build exactly this first version\)):\n/.test(m.text||''))li.append(requestCard(m.text));
+ else{const body=el('div','msg-text');body.textContent=m.text;li.append(body)}
  if(m.role==='assistant'&&m.failed&&m.retry&&(last||index==null)){const b=el('button','ghost retry','Try again');b.type='button';b.onclick=()=>{b.disabled=true;send(m.retry,m.retry_mode==='discuss'?'discuss':m.retry_mode==='agent'?'agent':'build')};li.append(b)}
  if(m.images&&m.images.length){const s=document.createElement('span');s.className='changed';s.textContent='Attached: '+m.images.join(', ');li.append(s)}
  if(m.design){const d=document.createElement('div');d.className='design-chip';for(const c of Object.values(m.design.palette||{}).slice(0,6)){const i=document.createElement('i');i.style.background=c;d.append(i)}d.append(document.createTextNode('Style: '+m.design.name+(m.design.fonts?' · '+m.design.fonts.display+' / '+m.design.fonts.body:'')));li.append(d)}
@@ -327,11 +396,15 @@ function messageItem(m,last,index){
   if(m.duration_ms!=null){const t=el('span');t.append(icon('clock'),secs(m.duration_ms));f.append(t)}
   if(m.credits!=null){const t=el('span');t.append(icon('coin'),creditsLabel(m));t.title='What this change cost';f.append(t)}
   if(m.attempts>1)f.append(el('span',null,'Fixed '+(m.attempts-1)+' problem'+(m.attempts>2?'s':'')));
+  // Which model wrote this version (quality.js), so the owner always knows.
+  if(m.built_by&&m.built_by.label){const t=el('span','built-by',m.built_by.label+(m.built_by.agent?' (agent)':''));t.title='The AI model that wrote this version';f.append(t)}
   const det=el('button','link-btn details-link','Details');det.type='button';det.onclick=()=>openDetail(index,'timeline');f.append(det);
   li.append(f);
  }
  if(m.role==='assistant'&&(m.verified||m.tests_added))li.append(verifiedCard(m.verified||{},m.checks,m.tests_added));
  // What the screenshot review saw (look-check.js): it matched, or what it fixed.
+ // The owner is told when a build ran on a cheaper model than the top ones (budget, credits, an outage).
+ if(m.role==='assistant'&&m.built_by&&m.built_by.cheap&&state.me&&state.me.viewer&&state.me.viewer.kind==='owner'){const d=el('p','look-note warn');d.append(el('span','vmark','!'),el('span',null,'Built with '+m.built_by.label+', not a top model. The top models were not used: check OpenRouter credits and the AI budget limits in Railway.'));li.append(d)}
  if(m.role==='assistant'&&m.craft){const d=el('p','look-note');d.append(el('span','vmark','✓'),el('span',null,m.craft));li.append(d)}
  if(m.role==='assistant'&&m.look){const d=el('p','look-note');d.append(el('span','vmark',m.look.ok?'✓':'↻'),el('span',null,m.look.ok?'Checked the screenshots: it looks the way you asked.':m.look.fixed?'Checked the screenshots and fixed: '+m.look.problems.join(' '):'The screenshots show: '+m.look.problems.join(' ')+' Ask again to fix it.'));li.append(d)}
  if(m.role==='assistant'&&m.feature_acceptance?.requested){
