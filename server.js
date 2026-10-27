@@ -10,6 +10,8 @@ const agentBrain = require("./agent-brain");
 const salesOpenSource = require("./sales-open-source");
 
 loadEnv();
+// KAIROQ_QUALITY=top: the best model for every build step (quality.js).
+{const set=require("./quality").apply(process.env);if(set.length)console.log("[quality] top models for builds: "+set.join(", "));}
 // Accept the variable name used by the existing Railway deployment.
 if (!process.env.OPENROUTER_API_KEY && process.env.OPEN_ROUTER) {
   process.env.OPENROUTER_API_KEY = process.env.OPEN_ROUTER.trim();
@@ -6914,7 +6916,7 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
   }
   if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
   // Muse Spark writes Standard builds before the free models when paid builds are on (its own cap).
-  if(museReady()&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&(!opts.tier||opts.tier==="standard"||opts.tier==="vision")){
+  if(museReady()&&!require("./quality").top()&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&(!opts.tier||opts.tier==="standard"||opts.tier==="vision")){
     try{const r=await callMuse(opts);return parse(r.text,r.model)}
     catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[builder] Muse failed, using the usual models: "+String(err.message||err).slice(0,200))}
   }
@@ -6939,7 +6941,7 @@ async function reviewLook({request,pictures,signal,avoid,prompt}){
   const chosen=String(process.env.KAIROQ_LOOK_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
   const free=chosen.length?[]:(await getModels().catch(()=>[])).filter(m=>m.isFree&&m.supportsVision&&!m.local&&m.id!=="openrouter/free").sort((a,b)=>(b.context_length||0)-(a.context_length||0)).map(m=>m.id).slice(0,3);
   const content=[{type:"text",text:prompt||look.prompt(request,avoid)},...pictures.slice(0,2).map(p=>({type:"image_url",image_url:{url:"data:"+(p.mime||"image/jpeg")+";base64,"+p.data}}))];
-  if(museReady()){
+  if(museReady()&&!require("./quality").top()){
     try{const r=await callMuse({messages:[{role:"user",content}],temperature:0.1,maxOutputTokens:800,signal});const v=look.verdict(r.text);if(v)return{...v,model:r.model}}
     catch(err){if(signal?.aborted)throw err;console.log("[look-check] Muse: "+String(err.message||err).slice(0,160))}
   }
