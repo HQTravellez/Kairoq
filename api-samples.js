@@ -279,7 +279,9 @@ function log(id){return readJson(file(id,'api-log.json'),[])}
 // preview: sample answers while the API's key is missing) or "live" (always real).
 async function fetchFor(id,args,{mode='live',real=require('./react-functions').guardedFetch}={}){
  const started=Date.now(),found=findApi(id,args.url);
- const sample=found&&(mode==='check'||(mode==='preview'&&!(found.api.secret&&hasKey(id,found.api.secret))));
+ // Samples in saved checks, and in the preview while a needed key is missing. An API that needs
+ // no key (Open-Meteo, Frankfurter) gets real answers in the preview too.
+ const sample=found&&(mode==='check'||(mode==='preview'&&Boolean(found.api.secret)&&!hasKey(id,found.api.secret)));
  const entry={at:new Date().toISOString(),method:String(args.method||'GET').toUpperCase(),url:safeUrl(args.url),api:found?found.api.title:null,sample:Boolean(sample),mode};
  try{
   const out=sample?sampleAnswer(found.api,findOperation(found.api,found.rest,args.method),args):await real(args);

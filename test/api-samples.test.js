@@ -181,3 +181,14 @@ test('a provider whose API details are not public gets a plain answer',async()=>
  const fetchUrl=async({url})=>({status:200,url,body:'<html><body>Contact your account representative.</body></html>'});
  await assert.rejects(samples.addByName(meta.id,{name:'Sabre',webSearch:async()=>['https://developer.example.test/docs'],fetchUrl,callModel:async()=>{throw Error('Specification has no supported HTTP operations')}}),e=>{assert.match(e.message,/couldn't find the details of Sabre's API on its public pages\. Some providers keep them behind a partner sign-in/);assert.doesNotMatch(e.message,/Specification|HTTP operations/);return true});
 });
+
+test('an API that needs no key gets real answers in the preview; saved checks still get samples',async()=>{
+ const meta=builder.create({name:'Weather',owner:'owner'});
+ samples.add(meta.id,{spec:{openapi:'3.0.3',info:{title:'Open Weather Free',version:'1'},servers:[{url:'https://api.weather-free.test/v1'}],paths:{'/forecast':{get:{responses:{200:{description:'ok',content:{'application/json':{schema:{type:'object',properties:{temperature:{type:'number'}}}}}}}}}}}});
+ const real=async()=>({status:200,headers:{},body:'{"temperature":12.4}'});
+ const preview=await samples.fetchFor(meta.id,{url:'https://api.weather-free.test/v1/forecast?city=Lisbon',method:'GET'},{mode:'preview',real});
+ assert.equal(preview.body,'{"temperature":12.4}','the real answer');
+ const check=await samples.fetchFor(meta.id,{url:'https://api.weather-free.test/v1/forecast?city=Lisbon',method:'GET'},{mode:'check',real});
+ assert.equal(check.headers['x-kairoq-sample'],'1','checks never call the real service');
+ assert.deepEqual(samples.log(meta.id).map(e=>e.sample),[true,false]);
+});
