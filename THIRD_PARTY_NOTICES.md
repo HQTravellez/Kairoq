@@ -33,6 +33,15 @@ Prettier 3.9 (MIT, https://github.com/prettier/prettier) formats the code the ap
 
 yaml 2.9.1 (ISC, https://github.com/eemeli/yaml) reads YAML API specs when the owner adds an outside API (`api-samples.js`). It runs on the server only.
 
+## Effect pieces in the app kit
+
+`starter-kit/src/components/ui/` includes effect components converted to JSX, with the app's theme colours:
+- Motion Primitives by ibelick (MIT, https://github.com/ibelick/motion-primitives): text-effect, text-shimmer, text-loop, tilt, spotlight, progressive-blur, image-comparison, magnetic, animated-group, scroll-progress, in-view.
+- Kokonut UI (MIT, https://github.com/kokonut-labs/kokonutui): background-paths.
+- Cult UI by Jordan Gilliam (MIT, https://github.com/nolly-studio/cult-ui): animated-gradient.
+
+Each file names its source and licence at the top, so the credit travels with the apps people download. Origin UI was not used: it is AGPL-3.0.
+
 ## Packages for generated apps
 
 - gsap 3.13 (GreenSock standard no-charge license, https://gsap.com/standard-license), lenis 1.3 (MIT), three 0.169 (MIT).

@@ -11,12 +11,14 @@ process.env.KAIROQ_BUILDER_ACCOUNTS_DB = path.join(tmp, 'accounts.sqlite');
 const builder = require('../react-builder'), design = require('../react-design'), runtime = require('../runtime-check');
 
 const NEW = ['data-table', 'kanban', 'command-menu', 'stat-card', 'motion'].map((n) => 'src/components/ui/' + n + '.jsx');
+// Effect pieces from MIT open-source libraries (Motion Primitives, Kokonut UI, Cult UI).
+const EFFECTS = ['text-effect', 'text-shimmer', 'text-loop', 'tilt', 'spotlight', 'progressive-blur', 'image-comparison', 'magnetic', 'animated-group', 'scroll-progress', 'in-view', 'background-paths', 'animated-gradient'].map((n) => 'src/components/ui/' + n + '.jsx');
 const shot = process.env.KAIROQ_KIT_SHOTS; // a folder: save screenshots there to look at them
 test.after(() => runtime.close());
 
 test('every new project gets the blocks, and the builder knows how and when to use them', () => {
   const files = design.starterFiles('Test');
-  for (const f of NEW) {
+  for (const f of [...NEW, ...EFFECTS]) {
     assert.ok(files[f], f);
     assert.ok(design.KIT_API[f], 'KIT_API ' + f);
     assert.equal(design.isKitFile(f, files[f]), true);
@@ -32,6 +34,12 @@ test('every new project gets the blocks, and the builder knows how and when to u
   // Credits stay in the files people download.
   assert.match(files['src/components/ui/motion.jsx'], /Magic UI \(magicui\.design, MIT\)/);
   assert.match(files['src/components/ui/kanban.jsx'], /next-shadcn-dashboard-starter by Kiranism \(MIT\)/);
+  for (const f of EFFECTS) {
+    assert.match(files[f].split('\n').slice(0, 3).join('\n'), /(Motion Primitives|Kokonut UI|Cult UI)[\s\S]*MIT/, 'credit kept in ' + f);
+    assert.ok(require('../ui-kit-docs').DOCS[f], 'docs for ' + f);
+    assert.doesNotMatch(files[f], /zinc-|#a1a1aa|from ['"]motion\/react|@\/lib/, 'theme colours and kit imports in ' + f);
+  }
+  assert.match(design.RULES, /pick from the effects that suit this business/);
 });
 
 test('with an art direction, the direction sets the layout and the playbook adds the rest', () => {
@@ -128,6 +136,51 @@ test('a landing page with the motion pieces builds and draws them', { timeout: 2
     assert.equal(await p2.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'no sideways scroll on a phone');
     if (shot) await p2.screenshot({ path: path.join(shot, 'kit-landing-phone.png'), fullPage: true });
     await still.close();
+    assert.deepEqual(errors, []);
+  } finally { server.close(); }
+});
+
+test('a landing page with the effect pieces builds, works on desktop and phone, and holds still for reduced motion', { timeout: 240000 }, async (t) => {
+  const meta = await buildApp('Effects', 'kit-effects-app.jsx');
+  if (!runtime.available()) { t.diagnostic('no browser here: only the build was checked'); return; }
+  const server = http.createServer((req, res) => { if (!builder.handlePreview(req, res)) { res.writeHead(404); res.end(); } });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const browser = await runtime.browser(), errors = [];
+  try {
+    const url = 'http://127.0.0.1:' + server.address().port + builder.previewUrl(meta);
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }), page = await ctx.newPage();
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(url, { waitUntil: 'networkidle' });
+    // The headline arrives word by word; the rotating word changes.
+    // (Screen readers get the sentence once; the animated words are hidden from them.)
+    await page.getByRole('heading', { level: 1, name: 'Rooms you will want to come home to' }).waitFor({ timeout: 8000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('h1 [aria-hidden] span')].every((el) => getComputedStyle(el).opacity === '1'), null, { timeout: 8000 });
+    const words = new Set();
+    for (let i = 0; i < 6; i++) { words.add(await page.locator('p:has-text("Renovations for")').textContent()); await page.waitForTimeout(500); }
+    assert.ok(words.size >= 2, 'the word loops: ' + [...words].join(' | '));
+    // The flowing lines draw on a canvas behind the hero.
+    await page.waitForFunction(() => { const c = document.querySelector('canvas'); return c && getComputedStyle(c).opacity !== '0'; }, null, { timeout: 8000 });
+    if (shot) await page.screenshot({ path: path.join(shot, 'kit-effects-hero.png') });
+    // Feature cards arrive; the before/after slider follows the pointer.
+    await page.locator('[data-testid="feature"]').first().scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="feature"]')].every((el) => getComputedStyle(el.parentElement.parentElement).opacity === '1'), null, { timeout: 8000 });
+    await page.locator('[data-testid="compare"]').scrollIntoViewIfNeeded();
+    const clipAt = () => page.locator('[data-testid="compare"] img').nth(1).evaluate((el) => el.style.clipPath || getComputedStyle(el).clipPath);
+    const b2 = await page.locator('[data-testid="compare"]').boundingBox();
+    await page.mouse.move(b2.x + b2.width * 0.2, b2.y + b2.height / 2); await page.waitForTimeout(600);
+    const left = await clipAt();
+    await page.mouse.move(b2.x + b2.width * 0.8, b2.y + b2.height / 2); await page.waitForTimeout(600);
+    assert.notEqual(await clipAt(), left, 'the slider follows the pointer');
+    if (shot) await page.screenshot({ path: path.join(shot, 'kit-effects-features.png'), fullPage: true });
+    await ctx.close();
+    // Phone: no sideways scroll.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 } }), p2 = await phone.newPage();
+    p2.on('pageerror', (e) => errors.push(e.message));
+    await p2.goto(url, { waitUntil: 'networkidle' });
+    await p2.waitForTimeout(800);
+    assert.equal(await p2.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'no sideways scroll on a phone');
+    if (shot) await p2.screenshot({ path: path.join(shot, 'kit-effects-phone.png'), fullPage: true });
+    await phone.close();
     assert.deepEqual(errors, []);
   } finally { server.close(); }
 });
