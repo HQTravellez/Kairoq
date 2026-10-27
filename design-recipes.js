@@ -142,6 +142,13 @@ function signatureText(id){const x=SIGNATURES.find(s=>s.id===id);return x?'Signa
 function signatureMissing(id,files){
  const x=SIGNATURES.find(s=>s.id===id);if(!x)return null;
  const code=Object.entries(files||{}).filter(([n,c])=>/^src\/.*\.(jsx?|tsx?)$/.test(n)&&!n.startsWith('src/components/ui/')&&typeof c==='string').map(([,c])=>c).join('\n');
- return x.needs.every(re=>re.test(code))?null:'The design brief\'s signature moment is missing from the page: '+x.name+'. '+x.look+' Add it to the landing page (import the pieces from the UI kit), keeping everything else.';
+ if(!x.needs.every(re=>re.test(code)))return'The design brief\'s signature moment is missing from the page: '+x.name+'. '+x.look+' Add it to the landing page (import the pieces from the UI kit), keeping everything else.';
+ // The 3D object is the hero's visual: it lives in the hero (a file named Hero or the one with
+ // the page headline), not lower down the page.
+ if(id==='object-3d'){
+  const home=Object.entries(files||{}).filter(([n,c])=>/^src\/.*\.(jsx?|tsx?)$/.test(n)&&typeof c==='string'&&x.needs[0].test(c));
+  if(!home.some(([n,c])=>/hero/i.test(n)||/<h1[\s>]/.test(c)||/function\s+Hero\b|const\s+Hero\b/.test(c)))return'The 3D object from the design brief is on the page but not in the hero. Move it into the hero section, beside the main headline at the top of the page, large (height={480} on desktop), keeping everything else.';
+ }
+ return null;
 }
 module.exports={RECIPES,KINDS,suggest,note,normalize,text,SIGNATURES,signature,signatureNote,signatureText,signatureMissing};
