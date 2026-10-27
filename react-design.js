@@ -271,6 +271,7 @@ function designNote(design){
  if(design.style){const t=require('./design-styles').text(design.style);if(t)lines.push(t)}
  if(design.playbook){const presets=require('./design-presets'),t=presets.playbookText(presets.byType(design.playbook),{layout:!design.direction&&!design.style});if(t)lines.push(t)}
  if(design.hero3d){const t=require('./design-hero3d').text(design.hero3d);if(t)lines.push(t)}
+ if(design.recipes){const t=require('./design-recipes').text(design.recipes);if(t)lines.push(t)}
  return lines.join('\n');
 }
 
@@ -299,13 +300,13 @@ function normalize(v){
  const radius=/^(0|0?\.\d+|1(\.\d+)?)rem$/.test(String(v.radius||'').trim())?String(v.radius).trim():'0.75rem';
  return{name:cleanText(v.name,60)||'Custom',summary:cleanText(v.summary,600),palette,fonts:{display:font(v.fonts?.display),body:font(v.fonts?.body),...(FONTS[font(v.fonts?.mono)]&&FONTS[font(v.fonts?.mono)][0]==='mono'&&v.fonts?.mono?{mono:font(v.fonts.mono)}:{})},radius,
   layout:cleanText(v.layout,600),imagery:cleanText(v.imagery,400),details:(Array.isArray(v.details)?v.details:[]).map(d=>cleanText(d,200)).filter(Boolean).slice(0,10),
-  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):'',...(require('./design-presets').byType(String(v.playbook||''))?{playbook:String(v.playbook)}:v.playbook===''?{playbook:''}:{}),...(require('./design-hero3d').normalize(v.hero3d)?{hero3d:require('./design-hero3d').normalize(v.hero3d)}:{})};
+  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):'',...(require('./design-presets').byType(String(v.playbook||''))?{playbook:String(v.playbook)}:v.playbook===''?{playbook:''}:{}),...(require('./design-hero3d').normalize(v.hero3d)?{hero3d:require('./design-hero3d').normalize(v.hero3d)}:{}),...(require('./design-recipes').normalize(v.recipes)?{recipes:require('./design-recipes').normalize(v.recipes)}:{})};
 }
 // Three directions are dealt from the design library (design-directions.js); the brief picks one.
 async function createBrief(request,{callModel,tier,signal,skills=[],projectName='',avoid=[],hasScreenshot=false}){
  const directions=require('./design-directions'),dealt=directions.deal(projectName+' '+request,{seed:projectName,avoid});
  const styles=require('./design-styles'),styleOptions=styles.options(request),named=styles.named(request);
- const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)+(dealt.kind==='app'?'':require('./design-hero3d').note(projectName+' '+request,{hasScreenshot}))}];
+ const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)+(dealt.kind==='app'?'':require('./design-hero3d').note(projectName+' '+request,{hasScreenshot})+require('./design-recipes').note(projectName+' '+request))}];
  const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier,design:true},parseBrief);
  if(brief.skill&&!skills.some(s=>s.id===brief.skill))brief.skill='';
  // The page playbook must be the one offered; a model that left the field out gets it anyway,
@@ -313,6 +314,7 @@ async function createBrief(request,{callModel,tier,signal,skills=[],projectName=
  const offered=require('./design-presets').playbook(projectName+' '+request);
  // App screens people work in get no 3D hero.
  if(dealt.kind==='app'&&brief.hero3d)delete brief.hero3d;
+ if(dealt.kind==='app'&&brief.recipes)delete brief.recipes;
  if(brief.hero3d&&brief.hero3d.recipe==='DeviceMockup'&&!hasScreenshot)brief.hero3d={recipe:'GlassShapes',mood:brief.hero3d.mood||'studio'};
  if(!offered||brief.playbook==='')delete brief.playbook;
  else if(brief.playbook!==offered.type)brief.playbook=offered.type;
