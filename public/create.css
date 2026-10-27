@@ -868,6 +868,45 @@ li.failed .retry:hover{border-color:#15140f}
 .api-add label{display:block;margin-top:8px}
 .api-add .row label{flex:1}
 .api-log-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+/* Trying an outside API (api-tryout.js): endpoints, inputs, the answer, Check all. */
+.api-tryout{margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px;background:var(--panel)}
+.api-tryout>summary{cursor:pointer;font-size:13px;font-weight:600;padding:4px 0}
+.api-tryout-bar{gap:8px;margin:6px 0;flex-wrap:wrap}
+.api-filter{flex:1;min-width:160px}
+.api-endpoints{list-style:none;margin:0;padding:0}
+.apis-list .api-endpoints>li,.apis-list .api-check-list>li{border:0;border-top:1px solid var(--border);border-radius:0;padding:0;background:none;box-shadow:none}
+.apis-list .api-check-list>li{padding:5px 2px}
+.api-endpoint{border-top:1px solid var(--border)}
+.api-endpoint-head{all:unset;box-sizing:border-box;display:flex;gap:8px;align-items:baseline;width:100%;padding:7px 2px;cursor:pointer;flex-wrap:wrap}
+.api-endpoint-head:hover{background:var(--hover)}
+.api-endpoint-head:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.api-method{font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 6px;border-radius:5px;background:#eef1f6;color:#334;min-width:44px;text-align:center}
+.api-method.m-get{background:#e6f4ea;color:#1d6b3a}.api-method.m-post{background:#e8efff;color:#2346a8}.api-method.m-put,.api-method.m-patch{background:#fff4e0;color:#8a5a00}.api-method.m-delete{background:#fdecec;color:#a12525}
+.api-path{font-size:12.5px;word-break:break-all}
+.api-summary{flex-basis:100%;padding-left:52px}
+.api-endpoint-panel{padding:4px 2px 12px}
+.api-params{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin:6px 0}
+.api-param{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.api-param input,.api-param select,.api-param textarea{font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.api-body{margin:6px 0}
+.api-sample-toggle{font-size:12px;display:flex;align-items:center;gap:4px}
+.api-reply{margin-top:10px}
+.api-reply-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.api-status{font:600 12px/1 ui-monospace,monospace;padding:4px 8px;border-radius:6px}
+.api-status.ok{background:#e9f7ef;color:#1d6b3a}.api-status.bad{background:#fdecec;color:#a12525}
+.api-reply-url{word-break:break-all;margin:6px 0 2px}
+.api-reply-body{background:var(--code);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:6px 0 0}
+.api-reply-error{color:var(--error);font-size:13px}
+.api-check-summary{font-weight:600;font-size:13px;margin:6px 0}
+.api-check-list{list-style:none;margin:0 0 8px;padding:0}
+.api-check-item{display:flex;gap:8px;align-items:baseline;padding:5px 2px;border-top:1px solid var(--border);cursor:pointer;flex-wrap:wrap}
+.api-check-item:hover{background:var(--hover)}
+.api-check-mark{width:14px;font-weight:700}
+.api-check-item.ok .api-check-mark{color:#1d6b3a}.api-check-item.fail .api-check-mark{color:#a12525}.api-check-item.sample .api-check-mark,.api-check-item.input .api-check-mark{color:#8a5a00}
+.api-check-why{flex-basis:100%;padding-left:22px;color:var(--muted)}
+.api-log-row{cursor:pointer}.api-log-row:hover{background:var(--hover)}
+@media (max-width:600px){.api-summary,.api-check-why{padding-left:0}}
+
 .api-log-table th,.api-log-table td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);vertical-align:top}
 .api-log-table td:nth-child(2){word-break:break-all}
 .api-offer{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border:1px dashed var(--border);border-radius:10px;margin:6px 0}

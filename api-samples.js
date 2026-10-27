@@ -41,7 +41,7 @@ function add(id,{spec,secret,baseUrl,source=null,drafted=false}){
  let plan;try{plan=require('./api-learning').learn(typeof spec==='string'?specText(spec):spec)}catch(e){throw fail(400,'Could not read that spec: '+e.message)}
  const base=cleanBase(baseUrl||plan.baseUrl);
  const api={slug:slugOf(plan.title,all.map(a=>a.slug)),title:plan.title,version:plan.version,baseUrl:base,secret:key||null,auth:plan.auth,
-  operations:plan.operations.slice(0,300).map(o=>({id:o.id,method:o.method,path:o.path,summary:o.summary,requiredParameters:o.requiredParameters,bodyFields:o.bodyFields,successCodes:o.successCodes,responseSchemas:o.responseSchemas,...(o.responseExamples&&Object.keys(o.responseExamples).length?{responseExamples:o.responseExamples}:{})})),
+  operations:plan.operations.slice(0,300).map(o=>({id:o.id,method:o.method,path:o.path,summary:o.summary,requiredParameters:o.requiredParameters,bodyFields:o.bodyFields,successCodes:o.successCodes,parameters:(o.parameters||[]).slice(0,40),requestSchema:o.requestSchema&&JSON.stringify(o.requestSchema).length<=20000?o.requestSchema:undefined,responseSchemas:o.responseSchemas,...(o.responseExamples&&Object.keys(o.responseExamples).length?{responseExamples:o.responseExamples}:{})})),
   source:source?String(source).slice(0,300):null,drafted:Boolean(drafted),added_at:new Date().toISOString()};
  if(all.some(a=>a.baseUrl===api.baseUrl))throw fail(409,'This app already has an API at '+api.baseUrl+'. Remove it first to replace it.');
  writeJson(file(id,'apis.json'),[...all,api]);
@@ -298,4 +298,4 @@ function modeOf(meta,req,sb){
 }
 // For the publish screen: added APIs whose key is still missing.
 function missingKeys(id){return apis(id).filter(a=>a.secret&&!hasKey(id,a.secret)).map(a=>({title:a.title,secret:a.secret}))}
-module.exports={addByName,suggestions,keyName,specText,add,remove,list,log,promptNote,fetchFor,modeOf,missingKeys,sampleAnswer,findApi,findOperation,sampleOf};
+module.exports={secretKey,hasKey,apis,logCall,safeUrl,addByName,suggestions,keyName,specText,add,remove,list,log,promptNote,fetchFor,modeOf,missingKeys,sampleAnswer,findApi,findOperation,sampleOf};
