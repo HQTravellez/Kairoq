@@ -384,11 +384,15 @@ function messageItem(m,last,index){
   if(m.duration_ms!=null){const t=el('span');t.append(icon('clock'),secs(m.duration_ms));f.append(t)}
   if(m.credits!=null){const t=el('span');t.append(icon('coin'),creditsLabel(m));t.title='What this change cost';f.append(t)}
   if(m.attempts>1)f.append(el('span',null,'Fixed '+(m.attempts-1)+' problem'+(m.attempts>2?'s':'')));
+  // Which model wrote this version (quality.js), so the owner always knows.
+  if(m.built_by&&m.built_by.label){const t=el('span','built-by',m.built_by.label+(m.built_by.agent?' (agent)':''));t.title='The AI model that wrote this version';f.append(t)}
   const det=el('button','link-btn details-link','Details');det.type='button';det.onclick=()=>openDetail(index,'timeline');f.append(det);
   li.append(f);
  }
  if(m.role==='assistant'&&(m.verified||m.tests_added))li.append(verifiedCard(m.verified||{},m.checks,m.tests_added));
  // What the screenshot review saw (look-check.js): it matched, or what it fixed.
+ // The owner is told when a build ran on a cheaper model than the top ones (budget, credits, an outage).
+ if(m.role==='assistant'&&m.built_by&&m.built_by.cheap&&state.me&&state.me.viewer&&state.me.viewer.kind==='owner'){const d=el('p','look-note warn');d.append(el('span','vmark','!'),el('span',null,'Built with '+m.built_by.label+', not a top model. The top models were not used: check OpenRouter credits and the AI budget limits in Railway.'));li.append(d)}
  if(m.role==='assistant'&&m.craft){const d=el('p','look-note');d.append(el('span','vmark','✓'),el('span',null,m.craft));li.append(d)}
  if(m.role==='assistant'&&m.look){const d=el('p','look-note');d.append(el('span','vmark',m.look.ok?'✓':'↻'),el('span',null,m.look.ok?'Checked the screenshots: it looks the way you asked.':m.look.fixed?'Checked the screenshots and fixed: '+m.look.problems.join(' '):'The screenshots show: '+m.look.problems.join(' ')+' Ask again to fix it.'));li.append(d)}
  if(m.role==='assistant'&&m.feature_acceptance?.requested){

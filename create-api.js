@@ -377,7 +377,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
      }catch(e){if(signal.aborted)throw e;console.warn('[redesign]',String(e.message||e).slice(0,200))}
     }
     const fast=!redesign&&quickEdit(builder.loadMeta(id),message,{mode,images,context});if(fast)update({quick:true});
-    job.result=await builder.edit(id,message,{onVersion,makeModel,...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
+    job.result=await builder.edit(id,message,{onVersion,makeModel,designShots,...(shownText?{displayText:shownText}:{}),callModel:fast?(o,p)=>callModel({...o,fast:true},p):callModel,onStream,onThinking,onEvent,tier:modelTier,images,checkRuntime,inspect,assetNote,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})});
     // Look before replying (look-check.js): a change about layout or looks is compared with what
     // the owner asked, on screenshots; if it does not match, the builder fixes it once, free.
     if(mode==='build'&&!hooks&&!fast&&reviewLook&&designShots&&job.result&&job.result.version&&!job.result.unchanged&&!job.result.rolled_back&&!job.result.design&&require('./look-check').isVisual(message)&&process.env.KAIROQ_LOOK_CHECK!=='off'){
@@ -407,7 +407,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
       let last=null;
       const craft=await require('./craft-check').run({url:()=>builder.previewUrl(builder.loadMeta(id)),request:message,facts,type:meta0.design.norms||require('./craft-norms').typeOf(meta0.name+' '+message),designShots,reviewLook,signal,avoid:(require('./design-presets').byType(meta0.design?.playbook||'')||{}).avoid,
        onProgress:p=>update({status:'reviewing',progress:p,stream:null}),
-       edit:async(msg,shown)=>{const r=await builder.edit(id,msg,{onVersion,displayText:shown,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});if(r&&!r.unchanged&&!r.rolled_back)last=r;return r}});
+       edit:async(msg,shown)=>{const r=await builder.edit(id,msg,{onVersion,designShots,displayText:shown,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});if(r&&!r.unchanged&&!r.rolled_back)last=r;return r}});
       if(last)job.result={...last,first_version:first.version,design:first.design};
       job.result.craft=craft;
       const line=require('./craft-check').summary(craft);
