@@ -860,9 +860,14 @@
     <ul class="domains apis-list" id="apis-list"></ul>
     <details class="api-add"><summary>More options</summary>
       <label>Link to its spec (OpenAPI or Swagger, JSON or YAML)<input id="api-spec-url" type="url" placeholder="https://api.example.com/openapi.json"></label>
-      <label>Or paste the spec<textarea id="api-spec" rows="4" spellcheck="false" placeholder='{"openapi":"3.0.0", ...}'></textarea></label>
+      <label>Or paste the spec, or a Hoppscotch or Postman collection<textarea id="api-spec" rows="4" spellcheck="false" placeholder='{"openapi":"3.0.0", ...}'></textarea></label>
       <div class="row"><label>Key name<input id="api-secret" placeholder="HOTELBEDS_KEY" spellcheck="false"></label><label>Address (if the spec has none)<input id="api-base" type="url" placeholder="https://api.example.com/v1"></label></div>
       <div class="row"><button class="ghost" id="api-add-spec" type="button">Add from spec</button></div>
+    </details>
+    <details class="api-add api-curl"><summary>Paste a cURL command</summary>
+      <label>Copy a request as cURL from your browser, Postman, Hoppscotch or an API's docs<textarea id="api-curl" rows="3" spellcheck="false" placeholder="curl 'https://api.example.com/v1/orders?limit=5' -H 'Accept: application/json'"></textarea></label>
+      <div class="row"><button class="ghost" id="api-curl-go" type="button">Open it</button></div>
+      <p class="muted small" id="api-curl-status" role="status"></p>
     </details>
     <details class="api-log"><summary>Recent outside calls</summary><div id="api-log"></div></details>
     <h3>Code</h3>

@@ -39,7 +39,7 @@ function endpoints(api){
   let body=null;
   if(!READ.has(o.method)&&o.requestSchema&&Object.keys(o.requestSchema).length){try{body=JSON.stringify(samples.sampleOf(o.requestSchema,'',seq(o.id)),null,2)}catch{body='{}'}}
   else if(!READ.has(o.method)&&(o.bodyFields||[]).length)body=JSON.stringify(Object.fromEntries(o.bodyFields.map(f=>[f.name,''])),null,2);
-  return{id:o.id,method:o.method,path:o.path,summary:o.summary||'',params,body,read_only:READ.has(o.method)};
+  return{id:o.id,method:o.method,path:o.path,summary:o.summary||'',params,body,read_only:READ.has(o.method),rules:(api.rules&&api.rules[o.id])||[],suggested:require('./api-rules').suggest(o)};
  });
 }
 function seq(seed){let x=0;for(const c of String(seed))x=(x*31+c.charCodeAt(0))>>>0;return()=>{x=(x*1103515245+12345)>>>0;return x/4294967296}}
@@ -104,7 +104,9 @@ function reason(status,body){
 }
 
 function findOp(api,opId){const op=(api.operations||[]).find(o=>o.id===opId);if(!op)throw fail(404,'That endpoint is not part of '+api.title+' any more. Reload the list.');return op}
-function findApi(id,slug){const api=samples.apis(id).find(a=>a.slug===slug);if(!api)throw fail(404,'That API is not added to this app.');return api}
+function findApi(id,slug){const api=samples.apis(id).find(a=>a.slug===slug);if(!api)throw fail(404,'That API is not added to this app.');
+ // Switched to its test address: Try and Check all call that, with the test key.
+ return api.test&&api.test.use&&api.test.baseUrl?{...api,baseUrl:api.test.baseUrl,secret:api.test.secret||null,live:{baseUrl:api.baseUrl,secret:api.secret},testing:true}:api}
 function needsKey(id,api){return Boolean(api.secret)&&!samples.hasKey(id,api.secret)}
 
 // Send one request. Sample when asked, or when the key is missing; a real call that can change data
@@ -130,9 +132,15 @@ async function send(id,{slug,op:opId,values={},body,sample=false,confirm=false},
  const type=String((out.headers&&(out.headers['content-type']||out.headers['Content-Type']))||'');
  let json=false,shown=text;try{if(text.trim()){shown=JSON.stringify(JSON.parse(text),null,2);json=true}}catch{}
  samples.logCall(id,{...entry,status:out.status,ms,reply:text.slice(0,3000)});
- const ok=out.status>=200&&out.status<300;
- return{status:out.status,ok,ms,sample:useSample,why:useSample?(needsKey(id,api)?'Sample answer: add the '+api.secret+' key for real answers.':'Sample answer, as you asked.'):'Real answer from '+api.title+'.',
-  reason:ok?'':reason(out.status,text),url:samples.safeUrl(req.url),method:op.method,content_type:type.split(';')[0],json,body:shown.length>MAX_BODY?shown.slice(0,MAX_BODY)+'\n… (cut: the answer is longer)':shown,size:text.length};
+ // The endpoint's answer checks (api-rules.js); without any, a success status is the check.
+ const R=require('./api-rules'),rules=(api.rules&&api.rules[op.id])||[];
+ const checks=R.evaluate(rules.length?rules:[{kind:'status',value:'2xx'}],{status:out.status,ms,body:text,headers:out.headers});
+ // GraphQL answers errors with status 200: they count as a failed check.
+ if(json){try{const j=JSON.parse(text);if(Array.isArray(j.errors)&&j.errors.length)checks.push({label:'No GraphQL errors',pass:false,actual:String(j.errors[0]&&j.errors[0].message||'error').slice(0,120)})}catch{}}
+ const ok=checks.every(c=>c.pass);
+ const failed=checks.filter(c=>!c.pass);
+ return{status:out.status,ok,ms,checks,testing:Boolean(api.testing),sample:useSample,why:useSample?(needsKey(id,api)?'Sample answer: add the '+api.secret+' key for real answers.':'Sample answer, as you asked.'):'Real answer from '+api.title+(api.testing?' (test address)':'')+'.',
+  reason:ok?'':out.status>=200&&out.status<300?'Failed checks: '+failed.map(c=>c.label+' (got '+c.actual+')').join('; ')+'.':reason(out.status,text),url:samples.safeUrl(req.url),method:op.method,content_type:type.split(';')[0],json,body:shown.length>MAX_BODY?shown.slice(0,MAX_BODY)+'\n… (cut: the answer is longer)':shown,size:text.length};
 }
 
 // Call every read-only endpoint once with its starting values; say plainly which work.
@@ -144,7 +152,7 @@ async function check(id,{slug},{fetchUrl=require('./react-functions').guardedFet
   if(missing.length)return{id:e.id,method:e.method,path:e.path,result:'input',reason:'Needs a value for '+missing.join(', ')+' to check. Open it and fill it in.'};
   try{
    const r=await send(id,{slug,op:e.id,values:Object.fromEntries(e.params.map(p=>[p.name,p.value])),sample:sampleOnly},{fetchUrl});
-   return{id:e.id,method:e.method,path:e.path,result:r.sample?'sample':r.ok?'ok':'fail',status:r.status,ms:r.ms,reason:r.sample?'Answers with sample data until the '+api.secret+' key is added.':r.ok?'Works: answered in '+r.ms+' ms.':r.reason};
+   return{id:e.id,method:e.method,path:e.path,result:r.sample?'sample':r.ok?'ok':'fail',status:r.status,ms:r.ms,reason:r.sample?'Answers with sample data until the '+api.secret+' key is added.':r.ok?'Works: answered in '+r.ms+' ms'+(r.checks.length>1?', all '+r.checks.length+' checks pass':'')+'.':r.reason};
   }catch(err){return{id:e.id,method:e.method,path:e.path,result:'fail',reason:String(err.message||err).slice(0,200)}}
  };
  for(let i=0;i<list.length;i+=3)results.push(...await Promise.all(list.slice(i,i+3).map(one)));
@@ -154,4 +162,32 @@ async function check(id,{slug},{fetchUrl=require('./react-functions').guardedFet
  return{api:api.title,summary:summary+(writes?' '+writes+' endpoint'+(writes>1?'s change':' changes')+' data, so '+(writes>1?'they are':'it is')+' not called here: try '+(writes>1?'them':'it')+' one by one.':'')+(beyond>0?' Only the first '+MAX_CHECK+' read-only endpoints are checked.':''),results};
 }
 
-module.exports={endpoints,startValue,buildRequest,send,check,reason};
+// A pasted cURL command: matched to an added API's endpoint (its inputs filled in), or, when asked,
+// added as a new API with that one endpoint. Keys in the command are never kept.
+function fromCurl(id,{curl,add=false}){
+ const imp=require('./api-import'),req=imp.parseCurl(curl);
+ const match=()=>{
+  for(const a of samples.apis(id)){
+   for(const base of [a.baseUrl,a.test&&a.test.baseUrl].filter(Boolean)){
+    const u=new URL(req.url),target=u.origin+u.pathname;
+    if(!(target===base||target.startsWith(base+'/')))continue;
+    const rest=target.slice(base.length)||'/',op=samples.findOperation(a,rest,req.method);if(!op)continue;
+    const values={};for(const [k,v] of u.searchParams)values[k]=v;
+    const want=rest.split('/').filter(Boolean),tpl=op.path.split('/').filter(Boolean);
+    tpl.forEach((seg,i)=>{const m=/^\{([^}]+)\}$/.exec(seg);if(m)values[m[1]]=decodeURIComponent(want[i]||'')});
+    return{slug:a.slug,op:op.id,values,body:req.body?(()=>{try{return JSON.stringify(JSON.parse(req.body),null,2)}catch{return req.body}})():null};
+   }
+  }
+  return null;
+ };
+ let found=match(),added=null;
+ if(!found&&add){
+  const spec=imp.specFromRequest(req);
+  added=samples.add(id,{spec,secret:req.secrets.length?samples.keyName(spec.info.title):''});
+  found=match();
+ }
+ return{match:found,added,method:req.method,url:samples.safeUrl(req.url),secrets:req.secrets,
+  note:req.secrets.length?'The command had a key in it ('+req.secrets.join(', ')+'). Kairoq did not keep it: add it with Add key, where it is stored encrypted.':''};
+}
+
+module.exports={fromCurl,endpoints,startValue,buildRequest,send,check,reason};

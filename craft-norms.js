@@ -18,13 +18,14 @@ const TYPES=[
  ['beauty',/\b(salons?|beauty|spa|florists?|flowers?|fashion|boutique|clothing|jewell?er\w*|skin\w*|cosmetic\w*|barber\w*)(?![a-z])/i],
  ['kids',/\b(kids?|child\w*|schools?|daycare|toys?|education|courses?|learning|tutor\w*|students?)(?![a-z])/i],
  ['health',/\b(clinics?|dent\w*|health|therap\w*|physio\w*|medical|pharmac\w*|wellness|doctors?|care)(?![a-z])/i],
- ['agency',/\b(agency|studio|design|marketing|creative|photograph\w*|portfolio|branding)(?![a-z])/i],
+ ['agency',/\b(agency|studio|design studio|graphic design|marketing agency|creative|photograph\w*|portfolio|branding)(?![a-z])/i],
  ['consumer',/\b(products?|hardware|devices?|shop|store|e-?commerce|brand)(?![a-z])/i],
 ];
 const NAMES={saas:'software',finance:'finance',travel:'travel and hotels',law:'law and professional services',food:'cafés and restaurants',fitness:'gyms and fitness',realestate:'renovation, architecture and real estate',beauty:'beauty, fashion and florists',kids:'children and education',health:'health and clinics',agency:'agencies and studios',consumer:'consumer products'};
 
 function typeOf(text){
- const t=String(text||'');let best=null,at=Infinity;
+ // Words about the page itself ("the marketing website home page for…") say nothing about the business.
+ const t=String(text||'').replace(/\b(marketing\s+)?(web\s?site|landing page|home ?page|web app|site|page)s?\b/gi,' ');let best=null,at=Infinity;
  for(const [id,re] of TYPES){const m=re.exec(t);if(m&&m.index<at){at=m.index;best=id}}
  return best;
 }
