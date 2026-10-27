@@ -19,7 +19,7 @@ export function StatCard({ label, value, change, note, goodWhen = 'up', icon: Ic
   const good = hasChange && (goodWhen === 'down' ? !up : up);
   const Trend = up ? TrendingUp : TrendingDown;
   return (
-    <div className={cn('flex flex-col gap-3 rounded-xl border bg-card p-5 text-card-foreground shadow-soft', className)}>
+    <div className={cn('flex flex-col gap-3 rounded-lg border bg-card p-5 text-card-foreground', className)}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm text-muted-foreground">{label}</p>
         {hasChange ? (

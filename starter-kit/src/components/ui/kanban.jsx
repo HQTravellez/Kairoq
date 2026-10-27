@@ -46,7 +46,7 @@ function Card({ item, renderCard }) {
       {...attributes}
       {...listeners}
       className={cn(
-        'cursor-grab touch-none rounded-lg border bg-card p-3 text-card-foreground shadow-soft outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing',
+        'cursor-grab touch-none rounded-lg border bg-card p-3 text-card-foreground outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing',
         isDragging && 'opacity-40'
       )}
     >
