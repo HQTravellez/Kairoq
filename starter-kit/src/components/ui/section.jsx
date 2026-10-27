@@ -8,6 +8,8 @@ export function Container({ className, ...props }) {
 export function Section({ className, ...props }) {
   return <section className={cn('py-16 sm:py-24', className)} {...props} />;
 }
+// A short lead-in line in sentence case (not tiny capitals). Kept for older pages; new pages
+// rarely need it: a heading stands on its own.
 export function Eyebrow({ className, ...props }) {
-  return <p className={cn('text-xs font-semibold uppercase tracking-[0.2em] text-primary', className)} {...props} />;
+  return <p className={cn('text-sm font-medium text-muted-foreground', className)} {...props} />;
 }

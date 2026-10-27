@@ -398,6 +398,23 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
      if(job.result.look)try{const m=builder.loadMeta(id),last=m.messages.at(-1);if(last&&last.role==='assistant'){last.look=job.result.look;builder.saveMeta(m)}}catch{}
     }
     // The first build of a new project on Pro or Max gets a free design review.
+    // The craft check (craft-check.js): the first build of a site is measured for the generic
+    // "made by AI" look and refined before the owner sees it, on every plan, free.
+    if(mode==='build'&&job.result.design&&!job.result.rolled_back&&designShots&&process.env.KAIROQ_CRAFT_CHECK!=='off'&&builder.loadMeta(id).design&&builder.loadMeta(id).design.signature){
+     const first=job.result;
+     try{
+      const meta0=builder.loadMeta(id),facts=[...meta0.messages.filter(m=>m.role==='user').map(m=>m.text),meta0.knowledge||''].join('\n');
+      let last=null;
+      const craft=await require('./craft-check').run({url:()=>builder.previewUrl(builder.loadMeta(id)),request:message,facts,designShots,reviewLook,signal,avoid:(require('./design-presets').byType(meta0.design?.playbook||'')||{}).avoid,
+       onProgress:p=>update({status:'reviewing',progress:p,stream:null}),
+       edit:async(msg,shown)=>{const r=await builder.edit(id,msg,{onVersion,displayText:shown,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});if(r&&!r.unchanged&&!r.rolled_back)last=r;return r}});
+      if(last)job.result={...last,first_version:first.version,design:first.design};
+      job.result.craft=craft;
+      const line=require('./craft-check').summary(craft);
+      if(line)try{const m=builder.loadMeta(id),a=m.messages.at(-1);if(a&&a.role==='assistant'){a.craft=line;builder.saveMeta(m)}}catch{}
+     }catch(e){if(signal.aborted)throw e;console.warn('[craft-check]',String(e.message||e).slice(0,200));job.result=first}
+     finally{update({progress:null})}
+    }
     if(mode==='build'&&job.result.design&&(tier==='pro'||tier==='max')&&designShots&&process.env.KAIROQ_AUTO_POLISH!=='off'){
      const first=job.result;
      try{job.result={...await builder.polish(id,{shots:designShots,callModel,onVersion,onStream,onThinking,onEvent,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}

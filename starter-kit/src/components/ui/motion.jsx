@@ -78,10 +78,10 @@ export function BentoGrid({ className, children, ...props }) {
 }
 
 // background: a picture or a small piece of the real product shown at the top of the card.
-export function BentoCard({ name, description, icon: Icon, href, cta = 'Learn more', background, className, ...props }) {
+export function BentoCard({ name, description, icon: Icon, href, cta = 'Open', background, className, ...props }) {
   return (
     <div
-      className={cn('group flex flex-col overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-glow', className)}
+      className={cn('group flex flex-col overflow-hidden rounded-lg border bg-card text-card-foreground transition-colors duration-200 hover:border-foreground/30', className)}
       {...props}
     >
       {background && <div className="relative min-h-[10rem] flex-1 overflow-hidden border-b bg-muted/40">{background}</div>}

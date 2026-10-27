@@ -30,6 +30,9 @@ const PATTERNS=[
  'the headline is a full sentence over three or four lines at display size (keep it to about five words, the rest below)',
  'everything centred, or every section using the same layout',
  'the same fade-up on every section, hover lift on every card, or bounce easing',
+ 'words joined with "·" or "|" separators in labels and meta lines',
+ 'an arrow (→, ↗) on every button and link',
+ 'soft drop shadows under every card and box, or very round corners on everything',
  'copy that corrects itself ("not just X, it\'s Y"), three-part slogan headlines, or "Get started" and "Learn more" as button labels',
 ];
 function list(){return PATTERNS.map(p=>'- '+p).join('\n')}

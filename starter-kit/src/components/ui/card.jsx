@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../../lib/utils.js';
 
 export const Card = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('rounded-xl border bg-card text-card-foreground shadow-soft', className)} {...props} />
+  <div ref={ref} className={cn('rounded-lg border bg-card text-card-foreground', className)} {...props} />
 ));
 export const CardHeader = React.forwardRef(({ className, ...props }, ref) => (
   <div ref={ref} className={cn('flex flex-col gap-1.5 p-6', className)} {...props} />
