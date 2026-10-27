@@ -12,8 +12,7 @@ function TextLoop({
   transition = { duration: 0.3 },
   variants,
   onIndexChange,
-  trigger = true,
-  mode = "popLayout"
+  trigger = true
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const items = Children.toArray(children);
@@ -34,10 +33,13 @@ function TextLoop({
     animate: { y: 0, opacity: 1 },
     exit: { y: -20, opacity: 0 }
   };
-  return <div className={cn("relative inline-block whitespace-nowrap", className)}>
-      <AnimatePresence mode={mode} initial={false}>
-        <motion.div
+  // The leaving and the arriving word share one grid cell, so the swap never pops a word out of
+  // the line or leaves an empty line under the headline (Kairoq fix; the original used popLayout).
+  return <span className={cn("relative inline-grid whitespace-nowrap align-baseline", className)}>
+      <AnimatePresence initial={false}>
+        <motion.span
     key={currentIndex}
+    className="[grid-area:1/1]"
     initial='initial'
     animate='animate'
     exit='exit'
@@ -45,9 +47,9 @@ function TextLoop({
     variants={variants || motionVariants}
   >
           {items[currentIndex]}
-        </motion.div>
+        </motion.span>
       </AnimatePresence>
-    </div>;
+    </span>;
 }
 export {
   TextLoop

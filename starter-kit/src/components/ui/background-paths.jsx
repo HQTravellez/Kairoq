@@ -9,6 +9,8 @@
  * @website: https://kokonutui.com
  * @github: https://github.com/kokonut-labs/kokonutui
  */
+// strength (0.1 to 1) makes only the lines quieter; never put opacity on BackgroundPaths itself,
+// because that fades the hero content inside it too.
 import { useEffect, useRef } from 'react';
 import { cn } from '../../lib/utils.js';
 const SAMPLES = 64;
@@ -92,7 +94,8 @@ function BackgroundPaths({
   spread = 1,
   angle = -8,
   speed = 1,
-  interactive = true
+  interactive = true,
+  strength = 1
 }) {
   const rootRef = useRef(null);
   const canvasRef = useRef(null);
@@ -169,7 +172,7 @@ function BackgroundPaths({
       }
     };
     resize();
-    canvas.style.opacity = "1";
+    canvas.style.opacity = String(Math.min(1, Math.max(0.1, strength)));
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(canvas);
     let onScreen = true;
@@ -224,7 +227,7 @@ function BackgroundPaths({
       root.removeEventListener("pointermove", onMove);
       root.removeEventListener("pointerleave", onLeave);
     };
-  }, [count, spread, angle, speed, interactive]);
+  }, [count, spread, angle, speed, interactive, strength]);
   return <div
     className={cn(
       "relative flex min-h-[560px] w-full items-center justify-center overflow-hidden bg-background text-foreground",
@@ -245,6 +248,7 @@ function BackgroundPaths({
     }}
   >
         <canvas
+    data-strength={strength}
     className="h-full w-full opacity-0 transition-opacity duration-500 ease-out"
     ref={canvasRef}
   />

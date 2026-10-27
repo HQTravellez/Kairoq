@@ -30,6 +30,8 @@ async function tells(page,screen='desktop'){
    if(!prev&&h.parentElement)prev=h.parentElement.previousElementSibling;
    for(let i=0;i<2&&prev;i++){
     const s=getComputedStyle(prev),t=text(prev);
+    // Chapter words ("Book.", "Approve.") are part of the story, not labels.
+    if(prev.hasAttribute('data-chapter')||prev.querySelector('[data-chapter]'))break;
     // Tiny capitals or letter-spacing, or a short line in the accent colour (the sentence-case variant).
     if(visible(prev)&&t&&t.length<=48&&!/^0?\d+\.?$/.test(t)&&parseFloat(s.fontSize)<=15&&(s.textTransform==='uppercase'||(t===t.toUpperCase()&&/[A-Z]{3}/.test(t))||parseFloat(s.letterSpacing)>=1.2||(s.color!==getComputedStyle(h).color&&sat(s.color)>0.35))){eyebrows.push(t);break}
     prev=prev.previousElementSibling;
@@ -115,6 +117,9 @@ async function tells(page,screen='desktop'){
   if(numbered.length>=3)add('minor','numbers','Numbered markers (01, 02, 03…) on '+numbered.length+' items','Keep numbers only for real steps in order; otherwise remove them.');
 
   // Plain measurements, compared with what the best sites of the kind do (craft-norms.js).
+  // A faded headline: the main heading (or a wrapper around it, such as a hero backdrop given an
+  // opacity) is see-through, so the most important words on the page look washed out.
+  {const h=document.querySelector('h1');if(h){let o=1;for(let e=h;e&&e!==document.documentElement;e=e.parentElement)o*=parseFloat(getComputedStyle(e).opacity)||0;if(o<0.75&&h.getBoundingClientRect().height>1)add('major','faded-headline','The main headline is faded (opacity '+o.toFixed(2)+')','Give the headline and the hero it sits in full opacity; to make a backdrop quieter, fade only the backdrop (BackgroundPaths strength, or opacity on the decoration itself), never a wrapper around the text.')}}
   const h1el=heads.find(h=>h.tagName==='H1'),med=a=>a.length?a.slice().sort((x,y)=>x-y)[a.length>>1]:null;
   const boxesAll=shown.filter(el=>{const r=el.getBoundingClientRect();return r.width*r.height>9000&&r.width<innerWidth*0.95&&boxy(el)});
   const metrics={h1px:h1el?parseFloat(getComputedStyle(h1el).fontSize):null,h1words:h1el?text(h1el).split(/\s+/).filter(Boolean).length:null,radius:med(boxesAll.map(el=>parseFloat(getComputedStyle(el).borderTopLeftRadius))),shadows:boxesAll.filter(el=>getComputedStyle(el).boxShadow!=='none').length,sections:shown.filter(el=>el.tagName==='SECTION'&&el.getBoundingClientRect().height>200).length};
