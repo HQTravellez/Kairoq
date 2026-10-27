@@ -459,8 +459,8 @@ async function designShots(url,{timeoutMs=20000}={}){
    // Measured problems on the same page (design-dom.js, design-frame.js), for the design review.
    let issues=[];try{issues=[...await require('./design-dom').inspect(page,name),...await require('./design-frame').frame(page,name)]}catch{}
    // The "made by AI" giveaways, measured (design-tells.js), and the big numbers shown.
-   let stats=[];try{const t=await require('./design-tells').tells(page,name);issues.push(...t.issues);stats=t.stats}catch{}
-   shots.push({name,mime:'image/jpeg',data:buf.toString('base64'),issues,stats});
+   let stats=[],metrics=null;try{const t=await require('./design-tells').tells(page,name);issues.push(...t.issues);stats=t.stats;metrics=t.metrics}catch{}
+   shots.push({name,mime:'image/jpeg',data:buf.toString('base64'),issues,stats,metrics});
   }catch{}finally{await context.close().catch(()=>{})}
  }
  return shots;

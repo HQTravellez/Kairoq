@@ -11,7 +11,7 @@ const APP_PACKAGES={react:'UI',
  zod:'validation','react-hook-form':'forms','@radix-ui/react-dialog':'dialogs','@radix-ui/react-dropdown-menu':'menus','@radix-ui/react-tabs':'tabs','@radix-ui/react-tooltip':'tooltips',
  '@radix-ui/react-popover':'popovers','@radix-ui/react-select':'selects','@radix-ui/react-accordion':'accordions','@radix-ui/react-switch':'switches',
  sonner:'toasts','react-markdown':'markdown','@tanstack/react-query':'data fetching','canvas-confetti':'confetti','react-day-picker':'date picker',
- 'embla-carousel-react':'carousels','@tanstack/react-table':'tables (use DataTable from the UI kit; TanStack Table 8 API)','@dnd-kit/core':'drag and drop (use Kanban from the UI kit)','qrcode.react':'QR codes',three:'custom 3D (prefer the ready pieces in kairoq/scene; for showing a model use Model3D from kairoq/3d)','@react-three/fiber':'three.js as React components (Canvas, useFrame); wrap custom scenes in Scene3D from kairoq/scene','@react-three/drei':'helpers for @react-three/fiber (OrbitControls, useGLTF, Html, Float, ContactShadows...)',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
+ 'embla-carousel-react':'carousels','@tanstack/react-table':'tables (use DataTable from the UI kit; TanStack Table 8 API)','@dnd-kit/core':'drag and drop (use Kanban from the UI kit)','qrcode.react':'QR codes','@phosphor-icons/react':'icons with character in six weights (thin, light, regular, bold, fill, duotone); pick one weight for the whole site',three:'custom 3D (prefer the ready pieces in kairoq/scene; for showing a model use Model3D from kairoq/3d)','@react-three/fiber':'three.js as React components (Canvas, useFrame); wrap custom scenes in Scene3D from kairoq/scene','@react-three/drei':'helpers for @react-three/fiber (OrbitControls, useGLTF, Html, Float, ContactShadows...)',gsap:'timeline and scroll animation (gsap/ScrollTrigger for pinned scroll stories)',lenis:'smooth scrolling',remotion:'video compositions (with @remotion/player; companies of 4+ people need a Remotion company license)','@remotion/player':'plays Remotion compositions inline'};
 const KAIROQ_MODULES=['kairoq','kairoq/3d','kairoq/scene','kairoq/story','kairoq/hero3d','kairoq/scroll'];
 const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),...KAIROQ_MODULES];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
@@ -404,6 +404,19 @@ async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress
   try{const made=await makeModel(brief.hero3d.custom);if(made&&made.path)brief={...brief,hero3d:{...brief.hero3d,src:made.path}}}
   catch(e){if(signal?.aborted)throw e;console.warn('[model-agent]',String(e.message||e).slice(0,200))}
  }
+ // Real photos for a new site (photo-finder.js): found, downloaded and licensed before the first
+ // build, so the builder uses them instead of guessing stock links.
+ if(!planned&&brief.signature&&(brief.photos||[]).length&&process.env.KAIROQ_PHOTOS!=='off'){
+  onProgress('finding photos');
+  try{
+   const found=await require('./photo-finder').find(brief.photos);
+   if(found.length){
+    const fit=found.filter(f=>Buffer.byteLength(f.data,'base64')<=3*1024*1024);
+    const saved=fit.length?require('./react-assets').save(id,fit.map(f=>({name:f.name,data:f.data}))):[];
+    if(saved.length)brief={...brief,photo_files:saved.map((name,i)=>({path:'./uploads/'+name,query:fit[i].query,credit:fit[i].credit}))};
+   }
+  }catch(e){if(signal?.aborted)throw e;console.warn('[photo-finder]',String(e.message||e).slice(0,200))}
+ }
  const fresh=loadMeta(id);
  delete fresh.planned_design;
  fresh.design=brief;
@@ -690,6 +703,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
     if(checkRuntime&&process.env.KAIROQ_IMAGE_LINK_CHECK!=='off'){try{runtimeErrors.push(...await require('./image-links').broken(next))}catch{}}
     // The first build of a new design: its signature moment must really be on the page.
     if(brief&&brief.signature){const miss=require('./design-recipes').signatureMissing(brief.signature,next);if(miss)runtimeErrors.push(miss)}
+   // Photos whose licence asks for a credit (photo-finder.js): the credit must be on the site.
+   if(brief&&Array.isArray(brief.photo_files)){const code=Object.values(next).join('\n'),missing=brief.photo_files.filter(p=>p.credit&&p.credit.attribution_required&&code.includes(p.path.replace('./',''))&&!code.includes(p.credit.creator||'\u0000'));if(missing.length)runtimeErrors.push('Photo credits are missing: the licence of these photos asks for a credit. '+require('./photo-finder').creditLine(missing))}
     // Saved checks: flows that worked before must still work (run on a test copy of the data).
     if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
    }finally{clearTesting(id,n)}

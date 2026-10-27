@@ -1,0 +1,901 @@
+{
+ "about": "Measurements (numbers only) of the public home pages of 117 well-designed websites, taken in a desktop browser in October 2026. Nothing from the sites (code, text, images) is stored. Ranges are [25th, 50th, 75th percentile].",
+ "measured": "2026-10-27",
+ "types": {
+  "agency": {
+   "sites": 9,
+   "h1_px": [
+    56,
+    72,
+    80
+   ],
+   "h1_weight": 300,
+   "h1_tracking": -0.02,
+   "h1_words": [
+    2,
+    3,
+    5
+   ],
+   "body_px": 16,
+   "body_lh": 1.4,
+   "text_width": 453,
+   "fonts": [
+    3,
+    5,
+    1
+   ],
+   "serif_share": 0.33,
+   "dark_share": 0.11,
+   "radius": [
+    0,
+    0,
+    6
+   ],
+   "pill_buttons": 0.22,
+   "shadows": [
+    0,
+    0
+   ],
+   "boxes": [
+    15,
+    18
+   ],
+   "grids": [
+    0,
+    0
+   ],
+   "sections": [
+    2,
+    4
+   ],
+   "screens": 8.1,
+   "eyebrow_share": 0.0,
+   "arrows_share": 0.0,
+   "dots_share": 0.0,
+   "hero": {
+    "video": 0.44,
+    "3d_canvas": 0.0,
+    "image": 0.56,
+    "illustration": 0.33,
+    "input": 0.0
+   },
+   "examples": [
+    "pentagram.com",
+    "instrument.com",
+    "koto.com",
+    "locomotive.ca",
+    "work.co",
+    "metalab.com",
+    "wearecollins.com",
+    "basicagency.com",
+    "ideo.com"
+   ]
+  },
+  "beauty": {
+   "sites": 9,
+   "h1_px": [
+    30,
+    32,
+    55
+   ],
+   "h1_weight": 400,
+   "h1_tracking": 0,
+   "h1_words": [
+    2,
+    4,
+    5
+   ],
+   "body_px": 16,
+   "body_lh": 1.43,
+   "text_width": 842,
+   "fonts": [
+    1,
+    5,
+    3
+   ],
+   "serif_share": 0.11,
+   "dark_share": 0.0,
+   "radius": [
+    2.5,
+    4,
+    12
+   ],
+   "pill_buttons": 0.11,
+   "shadows": [
+    2,
+    2
+   ],
+   "boxes": [
+    18,
+    19
+   ],
+   "grids": [
+    0,
+    0
+   ],
+   "sections": [
+    4,
+    8
+   ],
+   "screens": 6.1,
+   "eyebrow_share": 0.0,
+   "arrows_share": 0.0,
+   "dots_share": 0.0,
+   "hero": {
+    "video": 0.22,
+    "3d_canvas": 0.0,
+    "image": 0.89,
+    "illustration": 0.11,
+    "input": 0.22
+   },
+   "examples": [
+    "bouqs.com",
+    "farmgirlflowers.com",
+    "aesop.com",
+    "glossier.com",
+    "everlane.com",
+    "allbirds.com",
+    "warbyparker.com",
+    "byredo.com",
+    "sezane.com"
+   ]
+  },
+  "consumer": {
+   "sites": 6,
+   "h1_px": [
+    48,
+    60,
+    72
+   ],
+   "h1_weight": 500,
+   "h1_tracking": 0,
+   "h1_words": [
+    4,
+    6,
+    6
+   ],
+   "body_px": 16,
+   "body_lh": 1.33,
+   "text_width": 480,
+   "fonts": [
+    4,
+    1,
+    1
+   ],
+   "serif_share": 0.0,
+   "dark_share": 0.0,
+   "radius": [
+    0,
+    8,
+    12
+   ],
+   "pill_buttons": 0.5,
+   "shadows": [
+    0,
+    1
+   ],
+   "boxes": [
+    13,
+    17
+   ],
+   "grids": [
+    0,
+    0
+   ],
+   "sections": [
+    4,
+    12
+   ],
+   "screens": 8.7,
+   "eyebrow_share": 0.0,
+   "arrows_share": 0.17,
+   "dots_share": 0.17,
+   "hero": {
+    "video": 0.67,
+    "3d_canvas": 0.0,
+    "image": 0.83,
+    "illustration": 0.0,
+    "input": 0.17
+   },
+   "examples": [
+    "apple.com",
+    "nothing.tech",
+    "rivian.com",
+    "sonos.com",
+    "dysoncanada.ca",
+    "frame.work"
+   ]
+  },
+  "finance": {
+   "sites": 10,
+   "h1_px": [
+    64,
+    76,
+    80
+   ],
+   "h1_weight": 500,
+   "h1_tracking": 0,
+   "h1_words": [
+    5,
+    5,
+    6
+   ],
+   "body_px": 16,
+   "body_lh": 1.4,
+   "text_width": 536,
+   "fonts": [
+    1,
+    8,
+    1
+   ],
+   "serif_share": 0.1,
+   "dark_share": 0.2,
+   "radius": [
+    16,
+    24,
+    38.9231
+   ],
+   "pill_buttons": 0.3,
+   "shadows": [
+    1,
+    2
+   ],
+   "boxes": [
+    17,
+    41
+   ],
+   "grids": [
+    0,
+    0
+   ],
+   "sections": [
+    12,
+    14
+   ],
+   "screens": 13.1,
+   "eyebrow_share": 0.0,
+   "arrows_share": 0.0,
+   "dots_share": 0.0,
+   "hero": {
+    "video": 0.5,
+    "3d_canvas": 0.2,
+    "image": 0.8,
+    "illustration": 0.0,
+    "input": 0.5
+   },
+   "examples": [
+    "mercury.com",
+    "ramp.com",
+    "brex.com",
+    "wise.com",
+    "monzo.com",
+    "wealthsimple.com",
+    "plaid.com",
+    "revolut.com",
+    "chime.com",
+    "n26.com"
+   ]
+  },
+  "fitness": {
+   "sites": 10,
+   "h1_px": [
+    48,
+    72,
+    96
+   ],
+   "h1_weight": 600,
+   "h1_tracking": 0,
+   "h1_words": [
+    3,
+    4,
+    6
+   ],
+   "body_px": 16,
+   "body_lh": 1.43,
+   "text_width": 479,
+   "fonts": [
+    6,
+    2,
+    2
+   ],
+   "serif_share": 0.1,
+   "dark_share": 0.0,
+   "radius": [
+    8,
+    8,
+    10
+   ],
+   "pill_buttons": 0.2,
+   "shadows": [
+    1,
+    1
+   ],
+   "boxes": [
+    10,
+    15
+   ],
+   "grids": [
+    0,
+    1
+   ],
+   "sections": [
+    6,
+    6
+   ],
+   "screens": 6.3,
+   "eyebrow_share": 0.1,
+   "arrows_share": 0.0,
+   "dots_share": 0.0,
+   "hero": {
+    "video": 0.2,
+    "3d_canvas": 0.0,
+    "image": 0.5,
+    "illustration": 0.0,
+    "input": 0.1
+   },
+   "examples": [
+    "equinox.com",
+    "barrys.com",
+    "solidcore.co",
+    "onepeloton.com",
+    "whoop.com",
+    "f45training.com",
+    "orangetheory.com",
+    "strava.com",
+    "classpass.com",
+    "ouraring.com"
+   ]
+  },
+  "food": {
+   "sites": 10,
+   "h1_px": [
+    36,
+    40,
+    56
+   ],
+   "h1_weight": 500,
+   "h1_tracking": 0,
+   "h1_words": [
+    3,
+    3,
+    5
+   ],
+   "body_px": 14.4,
+   "body_lh": 1.33,
+   "text_width": 437,
+   "fonts": [
+    1,
+    6,
+    3
+   ],
+   "serif_share": 0.1,
+   "dark_share": 0.0,
+   "radius": [
+    0,
+    0,
+    16
+   ],
+   "pill_buttons": 0.3,
+   "shadows": [
+    0,
+    1
+   ],
+   "boxes": [
+    13,
+    28
+   ],
+   "grids": [
+    0,
+    0
+   ],
+   "sections": [
+    5,
+    7
+   ],
+   "screens": 7.8,
+   "eyebrow_share": 0.2,
+   "arrows_share": 0.2,
+   "dots_share": 0.0,
+   "hero": {
+    "video": 0.0,
+    "3d_canvas": 0.0,
+    "image": 0.8,
+    "illustration": 0.1,
+    "input": 0.2
+   },
+   "examples": [
+    "bluebottlecoffee.com",
+    "stumptowncoffee.com",
+    "intelligentsia.com",
+    "sweetgreen.com",
+    "shakeshack.com",
+    "dishoom.com",
+    "tartinebakery.com",
+    "momofuku.com",
+    "balthazarny.com",
+    "joecoffeecompany.com"
+   ]
+  },
+  "health": {
+   "sites": 10,
+   "h1_px": [
+    49.5,
+    57,
+    72
+   ],
+   "h1_weight": 410,
+   "h1_tracking": 0,
+   "h1_words": [
+    4,
+    5,
+    7
+   ],
+   "body_px": 16,
+   "body_lh": 1.5,
+   "text_width": 398,
+   "fonts": [
+    4,
+    4,
+    2
+   ],
+   "serif_share": 0.2,
+   "dark_share": 0.0,
+   "radius": [
+    8,
+    12,
+    20
+   ],
+   "pill_buttons": 0.4,
+   "shadows": [
+    2,
+    4
+   ],
+   "boxes": [
+    28,
+    36
+   ],
+   "grids": [
+    0,
+    1
+   ],
+   "sections": [
+    6,
+    7
+   ],
+   "screens": 9.4,
+   "eyebrow_share": 0.3,
+   "arrows_share": 0.0,
+   "dots_share": 0.1,
+   "hero": {
+    "video": 0.1,
+    "3d_canvas": 0.2,
+    "image": 0.7,
+    "illustration": 0.1,
+    "input": 0.2
+   },
+   "examples": [
+    "onemedical.com",
+    "hims.com",
+    "headspace.com",
+    "calm.com",
+    "parsleyhealth.com",
+    "hellotend.com",
+    "zocdoc.com",
+    "mavenclinic.com",
+    "ro.co",
+    "functionhealth.com"
+   ]
+  },
+  "kids": {
+   "sites": 10,
+   "h1_px": [
+    36,
+    40,
+    48
+   ],
+   "h1_weight": 700,
+   "h1_tracking": 0,
+   "h1_words": [
+    6,
+    7,
+    7
+   ],
+   "body_px": 20,
+   "body_lh": 1.42,
+   "text_width": 420,
+   "fonts": [
+    5,
+    3,
+    2
+   ],
+   "serif_share": 0.0,
+   "dark_share": 0.0,
+   "radius": [
+    0,
+    8,
+    16
+   ],
+   "pill_buttons": 0.2,
+   "shadows": [
+    0,
+    2
+   ],
+   "boxes": [
+    16,
+    39
+   ],
+   "grids": [
+    0,
+    1
+   ],
+   "sections": [
+    6,
+    8
+   ],
+   "screens": 7.1,
+   "eyebrow_share": 0.0,
+   "arrows_share": 0.2,
+   "dots_share": 0.0,
+   "hero": {
+    "video": 0.2,
+    "3d_canvas": 0.0,
+    "image": 0.8,
+    "illustration": 0.2,
+    "input": 0.3
+   },
+   "examples": [
+    "duolingo.com",
+    "khanacademy.org",
+    "outschool.com",
+    "lovevery.com",
+    "tonies.ca",
+    "primary.com",
+    "brilliant.org",
+    "kiwico.com",
+    "getepic.com",
+    "scratch.mit.edu"
+   ]
+  },
+  "law": {
+   "sites": 10,
+   "h1_px": [
+    44,
+    48,
+    96
+   ],
+   "h1_weight": 400,
+   "h1_tracking": 0,
+   "h1_words": [
+    4,
+    6,
+    8
+   ],
+   "body_px": 20,
+   "body_lh": 1.4,
+   "text_width": 620,
+   "fonts": [
+    2,
+    5,
+    3
+   ],
+   "serif_share": 0.3,
+   "dark_share": 0.1,
+   "radius": [
+    0,
+    0,
+    6
+   ],
+   "pill_buttons": 0.0,
+   "shadows": [
+    1,
+    1
+   ],
+   "boxes": [
+    12,
+    20
+   ],
+   "grids": [
+    0,
+    0
+   ],
+   "sections": [
+    5,
+    6
+   ],
+   "screens": 6.3,
+   "eyebrow_share": 0.3,
+   "arrows_share": 0.0,
+   "dots_share": 0.0,
+   "hero": {
+    "video": 0.2,
+    "3d_canvas": 0.0,
+    "image": 0.7,
+    "illustration": 0.0,
+    "input": 0.4
+   },
+   "examples": [
+    "cooley.com",
+    "wsgr.com",
+    "kirkland.com",
+    "hlc.com",
+    "mckinsey.com",
+    "bcg.com",
+    "clio.com",
+    "lw.com",
+    "gibsondunn.com",
+    "slaughterandmay.com"
+   ]
+  },
+  "realestate": {
+   "sites": 9,
+   "h1_px": [
+    55,
+    60,
+    95
+   ],
+   "h1_weight": 500,
+   "h1_tracking": 0,
+   "h1_words": [
+    4,
+    5,
+    5
+   ],
+   "body_px": 18,
+   "body_lh": 1.4,
+   "text_width": 437,
+   "fonts": [
+    3,
+    3,
+    3
+   ],
+   "serif_share": 0.33,
+   "dark_share": 0.11,
+   "radius": [
+    0,
+    8,
+    9.231
+   ],
+   "pill_buttons": 0.22,
+   "shadows": [
+    1,
+    2
+   ],
+   "boxes": [
+    21,
+    41
+   ],
+   "grids": [
+    0,
+    1
+   ],
+   "sections": [
+    8,
+    10
+   ],
+   "screens": 8.2,
+   "eyebrow_share": 0.0,
+   "arrows_share": 0.11,
+   "dots_share": 0.11,
+   "hero": {
+    "video": 0.44,
+    "3d_canvas": 0.0,
+    "image": 0.89,
+    "illustration": 0.0,
+    "input": 0.33
+   },
+   "examples": [
+    "compass.com",
+    "opendoor.com",
+    "havenly.com",
+    "blockrenovation.com",
+    "sweeten.com",
+    "snohetta.com",
+    "big.dk",
+    "fosterandpartners.com",
+    "homebound.com"
+   ]
+  },
+  "saas": {
+   "sites": 14,
+   "h1_px": [
+    64,
+    64,
+    68
+   ],
+   "h1_weight": 600,
+   "h1_tracking": -0.03,
+   "h1_words": [
+    4,
+    6,
+    7
+   ],
+   "body_px": 17,
+   "body_lh": 1.5,
+   "text_width": 486,
+   "fonts": [
+    7,
+    3,
+    4
+   ],
+   "serif_share": 0.07,
+   "dark_share": 0.29,
+   "radius": [
+    6,
+    12,
+    16
+   ],
+   "pill_buttons": 0.14,
+   "shadows": [
+    9,
+    30
+   ],
+   "boxes": [
+    56,
+    94
+   ],
+   "grids": [
+    1,
+    1
+   ],
+   "sections": [
+    6,
+    11
+   ],
+   "screens": 11.7,
+   "eyebrow_share": 0.0,
+   "arrows_share": 0.07,
+   "dots_share": 0.21,
+   "hero": {
+    "video": 0.29,
+    "3d_canvas": 0.29,
+    "image": 0.43,
+    "illustration": 0.0,
+    "input": 0.14
+   },
+   "examples": [
+    "linear.app",
+    "stripe.com",
+    "vercel.com",
+    "fin.ai",
+    "perflo.ai",
+    "superapp.dev",
+    "notion.com",
+    "figma.com",
+    "raycast.com",
+    "framer.com",
+    "cal.com",
+    "resend.com",
+    "attio.com",
+    "posthog.com"
+   ]
+  },
+  "travel": {
+   "sites": 10,
+   "h1_px": [
+    45,
+    60,
+    80
+   ],
+   "h1_weight": 400,
+   "h1_tracking": -0.004,
+   "h1_words": [
+    5,
+    5,
+    8
+   ],
+   "body_px": 16,
+   "body_lh": 1.43,
+   "text_width": 500,
+   "fonts": [
+    2,
+    3,
+    5
+   ],
+   "serif_share": 0.2,
+   "dark_share": 0.0,
+   "radius": [
+    0,
+    2.5,
+    14
+   ],
+   "pill_buttons": 0.2,
+   "shadows": [
+    1,
+    1
+   ],
+   "boxes": [
+    8,
+    27
+   ],
+   "grids": [
+    0,
+    0
+   ],
+   "sections": [
+    7,
+    10
+   ],
+   "screens": 6.3,
+   "eyebrow_share": 0.2,
+   "arrows_share": 0.1,
+   "dots_share": 0.2,
+   "hero": {
+    "video": 0.2,
+    "3d_canvas": 0.0,
+    "image": 0.8,
+    "illustration": 0.1,
+    "input": 0.5
+   },
+   "examples": [
+    "navan.com",
+    "perk.com",
+    "acehotel.com",
+    "thehoxton.com",
+    "aman.com",
+    "sonder.com",
+    "hopper.com",
+    "mrandmrssmith.com",
+    "standardhotels.com",
+    "editionhotels.com"
+   ]
+  }
+ },
+ "all": {
+  "sites": 117,
+  "h1_px": [
+   46,
+   63,
+   79.3333
+  ],
+  "h1_weight": 500,
+  "h1_tracking": 0,
+  "h1_words": [
+   4,
+   5,
+   7
+  ],
+  "body_px": 16,
+  "body_lh": 1.42,
+  "text_width": 480,
+  "fonts": [
+   39,
+   48,
+   30
+  ],
+  "serif_share": 0.15,
+  "dark_share": 0.08,
+  "radius": [
+   0,
+   8,
+   16
+  ],
+  "pill_buttons": 0.22,
+  "shadows": [
+   1,
+   2
+  ],
+  "boxes": [
+   16,
+   36
+  ],
+  "grids": [
+   0,
+   1
+  ],
+  "sections": [
+   6,
+   8
+  ],
+  "screens": 8.3,
+  "eyebrow_share": 0.09,
+  "arrows_share": 0.07,
+  "dots_share": 0.07,
+  "hero": {
+   "video": 0.27,
+   "3d_canvas": 0.07,
+   "image": 0.71,
+   "illustration": 0.08,
+   "input": 0.26
+  }
+ }
+}

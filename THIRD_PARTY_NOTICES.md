@@ -51,6 +51,12 @@ Each file names its source and licence at the top, so the credit travels with th
 
 New sites and apps use only these fonts, bundled into each build from the Fontsource npm packages (`@fontsource-variable/*`, `@fontsource/*`). Every one is under the SIL Open Font License 1.1, which allows commercial use and embedding in websites. `test/font-library.test.js` checks each installed package's licence. Each site's CSS names the licence. The fonts: Geist, Inter, Inter Tight, Mona Sans, Instrument Sans, Hanken Grotesk, Schibsted Grotesk, Familjen Grotesk, Onest, Figtree, Manrope, Public Sans, Bricolage Grotesque, Archivo, Hubot Sans, Funnel Display, Host Grotesk, Space Grotesk, Unbounded, Syne, Big Shoulders Display, Anton, Fraunces, Newsreader, Source Serif 4, EB Garamond, Bodoni Moda, Instrument Serif, Young Serif, Gloock, DM Serif Display, Libre Caslon Text, Geist Mono, JetBrains Mono, IBM Plex Mono, Fredoka, Baloo 2, Nunito, Quicksand.
 
+## Craft library, photos and icons (craft-norms.json, photo-finder.js)
+
+- **craft-norms.json** holds measurements only (font sizes and weights, corner sizes, counts of boxes, shadows and sections, what the hero shows) of the public home pages of 117 well-designed websites, taken in a desktop browser in October 2026. No code, text, images or colours from those sites are stored. Only the site addresses are kept, as examples.
+- **Photos** for new sites come from Pexels when `PEXELS_API_KEY` is set. The Pexels License allows free use and asks for a credit to the photographer and a link to Pexels, which Kairoq adds and checks. Otherwise they come from Openverse, restricted to CC0 or CC BY with commercial use allowed. CC BY photos get a credit line, which Kairoq checks. The licence and credit of every photo are saved with the project.
+- **@phosphor-icons/react** 2.1 (MIT) is available to generated apps as a second icon set, next to lucide-react.
+
 ## html-anything: page-type design skills
 
 The design skills marked "Page types" in `design-skills/` (printable invoice, pricing page, email newsletter, event flyer, social carousel, pitch deck and the others) were adapted from the skill templates in html-anything by nexu-io, https://github.com/nexu-io/html-anything, licensed under the Apache License 2.0 (full text in `licenses/html-anything-LICENSE.txt`). Kairoq rewrote them in English for React and Tailwind apps and expanded their content; the templates html-anything marks as adapted from other projects were not used.
