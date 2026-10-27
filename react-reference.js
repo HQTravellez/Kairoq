@@ -430,7 +430,11 @@ function normalizePlan(v){
   out_of_scope:list(v.out_of_scope,8,o=>o&&cleanText(o.what,120)&&{what:cleanText(o.what,120),why:cleanText(o.why,240)})
  };
  if(!plan.features.length)throw fail(422,'The plan has no features');
- try{plan.design=require('./react-design').normalize(v.design||{})}catch{plan.design=null}
+ // The reference's fonts: a library font is used as it is; a paid one (Söhne, Canela…) becomes the
+ // closest free font from the library (font-library.js).
+ const lib=require('./font-library'),fd=(v.design&&v.design.fonts)||{};
+ const fonts=v.design&&v.design.fonts?{...fd,display:lib.closest(fd.display,/serif|canela|tiempos|garamond|caslon|bodoni|didot/i.test(String(fd.display))?'serif':'display'),body:lib.closest(fd.body,'sans'),...(fd.mono?{mono:lib.closest(fd.mono,'mono')}:{})}:undefined;
+ try{plan.design=require('./react-design').normalize({...(v.design||{}),...(fonts?{fonts}:{})})}catch{plan.design=null}
  return plan;
 }
 function parsePlan(content){

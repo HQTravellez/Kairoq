@@ -57,7 +57,8 @@ test('new projects start with the UI kit and design tokens, the model sees the k
  assert.ok(Object.keys(files).filter(f=>f.startsWith('src/components/ui/')).length>=15);
  assert.deepEqual(builder.validateFiles(files),[]);
  assert.ok(design.hasTokens(files)&&design.isUntouchedStarter(files));
- assert.match(files['src/index.css'],/^@import url\('https:\/\/fonts\.googleapis\.com\/css2\?family=Inter:wght@400;500;600;700&display=swap'\);/);
+ // The starter's font comes from the font library, bundled into the build (font-library.js).
+ assert.match(files['src/index.css'],/^\/\* Fonts: SIL Open Font License 1\.1[^\n]*\n@import '@fontsource-variable\/inter';/);
  const ctx=builder.contextFiles(files);
  assert.match(ctx,/UI kit \(unchanged starter files[\s\S]*button\.jsx: Button \{variant: default\|secondary/);
  assert.ok(!ctx.includes('buttonVariants = cva('),'kit code is summarised, not sent');
@@ -83,8 +84,8 @@ test('tokens are readable: foregrounds are chosen for contrast and briefs are va
  assert.deepEqual([n.fonts.display,n.fonts.body,n.radius,n.skill],['Inter','DM Sans','0.75rem','']);
  // Re-applying replaces the token block and the font import instead of stacking them.
  const css=design.applyToCss(design.applyToCss(design.starterFiles('x')['src/index.css'],BRIEF),{...BRIEF,fonts:{display:'Fraunces',body:'Inter'}});
- assert.equal(css.match(/kairoq:tokens:end/g).length,1);assert.equal(css.match(/kairoq:fonts/g).length,1);
- assert.match(css,/family=Fraunces:wght@400;500;600;700&family=Inter/);
+ assert.equal(css.match(/kairoq:tokens:end/g).length,1);assert.equal(css.match(/kairoq:fonts/g).length,3,'the licence line and one import per font, not stacked');assert.equal(css.match(/fraunces/g).length,1);
+ assert.match(css,/@import '@fontsource-variable\/fraunces';[^\n]*\n@import '@fontsource-variable\/inter';/);
 });
 
 test('the first build gets a design brief and a matching skill; later builds follow it',async()=>{

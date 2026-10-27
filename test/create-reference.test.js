@@ -129,7 +129,7 @@ test('the plan is normalized and becomes an original-work build task',()=>{
  assert.deepEqual(plan.entities.map(e=>e.name),['bookings']);
  assert.deepEqual(plan.auth.methods,['email'],'unsupported sign-in methods are dropped');
  assert.equal(plan.api[0].method,'POST');
- assert.equal(plan.design.name,'Harbour Calm');assert.equal(plan.design.fonts.display,'Playfair Display');
+ assert.equal(plan.design.name,'Harbour Calm');assert.equal(plan.design.fonts.display,'Gloock','the reference\'s font becomes its free library match (font-library.js)');
  assert.throws(()=>ref.normalizePlan({features:[]}),/no features/);
  plan.features[0].enabled=false;
  const t=ref.buildTask(plan,{kind:'repo',license:{use:'copyleft'}});
@@ -287,7 +287,7 @@ test('analyze → plan → build → journeys on desktop and phone → design ch
  assert.deepEqual(r.problems,[]);
  const after=builder.loadMeta(id);
  assert.equal(after.design.name,'Harbour Calm','the plan\'s design is the project design');
- assert.ok(builder.loadFiles(id,after.current_version)['src/index.css'].includes('Playfair Display'));
+ assert.ok(builder.loadFiles(id,after.current_version)['src/index.css'].includes('Gloock'));
  assert.equal(checks.list(after)[0].source,'reference');
  assert.ok(after.reference.built_at);
  assert.equal(after.published.version,after.current_version);

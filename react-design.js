@@ -81,8 +81,11 @@ const FONTS={
 // More families from the business presets (design-presets.json, from ui-ux-pro-max-skill, MIT),
 // with the weights each really has. The list above wins where both name a family.
 for(const [name,[kind,weights]] of Object.entries(require('./design-presets.json').families||{}))if(!FONTS[name]&&/^(sans|serif|display|mono)$/.test(kind)&&/^\d{3}(;\d{3})*$/.test(weights))FONTS[name]=[kind,weights];
+// The font library (font-library.js): bundled into the build, named by its CSS family.
+const FONTLIB=require('./font-library');
+for(const [name,f] of Object.entries(FONTLIB.LIBRARY))if(!FONTS[name])FONTS[name]=[f.kind==='kids'?'sans':f.kind,'400;500;600;700'];
 const FALLBACK={sans:'ui-sans-serif, system-ui, sans-serif',display:'ui-sans-serif, system-ui, sans-serif',serif:'ui-serif, Georgia, serif',mono:'ui-monospace, monospace'};
-function fontStack(name){const f=FONTS[name];return"'"+name+"', "+FALLBACK[f?f[0]:'sans']}
+function fontStack(name){const f=FONTS[name],lib=FONTLIB.family(name);return(lib?"'"+lib+"', ":'')+"'"+name+"', "+FALLBACK[f?f[0]:'sans']}
 function fontUrl(names){
  const list=[...new Set(names.filter(n=>FONTS[n]))];
  if(!list.length)return null;
@@ -143,7 +146,13 @@ function tokens(design={}){
 const START='/* kairoq:tokens:start (design tokens; edit colours here, not in components) */',END='/* kairoq:tokens:end */';
 const FONT_MARK='/* kairoq:fonts */';
 function tokensBlock(design){return START+'\n@layer base {\n  :root {\n'+Object.entries(tokens(design)).map(([k,v])=>'    '+k+': '+v+';').join('\n')+'\n  }\n}\n'+END}
-function fontLine(design){const url=fontUrl([design.fonts?.display||'Inter',design.fonts?.body||'Inter',...(FONTS[design.fonts?.mono]?[design.fonts.mono]:[])]);return url?"@import url('"+url+"'); "+FONT_MARK:''}
+function fontLine(design){
+ // Library fonts are bundled (one import per font); other fonts (older projects) load from Google.
+ const names=[design.fonts?.display||'Inter',design.fonts?.body||'Inter',...(FONTS[design.fonts?.mono]?[design.fonts.mono]:[])];
+ if(names.every(FONTLIB.has))return['/* Fonts: SIL Open Font License 1.1 (free for commercial use), bundled from Fontsource */ '+FONT_MARK,...FONTLIB.imports(names).map(l=>l+' '+FONT_MARK)].join('\n');
+ return googleFontLine(design);
+}
+function googleFontLine(design){const url=fontUrl([design.fonts?.display||'Inter',design.fonts?.body||'Inter',...(FONTS[design.fonts?.mono]?[design.fonts.mono]:[])]);return url?"@import url('"+url+"'); "+FONT_MARK:''}
 const BASE_CSS=`@tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -301,10 +310,9 @@ function designNote(design){
 const BRIEF_PROMPT=`You are the art director of an app builder like Lovable. Before any code is written, decide the visual direction for the app the user describes. Be specific and bold: pick a direction that suits the audience and brand (for example warm Mediterranean editorial for a boutique hotel, crisp dark technical for a developer tool, soft playful pastels for a kids' app), not a generic blue SaaS look.
 Respond with ONLY a JSON object, no markdown:
 {"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty","playbook":"the page playbook's business type if one is given below and it fits, or empty","hero3d":{"recipe":"a 3D hero recipe from the list below, or none","object":"an object from the list, when the recipe takes one","mood":"studio, sunset or neon"}}
-Rules: background and foreground must have strong contrast; primary must stand out on the background; secondary is a quiet surface colour; muted is a subtle background tint; accent is a second highlight. radius is between 0rem and 1.5rem. Choose fonts only from this list: FONTS.`;
+Rules: background and foreground must have strong contrast; primary must stand out on the background; secondary is a quiet surface colour; muted is a subtle background tint; accent is a second highlight. radius is between 0rem and 1.5rem. FONTS`;
 function briefPrompt(skills){
- const list=Object.keys(FONTS).filter(n=>FONTS[n][0]!=='mono').map(n=>n+' ('+FONTS[n][0]+')').join(', ');
- return BRIEF_PROMPT.replace('FONTS',list)+(skills&&skills.length?'\nDesign skills (pick at most one that fits, or ""):\n'+skills.map(s=>'- '+s.id+': '+s.description).join('\n'):'\nThere are no design skills to choose from; set "skill" to "".');
+ return BRIEF_PROMPT.replace('FONTS','\n'+FONTLIB.note())+(skills&&skills.length?'\nDesign skills (pick at most one that fits, or ""):\n'+skills.map(s=>'- '+s.id+': '+s.description).join('\n'):'\nThere are no design skills to choose from; set "skill" to "".');
 }
 function cleanText(v,n){return String(v||'').replace(/[\u0000-\u001f]+/g,' ').trim().slice(0,n)}
 function parseBrief(content){
@@ -352,7 +360,11 @@ async function createBrief(request,{callModel,tier,signal,skills=[],projectName=
  // A style the owner named is always used; otherwise only one of those offered.
  if(named.length&&!named.some(s=>s.id===brief.style))brief.style=named[0].id;
  else if(brief.style&&!styleOptions.some(s=>s.id===brief.style))delete brief.style;
- const held=moods.enforce(brief,mood,{avoidFonts,fonts:Object.keys(FONTS)});
+ const held=moods.enforce(brief,mood,{avoidFonts,fonts:Object.keys(FONTLIB.LIBRARY)});
+ // New sites use only the font library: any other font becomes the closest library font.
+ const kindOf=n=>(FONTS[n]||['sans'])[0];
+ held.fonts={...held.fonts,display:FONTLIB.closest(held.fonts.display,kindOf(held.fonts.display)),body:FONTLIB.closest(held.fonts.body,kindOf(held.fonts.body))};
+ if(held.fonts.mono)held.fonts.mono=FONTLIB.closest(held.fonts.mono,'mono');
  if(signature)held.signature=held.hero3d&&held.hero3d.recipe!=='none'?'object-3d':signature;
  return{...held,created_at:new Date().toISOString()};
 }
