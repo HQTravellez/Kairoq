@@ -904,6 +904,13 @@ li.failed .retry:hover{border-color:#15140f}
 .api-check-mark{width:14px;font-weight:700}
 .api-check-item.ok .api-check-mark{color:#1d6b3a}.api-check-item.fail .api-check-mark{color:#a12525}.api-check-item.sample .api-check-mark,.api-check-item.input .api-check-mark{color:#8a5a00}
 .api-check-why{flex-basis:100%;padding-left:22px;color:var(--muted)}
+.api-rules{margin-top:10px;border-top:1px solid var(--border);padding-top:8px}
+.api-rules-title{font-size:12px;font-weight:600;margin:0 0 4px}
+.api-rule-list,.api-check-results{list-style:none;margin:0 0 6px;padding:0;font-size:12.5px}
+.apis-list .api-rule-list>li,.apis-list .api-check-results>li{border:0;border-radius:0;padding:3px 0;background:none;box-shadow:none;display:flex;gap:8px;align-items:baseline}
+.api-rule-add{gap:6px;flex-wrap:wrap}.api-rule-add select,.api-rule-add input{font-size:12.5px;max-width:200px}
+.api-test{margin:6px 0;font-size:12.5px}.api-test>summary{cursor:pointer;color:var(--muted)}.api-test .row{gap:6px;flex-wrap:wrap;margin-top:6px}.api-test input{min-width:200px;flex:1}
+.api-check-results .api-check-mark{width:14px;font-weight:700}.api-check-results .ok .api-check-mark{color:#1d6b3a}.api-check-results .fail .api-check-mark{color:#a12525}
 .api-log-row{cursor:pointer}.api-log-row:hover{background:var(--hover)}
 @media (max-width:600px){.api-summary,.api-check-why{padding-left:0}}
 

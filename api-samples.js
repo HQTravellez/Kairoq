@@ -33,8 +33,11 @@ function cleanBase(u){
 
 // ---------- adding and listing ----------
 // spec: the OpenAPI / Swagger JSON (text or object). baseUrl: needed when the spec has none.
-function add(id,{spec,secret,baseUrl,source=null,drafted=false}){
+function add(id,{spec,secret,baseUrl,source=null,drafted=false,rules=null}){
  const all=apis(id);
+ // A Hoppscotch collection: read through the Postman importer; its tests become answer checks.
+ let fromTests=null;
+ {let v=spec;if(typeof v==='string'){try{v=JSON.parse(specText(v))}catch{v=null}}const imp=require('./api-import');if(imp.isHoppscotch(v)||(Array.isArray(v)&&v.length&&imp.isHoppscotch(v[0]))){const h=imp.hoppscotchToPostman(v);spec=h.collection;fromTests=h.checks}}
  if(all.length>=MAX_APIS)throw fail(409,'An app can use at most '+MAX_APIS+' outside APIs. Remove one first.');
  const key=String(secret||'').trim().toUpperCase();
  if(key&&!SECRET.test(key))throw fail(400,'Name the key like HOTELBEDS_KEY: capital letters, digits and _');
@@ -43,9 +46,29 @@ function add(id,{spec,secret,baseUrl,source=null,drafted=false}){
  const api={slug:slugOf(plan.title,all.map(a=>a.slug)),title:plan.title,version:plan.version,baseUrl:base,secret:key||null,auth:plan.auth,
   operations:plan.operations.slice(0,300).map(o=>({id:o.id,method:o.method,path:o.path,summary:o.summary,requiredParameters:o.requiredParameters,bodyFields:o.bodyFields,successCodes:o.successCodes,parameters:(o.parameters||[]).slice(0,40),requestSchema:o.requestSchema&&JSON.stringify(o.requestSchema).length<=20000?o.requestSchema:undefined,responseSchemas:o.responseSchemas,...(o.responseExamples&&Object.keys(o.responseExamples).length?{responseExamples:o.responseExamples}:{})})),
   source:source?String(source).slice(0,300):null,drafted:Boolean(drafted),added_at:new Date().toISOString()};
+ // Answer checks from imported tests, matched to the endpoints by request name.
+ const R=require('./api-rules'),byName={...(fromTests||{}),...(rules||{})};
+ for(const [name,list] of Object.entries(byName)){const op=api.operations.find(o=>o.id===name||o.summary===name||o.id===String(name).replace(/[^a-z0-9_.-]/gi,'_'));if(op){api.rules=api.rules||{};api.rules[op.id]=R.cleanAll(list)}}
  if(all.some(a=>a.baseUrl===api.baseUrl))throw fail(409,'This app already has an API at '+api.baseUrl+'. Remove it first to replace it.');
  writeJson(file(id,'apis.json'),[...all,api]);
  return view(id,api);
+}
+// Answer checks for one endpoint (api-rules.js).
+function setRules(id,slug,opId,rules){
+ const all=apis(id),api=all.find(a=>a.slug===slug);if(!api)throw fail(404,'That API is not added to this app.');
+ if(!api.operations.some(o=>o.id===opId))throw fail(404,'That endpoint is not part of '+api.title+'.');
+ const list=require('./api-rules').cleanAll(rules);api.rules={...(api.rules||{})};if(list.length)api.rules[opId]=list;else delete api.rules[opId];
+ writeJson(file(id,'apis.json'),all);return api.rules[opId]||[];
+}
+// A test address (and its own key) next to the live one; "use" switches what Try and Check all call.
+// The app itself always calls the live address.
+function setTest(id,slug,{baseUrl,secret,use}){
+ const all=apis(id),api=all.find(a=>a.slug===slug);if(!api)throw fail(404,'That API is not added to this app.');
+ if(baseUrl===null||baseUrl===''){delete api.test;writeJson(file(id,'apis.json'),all);return null}
+ const key=String(secret||'').trim().toUpperCase();
+ if(key&&!SECRET.test(key))throw fail(400,'Name the key like AMADEUS_TEST_KEY: capital letters, digits and _');
+ api.test={baseUrl:cleanBase(baseUrl||(api.test&&api.test.baseUrl)),secret:key||(api.test&&api.test.secret)||null,use:use===undefined?Boolean(api.test&&api.test.use):Boolean(use)};
+ writeJson(file(id,'apis.json'),all);return api.test;
 }
 function remove(id,slug){
  const all=apis(id);
@@ -53,7 +76,7 @@ function remove(id,slug){
  writeJson(file(id,'apis.json'),all.filter(a=>a.slug!==String(slug)));
  return list(id);
 }
-function view(id,a){return{slug:a.slug,title:a.title,version:a.version||'',base_url:a.baseUrl,secret:a.secret,key_added:a.secret?hasKey(id,a.secret):false,operations:a.operations.length,source:a.source||null,drafted:Boolean(a.drafted),added_at:a.added_at}}
+function view(id,a){return{...(a.test?{test:{base_url:a.test.baseUrl,secret:a.test.secret,use:a.test.use,key_added:a.test.secret?hasKey(id,a.test.secret):false}}:{}),slug:a.slug,title:a.title,version:a.version||'',base_url:a.baseUrl,secret:a.secret,key_added:a.secret?hasKey(id,a.secret):false,operations:a.operations.length,source:a.source||null,drafted:Boolean(a.drafted),added_at:a.added_at}}
 function list(id){return apis(id).map(a=>view(id,a))}
 
 // ---------- adding by name ----------
@@ -82,6 +105,11 @@ async function addByName(id,{name,secret,webSearch,callModel,fetchUrl=require('.
  if(text.length<2)throw fail(400,'Type the service\'s name or website, for example Hotelbeds');
  if(apis(id).length>=MAX_APIS)throw fail(409,'An app can use at most '+MAX_APIS+' outside APIs. Remove one first.');
  const asUrl=/^https?:\/\//i.test(text)?text:/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(text)?'https://'+text:null;
+ // A GraphQL address: one query endpoint, tried with a JSON body {query, variables}.
+ if(asUrl&&/\/graphql\/?$/i.test(new URL(asUrl).pathname)){
+  const u=new URL(asUrl),path=u.pathname.replace(/\/+$/,'');
+  return add(id,{spec:{openapi:'3.0.3',info:{title:u.hostname.replace(/^www\.|^api\./,'')+' GraphQL',version:''},servers:[{url:u.origin}],paths:{[path]:{post:{operationId:'graphql_query',summary:'GraphQL query',requestBody:{content:{'application/json':{schema:{type:'object',properties:{query:{type:'string',example:'{ __typename }'},variables:{type:'object',example:{}}}}}}},responses:{200:{description:'The data, or errors'}}}}}},secret,source:asUrl});
+ }
  const tried=new Set(),failures=[];
  const get=async url=>{url=rawUrl(url);if(tried.has(url)||tried.size>=10)return null;tried.add(url);try{const r=await fetchUrl({url,method:'GET',headers:{Accept:'application/json, application/yaml, text/yaml, text/html'}});return r.status>=200&&r.status<300?{url,body:String(r.body||'')}:null}catch{return null}};
  const trySpec=async url=>{const r=await get(url);if(!r)return null;try{const t=specText(r.body);require('./api-learning').learn(t);return{url:r.url,spec:t}}catch(e){failures.push(e.message);return null}};
@@ -298,4 +326,4 @@ function modeOf(meta,req,sb){
 }
 // For the publish screen: added APIs whose key is still missing.
 function missingKeys(id){return apis(id).filter(a=>a.secret&&!hasKey(id,a.secret)).map(a=>({title:a.title,secret:a.secret}))}
-module.exports={secretKey,hasKey,apis,logCall,safeUrl,addByName,suggestions,keyName,specText,add,remove,list,log,promptNote,fetchFor,modeOf,missingKeys,sampleAnswer,findApi,findOperation,sampleOf};
+module.exports={setRules,setTest,secretKey,hasKey,apis,logCall,safeUrl,addByName,suggestions,keyName,specText,add,remove,list,log,promptNote,fetchFor,modeOf,missingKeys,sampleAnswer,findApi,findOperation,sampleOf};

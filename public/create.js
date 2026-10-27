@@ -2079,6 +2079,16 @@ function apiTryout(id,a,editor){
  const checkBtn=el('button','ghost','Check all');checkBtn.type='button';checkBtn.disabled=!editor;checkBtn.title='Calls every read-only endpoint once and shows which work';
  const filter=el('input','api-filter');filter.placeholder='Find an endpoint';filter.setAttribute('aria-label','Find an endpoint');
  bar.append(filter,checkBtn);wrap.append(bar);
+ // A test address next to the live one (Try and Check all only; the app keeps calling the live one).
+ if(editor){
+  const test=el('details','api-test'),ts=el('summary','',a.test&&a.test.use?'Using the test address':'Test address');test.append(ts);
+  const row=el('div','row'),base=el('input'),key=el('input'),use=el('label','api-sample-toggle'),useBox=el('input'),save=el('button','ghost','Save'),note=el('p','muted small');
+  base.placeholder='https://test.api.example.com/v2';base.value=(a.test&&a.test.base_url)||'';key.placeholder='Test key name, e.g. AMADEUS_TEST_KEY';key.value=(a.test&&a.test.secret)||'';useBox.type='checkbox';useBox.checked=Boolean(a.test&&a.test.use);use.append(useBox,document.createTextNode(' Use it for Try and Check all'));save.type='button';
+  save.onclick=async()=>{try{await api('/projects/'+id+'/apitest',{method:'POST',body:{slug:a.slug,base_url:base.value.trim()||null,secret:key.value.trim(),use:useBox.checked}});text(note,'Saved. Your app keeps calling the live address.');renderApis().catch(()=>{})}catch(err){text(note,err.message)}};
+  row.append(base,key,use,save);test.append(row,note);
+  if(a.test&&a.test.secret&&!a.test.key_added&&(state.project.role||'owner')==='owner'){const k=el('button','link-btn','Add the test key');k.type='button';k.onclick=()=>openKey({...a,secret:a.test.secret,key_added:false,title:a.title+' (test)'});test.append(k)}
+  wrap.append(test);
+ }
  const checkOut=el('div','api-check hidden');wrap.append(checkOut);
  const ul=el('ul','api-endpoints');wrap.append(ul);
  const rows=[];
@@ -2087,27 +2097,55 @@ function apiTryout(id,a,editor){
   head.append(el('span','api-method m-'+e.method.toLowerCase(),e.method),el('code','api-path',e.path),el('span','muted small api-summary',e.summary));
   const panel=el('div','api-endpoint-panel hidden');
   head.onclick=()=>{panel.classList.toggle('hidden');if(!panel.dataset.ready){panel.dataset.ready='1';fillPanel(panel,e)}};
-  li.append(head,panel);ul.append(li);rows.push({li,e,open:()=>{panel.classList.remove('hidden');if(!panel.dataset.ready){panel.dataset.ready='1';fillPanel(panel,e)}}});
+  const open=preset=>{wrap.open=true;panel.classList.remove('hidden');if(preset&&panel.dataset.ready){panel.replaceChildren();delete panel.dataset.ready}if(!panel.dataset.ready){panel.dataset.ready='1';fillPanel(panel,e,preset)}li.scrollIntoView({block:'nearest'})};
+  li.append(head,panel);ul.append(li);rows.push({li,e,open});
+  // A pasted cURL command opens the matching endpoint with its inputs filled in.
+  (window.__apiOpen=window.__apiOpen||{})[a.slug+'|'+e.id]=open;
  }
  filter.oninput=()=>{const q=filter.value.trim().toLowerCase();for(const r of rows)r.li.classList.toggle('hidden',Boolean(q)&&!(r.e.method+' '+r.e.path+' '+r.e.summary).toLowerCase().includes(q))};
- function fillPanel(panel,e){
+ function fillPanel(panel,e,preset){
   const inputs={};
   if(e.params.length){
    const grid=el('div','api-params');
    for(const p of e.params){
     const lab=el('label','api-param');lab.append(el('span','',p.name+(p.required?' *':'')+' ('+(p.in==='path'?'in the address':p.in==='header'?'header':'query')+')'));
-    let inp;if(p.options){inp=el('select');for(const o of ['',...p.options]){const op=el('option','',o||'(none)');op.value=o;inp.append(op)}inp.value=p.value}else{inp=el('input');inp.value=p.value;inp.spellcheck=false}
+    const start=preset&&preset.values&&preset.values[p.name]!==undefined?String(preset.values[p.name]):p.value;
+    let inp;if(p.options){inp=el('select');for(const o of ['',...p.options]){const op=el('option','',o||'(none)');op.value=o;inp.append(op)}inp.value=start}else{inp=el('input');inp.value=start;inp.spellcheck=false}
     if(p.description)lab.title=p.description;
     lab.append(inp);grid.append(lab);inputs[p.name]=inp;
    }
    panel.append(grid);
   }else panel.append(el('p','muted small','No inputs needed.'));
   let bodyBox=null;
-  if(!e.read_only){const lab=el('label','api-param api-body');lab.append(el('span','','Request body (JSON)'));bodyBox=el('textarea');bodyBox.rows=6;bodyBox.spellcheck=false;bodyBox.value=e.body||'';lab.append(bodyBox);panel.append(lab)}
+  if(!e.read_only){const lab=el('label','api-param api-body');lab.append(el('span','','Request body (JSON)'));bodyBox=el('textarea');bodyBox.rows=6;bodyBox.spellcheck=false;bodyBox.value=(preset&&preset.body)||e.body||'';lab.append(bodyBox);panel.append(lab)}
   const actions=el('div','row'),sendBtn=el('button','primary','Send');sendBtn.type='button';sendBtn.disabled=!editor;
   const sampleLab=el('label','api-sample-toggle'),sampleBox=el('input');sampleBox.type='checkbox';sampleLab.append(sampleBox,document.createTextNode(' Sample answer'));
-  if(a.secret&&!a.key_added){sampleBox.checked=true;sampleBox.disabled=true;sampleLab.title='Add the '+a.secret+' key for real answers'}
+  const keyName=a.test&&a.test.use?a.test.secret:a.secret,keyIn=a.test&&a.test.use?a.test.key_added:a.key_added;
+  if(keyName&&!keyIn){sampleBox.checked=true;sampleBox.disabled=true;sampleLab.title='Add the '+keyName+' key for real answers'}
   actions.append(sendBtn,sampleLab);panel.append(actions);
+  // Checks on the answer (api-rules.js), like Hoppscotch tests: saved per endpoint.
+  let rules=(e.rules||[]).slice();
+  const checks=el('div','api-rules'),ruleList=el('ul','api-rule-list');
+  checks.append(el('p','api-rules-title','Checks on the answer'),ruleList);
+  const label=r=>r.kind==='status'?'Status is '+String(r.value).toUpperCase():r.kind==='time'?'Answers within '+(r.value>=1000?r.value/1000+' s':r.value+' ms'):(r.kind==='header'?'Header '+r.name:r.path)+({exists:' exists',missing:' is not there',eq:' is '+r.value,neq:' is not '+r.value,contains:' contains '+r.value,gt:' is more than '+r.value,lt:' is less than '+r.value,type:' is a '+r.value,length:' has '+r.value+' items'})[r.op||'exists'];
+  const save=async next=>{try{rules=(await api('/projects/'+id+'/apirules',{method:'POST',body:{slug:a.slug,op:e.id,rules:next}})).rules;e.rules=rules;drawRules()}catch(err){text(ruleNote,err.message)}};
+  const ruleNote=el('p','muted small');
+  function drawRules(){
+   ruleList.replaceChildren();
+   if(!rules.length)ruleList.append(el('li','muted small','None yet: a success status counts as passing.'));
+   rules.forEach((r,i)=>{const li=el('li','api-rule');li.append(el('span','',label(r)));if(editor){const x=el('button','link-btn','Remove');x.type='button';x.onclick=()=>save(rules.filter((_,k)=>k!==i));li.append(x)}ruleList.append(li)});
+  }
+  drawRules();
+  if(editor){
+   const add=el('div','row api-rule-add'),kind=el('select'),path=el('input'),val=el('input'),addBtn=el('button','ghost','Add check'),sug=el('button','link-btn','Suggest checks');
+   for(const [v,t] of [['status','Status is'],['time','Answers within (ms)'],['exists','Field exists'],['eq','Field is'],['contains','Field contains'],['gt','Field is more than'],['header','Header exists']]){const o=el('option','',t);o.value=v;kind.append(o)}
+   path.placeholder='Field, e.g. data[0].price';val.placeholder='Value';path.spellcheck=val.spellcheck=false;addBtn.type=sug.type='button';
+   const shape=()=>{const k=kind.value;path.classList.toggle('hidden',k==='status'||k==='time');path.placeholder=k==='header'?'Header name':'Field, e.g. data[0].price';val.classList.toggle('hidden',k==='exists'||k==='header');val.placeholder=k==='status'?'200 or 2xx':k==='time'?'2000':'Value'};kind.onchange=shape;shape();
+   addBtn.onclick=()=>{const k=kind.value,r=k==='status'?{kind:'status',value:val.value||'2xx'}:k==='time'?{kind:'time',value:Number(val.value)||2000}:k==='header'?{kind:'header',name:path.value,op:'exists'}:{kind:'field',path:path.value,op:k,...(k==='exists'?{}:{value:val.value})};save([...rules,r]);path.value='';val.value=''};
+   sug.onclick=()=>save([...rules,...(e.suggested||[]).filter(s=>!rules.some(r=>JSON.stringify(r)===JSON.stringify(s)))]);
+   add.append(kind,path,val,addBtn,sug);checks.append(add,ruleNote);
+  }
+  panel.append(checks);
   const out=el('div','api-reply hidden');panel.append(out);
   const go=async confirm=>{
    sendBtn.disabled=true;sendBtn.textContent='Sending…';
@@ -2124,9 +2162,10 @@ function apiTryout(id,a,editor){
  function showReply(out,r){
   out.classList.remove('hidden');out.replaceChildren();
   const head=el('div','api-reply-head');
-  head.append(el('span','api-status '+(r.ok?'ok':'bad'),String(r.status)),el('span','api-key '+(r.sample?'sample':'real'),r.sample?'Sample':'Real'),el('span','muted small',r.ms+' ms · '+(r.size>=1024?Math.round(r.size/1024)+' KB':r.size+' bytes')));
+  head.append(el('span','api-status '+(r.status>=200&&r.status<300?'ok':'bad'),String(r.status)),el('span','api-key '+(r.sample?'sample':'real'),r.sample?'Sample':'Real'),el('span','muted small',r.ms+' ms · '+(r.size>=1024?Math.round(r.size/1024)+' KB':r.size+' bytes')));
   const copy=el('button','link-btn','Copy');copy.type='button';copy.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(r.body);head.append(copy);
   out.append(head,el('p','muted small api-reply-url',r.method+' '+r.url),el('p','small',r.why+(r.reason?' '+r.reason:'')));
+  if(r.checks&&r.checks.length){const ul=el('ul','api-check-results');for(const c of r.checks){const li=el('li','api-check-item '+(c.pass?'ok':'fail'));li.append(el('span','api-check-mark',c.pass?'✓':'✕'),el('span','',c.label),el('span','muted small',' got '+c.actual));ul.append(li)}out.append(ul)}
   out.append(el('pre','api-reply-body',r.body||'(empty answer)'));
  }
  checkBtn.onclick=async()=>{
@@ -2171,6 +2210,24 @@ async function addApi(body){
  }catch(err){text($('api-status'),err.message)}
  finally{for(const b of ['api-add','api-add-spec'])$(b).disabled=false}
 }
+// A pasted cURL command: opens the matching endpoint with its inputs filled, or offers to add it.
+async function openCurl(add){
+ const curl=$('api-curl').value.trim(),st=$('api-curl-status');if(!curl)return;
+ text(st,'Reading the command…');
+ try{
+  const r=await api('/projects/'+state.project.id+'/apicurl',{method:'POST',body:{curl,add}});
+  if(r.match){
+   if(r.added)await renderApis();
+   const open=window.__apiOpen&&window.__apiOpen[r.match.slug+'|'+r.match.op];
+   text(st,(r.added?'Added '+r.added.title+'. ':'')+'Opened '+r.method+' '+r.url.split('?')[0]+' below. '+r.note);
+   if(open)open({values:r.match.values,body:r.match.body});
+  }else{
+   st.replaceChildren(el('span','',r.method+' '+r.url.split('?')[0]+' is not part of an API added here. '+r.note+' '));
+   const b=el('button','link-btn','Add it as an API');b.type='button';b.onclick=()=>openCurl(true);st.append(b);
+  }
+ }catch(err){text(st,err.message)}
+}
+$('api-curl-go').onclick=()=>openCurl(false);
 $('api-add').onclick=()=>{const n=$('api-name').value.trim();if(n)addApi({name:n})};
 $('api-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('api-add').click()}};
 $('api-add-spec').onclick=()=>addApi({spec_url:$('api-spec-url').value.trim()||undefined,spec:$('api-spec').value.trim()||undefined,secret:$('api-secret').value.trim(),base_url:$('api-base').value.trim()||undefined});
