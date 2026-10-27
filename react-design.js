@@ -294,6 +294,12 @@ function designNote(design){
  lines.push('Palette: '+Object.entries(design.palette).map(([k,v])=>k+' '+v).join(', ')+'. Fonts: '+(design.fonts?.display||'Inter')+' for headings (font-display), '+(design.fonts?.body||'Inter')+' for text (font-sans)'+(design.fonts?.mono?', '+design.fonts.mono+' for code (font-mono; it joins -> and => into one shape)':'')+'. Corner radius '+(design.radius||'0.75rem')+'.');
  if(design.layout)lines.push('Layout: '+design.layout);
  if(design.imagery)lines.push('Imagery: '+design.imagery);
+ if(design.norms)lines.push(require('./craft-norms').note(design.norms));
+ if(Array.isArray(design.photo_files)&&design.photo_files.length){
+  lines.push('Real photos for this site are ready (found and licensed by Kairoq): '+design.photo_files.map(p=>p.path+' ('+p.query+')').join(', ')+'. Use them first: the hero and the main sections. Use other photos only where these do not fit.');
+  const credit=require('./photo-finder').creditLine(design.photo_files);if(credit)lines.push(credit);
+ }
+ if(design.art&&ART[design.art])lines.push('Artwork: if you generate images, make every one in this hand-made style: '+ART[design.art]+'. Never glossy 3D renders, purple or neon gradients, lens flares or text inside images.');
  if(Array.isArray(design.details)&&design.details.length)lines.push('Details:\n'+design.details.map(d=>'- '+d).join('\n'));
  if(design.notes)lines.push('Owner notes: '+design.notes);
  if(design.idea)lines.push('The idea: '+design.idea);
@@ -306,10 +312,23 @@ function designNote(design){
  return lines.join('\n');
 }
 
+// Hand-made art styles for generated images, where real photos do not fit (software, finance,
+// agencies). One style per site, so the images read as one brand, never as "AI art".
+const ART={
+ 'risograph':'risograph print: two or three flat ink colours from the palette, visible grain and slight misregistration, simple shapes',
+ 'paper-cut':'paper cut-out collage: layered coloured paper with soft real shadows, slightly uneven edges, photographed from above',
+ 'linocut':'linocut or engraving: bold black lines and hatching on off-white paper, one accent ink colour',
+ 'gouache':'gouache painting: matte, opaque brush strokes, a limited palette, visible paper texture',
+ 'clay':'hand-made clay models: matte plasticine with fingerprints and imperfect edges, soft studio light, plain background',
+ 'line':'single-weight technical line drawing in the text colour on the background colour, isometric or flat, generous white space',
+ 'still-life':'analogue photograph of a still life: real objects on a plain surface, natural window light, film grain',
+};
+const ART_FOR={saas:['line','risograph','clay'],finance:['line','paper-cut','still-life'],agency:['risograph','linocut','gouache'],consumer:['still-life','clay','paper-cut'],kids:['paper-cut','gouache','clay']};
+
 // ---------- the design brief ----------
 const BRIEF_PROMPT=`You are the art director of an app builder like Lovable. Before any code is written, decide the visual direction for the app the user describes. Be specific and bold: pick a direction that suits the audience and brand (for example warm Mediterranean editorial for a boutique hotel, crisp dark technical for a developer tool, soft playful pastels for a kids' app), not a generic blue SaaS look.
 Respond with ONLY a JSON object, no markdown:
-{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty","playbook":"the page playbook's business type if one is given below and it fits, or empty","hero3d":{"recipe":"a 3D hero recipe from the list below, or none","object":"an object from the list, when the recipe takes one","mood":"studio, sunset or neon"}}
+{"name":"2-4 word style name","summary":"two or three sentences describing the look and feel","palette":{"background":"#hex","foreground":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","muted":"#hex"},"fonts":{"display":"heading font","body":"text font"},"radius":"0.75rem","layout":"one or two sentences: page structure, hero treatment, grid, navigation","imagery":"what photos or illustrations to use and how to frame them","photos":["2 or 3 search terms for REAL photos of this business: concrete subjects a photographer would shoot (for example \"barista pouring latte art\", \"finished modern kitchen renovation\"); [] when real photos do not fit (software, abstract services)"],"details":["5 to 8 short, concrete design rules for this app (buttons, cards, sections, motion, icon style)"],"direction":"id of the dealt direction you chose, or empty","style":"id of a ready style system below, or empty","idea":"one sentence: what only this business has, carried by that direction","skill":"id of the best matching design skill below, or empty","playbook":"the page playbook's business type if one is given below and it fits, or empty","hero3d":{"recipe":"a 3D hero recipe from the list below, or none","object":"an object from the list, when the recipe takes one","mood":"studio, sunset or neon"}}
 Rules: background and foreground must have strong contrast; primary must stand out on the background; secondary is a quiet surface colour; muted is a subtle background tint; accent is a second highlight. radius is between 0rem and 1.5rem. FONTS`;
 function briefPrompt(skills){
  return BRIEF_PROMPT.replace('FONTS','\n'+FONTLIB.note())+(skills&&skills.length?'\nDesign skills (pick at most one that fits, or ""):\n'+skills.map(s=>'- '+s.id+': '+s.description).join('\n'):'\nThere are no design skills to choose from; set "skill" to "".');
@@ -330,7 +349,7 @@ function normalize(v){
  const radius=/^(0|0?\.\d+|1(\.\d+)?)rem$/.test(String(v.radius||'').trim())?String(v.radius).trim():'0.75rem';
  return{name:cleanText(v.name,60)||'Custom',summary:cleanText(v.summary,600),palette,fonts:{display:font(v.fonts?.display),body:font(v.fonts?.body),...(FONTS[font(v.fonts?.mono)]&&FONTS[font(v.fonts?.mono)][0]==='mono'&&v.fonts?.mono?{mono:font(v.fonts.mono)}:{})},radius,
   layout:cleanText(v.layout,600),imagery:cleanText(v.imagery,400),details:(Array.isArray(v.details)?v.details:[]).map(d=>cleanText(d,200)).filter(Boolean).slice(0,10),
-  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):'',...(require('./design-presets').byType(String(v.playbook||''))?{playbook:String(v.playbook)}:v.playbook===''?{playbook:''}:{}),...(require('./design-hero3d').normalize(v.hero3d)?{hero3d:require('./design-hero3d').normalize(v.hero3d)}:{}),...(require('./design-recipes').normalize(v.recipes)?{recipes:require('./design-recipes').normalize(v.recipes)}:{}),...(require('./design-moods').MOODS.some(m=>m.id===v.mood)?{mood:String(v.mood)}:{}),...(require('./design-recipes').SIGNATURES.some(x=>x.id===v.signature)?{signature:String(v.signature)}:{})};
+  notes:cleanText(v.notes,1500),...(v.direction&&require('./design-directions').validId(String(v.direction))?{direction:String(v.direction),...(/^[a-z-]{2,30}$/.test(String(v.sector||''))?{sector:String(v.sector)}:{})}:{}),...(cleanText(v.idea,300)?{idea:cleanText(v.idea,300)}:{}),...(v.style&&require('./design-styles').valid(String(v.style))?{style:String(v.style)}:{}),skill:/^[a-z0-9][a-z0-9-]{0,60}$/.test(String(v.skill||''))?String(v.skill):'',...(require('./design-presets').byType(String(v.playbook||''))?{playbook:String(v.playbook)}:v.playbook===''?{playbook:''}:{}),...(require('./design-hero3d').normalize(v.hero3d)?{hero3d:require('./design-hero3d').normalize(v.hero3d)}:{}),...(require('./design-recipes').normalize(v.recipes)?{recipes:require('./design-recipes').normalize(v.recipes)}:{}),...(require('./design-moods').MOODS.some(m=>m.id===v.mood)?{mood:String(v.mood)}:{}),...(require('./design-recipes').SIGNATURES.some(x=>x.id===v.signature)?{signature:String(v.signature)}:{}),...(require('./craft-norms').DATA.types[v.norms]?{norms:String(v.norms)}:{}),...(Array.isArray(v.photos)?{photos:v.photos.map(x=>cleanText(x,60)).filter(x=>x.length>=3).slice(0,3)}:{}),...(Array.isArray(v.photo_files)?{photo_files:v.photo_files.filter(x=>x&&/^\.\/uploads\/[a-z0-9.-]+$/.test(String(x.path||''))).slice(0,3).map(x=>({path:String(x.path),query:cleanText(x.query,60),credit:x.credit&&typeof x.credit==='object'?{title:cleanText(x.credit.title,140),creator:cleanText(x.credit.creator,80),source_url:cleanText(x.credit.source_url,300),license:cleanText(x.credit.license,40),license_url:cleanText(x.credit.license_url,300),provider:cleanText(x.credit.provider,20),attribution_required:Boolean(x.credit.attribution_required)}:null}))}:{}),...(ART[v.art]?{art:String(v.art)}:{})};
 }
 // Three directions are dealt from the design library (design-directions.js); the brief picks one.
 async function createBrief(request,{callModel,tier,signal,skills=[],projectName='',avoid=[],hasScreenshot=false,recent=[],owner=''}){
@@ -342,8 +361,10 @@ async function createBrief(request,{callModel,tier,signal,skills=[],projectName=
  const mood=moods.deal(projectName+' '+request,{recent,seed:projectName}),avoidFonts=moods.recentFonts(recent);
  const signature=dealt.kind==='app'?null:recipesLib.signature(projectName+' '+request,{recent,seed:projectName});
  moods.claim(owner,{mood:mood.id,signature});
+ // What the best sites of this kind do, measured (craft-norms.js).
+ const normsType=dealt.kind==='app'?null:require('./craft-norms').typeOf(projectName+' '+request);
  const styles=require('./design-styles'),styleOptions=styles.options(request),named=styles.named(request);
- const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)+(dealt.kind==='app'?'':require('./design-hero3d').note(projectName+' '+request,{hasScreenshot})+require('./design-recipes').note(projectName+' '+request)+recipesLib.signatureNote(signature))+moods.note(mood,{avoidFonts})}];
+ const messages=[{role:'system',content:briefPrompt(skills)},{role:'user',content:'App name: '+projectName+'\nWhat the user wants:\n'+String(request).slice(0,4000)+require('./design-presets').note(projectName+' '+request)+directions.note(dealt)+styles.note(styleOptions)+(dealt.kind==='app'?'':require('./design-hero3d').note(projectName+' '+request,{hasScreenshot})+require('./design-recipes').note(projectName+' '+request)+recipesLib.signatureNote(signature))+(normsType?'\n\n'+require('./craft-norms').note(normsType)+' Follow these proportions.':'')+moods.note(mood,{avoidFonts})}];
  const brief=await callModel({messages,temperature:0.7,maxOutputTokens:1800,signal,tier,design:true},parseBrief);
  if(brief.skill&&!skills.some(s=>s.id===brief.skill))brief.skill='';
  // The page playbook must be the one offered; a model that left the field out gets it anyway,
@@ -365,8 +386,11 @@ async function createBrief(request,{callModel,tier,signal,skills=[],projectName=
  const kindOf=n=>(FONTS[n]||['sans'])[0];
  held.fonts={...held.fonts,display:FONTLIB.closest(held.fonts.display,kindOf(held.fonts.display)),body:FONTLIB.closest(held.fonts.body,kindOf(held.fonts.body))};
  if(held.fonts.mono)held.fonts.mono=FONTLIB.closest(held.fonts.mono,'mono');
+ if(normsType)held.norms=normsType;
+ // Real photos where they fit; a hand-made art style where they do not.
+ if(normsType&&ART_FOR[normsType]&&!(held.photos||[]).length){const list=ART_FOR[normsType],avoidArt=new Set(recent.map(d=>d&&d.art).filter(Boolean));held.art=list.find(a=>!avoidArt.has(a))||list[0];held.imagery=(held.imagery?held.imagery+' ':'')+'Generated images in one hand-made style: '+ART[held.art]+'.'}
  if(signature)held.signature=held.hero3d&&held.hero3d.recipe!=='none'?'object-3d':signature;
  return{...held,created_at:new Date().toISOString()};
 }
 
-module.exports={kit,withKit,isDesignComplaint,KIT_API,isKitFile,FONTS,fontUrl,tokens,tokensBlock,applyToCss,starterFiles,starterApp,isUntouchedStarter,addDesignSystem,hasTokens,THEME,RULES,designNote,briefPrompt,parseBrief,normalize,createBrief,hexToRgb,contrast};
+module.exports={ART,ART_FOR,kit,withKit,isDesignComplaint,KIT_API,isKitFile,FONTS,fontUrl,tokens,tokensBlock,applyToCss,starterFiles,starterApp,isUntouchedStarter,addDesignSystem,hasTokens,THEME,RULES,designNote,briefPrompt,parseBrief,normalize,createBrief,hexToRgb,contrast};

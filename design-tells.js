@@ -114,7 +114,11 @@ async function tells(page,screen='desktop'){
   const numbered=shown.filter(el=>/^0\d$/.test(own(el)));
   if(numbered.length>=3)add('minor','numbers','Numbered markers (01, 02, 03…) on '+numbered.length+' items','Keep numbers only for real steps in order; otherwise remove them.');
 
-  return{issues:out,stats};
+  // Plain measurements, compared with what the best sites of the kind do (craft-norms.js).
+  const h1el=heads.find(h=>h.tagName==='H1'),med=a=>a.length?a.slice().sort((x,y)=>x-y)[a.length>>1]:null;
+  const boxesAll=shown.filter(el=>{const r=el.getBoundingClientRect();return r.width*r.height>9000&&r.width<innerWidth*0.95&&boxy(el)});
+  const metrics={h1px:h1el?parseFloat(getComputedStyle(h1el).fontSize):null,h1words:h1el?text(h1el).split(/\s+/).filter(Boolean).length:null,radius:med(boxesAll.map(el=>parseFloat(getComputedStyle(el).borderTopLeftRadius))),shadows:boxesAll.filter(el=>getComputedStyle(el).boxShadow!=='none').length,sections:shown.filter(el=>el.tagName==='SECTION'&&el.getBoundingClientRect().height>200).length};
+  return{issues:out,stats,metrics};
  },{FILLER,screen});
 }
 
