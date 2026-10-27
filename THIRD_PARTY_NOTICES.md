@@ -47,6 +47,10 @@ Each file names its source and licence at the top, so the credit travels with th
 - gsap 3.13 (GreenSock standard no-charge license, https://gsap.com/standard-license), lenis 1.3 (MIT), three 0.169 (MIT).
 - remotion and @remotion/player 4.0 (Remotion License: free for individuals, non-profits and companies of up to 3 people; larger companies need a company license from remotion.pro). Generated apps only include them when the app imports them.
 
+## Font library (font-library.js)
+
+New sites and apps use only these fonts, bundled into each build from the Fontsource npm packages (`@fontsource-variable/*`, `@fontsource/*`). Every one is under the SIL Open Font License 1.1, which allows commercial use and embedding in websites. `test/font-library.test.js` checks each installed package's licence. Each site's CSS names the licence. The fonts: Geist, Inter, Inter Tight, Mona Sans, Instrument Sans, Hanken Grotesk, Schibsted Grotesk, Familjen Grotesk, Onest, Figtree, Manrope, Public Sans, Bricolage Grotesque, Archivo, Hubot Sans, Funnel Display, Host Grotesk, Space Grotesk, Unbounded, Syne, Big Shoulders Display, Anton, Fraunces, Newsreader, Source Serif 4, EB Garamond, Bodoni Moda, Instrument Serif, Young Serif, Gloock, DM Serif Display, Libre Caslon Text, Geist Mono, JetBrains Mono, IBM Plex Mono, Fredoka, Baloo 2, Nunito, Quicksand.
+
 ## html-anything: page-type design skills
 
 The design skills marked "Page types" in `design-skills/` (printable invoice, pricing page, email newsletter, event flyer, social carousel, pitch deck and the others) were adapted from the skill templates in html-anything by nexu-io, https://github.com/nexu-io/html-anything, licensed under the Apache License 2.0 (full text in `licenses/html-anything-LICENSE.txt`). Kairoq rewrote them in English for React and Tailwind apps and expanded their content; the templates html-anything marks as adapted from other projects were not used.

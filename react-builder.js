@@ -15,7 +15,9 @@ const APP_PACKAGES={react:'UI',
 const KAIROQ_MODULES=['kairoq','kairoq/3d','kairoq/scene','kairoq/story','kairoq/hero3d','kairoq/scroll'];
 const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),...KAIROQ_MODULES];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
-function allowedImport(spec){if(KAIROQ_MODULES.includes(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
+// Font packages from the font library (font-library.js) may be imported by the site's CSS.
+const FONT_PACKAGES=new Set(require('./font-library').packages());
+function allowedImport(spec){if(KAIROQ_MODULES.includes(spec))return true;if(FONT_PACKAGES.has(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -137,7 +139,7 @@ function validateFiles(files){
    }
   }
   if(name.endsWith('.css')){
-   for(const m of code.matchAll(/@import\s+(?:url\()?\s*['"]?([^'")\s;]+)/g)){const spec=m[1];if(!/^https:\/\//.test(spec)&&!(spec.startsWith('.')&&resolveRelative(name,spec,files)))errors.push(name+': @import "'+spec+'" must be an https URL or a project CSS file.')}
+   for(const m of code.matchAll(/@import\s+(?:url\()?\s*['"]?([^'")\s;]+)/g)){const spec=m[1];if(!/^https:\/\//.test(spec)&&!FONT_PACKAGES.has(spec)&&!(spec.startsWith('.')&&resolveRelative(name,spec,files)))errors.push(name+': @import "'+spec+'" must be an https URL, a project CSS file or a font from the font library.')}
    for(const m of code.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)){const u=m[1].trim();if(!/^(https:|data:|#)/.test(u))errors.push(name+': url('+u+') must be an https or data: URL.')}
   }
  }
