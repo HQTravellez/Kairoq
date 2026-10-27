@@ -17,7 +17,7 @@ const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),...KAIROQ_MODULES];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
 // Font packages from the font library (font-library.js) may be imported by the site's CSS.
 const FONT_PACKAGES=new Set(require('./font-library').packages());
-function allowedImport(spec){if(KAIROQ_MODULES.includes(spec))return true;if(FONT_PACKAGES.has(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
+function allowedImport(spec){if(KAIROQ_MODULES.includes(spec))return true;if(spec==='react-native'||spec==='react-native-web')return true;if(FONT_PACKAGES.has(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -245,7 +245,8 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
   const output=[];
   const logger={info(){},warn(m){output.push(String(m))},warnOnce(m){output.push(String(m))},error(m){output.push(String(m))},clearScreen(){},hasErrorLogged(){return false},hasWarned:false};
   const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[importGuard(fs.realpathSync(work)),react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId,version)],
-   resolve:{dedupe:['react','react-dom']},
+   // Native apps (react-native-app.js) preview through react-native-web.
+   resolve:{dedupe:['react','react-dom'],alias:{'react-native':'react-native-web'}},
    css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:require('./react-design').THEME})]}},
    server:{fs:{strict:true,allow:[work]}},
    build:{outDir,emptyOutDir:true,assetsInlineLimit:0,reportCompressedSize:false,sourcemap:false}});
@@ -491,7 +492,7 @@ function readFile(id,name){const m=loadMeta(id),files=loadFiles(id,m.current_ver
 
 // The owner's standing instructions for this project (brand, audience, rules), sent with every request.
 // Also carries the design brief and the design skills switched on for the project.
-function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();let files={};try{files=meta.current_version?loadFiles(meta.id,meta.current_version):{}}catch{}return require('./project-memory').note(meta,files)+require('./react-mobile').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+require('./api-samples').promptNote(meta.id)+require('./build-lessons').promptNote()+require('./account-memory').preferenceNote(meta.owner)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
+function knowledgeNote(meta){const k=String(meta.knowledge||'').trim();let files={};try{files=meta.current_version?loadFiles(meta.id,meta.current_version):{}}catch{}return require('./project-memory').note(meta,files)+require('./react-mobile').promptNote(meta)+require('./react-native-app').promptNote(meta)+require('./react-design').designNote(meta.design)+require('./react-skills').promptNote(meta)+require('./react-checks').promptNote(meta)+require('./api-samples').promptNote(meta.id)+require('./build-lessons').promptNote()+require('./account-memory').preferenceNote(meta.owner)+(k?'\n\nProject knowledge from the owner. Follow it unless the user asks otherwise:\n'+k:'')}
 function userContent(text,images){
  if(!images||!images.length)return text;
  return[{type:'text',text},...images.map(img=>({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.data}}))];
@@ -581,11 +582,22 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
  // The first build turns the bare starter into a whole product, as Lovable does, not one basic page.
  const firstBuild=require('./react-design').isUntouchedStarter(base);
+ // A request for an iPhone or Android app becomes a native app (Expo, react-native-app.js): the
+ // starter is the native one and the design's colours go to src/theme.js.
+ const nativeApp=require('./react-native-app');
+ if(firstBuild&&!meta.native&&nativeApp.wanted(text)){const m=loadMeta(id);m.native={enabled:true,sdk:nativeApp.SDK(),at:new Date().toISOString()};saveMeta(m);meta=m}
+ if(nativeApp.enabled(meta)){
+  if(firstBuild||!base['src/components/native.jsx'])base={...nativeApp.starterFiles(meta.name,brief||meta.design),...(firstBuild?{}:base)};
+  if(brief)base={...base,'src/theme.js':nativeApp.themeFile(brief)};
+  delete base['src/index.css'];
+  // The web kit (Tailwind components) is not used by native apps.
+  for(const k of Object.keys(base))if(k.startsWith('src/components/ui/')||k==='src/lib/utils.js')delete base[k];
+ }
  // Prompt caching: what stays the same between requests comes first (the builder rules, then the
  // project files, oldest-unchanged first, then the project notes); what changes per message
  // (recalled lessons, memory, assets, the request) comes last, after the chat history.
  const projectFiles='Current project files:\n\n'+contextFiles(base,160000,lastChangedVersions(meta));
- const request=(firstBuild?FIRST_BUILD+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text+buildContract.prompt(ownerRequirements)+featureQA.instructions(ownerRequirements)+require('./engineering-workflows').prompt(text);
+ const request=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text+buildContract.prompt(ownerRequirements)+featureQA.instructions(ownerRequirements)+require('./engineering-workflows').prompt(text);
  // Recall verified, project-local repair lessons as untrusted context only.
  let learningNote='';
  if(meta.current_version>1){try{
@@ -605,7 +617,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
  let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),check:files=>selfCheck(id,meta,files,checkRuntime),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
  let usedOpenCode=false,usedFallback=false;
- const ocRequest=(firstBuild?FIRST_BUILD+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
+ const ocRequest=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
  // What the user sees afterwards: the plan, the model's reasoning and how long it thought.
  let thinking='',thoughtMs=null,firstPlan=null;
@@ -644,7 +656,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   // Small changes arrive as find/replace edits (cheaper than rewriting whole files).
   const both=Object.keys(reply.edits).filter(f=>Object.hasOwn(reply.files,f));
   const applied=require('./react-edits').apply(next,reply.edits);next=applied.files;
-  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:checkProject(next))];
+  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:checkProject(next)),...(applied.errors.length||!nativeApp.enabled(meta)?[]:nativeApp.problems(next))];
   messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,edits:reply.edits,delete:reply.delete})});
   if(errors.length){
    lastError=errors.slice(0,12).join('\n');
