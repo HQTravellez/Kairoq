@@ -34,12 +34,21 @@ function seeded(seed){let x=0;for(const ch of String(seed))x=(x*31+ch.charCodeAt
 // businesses do not always get the same one.
 function deal(request,{recent=[],seed=''}={}){
  const used=new Set(recent.map(d=>d&&d.mood).filter(Boolean));
- const fit=MOODS.filter(m=>m.fits.test(String(request||'')));
+ // The business type comes first: the mood whose words appear earliest in the request wins
+ // ("a law firm … a first consultation" is a law firm, not a consultancy). Ties are turned.
+ const at=m=>{const x=m.fits.exec(String(request||''));return x?x.index:-1};
+ const fit=MOODS.filter(m=>at(m)>=0).sort((a,b)=>at(a)-at(b));
+ const first=fit.filter(m=>at(m)===at(fit[0]));
  const rest=MOODS.filter(m=>!fit.includes(m));
  const turn=list=>{const k=list.length?seeded(seed+request)%list.length:0;return[...list.slice(k),...list.slice(0,k)]};
- const order=[...turn(fit),...turn(rest.filter(m=>FALLBACK.includes(m.id))),...turn(rest.filter(m=>!FALLBACK.includes(m.id)))];
+ const order=[...turn(first),...fit.filter(m=>!first.includes(m)),...turn(rest.filter(m=>FALLBACK.includes(m.id))),...turn(rest.filter(m=>!FALLBACK.includes(m.id)))];
  return order.find(m=>!used.has(m.id))||order[0];
 }
+// Moods and signatures handed out in the last few minutes, per owner, so two sites designed at
+// the same time (before either brief is saved) do not get the same look.
+const CLAIMED=new Map(),HOLD=15*60*1000;
+function claimed(owner){const now=Date.now();const list=(CLAIMED.get(String(owner||''))||[]).filter(c=>now-c.at<HOLD);CLAIMED.set(String(owner||''),list);return list}
+function claim(owner,entry){if(!owner)return;claimed(owner).push({...entry,at:Date.now()})}
 // Heading fonts the owner's recent sites used.
 function recentFonts(recent){return[...new Set(recent.map(d=>d&&d.fonts&&d.fonts.display).filter(Boolean))].slice(0,4)}
 // The block for the art director.
@@ -63,4 +72,4 @@ function enforce(brief,mood,{avoidFonts=[],fonts=[]}={}){
  }
  return out;
 }
-module.exports={MOODS,deal,note,enforce,recentFonts,isCream,hsl};
+module.exports={MOODS,claim,claimed,deal,note,enforce,recentFonts,isCream,hsl};

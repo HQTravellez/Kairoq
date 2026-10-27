@@ -37,7 +37,7 @@ test('every landing page gets a signature moment, checked after the first build'
  const files={'src/App.jsx':"import { TextLoop } from './components/ui/text-loop.jsx';\nexport default function App(){return <h1>Hi</h1>}"};
  assert.match(recipes.signatureMissing('rotating-headline',files),/signature moment is missing from the page: Rotating headline/);
  assert.equal(recipes.signatureMissing('rotating-headline',{...files,'src/components/home/Hero.jsx':"import { Magnetic } from '../ui/magnetic.jsx'"}),null);
- assert.equal(recipes.signatureMissing('object-3d',{'src/App.jsx':"import { Diorama } from 'kairoq/hero3d'"}),null);
+ assert.equal(recipes.signatureMissing('object-3d',{'src/App.jsx':"import { Diorama } from 'kairoq/hero3d'\nexport default()=><h1>Northline</h1>"}),null);
  // The brief: offered a mood and a signature, held to them; a 3D hero is the signature.
  const seen=[];
  const callModel=async(o,parse)=>{seen.push(o.messages[1].content);return parse(brief())};
@@ -107,4 +107,22 @@ test('"the design sucks": an apology and a completely new look, not a question b
   assert.equal(fresh.messages.filter(x=>x.role==='user').at(-1).text,'the design sucks','the owner sees their own words');
   assert.match(builder.loadFiles(meta.id,fresh.current_version)['src/index.css'],new RegExp(fresh.design.fonts.display.replace(/ /g,'.')),'the new fonts are in the tokens');
  }finally{delete process.env.KAIROQ_DESIGN_BRIEF;server.close()}
+});
+
+test('the business type picks the mood, sites designed together differ, the 3D sits in the hero, photos get an overlay',async()=>{
+ // "consultation" is a consultancy word, but this is a law firm.
+ assert.equal(moods.deal('Hale Whitford Law: a Toronto law firm for employment disputes; how a first consultation works').id,'red-black-law');
+ // Two sites designed at the same time: the second does not get the first one's mood or signature.
+ const callModel=async(o,parse)=>parse(brief());
+ const a=await design.createBrief('Ironside Gym, a strength gym in Mississauga',{callModel,projectName:'Ironside Gym',owner:'same-time'});
+ const b=await design.createBrief('Ironside Gym, a strength gym in Mississauga',{callModel,projectName:'Ironside Gym',owner:'same-time'});
+ assert.notEqual(a.mood,b.mood);assert.notEqual(a.signature,b.signature);
+ const c=await design.createBrief('Ironside Gym, a strength gym in Mississauga',{callModel,projectName:'Ironside Gym',owner:'someone-else'});
+ assert.equal(c.mood,a.mood,'other owners are not affected');
+ // The 3D object must be in the hero, not lower down.
+ const shapes="import { GlassShapes } from 'kairoq/hero3d'";
+ assert.match(recipes.signatureMissing('object-3d',{'src/components/home/Preview.jsx':shapes,'src/components/home/Hero.jsx':'<h1>Make the numbers make sense</h1>'}),/not in the hero/);
+ assert.equal(recipes.signatureMissing('object-3d',{'src/components/home/Hero.jsx':shapes}),null);
+ assert.equal(recipes.signatureMissing('object-3d',{'src/pages/Home.jsx':shapes+'\n<h1>Ledgerly</h1>'}),null);
+ assert.match(design.RULES,/Text on a photo always sits on a dark overlay/);
 });

@@ -392,7 +392,7 @@ async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress
   const hasScreenshot=(()=>{try{return require('./react-assets').list(id).some(a=>/\.(png|jpe?g|webp)$/i.test(a.name))}catch{return false}})();
   // The owner's most recent other sites, so this one looks different (design-moods.js).
   const recent=list(meta.owner).filter(p=>p.id!==id).slice(0,6).map(p=>{try{return loadMeta(p.id).design||null}catch{return null}}).filter(Boolean);
-  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,hasScreenshot,recent,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
+  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,hasScreenshot,recent,owner:meta.owner,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
   catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
  }
  // A bespoke 3D object the brief asked for: the Blender modelling agent makes it now, so the
