@@ -122,8 +122,11 @@ test('one button: the photo becomes checked stills, a film, frames, a reel and a
 
 test('when the film cannot be made everything is refunded; when only the reel fails its part is; the site reel films the site',async()=>{
  const {cookie}=owner;
- // Wait for the build that added the scene to finish, so the next film is not blocked by it.
- await new Promise(r=>setTimeout(r,300));
+ // Each finished film starts a build that adds its scene to the site (a normal, priced change).
+ // Credits are compared only once that build is over, so its own charge or refund is not counted.
+ const idle=()=>until(async()=>!(await request(server,'GET','/api/create/projects/'+project,{headers:{cookie}})).json.active_job,20000);
+ const spent=async start=>{await idle();return start-(await credits(cookie))};
+ await idle();
  failNext=1;let before=await credits(cookie);
  let r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png',note:'chocolate pouring over it'}});
  assert.equal(r.status,202,JSON.stringify(r.json));assert.equal(r.json.explode.motion,'pour');
@@ -134,9 +137,9 @@ test('when the film cannot be made everything is refunded; when only the reel fa
  r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{photo:'burger.png',note:'steam rising'}});
  x=await until(async()=>{const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return e.status!=='making'&&e},20000);
  assert.equal(x.status,'done');assert.equal(x.reel,null);assert.ok(x.frames>0);
- assert.equal(await credits(cookie),before-50+20,'the reel\'s part came back');
+ assert.equal(await spent(before),50-20,'the reel\'s part came back (the scene build here fails and is refunded)');
  // The site reel: a screenshot of the site, on a laptop, filmed in 9:16 from one still.
- const asked0=asked.length,seen=images.length;before=await credits(cookie);
+ const asked0=asked.length,seen=images.length;await idle();before=await credits(cookie);
  r=await request(server,'POST','/api/create/projects/'+project+'/explodes',{headers:{cookie},body:{op:'site'}});
  assert.equal(r.status,202,JSON.stringify(r.json));assert.equal(await credits(cookie),before-25);
  x=await until(async()=>{const e=(await request(server,'GET','/api/create/projects/'+project+'/explodes',{headers:{cookie}})).json.explodes[0];return e.status!=='making'&&e},20000);
@@ -172,7 +175,9 @@ test('ScrollVideo: pinned, plays forward to the parts and back as the page scrol
 export default function App(){return(<main>
  <section className="h-[70vh] grid place-items-center"><h1 className="text-5xl font-semibold">Stack House</h1></section>
  <ScrollVideo src="./uploads/explode-${eid}/" frames={${frames}} alt="Our burger, layer by layer" captions={[{title:'Brioche bun',text:'Baked every morning.'},{title:'Smashed patty',text:'Two thin patties.'},{title:'Aged cheddar'}]} />
+ <div className="overflow-hidden rounded-2xl">{/* a wrapper like builders sometimes add: the scene must still pin */}
  <ScrollVideo layout="split" src="./uploads/explode-${eid}/" frames={${frames}} title="Stacked to order" text="Every layer, built when you order." cta={{label:'Order now',href:'#order'}} />
+ </div>
  <section id="order" className="h-[80vh] grid place-items-center"><p>Order now</p></section>
 </main>)}
 `;
@@ -206,6 +211,7 @@ export default function App(){return(<main>
   const s0=await sceneFrame(0.05),s1=await sceneFrame(0.5),s2=await sceneFrame(1);
   assert.ok(s0<s1&&s1<s2&&s2===frames-1,'plays once: '+[s0,s1,s2]);
   await sceneFrame(0.5);
+  assert.equal(Math.round(await page.evaluate(()=>document.querySelectorAll('[data-kq-scroll-video] [data-kq-scene]')[1].getBoundingClientRect().top)),0,'the scene stays pinned inside an overflow-hidden wrapper');
   const box=await page.evaluate(()=>{const t=document.querySelector('[data-kq-scene-text] h2').getBoundingClientRect(),c=document.querySelectorAll('[data-kq-scroll-video] canvas')[1].getBoundingClientRect();return{textRight:t.right,canvasLeft:c.left,top:t.top}});
   assert.ok(box.textRight<=box.canvasLeft+1&&box.top>0,'headline beside the film: '+JSON.stringify(box));
   assert.equal(await page.locator('[data-kq-scene-text] a').getAttribute('href'),'#order');

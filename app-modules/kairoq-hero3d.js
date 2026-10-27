@@ -524,6 +524,16 @@ function Film({ size, enabled }) {
     h(Vignette, { offset: 0.3, darkness: 0.45 }));
 }
 
+// Sticky pinning stops working inside a parent with overflow: hidden (a common wrapper for rounded
+// boxes). Such parents get overflow: clip instead, which looks the same and keeps pinning working.
+function keepPinned(el) {
+  try {
+    for (let p = el && el.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+      const s = getComputedStyle(p);
+      if (s.overflowX === 'hidden' || s.overflowY === 'hidden') p.style.overflow = 'clip';
+    }
+  } catch {}
+}
 export function ScrollAssembly({ object = 'watch', src, shots, screens = 4, gap = 0.16, labels, colors: colorsProp, mood = 'studio', effects = true, className, style, alt, children }) {
   const colors = useBrandColors(colorsProp);
   const url = urlOf(object, src);
@@ -533,6 +543,7 @@ export function ScrollAssembly({ object = 'watch', src, shots, screens = 4, gap 
   const still = prefersStill();
   const plan = useMemo(() => planShots(shots), [JSON.stringify(shots || null)]);
   const captions = plan.filter((s) => s.caption);
+  useEffect(() => { if (!still) keepPinned(outer.current); }, [still]);
   useEffect(() => {
     let frame = 0;
     const update = () => {
