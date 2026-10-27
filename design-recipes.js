@@ -124,10 +124,14 @@ const SIGNATURES=[
  S('flowing-lines','Flowing lines','A hero over fine flowing lines in the text colour that part around the cursor (BackgroundPaths), the headline revealed word by word (TextEffect).',[/\bui\/background-paths/,/\bui\/text-effect/],/\b(software|saas|consult\w*|studio|agency|law\w*|account\w*|finance|architect\w*|clinic|therap\w*)/i),
  S('glow-hero','Glow hero','Soft moving glows in the brand colours behind the hero (AnimatedGradient), the headline revealed word by word (TextEffect), the main button pulling toward the pointer (Magnetic).',[/\bui\/animated-gradient/,/\bui\/text-effect/],/\b(app|ai|tech|startup|events?|music|beauty|salon|spa|fitness|gym)/i),
  S('rotating-headline','Rotating headline','A very large headline whose last words rotate through the services or audiences (TextLoop), revealed word by word (TextEffect), with a magnetic main button (Magnetic).',[/\bui\/text-loop/,/\bui\/magnetic/],/\b(renovat\w*|contractor|trades?|cleaning|services?|agency|school|course|tours?|travel)/i),
+ S('show-it-working','Show it working','The product shown working instead of feature cards: a product tour (ProductTour) where a cursor clicks through 3 to 5 real steps of the product, one short caption each, built from the product\'s own screens in code; where the product takes a request (search, booking, a question), the hero is that real input with example requests typed into it (TypedInput).',[/\bui\/product-tour/],/\b(software|saas|platform|b2b|dashboard|crm|api|startup|portal|ai (?:assistant|agent|tool)|(?:web|mobile) app|tool for)/i),
  S('tilt-cards','Living cards','The main offers as cards that arrive one after another (AnimatedGroup), tilt toward the pointer (Tilt) and glow under it (Spotlight).',[/\bui\/tilt/,/\bui\/spotlight/],/\b(restaurant|caf[eé]|cafe|menu|shop|store|products?|gym|hotel|stays?|florist|bakery)/i),
 ];
 // The signature for a request: suited to it and not used by the owner's recent sites.
+// Software is shown working: the product tour is the default for it.
+const SOFTWARE=/\b(software|saas|platform|b2b|dashboard|crm|api|startup|portal|ai (?:assistant|agent|tool)|(?:web|mobile) app|tool for)/i;
 function signature(request,{recent=[],seed=''}={}){
+ if(SOFTWARE.test(String(request||'')))return'show-it-working';
  const used=new Set(recent.map(d=>d&&d.signature).filter(Boolean));
  const pool=SIGNATURES.filter(x=>x.fits);
  const fit=pool.filter(x=>x.fits.test(String(request||''))),rest=pool.filter(x=>!fit.includes(x));
@@ -151,4 +155,4 @@ function signatureMissing(id,files){
  }
  return null;
 }
-module.exports={RECIPES,KINDS,suggest,note,normalize,text,SIGNATURES,signature,signatureNote,signatureText,signatureMissing};
+module.exports={SOFTWARE,RECIPES,KINDS,suggest,note,normalize,text,SIGNATURES,signature,signatureNote,signatureText,signatureMissing};
