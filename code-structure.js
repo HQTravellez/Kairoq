@@ -101,6 +101,6 @@ function readability(files,changed=Object.keys(files||{}),base={}){
 function isMinor(problem){return/no first-line comment|console\.log or debugger|commented-out code/.test(problem)}
 function needsRework(problems){return problems.some(p=>!isMinor(p))}
 // What goes back to the builder when a change breaks the rules.
-function fixMessage(problems){return'The change works, but its code is not as clear and organised as this project needs (nothing was applied yet):\n'+problems.slice(0,12).map(p=>'- '+p).join('\n')+'\nReturn the same change again, following the code structure and readable code rules. Keep behaviour, copy and styles exactly the same.'}
+function fixMessage(problems){return'The change works, but its code is not as clear and organised as this project needs (nothing was applied yet):\n'+problems.slice(0,12).map(p=>'- '+p).join('\n')+'\nReturn the same change again, following the code structure and readable code rules. Keep behaviour, copy and styles exactly the same. Your "message" is for the owner, who never sees code: describe what they get in the app (as you would have the first time), never files, folders, components or this tidy-up.'}
 function isTidy(message){return/^\s*tidy up the code\.?\s*$/i.test(String(message||''))}
 module.exports={RULES,TIDY,check,readability,isMinor,needsRework,fixMessage,isTidy,components,longestArray,longFunctions,headerComment};

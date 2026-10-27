@@ -390,7 +390,9 @@ async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress
   onProgress('designing');
   // A device mockup needs a real screenshot of the product: an image the owner uploaded earlier.
   const hasScreenshot=(()=>{try{return require('./react-assets').list(id).some(a=>/\.(png|jpe?g|webp)$/i.test(a.name))}catch{return false}})();
-  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,hasScreenshot,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
+  // The owner's most recent other sites, so this one looks different (design-moods.js).
+  const recent=list(meta.owner).filter(p=>p.id!==id).slice(0,6).map(p=>{try{return loadMeta(p.id).design||null}catch{return null}}).filter(Boolean);
+  try{brief=await design.createBrief(text,{callModel,tier,signal,projectName:meta.name,hasScreenshot,recent,skills:require('./react-skills').library(meta.owner||'owner').map(s=>({id:s.id,description:s.name+': '+s.description}))})}
   catch(e){if(signal?.aborted)throw e;console.warn('[design-brief]',String(e.message||e).slice(0,200));return null}
  }
  // A bespoke 3D object the brief asked for: the Blender modelling agent makes it now, so the
@@ -560,7 +562,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  if(brief)tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'" ('+brief.fonts.display+' / '+brief.fonts.body+')'});
  try{for(const a of require('./api-samples').missingKeys(id))tl.add({t:'note',icon:'web',text:'Using sample answers for '+a.title+' in the preview until you add '+a.secret})}catch{}
  meta=loadMeta(id);
- let base=loadFiles(id,meta.current_version);
+ let base=require('./react-design').withKit(loadFiles(id,meta.current_version));
  if(brief)base={...base,'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)};
  // The first build turns the bare starter into a whole product, as Lovable does, not one basic page.
  const firstBuild=require('./react-design').isUntouchedStarter(base);
@@ -684,6 +686,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
     if(checkRuntime){try{const r=await runtimeProblems(id,previewUrl(meta,n),checkRuntime);runtimeErrors=r.errors;verified=r.verified}catch(e){runtimeErrors=[];verified=null}}
     // Photo links that do not exist (other sites' photos the browser check cannot see failing).
     if(checkRuntime&&process.env.KAIROQ_IMAGE_LINK_CHECK!=='off'){try{runtimeErrors.push(...await require('./image-links').broken(next))}catch{}}
+    // The first build of a new design: its signature moment must really be on the page.
+    if(brief&&brief.signature){const miss=require('./design-recipes').signatureMissing(brief.signature,next);if(miss)runtimeErrors.push(miss)}
     // Saved checks: flows that worked before must still work (run on a test copy of the data).
     if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
    }finally{clearTesting(id,n)}

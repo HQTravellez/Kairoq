@@ -46,5 +46,6 @@ function check(message,before={},after={}){
  }
  return out;
 }
-function note(found){return found.length?'This change also touched '+found.map(f=>f.area+' ('+f.files.join(', ')+')').join(' and ')+', which you did not ask about. If that was not intended, undo it from the version list.':''}
+const PLAIN={'saved data and bookings':'how the app saves information (like enquiries or bookings)','payments':'payments','sign-in':'a sign-in'};
+function note(found){return found.length?'I also changed '+found.map(f=>PLAIN[f.area]||f.area).join(' and ')+', which you didn\'t ask for. If you don\'t want that, undo this change.':''}
 module.exports={check,note,changedLines};
