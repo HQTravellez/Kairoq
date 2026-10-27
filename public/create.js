@@ -2056,7 +2056,9 @@ async function renderApis(){
   row.append(name,key);
   if(a.secret&&owner){const add=el('button',a.key_added?'ghost':'primary',a.key_added?'Replace key':'Add key');add.type='button';add.onclick=()=>openKey(a);row.append(add)}
   if(editor){const rm=el('button','link-btn','Remove');rm.type='button';rm.onclick=async()=>{try{await api('/projects/'+id+'/apis',{method:'DELETE',body:{slug:a.slug}});renderApis()}catch(err){text($('api-status'),err.message)}};row.append(rm)}
-  li.append(row);list.append(li);
+  li.append(row);
+  if(a.endpoints&&a.endpoints.length)li.append(apiTryout(id,a,editor));
+  list.append(li);
  }
  const sug=$('api-suggested');sug.replaceChildren();
  for(const g of suggested){
@@ -2064,15 +2066,99 @@ async function renderApis(){
   if(editor){const b=el('button','ghost','Use sample answers');b.type='button';b.onclick=()=>addApi({name:g.host,secret:g.secret});row.append(b)}
   sug.append(row);
  }
- const box=$('api-log');box.replaceChildren();
- if(!log.length)box.append(el('p','muted small','No calls yet. Calls your server functions make to other services show here.'));
- else{
-  const t=el('table','api-log-table'),head=el('tr');for(const h of ['When','Call','Answer','Status','Time'])head.append(el('th','',h));t.append(head);
-  for(const c of log.slice(0,50)){const tr=el('tr');tr.append(el('td','',new Date(c.at).toLocaleTimeString()),el('td','',c.method+' '+c.url),el('td','',c.sample?'Sample':'Real'),el('td','',c.status?String(c.status):(c.error||'failed')),el('td','',c.ms+' ms'));t.append(tr)}
-  box.append(t);
- }
+ showApiLog(log);
  for(const b of ['api-add','api-add-spec'])$(b).disabled=!editor;
 }
+function prettyJson(t){try{return JSON.stringify(JSON.parse(t),null,2)}catch{return String(t||'')}}
+// Try an API like Beeceptor: its endpoints with inputs filled from the spec's examples, Send shows
+// the answer (real, or a sample while the key is missing), Check all calls every read-only one.
+function apiTryout(id,a,editor){
+ const wrap=el('details','api-tryout'),sum=el('summary','',a.endpoints.length+' endpoint'+(a.endpoints.length>1?'s':'')+': try them');wrap.append(sum);
+ const bar=el('div','row api-tryout-bar');
+ const checkBtn=el('button','ghost','Check all');checkBtn.type='button';checkBtn.disabled=!editor;checkBtn.title='Calls every read-only endpoint once and shows which work';
+ const filter=el('input','api-filter');filter.placeholder='Find an endpoint';filter.setAttribute('aria-label','Find an endpoint');
+ bar.append(filter,checkBtn);wrap.append(bar);
+ const checkOut=el('div','api-check hidden');wrap.append(checkOut);
+ const ul=el('ul','api-endpoints');wrap.append(ul);
+ const rows=[];
+ for(const e of a.endpoints){
+  const li=el('li','api-endpoint'),head=el('button','api-endpoint-head');head.type='button';
+  head.append(el('span','api-method m-'+e.method.toLowerCase(),e.method),el('code','api-path',e.path),el('span','muted small api-summary',e.summary));
+  const panel=el('div','api-endpoint-panel hidden');
+  head.onclick=()=>{panel.classList.toggle('hidden');if(!panel.dataset.ready){panel.dataset.ready='1';fillPanel(panel,e)}};
+  li.append(head,panel);ul.append(li);rows.push({li,e,open:()=>{panel.classList.remove('hidden');if(!panel.dataset.ready){panel.dataset.ready='1';fillPanel(panel,e)}}});
+ }
+ filter.oninput=()=>{const q=filter.value.trim().toLowerCase();for(const r of rows)r.li.classList.toggle('hidden',Boolean(q)&&!(r.e.method+' '+r.e.path+' '+r.e.summary).toLowerCase().includes(q))};
+ function fillPanel(panel,e){
+  const inputs={};
+  if(e.params.length){
+   const grid=el('div','api-params');
+   for(const p of e.params){
+    const lab=el('label','api-param');lab.append(el('span','',p.name+(p.required?' *':'')+' ('+(p.in==='path'?'in the address':p.in==='header'?'header':'query')+')'));
+    let inp;if(p.options){inp=el('select');for(const o of ['',...p.options]){const op=el('option','',o||'(none)');op.value=o;inp.append(op)}inp.value=p.value}else{inp=el('input');inp.value=p.value;inp.spellcheck=false}
+    if(p.description)lab.title=p.description;
+    lab.append(inp);grid.append(lab);inputs[p.name]=inp;
+   }
+   panel.append(grid);
+  }else panel.append(el('p','muted small','No inputs needed.'));
+  let bodyBox=null;
+  if(!e.read_only){const lab=el('label','api-param api-body');lab.append(el('span','','Request body (JSON)'));bodyBox=el('textarea');bodyBox.rows=6;bodyBox.spellcheck=false;bodyBox.value=e.body||'';lab.append(bodyBox);panel.append(lab)}
+  const actions=el('div','row'),sendBtn=el('button','primary','Send');sendBtn.type='button';sendBtn.disabled=!editor;
+  const sampleLab=el('label','api-sample-toggle'),sampleBox=el('input');sampleBox.type='checkbox';sampleLab.append(sampleBox,document.createTextNode(' Sample answer'));
+  if(a.secret&&!a.key_added){sampleBox.checked=true;sampleBox.disabled=true;sampleLab.title='Add the '+a.secret+' key for real answers'}
+  actions.append(sendBtn,sampleLab);panel.append(actions);
+  const out=el('div','api-reply hidden');panel.append(out);
+  const go=async confirm=>{
+   sendBtn.disabled=true;sendBtn.textContent='Sending…';
+   try{
+    const r=await api('/projects/'+id+'/apitry',{method:'POST',body:{slug:a.slug,op:e.id,values:Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value])),body:bodyBox?bodyBox.value:undefined,sample:sampleBox.checked,confirm}});
+    showReply(out,r);renderApisLogOnly();
+   }catch(err){
+    if(err.data&&err.data.confirm&&!confirm){if(window.confirm(err.message))return go(true)}
+    out.classList.remove('hidden');out.replaceChildren(el('p','api-reply-error',err.message));
+   }finally{sendBtn.disabled=!editor;sendBtn.textContent='Send'}
+  };
+  sendBtn.onclick=()=>go(false);
+ }
+ function showReply(out,r){
+  out.classList.remove('hidden');out.replaceChildren();
+  const head=el('div','api-reply-head');
+  head.append(el('span','api-status '+(r.ok?'ok':'bad'),String(r.status)),el('span','api-key '+(r.sample?'sample':'real'),r.sample?'Sample':'Real'),el('span','muted small',r.ms+' ms · '+(r.size>=1024?Math.round(r.size/1024)+' KB':r.size+' bytes')));
+  const copy=el('button','link-btn','Copy');copy.type='button';copy.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(r.body);head.append(copy);
+  out.append(head,el('p','muted small api-reply-url',r.method+' '+r.url),el('p','small',r.why+(r.reason?' '+r.reason:'')));
+  out.append(el('pre','api-reply-body',r.body||'(empty answer)'));
+ }
+ checkBtn.onclick=async()=>{
+  checkBtn.disabled=true;checkBtn.textContent='Checking…';checkOut.classList.remove('hidden');checkOut.replaceChildren(el('p','muted small','Calling each read-only endpoint once…'));
+  try{
+   const r=await api('/projects/'+id+'/apicheck',{method:'POST',body:{slug:a.slug}});
+   checkOut.replaceChildren(el('p','api-check-summary',r.summary));
+   const list=el('ul','api-check-list');
+   for(const x of r.results){
+    const li=el('li','api-check-item '+x.result);
+    li.append(el('span','api-check-mark',x.result==='ok'?'✓':x.result==='sample'?'○':x.result==='input'?'…':'✕'),el('span','api-method m-'+x.method.toLowerCase(),x.method),el('code','api-path',x.path),el('span','small api-check-why',x.reason));
+    const row=rows.find(r=>r.e.id===x.id);if(row){li.tabIndex=0;li.title='Open this endpoint';li.onclick=()=>{row.open();row.li.scrollIntoView({block:'nearest'})}}
+    list.append(li);
+   }
+   checkOut.append(list);renderApisLogOnly();
+  }catch(err){checkOut.replaceChildren(el('p','api-reply-error',err.message))}
+  finally{checkBtn.disabled=!editor;checkBtn.textContent='Check all'}
+ };
+ return wrap;
+}
+// The call log, with each answer one click away.
+function showApiLog(log){
+ const box=$('api-log');box.replaceChildren();
+ if(!log.length){box.append(el('p','muted small','No calls yet. Calls your server functions make to other services, and the ones you try here, show here.'));return}
+ const t=el('table','api-log-table'),head=el('tr');for(const h of ['When','Call','Answer','Status','Time'])head.append(el('th','',h));t.append(head);
+ for(const c of log.slice(0,50)){
+  const tr=el('tr');tr.append(el('td','',new Date(c.at).toLocaleTimeString()),el('td','',c.method+' '+c.url),el('td','',(c.sample?'Sample':'Real')+(c.mode==='try'?' (tried here)':'')),el('td','',c.status?String(c.status):(c.error||'failed')),el('td','',c.ms+' ms'));t.append(tr);
+  if(c.reply){tr.classList.add('api-log-row');tr.title='Show the answer';const r2=el('tr','api-log-reply hidden'),td=el('td');td.colSpan=5;td.append(el('pre','api-reply-body',prettyJson(c.reply)));r2.append(td);tr.onclick=()=>r2.classList.toggle('hidden');t.append(r2)}
+ }
+ box.append(t);
+}
+// After a try, refresh only the call log (keeps the open endpoint panels as they are).
+function renderApisLogOnly(){const id=state.project&&state.project.id;if(id)api('/projects/'+id+'/apis').then(({log})=>showApiLog(log)).catch(()=>{})}
 async function addApi(body){
  text($('api-status'),body.name?'Looking up '+body.name+'… (up to a minute)':'Reading the spec…');
  for(const b of ['api-add','api-add-spec'])$(b).disabled=true;
