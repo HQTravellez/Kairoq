@@ -57,6 +57,11 @@ test('in the editor: questions, the plan, Approve, and the build gets the answer
  page.on('pageerror',e=>errors.push(e.message));
  try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/create',{waitUntil:'domcontentloaded'});
+  // What to build: the switch changes the examples; a phone app is asked for as one.
+  await page.click('#new-kind [data-kind="phone"]');
+  assert.equal(await page.getAttribute('#new-kind [data-kind="phone"]','aria-pressed'),'true');
+  assert.match(await page.locator('#examples').innerText(),/iPhone app for my café/);
+  await page.click('#new-kind [data-kind="site"]');
   await page.fill('#new-prompt','An iPhone app like Quiver: kids color a page and a 3D animal comes alive');
   await page.click('#new-submit');
   await page.waitForSelector('.ask-opt',{timeout:20000});
