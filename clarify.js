@@ -8,9 +8,10 @@ Read their request. Ask at most 3 short questions, only where the answer changes
 (who needs to sign in, which parts or pages, what data it keeps, payments, emails or reminders,
 languages). Never ask about colours, style or wording: the builder chooses those. If the request
 is already clear enough to build well, ask nothing.
-Each question has 2 to 4 short options (a few words each) the owner can tap; set "multi": true
-when several options can apply together.
-Respond with ONLY JSON: {"questions":[{"q":"…?","options":["…","…"],"multi":false}]}`;
+Each question has 2 to 4 options the owner can tap: a short label (a few words) and one plain
+sentence saying what it means for the app. Put the option you recommend first and set
+"recommended": 0. Set "multi": true when several options can apply together.
+Respond with ONLY JSON: {"questions":[{"q":"…?","options":[{"label":"…","detail":"…"},{"label":"…","detail":"…"}],"recommended":0,"multi":false}]}`;
 const TIMEOUT_MS=12000;
 
 function clip(v,n){return String(v??'').replace(/\s+/g,' ').trim().slice(0,n)}
@@ -18,18 +19,22 @@ function clip(v,n){return String(v??'').replace(/\s+/g,' ').trim().slice(0,n)}
 function clean(raw){
  const out=[];
  for(const x of Array.isArray(raw&&raw.questions)?raw.questions:[]){
-  const q=clip(x&&x.q,140),opts=[...new Set((Array.isArray(x&&x.options)?x.options:[]).map(o=>clip(o,48)).filter(Boolean))].slice(0,4);
+  // Options are a label and one sentence ({label, detail}) or, from older models, a plain label.
+  const raw=(Array.isArray(x&&x.options)?x.options:[]).map(o=>typeof o==='string'?{label:clip(o,48),detail:''}:{label:clip(o&&(o.label||o.text),48),detail:clip(o&&(o.detail||o.description),140)}).filter(o=>o.label);
+  const seen=new Set(),list=raw.filter(o=>!seen.has(o.label.toLowerCase())&&seen.add(o.label.toLowerCase())).slice(0,4);
+  const q=clip(x&&x.q,140),opts=list.map(o=>o.label);
   if(q.length<6||opts.length<2)continue;
-  out.push({q:/[?]$/.test(q)?q:q+'?',options:opts,multi:x.multi===true});
+  const r=Number(x.recommended);
+  out.push({q:/[?]$/.test(q)?q:q+'?',options:opts,...(list.some(o=>o.detail)?{details:list.map(o=>o.detail)}:{}),...(Number.isInteger(r)&&r>=0&&r<opts.length?{recommended:r}:{}),multi:x.multi===true});
   if(out.length>=3)break;
  }
  return out;
 }
 // Long, detailed requests are clear enough already.
-function worthAsking(prompt){const t=clip(prompt,4000);return t.length>=3&&t.length<=280}
+function worthAsking(prompt){const t=clip(prompt,4000);return t.length>=3&&t.length<=600}
 async function questions(prompt,{callModel,tier='standard'}={}){
  if(!callModel||!worthAsking(prompt))return[];
- const ask=callModel({messages:[{role:'system',content:SYSTEM},{role:'user',content:clip(prompt,600)}],tier,temperature:0.2,maxOutputTokens:500,purpose:'clarify'},c=>{const t=String(c).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');return JSON.parse(t.slice(a,b+1))});
+ const ask=callModel({messages:[{role:'system',content:SYSTEM},{role:'user',content:clip(prompt,600)}],tier,temperature:0.2,maxOutputTokens:900,purpose:'clarify'},c=>{const t=String(c).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');return JSON.parse(t.slice(a,b+1))});
  try{return clean(await Promise.race([ask,new Promise((_,rej)=>setTimeout(()=>rej(Error('timeout')),TIMEOUT_MS))]))}
  catch{return[]}
 }

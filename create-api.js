@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
@@ -1241,6 +1241,13 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
   if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
+  // The plan before the first build (build-plan.js): free, shown with Approve, Review and Skip.
+  if(action==='/plan'&&method==='POST'){
+   limitedKey('plan:'+v.owner,30,3600000);
+   const b=await readJson(req,12000);
+   const plan=process.env.KAIROQ_PLAN==='off'?null:await require('./build-plan').make(String(b.prompt||''),{callModel:deps.callModel,tier:b.tier==='pro'||b.tier==='max'?b.tier:'standard',webSearch:deps.webSearch,browseSite:deps.browseSite});
+   return send(res,200,{plan}),true;
+  }
   // The look picked before the first build becomes the project's design (react-builder prepareDesign).
   if(action==='/look'&&method==='POST'){
    const b=await readJson(req,12000),meta=builder.loadMeta(id);
