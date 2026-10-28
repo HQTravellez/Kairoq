@@ -102,7 +102,7 @@ function checklist(id){
  const meta=builder.loadMeta(id),s=meta.store||{},view=listing.view(meta),r=ready();
  const items=[
   {key:'native',ok:require('./react-native-app').enabled(meta),text:'A native iPhone and Android app (ask for "an iPhone app…")'},
-  {key:'listing',ok:Boolean(view.listing)&&!view.missing.length,text:view.listing?(view.missing.length?'Store listing: still needs '+view.missing.join(' ').toLowerCase():'Store listing ready'):'Prepare the store listing'},
+  {key:'listing',ok:Boolean(view.listing)&&!view.missing.length,text:view.listing?(view.missing.length?'Store listing still needs: '+view.missing.map(m=>m.replace(/\.$/,'').replace(/^./,c=>c.toLowerCase())).join('; '):'Store listing ready'):'Prepare the store listing'},
   {key:'server',ok:r.eas&&r.expo_token,text:r.eas&&r.expo_token?'Kairoq can build for the stores':'Kairoq needs EXPO_TOKEN and the eas program on the server (admin)'},
   {key:'apple',ok:has(id,S.ascP8)&&has(id,S.ascAppId),text:has(id,S.ascP8)?(has(id,S.ascAppId)?'Apple: key saved, app found in App Store Connect':'Apple: key saved, but no app with the ID '+view.bundle_id+' in App Store Connect yet'):'Apple: add your App Store Connect API key'},
   {key:'google',ok:has(id,S.playJson),text:has(id,S.playJson)?'Google Play: service account saved'+(s.google&&s.google.first_upload_done?'':' (the first upload is done by hand)'):'Google Play: add a service account key (optional for the first upload)'},
