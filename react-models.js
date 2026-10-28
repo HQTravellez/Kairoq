@@ -12,7 +12,7 @@ const VIEWER_VERSION='4.4.0',VIEWER_FILE='model-viewer-'+VIEWER_VERSION+'.min.js
 // Google <model-viewer> (Apache-2.0), its bundled build with three.js inside. Served to the Create
 // editor at /vendor/model-viewer/ and copied into apps that show 3D.
 const VIEWER_SRC=path.join(__dirname,'public','vendor','model-viewer',VIEWER_FILE);
-const FILE=/^[a-z0-9][a-z0-9-]{0,60}\.(glb|png|hdr)$/;
+const FILE=/^[a-z0-9][a-z0-9-]{0,60}\.(glb|png|jpg|hdr)$/;
 // The 3D styles an owner can pick in the look chooser (looks.js reads these too).
 const STYLES={
  none:{label:'No 3D',hint:''},
@@ -38,6 +38,14 @@ function isGlb(b){return b.length>=20&&b.readUInt32LE(0)===0x46546c67&&b.readUIn
 function isPng(b){return b.length>8&&b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))}
 function isJpg(b){return b.length>3&&b[0]===0xff&&b[1]===0xd8}
 function isHdr(b){return /^#\?(RADIANCE|RGBE)/.test(b.subarray(0,16).toString('latin1'))}
+// The names of the animations inside a GLB (walk, run, jump...), read from its JSON chunk.
+function animationNames(glb){
+ try{
+  if(!isGlb(glb)||glb.readUInt32LE(16)!==0x4e4f534a)return[];
+  const doc=JSON.parse(glb.subarray(20,20+glb.readUInt32LE(12)).toString('utf8'));
+  return(doc.animations||[]).map((a,i)=>String(a&&a.name||'Animation '+(i+1)).replace(/[^\w .|-]/g,'').slice(0,60)).filter(Boolean).slice(0,40);
+ }catch{return[]}
+}
 
 // Packs a glTF (JSON plus its .bin and texture files) into one GLB. resource(uri) returns the
 // bytes of a file the glTF points to.
@@ -81,9 +89,10 @@ function keep(id,entry,glb,poster){
  const file=fileName(entry.title||'model',glb,ext);
  fs.writeFileSync(path.join(dir(id),file),glb);
  let posterFile=null;
- if(poster){posterFile=file.replace(/\.(glb|hdr)$/,'.png');fs.writeFileSync(path.join(dir(id),posterFile),poster)}
+ if(poster){posterFile=file.replace(/\.(glb|hdr)$/,isJpg(poster)?'.jpg':'.png');fs.writeFileSync(path.join(dir(id),posterFile),poster)}
+ const animations=ext==='glb'?animationNames(glb):[];
  const item={file,kind:entry.kind||'model',title:String(entry.title||'Model').slice(0,80),bytes:glb.length,poster:posterFile,poster_bytes:poster?poster.length:0,
-  source:entry.source||{provider:'upload'},converted:entry.converted||null,info:entry.info||null,added_at:new Date().toISOString()};
+  source:entry.source||{provider:'upload'},converted:entry.converted||null,info:entry.info||null,...(animations.length?{animations}:{}),added_at:new Date().toISOString()};
  store(id,[...items.filter(m=>m.file!==file),item]);
  return view(item);
 }
@@ -176,6 +185,52 @@ async function addPolyHaven(id,assetId,{kind='model',fetchImpl=fetch}={}){
  return keep(id,{title:source.title,kind:'model',source},glb,thumb);
 }
 
+// ---------- Poly Pizza (poly.pizza; api.poly.pizza, key in POLY_PIZZA_KEY) ----------
+// Over 10,000 free low-poly models, many animated (Quaternius, Kenney and others). Only models
+// under CC0 (no credit needed) or CC-BY (credit the creator; the app shows it) are offered.
+const PP_API='https://api.poly.pizza/v1';
+function polyPizzaReady(){return Boolean(process.env.POLY_PIZZA_KEY)&&process.env.KAIROQ_POLYPIZZA!=='off'}
+function ppLicence(v){const s=String(v||'').toUpperCase().replace(/\s+/g,' ');return /^CC0/.test(s)||/PUBLIC DOMAIN/.test(s)?'CC0':/^CC[- ]BY( 3\.0| 4\.0)?$/.test(s)?'CC-BY':null}
+async function ppJson(pathname,fetchImpl){
+ if(!polyPizzaReady())throw fail(409,'Finding ready-made characters needs a Poly Pizza key (POLY_PIZZA_KEY on the server).');
+ const r=await fetchImpl(PP_API+pathname,{headers:{'X-Auth-Token':process.env.POLY_PIZZA_KEY,Accept:'application/json','User-Agent':UA},signal:AbortSignal.timeout(20000)});
+ if(!r.ok)throw fail(502,'Poly Pizza answered HTTP '+r.status);return r.json();
+}
+async function ppBytes(url,fetchImpl,limit){
+ const u=new URL(url);if(u.protocol!=='https:'||!/(^|\.)poly\.pizza$/.test(u.hostname))throw fail(502,'Unexpected Poly Pizza download address');
+ const r=await fetchImpl(u.href,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(60000)});if(!r.ok)throw fail(502,'Poly Pizza download failed (HTTP '+r.status+')');
+ const b=Buffer.from(await r.arrayBuffer());if(b.length>limit)throw fail(413,'This Poly Pizza model is too big');return b;
+}
+// One Poly Pizza model as Kairoq shows it, or null when its licence cannot be used.
+function ppView(m){
+ const licence=ppLicence(m&&m.Licence);if(!m||!m.ID||!licence||!m.Download)return null;
+ const creator=String(m.Creator&&m.Creator.Username||'').slice(0,60),tris=Number(m.TriangleCount)||null;
+ const notes=[];
+ notes.push(m.Animated?'Animated':'Stands still');
+ if(tris)notes.push(tris<3000?'faceted low-poly':tris<15000?'low-poly':'detailed');
+ if(licence==='CC-BY')notes.push('app must credit '+(creator||'the creator'));
+ return{id:String(m.ID).slice(0,40),title:String(m.Title||'Model').slice(0,80),creator,licence,animated:Boolean(m.Animated),tris,
+  thumb:/^https:\/\/([\w-]+\.)*poly\.pizza\//.test(String(m.Thumbnail||''))?String(m.Thumbnail):null,url:'https://poly.pizza/m/'+encodeURIComponent(m.ID),note:notes.join(' · ')};
+}
+async function searchPolyPizza(query,{animated=false,fetchImpl=fetch,limit=3}={}){
+ const q=String(query||'').replace(/[^\w ]+/g,' ').trim().slice(0,60);if(!q)return[];
+ const run=async anim=>{const d=await ppJson('/search/'+encodeURIComponent(q)+'?limit=24'+(anim?'&animated=true':''),fetchImpl);return(d.results||[]).map(ppView).filter(Boolean)};
+ let rows=await run(animated);
+ if(animated&&rows.length<limit)rows=[...rows,...(await run(false)).filter(r=>!rows.some(x=>x.id===r.id))];
+ return rows.slice(0,Math.max(1,Math.min(12,limit)));
+}
+async function addPolyPizza(id,modelId,{fetchImpl=fetch}={}){
+ builder.loadMeta(id);
+ const pid=String(modelId||'');if(!/^[\w-]{3,40}$/.test(pid))throw fail(400,'Pick a Poly Pizza model');
+ if(load(id).some(m=>m.source&&m.source.provider==='polypizza'&&m.source.id===pid))return load(id).map(view).find(m=>m.source.id===pid);
+ const m=await ppJson('/model/'+encodeURIComponent(pid),fetchImpl),v=ppView(m);
+ if(!v)throw fail(422,'This model\'s licence does not allow use in your app');
+ const glb=await ppBytes(m.Download,fetchImpl,MAX_GLB);if(!isGlb(glb))throw fail(502,'Poly Pizza sent a file that is not a GLB model');
+ let thumb=null;try{if(v.thumb){const t=await ppBytes(v.thumb,fetchImpl,3*1024*1024);thumb=isPng(t)||isJpg(t)?t:null}}catch{}
+ const source={provider:'polypizza',id:pid,title:v.title,creator:v.creator,license:v.licence,url:v.url};
+ return keep(id,{title:v.title,kind:'model',source},glb,thumb);
+}
+
 // The owner picked a 3D style but has no model yet: once per project, the AI names an object
 // that suits the app and the best Poly Haven match is added, so the first build already has 3D.
 async function autoModel(id,request,{callModel,signal,fetchImpl=fetch}={}){
@@ -199,7 +254,7 @@ function remove(id,file){
  for(const f of [m.file,m.poster])if(f)fs.rmSync(path.join(dir(id),f),{force:true});
  store(id,items.filter(x=>x!==m));return list(id);
 }
-const TYPES={glb:'model/gltf-binary',png:'image/png',hdr:'application/octet-stream'};
+const TYPES={glb:'model/gltf-binary',png:'image/png',jpg:'image/jpeg',hdr:'application/octet-stream'};
 function read(id,file){
  if(!FILE.test(String(file||'')))return null;
  const f=path.join(dir(id),file);if(!fs.existsSync(f))return null;
@@ -223,10 +278,10 @@ function note(id,meta){
  if(!items.length&&style==='none')return'';
  const models=items.filter(m=>m.kind==='model'),envs=items.filter(m=>m.kind==='environment');
  const L=['3D IN THIS APP. Show 3D only with: import { Model3D } from \'kairoq/3d\'; (never three.js directly for these files, and never other model URLs).'];
- for(const m of models)L.push('- model ./models/'+m.file+' "'+m.title+'"'+(m.poster?' poster ./models/'+m.poster:'')+(m.source&&m.source.provider==='polyhaven'?' (Poly Haven, CC0)':''));
+ for(const m of models)L.push('- model ./models/'+m.file+' "'+m.title+'"'+(m.poster?' poster ./models/'+m.poster:'')+(m.source&&m.source.provider==='polyhaven'?' (Poly Haven, CC0)':'')+(m.source&&m.source.provider==='polypizza'?' (Poly Pizza, '+m.source.license+(m.source.license==='CC-BY'?': show the credit "'+m.title+'" by '+(m.source.creator||'its creator')+' (poly.pizza, CC-BY) on an about or credits screen':'')+')':'')+(m.animations&&m.animations.length?' animations: '+m.animations.map(a=>'"'+a+'"').join(', '):''));
  for(const m of envs)L.push('- lighting ./models/'+m.file+' "'+m.title+'" (pass as environment="./models/'+m.file+'")');
- L.push('<Model3D src="./models/x.glb" poster="./models/x.png" alt="what it shows" mode="product|walkthrough|scroll|background" className="h-[60vh] w-full" /> Props: environment, autoRotate, ar (default on in product mode), hotspots=[{position:"0 1 0",normal:"0 0 1",label:"Kitchen"}], stops=["0deg 75deg 105%","90deg 60deg 80%"] (scroll mode: camera stops as the section scrolls), cameraOrbit, cameraTarget, exposure. Give it a fixed height, real alt text, and a short text line nearby saying visitors can drag to turn it. It already shows the poster while loading, on old phones and for reduced motion.');
+ L.push('<Model3D src="./models/x.glb" poster="./models/x.png" alt="what it shows" mode="product|walkthrough|scroll|background" className="h-[60vh] w-full" /> Props: environment, autoRotate, animation="Idle" (loops one of the model’s own animations; leave it out to loop the first), tapAnimation="Jump" (plays once when tapped, then back), onAnimations={names=>…} (the names, once loaded), onControls={setModel} (once loaded: {animations, materials, play(name,{once}), pause(), replay(), reset()} for buttons like Walk, Jump, Replay), blank (every part plain white, e.g. a character waiting to be coloured in), colors={{"Body":"#4caf50"}} (paint parts by material name from controls.materials, or by index "0"), credit line for the model under it, ar (default on in product mode), hotspots=[{position:"0 1 0",normal:"0 0 1",label:"Kitchen"}], stops=["0deg 75deg 105%","90deg 60deg 80%"] (scroll mode: camera stops as the section scrolls), cameraOrbit, cameraTarget, exposure. Give it a fixed height, real alt text, and a short text line nearby saying visitors can drag to turn it. It already shows the poster while loading, on old phones and for reduced motion.');
  if(style!=='none')L.push('The owner chose the 3D style "'+STYLES[style].label+'". '+STYLES[style].hint+(models.length?'':' No model is in the project yet: say in "message" that they can add one in Design → 3D models (upload or Poly Haven), and lay the section out so the model drops in.'));
  return L.join('\n');
 }
-module.exports={saveMade,STYLES,MAX_MODELS,MAX_GLB,VIEWER_FILE,VIEWER_SRC,list,upload,addPolyHaven,searchPolyHaven,autoModel,setPoster,remove,read,copyInto,copyViewer,usesViewer,note,packGlb,isGlb,dir};
+module.exports={searchPolyPizza,addPolyPizza,polyPizzaReady,ppView,ppLicence,animationNames,saveMade,STYLES,MAX_MODELS,MAX_GLB,VIEWER_FILE,VIEWER_SRC,list,upload,addPolyHaven,searchPolyHaven,autoModel,setPoster,remove,read,copyInto,copyViewer,usesViewer,note,packGlb,isGlb,dir};

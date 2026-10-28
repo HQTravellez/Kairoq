@@ -35,10 +35,46 @@ function Poster({poster,alt,className,style}){
  return poster?h('img',{src:poster,alt,className,style:{objectFit:'contain',width:'100%',height:'100%',...style},loading:'lazy',decoding:'async'})
   :h('div',{role:'img','aria-label':alt,className,style:{background:'linear-gradient(160deg,rgba(127,127,127,.12),rgba(127,127,127,.04))',...style}});
 }
-export function Model3D({src,poster,alt='3D model',mode='product',environment,skybox,autoRotate,ar,hotspots=[],stops=[],cameraOrbit,cameraTarget,fieldOfView,exposure=0.95,toneMapping='aces',shadow=1,className='',style,onLoad,children}){
+export function Model3D({src,poster,alt='3D model',mode='product',environment,skybox,autoRotate,ar,hotspots=[],stops=[],cameraOrbit,cameraTarget,fieldOfView,exposure=0.95,toneMapping='aces',shadow=1,animation,tapAnimation,onAnimations,onControls,blank,colors,className='',style,onLoad,children}){
  const ref=useRef(null);const [ready,setReady]=useState(false);const [failed,setFailed]=useState(false);
  const still=reduced();
  useEffect(()=>{let live=true;if(!webgl()){setFailed(true);return}loadViewer().then(()=>{if(live)setReady(true)}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[]);
+ // The model's own animations (walk, jump...): one loops (the named one or the first), and
+ // tapAnimation plays once when the model is tapped, then the loop comes back.
+ useEffect(()=>{
+  const el=ref.current;if(!el||!ready)return;
+  const names=()=>Array.from(el.availableAnimations||[]);
+  const mats=()=>Array.from((el.model&&el.model.materials)||[]);
+  const pick=n=>{const all=names();if(!n)return all[0];const l=String(n).toLowerCase();return all.find(a=>a===n)||all.find(a=>a.toLowerCase()===l)||all.find(a=>a.toLowerCase().includes(l))};
+  const loop=()=>{const n=pick(animation);if(!n||still)return;el.animationName=n;el.play()};
+  const loaded=()=>{const all=names();el.dataset.kqAnimations=all.join('|');onAnimations&&onAnimations(all);loop();
+   // Buttons in the app (Walk, Jump, Replay...) drive the model through these controls.
+   onControls&&onControls({animations:all,materials:mats().map(m=>m.name),
+    play:(n,{once=false}={})=>{const a=pick(n);if(!a)return false;busy=once;el.animationName=a;el.currentTime=0;el.play(once?{repetitions:1}:undefined);return true},
+    pause:()=>el.pause(),replay:()=>{el.currentTime=0;el.play()},
+    reset:()=>{el.cameraOrbit='auto auto auto';el.resetTurntableRotation&&el.resetTurntableRotation();el.jumpCameraToGoal&&el.jumpCameraToGoal()}})};
+  let busy=false;
+  const tap=()=>{const n=tapAnimation&&pick(tapAnimation);if(!n||busy)return;busy=true;el.animationName=n;el.currentTime=0;el.play({repetitions:1})};
+  const done=()=>{busy=false;loop()};
+  el.addEventListener('load',loaded);el.addEventListener('click',tap);el.addEventListener('finished',done);
+  if(el.loaded)loaded();
+  return()=>{el.removeEventListener('load',loaded);el.removeEventListener('click',tap);el.removeEventListener('finished',done)};
+ },[ready,src,animation,tapAnimation]);
+ // Colours on the model: blank makes every part plain white (ready to be coloured in), and
+ // colors={{"Body":"#4caf50"}} paints parts by material name (or index "0", "1"...).
+ useEffect(()=>{
+  const el=ref.current;if(!el||!ready||(!blank&&!colors))return;
+  const rgba=h=>{const m=/^#?([0-9a-f]{6})$/i.exec(String(h||''));if(!m)return null;const n=parseInt(m[1],16);return[((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255,1]};
+  const paint=()=>{
+   const list=Array.from((el.model&&el.model.materials)||[]);
+   list.forEach((m,i)=>{const pbr=m.pbrMetallicRoughness;if(!pbr)return;
+    const want=colors&&(colors[m.name]??colors[String(i)]);const c=rgba(want)||(blank?[0.96,0.96,0.95,1]:null);if(!c)return;
+    try{if(blank||want)pbr.baseColorTexture&&pbr.baseColorTexture.setTexture&&pbr.baseColorTexture.setTexture(null)}catch{}
+    pbr.setBaseColorFactor(c)});
+   el.dataset.kqPainted='true';
+  };
+  if(el.loaded)paint();el.addEventListener('load',paint);return()=>el.removeEventListener('load',paint);
+ },[ready,src,blank,JSON.stringify(colors||null)]);
  useEffect(()=>{const el=ref.current;if(!el)return;const bad=()=>setFailed(true),ok=()=>{el.dataset.kqLoaded='true';onLoad&&onLoad(el)};el.addEventListener('error',bad);el.addEventListener('load',ok);return()=>{el.removeEventListener('error',bad);el.removeEventListener('load',ok)}},[ready,src]);
  // Scroll story: the camera follows how far the section has scrolled through the screen.
  useEffect(()=>{
@@ -59,6 +95,7 @@ export function Model3D({src,poster,alt='3D model',mode='product',environment,sk
  if(mode==='scroll'){attrs['disable-zoom']='';attrs['interpolation-decay']='120'}
  if(bg){attrs['disable-zoom']='';attrs['rotation-per-second']='8deg';attrs['aria-hidden']='true'}
  if(rotate){attrs['auto-rotate']='';attrs['auto-rotate-delay']='0'}
+ if(tapAnimation)attrs.style.cursor='pointer';
  if(useAr){attrs.ar='';attrs['ar-modes']='webxr scene-viewer quick-look'}
  // Soft studio light built into model-viewer (no download) unless an HDRI is given.
  attrs['environment-image']=environment||'neutral';attrs['shadow-softness']='0.9';

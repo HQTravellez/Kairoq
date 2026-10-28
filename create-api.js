@@ -1381,6 +1381,12 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(op==='poster'){const bytes=await readRaw(req,3*1024*1024+1);return send(res,200,{model:M.setPoster(id,String(q.get('file')||''),bytes),...state()}),true}
    const b=await readJson(req,4000);
    if(op==='style'){if(!M.STYLES[b.style])throw Object.assign(Error('Unknown 3D style'),{status:400});const meta=builder.loadMeta(id);meta.three_d={style:b.style,at:new Date().toISOString()};builder.saveMeta(meta);return send(res,200,state()),true}
+   // A ready-made character from Poly Pizza (the pick in the plan, or Design → 3D models).
+   if(op==='polypizza-search')return send(res,200,{results:await M.searchPolyPizza(b.query,{animated:Boolean(b.animated),limit:6})}),true;
+   if(op==='polypizza'){
+    if(limited(req,'model-polypizza',40,3600000))throw Object.assign(Error('Too many downloads. Wait a while.'),{status:429});
+    return send(res,201,{added:await M.addPolyPizza(id,b.id),...state()}),true;
+   }
    if(process.env.KAIROQ_POLYHAVEN==='off')throw Object.assign(Error('Poly Haven is switched off on this server'),{status:409});
    if(op==='search')return send(res,200,{results:await M.searchPolyHaven(b.query,{kind:b.kind==='environment'?'environment':'model'})}),true;
    if(op==='polyhaven'){
