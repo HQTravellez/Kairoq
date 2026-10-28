@@ -1,0 +1,112 @@
+/* Kairoq Studio look (loaded last on create.html). One light theme for the whole builder:
+   cool neutral greys, white surfaces, one ultramarine accent for the main action, Geist, 15 px
+   chat text, one family of rounded shapes. The older layers (create.css, builder.css,
+   chat-box.css, create-kairoq.css, create-look.css) keep their layout; this file sets the colours,
+   type and shapes they all use, so the editor reads as one calm product. */
+:root{
+  --k-bg:#f6f7f9;--k-tint:#eff1f4;--k-surface:#ffffff;--k-line:#e4e6eb;--k-line-strong:#d3d6de;
+  --k-ink:#0f1115;--k-ink-2:#454954;--k-ink-3:#7a7f8c;
+  --k-accent:#3f4cf6;--k-accent-hover:#3240e6;--k-accent-soft:#eef0ff;--k-accent-line:#c9cdfd;--k-ring:0 0 0 3px rgba(63,76,246,.18);
+  --k-shadow-1:0 1px 2px rgba(15,17,21,.05);--k-shadow-2:0 1px 2px rgba(15,17,21,.04),0 16px 40px -20px rgba(15,17,21,.22);
+  /* the tokens the older layers read */
+  --bg:var(--k-bg);--panel:var(--k-surface);--side:var(--k-surface);--border:var(--k-line);--hover:var(--k-tint);
+  --text:var(--k-ink);--muted:var(--k-ink-3);--accent:var(--k-accent);--accent-2:var(--k-accent-hover);--accent-3:var(--k-accent-soft);--accent-ink:#fff;
+  --ink:var(--k-ink);--ink-text:#fff;--grad:var(--k-accent);
+  --lk-wine:var(--k-accent);--lk-wine-d:var(--k-accent-hover);--lk-ink:var(--k-ink);--lk-muted:var(--k-ink-3);--lk-line:var(--k-line);--lk-line-2:var(--k-line-strong);--lk-soft:var(--k-tint);--lk-side:var(--k-bg);
+}
+body{font-family:Geist,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--k-bg);color:var(--k-ink);font-feature-settings:"ss01","cv11";text-rendering:optimizeLegibility}
+#editor{
+  --b-bg:var(--k-bg);--b-tint:var(--k-tint);--b-surface:var(--k-surface);--b-line:var(--k-line);--b-line-strong:var(--k-line-strong);
+  --b-ink:var(--k-ink);--b-ink-2:var(--k-ink-2);--b-ink-3:var(--k-ink-3);--b-brand:var(--k-accent);
+  --b-shadow-1:var(--k-shadow-1);--b-shadow-2:var(--k-shadow-2);
+}
+:focus-visible{outline-color:var(--k-accent)!important}
+
+/* ---------- Editor frame: a white chat column beside a grey stage with the preview as a card ---------- */
+#editor{grid-template-columns:minmax(340px,440px) minmax(0,1fr)!important}
+#editor .chat{background:var(--k-surface)!important;border-right:1px solid var(--k-line)!important}
+#editor .stage{background:var(--k-bg)!important}
+#editor .chat-head{height:56px;border-bottom:1px solid var(--k-line)!important}
+#editor #project-name{font-size:15px!important;font-weight:600!important}
+#editor .stage-bar{height:56px;padding:0 16px 0 12px!important;gap:8px!important}
+#editor .canvas{padding:0 16px 16px 12px!important}
+#editor .canvas>iframe,#editor #frame{border-radius:16px!important;border-color:var(--k-line)!important;box-shadow:var(--k-shadow-2)!important}
+
+/* toolbar: a segmented switch, quiet icon buttons, Share and one bright Publish */
+#editor .stage-bar .seg{background:var(--k-tint)!important;border-radius:12px!important}
+#editor .stage-bar .seg button{border-radius:9px!important;color:var(--k-ink-2)!important}
+#editor .stage-bar .seg button[aria-pressed=true]{background:var(--k-surface)!important;color:var(--k-ink)!important;box-shadow:0 1px 2px rgba(15,17,21,.08),0 0 0 1px rgba(15,17,21,.04)!important}
+#editor .stage-bar .ghost,#editor .stage-bar .menu>summary{color:var(--k-ink-2)!important;border-radius:10px!important}
+#editor .stage-bar .ghost:hover,#editor .stage-bar .menu>summary:hover,#editor .stage-bar .menu[open]>summary{background:var(--k-tint)!important;color:var(--k-ink)!important}
+#editor #versions{border-radius:10px!important;border-color:var(--k-line)!important;background-color:var(--k-surface)!important;color:var(--k-ink-2)!important;font-size:13px!important}
+#editor #share-open{border-radius:999px!important;border:1px solid var(--k-line-strong)!important;background:var(--k-surface)!important;padding:0 16px!important}
+#editor #publish-open{border-radius:999px!important;background:var(--k-accent)!important;color:#fff!important;padding:0 18px!important;box-shadow:0 1px 2px rgba(63,76,246,.3)!important}
+#editor #publish-open:hover{background:var(--k-accent-hover)!important}
+#editor #publish-open .live-dot{background:#fff!important;box-shadow:none!important}
+#editor .menu-panel{border-radius:16px!important;border-color:var(--k-line)!important;box-shadow:var(--k-shadow-2)!important}
+#editor .menu-panel button:hover{background:var(--k-tint)!important}
+#editor .menu-panel button b{color:var(--k-ink)}
+
+/* ---------- Chat: 15 px text, soft user bubbles, Kairoq's mark in the accent ---------- */
+.chat{background:var(--k-surface)!important}
+#editor .messages{padding:20px 22px 12px!important;gap:14px!important}
+#editor .messages li.user{background:var(--k-tint)!important;color:var(--k-ink)!important;font-size:15px!important;border-radius:20px 20px 6px 20px!important;padding:12px 16px!important}
+#editor .messages li.assistant{font-size:15px!important;line-height:1.6!important;color:var(--k-ink)!important}
+#editor .messages .assistant::before,.messages .assistant::before{background:var(--k-accent)!important;color:#fff!important;border-radius:7px!important;box-shadow:none!important}
+#editor .messages .user .msg-text,#editor .messages .user>.bubble,.messages li.user{background:var(--k-tint)!important;border-color:transparent!important}
+#editor .msg-meta{color:var(--k-ink-3)!important}
+#editor .msg-meta .ver{border-color:var(--k-line)!important;color:var(--k-ink-2)!important}
+.look-note{color:var(--k-ink-3)!important}
+.look-note .vmark{color:#16804a!important}
+.verified,.verified.ok,.verified.bad{border-color:var(--k-line)!important;border-radius:14px!important}
+.verified li.bad .vmark{color:var(--k-accent)!important}
+.verified .verification-scope{border-top-color:var(--k-line)!important;color:var(--k-ink-3)!important}
+
+/* the message box: a white card, room to type, a round accent send button */
+.chat #chat-form.composer{margin:8px 18px 18px!important;padding:16px 16px 10px 18px!important;border:1px solid var(--k-line-strong)!important;border-radius:22px!important;box-shadow:var(--k-shadow-2)!important}
+.chat #chat-form.composer:focus-within{border-color:var(--k-accent-line)!important;box-shadow:var(--k-ring),var(--k-shadow-2)!important}
+.chat #chat-input{font-size:15px!important;line-height:1.55!important}
+.chat #chat-input::placeholder{color:#9a9eaa!important}
+.chat .composer-bar #menu-plus>summary,.chat .composer-bar .menu.up.pick>summary{color:var(--k-ink-2)!important;border-radius:999px!important}
+.chat .composer-bar .menu.up.pick>summary{background:var(--k-tint)!important;padding:0 12px!important}
+.chat .composer-bar #menu-plus>summary:hover,.chat .composer-bar #menu-plus[open]>summary,.chat .composer-bar .menu.up.pick>summary:hover,.chat .composer-bar .menu.up.pick[open]>summary{background:#e6e8ee!important;color:var(--k-ink)!important}
+.chat .composer-bar .send{width:36px!important;height:36px!important;background:var(--k-accent)!important;color:#fff!important}
+.chat .composer-bar .send.is-empty{background:var(--k-tint)!important;color:#a3a7b2!important}
+#progress:not(.hidden){border-color:var(--k-accent-line)!important;background:var(--k-accent-soft)!important;color:#2b36b8!important;margin:0 18px -16px!important}
+#progress .dot{background:var(--k-accent)!important;box-shadow:0 0 0 0 rgba(63,76,246,.4)!important}
+#progress #stop-job{color:#2b36b8!important}
+
+/* ---------- Questions, the plan and the answers ---------- */
+.messages li.assistant.ask-card{border-color:var(--k-line)!important;border-radius:20px!important;padding:18px 18px 16px!important;box-shadow:var(--k-shadow-2)!important;gap:12px!important}
+.ask-head,.ask-count{color:var(--k-ink-3)!important;font-weight:500!important}
+.ask-q{font-size:16px!important;line-height:1.4!important;letter-spacing:-.01em}
+.ask-card .ask-opt{border:1px solid var(--k-line)!important;background:var(--k-surface)!important;border-radius:14px!important;padding:12px 14px!important;transition:border-color .15s,background .15s}
+.ask-card .ask-opt:hover{border-color:var(--k-line-strong)!important}
+.ask-card .ask-opt:has(input:checked),.ask-card .ask-opt.on{border-color:var(--k-accent)!important;background:var(--k-accent-soft)!important}
+.ask-card .ask-opt input{accent-color:var(--k-accent)!important}
+.ask-detail{color:var(--k-ink-3)!important}
+.ask-other{border-radius:14px!important;height:44px!important;background:var(--k-surface)!important;border-color:var(--k-line)!important}
+.ask-arrow{border-color:var(--k-line)!important;background:var(--k-surface)!important}
+.ask-card .ask-next,.ask-card .plan-approve,.ask-next{background:var(--k-accent)!important;color:#fff!important;height:38px!important;padding:0 20px!important;border-radius:999px!important}
+.ask-card .ask-next:hover,.ask-card .plan-approve:hover{background:var(--k-accent-hover)!important}
+.ask-link{color:var(--k-ink-2)!important}
+.plan-title{font-size:18px!important;letter-spacing:-.015em}
+.plan-summary{color:var(--k-ink-2)!important}
+.plan-review{height:38px!important;border-color:var(--k-line-strong)!important;border-radius:999px!important}
+.plan-more{border-top-color:var(--k-line)!important}
+.plan-wait{background:var(--k-bg)!important}
+.plan-wait-title{font-size:20px!important;letter-spacing:-.015em}
+.req-answers{background:rgba(255,255,255,.7)!important;border:1px solid var(--k-line)}
+
+/* ---------- Home: white sidebar, accent mark, calm prompt box ---------- */
+.home h1,.hero h1{color:var(--k-ink)!important;letter-spacing:-.025em!important}
+.home .prompt-box,.prompt-box{border-color:var(--k-line-strong)!important;border-radius:22px!important;box-shadow:var(--k-shadow-2)!important;background:var(--k-surface)!important}
+.prompt-box:focus-within{border-color:var(--k-accent-line)!important;box-shadow:var(--k-ring),var(--k-shadow-2)!important}
+.hero-chip,.home .chips button,.suggestions button,.example{border-color:var(--k-line)!important;background:var(--k-surface)!important;color:var(--k-ink-2)!important;border-radius:999px!important}
+.hero-chip:hover,.home .chips button:hover,.example:hover{background:var(--k-tint)!important;color:var(--k-ink)!important}
+.work{background:var(--k-tint)!important;border-color:var(--k-line)!important}
+.messages .user,.messages li.user{color:var(--k-ink)}
+#editor #versions{max-width:180px!important;min-width:0!important}
+#editor .stage-bar .menu#menu-test>summary{padding:0 10px!important}
+#new-submit{background:var(--k-accent)!important;color:#fff!important;border:0!important}
+#new-submit:hover{background:var(--k-accent-hover)!important}

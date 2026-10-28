@@ -337,7 +337,7 @@ function messageItem(m,last,index){
   // Like Lovable: "Thought for Ns", the answer (formatted), then what was done, folded.
   const think=tl.find(e=>e.t==='think');
   const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
-  if(thoughtMs!=null){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secs(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
+  if(thoughtMs!=null){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secsShort(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
   li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
@@ -989,7 +989,8 @@ const LABELS={researching:'Looking things up on the web…',pitching:'Writing th
 const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',modelling:'Modelling in Blender',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
-function secs(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'}
+// "12s" or "2m 05s" (for "Thought for …"; secs() below gives " in 4.0 s").
+function secsShort(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'}
 function phaseOf(j){if(j.mode==='discuss')return'thinking';if(j.status==='queued'||(j.status==='writing'&&!(j.stream&&j.stream.chars)))return'thinking';return j.status}
 const ICONS={think:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',plan:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',read:'<path d="M4 19.5V5a2 2 0 0 1 2-2h8l6 6v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5z"/><path d="M14 3v6h6"/>',edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',build:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',test:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/>',check:'<path d="M20 6 9 17l-5-5"/>',fix:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',note:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',design:'<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"/>',image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',web:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',logs:'<path d="M4 17l6-6-6-6M12 19h8"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',coin:'<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.2 0 1.1-1.1 1.9-2.5 1.9a2.5 2 0 0 1-2.5-1.5M12 6.5V8M12 16v1.5"/>',back:'<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',chev:'<path d="m9 6 6 6-6 6"/>',down:'<path d="m6 9 6 6 6-6"/>'};
 function icon(name,cls){const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('class','ico'+(cls?' '+cls:''));s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[name]||ICONS.note;return s}
@@ -1028,7 +1029,7 @@ function eventRow(e,{expand=false,version=null,live=false}={}){
  let more=null;
  if(e.t==='think'){
   if(e.title){const t=el('div','ev-title');inlineMd(t,e.title);main.insertBefore(t,head)}
-  head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secs(e.ms||0)));
+  head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secsShort(e.ms||0)));
   if(e.text)more=()=>el('p','ev-thought',e.text);
  }else if(e.t==='plan'){head.append(el('span','ev-label','Plan'));const ol=el('ol','ev-plan');for(const it of e.items||[]){const x=el('li');inlineMd(x,it);ol.append(x)}main.append(ol)}
  else if(e.t==='read'){head.append(el('span','ev-label','Read'));for(const f of e.files||[])head.append(fileChip(f))}
