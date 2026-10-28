@@ -13,7 +13,7 @@ const clip=(v,n)=>String(v??'').replace(/\s+/g,' ').trim().slice(0,n);
 // A request for a phone app. "Build a mobile app:" is what Kairoq's home page sends.
 function wanted(text){
  const t=String(text||'');
- return /^Build a mobile app:/i.test(t)||/\b(iphone|ios|android|native|mobile|phone)\s+(app|application)\b/i.test(t)||/\bapp store\b|\bplay store\b|\bexpo\b|\breact native\b/i.test(t);
+ return /^Build a mobile app:/i.test(t)||/\b(iphone|ios|android|native|mobile|phone)\s+(app|application)\b/i.test(t)||/\b(iphone|ios|android)\b(\s+[\w-]+){1,4}\s+(app|application)\b/i.test(t)||/\b(app|application)\s+for\s+(the\s+)?(iphone|ios|android)\b/i.test(t)||/\bapp store\b|\bplay store\b|\bexpo\b|\breact native\b/i.test(t);
 }
 function enabled(meta){return Boolean(meta&&meta.native&&meta.native.enabled)}
 const SDK=()=>process.env.KAIROQ_EXPO_SDK||require('snack-content').defaultSdkVersion;

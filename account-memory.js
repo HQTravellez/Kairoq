@@ -73,7 +73,7 @@ function candidates(owner){return [...load(owner).recipes.filter(r=>r.status==='
 function matchRecipes(owner,message){
  if(!active(owner))return[];
  const w=words(message);if(!w.length)return[];
- return candidates(owner).map(r=>{const t=words(r.title),all=words(r.title+' '+r.when);const n=overlap(w,all),tn=overlap(w,t);return{r,score:n+tn,ok:n>=2||(t.length>0&&tn===t.length)}}).filter(x=>x.ok).sort((a,b)=>b.score-a.score).slice(0,2).map(x=>x.r);
+ return candidates(owner).map(r=>{const t=words(r.title),all=words(r.title+' '+r.when);const n=overlap(w,all),tn=overlap(w,t);return{r,score:n+tn,ok:tn>=1&&(n>=2||tn===t.length)}}).filter(x=>x.ok).sort((a,b)=>b.score-a.score).slice(0,2).map(x=>x.r);
 }
 function recipeNote(list){
  if(!list.length)return'';

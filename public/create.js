@@ -259,7 +259,12 @@ async function askThenBuild(prompt){
   planWaiting(true);
   const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
   if(!plan)return go(answers,null);
-  showBuildPlan(card,plan,{onApprove:()=>go(answers,plan),onSkip:()=>go(answers,null)});
+  // A character the owner picked in the plan is added to the project's 3D files first.
+  const approve=async()=>{
+   if(plan.pick){try{const d=await api('/projects/'+project.id+'/models?op=polypizza',{method:'POST',body:{id:plan.pick.id}});plan.picked=d.added.title}catch(err){card.querySelector('.char-pick')?.append(el('p','char-note char-err',err.message));return false}}
+   go(answers,plan);
+  };
+  showBuildPlan(card,plan,{onApprove:approve,onSkip:()=>go(answers,null),projectId:project.id});
   list.scrollTop=list.scrollHeight;
  };
  const picked=questions.map(()=>new Set()),other=questions.map(()=>'');let at=0;
@@ -319,10 +324,37 @@ function requestCard(t){
 }
 // The plan before the first build: a title, a short summary, Review (the screens, features, what
 // waits, what was looked up), Skip and Approve.
-function showBuildPlan(card,plan,{onApprove,onSkip}){
- morph(card,()=>fillPlan(card,plan,{onApprove,onSkip}),0);
+function showBuildPlan(card,plan,{onApprove,onSkip,projectId}){
+ morph(card,()=>fillPlan(card,plan,{onApprove,onSkip,projectId}),0);
 }
-function fillPlan(card,plan,{onApprove,onSkip}){
+// The character in the plan (build-plan.js characterChoices): real ready-made 3D models to pick
+// from, each with its picture, creator, licence and one honest note. Nothing is built until one
+// is picked; "Show others" looks for more.
+function characterPick(plan,{projectId,onChange}){
+ const c=plan.characters,box=el('div','char-pick');
+ box.append(el('p','plan-part','Pick the character'));
+ if(c.phone_note)box.append(el('p','char-note',c.phone_note));
+ if(c.unavailable&&!(c.options||[]).length){box.append(el('p','char-note',c.unavailable+' The app will be built without a ready-made character.'));return box}
+ const grid=el('div','char-grid');box.append(grid);
+ const draw=list=>{
+  grid.replaceChildren();
+  if(!list.length){grid.append(el('p','char-note','No ready-made "'+c.search+'" model was found. Try Show others, or skip and add one later in Design → 3D models.'));return}
+  for(const o of list){
+   const b=el('button','char-opt');b.type='button';b.setAttribute('aria-pressed',String(plan.pick&&plan.pick.id===o.id));
+   const pic=el('div','char-pic');if(o.thumb){const img=document.createElement('img');img.src=o.thumb;img.alt=o.title;img.loading='lazy';img.referrerPolicy='no-referrer';pic.append(img)}
+   const link=el('a','char-link','View in 3D');link.href=o.url;link.target='_blank';link.rel='noopener';link.onclick=e=>e.stopPropagation();
+   b.append(pic,el('span','char-name',o.title),el('span','char-meta',(o.creator?o.creator+' · ':'')+o.licence),el('span','char-note',o.note),link);
+   b.onclick=()=>{plan.pick=o;for(const x of grid.querySelectorAll('.char-opt'))x.setAttribute('aria-pressed','false');b.setAttribute('aria-pressed','true');onChange()};
+   grid.append(b);
+  }
+ };
+ draw(c.options||[]);
+ const more=el('button','ask-link char-more','Show others');more.type='button';
+ more.onclick=async()=>{more.disabled=true;more.textContent='Looking…';try{const d=await api('/projects/'+projectId+'/models?op=polypizza-search',{method:'POST',body:{query:c.search,animated:c.animated}});const seen=new Set((c.options||[]).map(x=>x.id));const fresh=(d.results||[]).filter(x=>!seen.has(x.id));c.options=[...fresh,...(c.options||[])].slice(0,6);draw(c.options);more.textContent=fresh.length?'Show others':'No more found'}catch(err){more.textContent=err.message}more.disabled=false};
+ box.append(more);
+ return box;
+}
+function fillPlan(card,plan,{onApprove,onSkip,projectId}){
  card.classList.add('plan-card');
  if(plan.searches)card.append(el('p','plan-research','✓ Looked up '+plan.searches+' source'+(plan.searches===1?'':'s')+' before planning'));
  card.append(el('p','plan-kicker','Plan'),el('h3','plan-title',plan.title),el('p','plan-summary',plan.summary));
@@ -336,9 +368,14 @@ function fillPlan(card,plan,{onApprove,onSkip}){
  const review=el('button','plan-review','Review');review.type='button';review.setAttribute('aria-expanded','false');
  review.onclick=()=>{const open=more.classList.toggle('hidden');review.setAttribute('aria-expanded',String(!open));review.textContent=open?'Review':'Hide details'};
  const skip=el('button','ask-link','Skip');skip.type='button';skip.title='Build without the plan';skip.onclick=onSkip;
- const ok=el('button','ask-next plan-approve','Approve');ok.type='button';ok.onclick=()=>{ok.disabled=true;onApprove()};
+ const ok=el('button','ask-next plan-approve','Approve');ok.type='button';
+ const needPick=()=>Boolean(plan.characters&&(plan.characters.options||[]).length&&!plan.pick);
+ const sync=()=>{ok.disabled=needPick();ok.textContent=needPick()?'Pick a character':'Approve'};
+ ok.onclick=async()=>{if(needPick())return;ok.disabled=true;ok.textContent='Adding the character…';if(await onApprove()===false)sync()};
  foot.append(review,el('span','ask-gap'),skip,ok);
- card.append(more,foot);
+ card.append(more);
+ if(plan.characters)card.append(characterPick(plan,{projectId,onChange:sync}));
+ card.append(foot);sync();
  ok.focus({preventScroll:true});
 }
 // The approved plan, added to the request (the same words as build-plan.js withPlan).
@@ -346,7 +383,8 @@ function withPlan(req,p){
  return req.trim()+'\n\nApproved plan (build exactly this first version):\n'+p.title+'. '+p.summary
   +((p.screens||[]).length?'\nScreens: '+p.screens.map(s=>s.name+(s.what?' ('+s.what+')':'')).join('; '):'')
   +((p.features||[]).length?'\nFeatures: '+p.features.join('; '):'')
-  +((p.left_out||[]).length?'\nLeft out for now: '+p.left_out.join('; '):'');
+  +((p.left_out||[]).length?'\nLeft out for now: '+p.left_out.join('; '):'')
+  +(p.picked?'\nCharacter: the owner picked the ready-made 3D model "'+p.picked+'" (in this project\'s 3D files). Show it with Model3D and use its own animations; never draw the character from shapes or SVG.':'');
 }
 // While the plan waits, the preview says so instead of showing the bare starter.
 function planWaiting(on){

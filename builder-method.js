@@ -11,7 +11,8 @@ const DEBUG=`How to fix it (find the cause first; a symptom fix fails again):
 4. If a fix you already tried did not work, it was the wrong cause: re-read the error and the code before trying again.`;
 
 // What "message" may claim (verification-before-completion).
-const VERIFY=`- Your "message" must be honest: describe what you changed, not that it works. Kairoq builds the app, opens it in a browser and runs its checks after your reply; never write "fixed", "tested", "works now" or "all good" about something you could not see running.`;
+const VERIFY=`- Your "message" must be honest: describe what you changed, not that it works. Kairoq builds the app, opens it in a browser and runs its checks after your reply; never write "fixed", "tested", "works now" or "all good" about something you could not see running.
+- When part of what the owner asked for is not in this version (a real 3D model, camera tracking, a service that needs a key or account, a store build), end "message" with "Not done yet:" and each missing part in plain words. Never stand in a drawing or fake for something asked for (an SVG for a 3D character, preset colours for colours read from a photo) without saying so there.`;
 
 // How to treat review findings (receiving-code-review).
 const REVIEW=`Treat these findings as claims to check, not orders: for each one, look at the code it points to. Fix the ones that are right; if one is wrong (the code already handles it, or the change would break what the user asked for), leave that part as it is and say why in "message" in one short sentence.`;

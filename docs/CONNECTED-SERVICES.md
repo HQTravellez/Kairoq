@@ -72,6 +72,12 @@ In the app builder: **Design → 3D models**.
   renders a preview picture. Scripts inside files never run.
 - **Poly Haven**: search free (CC0) models and HDRI lighting and add one with a tap. Kairoq packs
   the model into one GLB and uses Poly Haven's picture as its preview.
+- **Ready-made characters (Poly Pizza)**: when the plan needs a character (a dinosaur, a mascot,
+  a car), it shows up to three real models from poly.pizza with their picture, creator, licence
+  (CC0 or CC-BY only), whether they are animated and one honest note. The owner picks one before
+  the build; it comes in with its own animations (walk, jump...), and `Model3D` loops one and
+  plays another on tap. Needs `POLY_PIZZA_KEY` (free account, poly.pizza/settings/api) in
+  Railway; without it the plan says plainly that characters cannot be searched yet.
 - **3D style**: the look step before the first build asks "Add 3D?" (product viewer, room
   walkthrough, scroll story, 3D background). With a style and no model, Kairoq adds a fitting
   Poly Haven model before the build.

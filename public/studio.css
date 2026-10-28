@@ -139,7 +139,7 @@ body{font-family:Geist,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 @keyframes k-in-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes k-shim{from{background-position:100% 0}to{background-position:-100% 0}}
 .messages li.ask-card.enter{animation:k-card-in .42s cubic-bezier(.2,.8,.2,1) both}
-.messages li.ask-card{transition:height .32s cubic-bezier(.2,.8,.2,1);overflow:hidden}
+.messages li.ask-card{transition:height .32s cubic-bezier(.2,.8,.2,1);overflow:hidden;flex-shrink:0}
 .messages li.ask-card>*{animation:k-in-up .36s cubic-bezier(.2,.8,.2,1) both}
 .messages li.ask-card[data-dir="1"]>*{animation-name:k-in-right}
 .messages li.ask-card[data-dir="-1"]>*{animation-name:k-in-left}
@@ -232,3 +232,20 @@ body{font-family:Geist,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 .examples{gap:8px!important;justify-content:center}
 .example{font-size:13px!important;padding:7px 14px!important}
 @media (prefers-reduced-motion:reduce){.home-hero>*{animation:none!important}}
+
+/* ----- Character pick in the plan (create.js characterPick) ----- */
+.char-pick{margin:14px 0 4px;padding-top:12px;border-top:1px solid var(--k-line)}
+.char-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.char-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 6px 8px;border:1px solid var(--k-line);border-radius:12px;background:var(--k-surface);text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s;font:inherit;color:var(--k-ink);min-width:0}
+.char-opt:hover{border-color:var(--k-line-strong)}
+.char-opt[aria-pressed="true"]{border-color:var(--k-accent)!important;box-shadow:var(--k-ring)!important;background:var(--k-accent-soft)!important}
+.char-opt{background:var(--k-surface)!important}
+.char-pic{width:100%;aspect-ratio:1;border-radius:8px;background:var(--k-tint);overflow:hidden;margin-bottom:4px}
+.char-pic img{width:100%;height:100%;object-fit:cover;display:block}
+.char-name{font-weight:600;font-size:13px;line-height:1.25;overflow-wrap:anywhere}
+.char-meta{font-size:12px;color:var(--k-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.char-note{font-size:12px;color:var(--k-ink-2);line-height:1.35}
+.char-err{color:#b42318;margin-top:6px}
+.char-link{font-size:12px;color:var(--k-accent);margin-top:2px}
+.char-more{margin-top:6px}
+@media (max-width:420px){.char-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

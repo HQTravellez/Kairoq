@@ -600,7 +600,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // A request for an iPhone or Android app becomes a native app (Expo, react-native-app.js): the
  // starter is the native one and the design's colours go to src/theme.js.
  const nativeApp=require('./react-native-app');
- if(firstBuild&&!meta.native&&nativeApp.wanted(text)){const m=loadMeta(id);m.native={enabled:true,sdk:nativeApp.SDK(),at:new Date().toISOString()};saveMeta(m);meta=m}
+ // A phone app with a 3D character stays a phone-first web app: 3D and AR (Model3D) run in the
+ // phone's browser, not in the native kit yet.
+ if(firstBuild&&!meta.native&&nativeApp.wanted(text)&&!require('./react-models').list(id).some(m=>m.kind==='model')){const m=loadMeta(id);m.native={enabled:true,sdk:nativeApp.SDK(),at:new Date().toISOString()};saveMeta(m);meta=m}
  if(nativeApp.enabled(meta)){
   if(firstBuild||!base['src/components/native.jsx'])base={...nativeApp.starterFiles(meta.name,brief||meta.design),...(firstBuild?{}:base)};
   if(brief)base={...base,'src/theme.js':nativeApp.themeFile(brief)};
@@ -672,7 +674,9 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   // Small changes arrive as find/replace edits (cheaper than rewriting whole files).
   const both=Object.keys(reply.edits).filter(f=>Object.hasOwn(reply.files,f));
   const applied=require('./react-edits').apply(next,reply.edits);next=applied.files;
-  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:checkProject(next)),...(applied.errors.length||!nativeApp.enabled(meta)?[]:nativeApp.problems(next))];
+  const errors=[...both.map(f=>f+' is in both "files" and "edits"; use one'),...applied.errors,...(applied.errors.length?[]:checkProject(next)),...(applied.errors.length||!nativeApp.enabled(meta)?[]:nativeApp.problems(next)),
+   // The owner picked a ready-made character in the plan: it must be shown, not drawn.
+   ...(applied.errors.length||!/picked the ready-made 3D model "/.test(text)||require('./react-models').usesViewer(next)?[]:['The owner picked a ready-made 3D character in the plan, but no file shows it. Show it with import { Model3D } from \'kairoq/3d\' and the model file listed under 3D IN THIS APP, using its own animations (animation and tapAnimation props); do not draw the character with SVG or shapes.'])];
   messages.push({role:'assistant',content:JSON.stringify({message:reply.message,files:reply.files,edits:reply.edits,delete:reply.delete})});
   if(errors.length){
    lastError=errors.slice(0,12).join('\n');
