@@ -271,7 +271,7 @@ async function askThenBuild(prompt){
  const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
  // The last question is always the look: "How should it feel?" (create-look.js).
  const total=questions.length+(window.KairoqLook?1:0);
- const lookStep=()=>window.KairoqLook.step({card,name,count:total>1?'Question '+total+' of '+total:'One quick question',
+ const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:total>1?'Question '+total+' of '+total:'One quick question',
   onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw(-1)}:null});
  if(!questions.length)return window.KairoqLook?lookStep():build([]);
  const draw=(dir=1)=>morph(card,()=>{

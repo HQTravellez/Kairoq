@@ -81,8 +81,11 @@ function lookCard(look,{on,onPick}){
 // ---------- data ----------
 let data=null;
 async function loadData(){if(!data)data=await call('/looks');return data}
-function forFeel(feel){
- const recent=new Set(data.recent||[]),all=data.looks.filter(l=>l.feel===feel);
+// Apps for children start on Playful and are offered only light, soft looks (no dark screens).
+function forKids(prompt){return /\b(kids?|children|child|toddlers?|preschool(ers)?|little ones|nursery|kindergarten)\b/i.test(String(prompt||''))}
+function light(l){const n=parseInt(String(l.colors&&l.colors.bg||'#ffffff').slice(1),16);return(0.2126*((n>>16)&255)+0.7152*((n>>8)&255)+0.0722*(n&255))/255>0.72}
+function forFeel(feel,kids){
+ const recent=new Set(data.recent||[]),every=data.looks.filter(l=>l.feel===feel),soft=kids?every.filter(light):every,all=soft.length>=3?soft:every;
  // Looks used for the owner's newest apps go to the end so new apps do not repeat them.
  return all.filter(l=>!recent.has(l.id.split('--')[0])).concat(all.filter(l=>recent.has(l.id.split('--')[0])));
 }
@@ -234,15 +237,16 @@ const THREE_D=[
 // ---------- the step inside the chat ----------
 // card: the chat list item to draw into. count: "Question 3 of 3" or "One quick question".
 // onBuild(look|null): null means "Decide for me" without a pick (Kairoq's own design brief).
-async function step({card,count,name,onBuild,onBack,onSkip}){
+async function step({card,count,name,prompt,onBuild,onBack,onSkip}){
  card.replaceChildren(h('p',{class:'ask-head'},'Loading looks…'));
  try{await loadData()}catch(e){return onBuild(null)}
- const st={feel:'calm',page:0,picked:null,three:'none'};
+ const kids=forKids(prompt);
+ const st={feel:kids?'playful':'calm',page:0,picked:null,three:'none'};
  const preview=previewPane();document.body.classList.add('picking-look');
  const done=()=>{document.body.classList.remove('picking-look');preview.remove()};
  // A look from the gallery, a website or Fine-tune joins the cards and is selected.
  const use=look=>{st.picked=look;if(!shown().some(l=>l.id===look.id)&&!(data.brand&&look.id===data.brand.id))st.extra=look;draw()};
- function shown(){const list=forFeel(st.feel);const n=list.length;const a=(st.page*3)%n;return[0,1,2].map(i=>list[(a+i)%n])}
+ function shown(){const list=forFeel(st.feel,kids);const n=list.length;const a=(st.page*3)%n;return[0,1,2].map(i=>list[(a+i)%n])}
  function draw(){
   const three=shown();if(!st.picked)st.picked=three[0];
   const cards=[...(data.brand?[data.brand]:[]),...(st.extra?[st.extra]:[]),...three];
@@ -277,5 +281,5 @@ function previewPane(){
  return p;
 }
 
-window.KairoqLook={step,openGallery,openTune,openSite,sample};
+window.KairoqLook={step,openGallery,openTune,openSite,sample,forKids};
 })();

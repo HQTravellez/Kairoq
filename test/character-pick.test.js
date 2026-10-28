@@ -138,6 +138,10 @@ test('in the editor: the plan shows real characters, Approve waits for a pick, t
   await page.fill('#new-prompt','Build an iPhone AR coloring book app for kids with a real animated T-Rex');
   await page.click('#new-submit');
   await page.waitForSelector('.ask-card',{timeout:20000});
+  // A kids' app starts on Playful with light looks only (no black screens).
+  await page.waitForSelector('.lk-chip.on',{timeout:20000});
+  assert.equal(await page.locator('.lk-feels:not(.lk-3d) .lk-chip.on').innerText(),'Playful');
+  assert.equal(await page.evaluate(()=>window.KairoqLook.forKids('An app for kids')),true);
   const skip=page.locator('.ask-card button:has-text("Skip")').first();
   await skip.waitFor({timeout:20000});await skip.click();
   await page.waitForSelector('.char-opt',{timeout:20000});
@@ -159,4 +163,54 @@ test('in the editor: the plan shows real characters, Approve waits for a pick, t
   assert.doesNotMatch(built[0],/FIRST_BUILD_NATIVE|react-native/i,'a 3D character app stays a web app');
   assert.deepEqual(errors,[]);
  }finally{global.fetch=realFetch;await ctx.close();server.close();runtime.close()}
+});
+
+test('in a built app: the real model plays its animations from buttons and wears the given colours',{timeout:240000},async(t)=>{
+ const runtime=require('../runtime-check');
+ if(!runtime.available()){t.diagnostic('no browser here');return}
+ const http=require('http');
+ // One triangle (material "Body", green) with two animations that move it: Idle and Jump.
+ const bin=Buffer.alloc(36+8+24+24);
+ [0,0,0,1,0,0,0,1,0].forEach((v,i)=>bin.writeFloatLE(v,i*4));
+ [0,1].forEach((v,i)=>bin.writeFloatLE(v,36+i*4));
+ [0,0,0,0,0.2,0].forEach((v,i)=>bin.writeFloatLE(v,44+i*4));
+ [0,0,0,0,1,0].forEach((v,i)=>bin.writeFloatLE(v,68+i*4));
+ const json={asset:{version:'2.0'},scenes:[{nodes:[0]}],scene:0,nodes:[{mesh:0,name:'Dino'}],meshes:[{primitives:[{attributes:{POSITION:0},material:0}]}],
+  materials:[{name:'Body',pbrMetallicRoughness:{baseColorFactor:[0.2,0.6,0.2,1]},doubleSided:true}],
+  accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[0,0,0],max:[1,1,0]},{bufferView:1,componentType:5126,count:2,type:'SCALAR',min:[0],max:[1]},{bufferView:2,componentType:5126,count:2,type:'VEC3'},{bufferView:3,componentType:5126,count:2,type:'VEC3'}],
+  bufferViews:[{buffer:0,byteOffset:0,byteLength:36},{buffer:0,byteOffset:36,byteLength:8},{buffer:0,byteOffset:44,byteLength:24},{buffer:0,byteOffset:68,byteLength:24}],
+  buffers:[{uri:'d.bin',byteLength:bin.length}],
+  animations:[{name:'Idle',samplers:[{input:1,output:2}],channels:[{sampler:0,target:{node:0,path:'translation'}}]},{name:'Jump',samplers:[{input:1,output:3}],channels:[{sampler:0,target:{node:0,path:'translation'}}]}]};
+ const meta=builder.create({name:'Dino buttons',owner:'owner'});
+ const added=await M.upload(meta.id,'dino.glb',M.packGlb(json,()=>bin),{blender:{INPUTS:[],available:()=>false}});
+ assert.deepEqual(added.animations,['Idle','Jump']);
+ const APP=`import React,{useState} from 'react';
+import { Model3D } from 'kairoq/3d';
+export default function App(){
+ const [m,setM]=useState(null);
+ return <main><Model3D src="${added.path}" alt="A T-Rex" mode="product" ar={false} blank colors={{Body:'#ff0000'}} animation="Idle" onControls={setM} className="h-96 w-full" />
+ <button id="jump" onClick={()=>m&&m.play('jump',{once:true})}>Jump</button>
+ <p id="names">{m?m.animations.join(',')+'|'+m.materials.join(','):''}</p></main>}
+`;
+ const r=await builder.edit(meta.id,'Show the dinosaur with Walk and Jump buttons',{callModel:async(_o,parse)=>parse(JSON.stringify({message:'Added the dinosaur.',files:{'src/App.jsx':APP}}))});
+ const dist=path.join(builder.versionDir(meta.id,r.version),'dist');
+ const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.glb':'model/gltf-binary','.png':'image/png','.jpg':'image/jpeg'};
+ const server=http.createServer((req,res)=>{let f=decodeURIComponent(req.url.split('?')[0]);if(f.endsWith('/'))f+='index.html';const p=path.join(dist,f);if(p.startsWith(dist)&&fs.existsSync(p)){res.writeHead(200,{'content-type':types[path.extname(p)]||'application/octet-stream'});return res.end(fs.readFileSync(p))}res.writeHead(404);res.end()});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const ctx=await (await runtime.browser()).newContext({viewport:{width:900,height:900}}),page=await ctx.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto('http://127.0.0.1:'+server.address().port+'/',{waitUntil:'load'});
+  const viewer=await page.waitForSelector('model-viewer',{timeout:30000});
+  if(!(await page.evaluate(()=>{const c=document.createElement('canvas');return Boolean(c.getContext('webgl2')||c.getContext('webgl'))}))){t.diagnostic('no WebGL in this browser');return}
+  await page.waitForFunction(()=>document.querySelector('model-viewer')?.dataset.kqPainted==='true',null,{timeout:30000});
+  assert.equal(await page.locator('#names').innerText(),'Idle,Jump|Body');
+  const look=await viewer.evaluate(el=>({anim:el.animationName,paused:el.paused,color:Array.from(el.model.materials[0].pbrMetallicRoughness.baseColorFactor).map(v=>Math.round(v*100)/100)}));
+  assert.equal(look.anim,'Idle');assert.equal(look.paused,false);
+  assert.deepEqual(look.color,[1,0,0,1],'the Body part wears the given colour');
+  await page.click('#jump');
+  assert.equal(await viewer.evaluate(el=>el.animationName),'Jump');
+  await page.waitForFunction(()=>document.querySelector('model-viewer').animationName==='Idle',null,{timeout:10000});
+  assert.deepEqual(errors,[]);
+ }finally{await ctx.close();server.close();runtime.close()}
 });
