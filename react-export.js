@@ -26,6 +26,8 @@ function exportFiles(id){
  const meta=builder.loadMeta(id);
  if(!meta.current_version)throw fail(409,'Build the app first');
  const source=builder.loadFiles(id,meta.current_version),pkg=require('./package.json').dependencies;
+ // A native app (react-native-app.js) downloads as a ready Expo project.
+ if(require('./react-native-app').enabled(meta))return require('./react-native-app').expoProject(source,meta);
  const out={
   'package.json':JSON.stringify({name:slug(meta.name),private:true,version:'1.0.0',type:'module',scripts:{dev:'vite',build:'vite build',preview:'vite preview'},
    dependencies:Object.fromEntries(Object.entries({...usedDependencies(source,pkg),'react-router-dom':pkg['react-router-dom']}).sort()), // kairoq.js uses react-router-dom (Router)

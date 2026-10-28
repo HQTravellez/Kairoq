@@ -160,3 +160,8 @@ requirements. API/schema compatibility and offline tests do not establish produc
 - WebKit (Safari's engine) as built by Playwright — https://playwright.dev — Apache-2.0 (Playwright)
   and LGPL/BSD (WebKit). Installed unmodified in the Docker image and run as a separate browser
   for the "iPhone Safari" checks and the editor's "Real Safari" screenshot (`runtime-check.js`).
+
+## Native mobile apps (react-native-app.js)
+
+- **react-native-web** 0.21.4, MIT, (c) Nicolas Gallagher and Meta Platforms. https://github.com/necolas/react-native-web. It runs the React Native code of native apps in the browser preview.
+- **snack-sdk** 6.6.2 and **snack-content**, MIT, (c) 650 Industries (Expo). https://github.com/expo/snack. They upload a native app to Expo Snack so the free Expo Go app opens it on a phone. The code goes to Expo's servers only when the owner presses "Run on your phone".

@@ -291,6 +291,17 @@ function planWaiting(on){
  box.append(el('p','plan-wait-title','Your app will appear here'),el('p','plan-wait-sub','Approve the plan to start building.'));
  $('canvas').append(box);
 }
+// Run on your phone (react-native-app.js): Expo Snack gives a QR code the Expo Go app opens.
+$('run-phone').onclick=async()=>{
+ const d=$('phone-dialog');text($('phone-error'),'');text($('phone-status'),'Getting your app ready for your phone…');$('phone-box').classList.add('hidden');d.showModal();
+ try{
+  const {phone}=await api('/projects/'+state.project.id+'/phone',{method:'POST',body:{}});
+  $('phone-qr').src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(phone.qr);
+  $('phone-snack').href=phone.snack_url;
+  text($('phone-status'),'Version '+phone.version+' is ready. Scan the code with your phone.');
+  $('phone-box').classList.remove('hidden');
+ }catch(err){text($('phone-status'),'');text($('phone-error'),err.message)}
+};
 // ---------- editor ----------
 async function openProject(id,{pendingText,job}={}){
  const {project,account,active_job}=await api('/projects/'+id);
@@ -303,7 +314,8 @@ async function openProject(id,{pendingText,job}={}){
  renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
  renderVersions();
- device(Boolean(project.mobile&&project.mobile.enabled));
+ device(Boolean(project.mobile&&project.mobile.enabled)||Boolean(project.native));
+ $('run-phone').classList.toggle('hidden',!project.native);
  setPreview(project.preview_url);
  renderSamplePill();
  if(state.code)await renderFiles();
