@@ -176,6 +176,36 @@ function shortName(prompt){
  if(t.length>40){const c=t.slice(0,41);t=c.slice(0,Math.max(c.lastIndexOf(' '),20))}
  return t.replace(/[\s,;-]+(a|an|the|and|or|with|for|of|to|in|my|our)$/i,'').replace(/[\s,;:-]+$/,'')||'New app';
 }
+// Sliding switches (like iOS and superapp): each segmented group in the editor gets a white thumb
+// that glides to the pressed button, whatever changes aria-pressed (a click or the code).
+function slideSegs(){
+ for(const seg of document.querySelectorAll('#editor .seg')){
+  if(seg.querySelector('.seg-thumb'))continue;
+  const thumb=document.createElement('span');thumb.className='seg-thumb';thumb.setAttribute('aria-hidden','true');seg.prepend(thumb);seg.classList.add('sliding');
+  const place=()=>{const on=seg.querySelector('button[aria-pressed="true"]');if(!on||!on.offsetWidth){thumb.style.opacity='0';return}thumb.style.opacity='1';thumb.style.width=on.offsetWidth+'px';thumb.style.transform='translateX('+(on.offsetLeft-thumb.offsetParent.clientLeft)+'px)'};
+  new MutationObserver(place).observe(seg,{attributes:true,subtree:true,attributeFilter:['aria-pressed','class','hidden']});
+  if(window.ResizeObserver)new ResizeObserver(place).observe(seg);
+  requestAnimationFrame(place);
+ }
+}
+slideSegs();
+// Smooth steps in the ask card (like superapp): the old step slides out, the card's height eases
+// to fit the next one, and the new step slides in from the side it comes from (dir 1 forward,
+// -1 back, 0 fade). The slide-in itself is CSS (.ask-card[data-dir] > *). Reduced motion: instant.
+const STILL=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function morph(card,fill,dir=1){
+ card.dataset.dir=String(dir);
+ if(STILL||!card.isConnected||!card.children.length){card.replaceChildren();fill();return}
+ const from=card.offsetHeight;
+ card.style.height=from+'px';card.classList.add('morphing');
+ for(const c of card.children)c.classList.add('step-out');
+ setTimeout(()=>{
+  card.replaceChildren();fill();
+  card.style.height='auto';const to=card.offsetHeight;card.style.height=from+'px';
+  void card.offsetHeight;card.style.height=to+'px';
+  setTimeout(()=>{card.style.height='';card.classList.remove('morphing')},340);
+ },150);
+}
 // Started from the main Kairoq page: open the editor straight away and ask any quick questions
 // inside the chat, one at a time, before the first build starts.
 async function askThenBuild(prompt){
@@ -185,7 +215,7 @@ async function askThenBuild(prompt){
  const list=$('messages');list.replaceChildren();
  let mine=messageItem({role:'user',text:prompt});list.append(mine);
  const card=document.createElement('li');card.className='assistant ask-card';
- card.append(el('p','ask-head','Reading your request…'));list.append(card);
+ card.classList.add('enter');card.dataset.dir='0';card.append(el('p','ask-head k-shimmer','Reading your request…'));list.append(card);
  const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
  // The picked look (if any) becomes the project's colours and fonts; then the plan (build-plan.js)
  // is shown with Review, Skip and Approve, and the build starts on Approve (or Skip).
@@ -194,7 +224,7 @@ async function askThenBuild(prompt){
  const build=async(answers,look)=>{
   if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
   if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
-  card.replaceChildren(el('p','ask-head','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.'));
+  morph(card,()=>card.append(el('p','ask-head k-shimmer','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
   planWaiting(true);
   const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
   if(!plan)return go(answers,null);
@@ -206,10 +236,10 @@ async function askThenBuild(prompt){
  // The last question is always the look: "How should it feel?" (create-look.js).
  const total=questions.length+(window.KairoqLook?1:0);
  const lookStep=()=>window.KairoqLook.step({card,name,count:total>1?'Question '+total+' of '+total:'One quick question',
-  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw()}:null});
+  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw(-1)}:null});
  if(!questions.length)return window.KairoqLook?lookStep():build([]);
- const draw=()=>{
-  const q=questions[at];card.replaceChildren();
+ const draw=(dir=1)=>morph(card,()=>{
+  const q=questions[at];
   // Like superapp: the question, option cards (a label and one sentence), "Other…", then
   // Back and forward arrows, Skip all and Next.
   const head=el('div','ask-top');head.append(el('span','ask-count',total>1?'Question '+(at+1)+' of '+total:'One quick question'));
@@ -227,17 +257,19 @@ async function askThenBuild(prompt){
   own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false;mark()}};
   mark();
   const foot=el('div','ask-foot');
-  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw()};
+  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw(-1)};
   const fwd=el('button','ask-arrow','›');fwd.type='button';fwd.setAttribute('aria-label','Next question');fwd.disabled=at===questions.length-1&&!window.KairoqLook;
   const last=at===questions.length-1,final=last&&!window.KairoqLook;
-  const forward=()=>{if(final)build(answers());else if(last)lookStep();else{at++;draw()}};fwd.onclick=forward;
+  const forward=()=>{if(final)build(answers());else if(last){morph(card,()=>card.append(el('p','ask-head k-shimmer','Finding looks that fit…')),1);setTimeout(lookStep,STILL?0:170)}else{at++;draw(1)}};fwd.onclick=forward;
   const skip=el('button','ask-link','Skip all');skip.type='button';skip.onclick=()=>build(answers());
   const next=el('button','ask-next',final?'Submit':'Next');next.type='button';next.onclick=forward;
   foot.append(back,fwd,el('span','ask-gap'),skip,next);
-  card.append(head,el('p','ask-q',q.q),opts,own,foot);
+  // Thin progress segments, one per question (and the look).
+  const bar=el('div','ask-progress');for(let k=0;k<total;k++)bar.append(el('i',k<=at?'on':null));
+  card.append(bar,head,el('p','ask-q',q.q),opts,own,foot);
   list.scrollTop=list.scrollHeight;
- };
- draw();
+ },dir);
+ draw(0);
 }
 // A first request with the owner's answers and the approved plan, shown like superapp: the request,
 // each question small with its answer under it, then the plan's title.
@@ -257,7 +289,10 @@ function requestCard(t){
 // The plan before the first build: a title, a short summary, Review (the screens, features, what
 // waits, what was looked up), Skip and Approve.
 function showBuildPlan(card,plan,{onApprove,onSkip}){
- card.replaceChildren();card.classList.add('plan-card');
+ morph(card,()=>fillPlan(card,plan,{onApprove,onSkip}),0);
+}
+function fillPlan(card,plan,{onApprove,onSkip}){
+ card.classList.add('plan-card');
  if(plan.searches)card.append(el('p','plan-research','✓ Looked up '+plan.searches+' source'+(plan.searches===1?'':'s')+' before planning'));
  card.append(el('p','plan-kicker','Plan'),el('h3','plan-title',plan.title),el('p','plan-summary',plan.summary));
  const more=el('div','plan-more hidden');
