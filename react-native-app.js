@@ -210,15 +210,29 @@ async function runOnPhone(meta,files,{fetchImpl}={}){
 }
 
 // ---------- the download: a ready Expo project ----------
-function expoProject(files,meta){
- const slug=clip(meta.name,40).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'app';
- const sdk=SDK(),major=sdk.split('.')[0];
+// The versions that go with the Expo SDK (snack-content's table, so the phone, Snack and the
+// store build all use the same react and react-native).
+function coreVersions(sdk=SDK()){
+ const t=(require('snack-content').sdks||require('snack-content/build/sdks').default||{})[sdk];
+ const m=t&&t.coreModules||{};
+ const major=sdk.split('.')[0];
+ return{expo:m.expo||'~'+major+'.0.0',react:m.react||'*','react-native':m['react-native']||'*'};
+}
+// opts: bundleId, packageName (store identifiers), icon (PNG bytes), version, buildNumber.
+function expoProject(files,meta,opts={}){
+ const slug=opts.slug||clip(meta.name,40).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'app';
  const out={};
  for(const [n,f] of Object.entries(snackFiles(files)))out[n]=f.contents;
- out['package.json']=JSON.stringify({name:slug,version:'1.0.0',main:'expo/AppEntry.js',private:true,scripts:{start:'expo start',android:'expo start --android',ios:'expo start --ios',web:'expo start --web'},dependencies:{expo:'~'+major+'.0.0',react:'*','react-native':'*'}},null,2)+'\n';
- out['app.json']=JSON.stringify({expo:{name:clip(meta.name,45)||'App',slug,version:'1.0.0',orientation:'portrait',userInterfaceStyle:'light',ios:{supportsTablet:true},android:{}}},null,2)+'\n';
+ out['package.json']=JSON.stringify({name:slug,version:'1.0.0',main:'expo/AppEntry.js',private:true,scripts:{start:'expo start',android:'expo start --android',ios:'expo start --ios',web:'expo start --web'},dependencies:coreVersions()},null,2)+'\n';
+ const expo={name:clip(meta.name,30)||'App',slug,version:opts.version||'1.0.0',orientation:'portrait',userInterfaceStyle:'light',
+  ...(opts.icon?{icon:'./assets/icon.png'}:{}),
+  ios:{supportsTablet:false,...(opts.bundleId?{bundleIdentifier:opts.bundleId}:{}),config:{usesNonExemptEncryption:false}},
+  android:{...(opts.packageName?{package:opts.packageName}:{}),...(opts.icon?{adaptiveIcon:{foregroundImage:'./assets/icon.png',backgroundColor:opts.iconBackground||'#ffffff'}}:{})},
+  ...(opts.projectId?{extra:{eas:{projectId:opts.projectId}}}:{})};
+ if(opts.icon)out['assets/icon.png']=opts.icon;
+ out['app.json']=JSON.stringify({expo},null,2)+'\n';
  out['babel.config.js']="module.exports = function (api) {\n  api.cache(true);\n  return { presets: ['babel-preset-expo'] };\n};\n";
- out['README.md']=`# ${clip(meta.name,60)||'App'}\n\nMade with Kairoq. A React Native app built with Expo.\n\n1. Install Node.js 20 or newer.\n2. In this folder run \`npm install\`, then \`npx expo install --fix\` (it sets react and react-native to the versions this Expo SDK needs), then \`npx expo start\`.\n3. Scan the QR code with the Expo Go app (iPhone camera or Android) to open it on your phone.\n\nTo publish to the App Store and Google Play, use EAS Build: https://docs.expo.dev/build/introduction/\n`;
+ out['README.md']=`# ${clip(meta.name,60)||'App'}\n\nMade with Kairoq. A React Native app built with Expo.\n\n1. Install Node.js 20 or newer.\n2. In this folder run \`npm install\`, then \`npx expo start\`.\n3. Scan the QR code with the Expo Go app (iPhone camera or Android) to open it on your phone.\n\nTo publish to the App Store and Google Play, use "Publish to the stores" in Kairoq, or EAS Build: https://docs.expo.dev/build/introduction/\n`;
  return out;
 }
-module.exports={FIRST_BUILD,wanted,enabled,themeFile,starterFiles,KIT_FILES,isKitFile,promptNote,problems,snackFiles,runOnPhone,expoProject,SDK,MAIN,KIT};
+module.exports={FIRST_BUILD,wanted,enabled,themeFile,starterFiles,KIT_FILES,isKitFile,promptNote,problems,snackFiles,runOnPhone,expoProject,coreVersions,SDK,MAIN,KIT};

@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
@@ -885,8 +885,8 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook}){
- const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook};
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook,storeShots}){
+ const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook,storeShots};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;

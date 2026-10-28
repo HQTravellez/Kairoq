@@ -302,6 +302,51 @@ $('run-phone').onclick=async()=>{
   $('phone-box').classList.remove('hidden');
  }catch(err){text($('phone-status'),'');text($('phone-error'),err.message)}
 };
+// Publish to the App Store and Google Play (store-listing.js, store-publish.js).
+const storeState={timer:null};
+function storeFile(name){return '/api/create/projects/'+state.project.id+'/storefile?name='+encodeURIComponent(name)+'&t='+Date.now()}
+function renderStores(st){
+ const check=$('store-check');check.replaceChildren();
+ for(const c of st.checklist||[]){const li=el('li',c.ok?'ok':'todo');li.append(el('span','vmark',c.ok?'✓':'•'),el('span',null,c.text));check.append(li)}
+ const media=$('store-media');media.replaceChildren();
+ if(st.icon){const f=el('figure');const img=document.createElement('img');img.src=storeFile(st.icon);img.alt='App icon';img.className='store-icon';f.append(img,el('figcaption',null,'Icon'));media.append(f)}
+ for(const p of ['ios','android'])for(const n of (st.shots&&st.shots[p])||[]){const f=el('figure');const a=document.createElement('a');a.href=storeFile(n);a.target='_blank';a.rel='noopener';const img=document.createElement('img');img.src=storeFile(n);img.alt=(p==='ios'?'iPhone':'Android')+' screenshot';a.append(img);f.append(a,el('figcaption',null,p==='ios'?'iPhone':'Android'));media.append(f)}
+ const L=st.listing;$('store-fields').classList.toggle('hidden',!L);
+ text($('store-prepare'),L?'Prepare again':'Prepare the listing');
+ const cat=$('st-category');if(!cat.options.length)for(const c of st.categories||[]){const o=document.createElement('option');o.value=o.textContent=c;cat.append(o)}
+ if(L){$('st-name').value=L.name||'';$('st-subtitle').value=L.subtitle||'';$('st-promo').value=L.promo||'';$('st-description').value=L.description||'';$('st-keywords').value=L.keywords||'';cat.value=L.category||'Lifestyle';$('st-privacy').value=L.privacy_url||'';$('st-support').value=L.support_url||''}
+ $('st-bundle').value=st.bundle_id||'';$('st-package').value=st.package_name||'';$('st-bundle').disabled=Boolean(st.locked&&st.locked.bundle_id);$('st-package').disabled=Boolean(st.locked&&st.locked.package_name);
+ text($('st-bundle-show'),st.bundle_id||'');
+ text($('st-apple-state'),st.apple&&st.apple.key_saved_at?(st.apple.app_found?'Key saved. App found: '+(st.apple.app_name||'yes')+'.':'Key saved. The app is not in App Store Connect yet.'):'');
+ text($('st-google-state'),st.google&&st.google.key_saved_at?'Key saved ('+st.google.client_email+').':'');
+ const runs=$('store-runs');runs.replaceChildren();
+ for(const r of st.runs||[]){
+  const li=el('li','run '+r.state);
+  li.append(el('b',null,(r.platform==='ios'?'iPhone':'Android')+' · version '+r.version),el('span',null,r.text||r.state));
+  const acts=el('span','run-acts');
+  if(r.build_url){const a=el('a','link-btn','Build log');a.href=r.build_url;a.target='_blank';a.rel='noopener';acts.append(a)}
+  if(r.file){const a=el('a','link-btn',r.platform==='ios'?'Download the build':'Download the .aab file');a.href=r.file;a.target='_blank';a.rel='noopener';acts.append(a)}
+  if(r.state==='built'){const b=el('button','ghost',r.platform==='ios'?'Send to App Store':'I uploaded it');b.type='button';b.onclick=()=>storeCall({action:'send',run:r.id},b);acts.append(b)}
+  li.append(acts);runs.append(li);
+ }
+ clearTimeout(storeState.timer);
+ if($('stores-dialog').open&&(st.runs||[]).some(r=>['starting','building','submitting'].includes(r.state)))storeState.timer=setTimeout(()=>loadStores(true),30000);
+}
+async function loadStores(refresh){try{const {stores}=await api('/projects/'+state.project.id+'/stores'+(refresh?'?refresh=1':''));renderStores(stores)}catch(err){text($('store-error'),err.message)}}
+async function storeCall(body,btn){
+ text($('store-error'),'');const was=btn&&btn.textContent;if(btn){btn.disabled=true;btn.textContent='Working…'}
+ try{const r=await api('/projects/'+state.project.id+'/stores',{method:'POST',body});renderStores(r.stores);return r}
+ catch(err){text($('store-error'),err.message)}
+ finally{if(btn){btn.disabled=false;btn.textContent=was}}
+}
+$('stores-open').onclick=()=>{text($('store-error'),'');$('stores-dialog').showModal();loadStores(true)};
+$('stores-dialog').addEventListener('close',()=>clearTimeout(storeState.timer));
+$('store-prepare').onclick=e=>{text($('store-prep-note'),'Writing the listing and taking screenshots… (about a minute)');storeCall({action:'prepare'},e.currentTarget).finally(()=>text($('store-prep-note'),'Check the text and the pictures. You can change anything before you build.'))};
+$('store-save').onclick=e=>storeCall({action:'update',listing:{name:$('st-name').value,subtitle:$('st-subtitle').value,promo:$('st-promo').value,description:$('st-description').value,keywords:$('st-keywords').value,category:$('st-category').value,privacy_url:$('st-privacy').value.trim(),support_url:$('st-support').value.trim()},...($('st-bundle').disabled?{}:{bundle_id:$('st-bundle').value.trim()}),...($('st-package').disabled?{}:{package_name:$('st-package').value.trim()})},e.currentTarget);
+$('store-apple').onclick=async e=>{const r=await storeCall({action:'apple',keyId:$('st-asc-key').value.trim(),issuerId:$('st-asc-issuer').value.trim(),p8:$('st-asc-p8').value},e.currentTarget);if(r){$('st-asc-p8').value='';$('st-asc-key').value='';$('st-asc-issuer').value=''}};
+$('store-google').onclick=async e=>{const r=await storeCall({action:'google',serviceAccount:$('st-play').value},e.currentTarget);if(r)$('st-play').value=''};
+$('store-ios').onclick=e=>storeCall({action:'publish',platform:'ios'},e.currentTarget);
+$('store-android').onclick=e=>storeCall({action:'publish',platform:'android'},e.currentTarget);
 // ---------- editor ----------
 async function openProject(id,{pendingText,job}={}){
  const {project,account,active_job}=await api('/projects/'+id);
@@ -315,7 +360,7 @@ async function openProject(id,{pendingText,job}={}){
  renderMessages(pendingText);
  renderVersions();
  device(Boolean(project.mobile&&project.mobile.enabled)||Boolean(project.native));
- $('run-phone').classList.toggle('hidden',!project.native);
+ $('run-phone').classList.toggle('hidden',!project.native);$('stores-open').classList.toggle('hidden',!project.native);
  setPreview(project.preview_url);
  renderSamplePill();
  if(state.code)await renderFiles();

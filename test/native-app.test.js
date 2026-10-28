@@ -31,7 +31,7 @@ test('Snack files and the Expo download: .jsx become .js with imports that still
  assert.match(snack['src/App.js'].contents,/from '\.\/screens\/Menu'/);
  assert.doesNotMatch(Object.values(snack).map(f=>f.contents).join('\n'),/\.jsx['"]/);
  const pj=JSON.parse(nat.expoProject(files,{name:'Café Order'})['package.json']);
- assert.equal(pj.main,'expo/AppEntry.js');assert.match(pj.dependencies.expo,/^~\d+\.0\.0$/);
+ assert.equal(pj.main,'expo/AppEntry.js');assert.match(pj.dependencies.expo,/^~\d+\.\d+\.\d+$/);assert.match(pj.dependencies['react-native'],/^0\.\d+\.\d+$/,'pinned to the SDK');
 });
 
 test('Run on your phone: the version is saved on Expo Snack and a QR code comes back',async()=>{

@@ -821,5 +821,20 @@ async function renderHtml(html,{width,height}){
   return await page.screenshot({type:'png',clip:{x:0,y:0,width,height}});
  }finally{await context.close().catch(()=>{})}
 }
+// Store screenshots of a native app's preview (store-listing.js): the first screen, then one per
+// bottom tab, at the exact pixel size a store asks for (width x height CSS pixels x scale).
+async function storeShots(url,{width=440,height=956,scale=3,max=4}={}){
+ if(!available())throw Error('Chromium is not available');
+ const context=await (await browser()).newContext({viewport:{width,height},deviceScaleFactor:scale,isMobile:true,hasTouch:true,reducedMotion:'reduce'});
+ try{
+  const page=await context.newPage(),out=[];
+  await page.goto(url,{waitUntil:'networkidle',timeout:30000});
+  await page.waitForTimeout(600);
+  out.push(await page.screenshot({type:'png'}));
+  const tabs=await page.locator('[role="tab"]').all();
+  for(const t of tabs.slice(1,max)){await t.click().catch(()=>{});await page.waitForTimeout(500);out.push(await page.screenshot({type:'png'}))}
+  return out;
+ }finally{await context.close().catch(()=>{})}
+}
 async function close(){if(webkitPromise){const w=await webkitPromise.catch(()=>null);webkitPromise=null;await w?.close().catch(()=>{})}if(fastPromise){const b=await fastPromise.catch(()=>null);fastPromise=null;await b?.close().catch(()=>{})}try{fastProc&&fastProc.kill()}catch{}for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
-module.exports={safariShot,DEVICES,devicesAvailable,webkitAvailable,fastStats:()=>({...fastStats,installed:Boolean(lightpandaPath())}),renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
+module.exports={storeShots,safariShot,DEVICES,devicesAvailable,webkitAvailable,fastStats:()=>({...fastStats,installed:Boolean(lightpandaPath())}),renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
