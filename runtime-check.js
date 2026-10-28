@@ -836,5 +836,61 @@ async function storeShots(url,{width=440,height=956,scale=3,max=4}={}){
   return out;
  }finally{await context.close().catch(()=>{})}
 }
+// The page as layers for Figma (figma-export.js): boxes (backgrounds, borders, corners,
+// shadows, background photos), images, inline SVGs and text runs, in paint order and page
+// coordinates, so the Kairoq Figma plugin can rebuild it as editable frames.
+async function captureLayout(url,{width=1440,height=900,maxHeight=7000,maxNodes=1800,mobile=false}={}){
+ if(!available())throw Error('Chromium is not available');
+ const context=await (await browser()).newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile,reducedMotion:'reduce'});
+ try{
+  const page=await context.newPage();
+  await page.goto(url,{waitUntil:'networkidle',timeout:30000});
+  await page.waitForTimeout(800);
+  return await page.evaluate(({maxHeight,maxNodes})=>{
+   const nodes=[],H=Math.min(maxHeight,document.documentElement.scrollHeight),sx=window.scrollX,sy=window.scrollY;
+   const color=c=>{const m=/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(c||'');if(!m)return null;const a=m[4]===undefined?1:+m[4];return a<0.02?null:{r:+m[1]/255,g:+m[2]/255,b:+m[3]/255,a}};
+   const box=r=>({x:Math.round(r.left+sx),y:Math.round(r.top+sy),w:Math.round(r.width),h:Math.round(r.height)});
+   const visible=(el,s)=>s.display!=='none'&&s.visibility!=='hidden'&&+s.opacity>0.02;
+   const els=document.body.querySelectorAll('*');
+   for(const el of els){
+    if(nodes.length>=maxNodes)break;
+    const tag=el.tagName.toLowerCase();if(['script','style','noscript','template','head','meta','link'].includes(tag))continue;
+    if(el.closest('svg')&&tag!=='svg')continue;
+    const s=getComputedStyle(el),r=el.getBoundingClientRect();
+    if(!visible(el,s)||r.width<=2||r.height<=2||r.top+sy>H)continue;
+    // Screen-reader-only text is not part of the design.
+    if(s.position==='absolute'&&s.overflow==='hidden'&&r.width<=2)continue;
+    const b=box(r),opacity=+s.opacity;
+    if(tag==='svg'){nodes.push({t:'svg',...b,svg:el.outerHTML.slice(0,40000),opacity});continue}
+    if(tag==='img'&&el.currentSrc){nodes.push({t:'image',...b,src:el.currentSrc,fit:s.objectFit||'fill',radius:parseFloat(s.borderTopLeftRadius)||0,opacity});continue}
+    // A canvas (flowing lines, charts) becomes a picture of what it shows; a video its poster.
+    if(tag==='canvas'){let src=null;try{src=el.toDataURL('image/png')}catch{}nodes.push(src?{t:'image',...b,src,fit:'fill',radius:0,opacity}:{t:'box',...b,fill:{r:.9,g:.9,b:.92,a:1},name:tag});continue}
+    if(tag==='video'||tag==='iframe'){nodes.push(el.poster?{t:'image',...b,src:el.poster,fit:'cover',radius:parseFloat(s.borderTopLeftRadius)||0,opacity}:{t:'box',...b,fill:{r:.9,g:.9,b:.92,a:1},radius:parseFloat(s.borderTopLeftRadius)||0,name:tag});continue}
+    const sides=['Top','Right','Bottom','Left'].map(k=>({k,w:parseFloat(s['border'+k+'Width'])||0,c:color(s['border'+k+'Color'])}));
+    const even=sides.every(x=>x.w===sides[0].w&&JSON.stringify(x.c)===JSON.stringify(sides[0].c));
+    const fill=color(s.backgroundColor),bw=even?sides[0].w:0,stroke=bw?sides[0].c:null;
+    // A border on some sides only (a divider, an underline, a left rule) becomes a thin bar.
+    if(!even)for(const x of sides)if(x.w&&x.c){const bar=x.k==='Top'?{x:b.x,y:b.y,w:b.w,h:x.w}:x.k==='Bottom'?{x:b.x,y:b.y+b.h-x.w,w:b.w,h:x.w}:x.k==='Left'?{x:b.x,y:b.y,w:x.w,h:b.h}:{x:b.x+b.w-x.w,y:b.y,w:x.w,h:b.h};nodes.push({t:'box',...bar,fill:x.c,radius:0,name:'Border'})}
+    const bg=/url\(["']?([^"')]+)/.exec(s.backgroundImage||'');
+    const shadow=s.boxShadow&&s.boxShadow!=='none'?s.boxShadow:null;
+    if(fill||stroke||bg||shadow)nodes.push({t:'box',...b,fill,stroke,strokeWidth:bw,radius:parseFloat(s.borderTopLeftRadius)||0,image:bg?bg[1]:null,shadow,opacity,name:tag+(el.id?'#'+el.id:'')});
+    // What a field shows: its value, or its placeholder in a lighter colour.
+    if((tag==='input'&&!/^(checkbox|radio|range|color|file|hidden|submit|button)$/.test(el.type))||tag==='textarea'){
+     const v=el.value||el.placeholder||'';
+     if(v){const pl=parseFloat(s.paddingLeft)||0,fs=parseFloat(s.fontSize)||14,c=color(s.color)||{r:0,g:0,b:0,a:1};
+      nodes.push({t:'text',x:b.x+pl,y:Math.round(b.y+(tag==='textarea'?parseFloat(s.paddingTop)||0:(b.h-fs*1.3)/2)),w:Math.max(10,b.w-pl*2),h:Math.round(fs*1.3),text:v.replace(/\s+/g,' ').slice(0,200),font:s.fontFamily.split(',')[0].replace(/["']/g,'').trim(),weight:+s.fontWeight||400,italic:false,size:fs,lineHeight:null,letterSpacing:0,color:el.value?c:{...c,a:c.a*0.55},align:s.textAlign==='center'?'center':'left',opacity})}
+    }
+    // Text runs: the element's own text nodes, measured where they really are.
+    for(const n of el.childNodes){
+     if(n.nodeType!==3||!n.textContent.trim())continue;
+     const range=document.createRange();range.selectNodeContents(n);const rr=range.getBoundingClientRect();if(rr.width<1)continue;
+     const ls=parseFloat(s.letterSpacing);
+     nodes.push({t:'text',...box(rr),text:n.textContent.replace(/\s+/g,' ').trim(),font:s.fontFamily.split(',')[0].replace(/["']/g,'').trim(),weight:+s.fontWeight||400,italic:s.fontStyle==='italic',size:parseFloat(s.fontSize),lineHeight:s.lineHeight==='normal'?null:parseFloat(s.lineHeight),letterSpacing:isNaN(ls)?0:ls,color:color(s.color)||{r:0,g:0,b:0,a:1},align:s.textAlign,transform:s.textTransform,opacity});
+    }
+   }
+   return{width:document.documentElement.clientWidth,height:H,background:color(getComputedStyle(document.body).backgroundColor)||color(getComputedStyle(document.documentElement).backgroundColor)||{r:1,g:1,b:1,a:1},title:document.title,nodes};
+  },{maxHeight,maxNodes});
+ }finally{await context.close().catch(()=>{})}
+}
 async function close(){if(webkitPromise){const w=await webkitPromise.catch(()=>null);webkitPromise=null;await w?.close().catch(()=>{})}if(fastPromise){const b=await fastPromise.catch(()=>null);fastPromise=null;await b?.close().catch(()=>{})}try{fastProc&&fastProc.kill()}catch{}for(const k of ['browserPromise','externalBrowserPromise']){const p=k==='browserPromise'?browserPromise:externalBrowserPromise;if(!p)continue;if(k==='browserPromise')browserPromise=null;else externalBrowserPromise=null;const b=await p.catch(()=>null);await b?.close().catch(()=>{})}}
-module.exports={storeShots,safariShot,DEVICES,devicesAvailable,webkitAvailable,fastStats:()=>({...fastStats,installed:Boolean(lightpandaPath())}),renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};
+module.exports={captureLayout,storeShots,safariShot,DEVICES,devicesAvailable,webkitAvailable,fastStats:()=>({...fastStats,installed:Boolean(lightpandaPath())}),renderSite,savesData,deadClicks,check,screenshot,inspect,session,checkSite,startProxy,designShots,renderHtml,available,close,browser};

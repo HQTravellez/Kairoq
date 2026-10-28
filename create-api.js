@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/figmaexport':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
@@ -885,13 +885,26 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook,storeShots,snackFetch,appleFetch}){
- const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook,storeShots,snackFetch,appleFetch};
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture}){
+ const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
  try{
   if(!['GET','HEAD','OPTIONS'].includes(method)&&!sameOrigin(req))throw Object.assign(Error('Cross-site request blocked'),{status:403});
+  // Kairoq for Figma (figma-export.js): the plugin downloads a page by its short code. Public on
+  // purpose (the code is the key, valid 30 minutes); Figma plugins call from their own origin.
+  if(route.startsWith('/figma/')&&(method==='GET'||method==='OPTIONS')){
+   const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET','Access-Control-Max-Age':'600'};
+   if(method==='OPTIONS'){res.writeHead(204,cors);res.end();return true}
+   limitedKey('figma-code:'+(req.socket&&req.socket.remoteAddress||''),60,600000);
+   try{const data=require('./figma-export').take(decodeURIComponent(route.slice(8)));res.writeHead(200,{...cors,'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));return true}
+   catch(e){res.writeHead(e.status||500,{...cors,'Content-Type':'application/json'});res.end(JSON.stringify({error:e.message}));return true}
+  }
+  if(route==='/figma-plugin.zip'&&method==='GET'){
+   const zip=require('./figma-export').pluginZip(origin(req));
+   res.writeHead(200,{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="kairoq-for-figma.zip"','Cache-Control':'no-store'});res.end(zip);return true;
+  }
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
@@ -1270,6 +1283,11 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    if(b.action==='publish'){limitedKey('store-pub:'+id,10,3600000);return send(res,200,{stores:await P.publish(id,String(b.platform||''),{fetchImpl:deps.appleFetch})}),true}
    if(b.action==='send'){return send(res,200,{stores:await P.sendBuilt(id,String(b.run||''),{fetchImpl:deps.appleFetch})}),true}
    throw Object.assign(Error('Unknown action'),{status:400});
+  }
+  // Send to Figma: the page as layers, picked up by the Kairoq Figma plugin with a code.
+  if(action==='/figmaexport'&&method==='POST'){
+   limitedKey('figma-export:'+id,20,3600000);
+   return send(res,200,await require('./figma-export').create(id,{capture:deps.figmaCapture})),true;
   }
   // The plan before the first build (build-plan.js): free, shown with Approve, Review and Skip.
   if(action==='/plan'&&method==='POST'){

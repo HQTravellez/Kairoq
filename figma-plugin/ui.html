@@ -1,0 +1,33 @@
+<!-- Kairoq for Figma: paste the code from Kairoq's "Send to Figma"; the page is downloaded here
+     and handed to code.js, which builds the frames. -->
+<style>
+  body{margin:0;padding:16px;font:13px/1.45 Inter,system-ui,sans-serif;color:#0f1115}
+  h1{font-size:15px;margin:0 0 4px}p{margin:0 0 12px;color:#5b606b}
+  input{width:100%;box-sizing:border-box;height:40px;padding:0 12px;border:1px solid #d3d6de;border-radius:10px;font:600 16px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+  input:focus{outline:2px solid #3f4cf6;outline-offset:1px}
+  button{margin-top:12px;width:100%;height:40px;border:0;border-radius:999px;background:#3f4cf6;color:#fff;font:600 13px Inter,system-ui,sans-serif;cursor:pointer}
+  button:disabled{opacity:.5}
+  #status{margin-top:10px;min-height:18px;color:#5b606b}#status.err{color:#c4291c}
+</style>
+<h1>Bring a Kairoq page into Figma</h1>
+<p>In Kairoq, open your project, press <b>Send to Figma</b> and paste the code here.</p>
+<input id="code" placeholder="ABCD-2345" maxlength="9" autocomplete="off" spellcheck="false">
+<button id="go">Build in Figma</button>
+<div id="status" role="status"></div>
+<script>
+const ORIGIN='__KAIROQ_ORIGIN__';
+const $=id=>document.getElementById(id),say=(t,err)=>{$('status').textContent=t;$('status').className=err?'err':''};
+$('go').onclick=async()=>{
+  const code=$('code').value.trim();if(!code)return say('Paste the code from Kairoq first.',true);
+  $('go').disabled=true;say('Downloading the page from Kairoq…');
+  try{
+    const r=await fetch(ORIGIN+'/api/create/figma/'+encodeURIComponent(code));
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||('Kairoq answered '+r.status));
+    say('Building '+j.frames.length+' frame'+(j.frames.length===1?'':'s')+'…');
+    parent.postMessage({pluginMessage:{type:'build',data:j}},'*');
+  }catch(e){say(e.message,true);$('go').disabled=false}
+};
+$('code').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
+onmessage=e=>{const m=e.data.pluginMessage;if(!m)return;if(m.type==='done'){say('Done: '+m.layers+' layers. You can edit everything.');$('go').disabled=false}if(m.type==='error'){say(m.message,true);$('go').disabled=false}};
+</script>
