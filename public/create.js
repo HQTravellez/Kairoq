@@ -538,7 +538,9 @@ function device(mobile){
  d.className='device '+(hidden?'hidden ':'')+(mobile?'phone '+m.os+(m.island?' island':'')+(m.home?' homebutton':''):'desktop');
  for(const [k,v] of Object.entries({'--dev-w':m.w+'px','--dev-h':m.h+'px','--dev-top':m.top+'px','--dev-url':m.urlTop+'px','--dev-bottom':m.bottom+'px','--dev-radius':m.radius+'px'}))d.style.setProperty(k,v);
  $('device-model').classList.toggle('hidden',!mobile);$('device-model').value=state.deviceModel;
- $('safari-shot').classList.toggle('hidden',!mobile||m.os==='android');
+ $('safari-shot').classList.toggle('hidden',!mobile||m.os==='android'||Boolean(state.project&&state.project.native));
+ // A native app is not a web page: no browser address bar in its phone frame.
+ $('editor').classList.toggle('is-native',Boolean(state.project&&state.project.native));
  $('dev-shot').classList.add('hidden');
  try{const host=new URL($('frame').src||location.href).host;for(const h of d.querySelectorAll('.dev-host'))h.textContent=state.project&&state.project.published&&state.project.published.slug?state.project.published.slug+'.kairoq.app':host}catch{}
  fitDevice();
@@ -1171,6 +1173,7 @@ function openDetail(source,tab){detailState.source=source;if(tab)detailState.tab
 function closeDetail(){detailState.source=null;$('detail').classList.add('hidden');document.querySelector('.stage').classList.remove('show-detail')}
 $('detail-close').onclick=closeDetail;
 document.querySelector('.stage-bar').addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
+document.querySelector('.preview-bar').addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&detailState.source!==null&&!document.querySelector('dialog[open]'))closeDetail()});
 for(const b of document.querySelectorAll('#detail [data-tab]'))b.onclick=()=>{detailState.tab=b.dataset.tab;renderDetail()};
 const diffCache=new Map();
@@ -1259,7 +1262,11 @@ async function watch(job){
  $('stream')?.remove();
  if(done&&state.project&&state.project.id===id){
   const {project,account}=await api('/projects/'+id);
+  // A first build can turn the project into a native app: switch to the phone frame then.
+  const becameNative=Boolean(project.native)&&!state.project.native;
   state.project=project;if(account)renderCredits(account);
+  if(becameNative)device(true);
+  $('run-phone').classList.toggle('hidden',!project.native);
   state.runtimeErrors=[];
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
