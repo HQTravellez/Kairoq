@@ -33,10 +33,12 @@ function TextLoop({
     animate: { y: 0, opacity: 1 },
     exit: { y: -20, opacity: 0 }
   };
-  // The leaving and the arriving word share one grid cell, so the swap never pops a word out of
-  // the line or leaves an empty line under the headline (Kairoq fix; the original used popLayout).
+  // Kairoq fix (the original used popLayout, which left an empty line): every word sits in one
+  // grid cell; hidden copies of all of them keep the cell as wide as the longest, so the headline
+  // never moves, and the leaving word goes before the next arrives (mode "wait").
   return <span className={cn("relative inline-grid whitespace-nowrap align-baseline", className)}>
-      <AnimatePresence initial={false}>
+      {items.map((item, i) => <span key={'w' + i} aria-hidden="true" className="invisible [grid-area:1/1]">{item}</span>)}
+      <AnimatePresence mode="wait" initial={false}>
         <motion.span
     key={currentIndex}
     className="[grid-area:1/1]"

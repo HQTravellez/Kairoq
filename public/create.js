@@ -176,6 +176,36 @@ function shortName(prompt){
  if(t.length>40){const c=t.slice(0,41);t=c.slice(0,Math.max(c.lastIndexOf(' '),20))}
  return t.replace(/[\s,;-]+(a|an|the|and|or|with|for|of|to|in|my|our)$/i,'').replace(/[\s,;:-]+$/,'')||'New app';
 }
+// Sliding switches (like iOS and superapp): each segmented group in the editor gets a white thumb
+// that glides to the pressed button, whatever changes aria-pressed (a click or the code).
+function slideSegs(){
+ for(const seg of document.querySelectorAll('#editor .seg')){
+  if(seg.querySelector('.seg-thumb'))continue;
+  const thumb=document.createElement('span');thumb.className='seg-thumb';thumb.setAttribute('aria-hidden','true');seg.prepend(thumb);seg.classList.add('sliding');
+  const place=()=>{const on=seg.querySelector('button[aria-pressed="true"]');if(!on||!on.offsetWidth){thumb.style.opacity='0';return}thumb.style.opacity='1';thumb.style.width=on.offsetWidth+'px';thumb.style.transform='translateX('+(on.offsetLeft-thumb.offsetParent.clientLeft)+'px)'};
+  new MutationObserver(place).observe(seg,{attributes:true,subtree:true,attributeFilter:['aria-pressed','class','hidden']});
+  if(window.ResizeObserver)new ResizeObserver(place).observe(seg);
+  requestAnimationFrame(place);
+ }
+}
+slideSegs();
+// Smooth steps in the ask card (like superapp): the old step slides out, the card's height eases
+// to fit the next one, and the new step slides in from the side it comes from (dir 1 forward,
+// -1 back, 0 fade). The slide-in itself is CSS (.ask-card[data-dir] > *). Reduced motion: instant.
+const STILL=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function morph(card,fill,dir=1){
+ card.dataset.dir=String(dir);
+ if(STILL||!card.isConnected||!card.children.length){card.replaceChildren();fill();return}
+ const from=card.offsetHeight;
+ card.style.height=from+'px';card.classList.add('morphing');
+ for(const c of card.children)c.classList.add('step-out');
+ setTimeout(()=>{
+  card.replaceChildren();fill();
+  card.style.height='auto';const to=card.offsetHeight;card.style.height=from+'px';
+  void card.offsetHeight;card.style.height=to+'px';
+  setTimeout(()=>{card.style.height='';card.classList.remove('morphing')},340);
+ },150);
+}
 // Started from the main Kairoq page: open the editor straight away and ask any quick questions
 // inside the chat, one at a time, before the first build starts.
 async function askThenBuild(prompt){
@@ -185,7 +215,7 @@ async function askThenBuild(prompt){
  const list=$('messages');list.replaceChildren();
  let mine=messageItem({role:'user',text:prompt});list.append(mine);
  const card=document.createElement('li');card.className='assistant ask-card';
- card.append(el('p','ask-head','Reading your request…'));list.append(card);
+ card.classList.add('enter');card.dataset.dir='0';card.append(el('p','ask-head k-shimmer','Reading your request…'));list.append(card);
  const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
  // The picked look (if any) becomes the project's colours and fonts; then the plan (build-plan.js)
  // is shown with Review, Skip and Approve, and the build starts on Approve (or Skip).
@@ -194,7 +224,7 @@ async function askThenBuild(prompt){
  const build=async(answers,look)=>{
   if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
   if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
-  card.replaceChildren(el('p','ask-head','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.'));
+  morph(card,()=>card.append(el('p','ask-head k-shimmer','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
   planWaiting(true);
   const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
   if(!plan)return go(answers,null);
@@ -206,10 +236,10 @@ async function askThenBuild(prompt){
  // The last question is always the look: "How should it feel?" (create-look.js).
  const total=questions.length+(window.KairoqLook?1:0);
  const lookStep=()=>window.KairoqLook.step({card,name,count:total>1?'Question '+total+' of '+total:'One quick question',
-  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw()}:null});
+  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw(-1)}:null});
  if(!questions.length)return window.KairoqLook?lookStep():build([]);
- const draw=()=>{
-  const q=questions[at];card.replaceChildren();
+ const draw=(dir=1)=>morph(card,()=>{
+  const q=questions[at];
   // Like superapp: the question, option cards (a label and one sentence), "Other…", then
   // Back and forward arrows, Skip all and Next.
   const head=el('div','ask-top');head.append(el('span','ask-count',total>1?'Question '+(at+1)+' of '+total:'One quick question'));
@@ -227,17 +257,19 @@ async function askThenBuild(prompt){
   own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false;mark()}};
   mark();
   const foot=el('div','ask-foot');
-  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw()};
+  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw(-1)};
   const fwd=el('button','ask-arrow','›');fwd.type='button';fwd.setAttribute('aria-label','Next question');fwd.disabled=at===questions.length-1&&!window.KairoqLook;
   const last=at===questions.length-1,final=last&&!window.KairoqLook;
-  const forward=()=>{if(final)build(answers());else if(last)lookStep();else{at++;draw()}};fwd.onclick=forward;
+  const forward=()=>{if(final)build(answers());else if(last){morph(card,()=>card.append(el('p','ask-head k-shimmer','Finding looks that fit…')),1);setTimeout(lookStep,STILL?0:170)}else{at++;draw(1)}};fwd.onclick=forward;
   const skip=el('button','ask-link','Skip all');skip.type='button';skip.onclick=()=>build(answers());
   const next=el('button','ask-next',final?'Submit':'Next');next.type='button';next.onclick=forward;
   foot.append(back,fwd,el('span','ask-gap'),skip,next);
-  card.append(head,el('p','ask-q',q.q),opts,own,foot);
+  // Thin progress segments, one per question (and the look).
+  const bar=el('div','ask-progress');for(let k=0;k<total;k++)bar.append(el('i',k<=at?'on':null));
+  card.append(bar,head,el('p','ask-q',q.q),opts,own,foot);
   list.scrollTop=list.scrollHeight;
- };
- draw();
+ },dir);
+ draw(0);
 }
 // A first request with the owner's answers and the approved plan, shown like superapp: the request,
 // each question small with its answer under it, then the plan's title.
@@ -257,7 +289,10 @@ function requestCard(t){
 // The plan before the first build: a title, a short summary, Review (the screens, features, what
 // waits, what was looked up), Skip and Approve.
 function showBuildPlan(card,plan,{onApprove,onSkip}){
- card.replaceChildren();card.classList.add('plan-card');
+ morph(card,()=>fillPlan(card,plan,{onApprove,onSkip}),0);
+}
+function fillPlan(card,plan,{onApprove,onSkip}){
+ card.classList.add('plan-card');
  if(plan.searches)card.append(el('p','plan-research','✓ Looked up '+plan.searches+' source'+(plan.searches===1?'':'s')+' before planning'));
  card.append(el('p','plan-kicker','Plan'),el('h3','plan-title',plan.title),el('p','plan-summary',plan.summary));
  const more=el('div','plan-more hidden');
@@ -349,7 +384,7 @@ function messageItem(m,last,index){
   // Like Lovable: "Thought for Ns", the answer (formatted), then what was done, folded.
   const think=tl.find(e=>e.t==='think');
   const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
-  if(thoughtMs!=null){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secs(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
+  if(thoughtMs!=null){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secsShort(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
   li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
@@ -538,7 +573,9 @@ function device(mobile){
  d.className='device '+(hidden?'hidden ':'')+(mobile?'phone '+m.os+(m.island?' island':'')+(m.home?' homebutton':''):'desktop');
  for(const [k,v] of Object.entries({'--dev-w':m.w+'px','--dev-h':m.h+'px','--dev-top':m.top+'px','--dev-url':m.urlTop+'px','--dev-bottom':m.bottom+'px','--dev-radius':m.radius+'px'}))d.style.setProperty(k,v);
  $('device-model').classList.toggle('hidden',!mobile);$('device-model').value=state.deviceModel;
- $('safari-shot').classList.toggle('hidden',!mobile||m.os==='android');
+ $('safari-shot').classList.toggle('hidden',!mobile||m.os==='android'||Boolean(state.project&&state.project.native));
+ // A native app is not a web page: no browser address bar in its phone frame.
+ $('editor').classList.toggle('is-native',Boolean(state.project&&state.project.native));
  $('dev-shot').classList.add('hidden');
  try{const host=new URL($('frame').src||location.href).host;for(const h of d.querySelectorAll('.dev-host'))h.textContent=state.project&&state.project.published&&state.project.published.slug?state.project.published.slug+'.kairoq.app':host}catch{}
  fitDevice();
@@ -1001,7 +1038,8 @@ const LABELS={researching:'Looking things up on the web…',pitching:'Writing th
 const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',modelling:'Modelling in Blender',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
-function secs(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'}
+// "12s" or "2m 05s" (for "Thought for …"; secs() below gives " in 4.0 s").
+function secsShort(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'}
 function phaseOf(j){if(j.mode==='discuss')return'thinking';if(j.status==='queued'||(j.status==='writing'&&!(j.stream&&j.stream.chars)))return'thinking';return j.status}
 const ICONS={think:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',plan:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',read:'<path d="M4 19.5V5a2 2 0 0 1 2-2h8l6 6v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5z"/><path d="M14 3v6h6"/>',edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',build:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',test:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/>',check:'<path d="M20 6 9 17l-5-5"/>',fix:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',note:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',design:'<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"/>',image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',web:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',logs:'<path d="M4 17l6-6-6-6M12 19h8"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',coin:'<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.2 0 1.1-1.1 1.9-2.5 1.9a2.5 2 0 0 1-2.5-1.5M12 6.5V8M12 16v1.5"/>',back:'<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',chev:'<path d="m9 6 6 6-6 6"/>',down:'<path d="m6 9 6 6 6-6"/>'};
 function icon(name,cls){const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('class','ico'+(cls?' '+cls:''));s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[name]||ICONS.note;return s}
@@ -1040,7 +1078,7 @@ function eventRow(e,{expand=false,version=null,live=false}={}){
  let more=null;
  if(e.t==='think'){
   if(e.title){const t=el('div','ev-title');inlineMd(t,e.title);main.insertBefore(t,head)}
-  head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secs(e.ms||0)));
+  head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secsShort(e.ms||0)));
   if(e.text)more=()=>el('p','ev-thought',e.text);
  }else if(e.t==='plan'){head.append(el('span','ev-label','Plan'));const ol=el('ol','ev-plan');for(const it of e.items||[]){const x=el('li');inlineMd(x,it);ol.append(x)}main.append(ol)}
  else if(e.t==='read'){head.append(el('span','ev-label','Read'));for(const f of e.files||[])head.append(fileChip(f))}
@@ -1170,6 +1208,7 @@ function openDetail(source,tab){detailState.source=source;if(tab)detailState.tab
 function closeDetail(){detailState.source=null;$('detail').classList.add('hidden');document.querySelector('.stage').classList.remove('show-detail')}
 $('detail-close').onclick=closeDetail;
 document.querySelector('.stage-bar').addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
+document.querySelector('.preview-bar').addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&detailState.source!==null&&!document.querySelector('dialog[open]'))closeDetail()});
 for(const b of document.querySelectorAll('#detail [data-tab]'))b.onclick=()=>{detailState.tab=b.dataset.tab;renderDetail()};
 const diffCache=new Map();
@@ -1258,7 +1297,11 @@ async function watch(job){
  $('stream')?.remove();
  if(done&&state.project&&state.project.id===id){
   const {project,account}=await api('/projects/'+id);
+  // A first build can turn the project into a native app: switch to the phone frame then.
+  const becameNative=Boolean(project.native)&&!state.project.native;
   state.project=project;if(account)renderCredits(account);
+  if(becameNative)device(true);
+  $('run-phone').classList.toggle('hidden',!project.native);
   state.runtimeErrors=[];
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}

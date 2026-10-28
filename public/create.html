@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/builder.css?v=8">
 <link rel="stylesheet" href="/create-kairoq.css?v=4">
 <link rel="stylesheet" href="/create-look.css?v=2">
+<link rel="stylesheet" href="/studio.css?v=8">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -449,16 +450,6 @@
         <button type="button" id="view-code" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg><span class="lbl">Code</span></button>
         <button type="button" id="view-data" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span class="lbl">Data</span></button>
       </div>
-      <div class="seg icons" role="group" aria-label="Device">
-        <button type="button" id="desktop" aria-pressed="true" aria-label="Desktop" title="Desktop"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
-        <button type="button" id="mobile" aria-pressed="false" aria-label="Phone" title="Phone"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg></button>
-      </div>
-      <select id="device-model" class="hidden" aria-label="Phone model"><option value="iphone16">iPhone 16</option><option value="iphone16max">iPhone 16 Pro Max</option><option value="iphonese">iPhone SE</option><option value="pixel">Pixel 9 (Android)</option><option value="ipad">iPad mini</option></select>
-      <button class="ghost hidden" id="safari-shot" type="button" title="Open this page in Safari's own engine (WebKit) on the server and show exactly what an iPhone shows">Real Safari</button>
-      <button class="ghost icon-btn" id="refresh" type="button" aria-label="Reload the preview" title="Reload the preview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
-      <select id="versions" aria-label="Version"></select>
-      <button type="button" class="ghost run-phone hidden" id="run-phone" title="Open this app on your phone with Expo Go"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>Run on your phone</button>
-      <a class="ghost icon-btn link" id="open" target="_blank" rel="noopener" title="Open the preview in a new tab" aria-label="Open in a new tab"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>
       <span class="bar-spacer"></span>
       <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits" aria-label="Edit text and images in the preview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span class="lbl">Edit</span></button>
       <details class="menu" id="menu-test">
@@ -476,13 +467,26 @@
           <button type="button" id="restore"><b>Restore this version</b><span>Make the version shown in the preview the current one</span></button>
           <button type="button" id="design-open"><b>Design</b><span>Colours, fonts, skills and images</span></button>
           <button type="button" id="mobile-open"><b>Phone app</b><span>Install on iPhone and Android</span></button>
+          <button type="button" id="connect-open"><b>Connectors</b><span>GitHub, payments, email, Figma, WhatsApp and more</span></button>
           <button type="button" id="team-open"><b>Share</b><span>Invite your team or share a preview</span></button>
           <button type="button" id="settings-open"><b>Settings</b><span>Knowledge, secrets, GitHub, API keys</span></button>
         </div>
       </details>
-      <button class="ghost" id="connect-open" type="button" title="GitHub, payments, email, Figma, WhatsApp and more"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg><span class="lbl">Connectors</span></button>
       <button class="ghost" id="share-open" type="button">Share</button>
       <button class="primary" id="publish-open" type="button"><i class="live-dot" aria-hidden="true"></i>Publish</button>
+    </div>
+    <!-- The preview's own controls (like superapp): device, phone, reload, version, run on your phone. -->
+    <div class="preview-bar" id="preview-bar">
+      <div class="seg icons" role="group" aria-label="Device">
+        <button type="button" id="desktop" aria-pressed="true" aria-label="Desktop" title="Desktop"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
+        <button type="button" id="mobile" aria-pressed="false" aria-label="Phone" title="Phone"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg></button>
+      </div>
+      <select id="device-model" class="hidden" aria-label="Phone model"><option value="iphone16">iPhone 16</option><option value="iphone16max">iPhone 16 Pro Max</option><option value="iphonese">iPhone SE</option><option value="pixel">Pixel 9 (Android)</option><option value="ipad">iPad mini</option></select>
+      <button class="ghost hidden" id="safari-shot" type="button" title="Open this page in Safari's own engine (WebKit) on the server and show exactly what an iPhone shows">Real Safari</button>
+      <button class="ghost icon-btn" id="refresh" type="button" aria-label="Reload the preview" title="Reload the preview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
+      <select id="versions" aria-label="Version"></select>
+      <button type="button" class="ghost run-phone hidden" id="run-phone" title="Open this app on your phone with Expo Go"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>Run on your phone</button>
+      <a class="ghost icon-btn link" id="open" target="_blank" rel="noopener" title="Open the preview in a new tab" aria-label="Open in a new tab"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>
     </div>
     <div class="errors hidden" id="errors" role="status">
       <details><summary id="errors-count"></summary><ul id="errors-list"></ul></details>
@@ -1273,6 +1277,6 @@
 </dialog>
 
 <script src="/create-look.js?v=6"></script>
-<script src="/create.js?v=20261120"></script>
+<script src="/create.js?v=20261131"></script>
 </body>
 </html>
