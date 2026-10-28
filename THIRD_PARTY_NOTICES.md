@@ -170,3 +170,7 @@ requirements. API/schema compatibility and offline tests do not establish produc
 
 - **eas-cli** 26.0.0, MIT, (c) 650 Industries (Expo). https://github.com/expo/eas-cli. Installed in the server image; it builds the native app on Expo's servers (EAS Build) and sends it to the stores (EAS Submit) with the owner's own store keys.
 - **node-forge** 1.x, used under its BSD-3-Clause licence (it is dual-licensed BSD-3-Clause or GPL-2.0), (c) Digital Bazaar. https://github.com/digitalbazaar/forge. It makes the signing key, the certificate request and the PKCS#12 files for the stores.
+
+## Kairoq for Figma (figma-plugin/, figma-export.js)
+
+The plugin is Kairoq's own code and uses only Figma's plugin API. Figma lets plugins create designs; its public REST API cannot, which is why Kairoq → Figma goes through a plugin.

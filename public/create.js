@@ -337,6 +337,15 @@ $('run-phone').onclick=async()=>{
   $('phone-box').classList.remove('hidden');
  }catch(err){text($('phone-status'),'');text($('phone-error'),err.message)}
 };
+// Send to Figma (figma-export.js): a code the Kairoq Figma plugin uses to rebuild the page.
+$('figma-send').onclick=async()=>{
+ const d=$('figma-dialog');text($('figma-error'),'');text($('figma-status'),'Capturing the page as layers… (about 20 seconds)');$('figma-box').classList.add('hidden');d.showModal();
+ try{
+  const r=await api('/projects/'+state.project.id+'/figmaexport',{method:'POST',body:{}});
+  text($('figma-code'),r.code);text($('figma-frames'),r.frames.map(f=>(f.label||f.name)+': '+f.nodes+' layers').join('. ')+'.');
+  text($('figma-status'),'Ready. Paste this code in the Kairoq plugin in Figma.');$('figma-box').classList.remove('hidden');
+ }catch(err){text($('figma-status'),'');text($('figma-error'),err.message)}
+};
 // Publish to the App Store and Google Play (store-listing.js, store-publish.js).
 const storeState={timer:null};
 function storeFile(name){return '/api/create/projects/'+state.project.id+'/storefile?name='+encodeURIComponent(name)+'&t='+Date.now()}

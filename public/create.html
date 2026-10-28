@@ -467,6 +467,7 @@
           <button type="button" id="restore"><b>Restore this version</b><span>Make the version shown in the preview the current one</span></button>
           <button type="button" id="design-open"><b>Design</b><span>Colours, fonts, skills and images</span></button>
           <button type="button" id="mobile-open"><b>Phone app</b><span>Install on iPhone and Android</span></button>
+          <button type="button" id="figma-send"><b>Send to Figma</b><span>Open this page in Figma as editable layers</span></button>
           <button type="button" id="connect-open"><b>Connectors</b><span>GitHub, payments, email, Figma, WhatsApp and more</span></button>
           <button type="button" id="team-open"><b>Share</b><span>Invite your team or share a preview</span></button>
           <button type="button" id="settings-open"><b>Settings</b><span>Knowledge, secrets, GitHub, API keys</span></button>
@@ -680,6 +681,24 @@
   </form>
 </dialog>
 
+<dialog id="figma-dialog">
+  <form method="dialog" class="dialog figma-send">
+    <h2>Send to Figma</h2>
+    <p class="muted small" id="figma-status">Capturing the page as layers…</p>
+    <div class="figma-code hidden" id="figma-box">
+      <p class="figma-code-value" id="figma-code" aria-label="Code for the Kairoq plugin"></p>
+      <p class="muted small" id="figma-frames"></p>
+      <ol class="small store-steps">
+        <li>First time only: <a href="/api/create/figma-plugin.zip" download>download the Kairoq plugin</a>, unzip it, and in the Figma desktop app choose Plugins, then Development, then Import plugin from manifest, and pick manifest.json.</li>
+        <li>In your Figma file, run Plugins, then Development, then Kairoq.</li>
+        <li>Paste the code. The page appears as editable frames: boxes, text in its fonts, images and icons.</li>
+      </ol>
+      <p class="muted small">The code works for 30 minutes.</p>
+    </div>
+    <p class="error" id="figma-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="stores-dialog" class="wide">
   <form method="dialog" class="dialog stores">
     <h2>Publish to the App Store and Google Play</h2>
