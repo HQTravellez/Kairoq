@@ -171,3 +171,35 @@ body{font-family:Geist,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #editor .seg.sliding button,#editor .seg.sliding button[aria-pressed=true]{background:transparent!important;box-shadow:none!important;position:relative;transition:color .2s}
 #editor .seg.sliding button[aria-pressed=true]{color:var(--k-ink)!important}
 @media (prefers-reduced-motion:reduce){#editor .seg .seg-thumb{transition:none}}
+
+/* ---------- Publish to the App Store and Google Play ---------- */
+#stores-dialog .dialog.stores{display:grid;gap:14px;max-width:760px}
+.store-check{list-style:none;margin:0;padding:12px 14px;display:grid;gap:6px;border:1px solid var(--k-line);border-radius:14px;background:var(--k-bg)}
+.store-check li{display:flex;gap:8px;font-size:13.5px}
+.store-check li.ok .vmark{color:#16804a;font-weight:700}
+.store-check li.todo .vmark{color:var(--k-ink-3)}
+.store-sec{display:grid;gap:10px;padding:16px;border:1px solid var(--k-line);border-radius:16px;background:var(--k-surface)}
+.store-sec h3{margin:0;font-size:15px;letter-spacing:-.01em}
+.store-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.store-steps{margin:0;padding-left:18px;line-height:1.6;color:var(--k-ink-2)}
+.store-media{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.store-media figure{margin:0;display:grid;gap:4px;justify-items:center;flex:none}
+.store-media img{height:180px;width:auto;border-radius:12px;border:1px solid var(--k-line);background:#fff}
+.store-media img.store-icon{height:96px;border-radius:22px}
+.store-media figcaption{font-size:11.5px;color:var(--k-ink-3)}
+.store-fields{display:grid;gap:4px}
+.store-fields .row,.store-sec .row{display:flex;gap:10px;align-items:end}
+.store-sec .row>label{flex:1}
+.store-sec .row.end{justify-content:flex-end;align-items:center}
+.store-runs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.store-runs li{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--k-line);border-radius:12px;font-size:13.5px}
+.store-runs li.failed{border-color:#f0c9c9;background:#fff7f7}
+.store-runs li.submitted{border-color:#cfe9d8;background:#f3fbf6}
+.store-runs .run-acts{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#stores-dialog h2{font-size:20px;letter-spacing:-.015em;margin:0}
+#stores-dialog .store-sec h3{text-transform:none!important;letter-spacing:-.01em!important;color:var(--k-ink)!important;font-size:15px!important;font-weight:650!important}
+#stores-dialog .primary{background:var(--k-accent)!important;border-color:var(--k-accent)!important;color:#fff!important;border-radius:999px!important;padding:9px 18px!important}
+#stores-dialog .primary:hover{background:var(--k-accent-hover)!important}
+#stores-dialog .store-sec .ghost{border:1px solid var(--k-line-strong)!important;border-radius:999px!important;padding:8px 16px!important;background:var(--k-surface)!important}
+#stores-dialog .store-sec .ghost:hover{background:var(--k-tint)!important}
+#stores-dialog label{font-weight:500;font-size:13px;color:var(--k-ink-2)}

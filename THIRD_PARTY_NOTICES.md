@@ -165,3 +165,8 @@ requirements. API/schema compatibility and offline tests do not establish produc
 
 - **react-native-web** 0.21.4, MIT, (c) Nicolas Gallagher and Meta Platforms. https://github.com/necolas/react-native-web. It runs the React Native code of native apps in the browser preview.
 - **snack-sdk** 6.6.2 and **snack-content**, MIT, (c) 650 Industries (Expo). https://github.com/expo/snack. They upload a native app to Expo Snack so the free Expo Go app opens it on a phone. The code goes to Expo's servers only when the owner presses "Run on your phone".
+
+## Publishing to the App Store and Google Play (store-*.js)
+
+- **eas-cli** 26.0.0, MIT, (c) 650 Industries (Expo). https://github.com/expo/eas-cli. Installed in the server image; it builds the native app on Expo's servers (EAS Build) and sends it to the stores (EAS Submit) with the owner's own store keys.
+- **node-forge** 1.x, used under its BSD-3-Clause licence (it is dual-licensed BSD-3-Clause or GPL-2.0), (c) Digital Bazaar. https://github.com/digitalbazaar/forge. It makes the signing key, the certificate request and the PKCS#12 files for the stores.

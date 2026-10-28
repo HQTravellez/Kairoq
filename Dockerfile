@@ -8,6 +8,10 @@ RUN npm install --omit=dev
 ARG KAIROQ_OPENCODE=off
 ARG KAIROQ_QUALITY=
 RUN if [ "$KAIROQ_OPENCODE" = "on" ] || [ "$KAIROQ_QUALITY" = "top" ]; then npm install -g --omit=dev opencode-ai@1.18.34; fi
+# eas-cli (MIT) for publishing native apps to the App Store and Google Play (store-publish.js);
+# it also needs EXPO_TOKEN in Railway. KAIROQ_APP_STORES=off leaves it out.
+ARG KAIROQ_APP_STORES=on
+RUN if [ "$KAIROQ_APP_STORES" != "off" ]; then npm install -g --omit=dev eas-cli@26.0.0; fi
 # Lightpanda, a light headless browser, as the fast lane for the live guard and for reading pages
 # for search engines (runtime-check.js), when the Railway variable KAIROQ_LIGHTPANDA=on. It runs
 # unmodified as its own process (AGPL-3.0, github.com/lightpanda-io/browser) with telemetry off;

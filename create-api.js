@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
@@ -885,8 +885,8 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook}){
- const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook};
+async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook,storeShots,snackFetch,appleFetch}){
+ const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook,storeShots,snackFetch,appleFetch};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
@@ -1241,6 +1241,36 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(!action&&method==='PATCH'){const b=await readJson(req,5000);builder.rename(id,b.name);return send(res,200,{project:projectView(id)}),true}
   if(!action&&method==='DELETE'){for(const d of builder.loadMeta(id).domains||[])await hosting.removeDomain(id,d.hostname);hosting.unpublish(id);backend.close(id);return send(res,200,builder.remove(id)),true}
   if(action==='/data'&&method==='GET')return send(res,200,backend.overview(id)),true;
+  // Run on your phone (react-native-app.js): the current version goes to Expo Snack; the reply
+  // has the QR code Expo Go opens. Free; one upload per version is reused.
+  if(action==='/phone'&&method==='POST'){
+   const meta=builder.loadMeta(id),nat=require('./react-native-app');
+   if(!nat.enabled(meta))throw Object.assign(Error('This project is a website. Ask for an iPhone or Android app to make a native app.'),{status:409});
+   if(!meta.current_version)throw Object.assign(Error('Build the app first'),{status:409});
+   if(meta.native.phone&&meta.native.phone.version===meta.current_version)return send(res,200,{phone:{...meta.native.phone,qr:require('./react-mobile').qrSvg(meta.native.phone.exp_url)}}),true;
+   limitedKey('phone:'+id,20,3600000);
+   let r;try{r=await nat.runOnPhone(meta,builder.loadFiles(id,meta.current_version),{fetchImpl:deps.snackFetch})}
+   catch(e){throw Object.assign(Error('Expo did not take the app just now ('+String(e.message||e).slice(0,160)+'). Try again in a minute.'),{status:502})}
+   const m=builder.loadMeta(id);m.native={...m.native,phone:{version:m.current_version,exp_url:r.exp_url,snack_url:r.snack_url,sdk:r.sdk,at:new Date().toISOString()}};builder.saveMeta(m);
+   return send(res,200,{phone:{...m.native.phone,qr:r.qr}}),true;
+  }
+  // Publishing a native app to the App Store and Google Play (store-listing.js, store-publish.js).
+  if(action==='/stores'&&method==='GET'){const P=require('./store-publish');return send(res,200,{stores:/[?&]refresh=1/.test(req.url)?await P.refresh(id):P.status(id)}),true}
+  if(action==='/storefile'&&method==='GET'){
+   const name=new URL(req.url,'http://x').searchParams.get('name'),png=require('./store-listing').file(id,name);
+   if(!png)return send(res,404,{error:'Not found'}),true;
+   res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'private, no-cache','Content-Disposition':'inline; filename="'+name+'"','X-Content-Type-Options':'nosniff'});res.end(png);return true;
+  }
+  if(action==='/stores'&&method==='POST'){
+   const b=await readJson(req,60000),P=require('./store-publish'),L=require('./store-listing');
+   if(b.action==='prepare'){limitedKey('store-prep:'+id,10,3600000);await L.prepare(id,{callModel:deps.callModel,renderHtml:require('./runtime-check').available()?require('./runtime-check').renderHtml:null,storeShots:deps.storeShots});return send(res,200,{stores:P.status(id)}),true}
+   if(b.action==='update'){L.update(id,b);return send(res,200,{stores:P.status(id)}),true}
+   if(b.action==='apple'){limitedKey('store-key:'+id,20,3600000);const r=await P.saveApple(id,b,{fetchImpl:deps.appleFetch});return send(res,200,{stores:P.status(id),apple:r}),true}
+   if(b.action==='google'){P.saveGoogle(id,b);return send(res,200,{stores:P.status(id)}),true}
+   if(b.action==='publish'){limitedKey('store-pub:'+id,10,3600000);return send(res,200,{stores:await P.publish(id,String(b.platform||''),{fetchImpl:deps.appleFetch})}),true}
+   if(b.action==='send'){return send(res,200,{stores:await P.sendBuilt(id,String(b.run||''),{fetchImpl:deps.appleFetch})}),true}
+   throw Object.assign(Error('Unknown action'),{status:400});
+  }
   // The plan before the first build (build-plan.js): free, shown with Approve, Review and Skip.
   if(action==='/plan'&&method==='POST'){
    limitedKey('plan:'+v.owner,30,3600000);

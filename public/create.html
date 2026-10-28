@@ -485,6 +485,7 @@
       <button class="ghost hidden" id="safari-shot" type="button" title="Open this page in Safari's own engine (WebKit) on the server and show exactly what an iPhone shows">Real Safari</button>
       <button class="ghost icon-btn" id="refresh" type="button" aria-label="Reload the preview" title="Reload the preview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
       <select id="versions" aria-label="Version"></select>
+      <button type="button" class="ghost run-phone hidden" id="stores-open" title="Publish this app to the App Store and Google Play"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>App stores</button>
       <button type="button" class="ghost run-phone hidden" id="run-phone" title="Open this app on your phone with Expo Go"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>Run on your phone</button>
       <a class="ghost icon-btn link" id="open" target="_blank" rel="noopener" title="Open the preview in a new tab" aria-label="Open in a new tab"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>
     </div>
@@ -679,6 +680,50 @@
   </form>
 </dialog>
 
+<dialog id="stores-dialog" class="wide">
+  <form method="dialog" class="dialog stores">
+    <h2>Publish to the App Store and Google Play</h2>
+    <p class="muted small">Kairoq prepares the listing, signs and builds the app on Expo's servers, and sends it to your store accounts. Nothing is sent to a store until you press a Build button.</p>
+    <ul class="store-check" id="store-check"></ul>
+    <section class="store-sec">
+      <div class="store-head"><h3>1. Listing</h3><button type="button" class="ghost" id="store-prepare">Prepare the listing</button></div>
+      <p class="muted small" id="store-prep-note">Kairoq writes the text from your app, makes a 1024 px icon and takes iPhone and Android screenshots of your screens.</p>
+      <div class="store-media" id="store-media"></div>
+      <div class="store-fields hidden" id="store-fields">
+        <label>App name (up to 30 characters)<input id="st-name" maxlength="30"></label>
+        <label>Subtitle (up to 30 characters)<input id="st-subtitle" maxlength="30"></label>
+        <label>Promotional text (up to 170 characters)<input id="st-promo" maxlength="170"></label>
+        <label>Description<textarea id="st-description" rows="6" maxlength="4000"></textarea></label>
+        <label>Keywords (up to 100 characters, separated by commas)<input id="st-keywords" maxlength="100"></label>
+        <label>Category<select id="st-category"></select></label>
+        <label>Privacy policy link<input id="st-privacy" placeholder="https://…"></label>
+        <label>Support link<input id="st-support" placeholder="https://…"></label>
+        <div class="row"><label>iPhone bundle ID<input id="st-bundle" spellcheck="false"></label><label>Android package<input id="st-package" spellcheck="false"></label></div>
+        <div class="row end"><button type="button" class="primary" id="store-save">Save the listing</button></div>
+      </div>
+    </section>
+    <section class="store-sec">
+      <h3>2. Apple</h3>
+      <ol class="small store-steps"><li>In <a href="https://appstoreconnect.apple.com/apps" target="_blank" rel="noopener">App Store Connect</a>, create the app: My Apps, then +, then New App, with the bundle ID <b id="st-bundle-show"></b>.</li><li>Users and Access, then Integrations, then App Store Connect API: generate a key with the Admin role and download the .p8 file.</li><li>Paste the key here. Kairoq checks it with Apple, then makes the signing certificate and profile itself.</li></ol>
+      <div class="row"><label>Key ID<input id="st-asc-key" spellcheck="false" autocomplete="off"></label><label>Issuer ID<input id="st-asc-issuer" spellcheck="false" autocomplete="off"></label></div>
+      <label>The .p8 file<textarea id="st-asc-p8" rows="3" spellcheck="false" autocomplete="off" placeholder="-----BEGIN PRIVATE KEY-----"></textarea></label>
+      <div class="row end"><span class="muted small" id="st-apple-state"></span><button type="button" class="ghost" id="store-apple">Save the Apple key</button></div>
+    </section>
+    <section class="store-sec">
+      <h3>3. Google Play</h3>
+      <ol class="small store-steps"><li>In the <a href="https://play.google.com/console" target="_blank" rel="noopener">Play Console</a>, create the app.</li><li>The first Android build is uploaded by hand (Google's rule): Kairoq gives you the file.</li><li>For later builds, add a Google Cloud service account with access to the app and paste its JSON key here.</li></ol>
+      <label>Service account JSON key<textarea id="st-play" rows="3" spellcheck="false" autocomplete="off" placeholder="{ &quot;type&quot;: &quot;service_account&quot;, … }"></textarea></label>
+      <div class="row end"><span class="muted small" id="st-google-state"></span><button type="button" class="ghost" id="store-google">Save the Google key</button></div>
+    </section>
+    <section class="store-sec">
+      <h3>4. Build and send</h3>
+      <div class="row"><button type="button" class="primary" id="store-ios">Build for iPhone</button><button type="button" class="primary" id="store-android">Build for Android</button></div>
+      <ul class="store-runs" id="store-runs"></ul>
+    </section>
+    <p class="error" id="store-error" role="alert"></p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="phone-dialog">
   <form method="dialog" class="dialog">
     <h2>Run on your phone</h2>
