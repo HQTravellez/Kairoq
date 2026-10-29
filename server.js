@@ -6906,6 +6906,13 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
     }
   }
   if(opts.tier==="chat")return callChatAnswer(opts,parse);
+  // Website checks and AI customers (tier "check") go straight to their own models on OpenRouter
+  // (Gemini Flash, DeepSeek; see callOpenRouterBuilder), not to the builder's provider, whose free
+  // daily allowance builds share. If that fails, the usual route below is tried.
+  if(opts.tier==="check"&&process.env.OPENROUTER_API_KEY&&process.env.KAIROQ_CHECK_PAID!=="off"){
+    try{return await callOpenRouterBuilder(opts,parse)}
+    catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[check] website-check models failed, using the usual route: "+String(err.message||err).slice(0,200))}
+  }
   // A fast model (Ollama Cloud, see fastBuilder) writes Standard builds first: it streams at
   // once, where the free OpenRouter models wait in line and think silently for minutes.
   const fb=fastBuilder();

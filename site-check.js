@@ -133,6 +133,9 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   const count=visitors();
   progress('Sending '+count+' AI customers through the site');
   const r=await require('./synthetic-customers').run('site-check',state.url,{audience:about.audience,goal:about.goal,count},{callModel,tier:tier(),site:true,browseSite,signal,onProgress:p=>progress(p.text)});
+  // Every visitor failed on the AI itself (a daily limit, an outage): there is no honest score.
+  const real=r.visits.filter(v=>v.outcome!=='skipped');
+  if(real.length&&real.every(v=>v.outcome==='error')){const first=String(real[0].error||'');throw Object.assign(Error(/429|limit|quota/i.test(first)?'The AI models have reached their limit for today, so the visitors could not run. Please try again later.':'The AI visitors could not run ('+clip(first,140)+'). Please try again later.'),{noScore:true})}
   const tech=technical(desktop.facts,phone.facts);
   const report={
    id:state.id,url:state.url,host:state.host,at:new Date().toISOString(),...about,
