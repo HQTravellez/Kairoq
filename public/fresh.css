@@ -117,3 +117,4 @@ body:not(.app) .landing .hero{background:linear-gradient(180deg,#ffffff 0%,#fbf5
 /* bars and progress on the landing: apricot, so they show on dark cards too */
 body:not(.app) .landing .funnel-row i,body:not(.app) .landing .tile.wide .funnel-row i{background:linear-gradient(90deg,#f3c79f,#e9a06a)!important}
 body:not(.app) .landing .mock-bar>span{background:#e9a06a!important}
+body.app dialog a{color:var(--k-ink);text-decoration:underline;text-underline-offset:2px}

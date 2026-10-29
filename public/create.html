@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="/create-kairoq.css?v=4">
 <link rel="stylesheet" href="/create-look.css?v=2">
 <link rel="stylesheet" href="/studio.css?v=11">
-<link rel="stylesheet" href="/fresh.css?v=4">
+<link rel="stylesheet" href="/fresh.css?v=5">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -884,7 +884,8 @@
     <h3>Reference library</h3>
     <p class="muted small">359 step-by-step tutorials on building things from scratch (build-your-own-x). Kairoq reads each one once and keeps its own notes, so builds use them without reading again. Learning uses free AI models, so it costs nothing; they have a daily limit, so it can take a few days. Press the button again to continue.</p>
     <p class="small" id="ref-status" role="status"></p>
-    <div class="row"><button class="ghost" id="ref-learn" type="button">Learn the library</button><button class="ghost hidden" id="ref-stop" type="button">Stop</button></div>
+    <div class="row"><button class="ghost" id="ref-learn" type="button">Learn the library</button><button class="ghost hidden" id="ref-stop" type="button">Stop</button><button class="ghost" id="ref-import" type="button">Import notes file</button><input type="file" id="ref-file" accept=".jsonl,.json,.txt,application/json" hidden></div>
+    <p class="muted small">Notes made elsewhere (for example by Hermes on your computer, using <a href="https://github.com/HQTravellez/Kairoq/blob/main/docs/HERMES-LIBRARY-GUIDE.md" target="_blank" rel="noopener">this guide</a>) can be imported here; Kairoq keeps them like its own.</p>
     <h3>Partners</h3>
     <p class="muted small">Services people can add from Integrations. Clicks and adds are counted per month so you can invoice partners.</p>
     <ul class="learn-rules" id="partner-admin-list"></ul>
@@ -1356,6 +1357,6 @@
 </dialog>
 
 <script src="/create-look.js?v=6"></script>
-<script src="/create.js?v=20261134"></script>
+<script src="/create.js?v=20261135"></script>
 </body>
 </html>

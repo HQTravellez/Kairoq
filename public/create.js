@@ -2958,6 +2958,13 @@ async function renderRefs(){
  }catch(err){text($('ref-status'),err.message)}
 }
 $('ref-learn').onclick=async()=>{$('ref-learn').disabled=true;try{await api('/admin/references',{method:'POST',body:{}})}catch(err){text($('ref-status'),err.message)}$('ref-learn').disabled=false;renderRefs()};
+$('ref-import').onclick=()=>$('ref-file').click();
+$('ref-file').onchange=async()=>{const f=$('ref-file').files[0];$('ref-file').value='';if(!f)return;
+ if(f.size>11000000){text($('ref-status'),'That file is too big (over 11 MB).');return}
+ text($('ref-status'),'Importing '+f.name+'…');
+ try{const r=await api('/admin/references/import',{method:'POST',body:{text:await f.text()}});
+  text($('ref-status'),'Imported '+r.imported+' tutorial'+(r.imported===1?'':'s')+(r.skipped_marked?', '+r.skipped_marked+' marked as videos':'')+(r.already?', '+r.already+' already learned (kept)':'')+(r.not_in_list?', '+r.not_in_list+' not in the list':'')+(r.too_short?', '+r.too_short+' too short':'')+(r.bad_lines?', '+r.bad_lines+' unreadable lines':'')+'. Now '+r.status.learned+' of '+r.status.total+' learned.')}
+ catch(err){text($('ref-status'),err.message)}};
 $('ref-stop').onclick=async()=>{try{await api('/admin/references',{method:'POST',body:{stop:true}})}catch{}renderRefs()};
 async function openAdmin(){text($('admin-error'),'');renderRefs();text($('learn-status'),'');$('admin-dialog').showModal();if(!state.templates)try{const r=await api('/templates');state.templates=r.templates;state.sponsored=r.sponsored||[]}catch{}try{renderPartnerAdmin((await api('/admin/partners')).partners)}catch(err){text($('admin-error'),err.message)}await renderAdmin()}
 function pctText(r){return r==null?'–':Math.round(r*1000)/10+'%'}

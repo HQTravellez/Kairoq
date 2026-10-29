@@ -110,3 +110,25 @@ test('a video is learned from its written version; one without is marked and not
  await assert.rejects(R.learn(item,{remote,callModel:async(o,p)=>p(NOTES)}),/No readable text/);
  assert.equal(R.savedNotes(item.url),null);assert.equal(R.readFile(item.url).skipped,true);
 });
+
+test('notes made outside Kairoq (Hermes) are imported from a JSON Lines file: only listed tutorials, real notes, nothing overwritten',()=>{
+ const list=R.catalog().tutorials.filter(x=>!R.readFile(x.url)).slice(0,3),notes=('Core idea: '+'a clear explanation of each step. '.repeat(20)).trim();
+ const lines=[
+  JSON.stringify({url:list[0].url,notes,sources:[list[0].url,'https://example.com/part-2','javascript:alert(1)']}),
+  JSON.stringify({url:list[1].url,skipped:true,reason:'video only'}),
+  JSON.stringify({url:list[2].url,notes:'too short'}),
+  JSON.stringify({url:'https://not-in-the-list.example/x',notes}),
+  'this is not json',
+ ].join('\n');
+ const r=R.importNotes(lines);
+ assert.deepEqual({i:r.imported,s:r.skipped_marked,t:r.too_short,n:r.not_in_list,b:r.bad_lines},{i:1,s:1,t:1,n:1,b:1});
+ const saved=R.savedNotes(list[0].url);assert.equal(saved.title,list[0].title);assert.equal(saved.by,'import');assert.deepEqual(saved.sources,[list[0].url,'https://example.com/part-2']);
+ assert.equal(R.readFile(list[1].url).skipped,true);
+ // Already learned: kept unless replace is asked for.
+ assert.equal(R.importNotes(JSON.stringify({url:list[0].url,notes:notes+' changed'})).already,1);
+ assert.equal(R.savedNotes(list[0].url).notes,notes);
+ assert.equal(R.importNotes(JSON.stringify({url:list[0].url,notes:notes+' changed'}),{replace:true}).imported,1);
+ // A JSON array works too.
+ assert.equal(R.importNotes(JSON.stringify([{url:list[2].url,notes}])).imported,1);
+ assert.throws(()=>R.importNotes('[not json'),/not valid JSON/);
+});
