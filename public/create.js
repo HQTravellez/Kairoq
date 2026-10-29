@@ -1146,7 +1146,9 @@ async function discussWhileBuilding(message){
    await new Promise(r=>setTimeout(r,300));
    current=(await api('/jobs/'+job.id)).job;
    if(state.project?.id!==projectId){answer.remove();return;}
-   const said=current.stream?.text?'Writing the answer…':'Thinking about your question…';if(answer.textContent!==said){const next=messageItem({role:'assistant',text:said});answer.replaceWith(next);answer=next;}
+   // Show text as soon as the model streams it instead of masking it behind a spinner.
+   const said=typeof current.stream?.text==='string'&&current.stream.text.trim()?current.stream.text:'Thinking about your question…';
+   if(answer.dataset.streamText!==said){const next=messageItem({role:'assistant',text:said});next.dataset.streamText=said;answer.replaceWith(next);answer=next;}
   }
   if(current.status==='failed'){if(current.saved){answer.remove();const k=(await api('/projects/'+projectId)).project.messages.at(-1);$('messages').append(messageItem(k&&k.failed?k:{role:'assistant',text:current.error,failed:true,retry:message,retry_mode:'discuss'}));return}throw Error(current.error)}
   // Reload the durable conversation, keeping the active build watcher intact.
