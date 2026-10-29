@@ -20,3 +20,23 @@ body.app.in-editor .stage:has(#device.phone:not(.hidden)) .device.phone{animatio
 body.app.in-editor .stage:has(.device.desktop) #frame:not(.hidden){animation:kq-preview-reveal .24s ease-out both}
 @media(prefers-reduced-motion:reduce){body.app.in-editor .device.phone,body.app.in-editor .stage #frame{animation:none!important;transition:none!important}}
 @media(max-width:700px){body.app.in-editor .canvas.mobile{padding:14px 8px!important}}
+
+/* Premium builder shell: hierarchy and whitespace, not decorative colour. */
+body.app{--workspace-edge:#e5e9f0;--workspace-muted:#667085;--workspace-bg:#f7f8fa}
+body.app .side{background:#fafbfc!important;border-right:1px solid #e8ebf0!important}
+body.app .side-brand{letter-spacing:-.035em}
+body.app .side-nav button{border-radius:10px!important;transition:background .16s ease,color .16s ease!important}
+body.app .side-nav button[aria-current]{background:#eef1fa!important;color:#27324b!important}
+body.app .shell-main{background:#fff}
+body.app:not(.in-editor) .shell-main{border:1px solid #e8ebf0!important;box-shadow:0 12px 34px #1b2c4808!important}
+body.app #home .home{background:radial-gradient(ellipse 70% 32% at 50% 23%,#f4f6fb,#fff 75%)!important}
+body.app #home .home-hero{padding-top:clamp(52px,9vh,108px)!important}
+body.app #home h1{font-weight:640!important;letter-spacing:-.055em!important}
+body.app #home .prompt-box{border:1px solid #e0e5ed!important;border-radius:18px!important;box-shadow:0 10px 38px #23334b0a!important}
+body.app #home .browser{border-radius:16px!important;box-shadow:0 5px 30px #24365008!important}
+body.app.in-editor #editor>.chat{box-shadow:6px 0 22px #1b263b05}
+body.app.in-editor .stage-bar{padding-inline:16px!important}
+body.app.in-editor #chat-form{border-radius:16px!important}
+body.app.in-editor #messages .assistant{line-height:1.68}
+body.app.in-editor #messages .user{line-height:1.55}
+@media(prefers-reduced-motion:reduce){body.app .side-nav button{transition:none!important}}
