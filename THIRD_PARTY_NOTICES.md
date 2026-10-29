@@ -140,6 +140,9 @@ requirements. API/schema compatibility and offline tests do not establish produc
 - Poly Haven — https://polyhaven.com — models, textures and HDRIs under CC0 (public domain),
   downloaded on request through api.polyhaven.com. Kairoq keeps the source and credit with
   each model.
+- build-your-own-x — https://github.com/codecrafters-io/build-your-own-x — the list of tutorials
+  (data/build-your-own-x.json) is CC0. The linked tutorials belong to their authors; Kairoq links to
+  them and keeps only its own notes written from them, never copies.
 - Poly Pizza — https://poly.pizza — free low-poly models (Quaternius, Kenney and others),
   downloaded on request through api.poly.pizza with the server's POLY_PIZZA_KEY. Only models under
   CC0 or CC-BY are offered; Kairoq keeps each model's creator and licence, and apps using a CC-BY

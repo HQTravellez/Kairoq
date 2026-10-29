@@ -659,8 +659,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
  // The builder's research and fetch tools (builder-tools.js), shown in the timeline as it works.
  const builderTools=oc&&process.env.KAIROQ_BUILDER_TOOLS!=='off'?require('./builder-tools').forProject(id):null;let toolsShown=0;
- const TOOL_NOTES={kairoq_search:['search','Searched the web'],kairoq_read:['globe','Read a page'],kairoq_download:['download','Downloaded a file into the app'],kairoq_package:['package','Added a package']};
- let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./builder-playbooks').note(text)),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
+ const TOOL_NOTES={kairoq_tutorials:['book','Looked in the reference library'],kairoq_search:['search','Searched the web'],kairoq_read:['globe','Read a page'],kairoq_download:['download','Downloaded a file into the app'],kairoq_package:['package','Added a package']};
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./builder-playbooks').note(text)+require('./builder-references').note(text)),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
  let usedOpenCode=false,usedFallback=false,usedModel=null;
  const ocRequest=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{

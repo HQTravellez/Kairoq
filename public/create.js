@@ -2876,7 +2876,21 @@ $('sf-save').onclick=async()=>{text($('admin-error'),'');if(await partnerAdminAc
 $('sf-clear').onclick=()=>fillSlotForm();
 
 // ---------- admin (owner only): what Kairoq is learning, and website check leads ----------
-async function openAdmin(){text($('admin-error'),'');text($('learn-status'),'');$('admin-dialog').showModal();if(!state.templates)try{const r=await api('/templates');state.templates=r.templates;state.sponsored=r.sponsored||[]}catch{}try{renderPartnerAdmin((await api('/admin/partners')).partners)}catch(err){text($('admin-error'),err.message)}await renderAdmin()}
+// The reference library (builder-references.js): how much Kairoq has learned, and the button
+// that has it read every tutorial once and keep its notes.
+let refTimer=null;
+async function renderRefs(){
+ clearTimeout(refTimer);
+ try{
+  const s=await api('/admin/references'),j=s.job,on=Boolean(j&&j.running);
+  text($('ref-status'),s.learned+' of '+s.total+' tutorials learned in '+s.topics+' topics'+(j?(on?' · learning now: '+j.done+' done':' · last run: '+j.done+' learned')+(j.skipped?', '+j.skipped+' had no readable text':'')+(j.failed?', '+j.failed+' failed'+(j.last_error?' ('+j.last_error.error+')':''):''):'')+'.');
+  $('ref-learn').classList.toggle('hidden',on||s.learned>=s.total);$('ref-stop').classList.toggle('hidden',!on);
+  if(on&&$('admin-dialog').open)refTimer=setTimeout(renderRefs,4000);
+ }catch(err){text($('ref-status'),err.message)}
+}
+$('ref-learn').onclick=async()=>{$('ref-learn').disabled=true;try{await api('/admin/references',{method:'POST',body:{}})}catch(err){text($('ref-status'),err.message)}$('ref-learn').disabled=false;renderRefs()};
+$('ref-stop').onclick=async()=>{try{await api('/admin/references',{method:'POST',body:{stop:true}})}catch{}renderRefs()};
+async function openAdmin(){text($('admin-error'),'');renderRefs();text($('learn-status'),'');$('admin-dialog').showModal();if(!state.templates)try{const r=await api('/templates');state.templates=r.templates;state.sponsored=r.sponsored||[]}catch{}try{renderPartnerAdmin((await api('/admin/partners')).partners)}catch(err){text($('admin-error'),err.message)}await renderAdmin()}
 function pctText(r){return r==null?'–':Math.round(r*1000)/10+'%'}
 async function renderAdmin(given){
  try{

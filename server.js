@@ -6868,7 +6868,7 @@ async function streamAppAi(body,onToken,onFirst){
 // in parallel, models per tier, the fast lane for small edits and live progress (it needs
 // KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true to write whole apps).
 // OpenCode as the build engine (opencode-engine.js) counts its model calls against the same budget.
-require("./builder-tools").configure({webSearch:searchPublicWeb});
+require("./builder-tools").configure({webSearch:searchPublicWeb,callModel:(o,p)=>callBuilderModel({tier:"standard",...o},p)});
 require("./opencode-engine").configure({enforceBudget,recordUsage:u=>recordUsage(u,{purpose:"developer-build",model:u.model,provider:"opencode"}),checkUrl:"http://127.0.0.1:"+PORT+"/internal/opencode-check"});
 function builderProvider(){
   const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();

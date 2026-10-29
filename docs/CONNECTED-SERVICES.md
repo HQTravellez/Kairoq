@@ -147,4 +147,12 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
 - **Playbooks** (`builder-playbooks.js`): short know-how for hard topics (3D characters, AR from a
   printed page, reading colours from a photo, printable pages), added when a request needs them.
 - Switch off with `KAIROQ_BUILDER_TOOLS=off`. Tool calls per change: `KAIROQ_BUILDER_TOOL_CALLS` (40).
+- **Reference library** (`builder-references.js`, `data/build-your-own-x.json`): all 359 tutorials
+  from build-your-own-x in 31 topics, with a Kairoq playbook per topic. The builder looks them up with
+  kairoq_tutorials. Admin → Reference library → "Learn the library" has Kairoq read each tutorial once
+  and keep its own notes (in `reference-notes/` next to the projects), so builds use the notes without
+  reading again; a tutorial the builder reads during a build is learned too. The notes are Kairoq's own
+  words, not copies of the articles. Learning everything costs roughly $10 to $15 of AI once with
+  Claude Sonnet, and it stops when the daily or monthly AI budget is used up (raise
+  `DAILY_COST_LIMIT_USD` first, then press the button again to continue).
 

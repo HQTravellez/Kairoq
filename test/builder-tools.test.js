@@ -102,7 +102,7 @@ test('the real OpenCode program searches and downloads through Kairoq',{skip:!pr
  try{
   const r=await s.reply({files:{'src/App.jsx':'export default function App(){return null}\n'},prompt:'Add a real T-Rex'});
   const names=offered.find(t=>t.includes('kairoq_search'))||[];
-  for(const n of ['kairoq_search','kairoq_read','kairoq_download','kairoq_package'])assert.ok(names.includes(n),n+' offered: '+names.join(','));
+  for(const n of ['kairoq_search','kairoq_read','kairoq_download','kairoq_package','kairoq_tutorials'])assert.ok(names.includes(n),n+' offered: '+names.join(','));
   assert.ok(!names.includes('bash')&&!names.includes('webfetch'),'still no shell and no open web');
   assert.match(results[0]||'',/poly\.pizza\/m\/UYtneO5FpF/);
   assert.match(results[1]||'',/Saved "T-Rex" \(CC0\)/);
