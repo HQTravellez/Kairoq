@@ -74,7 +74,7 @@ test('packages: permissive ones are added without install scripts, the app impor
 test('playbooks: a 3D colouring app gets the know-how for characters, AR, colours and printing',()=>{
  const P=require('../builder-playbooks');
  const ids=P.pick('Build an iPhone AR coloring book app for kids. The child prints a T-Rex coloring page, colors it, then points the phone at the paper. Tapping the drawing makes a real animated 3D T-Rex pop out wearing the child\'s colors').map(b=>b.id);
- assert.deepEqual(ids,['3d-character','ar-coloring','camera-colours']);
+ assert.deepEqual(ids,['3d-character','ar-coloring','camera-colours','printable']);
  assert.deepEqual(P.pick('A booking site for my salon'),[]);
  assert.match(P.note('a printable colouring page'),/window\.print/);
  assert.match(engine.rules('Rules.'),/Think, research, then build/);
@@ -109,4 +109,12 @@ test('the real OpenCode program searches and downloads through Kairoq',{skip:!pr
   assert.equal(M.list(meta.id)[0].title,'T-Rex');
   assert.match(r.message,/Fetched the T-Rex/);
  }finally{s.close();model.close();route.close();engine.configure({checkUrl:null});for(const k of ['KAIROQ_OPENCODE_BIN','EXPLABS_API_KEY','KAIROQ_OPENCODE_BASE_URL','KAIROQ_OPENCODE_MODEL'])delete process.env[k]}
+});
+
+test('game playbooks: a game request gets design, feel, testing and accessibility know-how',()=>{
+ const P=require('../builder-playbooks');
+ assert.deepEqual(P.pick('A snake game with a leaderboard for my café').map(b=>b.id),['game-design','game-feel','game-qa','game-accessibility']);
+ assert.deepEqual(P.pick('A video player page for my courses'),[]);
+ assert.match(P.note('a quiz game'),/delta|dt\)/);assert.match(P.note('a quiz game'),/44 px/);
+ assert.match(require('../builder-skills').open('game-feel'),/within 100 ms/);
 });

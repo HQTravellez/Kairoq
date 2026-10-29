@@ -152,7 +152,47 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
   kairoq_tutorials. Admin → Reference library → "Learn the library" has Kairoq read each tutorial once
   and keep its own notes (in `reference-notes/` next to the projects), so builds use the notes without
   reading again; a tutorial the builder reads during a build is learned too. The notes are Kairoq's own
-  words, not copies of the articles. Learning everything costs roughly $10 to $15 of AI once with
+  words, not copies of the articles. Series are learned whole (up to 15 parts), GitHub projects from their
+  README, docs and main code, and videos from their written version (bare videos are marked as not
+  learnable). Learning everything costs roughly $25 to $40 of AI once with
   Claude Sonnet, and it stops when the daily or monthly AI budget is used up (raise
   `DAILY_COST_LIMIT_USD` first, then press the button again to continue).
 
+
+## Autopilot, skills and helpers
+
+- **Autopilot** (`autopilot.js`): with top quality (or `KAIROQ_AUTOPILOT=on`), the first build is
+  tested against the owner's request (each thing asked for: done, partly done or missing, with
+  evidence; anything faked; screenshots, code, Kairoq's own tests and 2 AI customers), then the
+  missing items go back to the builder as a fix list, and it repeats. It stops when everything passes,
+  after `KAIROQ_AUTOPILOT_ROUNDS` fixes (3), or when two tests in a row find the same gaps. The owner
+  gets "Done: …" and "Not done yet: …". The project menu has **Keep going until it's right** to run
+  it on any app. `KAIROQ_AUTOPILOT=off` switches it off; `KAIROQ_AUTOPILOT_CUSTOMERS=off` skips the
+  AI customers.
+- **Skills** (`builder-skills.js`): the builder sees a menu of every playbook and library topic and
+  opens the ones it needs with kairoq_skill.
+- **Helpers** (OpenCode sub-agents): a researcher (search, read, library) and a reviewer (reads the
+  code, runs kairoq_check). Neither can change the app or run commands; only the builder edits.
+- **AI that uses the app's tools** (`app-ai-tools.js`): apps can declare server functions as
+  `"ai_tools"` in `src/backend.json`; `ai.chat({ messages, tools: true })` then lets the AI call them
+  as the visitor (declared arguments and types only, at most 5 calls per answer), for example a
+  hotel assistant that checks real availability. Tools marked `"confirm": true` (bookings, payments)
+  are never run by the AI: they come back as an `action` the app shows as a button.
+- **Integrations library** (`integrations.js`, `data/integrations.json`): 744 services and 9,501
+  actions from Activepieces' MIT integrations. Editor: Connectors → **744 apps** (search, pick what
+  should happen, add the key). Builder: kairoq_integration shows how a service signs in and its actions,
+  and reads the real code of one action once (kept in `integration-code/`). Rebuild the data with
+  `node scripts/build-integrations.js <activepieces>/packages/pieces/community data/integrations.json <commit>`.
+- **Connect with … (OAuth)** (`oauth-connect.js`): for the 118 services that sign in with OAuth, the
+  owner presses **Connect with X** in Connectors → 744 apps, signs in on the service's own page and
+  presses Allow. Kairoq keeps the tokens encrypted with the project's secrets (needs
+  `APP_ENCRYPTION_KEY`), renews them, and gives them only to server functions:
+  `const { access_token } = await secrets.oauth('hubspot')`. Each service needs an OAuth app:
+  - Kairoq's own, for every project: register an app with the service and add
+    `KAIROQ_OAUTH_<SERVICE>_CLIENT_ID` and `KAIROQ_OAUTH_<SERVICE>_CLIENT_SECRET` on Railway
+    (for example `KAIROQ_OAUTH_HUBSPOT_CLIENT_ID`). Redirect (callback) address:
+    `https://kairoq-production.up.railway.app/api/create/oauth/callback`
+    (taken from `KAIROQ_PUBLIC_URL` or `RAILWAY_PUBLIC_DOMAIN`).
+  - Or the owner's own: they paste a Client ID and Secret under "Use your own OAuth app".
+  Safety: random single-use state (10 minutes, bound to the project and the person), PKCE where the
+  service supports it, a fixed redirect address. Visitors connecting their own accounts is not built.

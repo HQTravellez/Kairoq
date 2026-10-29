@@ -24,7 +24,34 @@ const BOOKS=[
   text:`Printable pages:
 - Make the page its own route with a big "Print" button (window.print()) and @media print CSS: @page { size: A4 portrait; margin: 12mm }, hide the app's header, footer and buttons, black line art on white.
 - Draw the page as a clean SVG (thick, closed outlines a child can colour), with the regions the app reads later, a title and small "Made with <app>" text. Offer a download of the same SVG or PNG.`},
+ // Game playbooks: Kairoq's own words, informed by Claude Code Game Studios (Donchitos, MIT).
+ {id:'game-design',when:/\b(game|arcade|platformer|puzzle|snake|tetris|pong|flappy|quiz|mini ?game|leaderboard|high ?score)\b/i,
+  text:`Designing a small game:
+- Start from a one-screen brief, not documents: the core loop (what the player does again and again), the goal, how you win and lose, the controls on desktop and on a phone, and how long one round lasts (30 to 120 seconds for a quick brand game).
+- Keep every tuning value (speeds, timers, points, difficulty steps) in one data file (src/data/game.js), never scattered numbers in the code, so it can be tuned without touching logic.
+- Use the time since the last frame (dt) for all movement and timers, so the game runs the same on fast and slow phones.
+- Separate the game's logic (a pure state machine: ready, playing, paused, won, lost, with explicit transitions) from what draws it, so the logic can be tested without a screen.
+- One clear call to action at the end of a round: play again, share the score, or the business's real offer.`},
+ {id:'game-feel',when:/\b(game|arcade|platformer|puzzle|snake|tetris|pong|flappy|quiz|mini ?game|leaderboard|high ?score)\b/i,
+  text:`Making a game feel good ("juice"):
+- Every action answers within 100 ms with something the player can see and hear: a small bounce or squash-and-stretch, a burst of particles, a short sound, a number that pops up.
+- Hits and wins get weight: a tiny pause on impact (40 to 80 ms), a light screen shake (a few pixels, never for people who prefer reduced motion), a flash.
+- Ease everything (ease-out for things arriving, ease-in for leaving); nothing jumps or stops dead.
+- Ramp difficulty in small steps and give a moment of calm after a hard part; the first 10 seconds teach the controls by doing, not by reading.
+- Sound only after the first tap, a mute button always visible, and music quieter than effects.`},
+ {id:'game-qa',when:/\b(game|arcade|platformer|puzzle|snake|tetris|pong|flappy|quiz|mini ?game|leaderboard|high ?score)\b/i,
+  text:`Testing a game before calling it done:
+- Play it like a first-time player: within 5 seconds is the goal clear, within 10 are the controls clear, and does losing feel fair? Check on a phone size and with touch.
+- Automatic checks: the game starts, input moves the player, the score changes, pausing works and the tab being hidden pauses it, a round can be won and lost, play-again resets everything, and there are no errors in the console.
+- Balance: no dead stretch where nothing changes, no single trick that wins every time, difficulty that rises and never jumps, rewards that keep coming.
+- Never claim it is balanced or fun without evidence: if no one played it, say what was not tested in "Not done yet:".`},
+ {id:'game-accessibility',when:/\b(game|arcade|platformer|puzzle|snake|tetris|pong|flappy|quiz|mini ?game|leaderboard|high ?score)\b/i,
+  text:`Games everyone can play:
+- Text at least 18 px and readable on a phone, contrast at least 4.5:1, and never colour alone to tell things apart (add a shape, icon or label).
+- Simple controls: no pressing two buttons at once, taps instead of holds (or a toggle), big touch targets (at least 44 px), and keyboard play on desktop.
+- A pause that works at any moment, an easier or slower mode, and no time pressure that cannot be turned off for players who need it.
+- Separate volume (or mute) for music and effects, visual signs for important sounds, and no flashing faster than three times a second.`},
 ];
-function pick(text){return BOOKS.filter(b=>b.when.test(String(text||''))).slice(0,3)}
+function pick(text){return BOOKS.filter(b=>b.when.test(String(text||''))).slice(0,4)}
 function note(text){const list=pick(text);return list.length?'\n\nPLAYBOOKS (how these are really built; follow them):\n'+list.map(b=>b.text).join('\n\n'):''}
 module.exports={BOOKS,pick,note};

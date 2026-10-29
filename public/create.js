@@ -1156,9 +1156,9 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={researching:'Looking things up on the web…',pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',modelling:'Modelling a 3D object in Blender…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',reviews:'Reading what its users say in public reviews…',scoring:'Checking each planned feature against the code…',sweeping:'Checking nothing of the original is left…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
+const LABELS={autopilot:'Autopilot: testing the app against your request…',researching:'Looking things up on the web…',pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',modelling:'Modelling a 3D object in Blender…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',reviews:'Reading what its users say in public reviews…',scoring:'Checking each planned feature against the code…',sweeping:'Checking nothing of the original is left…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
-const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',modelling:'Modelling in Blender',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
+const PHASES={autopilot:'Autopilot',queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',modelling:'Modelling in Blender',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 // "12s" or "2m 05s" (for "Thought for …"; secs() below gives " in 4.0 s").
@@ -1240,7 +1240,7 @@ function workCard(){
 }
 // The stages of a build, shown as a checklist while it works (and over the preview on a first build).
 const STAGES=[['thinking','Understanding what you asked'],['designing','Choosing the design'],['writing','Writing the code'],['building','Building the preview'],['testing','Testing it in a browser']];
-function stageOf(p){return{designing:'designing',modelling:'designing',images:'designing',writing:'writing',fixing:'writing',building:'building',testing:'testing',checking:'testing',reviewing:'testing',verifying:'testing',repairing:'writing'}[p]||'thinking'}
+function stageOf(p){return{designing:'designing',modelling:'designing',images:'designing',writing:'writing',fixing:'writing',building:'building',testing:'testing',checking:'testing',reviewing:'testing',autopilot:'testing',verifying:'testing',repairing:'writing'}[p]||'thinking'}
 function stageList(j){
  const p=phaseOf(j),cur=stageOf(p);work.seen=work.seen||new Set();work.seen.add(cur);
  const shown=STAGES.filter(([id])=>id!=='designing'||work.seen.has('designing')),at=shown.findIndex(([id])=>id===cur);
@@ -2806,6 +2806,7 @@ const CONNECTORS=[
  {id:'email',name:'Email',desc:'Booking confirmations, password resets and owner notifications.',open:()=>openSettingsAt('email-status')},
  {id:'secrets',name:'API keys for your app',desc:'Keys for other services your server functions call (maps, SMS, AI…).',open:()=>openSettingsAt('secret-name')},
  {id:'figma',name:'Figma',desc:'Build a screen from a Figma frame.',open:()=>$('figma-open').click()},
+ {id:'apps',name:'744 apps',desc:'Mailchimp, HubSpot, Slack, Airtable, Shopify, Twilio and more: pick one and say what should happen.',open:()=>openApps()},
  {id:'partners',name:'Integrations',desc:'Booking, payments, reviews and more from our partners.',open:()=>openIntegrations()},
  {id:'whatsapp',name:'WhatsApp',desc:'Answer customers on WhatsApp with your app\'s assistant.',open:()=>openWhatsApp()},
  {id:'domain',name:'Custom domain',desc:'Publish the app on your own domain, like www.yourhotel.com.',open:()=>$('publish-open').click()},
@@ -2830,6 +2831,68 @@ $('connect-open').onclick=()=>{
  }
  $('connectors-dialog').showModal();
 };
+// "744 apps" (integrations.js): search a service, pick what should happen, and Kairoq adds it.
+let appsTimer=null;
+const CONNECT_LABEL={key:'Works with an API key',oauth:'Connect with your account (sign in on its own page)',none:'No sign-in needed'};
+async function openApps(){$('apps-dialog').showModal();$('apps-search').value='';$('apps-detail').replaceChildren(el('p','muted small','Pick a service to see what it can do.'));await appsSearch('');$('apps-search').focus()}
+async function appsSearch(q){
+ const ul=$('apps-list');
+ try{const d=await api('/integrations?limit=60&q='+encodeURIComponent(q));ul.replaceChildren();
+  if(!d.results.length)ul.append(el('li','muted small','No service found. Try another name.'));
+  for(const r of d.results){const li=el('li'),b=el('button','apps-item');b.type='button';b.append(el('b',null,r.name),el('span','muted small',r.actions+' actions'+(r.connect==='oauth'?' · sign-in needed':'')));b.onclick=()=>{for(const x of ul.querySelectorAll('.apps-item'))x.classList.toggle('on',x===b);appsShow(r.id)};li.append(b);ul.append(li)}
+ }catch(err){ul.replaceChildren(el('li','error',err.message))}
+}
+$('apps-search').oninput=()=>{clearTimeout(appsTimer);appsTimer=setTimeout(()=>appsSearch($('apps-search').value.trim()),200)};
+async function appsShow(id){
+ const box=$('apps-detail');box.replaceChildren(el('p','muted small','Loading…'));
+ const {integration:d}=await api('/integrations/'+encodeURIComponent(id));
+ const picked=new Set();
+ box.replaceChildren(el('h3',null,d.name),el('p','small',d.description),el('p','apps-connect '+d.connect,CONNECT_LABEL[d.connect]+(d.secrets.length?': '+d.how:'')));
+ const list=el('div','apps-actions');
+ const row=(x,kind)=>{const l=el('label','apps-action'),c=document.createElement('input');c.type='checkbox';c.onchange=()=>{c.checked?picked.add(x.label):picked.delete(x.label)};l.append(c,el('span',null,(kind==='trigger'?'When: ':'')+x.label));if(x.description)l.title=x.description;return l};
+ for(const a of d.actions.slice(0,40))list.append(row(a,'action'));
+ for(const t of d.triggers.slice(0,15))list.append(row(t,'trigger'));
+ const what=document.createElement('textarea');what.rows=2;what.placeholder='What should happen? e.g. "add everyone who books to my Mailchimp list"';what.className='apps-what';
+ const add=el('button','primary','Add '+d.name+' to my app');add.type='button';
+ add.onclick=()=>{
+  const want=what.value.trim()||[...picked].join('; ');if(!want){what.focus();return}
+  $('apps-dialog').close();
+  send('Connect '+d.name+': '+want+(picked.size?'\nUse: '+[...picked].join('; '):'')+'\n(Integration "'+d.id+'" from Kairoq\'s integrations library.)','build');
+ };
+ const tail=el('div','row');tail.append(add);
+ if(d.connect==='oauth')box.insertBefore(await oauthBox(d),box.querySelector('.plan-part'));
+ if(d.secrets.length){const keys=el('button','ghost','Add the key');keys.type='button';keys.title='Add '+d.secrets.join(', ')+' in Settings → Secrets';keys.onclick=async()=>{$('apps-dialog').close();await openSettingsAt('secret-name');$('secret-name').value=d.secrets[0]};tail.append(keys)}
+ box.append(el('p','plan-part','What should it do?'),list,what,tail,d.secrets.length?el('p','muted small','Keys it needs (added in Settings → Secrets, encrypted): '+d.secrets.join(', ')):'');
+}
+// "Connect with …" (oauth-connect.js): the owner signs in on the service's page in a small
+// window; with no Kairoq OAuth app for the service, the owner can use their own.
+async function oauthBox(d){
+ const box=el('div','oauth-box');
+ const draw=async()=>{
+  let s;try{s=(await api('/projects/'+state.project.id+'/oauth?service='+encodeURIComponent(d.id))).oauth}catch(err){box.replaceChildren(el('p','error',err.message));return}
+  box.replaceChildren();
+  if(s.connected){box.append(el('p','oauth-on','Connected'+(s.account?' ('+s.account+')':'')+' since '+new Date(s.connected_at).toLocaleDateString()));const off=el('button','ghost','Disconnect');off.type='button';off.onclick=async()=>{await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'disconnect',service:d.id}});draw()};box.append(off);return}
+  if(s.app){
+   const go=el('button','primary','Connect with '+d.name);go.type='button';
+   go.onclick=async()=>{go.disabled=true;try{const r=await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'start',service:d.id}});const w=window.open(r.url,'kairoq-oauth','width=520,height=720');if(!w)location.href=r.url}catch(err){box.append(el('p','error',err.message))}go.disabled=false};
+   box.append(go);
+  }else box.append(el('p','muted small','Kairoq has no '+d.name+' sign-in app yet. Use your own below, or ask Kairoq\'s team to add one.'));
+  const own=document.createElement('details');own.className='oauth-own';own.open=!s.app;
+  own.append(el('summary',null,'Use your own OAuth app'));
+  const form=el('div','oauth-form');
+  form.append(el('p','muted small','In '+d.name+'\'s developer settings, create an app and set its redirect (callback) address to:'),el('code','small',s.redirect_uri));
+  const f=(label,name,type='text')=>{const l=el('label',null,label),i=document.createElement('input');i.type=type;i.name=name;i.autocomplete='off';l.append(i);form.append(l);return i};
+  const cid=f('Client ID','client_id'),cs=f('Client Secret','client_secret','password');
+  const au=s.needs_urls?f('Authorize address (https://…)','auth_url'):null,tu=s.needs_urls?f('Token address (https://…)','token_url'):null;
+  const save=el('button','ghost','Save');save.type='button';
+  save.onclick=async()=>{try{await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'app',service:d.id,client_id:cid.value,client_secret:cs.value,...(au?{auth_url:au.value,token_url:tu.value}:{})}});draw()}catch(err){form.append(el('p','error',err.message))}};
+  form.append(save);own.append(form);box.append(own);
+ };
+ await draw();
+ const onMsg=e=>{if(e.origin===location.origin&&e.data&&e.data.kairoqOauth){draw()}};
+ window.addEventListener('message',onMsg);
+ return box;
+}
 $('integrations-open').onclick=()=>{$('menu-plus').open=false;if(state.project)openIntegrations()};
 
 // ---------- admin: partners and sponsored templates ----------
@@ -2883,7 +2946,7 @@ async function renderRefs(){
  clearTimeout(refTimer);
  try{
   const s=await api('/admin/references'),j=s.job,on=Boolean(j&&j.running);
-  text($('ref-status'),s.learned+' of '+s.total+' tutorials learned in '+s.topics+' topics'+(j?(on?' · learning now: '+j.done+' done':' · last run: '+j.done+' learned')+(j.skipped?', '+j.skipped+' had no readable text':'')+(j.failed?', '+j.failed+' failed'+(j.last_error?' ('+j.last_error.error+')':''):''):'')+'.');
+  text($('ref-status'),s.learned+' of '+s.total+' tutorials learned in '+s.topics+' topics'+(s.pages?' ('+s.pages+' pages and files read)':'')+(s.unlearnable?' · '+s.unlearnable+' videos have no written version to learn from':'')+(j?(on?' · learning now: '+j.done+' done':' · last run: '+j.done+' learned')+(j.skipped?', '+j.skipped+' had no readable text':'')+(j.failed?', '+j.failed+' failed'+(j.last_error?' ('+j.last_error.error+')':''):''):'')+'.');
   $('ref-learn').classList.toggle('hidden',on||s.learned>=s.total);$('ref-stop').classList.toggle('hidden',!on);
   if(on&&$('admin-dialog').open)refTimer=setTimeout(renderRefs,4000);
  }catch(err){text($('ref-status'),err.message)}
@@ -3437,6 +3500,8 @@ async function searchModels(){
 $('models-search').onclick=searchModels;
 $('models-query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchModels()}};
 $('models-style').onchange=async()=>{try{modelsData=await api('/projects/'+state.project.id+'/models?op=style',{method:'POST',body:{style:$('models-style').value}});renderModels();text($('models-status'),$('models-style').value==='none'?'Saved.':'Saved. Ask the chat to "add the 3D" to put it on the pages.')}catch(err){text($('models-status'),err.message)}};
+// Autopilot (autopilot.js): test against the request, fix what is missing, repeat.
+$('autopilot-run').onclick=()=>{$('menu-project').open=false;if(!state.project||!state.project.current_version){text($('chat-error'),'Build the app first.');return}const note=$('chat-input').value.trim();send(note?"Keep going until it's right: "+note:"Keep going until it's right",'autopilot',undefined,{message:note})};
 $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The design review needs a browser on the server (Chromium), which is not available here.');return}const note=$('chat-input').value.trim();send(note?'Polish the design: '+note:'Polish the design','polish',undefined,{message:note})};
 
 })();
@@ -3444,3 +3509,11 @@ $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The d
 // Dropdown menus (details.menu) close when something inside is chosen or when clicking elsewhere.
 document.addEventListener('click',e=>{for(const d of document.querySelectorAll('details.menu[open]'))if(!d.contains(e.target)||e.target.closest('.menu-panel button,.menu-panel a'))d.removeAttribute('open')});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')for(const d of document.querySelectorAll('details.menu[open]'))d.removeAttribute('open')});
+// The editor's top bar scrolls sideways on narrow screens, which would clip a dropdown inside it,
+// so an open menu there is placed on the page itself, under its button.
+for(const d of document.querySelectorAll('#editor .stage-bar details.menu'))d.addEventListener('toggle',()=>{
+ const p=d.querySelector('.menu-panel');if(!p)return;
+ if(!d.open){p.style.position=p.style.top=p.style.right=p.style.left='';return}
+ const r=d.querySelector('summary').getBoundingClientRect();
+ p.style.position='fixed';p.style.top=Math.round(r.bottom+6)+'px';p.style.left='auto';p.style.right=Math.max(8,Math.round(innerWidth-r.right))+'px';
+});

@@ -37,7 +37,7 @@ function normalizeConfig(cfg){
  return{collections,...require('./react-backend-extras').normalizeExtras(cfg,collections)};
 }
 function configErrors(files){
- try{const cfg=parseConfig(files);for(const a of cfg.automations||[])if(!require('./react-functions').functionFile(files,a.run))throw Error('Automation "'+a.name+'" runs "'+a.run+'", but there is no functions/'+a.run+'.js.');return[]}
+ try{const cfg=parseConfig(files);for(const a of cfg.automations||[])if(!require('./react-functions').functionFile(files,a.run))throw Error('Automation "'+a.name+'" runs "'+a.run+'", but there is no functions/'+a.run+'.js.');for(const t of Object.keys(cfg.ai_tools||{}))if(!require('./react-functions').functionFile(files,t))throw Error('AI tool "'+t+'" needs a server function functions/'+t+'.js.');return[]}
  catch(e){return[e.message]}
 }
 
@@ -463,7 +463,20 @@ async function handle(req,res,{onlyProject}={}){
   if((route==='/ai'||route==='/ai/ask')&&req.method==='POST'){
    if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
    limitedAi(req,id);
-   const b=await readJson(req,200000),run=onToken=>route==='/ai'?appAi(meta,db,b,{onToken}):require('./app-assistant').ask(db,b,(a,o)=>appAi(meta,db,a,o),{onToken});
+   const b=await readJson(req,200000);
+   // ai.chat({ tools: true }): the AI uses the app's declared server functions (app-ai-tools.js).
+   const withTools=route==='/ai'&&b.tools&&cfg.ai_tools;
+   const toolChat=async onToken=>{
+    const T=require('./app-ai-tools'),pick=Array.isArray(b.tools)?b.tools.map(String):null;
+    const tools=Object.fromEntries(Object.entries(cfg.ai_tools).filter(([n])=>!pick||pick.includes(n)));
+    const messages=(Array.isArray(b.messages)?b.messages:[]).slice(-30).map(m=>({role:m&&m.role==='assistant'?'assistant':'user',content:String(m&&m.content||'').slice(0,8000)}));
+    const out=await T.chat({tools,messages,system:String(b.system||'').slice(0,6000),
+     ask:async(msgs,system)=>(await appAi(meta,db,{messages:msgs,system,max_tokens:1200})).text,
+     run:async(name,args)=>T.resultOf(await runFunction(id,name,{meta,version,cfg,db,sb,user,req,request:{method:'POST',path:'/functions/'+name,query:{},headers:{'x-kairoq-ai-tool':'1'},body:args,rawBody:JSON.stringify(args)}}))});
+    if(onToken&&out.text)onToken(out.text);
+    return out;
+   };
+   const run=onToken=>withTools?toolChat(onToken):route==='/ai'?appAi(meta,db,b,{onToken}):require('./app-assistant').ask(db,b,(a,o)=>appAi(meta,db,a,o),{onToken});
    if(b.stream!==true)return send(res,200,await run()),true;
    await streamAnswer(res,run);
    return true;
@@ -521,6 +534,8 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
  const host={
   fetch:a=>samples.fetchFor(id,a,{mode:fetchMode}),
   secret:async n=>{const v=require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50));if(v&&String(v).length>=4)seen.add(String(v));return v},
+  // A service the owner connected with "Connect with …" (oauth-connect.js): a fresh access token.
+  oauth:async s=>{const t=await require('./oauth-connect').token(id,s);seen.add(t.access_token);return t},
   db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
   ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},
   extract:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-extract').extract(a,o=>appAi(meta,db,o))},
@@ -731,6 +746,9 @@ async function streamed(path,body,onToken){
 }
 export const ai={
   // ai.chat({ messages:[{role:'user',content:'...'}], system, max_tokens, onToken }) -> { text }
+  // ai.chat({ messages, tools: true }) -> { text, steps, action? }: the AI uses the app's
+  // "ai_tools" (server functions); an action ({tool,args,summary}) needs the visitor's tap:
+  // show a button that runs functions.invoke(action.tool, action.args).
   async chat(options){
     const {onToken,...body}=typeof options==='string'?{messages:[{role:'user',content:options}]}:options;
     return onToken?streamed('/ai',body,onToken):call('/ai',{method:'POST',body});

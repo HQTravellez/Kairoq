@@ -465,6 +465,7 @@
       <details class="menu" id="menu-project">
         <summary aria-label="Project menu" title="Project: restore, design, phone app, share, settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></summary>
         <div class="menu-panel">
+          <button type="button" id="autopilot-run"><b>Keep going until it's right</b><span>Kairoq tests the app against what you asked for and fixes what is missing</span></button>
           <button type="button" id="restore"><b>Restore this version</b><span>Make the version shown in the preview the current one</span></button>
           <button type="button" id="design-open"><b>Design</b><span>Colours, fonts, skills and images</span></button>
           <button type="button" id="mobile-open"><b>Phone app</b><span>Install on iPhone and Android</span></button>
@@ -598,6 +599,19 @@
     <h2>Connectors</h2>
     <p class="muted small">Connect this app to the services it uses. Keys you enter are encrypted and never shown again.</p>
     <ul class="connectors" id="connectors-list"></ul>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
+<dialog id="apps-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Connect another app</h2>
+    <p class="muted small" id="apps-sub">Search 744 services. Pick one and say what should happen; Kairoq adds it to your app.</p>
+    <input id="apps-search" type="search" placeholder="Search: Mailchimp, HubSpot, Slack, Airtable…" autocomplete="off" aria-label="Search services">
+    <div class="apps-pane">
+      <ul class="apps-list" id="apps-list" aria-label="Services"></ul>
+      <div class="apps-detail" id="apps-detail"></div>
+    </div>
+    <p class="muted small">From the open-source Activepieces integrations (MIT).</p>
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
