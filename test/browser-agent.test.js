@@ -254,3 +254,20 @@ test('handing over: ask_human and "take over" pause the agent; without a person 
  assert.equal(r.outcome,'blocked');
  assert.ok(!agent.systemPrompt('persona').includes('ask_human'));
 });
+
+test('sending a form (a normal POST, like Netlify Forms) counts as sent, not as a failed click; the visitor is told it went through',{skip:!runtime.available()&&'no Chromium'},async()=>{
+ const FORM='<!doctype html><html><head><meta charset="utf-8"><title>Stays</title></head><body><h1>Get a quote</h1><form method="POST" action="/thanks"><label>Your name <input name="n" required></label><button type="submit">Submit request</button></form></body></html>';
+ const srv=http.createServer((q,r)=>{r.writeHead(200,{'Content-Type':'text/html'});r.end(q.url.startsWith('/thanks')?'<h1>Thanks</h1>':FORM)});
+ await new Promise(r=>srv.listen(0,'127.0.0.1',r));
+ const s=await runtime.session('http://127.0.0.1:'+srv.address().port+'/',{site:true});
+ const seen=[];let turn=0;
+ const callModel=async(o,parse)=>{const t=typeof o.messages.at(-1).content==='string'?o.messages.at(-1).content:o.messages.at(-1).content[0].text;seen.push(t);turn++;
+  const id=re=>Number(new RegExp('\\[(\\d+)\\][^\\n]*'+re).exec(t)[1]);
+  return parse(JSON.stringify(turn===1?{thought:'name',feeling:'confident',actions:[{action:'fill',target:id('name'),value:'Priya'}]}:turn===2?{thought:'send',feeling:'confident',actions:[{action:'click',target:id('Submit')}]}:{thought:'sent',feeling:'confident',actions:[{action:'done',value:'Sent my request'}]}))};
+ try{
+  const r=await agent.run({session:s,goal:'Get a quote',mode:'persona',persona:'Priya',callModel,maxSteps:5,judge:false});
+  assert.equal(r.outcome,'completed');
+  const click=r.steps.find(x=>x.action==='click');assert.equal(click.sent,true);assert.equal(click.error,undefined);
+  assert.match(seen[2],/Your form was sent/);
+ }finally{await s.close();srv.close()}
+});

@@ -7026,13 +7026,18 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   const errors=[];
   if(opts.only&&!allowPaid)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
+  // Website checks and AI customers (tier "check"): a cheap, reliable paid model first (a few cents a
+  // check), with its own monthly cap and the free models behind it; builds are not affected.
+  const checkTier=opts.tier==="check",checkLimit=Number(process.env.KAIROQ_CHECK_MONTHLY_LIMIT_USD??20);
+  const checkCandidates=String(process.env.KAIROQ_CHECK_MODELS||"google/gemini-2.5-flash,deepseek/deepseek-v3.2").split(",").map(m=>m.trim()).filter(Boolean);
+  if(checkTier){allowPaid=process.env.KAIROQ_CHECK_PAID!=="off"&&(checkLimit<=0||(await usageTotals({purpose:"site-check"})).monthly<checkLimit);if(!allowPaid)errors.push("website-check models off or monthly cap reached; using free models")}
   // Pro tier: stronger models first, then the standard paid chain; never free models.
   const proCandidates=String(process.env.KAIROQ_PRO_MODELS||"anthropic/claude-sonnet-5.5,openai/gpt-6").split(",").map(m=>m.trim()).filter(Boolean);
   const visionCandidates=String(process.env.KAIROQ_VISION_MODELS||"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean);
   if((opts.tier==="pro"||opts.tier==="vision")&&!allowPaid)throw Error("Pro and image models need KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left this month."+(errors.length?" "+errors.join(" | "):""));
   const maxCandidates=String(process.env.KAIROQ_MAX_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean);
   if(opts.tier==="max"&&(!allowPaid||!maxCandidates.length))throw Error("The Max tier needs KAIROQ_MAX_MODELS, KAIROQ_BUILDER_PAID_APPROVED=true and builder budget left.");
-  const ordered=opts.tier==="chat"?freeCandidates:opts.tier==="max"?[...maxCandidates,...proCandidates]:opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
+  const ordered=checkTier?[...checkCandidates,...freeCandidates]:opts.tier==="chat"?freeCandidates:opts.tier==="max"?[...maxCandidates,...proCandidates]:opts.tier==="pro"?[...proCandidates,...paidCandidates]:opts.tier==="vision"?[...visionCandidates,...proCandidates]:mode==="paid-first"?[...(allowPaid?paidCandidates:[]),...freeCandidates]:[...freeCandidates,...(allowPaid?paidCandidates:[])];
   // Design work (the design brief and the screenshot review) can go to a stronger model
   // (KAIROQ_DESIGN_MODELS, e.g. Fable) first, whatever tier wrote the code.
   const designFirst=opts.design&&allowPaid?String(process.env.KAIROQ_DESIGN_MODELS||"").split(",").map(m=>m.trim()).filter(Boolean):[];
@@ -7051,12 +7056,13 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       const premium=opts.tier==="pro"||opts.tier==="max"||designModel;
       const outputCap=premium?Math.max(4000,Number(process.env.KAIROQ_PREMIUM_OUTPUT_TOKENS)||32000):Math.max(2000,Number(process.env.KAIROQ_STANDARD_OUTPUT_TOKENS)||16000);
       const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):10000;
-      const rates=free?[0,0]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
+      const rates=free?[0,0]:model.includes("gemini-2.5-flash")?[0.3,2.5]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
       if(!free){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
         if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
-        if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
+        if(checkTier){if(checkLimit>0&&(await usageTotals({purpose:"site-check"})).monthly+reserve>checkLimit)throw Error("Website-check monthly budget insufficient")}
+        else if(builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly+reserve>builderMonthlyLimit)throw Error("Builder monthly budget insufficient");
       }
       const stream=typeof opts.onToken==="function";
       // One request; a reply cut off at the output limit is continued (model-continue.js).
@@ -7070,7 +7076,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
         const text=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
         const cost=Number(data.usage?.cost||0);
         if(free&&cost>0)throw Error("Free request unexpectedly billed");
-        if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:"developer-build",model,tier:opts.tier||"standard",...(designModel?{design:true}:{})});
+        if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:checkTier?"site-check":"developer-build",model,tier:opts.tier||"standard",...(designModel?{design:true}:{})});
         lastData=data;
         return{content:text,finish:data.choices?.[0]?.finish_reason};
       };
