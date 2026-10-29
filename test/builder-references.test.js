@@ -49,10 +49,10 @@ test('"Learn the library" runs over what is not learned yet, shows progress, and
  const before=R.status().learned;
  R.learnAll({remote,callModel,max:3});
  await new Promise(r=>{const t=setInterval(()=>{const s=R.status();if(!s.job.running){clearInterval(t);r()}},20)});
- const s=R.status();assert.equal(s.learned,before+3);assert.equal(s.job.done,3);assert.equal(s.total,359);
+ const s=R.status();assert.equal(s.learned+s.unlearnable,before+3,'each one learned or, for a bare video, marked');assert.equal(s.job.done+s.job.skipped,3);assert.equal(s.total,359);
  R.learnAll({remote,callModel:async()=>{throw Error('Builder budget insufficient')},max:5});
  await new Promise(r=>{const t=setInterval(()=>{if(!R.status().job.running){clearInterval(t);r()}},20)});
- assert.match(R.status().job.last_error.error,/budget/);assert.equal(R.status().learned,before+3);
+ assert.match(R.status().job.last_error.error,/budget/);assert.equal(R.status().learned+R.status().unlearnable,before+3);
 });
 
 test('the builder\'s tools: kairoq_tutorials answers from the library; reading a library tutorial learns it',async()=>{
@@ -64,4 +64,39 @@ test('the builder\'s tools: kairoq_tutorials answers from the library; reading a
  for(let i=0;i<50&&!R.savedNotes(item.url);i++)await new Promise(r=>setTimeout(r,20));
  assert.ok(R.savedNotes(item.url),'learned while the builder read it');
  T.configure({callModel:null});
+});
+
+const PARA='<p>'+'This part explains the technique step by step with the data structure and the tests that prove it works. '.repeat(12)+'</p>';
+test('a series is learned whole: Kairoq follows "Next" and numbered parts on the same site',async()=>{
+ const site={
+  'https://blog.example/os/part-1':'<html><body><h1>Part 1: Booting</h1>'+PARA+'<a href="/os/part-2">Next</a><a href="https://other.example/ad">Sponsor</a></body></html>',
+  'https://blog.example/os/part-2':'<html><body><h1>Part 2: Memory</h1>'+PARA+'<a href="/os/part-3">Part 3</a></body></html>',
+  'https://blog.example/os/part-3':'<html><body><h1>Part 3: Scheduling</h1>'+PARA+'<a href="/about">About</a></body></html>'};
+ const fetched=[];const remote=async u=>{fetched.push(u);if(!site[u])throw Error('404 '+u);return{bytes:Buffer.from(site[u]),type:'text/html'}};
+ let seen='';const item={url:'http://blog.example/os/part-1',title:'Write an OS',topic:'Operating System',language:'Rust'};
+ const saved=await R.learn(item,{remote,callModel:async(o,p)=>{seen=o.messages[1].content;return p(NOTES)}});
+ assert.deepEqual(fetched,['https://blog.example/os/part-1','https://blog.example/os/part-2','https://blog.example/os/part-3'],'https first, the whole series, nothing off-site');
+ assert.equal(saved.pages,3);assert.match(seen,/This covers 3 pages/);assert.match(seen,/=== PART 3: https:\/\/blog\.example\/os\/part-3/);
+});
+
+test('a GitHub project is learned from its README, docs and main code',async()=>{
+ const raw=p=>'https://raw.githubusercontent.com/ann/tiny-git/HEAD/'+p;
+ const files={[raw('README.md')]:'# tiny-git\n'+'Content addressed objects, trees and commits. '.repeat(20),[raw('docs/objects.md')]:'Objects are stored by their hash. '.repeat(20),[raw('src/index.js')]:'export function hashObject(data){ /* sha1 of the header and data */ }\n'.repeat(10)};
+ const remote=async u=>{if(files[u])return{bytes:Buffer.from(files[u]),type:'text/plain'};throw Error('404 '+u)};
+ const fetchJson=async u=>{assert.match(u,/api\.github\.com\/repos\/ann\/tiny-git\/git\/trees\/HEAD\?recursive=1/);return{tree:[{type:'blob',path:'src/index.js',size:500},{type:'blob',path:'README.md',size:900},{type:'blob',path:'docs/objects.md',size:600},{type:'blob',path:'package-lock.json',size:900},{type:'blob',path:'test/a.test.js',size:100}]}};
+ let seen='';const saved=await R.learn({url:'https://github.com/ann/tiny-git',title:'Tiny Git',topic:'Git',language:'JavaScript'},{remote,fetchJson,callModel:async(o,p)=>{seen=o.messages[1].content;return p(NOTES)}});
+ assert.equal(saved.pages,3);
+ assert.ok(seen.indexOf('FILE README.md')<seen.indexOf('FILE docs/objects.md')&&seen.indexOf('FILE docs/objects.md')<seen.indexOf('FILE src/index.js'),'README, then docs, then code');
+ assert.doesNotMatch(seen,/package-lock|a\.test\.js/);
+});
+
+test('a video is learned from its written version; one without is marked and not tried again',async()=>{
+ const page=desc=>'<html><head><meta property="og:description" content="x"></head><body><script>var y={"shortDescription":"'+desc+'"}</script></body></html>';
+ const site={'https://www.youtube.com/watch?v=a':page('Build a regex engine. Written version: https://blog.example/regex'),'https://blog.example/regex':'<html><body>'+PARA+'</body></html>','https://www.youtube.com/watch?v=b':page('Subscribe! https://twitter.com/me')};
+ const remote=async u=>{if(site[u])return{bytes:Buffer.from(site[u]),type:'text/html'};throw Error('404 '+u)};
+ const a=await R.learn({url:'https://www.youtube.com/watch?v=a',title:'Regex video',topic:'Regex Engine',language:'Python'},{remote,callModel:async(o,p)=>p(NOTES)});
+ assert.equal(a.pages,2);
+ const item={url:'https://www.youtube.com/watch?v=b',title:'Video only',topic:'Shell',language:'C'};
+ await assert.rejects(R.learn(item,{remote,callModel:async(o,p)=>p(NOTES)}),/No readable text/);
+ assert.equal(R.savedNotes(item.url),null);assert.equal(R.readFile(item.url).skipped,true);
 });
