@@ -113,7 +113,7 @@ async function addPackage(id,{name},{fetchJson,install=npmInstall,log,dir}){
  return'Added '+n+'@'+info.version+' ('+meta.packages.at(-1).license+'): '+info.description+(info.peer.length?' It works with: '+info.peer.join(', ')+'.':'')+' Import it by its name; Kairoq\'s build now resolves it for this app.';
 }
 
-let hooks={webSearch:null};
+let hooks={webSearch:null,callModel:null};
 // server.js passes its web search (the same one the chat and the plan use).
 function configure(h){hooks={...hooks,...h}}
 // The tools for one build of one project, and what they did (shown to the owner afterwards).
@@ -123,7 +123,14 @@ function forProject(id,{webSearch=hooks.webSearch,remote=(u,o)=>require('./build
   if(++calls>Number(process.env.KAIROQ_BUILDER_TOOL_CALLS||40))return'You have used the tools '+(calls-1)+' times in this change; build with what you have.';
   const a=args&&typeof args==='object'?args:{};
   if(tool==='search')return search(a.query,{webSearch});
-  if(tool==='read')return read(a.url,{remote});
+  if(tool==='read'){
+   const page=await read(a.url,{remote});
+   // A library tutorial read for the first time is learned (notes saved) for next time.
+   const R=require('./builder-references'),item=R.inCatalog(a.url);
+   if(item&&hooks.callModel&&!R.savedNotes(item.url))R.learnFromText(item,page.slice(page.indexOf('\n')+1),{callModel:hooks.callModel}).catch(()=>{});
+   return page;
+  }
+  if(tool==='tutorials')return require('./builder-references').lookup(a.topic||a.query);
   if(tool==='download'){if(log.filter(x=>x.kind==='download').length>=MAX_PER_SESSION)return'Enough downloads for one change.';return download(id,a,{remote,log})}
   if(tool==='package')return addPackage(id,a,{fetchJson,install,log,dir:ctx&&ctx.dir});
   throw fail('Unknown tool');

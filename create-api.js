@@ -1078,6 +1078,14 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
     if(method==='GET')return send(res,200,{partners:P.adminView()}),true;
     if(method==='POST')return send(res,200,{partners:P.adminEdit(await readJson(req,20000))}),true;
    }
+   // The reference library (builder-references.js): learn every tutorial once, see progress.
+   if(route==='/admin/references'&&method==='GET')return send(res,200,require('./builder-references').status()),true;
+   if(route==='/admin/references'&&method==='POST'){
+    const b=await readJson(req,2000),R=require('./builder-references');
+    if(b.stop)return send(res,200,R.stopLearning()),true;
+    if(!callModel)throw Object.assign(Error('No AI model is set up on this server'),{status:503});
+    return send(res,202,R.learnAll({callModel:(o,p)=>callModel({tier:'standard',...o},p)})),true;
+   }
    if(route==='/admin/backup'&&method==='POST')return send(res,200,{backup:backups.run()}),true;
    // AI cost per tier and model over the last 30 days, next to what one message of that tier sells for.
    if(route==='/admin/costs'&&method==='GET'){
