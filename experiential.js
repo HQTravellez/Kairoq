@@ -16,6 +16,12 @@ function retryWait(header,attempt){
  return Math.max(0,Math.min(MAX_WAIT_MS,Number.isFinite(asked)&&asked>0?asked:backoff));
 }
 async function cooldown(signal){const ms=pauseUntil-Date.now();if(ms>0)await new Promise((resolve,reject)=>{const t=setTimeout(resolve,ms);signal?.addEventListener('abort',()=>{clearTimeout(t);reject(signal.reason||Error('Aborted'))},{once:true})})}
+// Experiential's free allowance is per UTC day: once it says so, waiting and retrying cannot help,
+// so Kairoq stops asking until the next 00:00 UTC and the callers fall back to other models.
+let dailyUntil=0;
+function nextUtcMidnight(now=Date.now()){const d=new Date(now);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+1)}
+function dailyLimited(data){return /per UTC day|rate_limit_day|daily (?:limit|allowance|quota)/i.test(JSON.stringify(data&&(data.error||data)||''))}
+function blocked(){return Date.now()<dailyUntil}
 function callProject(opts,services){
  // Small requests (the quick questions, suggestions) do not wait behind whole-app builds.
  if(Number.isInteger(opts.maxOutputTokens)&&opts.maxOutputTokens<=2500)return run(opts,services);
@@ -25,6 +31,7 @@ function callProject(opts,services){
 }
 async function run(opts,{enforceBudget,recordUsage,parse}){
  opts.signal?.throwIfAborted();
+ if(blocked())throw Object.assign(Error('Experiential 429: the free daily allowance is used up until 00:00 UTC'),{status:429,daily:true});
  const model='gpt-6-luna'; // Published $0.10/M input, $0.50/M output; no sampling overrides.
  const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(20000,opts.maxOutputTokens)):20000;
  let images=0;const inputText=JSON.stringify(opts.messages||[],(k,v)=>{if(k==='image_url'&&v&&typeof v==='object'){images++;return '[rendered screenshot]';}return v;});const input=Math.ceil(inputText.length/2)+images*16384;
@@ -43,12 +50,13 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
    signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(480000)]):AbortSignal.timeout(480000),body
   });
   data=await response.json().catch(()=>({}));
+  if(response.status===429&&dailyLimited(data)){dailyUntil=nextUtcMidnight();break}
   if(!RETRY.has(response.status)||attempt>=MAX_TRIES)break;
   const wait=retryWait(response.headers.get('retry-after'),attempt);
   pauseUntil=Math.max(pauseUntil,Date.now()+wait);
   console.warn('[experiential-builder] '+response.status+', retrying in '+Math.round(wait/1000)+'s ('+attempt+'/'+(MAX_TRIES-1)+')');
  }
- if(!response.ok)throw Error('Experiential '+response.status+': '+String(data.error?.message||data.error||'Request rejected').slice(0,220));
+ if(!response.ok)throw Object.assign(Error('Experiential '+response.status+': '+String(data.error?.message||data.error||'Request rejected').slice(0,220)),{status:response.status,...(blocked()?{daily:true}:{})});
  // Record usage before parsing: invalid model output can still incur cost.
  const reported=Number(data.usage?.cost);
  const cost=Number.isFinite(reported)?reported:reserve;
@@ -59,4 +67,4 @@ async function run(opts,{enforceBudget,recordUsage,parse}){
  console.log('[experiential-builder] response '+JSON.stringify({model,cost,characters:text.length,finish:data.choices?.[0]?.finish_reason}));
  return parse(text,model);
 }
-module.exports={configured,callProject,retryWait};
+module.exports={configured,callProject,retryWait,blocked,dailyLimited,nextUtcMidnight,_reset:()=>{dailyUntil=0}};

@@ -32,3 +32,17 @@ test('Experiential retries a busy gateway, waiting what it asks for, then gives 
  }finally{global.fetch=prior;delete process.env.EXPLABS_API_KEY}
  assert.equal(exp.retryWait('5',1),5000);assert.ok(exp.retryWait(null,3)<=30000&&exp.retryWait(null,3)>=6000);assert.equal(exp.retryWait('999',1),30000);
 });
+test('Experiential\'s free daily allowance: no retries, and no more requests until 00:00 UTC',async()=>{
+ const prior=global.fetch;process.env.EXPLABS_API_KEY='test-secret';let calls=0;exp._reset();
+ const services={enforceBudget:async()=>({daily:0,monthly:0}),recordUsage:async()=>{},parse:c=>JSON.parse(c)};
+ try{
+  global.fetch=async()=>{calls++;return{ok:false,status:429,headers:{get:k=>k==='retry-after'?'30':null},json:async()=>({error:{message:'org_token_rate_limit_day: Free core models share 1000000 input + output tokens per UTC day. Retry after 00:00 UTC.'}})}};
+  const t0=Date.now();
+  await assert.rejects(exp.callProject({messages:[],maxOutputTokens:800},services),err=>err.daily===true&&err.status===429&&/per UTC day/.test(err.message));
+  assert.equal(calls,1,'not retried');assert.ok(Date.now()-t0<3000,'did not wait');
+  assert.equal(exp.blocked(),true);
+  await assert.rejects(exp.callProject({messages:[],maxOutputTokens:800},services),/used up until 00:00 UTC/);
+  assert.equal(calls,1,'no request while the allowance is used up');
+  assert.equal(new Date(exp.nextUtcMidnight(Date.UTC(2026,9,29,18,5))).toISOString(),'2026-10-30T00:00:00.000Z');
+ }finally{global.fetch=prior;delete process.env.EXPLABS_API_KEY;exp._reset()}
+});

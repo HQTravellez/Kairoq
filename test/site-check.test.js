@@ -129,3 +129,10 @@ test('bad input, limits and the off switch',async()=>{
  assert.equal((await post({url:siteUrl(),email:'new@b.co',goal:'Again'},'10.8.0.10')).status,503);
  delete process.env.KAIROQ_SITE_CHECK;
 });
+
+test('the Kairoq owner is not held to the free check\'s daily limits',async()=>{
+ const deps={callModel,browseSite};
+ const go=(i,owner)=>siteCheck.start({url:siteUrl(),email:'owner-limits@lotus.pt',goal:'Owner test '+i,ip:'198.51.100.7',owner},deps);
+ for(let i=0;i<4;i++)assert.equal((await go(i,true)).status,'running');
+ await assert.rejects(go(9,false),/used today/);
+});

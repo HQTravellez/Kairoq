@@ -6923,13 +6923,29 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
       console.log("[builder] fast model "+fb.model+" failed, using the usual models: "+String(err.message||err).slice(0,200));
     }
   }
-  if(builderProvider()==="experiential")return experiential.callProject(opts,{enforceBudget,recordUsage,parse});
+  // Experiential first; when it is out (its free daily allowance, busy, or Kairoq's own budget for
+  // it), the free models below take over instead of the build or check failing.
+  if(builderProvider()==="experiential"){
+    try{return await experiential.callProject(opts,{enforceBudget,recordUsage,parse})}
+    catch(err){
+      if(err.name==="AbortError"||opts.signal?.aborted)throw err;
+      if(!/\b(?:429|502|503|504)\b|rate.?limit|quota|allowance|budget insufficient/i.test(String(err.message||err)))throw err;
+      console.log("[builder] Experiential unavailable, using the free models: "+String(err.message||err).slice(0,160));
+    }
+  }
   // Muse Spark writes Standard builds before the free models when paid builds are on (its own cap).
   if(museReady()&&!require("./quality").top()&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&(!opts.tier||opts.tier==="standard"||opts.tier==="vision")){
     try{const r=await callMuse(opts);return parse(r.text,r.model)}
     catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[builder] Muse failed, using the usual models: "+String(err.message||err).slice(0,200))}
   }
-  return callOpenRouterBuilder(opts,parse);
+  try{return await callOpenRouterBuilder(opts,parse)}
+  catch(err){
+    // Last: the free chat route (Kairoq Agent, then the free providers), for anything but Pro and
+    // Max work, which must not quietly drop to a weaker model.
+    if(err.name==="AbortError"||opts.signal?.aborted||["pro","max","vision"].includes(opts.tier))throw err;
+    try{return await callChatAnswer({...opts,freeOnly:true},parse)}
+    catch(e2){if(opts.signal?.aborted)throw e2;err.message=String(err.message||err)+" | free route: "+String(e2.message||e2).slice(0,200);throw err}
+  }
 }
 // Meta's Muse Spark (muse.js): its own monthly cap, and the app-wide AI budget.
 async function callMuse(opts){
