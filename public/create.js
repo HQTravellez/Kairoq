@@ -1156,9 +1156,9 @@ async function send(message,mode,path='/chat',extra={}){
   if(err.status===402&&state.me.purchases)openBuy();
  }
 }
-const LABELS={researching:'Looking things up on the web…',pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',modelling:'Modelling a 3D object in Blender…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',reviews:'Reading what its users say in public reviews…',scoring:'Checking each planned feature against the code…',sweeping:'Checking nothing of the original is left…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
+const LABELS={autopilot:'Autopilot: testing the app against your request…',researching:'Looking things up on the web…',pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',modelling:'Modelling a 3D object in Blender…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',reviews:'Reading what its users say in public reviews…',scoring:'Checking each planned feature against the code…',sweeping:'Checking nothing of the original is left…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
-const PHASES={queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',modelling:'Modelling in Blender',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
+const PHASES={autopilot:'Autopilot',queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',modelling:'Modelling in Blender',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 // "12s" or "2m 05s" (for "Thought for …"; secs() below gives " in 4.0 s").
@@ -1240,7 +1240,7 @@ function workCard(){
 }
 // The stages of a build, shown as a checklist while it works (and over the preview on a first build).
 const STAGES=[['thinking','Understanding what you asked'],['designing','Choosing the design'],['writing','Writing the code'],['building','Building the preview'],['testing','Testing it in a browser']];
-function stageOf(p){return{designing:'designing',modelling:'designing',images:'designing',writing:'writing',fixing:'writing',building:'building',testing:'testing',checking:'testing',reviewing:'testing',verifying:'testing',repairing:'writing'}[p]||'thinking'}
+function stageOf(p){return{designing:'designing',modelling:'designing',images:'designing',writing:'writing',fixing:'writing',building:'building',testing:'testing',checking:'testing',reviewing:'testing',autopilot:'testing',verifying:'testing',repairing:'writing'}[p]||'thinking'}
 function stageList(j){
  const p=phaseOf(j),cur=stageOf(p);work.seen=work.seen||new Set();work.seen.add(cur);
  const shown=STAGES.filter(([id])=>id!=='designing'||work.seen.has('designing')),at=shown.findIndex(([id])=>id===cur);
@@ -3437,6 +3437,8 @@ async function searchModels(){
 $('models-search').onclick=searchModels;
 $('models-query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchModels()}};
 $('models-style').onchange=async()=>{try{modelsData=await api('/projects/'+state.project.id+'/models?op=style',{method:'POST',body:{style:$('models-style').value}});renderModels();text($('models-status'),$('models-style').value==='none'?'Saved.':'Saved. Ask the chat to "add the 3D" to put it on the pages.')}catch(err){text($('models-status'),err.message)}};
+// Autopilot (autopilot.js): test against the request, fix what is missing, repeat.
+$('autopilot-run').onclick=()=>{$('menu-project').open=false;if(!state.project||!state.project.current_version){text($('chat-error'),'Build the app first.');return}const note=$('chat-input').value.trim();send(note?"Keep going until it's right: "+note:"Keep going until it's right",'autopilot',undefined,{message:note})};
 $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The design review needs a browser on the server (Chromium), which is not available here.');return}const note=$('chat-input').value.trim();send(note?'Polish the design: '+note:'Polish the design','polish',undefined,{message:note})};
 
 })();
@@ -3444,3 +3446,11 @@ $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The d
 // Dropdown menus (details.menu) close when something inside is chosen or when clicking elsewhere.
 document.addEventListener('click',e=>{for(const d of document.querySelectorAll('details.menu[open]'))if(!d.contains(e.target)||e.target.closest('.menu-panel button,.menu-panel a'))d.removeAttribute('open')});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')for(const d of document.querySelectorAll('details.menu[open]'))d.removeAttribute('open')});
+// The editor's top bar scrolls sideways on narrow screens, which would clip a dropdown inside it,
+// so an open menu there is placed on the page itself, under its button.
+for(const d of document.querySelectorAll('#editor .stage-bar details.menu'))d.addEventListener('toggle',()=>{
+ const p=d.querySelector('.menu-panel');if(!p)return;
+ if(!d.open){p.style.position=p.style.top=p.style.right=p.style.left='';return}
+ const r=d.querySelector('summary').getBoundingClientRect();
+ p.style.position='fixed';p.style.top=Math.round(r.bottom+6)+'px';p.style.left='auto';p.style.right=Math.max(8,Math.round(innerWidth-r.right))+'px';
+});

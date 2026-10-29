@@ -156,3 +156,18 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
   Claude Sonnet, and it stops when the daily or monthly AI budget is used up (raise
   `DAILY_COST_LIMIT_USD` first, then press the button again to continue).
 
+
+## Autopilot, skills and helpers
+
+- **Autopilot** (`autopilot.js`): with top quality (or `KAIROQ_AUTOPILOT=on`), the first build is
+  tested against the owner's request (each thing asked for: done, partly done or missing, with
+  evidence; anything faked; screenshots, code, Kairoq's own tests and 2 AI customers), then the
+  missing items go back to the builder as a fix list, and it repeats. It stops when everything passes,
+  after `KAIROQ_AUTOPILOT_ROUNDS` fixes (3), or when two tests in a row find the same gaps. The owner
+  gets "Done: …" and "Not done yet: …". The project menu has **Keep going until it's right** to run
+  it on any app. `KAIROQ_AUTOPILOT=off` switches it off; `KAIROQ_AUTOPILOT_CUSTOMERS=off` skips the
+  AI customers.
+- **Skills** (`builder-skills.js`): the builder sees a menu of every playbook and library topic and
+  opens the ones it needs with kairoq_skill.
+- **Helpers** (OpenCode sub-agents): a researcher (search, read, library) and a reviewer (reads the
+  code, runs kairoq_check). Neither can change the app or run commands; only the builder edits.

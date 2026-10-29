@@ -111,6 +111,8 @@ function cost({mode,tier,images,model=null}){
  const image=images?intEnv('KAIROQ_IMAGE_CREDITS',1):0;
  if(mode==='discuss')return(tier==='standard'&&!model?intEnv('KAIROQ_DISCUSS_CREDITS',1):Math.max(base,intEnv('KAIROQ_DISCUSS_CREDITS',1)))+image;
  if(mode==='polish')return Math.max(base,polishCredits())+image;
+ // Autopilot: up to KAIROQ_AUTOPILOT_ROUNDS fixes, each like one build (pricing to be set later).
+ if(mode==='autopilot')return base*require('./autopilot').maxRounds()+image;
  return base*(mode==='agent'?agentMultiplier():1)+image;
 }
 const IMAGE_TYPES={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif'};
@@ -233,7 +235,7 @@ function supportAnswer(meta){
   'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
  ].join('\n');
 }
-function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook}){
+function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
  const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
  if(active&&!concurrentDiscuss){
@@ -245,7 +247,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   }
   throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
  }
- if(!['build','discuss','agent','polish'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ if(!['build','discuss','agent','polish','autopilot'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
  if(!concurrentDiscuss&&(mode==='build'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingFeatureComplaint(message)){
   const ownerComplaint=String(message).trim();
   mode='build';
@@ -350,7 +352,29 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     try{recalled=mem.recall(memOwner,id,message)}catch{recalled=null}
     if(recalled)context=[context,recalled.note].filter(Boolean).join('\n\n');
    }
-   if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
+   // Autopilot (autopilot.js): test the app against the owner's request, fix what is missing,
+   // and repeat until it passes or the round limit; one honest summary at the end.
+   const autopilotRun=async(request,lastResult)=>{
+    const ap=require('./autopilot'),synthetic=require('./synthetic-customers');
+    const customers=browse&&process.env.KAIROQ_AUTOPILOT_CUSTOMERS!=='off'?async url=>{
+     const r=await synthetic.run(id,url,{audience:'',goal:String(request).split('\n')[0].slice(0,300),count:2,path:''},{callModel,browse,tier:'standard',signal});
+     return r.numbers.completion_rate+'% of '+r.numbers.visitors+' visitors reached the goal. '+(r.summary.headline||'')+(r.summary.issues||[]).map(x=>' Issue: '+x.title+(x.why?' ('+x.why+')':'')).join('')+(r.problems||[]).filter(p=>p.confirmed).map(p=>' Confirmed: '+(p.what||p.title||'')).join('');
+    }:null;
+    let latest=lastResult;
+    const out=await ap.run({signal,
+     onProgress:p=>update({status:'autopilot',progress:p.text,stream:null}),
+     test:async r=>ap.judge(id,{request,callModel,designShots,customers,checks:r||latest||{},tier:modelTier==='standard'?'pro':modelTier,signal}),
+     edit:async(msg,round)=>{const r=await builder.edit(id,msg,{onVersion,designShots,displayText:'Autopilot round '+round+': fixing what the test found',callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:st=>update({status:st,stream:null})});if(r&&!r.rolled_back)latest=r;return r}});
+    try{const m=builder.loadMeta(id),a=m.messages.at(-1);if(a&&a.role==='assistant'){a.autopilot={rounds:out.rounds,summary:out.summary};a.text=String(a.text||'').trim()+'\n\n'+out.summary;builder.saveMeta(m)}}catch{}
+    return out;
+   };
+   const ownerRequest=()=>{const m=builder.loadMeta(id);return[...m.messages.filter(x=>x.role==='user').map(x=>x.text).slice(-6),m.knowledge||''].filter(Boolean).join('\n\n').slice(-8000)};
+   if(mode==='autopilot'){
+    if(!builder.loadMeta(id).current_version)throw Object.assign(Error('Build the app first'),{status:400});
+    const out=await autopilotRun([ownerRequest(),message].filter(Boolean).join('\n\n'),null);
+    job.result={...(out.result||{version:builder.loadMeta(id).current_version}),autopilot:{rounds:out.rounds,summary:out.summary},message:out.summary};
+   }
+   else if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
    else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onVersion,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'){
     let extra='';
@@ -420,6 +444,13 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
      try{job.result={...await builder.polish(id,{shots:designShots,callModel,onVersion,onStream,onThinking,onEvent,tier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})}),first_version:first.version,polished:true,design:first.design}}
      catch(e){job.result={...first,polish_error:signal.aborted?'Stopped before the design review.':'The design review did not finish: '+String(e.message||e).slice(0,300)}}
     }
+   }
+   // Top quality: the first build is finished by the autopilot before the owner is told it is done.
+   if(mode==='build'&&job.result&&(job.result.design||Number(versionBefore)<=1)&&!job.result.unchanged&&!job.result.rolled_back&&!job.result.question&&require('./autopilot').enabled()){
+    const first=job.result;
+    try{const out=await autopilotRun(ownerRequest(),first);job.result={...(out.result&&!out.result.rolled_back?out.result:first),first_version:first.version,design:first.design,autopilot:{rounds:out.rounds,summary:out.summary}}}
+    catch(e){if(signal.aborted)throw e;console.warn('[autopilot]',String(e.message||e).slice(0,200));job.result={...first,autopilot_error:'The autopilot did not finish: '+String(e.message||e).slice(0,200)}}
+    finally{update({progress:null})}
    }
    // Completed work is always charged: Kairoq never refunds by itself because a change did not
    // turn out as hoped. Customers who are unhappy contact support, who review the request and
@@ -886,7 +917,7 @@ function streamJob(req,res,job){
 }
 
 async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture}){
- const deps={callModel,checkRuntime,inspect,webSearch,browseSite,designShots,generateImage,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture};
+ const deps={callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
  const route=url.slice('/api/create'.length),method=req.method;
