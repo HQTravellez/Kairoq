@@ -117,6 +117,8 @@ async function look(url,device,browseSite){
  }finally{await s.close()}
 }
 async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
+ // An overall time limit: a check never hangs on a model that does not answer.
+ const signal=AbortSignal.timeout(Math.max(60000,Number(process.env.KAIROQ_SITE_CHECK_TIMEOUT_MS||900000)));
  browseSite=browseSite||((u,o)=>require('./runtime-check').session(u,o));
  const progress=t=>{state.progress=t};
  try{
@@ -125,10 +127,10 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   fs.mkdirSync(dir(),{recursive:true});
   for(const [name,v] of [['desktop',desktop],['phone',phone]])if(v.shot)fs.writeFileSync(shotFile(state.id,name),Buffer.from(v.shot,'base64'));
   progress('Working out what visitors come to do');
-  const about=await understand(desktop.page,goal,{callModel});
+  const about=await understand(desktop.page,goal,{callModel,signal});
   const count=visitors();
   progress('Sending '+count+' AI customers through the site');
-  const r=await require('./synthetic-customers').run('site-check',state.url,{audience:about.audience,goal:about.goal,count},{callModel,tier:tier(),site:true,browseSite,onProgress:p=>progress(p.text)});
+  const r=await require('./synthetic-customers').run('site-check',state.url,{audience:about.audience,goal:about.goal,count},{callModel,tier:tier(),site:true,browseSite,signal,onProgress:p=>progress(p.text)});
   const tech=technical(desktop.facts,phone.facts);
   const report={
    id:state.id,url:state.url,host:state.host,at:new Date().toISOString(),...about,
@@ -144,7 +146,7 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   if(mail&&origin)mail(email,'Your website check for '+state.host+': '+report.score+'/100',
    'Your free website check is ready.\n\n'+(report.summary.headline||'')+'\n'+report.numbers.completed+' of '+report.numbers.visitors+' AI customers managed to '+report.goal.toLowerCase().replace(/\.$/,'')+'.\n\nSee the full report, with what to fix:\n'+origin+'/create/check/'+state.id+'\n\nKairoq can rebuild the site with these problems fixed, tested in a real browser before you pay.').catch(()=>{});
  }catch(e){
-  state.status='failed';state.error=clip(e.message||e,300);
+  state.status='failed';state.error=signal.aborted?'The check took too long (the AI models did not answer in time). Please try again in a few minutes.':clip(e.message||e,300);
   setEntry(state.id,{status:'failed'});
  }finally{
   setTimeout(()=>running.delete(state.id),600000).unref?.();

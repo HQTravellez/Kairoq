@@ -35,10 +35,36 @@ function normalizePersona(p,i){
   wants:clip(p&&p.wants,200)
  };
 }
+// When the model cannot write personas in time (a slow or silent free model), the test still runs
+// with these: a varied mix of ages, devices, patience and tech comfort, each wanting the goal.
+const STANDARD_PEOPLE=[
+ {name:'Maya',age:34,about:'Project manager who sorts things out on her phone between meetings',device:'phone',patience:'low',tech:'medium'},
+ {name:'Daniel',age:52,about:'Operations director comparing a few options on his laptop',device:'desktop',patience:'medium',tech:'medium'},
+ {name:'Priya',age:27,about:'Doing this for the first time, careful, reads everything',device:'phone',patience:'high',tech:'high'},
+ {name:'Tom',age:67,about:'Retired, reads slowly, wants clear prices and a phone number',device:'desktop',patience:'medium',tech:'low'},
+ {name:'Leila',age:41,about:'Busy parent in a hurry, sceptical of hidden fees',device:'phone',patience:'low',tech:'low'},
+ {name:'Marco',age:38,about:'Small-business owner checking details before committing',device:'desktop',patience:'medium',tech:'high'},
+ {name:'Aisha',age:23,about:'Student who expects things to work like the apps she uses',device:'phone',patience:'low',tech:'high'},
+ {name:'Grace',age:58,about:'Office manager arranging this for someone else',device:'desktop',patience:'high',tech:'low'},
+ {name:'Kenji',age:45,about:'Frequent traveller who wants the fastest way through',device:'phone',patience:'low',tech:'high'},
+ {name:'Rosa',age:31,about:'Nurse finishing a night shift, tired, on her phone',device:'phone',patience:'medium',tech:'medium'}];
+function standardPeople(n,goal){return Array.from({length:n},(_,i)=>{const p=STANDARD_PEOPLE[i%STANDARD_PEOPLE.length];return{...p,name:i<STANDARD_PEOPLE.length?p.name:p.name+' '+(Math.floor(i/STANDARD_PEOPLE.length)+1),wants:clip(goal,200)}})}
+const PERSONA_MS=()=>Math.max(1000,Number(process.env.KAIROQ_PERSONA_TIMEOUT_MS||120000));
 async function personas({audience,goal,count,callModel,tier,signal}){
  const n=Math.max(1,Math.min(MAX_PERSONAS(),Math.round(Number(count))||10));
  const messages=[{role:'system',content:PERSONA_PROMPT},{role:'user',content:'Audience: '+clip(audience,600)+'\nWhat they come to do: '+clip(goal,400)+'\nCreate exactly '+n+' personas.'}];
- const list=await callModel({messages,temperature:0.9,maxOutputTokens:Math.min(8000,300+n*120),signal,tier},content=>{const v=json(content);if(!Array.isArray(v.personas)||!v.personas.length)throw Error('No personas');return v.personas});
+ // A time limit, so a silent model never stalls the test (and a model that ignores the signal is
+ // left behind by the race).
+ const limit=AbortSignal.timeout(PERSONA_MS()),own=signal?AbortSignal.any([signal,limit]):limit;
+ let list;
+ try{
+  list=await Promise.race([
+   callModel({messages,temperature:0.9,maxOutputTokens:Math.min(8000,300+n*120),signal:own,tier},content=>{const v=json(content);if(!Array.isArray(v.personas)||!v.personas.length)throw Error('No personas');return v.personas}),
+   new Promise((_,reject)=>own.addEventListener('abort',()=>reject(own.reason||Error('timeout')),{once:true}))]);
+ }catch(e){
+  if(signal&&signal.aborted)throw e;
+  list=standardPeople(n,goal);
+ }
  return list.slice(0,n).map(normalizePersona);
 }
 
@@ -176,4 +202,4 @@ function fixMessage(report){
   s.issues.map((x,i)=>(i+1)+'. '+x.title+(x.why?': '+x.why:'')+(x.quote?' (a visitor said: "'+x.quote+'")':'')+at(i)).join('\n')+
   (s.fixes.length?'\nSuggested changes:\n'+s.fixes.map(f=>'- '+f).join('\n'):'');
 }
-module.exports={recall,recallQuestions,personas,visit,run,funnel,summarize,save,update,list,load,fixMessage,normalizePersona,MAX_PERSONAS};
+module.exports={standardPeople,recall,recallQuestions,personas,visit,run,funnel,summarize,save,update,list,load,fixMessage,normalizePersona,MAX_PERSONAS};

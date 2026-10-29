@@ -275,3 +275,21 @@ test('compare: the same customers visit this app and another website; nothing is
   assert.equal((await request(server,'POST','/api/create/projects/'+id+'/synthetic',{headers:{cookie},body:{repair:site.id}})).status,400);
  }finally{other.close()}
 });
+
+test('a model that never answers does not stall the test: built-in customers take over after the time limit',async()=>{
+ process.env.KAIROQ_PERSONA_TIMEOUT_MS='1000';
+ try{
+  const silent=()=>new Promise(()=>{});
+  const t0=Date.now();
+  const people=await synthetic.personas({audience:'Companies relocating staff',goal:'Get a quote for a furnished apartment',count:5,callModel:silent});
+  assert.ok(Date.now()-t0<5000,'did not wait for the silent model');
+  assert.equal(people.length,5);
+  assert.deepEqual(people.map(p=>p.device),['phone','desktop','phone','desktop','phone']);
+  assert.ok(people.every(p=>p.wants==='Get a quote for a furnished apartment'));
+  assert.equal(new Set(people.map(p=>p.name)).size,5);
+  assert.equal(synthetic.standardPeople(12,'x')[10].name,'Maya 2');
+  // Stopped by the caller (the whole check timed out): that error is passed on, not hidden.
+  const stop=new AbortController();setTimeout(()=>stop.abort(Error('Stopped')),50);
+  await assert.rejects(synthetic.personas({audience:'a',goal:'b',count:2,callModel:silent,signal:stop.signal}),/Stopped/);
+ }finally{delete process.env.KAIROQ_PERSONA_TIMEOUT_MS}
+});
