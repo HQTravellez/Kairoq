@@ -14,10 +14,11 @@ process.env.KAIROQ_SITE_CHECK_PER_EMAIL='2';
 const createApi=require('../create-api'),siteCheck=require('../site-check');
 
 // A scripted model: says what the site is, makes personas, two visitors book, one gives up.
-let modelCalls=0;
+let modelCalls=0,limitHit=false;
 const callModel=async(opts,parse)=>{
  modelCalls++;
  const sys=opts.messages[0].content,user=opts.messages.at(-1).content;
+ if(limitHit&&/role-playing a real person/.test(sys))throw Error('Experiential 429: org_token_rate_limit_day: Free core models share 1000000 tokens per UTC day');
  if(/say what it is for/.test(sys))return parse(JSON.stringify({business:'A small yoga studio in Lisbon',audience:'Locals who want to try yoga',goal:'Book a first class'}));
  if(/customer personas/.test(sys))return parse(JSON.stringify({personas:[{name:'Ana',age:31,device:'phone',patience:'low',tech:'medium',wants:'a class tonight'},{name:'Rui',age:52,device:'desktop',patience:'high',tech:'low',wants:'a beginner class'},{name:'Mia',age:24,device:'phone',patience:'medium',tech:'high',wants:'prices'}]}));
  if(/role-playing a real person/.test(sys)){
@@ -98,6 +99,18 @@ test('the same site the same day returns the saved report without running again'
  assert.deepEqual(leads.map(l=>l.email).sort(),['other@lotus.pt','owner@lotus.pt']);
  const signup=await request(server,'POST','/api/create/signup',{body:{email:'cust@example.com',password:'password1'},headers:{'x-forwarded-for':'10.7.0.1'}});
  assert.equal((await request(server,'GET','/api/create/site-checks',{headers:{cookie:signup.headers['set-cookie'][0].split(';')[0]}})).status,403);
+});
+
+test('when the AI itself is unavailable for every visitor, there is no made-up score: the check says so',async()=>{
+ limitHit=true;
+ try{
+  const r=await request(server,'POST','/api/create/site-check',{body:{url:siteUrl(),email:'limits@lotus.pt',goal:'See the class timetable'}});
+  assert.equal(r.status,202,r.text);
+  const c=await finish(r.json.id);
+  assert.equal(c.status,'failed',JSON.stringify(c));
+  assert.match(JSON.stringify(c),/reached their limit for today/);
+  assert.equal(c.score,undefined);
+ }finally{limitHit=false}
 });
 
 test('bad input, limits and the off switch',async()=>{
