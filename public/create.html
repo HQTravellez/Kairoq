@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="/builder.css?v=8">
 <link rel="stylesheet" href="/create-kairoq.css?v=4">
 <link rel="stylesheet" href="/create-look.css?v=2">
-<link rel="stylesheet" href="/studio.css?v=9">
+<link rel="stylesheet" href="/studio.css?v=10">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -242,15 +242,9 @@
       </div>
     </section>
 
-    <section class="cta" id="get-started">
-      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
-      <div class="cta-text">
-        <p class="kicker">Get started</p>
-        <h2>Your first app is <em>a sentence away.</em></h2>
-        <p>Create an account, describe the idea, and watch it get built and tested. Your prompt from above comes with you.</p>
-        <ul class="cta-list"><li>30 free credits to start</li><li>No card needed</li><li>Your code is yours to download</li></ul>
-      </div>
-      <div class="auth-card" id="signup" aria-labelledby="auth-title">
+    <dialog class="auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
+      <div class="auth-card" id="signup">
+        <button class="ghost icon-btn auth-close" id="auth-close" type="button" aria-label="Close">×</button>
         <h2 id="auth-title">Get started</h2>
         <div class="tabs" role="tablist">
           <button type="button" role="tab" id="tab-signup" aria-selected="true">Create account</button>
@@ -278,11 +272,11 @@
           <p class="error" id="reset-error" role="alert"></p>
         </form>
       </div>
-    </section>
+    </dialog>
 
     <footer class="foot">
       <span class="brand-foot">Kairoq <b>Create</b></span>
-      <nav aria-label="Footer"><a href="#how">How it works</a><a href="#features">What it does</a><a href="#pricing">Pricing</a><a href="/docs/create.md">Docs</a><a href="#signup">Sign in</a></nav>
+      <nav aria-label="Footer"><a href="#how">How it works</a><a href="#features">What it does</a><a href="#pricing">Pricing</a><a href="/docs/create.md">Docs</a><a href="#signup" id="foot-signin">Sign in</a></nav>
       <span class="muted small">Built in Toronto. Moving to Dubai.</span>
     </footer>
   </div>
@@ -1360,6 +1354,6 @@
 </dialog>
 
 <script src="/create-look.js?v=6"></script>
-<script src="/create.js?v=20261132"></script>
+<script src="/create.js?v=20261133"></script>
 </body>
 </html>

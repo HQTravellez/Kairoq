@@ -58,10 +58,16 @@ function setMode(mode){
  $('tab-signup').setAttribute('aria-selected',String(mode==='signup'));
  $('tab-login').setAttribute('aria-selected',String(mode==='login'));
  text($('auth-submit'),mode==='signup'?'Create account':'Sign in');
+ text($('auth-title'),mode==='signup'?'Create your account':'Sign in');
  $('password').autocomplete=mode==='signup'?'new-password':'current-password';
  $('free-note').classList.toggle('hidden',mode!=='signup');
  text($('auth-error'),'');
 }
+// Sign-in and sign-up open as a pop-up over the page (no big form on the landing page).
+function openAuth(mode){const d=$('auth-dialog');if(mode)setMode(mode);if(!d.open)d.showModal();(d.querySelector('form:not(.hidden) input')||$('email')).focus()}
+$('auth-close').onclick=()=>$('auth-dialog').close();
+$('auth-dialog').addEventListener('click',e=>{if(e.target===$('auth-dialog'))$('auth-dialog').close()});
+$('foot-signin').onclick=e=>{e.preventDefault();openAuth('login')};
 $('tab-signup').onclick=()=>setMode('signup');
 $('tab-login').onclick=()=>setMode('login');
 $('auth-form').onsubmit=async e=>{
@@ -1925,7 +1931,7 @@ function planCard(title,price,lines,action){
  return card;
 }
 function renderLanding(){
- renderTemplates($('landing-templates'),id=>{setPending({template:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()},id=>{setPending({sponsored:id});$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()}).catch(()=>{});
+ renderTemplates($('landing-templates'),id=>{setPending({template:id});openAuth('signup')},id=>{setPending({sponsored:id});openAuth('signup')}).catch(()=>{});
  const wrap=$('landing-plans');wrap.replaceChildren();
  const per=(state.me.tiers||[]).map(t=>t.label+' '+t.credits+' credit'+(t.credits===1?'':'s')).join(', ');
  wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a Kairoq URL','No card needed']));
@@ -1933,11 +1939,11 @@ function renderLanding(){
  for(const p of state.me.packs||[])wrap.append(planCard(p.name,p.label||p.credits+' credits',[p.credits+' credits, one-time','Never expire']));
  text($('pricing-note'),'Credits per message: '+per+(state.me.discuss_credits?'; Discuss '+state.me.discuss_credits:'')+'. Visual edits are free. If a change breaks your app, the next fix of that problem is on us. A request that fails before anything is saved is not charged.');
 }
-$('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});setMode('signup');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+$('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});openAuth('signup')};
 for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent.trim();$('landing-prompt').focus()};
 // Template gallery tabs: filter the cards by their category.
 for(const t of document.querySelectorAll('.show-tabs .tab'))t.onclick=()=>{for(const x of document.querySelectorAll('.show-tabs .tab'))x.setAttribute('aria-pressed',String(x===t));const cat=t.dataset.cat||'';for(const card of $('landing-templates').children){const c=(card.dataset.cat||card.querySelector('.cat')?.textContent||'').toLowerCase();card.hidden=Boolean(cat)&&c!==cat}};
-$('nav-signin').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create#signup';return}setMode(state.me&&state.me.signups===false?'login':'login');$('signup').scrollIntoView({behavior:'smooth'});$('email').focus()};
+$('nav-signin').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create#signup';return}openAuth('login')};
 $('nav-start').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create';return}$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
 // Landing motion: a typing placeholder, reveal-on-scroll and a cursor glow on the tiles. Nothing here is needed to use the page.
 (function(){
@@ -1951,7 +1957,7 @@ $('nav-start').onclick=()=>{if($('auth').classList.contains('hidden')){location.
   timer=setTimeout(tick,wait);
  }
  if(!reduce)timer=setTimeout(tick,1200);
- const items=document.querySelectorAll('.landing .section-head,.landing .steps li,.landing .tile,.landing .proof div,.landing .cmp-table,.landing .credits-how,.landing .cta-text,.landing .cta .auth-card');
+ const items=document.querySelectorAll('.landing .section-head,.landing .steps li,.landing .tile,.landing .proof div,.landing .cmp-table,.landing .credits-how');
  if(!reduce&&'IntersectionObserver' in window){
   const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}},{rootMargin:'0px 0px -6% 0px',threshold:0});
   for(const el of items){el.classList.add('rv');io.observe(el)}
@@ -2995,13 +3001,13 @@ async function start(){
  await handleLinks();
  const v=await loadMe();
  $('google-login').classList.toggle('hidden',!state.me.google);
- if(state.resetToken){show('auth');renderLanding();$('auth-form').classList.add('hidden');$('reset-form').classList.remove('hidden');$('signup').scrollIntoView();return}
+ if(state.resetToken){show('auth');renderLanding();$('auth-form').classList.add('hidden');$('reset-form').classList.remove('hidden');openAuth();return}
  if(state.flash){text($('auth-error'),state.flash);text($('home-error'),state.flash);state.flash=null}
  const share=/^\/create\/share\/([a-f0-9]{24})\/?$/.exec(location.pathname);
  if(share)return openShare(share[1],v);
  const ck=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);
  if(ck){if(v)api('/projects').then(r=>renderRecents(r.projects)).catch(()=>{});return openCheck(ck[1])}
- if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();return}
+ if(!v){show('auth');setMode(state.me.signups?'signup':'login');$('tab-signup').classList.toggle('hidden',!state.me.signups);renderLanding();if(location.hash==='#signup')openAuth();return}
  const pending=takePending();
  if(pending){
   if(pending.ask){try{return await askThenBuild(pending.prompt)}catch(err){if(EMBED&&window.parent!==window)return backToKairoq({error:err.message,prompt:pending.prompt});await loadHome();text($('home-error'),err.message);return}}
