@@ -622,7 +622,14 @@ function messageItem(m,last,index){
  }
  if(m.checks&&!tl.some(e=>e.t==='check')){const c=document.createElement('div');c.className='check-chip '+(m.checks.failed.length?'bad':'ok');c.textContent=m.checks.failed.length?'✗ Broke '+m.checks.failed.length+' of '+m.checks.ran+' saved checks: '+m.checks.failed.join(', '):'✓ All '+m.checks.ran+' saved check'+(m.checks.ran===1?'':'s')+' passed';li.append(c)}
  if(m.steps&&m.steps.length&&!tl.length){const d=document.createElement('details'),s=document.createElement('summary');s.textContent='Agent steps ('+m.steps.length+')';const ol=document.createElement('ol');ol.className='agent-steps';for(const st of m.steps){const li2=document.createElement('li');li2.textContent=st;ol.append(li2)}d.append(s,ol);li.append(d)}
- if(m.role==='assistant'&&m.mode==='discuss'&&m.proposal&&!m.question&&!m.failed&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Implement this plan';b.onclick=()=>{b.disabled=true;setChatMode('build');send('Implement this plan.','build','/chat',{implementFrom:m.at})};li.append(b)}
+ if(m.role==='assistant'&&m.mode==='discuss'&&m.proposal&&!m.question&&!m.failed&&last){const b=document.createElement('button');b.type='button';b.className='ghost small-btn';b.textContent='Review & build';b.onclick=()=>{
+   const chosen=(state.me?.models||[]).find(x=>x.id===state.model&&x.credits);
+   const tier=(state.me?.tiers||[]).find(x=>x.id===state.tier);
+   const credits=chosen?.credits??tier?.credits??1;
+   const price=state.me?.viewer?.kind==='customer'?credits+' credit'+(credits===1?'':'s'):'owner account (no credits)';
+   if(!window.confirm('Build the proposed changes to this project?\\n\\nEstimated cost: '+price+'.\\nChatting is free; this action generates code and may use credits.'))return;
+   b.disabled=true;setChatMode('build');send('Implement this plan.','build','/chat',{implementFrom:m.at});
+  };li.append(b)}
  if(m.role==='assistant'){
   const extra=[...li.children].filter(n=>n.matches('.status-line.done,.acts,.design-chip,.memory-chip,.file-chips.done,.msg-meta,.look-note:not(.warn),.check-chip:not(.bad),.agent-steps,.verified.ok,.verified-quiet'));
   if(extra.length){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...extra);li.append(details);}
