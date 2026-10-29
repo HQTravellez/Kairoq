@@ -111,6 +111,18 @@ A paid model from Meta, reached at `https://api.meta.ai/v1` (https://dev.meta.ai
 - Cost is worked out from token counts at $1.25 per million input tokens and $4.25 per million output tokens, and recorded as `muse` in the usage ledger.
 
 
+## Claude straight from Anthropic
+
+Claude models can run on your own Anthropic account instead of OpenRouter (`anthropic.js`, Anthropic's Messages API).
+- When `ANTHROPIC_API_KEY` is set, every Claude model the builder uses goes to Anthropic directly: Claude Fable, Opus and Sonnet in the model menu, and the Pro tier's Claude Sonnet. Other models (GPT-6, DeepSeek, Gemini) still go through OpenRouter.
+- Railway variables:
+  - `ANTHROPIC_API_KEY`: the key from console.anthropic.com. Add it in Railway, never in code.
+  - `KAIROQ_BUILDER_PAID_APPROVED=true`: needed for any paid model, Claude included.
+- Without an OpenRouter key, the Claude models still switch on in the menu; the others stay off.
+- A model picked by name in the menu now runs whatever `KAIROQ_BUILDER_MODE` says (picking it is the paid choice); the monthly builder budget still applies.
+- The system prompt is cached, which lowers the cost of repeated build calls. Cost is worked out from token counts (Opus $4/$20, Sonnet $2/$10 per million input/output tokens; other Claude models use the builder's usual estimate) and recorded with `provider: anthropic` in the usage ledger.
+- Not yet: the OpenCode engine and the main chat assistant still reach Claude through OpenRouter.
+
 ## Product films and reels (Google Gemini Omni Flash)
 
 Design → **Make it move**: the owner picks one product photo (and may add a line, like "chocolate

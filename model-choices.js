@@ -28,9 +28,15 @@ function parse(raw){
  }).filter(Boolean);
 }
 // Named models need OpenRouter and paid builds switched on; without them they are listed but off.
+// Claude models can instead go straight to Anthropic (ANTHROPIC_API_KEY, see anthropic.js).
 // Muse Spark goes to Meta's own API: it needs only META_MODEL_API_KEY (it has its own monthly cap).
 function ready(env=process.env){return Boolean(env.OPENROUTER_API_KEY)&&env.KAIROQ_BUILDER_PAID_APPROVED==='true'}
-function modelReady(m,env=process.env){return m.provider==='meta'?require('./muse').configured(env):ready(env)}
+function modelReady(m,env=process.env){
+ if(m.provider==='meta')return require('./muse').configured(env);
+ const a=require('./anthropic');
+ if(a.isClaude(m.id)&&a.configured(env))return env.KAIROQ_BUILDER_PAID_APPROVED==='true';
+ return ready(env);
+}
 function named(env=process.env){
  const raw=String(env.KAIROQ_MODEL_CHOICES||'').trim();
  if(raw.toLowerCase()==='off')return[];
