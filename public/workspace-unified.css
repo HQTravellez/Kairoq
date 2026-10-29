@@ -1,0 +1,27 @@
+/* Consistent project workspace: chat, canvas and progress share one visual language. */
+body.app.in-editor{--workspace-edge:#e4e9f1;--workspace-muted:#64748b;--workspace-bg:#f8fafd}
+body.app.in-editor .shell-main{background:var(--workspace-bg)!important}
+body.app.in-editor #editor{background:var(--workspace-bg)!important;gap:0!important;border-radius:0!important}
+body.app.in-editor #editor>.chat{background:#fff!important;border-right:1px solid var(--workspace-edge)!important;min-width:0}
+body.app.in-editor #editor .chat-head{background:#fff!important;border-bottom:1px solid var(--workspace-edge)!important;min-height:60px!important;padding:10px 16px!important}
+body.app.in-editor #project-name{font-weight:650!important;letter-spacing:-.02em!important;font-size:15px!important}
+body.app.in-editor #messages{padding:28px clamp(16px,3vw,44px) 24px!important;scrollbar-width:thin}
+body.app.in-editor #messages>li{max-width:780px}
+body.app.in-editor #chat-form{margin:0 16px 16px!important;border:1px solid #dfe5ee!important;background:white!important;border-radius:17px!important;box-shadow:0 8px 28px #1c2b4b0b!important;padding:12px!important}
+body.app.in-editor #chat-form:focus-within{border-color:#aebcf3!important;box-shadow:0 0 0 3px #4b62db18,0 8px 28px #1c2b4b0b!important}
+body.app.in-editor #chat-input{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;font-size:14px!important;line-height:1.6!important}
+body.app.in-editor #chat-form .composer-bar{border-top:1px solid #f0f2f6;padding-top:8px}
+body.app.in-editor #progress{background:#f6f8fe!important;border:1px solid #e3eafa!important;border-radius:10px!important;margin:8px 16px!important;padding:10px 12px!important;color:#3349a5!important;font-size:12.5px!important}
+body.app.in-editor #progress .dot{background:#5268df!important}
+body.app.in-editor .stage{background:var(--workspace-bg)!important;min-width:0}
+body.app.in-editor .stage-bar{background:white!important;border-bottom:1px solid var(--workspace-edge)!important;min-height:60px!important}
+body.app.in-editor #canvas{background:#f1f4f9!important}
+body.app.in-editor #frame{background:white!important;box-shadow:0 14px 40px #1f32501a!important}
+body.app.in-editor #build-overlay{background:rgba(246,249,253,.82)!important;backdrop-filter:blur(4px)}
+body.app.in-editor #build-overlay .bo-card{background:#fff!important;border:1px solid #e2e8f0!important;border-radius:14px!important;box-shadow:0 18px 60px #182d491a!important}
+body.app.in-editor .stage-bar button[aria-pressed=true]{background:#eef1ff!important;color:#3346ad!important}
+body.app.in-editor .messages .assistant::before{background:#4257e8!important}
+@media(max-width:900px){body.app.in-editor #messages{padding:20px 14px!important}body.app.in-editor #chat-form{margin:0 10px 10px!important}body.app.in-editor .chat-head,body.app.in-editor .stage-bar{min-height:52px!important}}
+@media(prefers-reduced-motion:reduce){body.app.in-editor #build-overlay{backdrop-filter:none}}
+
+body.app #home-error.welcome{color:#4257a1!important;background:#eef2ff;border:1px solid #dae2fc;border-radius:10px;padding:10px 14px;max-width:760px;margin:14px auto 0;line-height:1.5}
