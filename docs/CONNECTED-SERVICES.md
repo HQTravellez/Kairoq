@@ -178,3 +178,9 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
   as the visitor (declared arguments and types only, at most 5 calls per answer), for example a
   hotel assistant that checks real availability. Tools marked `"confirm": true` (bookings, payments)
   are never run by the AI: they come back as an `action` the app shows as a button.
+- **Integrations library** (`integrations.js`, `data/integrations.json`): 744 services and 9,501
+  actions from Activepieces' MIT integrations. Editor: Connectors → **744 apps** (search, pick what
+  should happen, add the key). Builder: kairoq_integration shows how a service signs in and its actions,
+  and reads the real code of one action once (kept in `integration-code/`). 118 services sign in with
+  OAuth, which apps cannot do yet; they are marked. Rebuild the data with
+  `node scripts/build-integrations.js <activepieces>/packages/pieces/community data/integrations.json <commit>`.

@@ -143,6 +143,10 @@ requirements. API/schema compatibility and offline tests do not establish produc
 - build-your-own-x — https://github.com/codecrafters-io/build-your-own-x — the list of tutorials
   (data/build-your-own-x.json) is CC0. The linked tutorials belong to their authors; Kairoq links to
   them and keeps only its own notes written from them, never copies.
+- Activepieces — https://github.com/activepieces/activepieces — MIT, Copyright (c) 2020-2024
+  Activepieces Inc. data/integrations.json holds facts read from packages/pieces/community (never the
+  ee folders, which are under a separate commercial licence); Kairoq reads an action's code from the
+  pinned commit when a build needs it and keeps that copy with this notice.
 - Claude Code Game Studios — https://github.com/Donchitos/Claude-Code-Game-Studios — MIT,
   Copyright (c) 2026 Donchitos. Kairoq's game playbooks (builder-playbooks.js) are written in Kairoq's
   own words, informed by its skills and checklists.

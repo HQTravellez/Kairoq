@@ -985,6 +985,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const raw=await readRaw(req);
    return send(res,200,await accounts.stripeWebhook(raw,req.headers['stripe-signature'])),true;
   }
+  // The integrations library (integrations.js): search the 744 services and see one.
+  if(route==='/integrations'&&method==='GET'){const q=new URL(req.url,'http://x').searchParams;return send(res,200,require('./integrations').search(q.get('q')||'',{limit:Number(q.get('limit'))||40})),true}
+  {const im=/^\/integrations\/([a-z0-9][a-z0-9-]{0,80})$/.exec(route);if(im&&method==='GET'){const d=require('./integrations').details(im[1]);if(!d)throw Object.assign(Error('Unknown integration'),{status:404});return send(res,200,{integration:d}),true}}
   if(route==='/templates'&&method==='GET'){const T=require('./create-templates'),thumbs=require('./template-thumbs');return send(res,200,{templates:T.list().map(t=>({...t,thumb:thumbs.url(T.get(t.id))})),sponsored:require('./partners').gallerySlots()}),true}
   // A template's picture for the gallery (see template-thumbs.js); the ?v= in its link changes with the template.
   const tth=/^\/templates\/([a-z0-9-]{1,60})\/thumb\.jpg$/.exec(route);

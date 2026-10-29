@@ -602,6 +602,19 @@
     <div class="row end"><button class="ghost" value="close">Close</button></div>
   </form>
 </dialog>
+<dialog id="apps-dialog" class="wide">
+  <form method="dialog" class="dialog">
+    <h2>Connect another app</h2>
+    <p class="muted small" id="apps-sub">Search 744 services. Pick one and say what should happen; Kairoq adds it to your app.</p>
+    <input id="apps-search" type="search" placeholder="Search: Mailchimp, HubSpot, Slack, Airtable…" autocomplete="off" aria-label="Search services">
+    <div class="apps-pane">
+      <ul class="apps-list" id="apps-list" aria-label="Services"></ul>
+      <div class="apps-detail" id="apps-detail"></div>
+    </div>
+    <p class="muted small">From the open-source Activepieces integrations (MIT).</p>
+    <div class="row end"><button class="ghost" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="publish-dialog">
   <form method="dialog" class="dialog">
     <h2>Publish</h2>

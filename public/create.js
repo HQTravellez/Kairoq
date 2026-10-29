@@ -2806,6 +2806,7 @@ const CONNECTORS=[
  {id:'email',name:'Email',desc:'Booking confirmations, password resets and owner notifications.',open:()=>openSettingsAt('email-status')},
  {id:'secrets',name:'API keys for your app',desc:'Keys for other services your server functions call (maps, SMS, AI…).',open:()=>openSettingsAt('secret-name')},
  {id:'figma',name:'Figma',desc:'Build a screen from a Figma frame.',open:()=>$('figma-open').click()},
+ {id:'apps',name:'744 apps',desc:'Mailchimp, HubSpot, Slack, Airtable, Shopify, Twilio and more: pick one and say what should happen.',open:()=>openApps()},
  {id:'partners',name:'Integrations',desc:'Booking, payments, reviews and more from our partners.',open:()=>openIntegrations()},
  {id:'whatsapp',name:'WhatsApp',desc:'Answer customers on WhatsApp with your app\'s assistant.',open:()=>openWhatsApp()},
  {id:'domain',name:'Custom domain',desc:'Publish the app on your own domain, like www.yourhotel.com.',open:()=>$('publish-open').click()},
@@ -2830,6 +2831,38 @@ $('connect-open').onclick=()=>{
  }
  $('connectors-dialog').showModal();
 };
+// "744 apps" (integrations.js): search a service, pick what should happen, and Kairoq adds it.
+let appsTimer=null;
+const CONNECT_LABEL={key:'Works with an API key',oauth:'Needs "Sign in with" (not available in apps yet)',none:'No sign-in needed'};
+async function openApps(){$('apps-dialog').showModal();$('apps-search').value='';$('apps-detail').replaceChildren(el('p','muted small','Pick a service to see what it can do.'));await appsSearch('');$('apps-search').focus()}
+async function appsSearch(q){
+ const ul=$('apps-list');
+ try{const d=await api('/integrations?limit=60&q='+encodeURIComponent(q));ul.replaceChildren();
+  if(!d.results.length)ul.append(el('li','muted small','No service found. Try another name.'));
+  for(const r of d.results){const li=el('li'),b=el('button','apps-item');b.type='button';b.append(el('b',null,r.name),el('span','muted small',r.actions+' actions'+(r.connect==='oauth'?' · sign-in needed':'')));b.onclick=()=>{for(const x of ul.querySelectorAll('.apps-item'))x.classList.toggle('on',x===b);appsShow(r.id)};li.append(b);ul.append(li)}
+ }catch(err){ul.replaceChildren(el('li','error',err.message))}
+}
+$('apps-search').oninput=()=>{clearTimeout(appsTimer);appsTimer=setTimeout(()=>appsSearch($('apps-search').value.trim()),200)};
+async function appsShow(id){
+ const box=$('apps-detail');box.replaceChildren(el('p','muted small','Loading…'));
+ const {integration:d}=await api('/integrations/'+encodeURIComponent(id));
+ const picked=new Set();
+ box.replaceChildren(el('h3',null,d.name),el('p','small',d.description),el('p','apps-connect '+d.connect,CONNECT_LABEL[d.connect]+(d.secrets.length?': '+d.how:'')));
+ const list=el('div','apps-actions');
+ const row=(x,kind)=>{const l=el('label','apps-action'),c=document.createElement('input');c.type='checkbox';c.onchange=()=>{c.checked?picked.add(x.label):picked.delete(x.label)};l.append(c,el('span',null,(kind==='trigger'?'When: ':'')+x.label));if(x.description)l.title=x.description;return l};
+ for(const a of d.actions.slice(0,40))list.append(row(a,'action'));
+ for(const t of d.triggers.slice(0,15))list.append(row(t,'trigger'));
+ const what=document.createElement('textarea');what.rows=2;what.placeholder='What should happen? e.g. "add everyone who books to my Mailchimp list"';what.className='apps-what';
+ const add=el('button','primary','Add '+d.name+' to my app');add.type='button';
+ add.onclick=()=>{
+  const want=what.value.trim()||[...picked].join('; ');if(!want){what.focus();return}
+  $('apps-dialog').close();
+  send('Connect '+d.name+': '+want+(picked.size?'\nUse: '+[...picked].join('; '):'')+'\n(Integration "'+d.id+'" from Kairoq\'s integrations library.)','build');
+ };
+ const tail=el('div','row');tail.append(add);
+ if(d.secrets.length){const keys=el('button','ghost','Add the key');keys.type='button';keys.title='Add '+d.secrets.join(', ')+' in Settings → Secrets';keys.onclick=async()=>{$('apps-dialog').close();await openSettingsAt('secret-name');$('secret-name').value=d.secrets[0]};tail.append(keys)}
+ box.append(el('p','plan-part','What should it do?'),list,what,tail,d.secrets.length?el('p','muted small','Keys it needs (added in Settings → Secrets, encrypted): '+d.secrets.join(', ')):'');
+}
 $('integrations-open').onclick=()=>{$('menu-plus').open=false;if(state.project)openIntegrations()};
 
 // ---------- admin: partners and sponsored templates ----------

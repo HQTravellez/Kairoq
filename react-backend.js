@@ -746,7 +746,7 @@ export const ai={
   // ai.chat({ messages:[{role:'user',content:'...'}], system, max_tokens, onToken }) -> { text }
   // ai.chat({ messages, tools: true }) -> { text, steps, action? }: the AI uses the app's
   // "ai_tools" (server functions); an action ({tool,args,summary}) needs the visitor's tap:
-  // show a button that runs functions.call(action.tool, action.args).
+  // show a button that runs functions.invoke(action.tool, action.args).
   async chat(options){
     const {onToken,...body}=typeof options==='string'?{messages:[{role:'user',content:options}]}:options;
     return onToken?streamed('/ai',body,onToken):call('/ai',{method:'POST',body});
