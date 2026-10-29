@@ -226,6 +226,13 @@ $('new-form').onsubmit=async e=>{
  try{
   const typed=$('new-prompt').value.trim();
   if(!typed)return;
+  // Greetings are conversation openers, not failed app specifications.
+  if(/^(hi|hello|hey|hey there|good morning|good afternoon|good evening)[!?.\s]*$/i.test(typed)){
+   $('home-error').classList.add('welcome');
+   text($('home-error'),"Hi! What would you like to create? Describe an idea, or choose an example below.");
+   return;
+  }
+  $('home-error').classList.remove('welcome');
   // A phone app is asked for in words the builder knows (react-native-app.js wanted()).
   const prompt=(KINDS[home.kind].prefix&&!/^Build a mobile app:/i.test(typed)?KINDS[home.kind].prefix:'')+typed;
   await askThenBuild(prompt);
