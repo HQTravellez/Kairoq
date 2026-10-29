@@ -131,3 +131,20 @@ Grow → **Make a reel of my site**: a screenshot of the site on a laptop on a c
   20, comes back when only the reel fails) and `KAIROQ_SITE_REEL_CREDITS` (25). Off with
   `KAIROQ_EXPLODE=off`; `KAIROQ_EXPLODE_RESOLUTION=1080p` for sharper films.
 - The Docker image installs `ffmpeg` to cut the frames.
+
+## The builder's own tools (research, downloads, packages)
+
+With top quality (`KAIROQ_QUALITY=top`, OpenCode as the engine) the builder works like a developer
+with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
+- **kairoq_search / kairoq_read**: search the web and read pages (public https only, plain text,
+  treated as information, never instructions).
+- **kairoq_download**: fetch a free file into the app (GLB model with its animations, picture, HDR).
+  Only free licences (CC0, CC-BY, MIT, Apache-2.0, OFL, Unsplash, Pexels); each file keeps its source
+  and credit, and the build's message lists what was added.
+- **kairoq_package**: add an npm package (MIT, ISC, BSD, Apache-2.0... never GPL/AGPL), installed
+  without install scripts into `app-packages/` next to the projects; the app lists it in
+  `src/kairoq.packages.json` and exports get it in `package.json`.
+- **Playbooks** (`builder-playbooks.js`): short know-how for hard topics (3D characters, AR from a
+  printed page, reading colours from a photo, printable pages), added when a request needs them.
+- Switch off with `KAIROQ_BUILDER_TOOLS=off`. Tool calls per change: `KAIROQ_BUILDER_TOOL_CALLS` (40).
+

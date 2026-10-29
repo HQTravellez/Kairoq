@@ -6868,6 +6868,7 @@ async function streamAppAi(body,onToken,onFirst){
 // in parallel, models per tier, the fast lane for small edits and live progress (it needs
 // KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true to write whole apps).
 // OpenCode as the build engine (opencode-engine.js) counts its model calls against the same budget.
+require("./builder-tools").configure({webSearch:searchPublicWeb});
 require("./opencode-engine").configure({enforceBudget,recordUsage:u=>recordUsage(u,{purpose:"developer-build",model:u.model,provider:"opencode"}),checkUrl:"http://127.0.0.1:"+PORT+"/internal/opencode-check"});
 function builderProvider(){
   const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
@@ -7165,7 +7166,7 @@ const server = http.createServer(async (req, res) => {
   if(url==="/internal/opencode-check"&&req.method==="POST"){
     const local=["127.0.0.1","::1","::ffff:127.0.0.1"].includes(req.socket.remoteAddress);
     if(!local)return json(res,404,{error:"Not found"});
-    try{const report=await require("./opencode-engine").runCheck(String(req.headers.authorization||"").replace(/^Bearer\s+/i,""));return json(res,200,{report})}
+    try{let b={};try{b=await getBody(req,20000)}catch{}const report=await require("./opencode-engine").runCheck(String(req.headers.authorization||"").replace(/^Bearer\s+/i,""),String(b&&b.tool||"check"),b&&b.args||{});return json(res,200,{report})}
     catch(e){return json(res,e.status||500,{error:String(e.message||e).slice(0,500)})}
   }
   if(url.startsWith("/builder/p/")&&reactBuilder.handlePreview(req,res))return;

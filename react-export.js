@@ -1,4 +1,6 @@
 "use strict";
+// Packages the builder added for this app (src/kairoq.packages.json, builder-tools.js).
+function addedPackages(files){try{const p=JSON.parse(files['src/kairoq.packages.json']||'{}').packages||{};return Object.fromEntries(Object.entries(p).filter(([n,v])=>/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/.test(n)&&/^[\w.+-]+$/.test(String(v))))}catch{return{}}}
 // Code download and two-way GitHub sync for Create projects. The export is a
 // standard Vite + React + Tailwind project; its 'kairoq' import points at the
 // app's backend on this Kairoq server.
@@ -30,7 +32,7 @@ function exportFiles(id){
  if(require('./react-native-app').enabled(meta))return require('./react-native-app').expoProject(source,meta);
  const out={
   'package.json':JSON.stringify({name:slug(meta.name),private:true,version:'1.0.0',type:'module',scripts:{dev:'vite',build:'vite build',preview:'vite preview'},
-   dependencies:Object.fromEntries(Object.entries({...usedDependencies(source,pkg),'react-router-dom':pkg['react-router-dom']}).sort()), // kairoq.js uses react-router-dom (Router)
+   dependencies:Object.fromEntries(Object.entries({...usedDependencies(source,pkg),'react-router-dom':pkg['react-router-dom'],...addedPackages(source)}).sort()), // kairoq.js uses react-router-dom (Router)
    devDependencies:{vite:pkg.vite,'@vitejs/plugin-react':pkg['@vitejs/plugin-react'],tailwindcss:pkg.tailwindcss}},null,2)+'\n',
   'vite.config.js':"import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nimport { fileURLToPath } from 'node:url';\n\nexport default defineConfig({\n  base: './',\n  plugins: [react()],\n  resolve: { alias: [\n    { find: /^kairoq\\/3d$/, replacement: fileURLToPath(new URL('./src/kairoq-3d.js', import.meta.url)) },\n    { find: /^kairoq\\/scene$/, replacement: fileURLToPath(new URL('./src/kairoq-scene.js', import.meta.url)) },\n    { find: /^kairoq\\/story$/, replacement: fileURLToPath(new URL('./src/kairoq-story.js', import.meta.url)) },\n    { find: /^kairoq\\/hero3d$/, replacement: fileURLToPath(new URL('./src/kairoq-hero3d.js', import.meta.url)) },\n    { find: /^kairoq\\/scroll$/, replacement: fileURLToPath(new URL('./src/kairoq-scroll.js', import.meta.url)) },\n    { find: /^kairoq$/, replacement: fileURLToPath(new URL('./src/kairoq.js', import.meta.url)) }\n  ] }\n});\n",
   'tailwind.config.js':"export default {\n  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],\n  // Colours, fonts, radius and shadows come from the CSS variables in src/index.css.\n  theme: "+JSON.stringify(require('./react-design').THEME,null,2).replace(/\n/g,'\n  ')+",\n  plugins: []\n};\n",

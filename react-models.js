@@ -97,6 +97,14 @@ function keep(id,entry,glb,poster){
  return view(item);
 }
 
+// A file the builder downloaded (builder-tools.js): a GLB model or HDR lighting with its source.
+function keepRemote(id,entry,bytes){
+ builder.loadMeta(id);
+ if(entry.kind==='environment'?!isHdr(bytes):!isGlb(bytes))throw fail(400,entry.kind==='environment'?'Not HDR lighting':'Not a GLB model');
+ if(bytes.length>MAX_GLB)throw fail(413,'This file is too big for an app (25 MB at most)');
+ const same=load(id).find(m=>m.source&&m.source.download===entry.source.download);if(same)return view(same);
+ return keep(id,entry,bytes,null);
+}
 // A model Kairoq's Blender modelling agent made (model-agent.js), with its preview picture.
 function saveMade(id,glb,poster,title){
  if(!isGlb(glb))throw fail(422,'The made model is not a valid GLB file');
@@ -278,10 +286,10 @@ function note(id,meta){
  if(!items.length&&style==='none')return'';
  const models=items.filter(m=>m.kind==='model'),envs=items.filter(m=>m.kind==='environment');
  const L=['3D IN THIS APP. Show 3D only with: import { Model3D } from \'kairoq/3d\'; (never three.js directly for these files, and never other model URLs).'];
- for(const m of models)L.push('- model ./models/'+m.file+' "'+m.title+'"'+(m.poster?' poster ./models/'+m.poster:'')+(m.source&&m.source.provider==='polyhaven'?' (Poly Haven, CC0)':'')+(m.source&&m.source.provider==='polypizza'?' (Poly Pizza, '+m.source.license+(m.source.license==='CC-BY'?': show the credit "'+m.title+'" by '+(m.source.creator||'its creator')+' (poly.pizza, CC-BY) on an about or credits screen':'')+')':'')+(m.animations&&m.animations.length?' animations: '+m.animations.map(a=>'"'+a+'"').join(', '):''));
+ for(const m of models)L.push('- model ./models/'+m.file+' "'+m.title+'"'+(m.poster?' poster ./models/'+m.poster:'')+(m.source&&m.source.provider==='polyhaven'?' (Poly Haven, CC0)':'')+(m.source&&m.source.provider==='web'?' ('+m.source.license+(/^CC-BY/.test(m.source.license)?': show the credit "'+m.title+'"'+(m.source.creator?' by '+m.source.creator:'')+' ('+m.source.license+')':'')+')':'')+(m.source&&m.source.provider==='polypizza'?' (Poly Pizza, '+m.source.license+(m.source.license==='CC-BY'?': show the credit "'+m.title+'" by '+(m.source.creator||'its creator')+' (poly.pizza, CC-BY) on an about or credits screen':'')+')':'')+(m.animations&&m.animations.length?' animations: '+m.animations.map(a=>'"'+a+'"').join(', '):''));
  for(const m of envs)L.push('- lighting ./models/'+m.file+' "'+m.title+'" (pass as environment="./models/'+m.file+'")');
  L.push('<Model3D src="./models/x.glb" poster="./models/x.png" alt="what it shows" mode="product|walkthrough|scroll|background" className="h-[60vh] w-full" /> Props: environment, autoRotate, animation="Idle" (loops one of the model’s own animations; leave it out to loop the first), tapAnimation="Jump" (plays once when tapped, then back), onAnimations={names=>…} (the names, once loaded), onControls={setModel} (once loaded: {animations, materials, play(name,{once}), pause(), replay(), reset()} for buttons like Walk, Jump, Replay), blank (every part plain white, e.g. a character waiting to be coloured in), colors={{"Body":"#4caf50"}} (paint parts by material name from controls.materials, or by index "0"), credit line for the model under it, ar (default on in product mode), hotspots=[{position:"0 1 0",normal:"0 0 1",label:"Kitchen"}], stops=["0deg 75deg 105%","90deg 60deg 80%"] (scroll mode: camera stops as the section scrolls), cameraOrbit, cameraTarget, exposure. Give it a fixed height, real alt text, and a short text line nearby saying visitors can drag to turn it. It already shows the poster while loading, on old phones and for reduced motion.');
  if(style!=='none')L.push('The owner chose the 3D style "'+STYLES[style].label+'". '+STYLES[style].hint+(models.length?'':' No model is in the project yet: say in "message" that they can add one in Design → 3D models (upload or Poly Haven), and lay the section out so the model drops in.'));
  return L.join('\n');
 }
-module.exports={searchPolyPizza,addPolyPizza,polyPizzaReady,ppView,ppLicence,animationNames,saveMade,STYLES,MAX_MODELS,MAX_GLB,VIEWER_FILE,VIEWER_SRC,list,upload,addPolyHaven,searchPolyHaven,autoModel,setPoster,remove,read,copyInto,copyViewer,usesViewer,note,packGlb,isGlb,dir};
+module.exports={keepRemote,searchPolyPizza,addPolyPizza,polyPizzaReady,ppView,ppLicence,animationNames,saveMade,STYLES,MAX_MODELS,MAX_GLB,VIEWER_FILE,VIEWER_SRC,list,upload,addPolyHaven,searchPolyHaven,autoModel,setPoster,remove,read,copyInto,copyViewer,usesViewer,note,packGlb,isGlb,dir};

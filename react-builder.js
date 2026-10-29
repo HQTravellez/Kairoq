@@ -17,7 +17,8 @@ const ALLOWED_PACKAGES=[...Object.keys(APP_PACKAGES),...KAIROQ_MODULES];
 function packageOf(spec){const parts=spec.split('/');return spec.startsWith('@')?parts.slice(0,2).join('/'):parts[0]}
 // Font packages from the font library (font-library.js) may be imported by the site's CSS.
 const FONT_PACKAGES=new Set(require('./font-library').packages());
-function allowedImport(spec){if(KAIROQ_MODULES.includes(spec))return true;if(spec==='react-native'||spec==='react-native-web')return true;if(FONT_PACKAGES.has(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
+// extra: npm packages this app added through the builder's kairoq_package tool (builder-tools.js).
+function allowedImport(spec,extra=[]){if(KAIROQ_MODULES.includes(spec))return true;if(extra.includes(packageOf(spec))&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec))return true;if(spec==='react-native'||spec==='react-native-web')return true;if(FONT_PACKAGES.has(spec))return true;const pkg=packageOf(spec);return Object.hasOwn(APP_PACKAGES,pkg)&&!spec.includes('..')&&!/\/(node_modules|package\.json)/.test(spec)}
 const MAX_FILES=80,MAX_FILE_BYTES=200000,MAX_PROJECT_BYTES=1500000,MAX_ATTEMPTS=3;
 const SOURCE_EXT=['.jsx','.js','.tsx','.ts'];
 
@@ -119,8 +120,21 @@ function specifiers(code){
  let m;while((m=re.exec(code)))out.push(m[1]||m[2]||m[3]||m[4]);
  return out;
 }
+// The packages an app added (src/kairoq.packages.json) that are installed on this server.
+function extraPackages(files){
+ let list=[];try{list=Object.keys(JSON.parse(files&&files['src/kairoq.packages.json']||'{}').packages||{})}catch{}
+ if(!list.length)return[];
+ const dir=require('./builder-tools').packagesDir();
+ return list.filter(n=>/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/.test(n)&&fs.existsSync(path.join(dir,'node_modules',n,'package.json')));
+}
+// What added packages work with (their peer dependencies) that Kairoq already has installed.
+function peersOf(extra){
+ const out=new Set(),dir=extra.length?require('./builder-tools').packagesDir():null;
+ for(const n of extra){try{for(const p of Object.keys(JSON.parse(fs.readFileSync(path.join(dir,'node_modules',n,'package.json'),'utf8')).peerDependencies||{}))if(fs.existsSync(path.join(__dirname,'node_modules',p,'package.json')))out.add(p)}catch{}}
+ return[...out];
+}
 function validateFiles(files){
- const errors=[],names=Object.keys(files);
+ const errors=[],names=Object.keys(files),extra=extraPackages(files);
  if(names.length>MAX_FILES)errors.push('Too many files ('+names.length+'); the limit is '+MAX_FILES+'.');
  let total=0;
  for(const name of names){
@@ -135,7 +149,7 @@ function validateFiles(files){
    for(const spec of specifiers(code)){
     if(spec.includes('?')||spec.includes('\0'))errors.push(name+': import "'+spec+'" uses a query, which is not allowed.');
     else if(spec.startsWith('.')){if(!resolveRelative(name,spec,files))errors.push(name+': import "'+spec+'" does not match a project file.')}
-    else if(!allowedImport(spec))errors.push(name+': package "'+spec+'" is not available. Available packages: '+Object.keys(APP_PACKAGES).join(', ')+'.');
+    else if(!allowedImport(spec,extra))errors.push(name+': package "'+spec+'" is not available. Available packages: '+[...Object.keys(APP_PACKAGES),...extra].join(', ')+(extra.length?'':'. Another package can be added with the kairoq_package tool when you have it')+'.');
    }
   }
   if(name.endsWith('.css')){
@@ -236,17 +250,26 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
   // The 3D viewer script, only for apps that show 3D (react-model3d.js).
   if(require('./react-models').usesViewer(files))require('./react-models').copyViewer(path.join(work,'public'));
   for(const [name,code] of Object.entries(files)){const file=path.join(work,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,code)}
-  // Packages resolve from Kairoq's own installed modules (validated imports only).
-  fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(work,'node_modules'),'dir');
+  // Packages resolve from Kairoq's own installed modules (validated imports only), plus the
+  // packages this app added (builder-tools.js), linked in next to them.
+  const extra=extraPackages(files);
+  if(!extra.length)fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(work,'node_modules'),'dir');
+  else{
+   const nm=path.join(work,'node_modules'),own=path.join(__dirname,'node_modules'),added=path.join(require('./builder-tools').packagesDir(),'node_modules');fs.mkdirSync(nm);
+   const link=(from,name)=>{const to=path.join(nm,name);if(fs.existsSync(to))return;fs.mkdirSync(path.dirname(to),{recursive:true});fs.symlinkSync(path.join(from,name),to,'dir')};
+   for(const e of fs.readdirSync(own)){if(e.startsWith('@')&&fs.statSync(path.join(own,e)).isDirectory())for(const s of fs.readdirSync(path.join(own,e)))link(own,e+'/'+s);else link(own,e)}
+   for(const n of extra)link(added,n);
+  }
   const {build:viteBuild}=await import('vite');
   const react=(await import('@vitejs/plugin-react')).default;
   const tailwind=require('tailwindcss');
   const modules=path.join(__dirname,'node_modules');
   const output=[];
   const logger={info(){},warn(m){output.push(String(m))},warnOnce(m){output.push(String(m))},error(m){output.push(String(m))},clearScreen(){},hasErrorLogged(){return false},hasWarned:false};
-  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[importGuard(fs.realpathSync(work)),react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId,version)],
+  const run=viteBuild({root:work,base:'./',configFile:false,envFile:false,logLevel:'silent',customLogger:logger,plugins:[importGuard(fs.realpathSync(work),extra),react({babel:{plugins:[require('./react-visual').locatorPlugin(work)]}}),kairoqClient(projectId,version)],
    // Native apps (react-native-app.js) preview through react-native-web.
-   resolve:{dedupe:['react','react-dom'],alias:{'react-native':'react-native-web'}},
+   // Added packages share the app's copies of what they work with (react, three...).
+   resolve:{dedupe:['react','react-dom',...peersOf(extra)],alias:{'react-native':'react-native-web'}},
    css:{postcss:{plugins:[tailwind({content:[path.join(work,'index.html'),path.join(work,'src/**/*.{js,jsx,ts,tsx}')],theme:require('./react-design').THEME})]}},
    server:{fs:{strict:true,allow:[work]}},
    build:{outDir,emptyOutDir:true,assetsInlineLimit:0,reportCompressedSize:false,sourcemap:false}});
@@ -261,8 +284,10 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
 // Enforces the import rules inside the build itself, so a specifier the source checks
 // miss (odd identifiers, string escapes) still cannot pull files from outside the project:
 // project code may import project files under src/, allowed packages and kairoq only.
-function importGuard(work){
+function importGuard(work,extra=[]){
  const src=path.join(work,'src')+path.sep,modules=fs.realpathSync(path.join(__dirname,'node_modules'))+path.sep;
+ // The packages this app added (builder-tools.js) may be loaded too, from their own folder.
+ const added=extra.length?fs.realpathSync(path.join(require('./builder-tools').packagesDir(),'node_modules'))+path.sep:null;
  const inside=(file,dir)=>file.startsWith(dir);
  const project=importer=>importer&&inside(importer,work+path.sep)&&!inside(importer,path.join(work,'node_modules')+path.sep);
  return{name:'kairoq-import-guard',enforce:'pre',
@@ -281,14 +306,14 @@ function importGuard(work){
     if(!inside(path.resolve(path.dirname(from),source),src))deny();
     return null;
    }
-   if(!allowedImport(source)||source.split('/').includes('..'))deny();
+   if(!allowedImport(source,extra)||source.split('/').includes('..'))deny();
    return null;
   },
   load(id){
    if(id.startsWith('\0'))return null;
    const file=id.split('?')[0];
    let real;try{real=fs.realpathSync(file)}catch{return null}
-   if(!inside(real,work+path.sep)&&!inside(real,modules))this.error('Loading files outside the project is not allowed.');
+   if(!inside(real,work+path.sep)&&!inside(real,modules)&&!(added&&inside(real,added)))this.error('Loading files outside the project is not allowed.');
    return null;
   }};
 }
@@ -632,7 +657,10 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // files in a folder of its own; everything else below stays the same. Requests with images
  // and design reviews keep Kairoq's own model, which sees pictures.
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
- let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)),check:files=>selfCheck(id,meta,files,checkRuntime,designShots),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')})}}):null;
+ // The builder's research and fetch tools (builder-tools.js), shown in the timeline as it works.
+ const builderTools=oc&&process.env.KAIROQ_BUILDER_TOOLS!=='off'?require('./builder-tools').forProject(id):null;let toolsShown=0;
+ const TOOL_NOTES={kairoq_search:['search','Searched the web'],kairoq_read:['globe','Read a page'],kairoq_download:['download','Downloaded a file into the app'],kairoq_package:['package','Added a package']};
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./builder-playbooks').note(text)),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
  let usedOpenCode=false,usedFallback=false,usedModel=null;
  const ocRequest=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
@@ -650,6 +678,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    catch(e){signal?.throwIfAborted();tl.add({t:'note',icon:'code',text:'OpenCode could not do this ('+String(e.message||e).slice(0,160)+'); Kairoq\'s own engine takes over'});ocSession.close();ocSession=null;reply=null;usedFallback=true}
   }
   if(ocSession){usedOpenCode=true;usedModel=(oc.model()||{}).id||usedModel}
+  // What the builder fetched (models, pictures, packages) is listed for the owner with licences.
+  if(reply&&builderTools&&builderTools.log.length>toolsShown){const said=require('./builder-tools').summary(builderTools.log.slice(toolsShown));toolsShown=builderTools.log.length;if(said)reply.message=String(reply.message||'').trim()+'\n\n'+said}
   if(!reply)reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,cacheKey:'kairoq-'+id,...(design?{design:true}:{}),
    onToken:onStream?(_d,all)=>{if(firstToken===null)firstToken=Date.now();onStream(all,attempt)}:undefined,
    onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},(c,m)=>{const r=parseEdit(c);if(m)r.model=String(m);return r});
@@ -1053,4 +1083,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={designProblems,usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={APP_PACKAGES,extraPackages,allowedImport,designProblems,usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
