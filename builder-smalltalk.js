@@ -49,14 +49,13 @@ const CHANGE_ASK=/\b(and|then) (add|build|make|create|change|put|implement)\b|\b
 
 function reply(kind,meta){
  const name=meta&&meta.name||'your app';
+ const pending=require('./builder-question').pending(meta);
+ if(kind!=='help')return(kind==='thanks'?"You're welcome.":"Hi — I'm here.")+' '+(pending&&pending.options.length?'Your choice is still open: '+pending.options.join(' or ')+'.':'We’re continuing '+name+'. Tell me what you’d like to do next.');
  const fresh=!meta||!(meta.current_version>1);
- if(kind==='thanks')return'You\'re welcome! Tell me the next thing you want to change in '+name+', and I\'ll build it.';
  const examples=fresh
   ?['Who it is for and what it should do','The pages you need (for example home, rooms, booking, contact)','What people can do on it: book, sign up, send a request']
   :['"Add a gallery page with our photos"','"Make the booking form ask for the number of guests"','"Change the colours to match our logo"'];
- const lead=kind==='help'
-  ?'I build and change '+name+' for you: pages, forms, sign-in, saved data and the design. Every change is tested in a real browser before you pay for it.'
-  :'Hi! I\'m ready to work on '+name+'.';
+ const lead='I can help with '+name+': pages, forms, sign-in, saved data and design. Ask a question or describe a change.';
  return lead+'\n\n'+(fresh?'Tell me about the app:':'Tell me what to change, for example:')+'\n'+examples.map(e=>'- '+e).join('\n');
 }
 

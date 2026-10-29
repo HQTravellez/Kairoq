@@ -4,7 +4,13 @@ const builder=fs.readFileSync(path.join(__dirname,'../react-builder.js'),'utf8')
 const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
 t('longer durable chat history is delivered and 20 turns are available as conversational context',()=>{
  assert.match(builder,/messages:lightMessages\(m\.messages\.slice\(-500\)\)/);
- assert.match(builder,/\.slice\(-20\)\.map\(m=>/);
+ const {historyMessages}=require('../react-builder');
+ const messages=[{role:'user',text:'Keep the original camera requirement.'}];
+ for(let i=0;i<30;i++)messages.push({role:i%2?'assistant':'user',text:'Follow-up '+i});
+ const history=historyMessages({messages});
+ assert.equal(history[0].content,messages[0].text);
+ assert.equal(history.at(-1).content,'Follow-up 29');
+ assert.ok(history.length>=20);
 });
 t('Discuss saves owner message before inference and never duplicates it after inference',()=>{
  const start=builder.indexOf('async function discuss('),end=builder.indexOf('// Validates, builds',start),body=builder.slice(start,end);
