@@ -1010,7 +1010,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(route==='/site-check'&&method==='POST'){
    limited(req,'site-check',6,600000);
    const b=await readJson(req,8000);let o='';try{o=origin(req)}catch{}
-   const r=await require('./site-check').start({url:b.url,email:b.email,goal:b.goal,ip:require('./client-ip').clientIp(req)},{callModel,browseSite,origin:o,mail:accounts.mailReady()?(to,subject,body)=>require('./react-backend-extras').deliver(to,subject,body):null});
+   const sv=viewer(req,isOwner),r=await require('./site-check').start({url:b.url,email:b.email,goal:b.goal,ip:require('./client-ip').clientIp(req),owner:Boolean(sv&&sv.kind==='owner')},{callModel,browseSite,origin:o,mail:accounts.mailReady()?(to,subject,body)=>require('./react-backend-extras').deliver(to,subject,body):null});
    return send(res,202,r),true;
   }
   const scm=/^\/site-check\/([a-f0-9]{24})(\/shot)?$/.exec(route);

@@ -96,9 +96,12 @@ async function start(opts,deps){
  const same=list.find(x=>x.host===host&&((x.status==='running'&&running.has(x.id))||x.status==='complete')&&now-Date.parse(x.at)<DAY&&(!goal||x.goal===goal));
  if(same){appendLead({email,url,id:same.id,at:new Date().toISOString(),cached:true});return{id:same.id,status:same.status,cached:true}}
  const today=list.filter(x=>now-Date.parse(x.at)<DAY);
+ // The Kairoq owner testing sites is not held to the free check's daily limits.
+ if(!opts.owner){
  if(today.filter(x=>x.ip===ipH).length>=intEnv('KAIROQ_SITE_CHECK_PER_IP',3))throw err('You have used today\'s free checks. Try again tomorrow, or sign up and test any site from the editor.',429);
  if(today.filter(x=>x.email===emailH).length>=intEnv('KAIROQ_SITE_CHECK_PER_EMAIL',3))throw err('This email has used today\'s free checks. Try again tomorrow.',429);
  if(today.length>=intEnv('KAIROQ_SITE_CHECK_DAILY',40))throw err('Today\'s free website checks are used up. Try again tomorrow, or sign up and test it from the editor.',503);
+ }
  const id=crypto.randomBytes(12).toString('hex');
  list.unshift({id,host,url,goal,at:new Date().toISOString(),ip:ipH,email:emailH,status:'running'});writeIndex(list);
  appendLead({email,url,id,at:new Date().toISOString()});
