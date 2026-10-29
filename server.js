@@ -6897,7 +6897,8 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
     const {model,onFallback,...rest}=opts;
     try{
       if(model==="meta/muse-spark"){const r=await callMuse(rest);return parse(r.text,r.model)}
-      if(!process.env.OPENROUTER_API_KEY)throw Error("OpenRouter is not set up");
+      // Claude models go straight to Anthropic when ANTHROPIC_API_KEY is set (anthropic.js).
+      if(!process.env.OPENROUTER_API_KEY&&!(require("./anthropic").isClaude(model)&&require("./anthropic").configured()))throw Error("OpenRouter is not set up");
       return await callOpenRouterBuilder({...rest,only:model},parse);
     }catch(err){
       if(err.name==="AbortError"||rest.signal?.aborted)throw err;
@@ -7040,12 +7041,15 @@ async function callFastBuilder(fb,opts,parse){
   return parse(content,fb.model);
 }
 async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
-  if(!process.env.OPENROUTER_API_KEY)return parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
+  const anthropic=require("./anthropic"),direct=anthropic.configured();
+  const freeOnly=async()=>parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
+  if(!process.env.OPENROUTER_API_KEY&&!direct)return freeOnly();
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
   const freeCandidates=[...new Set([String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free",...String(process.env.KAIROQ_BUILDER_FREE_FALLBACKS||"").split(",").map(m=>m.trim()).filter(m=>m.endsWith(":free"))])];
   const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
   const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
-  let allowPaid=(mode==="premium"||mode==="paid-first") && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+  // A model the owner picked by name (opts.only) is a paid choice in itself, whatever the mode.
+  let allowPaid=(mode==="premium"||mode==="paid-first"||Boolean(opts.only)) && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
   if(opts.only&&!allowPaid)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
@@ -7067,10 +7071,13 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   // Small, clear edits on the Standard tier ("make the button blue") go to a fast model first
   // (KAIROQ_FAST_MODELS); the usual models follow if it fails.
   const fastFirst=opts.fast&&allowPaid&&(!opts.tier||opts.tier==="standard")?String(process.env.KAIROQ_FAST_MODELS??"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):[];
-  const models=opts.only?[opts.only]:opts.tier==="chat"?freeCandidates.filter((m,i,a)=>m&&a.indexOf(m)===i):[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  let models=opts.only?[opts.only]:opts.tier==="chat"?freeCandidates.filter((m,i,a)=>m&&a.indexOf(m)===i):[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  // With an Anthropic key but no OpenRouter key, only the Claude models can run.
+  if(!process.env.OPENROUTER_API_KEY){models=models.filter(m=>anthropic.isClaude(m));if(!models.length)return freeOnly()}
   for(const model of models){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
+    const viaAnthropic=direct&&anthropic.isClaude(model);
     if(!free&&!allowPaid)continue;
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
@@ -7079,7 +7086,8 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       const premium=opts.tier==="pro"||opts.tier==="max"||designModel;
       const outputCap=premium?Math.max(4000,Number(process.env.KAIROQ_PREMIUM_OUTPUT_TOKENS)||32000):Math.max(2000,Number(process.env.KAIROQ_STANDARD_OUTPUT_TOKENS)||16000);
       const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):10000;
-      const rates=free?[0,0]:model.includes("gemini-2.5-flash")?[0.3,2.5]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
+      let rates=free?[0,0]:model.includes("gemini-2.5-flash")?[0.3,2.5]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
+      if(viaAnthropic)rates=anthropic.rates(model,rates);
       if(!free){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
@@ -7091,6 +7099,12 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       // One request; a reply cut off at the output limit is continued (model-continue.js).
       let lastData=null;
       const ask=async(msgs,onTok)=>{
+        if(viaAnthropic){
+          const r=await anthropic.ask(model,msgs,{maxTokens:maxOutput,onToken:stream?(onTok||(()=>{})):undefined,signal:require("./builder-response-policy").requestSignal(opts,{premium,stream})});
+          await recordUsage({...r.usage,cost:(r.usage.prompt_tokens*rates[0]+r.usage.completion_tokens*rates[1])/1000000},{purpose:checkTier?"site-check":"developer-build",model,provider:"anthropic",tier:opts.tier||"standard",...(designModel?{design:true}:{})});
+          lastData={choices:[{message:{content:r.content},finish_reason:r.finish}],usage:r.usage};
+          return{content:r.content,finish:r.finish};
+        }
         const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:require("./builder-response-policy").requestSignal(opts,{premium,stream}),body:JSON.stringify({model,...(opts.cacheKey?{session_id:String(opts.cacheKey).slice(0,128)}:{}),messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
         const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{}),opts.onReasoning):await response.json().catch(()=>({}));
         if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
