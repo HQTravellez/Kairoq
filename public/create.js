@@ -159,7 +159,7 @@ $('side-projects').onclick=async()=>{if($('home').classList.contains('hidden'))a
 $('side-templates').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();homeTab('templates');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
-$('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
+$('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button:not(#side-me)'))document.body.classList.remove('side-open')});
 // What to build (like superapp's first question): a website, a web app or a phone app. Each has
 // its own examples, typed into the empty box one after another (they stop when you type or focus).
 const KINDS={
@@ -187,6 +187,16 @@ function typeExamples(){
  home.typing=setTimeout(tick,500);
 }
 for(const b of document.querySelectorAll('#new-kind button'))b.onclick=()=>setKind(b.dataset.kind);
+// The home's tools row (like Genspark's): each tool starts that kind of build or opens that part.
+{const start=(kind,text)=>{setKind(kind);const box=$('new-prompt');if(text&&!box.value.trim())box.value=text;box.focus();box.setSelectionRange(box.value.length,box.value.length)};
+ const TOOLS={'kind-site':()=>start('site'),'kind-app':()=>start('app'),'kind-phone':()=>start('phone'),
+  game:()=>start('app','A small game for my business: '),'3d':()=>start('app','An app with a real animated 3D character that '),
+  leads:()=>$('side-leads').click(),check:()=>$('side-check').click(),web:()=>$('side-web').click(),
+  templates:()=>$('side-templates').click(),memory:()=>$('side-memory').click(),help:()=>$('side-docs').click()};
+ for(const b of document.querySelectorAll('#home-tools .tool'))b.onclick=()=>(TOOLS[b.dataset.tool]||(()=>{}))();}
+// The slim left bar keeps credits and the account in a small panel opened from its bottom button.
+$('side-me').onclick=e=>{e.stopPropagation();const open=!$('side').classList.contains('me-open');$('side').classList.toggle('me-open',open);$('side-me').setAttribute('aria-expanded',String(open))};
+document.addEventListener('click',e=>{if($('side').classList.contains('me-open')&&!e.target.closest('#side-foot,#side-me')){$('side').classList.remove('me-open');$('side-me').setAttribute('aria-expanded','false')}});
 $('new-prompt').addEventListener('focus',()=>{clearTimeout(home.typing);$('new-prompt').placeholder=KINDS[home.kind].examples[0]});
 $('new-prompt').addEventListener('blur',typeExamples);
 // A new app from the home box: the editor opens straight away and any quick questions, then
