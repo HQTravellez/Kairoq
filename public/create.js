@@ -131,6 +131,21 @@ function renderProjects(projects){
   li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
   if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
   if(p.published){const b=document.createElement('span');b.className='badge live';b.textContent='Live';li.append(b)}
+  if(p.role==='owner'){
+   const del=el('button','ghost link-btn','Delete');
+   del.type='button';del.setAttribute('aria-label','Delete project '+p.name);
+   del.onclick=async e=>{
+    e.stopPropagation();
+    if(!confirm('Permanently delete "'+p.name+'"? This removes the project and unpublishes its site. This cannot be undone.'))return;
+    del.disabled=true;del.textContent='Deleting…';
+    try{
+     await api('/projects/'+encodeURIComponent(p.id),{method:'DELETE'});
+     if(state.project?.id===p.id)state.project=null;
+     await loadHome();
+    }catch(err){del.disabled=false;del.textContent='Delete';alert('Could not delete project: '+err.message)}
+   };
+   li.append(del);
+  }
   list.append(li);
  }
  renderRecents(projects);
