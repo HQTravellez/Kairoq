@@ -249,6 +249,14 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
  }
  if(!['build','discuss','agent','polish','autopilot'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ // Free chat is limited per signed-in customer to protect provider costs. Owner QA is exempt.
+ // In-memory limits apply per server instance; distributed deployments need shared counters.
+ if(mode==='discuss'&&v.kind==='customer'&&!hooks){
+  const chat=String(message||'');
+  if(chat.length>3000)throw Object.assign(Error('Free chat messages can be up to 3,000 characters. Shorten your message or split it into smaller questions.'),{status:413});
+  limitedKey('free-discuss-hour:'+v.owner,intEnv('KAIROQ_FREE_CHAT_HOURLY_LIMIT',25),3600000);
+  limitedKey('free-discuss-day:'+v.owner,intEnv('KAIROQ_FREE_CHAT_DAILY_LIMIT',100),86400000);
+ }
  if(!concurrentDiscuss&&(mode==='build'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingFeatureComplaint(message)){
   const ownerComplaint=String(message).trim();
   mode='build';
