@@ -567,6 +567,44 @@ async function selfCheck(id,meta,files,checkRuntime,designShots=null){
   }finally{clearTesting(id,n)}
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 }
+// OpenCode's kairoq_browse: the folder's files built as a scratch version (like kairoq_check),
+// then the browser agent (browser-agent.js, task mode) uses the app on a test copy of its data
+// to reach the builder's goal. The report says whether it got there, the steps, what did not
+// work, and the page's errors, so the builder fixes the app by using it, not only by reading it.
+async function selfBrowse(id,meta,files,{goal,device}={},{browse,callModel,tier='standard'}){
+ goal=String(goal||'').replace(/\s+/g,' ').trim().slice(0,600);
+ if(!goal)return'Say what a visitor should be able to do, for example "add a task and mark it done".';
+ const errors=checkProject(files);
+ if(errors.length)return'The app does not build yet (call kairoq_check):\n- '+errors.slice(0,8).join('\n- ');
+ const n=900000+(++selfChecks),dir=versionDir(id,n);
+ try{
+  try{await build(files,path.join(dir,'dist'),{projectId:id})}catch(e){if(!e.build)throw e;return'The Vite build failed (call kairoq_check):\n'+String(e.message).slice(0,1500)}
+  markTesting(id,n,files);
+  try{
+   const viewport=/phone|mobile/i.test(String(device||''))?'phone':'desktop';
+   return await require('./react-sandbox').withSandbox(id,async box=>{
+    const s=await browse(previewUrl(meta,n),{sandbox:box.token,viewport});
+    if(!s)return'There is no browser on this server.';
+    try{
+     const r=await require('./browser-agent').run({session:s,goal,mode:'task',callModel,tier,maxSteps:Number(process.env.KAIROQ_BROWSE_STEPS||10),signal:AbortSignal.timeout(200000)});
+     return browseReport(goal,viewport,r,s.errors?s.errors():[]);
+    }finally{await s.close()}
+   });
+  }finally{clearTesting(id,n)}
+ }finally{fs.rmSync(dir,{recursive:true,force:true})}
+}
+function browseReport(goal,viewport,r,pageErrors=[]){
+ const head={completed:'Reached the goal',gave_up:'Gave up',stuck:'Did not reach the goal',blocked:'Blocked',error:'The browser run failed'}[r.outcome]||r.outcome;
+ const lines=(r.steps||[]).slice(0,14).map(x=>'- '+x.n+'. on '+(x.path||'/')+': '+x.action+(x.label?' "'+String(x.label).slice(0,60)+'"':'')+(x.value&&x.action!=='done'?' "'+String(x.value).slice(0,60)+'"':'')+(x.error?' (did not work: '+String(x.error).slice(0,120)+')':'')+(x.no_change?' (nothing changed on screen)':'')+(x.judged?' (checked: '+String(x.judged).slice(0,160)+')':''));
+ const out=[head+' ('+viewport+'): '+goal];
+ if(r.answer)out.push('What it saw at the end: '+String(r.answer).slice(0,400));
+ if(r.verdict&&!r.verdict.ok&&r.verdict.reason)out.push('Why it is not done: '+String(r.verdict.reason).slice(0,300));
+ if(r.error)out.push('Error: '+String(r.error).slice(0,300));
+ if(lines.length)out.push('Steps:\n'+lines.join('\n'));
+ if(pageErrors.length)out.push('Errors on the page:\n- '+pageErrors.slice(0,6).join('\n- '));
+ out.push(r.outcome==='completed'&&!pageErrors.length?'It works for this goal.':'Fix what stopped it (a missing button, a step that did nothing, an error), then call kairoq_check and kairoq_browse again.');
+ return out.join('\n');
+}
 // The design giveaways measured on a test build (craft-check.js), as a numbered list; '' when the
 // page is clean or is not a designed site.
 async function designProblems(meta,url,designShots){
@@ -606,7 +644,7 @@ async function runtimeProblems(id,url,checkRuntime){
 }
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null,designShots=null}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null,designShots=null,browse=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -660,8 +698,8 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  const oc=engine!==undefined?engine:(!images.length&&!design&&require('./opencode-engine').chosenFor(meta)?require('./opencode-engine'):null);
  // The builder's research and fetch tools (builder-tools.js), shown in the timeline as it works.
  const builderTools=oc&&process.env.KAIROQ_BUILDER_TOOLS!=='off'?require('./builder-tools').forProject(id):null;let toolsShown=0;
- const TOOL_NOTES={kairoq_integration:['plug','Looked up an integration'],task:['users','Sent a helper'],kairoq_skill:['book','Opened a skill'],kairoq_tutorials:['book','Looked in the reference library'],kairoq_search:['search','Searched the web'],kairoq_read:['globe','Read a page'],kairoq_download:['download','Downloaded a file into the app'],kairoq_package:['package','Added a package']};
- let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./builder-playbooks').note(text)+require('./builder-references').note(text)+require('./builder-skills').menu()),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
+ const TOOL_NOTES={kairoq_browse:['test','Tried the app in a browser'],kairoq_integration:['plug','Looked up an integration'],task:['users','Sent a helper'],kairoq_skill:['book','Opened a skill'],kairoq_tutorials:['book','Looked in the reference library'],kairoq_search:['search','Searched the web'],kairoq_read:['globe','Read a page'],kairoq_download:['download','Downloaded a file into the app'],kairoq_package:['package','Added a package']};
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./builder-playbooks').note(text)+require('./builder-references').note(text)+require('./builder-skills').menu()),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),browse:browse&&process.env.KAIROQ_BUILDER_BROWSE!=='off'?(files,a)=>selfBrowse(id,meta,files,a,{browse,callModel,tier}):null,onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
  let usedOpenCode=false,usedFallback=false,usedModel=null;
  const ocRequest=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
@@ -1084,4 +1122,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={APP_PACKAGES,extraPackages,allowedImport,designProblems,usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={selfBrowse,browseReport,APP_PACKAGES,extraPackages,allowedImport,designProblems,usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

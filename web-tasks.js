@@ -48,8 +48,10 @@ async function execute(owner,{url,task,watch=null,interactive=false},{callModel,
   if(!s)throw fail(503,'The web agent needs a browser (Chromium) on this server');
   entry.session=s;
   const handoff=interactive&&s.control?reason=>waitForPerson(entry,reason):null;
-  const r=await require('./browser-agent').run({session:s,goal:task,mode:'task',callModel,tier,maxSteps:maxSteps(),signal,handoff,wantsHandoff:()=>entry.wants,onStep:st=>{run.progress=(st.action==='done'?'Checking the answer':st.thought||st.action)}});
+  const notes=require('./site-notes');
+  const r=await require('./browser-agent').run({session:s,goal:task,mode:'task',notes:notes.note(owner,url),callModel,tier,maxSteps:maxSteps(),signal,handoff,wantsHandoff:()=>entry.wants,onStep:st=>{run.progress=(st.action==='done'?'Checking the answer':st.thought||st.action)}});
   Object.assign(run,{status:'complete',outcome:r.outcome,answer:clip(r.answer||'',4000),steps:r.steps.slice(-30),...(r.verdict&&r.verdict.checked?{verdict:{ok:r.verdict.ok,reason:r.verdict.reason}}:{}),...(r.error?{error:r.error}:{})});
+  try{notes.record(owner,url,task,r)}catch{}
   // Nothing useful came back (an error, or no answer at all): the credits go back.
   if(run.charged&&(r.outcome==='error'||!run.answer)){require('./builder-accounts').grant(owner,run.charged,'Refund: web agent found nothing','refund:'+ref);run.charged=0}
   // A watch learns where its answer comes from, so the next checks can skip the browser.
@@ -241,4 +243,4 @@ async function frame(owner,id){const e=live(owner,id);if(!e.session||!e.session.
 async function input(owner,id,ev){const e=live(owner,id);if(!e.waiting)throw fail(409,'Take over first');e.waiting.until=Date.now()+idleLimit();await e.session.control.input(ev||{});return{ok:true}}
 function takeover(owner,id){const e=live(owner,id);if(!e.session||!e.session.control)throw fail(409,'The browser is not open yet');e.wants=true;return publicRun(e.run)}
 function handBack(owner,id,{cancel=false,note=''}={}){const e=live(owner,id);if(e.waiting)e.waiting.finish(!cancel,clip(note,200));else e.wants=false;return publicRun(e.run)}
-module.exports={feedCheck,frame,input,takeover,handBack,start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,quick,compare,price};
+module.exports={dir,feedCheck,frame,input,takeover,handBack,start,execute,get,list,createWatch,addWatch,removeWatch,updateWatch,tick,quick,compare,price};
