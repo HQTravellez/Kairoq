@@ -143,6 +143,9 @@ requirements. API/schema compatibility and offline tests do not establish produc
 - build-your-own-x — https://github.com/codecrafters-io/build-your-own-x — the list of tutorials
   (data/build-your-own-x.json) is CC0. The linked tutorials belong to their authors; Kairoq links to
   them and keeps only its own notes written from them, never copies.
+- Claude Code Game Studios — https://github.com/Donchitos/Claude-Code-Game-Studios — MIT,
+  Copyright (c) 2026 Donchitos. Kairoq's game playbooks (builder-playbooks.js) are written in Kairoq's
+  own words, informed by its skills and checklists.
 - Poly Pizza — https://poly.pizza — free low-poly models (Quaternius, Kenney and others),
   downloaded on request through api.poly.pizza with the server's POLY_PIZZA_KEY. Only models under
   CC0 or CC-BY are offered; Kairoq keeps each model's creator and licence, and apps using a CC-BY

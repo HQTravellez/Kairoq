@@ -107,7 +107,7 @@ test('with autopilot on, the first build is tested and finished before the owner
 test('skills menu: the builder sees every skill and opens the ones it needs',async()=>{
  const menu=S.menu();
  assert.match(menu,/- 3d-character: /);assert.match(menu,/- Physics Engine: /);assert.match(menu,/- Operating System: \(not inside a browser app\)/);
- assert.equal(S.list().length,34);
+ assert.equal(S.list().length,38);
  const T=require('../builder-tools').forProject('x');
  assert.match(await T.run('skill',{name:'3d-character'}),/Model3D from 'kairoq\/3d'/);
  assert.match(await T.run('skill',{name:'game'}),/Topic: Game/);
