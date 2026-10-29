@@ -21,7 +21,7 @@ function connection(p){
  if(a.type==='SecretText')return{kind:'key',secrets:[base+'_API_KEY'],how:(a.displayName||'API key')+(a.description?': '+clip(a.description,160):'')};
  if(a.type==='BasicAuth')return{kind:'key',secrets:[base+'_USERNAME',base+'_PASSWORD'],how:'Username and password (or key and secret)'};
  if(a.type==='CustomAuth')return{kind:'key',secrets:(a.fields&&a.fields.length?a.fields:[{key:'api_key'}]).map(f=>base+'_'+String(f.key).toUpperCase().replace(/[^A-Z0-9]+/g,'_')),how:(a.fields||[]).map(f=>f.label).join(', ')||'Its keys'};
- if(a.type==='OAuth2')return{kind:'oauth',secrets:[],how:'Sign in with '+p.displayName+' (OAuth)'};
+ if(a.type==='OAuth2')return{kind:'oauth',secrets:[],how:'Connect with '+p.displayName+' (sign in on its own page)'};
  return{kind:'none',secrets:[],how:'No sign-in needed'};
 }
 // Search by name, description, category or action.
@@ -63,7 +63,7 @@ async function lookup(service,action,{remote=(u,o)=>require('./builder-assets').
  if(!p){const s=search(service,{limit:6}).results;return'No integration called "'+clip(service,60)+'".'+(s.length?' Closest: '+s.map(x=>x.name+' ('+x.id+')').join(', ')+'.':'')}
  const c=connection(p);
  const head='Integration: '+p.displayName+' ('+p.id+'). '+p.description+'\nConnect: '+c.how+'. '
-  +(c.kind==='key'?'In the app, read the keys in a server function with await secrets.get(name) for: '+c.secrets.join(', ')+'. Tell the owner in "message" to add them in Settings → Secrets (never put keys in the code).':c.kind==='oauth'?'This service signs in with OAuth, which Kairoq apps cannot do yet. If it also offers an API key or personal access token, use that as a secret instead; otherwise say so plainly in "Not done yet:".':'')
+  +(c.kind==='key'?'In the app, read the keys in a server function with await secrets.get(name) for: '+c.secrets.join(', ')+'. Tell the owner in "message" to add them in Settings → Secrets (never put keys in the code).':c.kind==='oauth'?'This service signs in with OAuth: the owner connects their account in Connectors → 744 apps → "Connect with '+p.displayName+'". In a server function, const { access_token } = await secrets.oauth(\''+p.id+'\') gives a fresh token (Kairoq renews it); send it as Authorization: Bearer <token>. Tell the owner in "message" to connect it.':'')
   +(p.api.length?'\nAPI addresses seen in its code: '+p.api.join(', '):'');
  if(!action){
   return head+'\n\nActions (call kairoq_integration again with the action name to read its real code):\n'+p.actions.map(a=>'- '+a.name+': '+a.displayName+(a.description?' — '+a.description:'')+(a.props?' ('+a.props.map(x=>x.key+(x.required?'*':'')).join(', ')+')':'')).join('\n')

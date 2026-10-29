@@ -121,7 +121,7 @@ globalThis.__ctx=user=>({user,fetch:__fetch,log:__log,
  db:{collection:__col,
   sql:(q,...p)=>Array.isArray(q)&&q.raw?__call('sql',{query:q.join('?'),params:p}):__call('sql',{query:String(q),params:p.length===1&&Array.isArray(p[0])?p[0]:p}),
   batch:steps=>__call('sql.batch',{steps})},
- secrets:{get:n=>__call('secret',{name:String(n)})},
+ secrets:{get:n=>__call('secret',{name:String(n)}),oauth:s=>__call('oauth',{service:String(s)})},
  ai:{chat:o=>__call('ai.chat',o),ask:(q,o={})=>__call('ai.ask',{...o,question:q}),extract:o=>__call('ai.extract',o)},
  email:{send:o=>__call('email',o)},
  crypto:{hmacSha256Hex:(k,m)=>__sync('hmac',{key:String(k),message:String(m)}),sha256Hex:m=>__sync('sha256',{message:String(m)}),timingSafeEqual:(a,b)=>__sync('tseq',{a:String(a),b:String(b)}),randomId:()=>__sync('random',null)}});
@@ -139,6 +139,7 @@ async function run({source,request,user,host}){
  const io={
   fetch:async a=>{if(++fetches>MAX_FETCHES)throw fail(429,'fetch: at most '+MAX_FETCHES+' requests per call');return host.fetch?host.fetch(a):guardedFetch(a)},
   secret:async a=>host.secret(a.name),
+  oauth:async a=>{if(!host.oauth)throw fail(501,'Connected services are not available here');return host.oauth(str(a.service))},
   'db.list':a=>host.db('list',a,user),'db.get':a=>host.db('get',a,user),'db.create':a=>host.db('create',a,user),'db.update':a=>host.db('update',a,user),'db.remove':a=>host.db('remove',a,user),
   sql:a=>{if(!host.sql)throw fail(501,'SQL is not available here');return host.sql(a.query,a.params)},
   'sql.batch':a=>{if(!host.sqlBatch)throw fail(501,'SQL is not available here');return host.sqlBatch(a.steps)},
@@ -246,7 +247,7 @@ function spawn(){
    try{
     // A call that arrives after its function's time is up is refused without doing the work.
     if(Date.now()>job.deadline)throw fail(504,'Function timed out');
-    const value=msg.op==='fetch'?await(job.host.fetch?job.host.fetch(msg.args):guardedFetch(msg.args)):msg.op==='secret'?await job.host.secret(msg.args.name):msg.op==='db'?await job.host.db(msg.args.op,msg.args.args,msg.user):msg.op==='ai'?await job.host.ai(msg.args,msg.user):msg.op==='ai.ask'?await need(job.host.ask)(msg.args,msg.user):msg.op==='ai.extract'?await need(job.host.extract)(msg.args,msg.user):msg.op==='email'?await job.host.email(msg.args,msg.user):msg.op==='sql'?await need(job.host.sql)(msg.args.query,msg.args.params):msg.op==='sqlBatch'?await need(job.host.sqlBatch)(msg.args.steps):(()=>{throw Error('Unknown host call')})();
+    const value=msg.op==='fetch'?await(job.host.fetch?job.host.fetch(msg.args):guardedFetch(msg.args)):msg.op==='secret'?await job.host.secret(msg.args.name):msg.op==='oauth'?await need(job.host.oauth)(String(msg.args.service||'')):msg.op==='db'?await job.host.db(msg.args.op,msg.args.args,msg.user):msg.op==='ai'?await job.host.ai(msg.args,msg.user):msg.op==='ai.ask'?await need(job.host.ask)(msg.args,msg.user):msg.op==='ai.extract'?await need(job.host.extract)(msg.args,msg.user):msg.op==='email'?await job.host.email(msg.args,msg.user):msg.op==='sql'?await need(job.host.sql)(msg.args.query,msg.args.params):msg.op==='sqlBatch'?await need(job.host.sqlBatch)(msg.args.steps):(()=>{throw Error('Unknown host call')})();
     reply={type:'hostReply',callId:msg.callId,value:value===undefined?null:value};
    }catch(e){reply={type:'hostReply',callId:msg.callId,error:String(e.message||e),status:e.status}}
    if(w.job===job)w.thread.postMessage(reply);

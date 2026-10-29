@@ -68,7 +68,7 @@ const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DE
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/apis':'viewer','POST:/apis':'editor','DELETE:/apis':'editor','POST:/apitry':'editor','POST:/apicheck':'editor','POST:/apirules':'editor','POST:/apicurl':'editor','POST:/apitest':'editor','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','GET:/oauth':'owner','POST:/oauth':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/apis':'viewer','POST:/apis':'editor','DELETE:/apis':'editor','POST:/apitry':'editor','POST:/apicheck':'editor','POST:/apirules':'editor','POST:/apicurl':'editor','POST:/apitest':'editor','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,thumb:require('./project-thumbs').url(p),role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -985,6 +985,17 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const raw=await readRaw(req);
    return send(res,200,await accounts.stripeWebhook(raw,req.headers['stripe-signature'])),true;
   }
+  // The service sends the owner back here after "Connect with …" (oauth-connect.js).
+  if(route==='/oauth/callback'&&method==='GET'){
+   const q=new URL(req.url,'http://x').searchParams,me=viewer(req,isOwner);
+   let ok=null,err='';
+   try{ok=await require('./oauth-connect').finish({state:q.get('state'),code:q.get('code'),error:q.get('error')},{who:me&&me.owner})}catch(e){err=String(e.message||e).slice(0,300)}
+   const esc=t=>String(t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+   const msg=ok?'Connected '+esc(ok.name)+'. You can close this window.':'Not connected: '+esc(err);
+   res.writeHead(ok?200:400,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"});
+   res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Kairoq</title><body style="font:16px system-ui;padding:40px;text-align:center"><p>'+msg+'</p><script>try{window.opener&&window.opener.postMessage({kairoqOauth:'+JSON.stringify(ok?{service:ok.service,ok:true}:{ok:false,error:err})+'},location.origin);'+(ok?'setTimeout(function(){window.close()},800)':'')+'}catch(e){}</script></body>');
+   return true;
+  }
   // The integrations library (integrations.js): search the 744 services and see one.
   if(route==='/integrations'&&method==='GET'){const q=new URL(req.url,'http://x').searchParams;return send(res,200,require('./integrations').search(q.get('q')||'',{limit:Number(q.get('limit'))||40})),true}
   {const im=/^\/integrations\/([a-z0-9][a-z0-9-]{0,80})$/.exec(route);if(im&&method==='GET'){const d=require('./integrations').details(im[1]);if(!d)throw Object.assign(Error('Unknown integration'),{status:404});return send(res,200,{integration:d}),true}}
@@ -1400,6 +1411,16 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(action==='/asset'&&method==='GET'){const file=require('./react-assets').read(id,new URL(req.url,'http://x').searchParams.get('name'));if(!file)throw Object.assign(Error('Unknown image'),{status:404});res.writeHead(200,{'Content-Type':file.type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'});res.end(file.bytes);return true}
   // 3D models (react-models.js): upload (raw bytes, ?op=upload&name=), Poly Haven search and add,
   // a preview picture made in the browser, the chosen 3D style, remove, and the files themselves.
+  // "Connect with …" for the app's outside services (oauth-connect.js). Owner only.
+  if(action==='/oauth'){
+   const O=require('./oauth-connect'),host='http://'+String(req.headers.host||'localhost');
+   if(method==='GET')return send(res,200,{oauth:O.status(id,String(new URL(req.url,'http://x').searchParams.get('service')||''),{fallbackOrigin:host})}),true;
+   const b=await readJson(req,8000),service=String(b.service||'');
+   if(b.op==='start'){limitedKey('oauth-start:'+id,30,3600000);return send(res,200,O.start(id,service,{who:v.owner,fallbackOrigin:host})),true}
+   if(b.op==='app')return send(res,200,{oauth:O.saveClient(id,service,b)}),true;
+   if(b.op==='disconnect')return send(res,200,{oauth:O.disconnect(id,service)}),true;
+   throw Object.assign(Error('Unknown OAuth action'),{status:400});
+  }
   if(action==='/models'){
    const M=require('./react-models'),q=new URL(req.url,'http://x').searchParams;
    const state=()=>{const meta=builder.loadMeta(id);return{models:M.list(id),style:(meta.three_d&&meta.three_d.style)||'none',styles:Object.entries(M.STYLES).map(([k,s])=>({id:k,label:s.label})),blender:require('./blender').available(),polyhaven:process.env.KAIROQ_POLYHAVEN!=='off'}};

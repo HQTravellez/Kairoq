@@ -18,6 +18,7 @@ for(const id of fs.readdirSync(root).sort()){
  const authType=authM?authM[1]:'None';stats[authType]=(stats[authType]||0)+1;
  const auth={type:authType};
  if(authM){const b=authM[2];for(const k of ['displayName','description','authUrl','tokenUrl'])if(str(b,k))auth[k]=str(b,k).slice(0,300);
+  if(authType==='OAuth2'){const sc=/scope\s*:\s*\[([\s\S]*?)\]/.exec(b);if(sc)auth.scope=[...sc[1].matchAll(/['"`]([^'"`]+)['"`]/g)].map(m=>m[1]).slice(0,40);if(!auth.scope||!auth.scope.length){const g=[...new Set((all.match(/https:\/\/www\.googleapis\.com\/auth\/[\w.]+/g)||[]))];if(g.length)auth.scope=g.slice(0,20)}if(/pkce\s*:\s*true/.test(b))auth.pkce=true;const am=/authorizationMethod\s*:\s*OAuth2AuthorizationMethod\.(\w+)/.exec(b);if(am)auth.method=am[1];const ex=/extra\s*:\s*\{([^}]*)\}/.exec(b);if(ex)auth.extra=Object.fromEntries([...ex[1].matchAll(/(\w+)\s*:\s*['"`]([^'"`]*)['"`]/g)].map(m=>[m[1],m[2]]));const pr=/props\s*:\s*\{/.test(b);if(pr)auth.needsProps=true}
   if(authType==='CustomAuth'){const props=[...b.matchAll(/(\w+)\s*:\s*(?:PieceAuth|Property)\.(\w+)\(\s*\{[\s\S]{0,300}?displayName\s*:\s*['"`]([^'"`]+)/g)].map(m=>({key:m[1],type:m[2],label:m[3]}));if(props.length)auth.fields=props.slice(0,8)}}
  const actions=[],triggers=[];
  for(const f of files){

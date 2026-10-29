@@ -32,7 +32,7 @@ test('the builder\'s tool: the list of actions, then the real code of one, read 
  assert.ok(fetched.every(u=>u.startsWith('https://raw.githubusercontent.com/activepieces/activepieces/'+I.data().commit+'/packages/pieces/community/sendgrid/')));
  const n=fetched.length;await t.run('integration',{service:'sendgrid',action:first.name});
  assert.equal(fetched.length,n,'kept: not fetched again');
- assert.match(await t.run('integration',{service:'mailchimp'}),/OAuth, which Kairoq apps cannot do yet/);
+ assert.match(await t.run('integration',{service:'mailchimp'}),/await secrets.oauth\('mailchimp'\)/);
  assert.match(await t.run('integration',{service:'nopeservice'}),/No integration called/);
 });
 
@@ -58,8 +58,16 @@ test('"Connect another app": search, pick what should happen, and Kairoq is aske
   assert.match(await page.locator('.apps-connect').innerText(),/Works with an API key/);
   assert.match(await page.locator('#apps-detail').innerText(),/SENDGRID_API_KEY/);
   await page.fill('.apps-what','email every new booking to the owner with SendGrid');
-  if(process.env.KAIROQ_SHOT)await page.screenshot({path:process.env.KAIROQ_SHOT});
   await page.locator('#apps-detail button.primary').click();
+  for(let i=0;i<100&&!built.length;i++)await new Promise(r=>setTimeout(r,200));
+  // A service that signs in with OAuth: "Use your own OAuth app" with the return address.
+  await page.click('#menu-project summary');await page.click('#connect-open');
+  await page.locator('.connector:has-text("744 apps") button').click();
+  await page.fill('#apps-search','hubspot');
+  await page.waitForSelector('.apps-item:has-text("HubSpot")');await page.locator('.apps-item:has-text("HubSpot")').first().click();
+  await page.waitForSelector('.oauth-own');
+  assert.match(await page.locator('#apps-detail').innerText(),/Connect with your account[\s\S]*Use your own OAuth app[\s\S]*\/api\/create\/oauth\/callback/);
+  if(process.env.KAIROQ_SHOT)await page.screenshot({path:process.env.KAIROQ_SHOT});
   for(let i=0;i<100&&!built.length;i++)await new Promise(r=>setTimeout(r,200));
   assert.match(built[0]||'',/Connect SendGrid: email every new booking to the owner with SendGrid/);
   assert.match(built[0],/Integration "sendgrid" from Kairoq's integrations library/);

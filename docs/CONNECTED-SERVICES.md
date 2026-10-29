@@ -181,6 +181,18 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
 - **Integrations library** (`integrations.js`, `data/integrations.json`): 744 services and 9,501
   actions from Activepieces' MIT integrations. Editor: Connectors → **744 apps** (search, pick what
   should happen, add the key). Builder: kairoq_integration shows how a service signs in and its actions,
-  and reads the real code of one action once (kept in `integration-code/`). 118 services sign in with
-  OAuth, which apps cannot do yet; they are marked. Rebuild the data with
+  and reads the real code of one action once (kept in `integration-code/`). Rebuild the data with
   `node scripts/build-integrations.js <activepieces>/packages/pieces/community data/integrations.json <commit>`.
+- **Connect with … (OAuth)** (`oauth-connect.js`): for the 118 services that sign in with OAuth, the
+  owner presses **Connect with X** in Connectors → 744 apps, signs in on the service's own page and
+  presses Allow. Kairoq keeps the tokens encrypted with the project's secrets (needs
+  `APP_ENCRYPTION_KEY`), renews them, and gives them only to server functions:
+  `const { access_token } = await secrets.oauth('hubspot')`. Each service needs an OAuth app:
+  - Kairoq's own, for every project: register an app with the service and add
+    `KAIROQ_OAUTH_<SERVICE>_CLIENT_ID` and `KAIROQ_OAUTH_<SERVICE>_CLIENT_SECRET` on Railway
+    (for example `KAIROQ_OAUTH_HUBSPOT_CLIENT_ID`). Redirect (callback) address:
+    `https://kairoq-production.up.railway.app/api/create/oauth/callback`
+    (taken from `KAIROQ_PUBLIC_URL` or `RAILWAY_PUBLIC_DOMAIN`).
+  - Or the owner's own: they paste a Client ID and Secret under "Use your own OAuth app".
+  Safety: random single-use state (10 minutes, bound to the project and the person), PKCE where the
+  service supports it, a fixed redirect address. Visitors connecting their own accounts is not built.

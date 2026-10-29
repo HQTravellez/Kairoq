@@ -2833,7 +2833,7 @@ $('connect-open').onclick=()=>{
 };
 // "744 apps" (integrations.js): search a service, pick what should happen, and Kairoq adds it.
 let appsTimer=null;
-const CONNECT_LABEL={key:'Works with an API key',oauth:'Needs "Sign in with" (not available in apps yet)',none:'No sign-in needed'};
+const CONNECT_LABEL={key:'Works with an API key',oauth:'Connect with your account (sign in on its own page)',none:'No sign-in needed'};
 async function openApps(){$('apps-dialog').showModal();$('apps-search').value='';$('apps-detail').replaceChildren(el('p','muted small','Pick a service to see what it can do.'));await appsSearch('');$('apps-search').focus()}
 async function appsSearch(q){
  const ul=$('apps-list');
@@ -2860,8 +2860,38 @@ async function appsShow(id){
   send('Connect '+d.name+': '+want+(picked.size?'\nUse: '+[...picked].join('; '):'')+'\n(Integration "'+d.id+'" from Kairoq\'s integrations library.)','build');
  };
  const tail=el('div','row');tail.append(add);
+ if(d.connect==='oauth')box.insertBefore(await oauthBox(d),box.querySelector('.plan-part'));
  if(d.secrets.length){const keys=el('button','ghost','Add the key');keys.type='button';keys.title='Add '+d.secrets.join(', ')+' in Settings → Secrets';keys.onclick=async()=>{$('apps-dialog').close();await openSettingsAt('secret-name');$('secret-name').value=d.secrets[0]};tail.append(keys)}
  box.append(el('p','plan-part','What should it do?'),list,what,tail,d.secrets.length?el('p','muted small','Keys it needs (added in Settings → Secrets, encrypted): '+d.secrets.join(', ')):'');
+}
+// "Connect with …" (oauth-connect.js): the owner signs in on the service's page in a small
+// window; with no Kairoq OAuth app for the service, the owner can use their own.
+async function oauthBox(d){
+ const box=el('div','oauth-box');
+ const draw=async()=>{
+  let s;try{s=(await api('/projects/'+state.project.id+'/oauth?service='+encodeURIComponent(d.id))).oauth}catch(err){box.replaceChildren(el('p','error',err.message));return}
+  box.replaceChildren();
+  if(s.connected){box.append(el('p','oauth-on','Connected'+(s.account?' ('+s.account+')':'')+' since '+new Date(s.connected_at).toLocaleDateString()));const off=el('button','ghost','Disconnect');off.type='button';off.onclick=async()=>{await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'disconnect',service:d.id}});draw()};box.append(off);return}
+  if(s.app){
+   const go=el('button','primary','Connect with '+d.name);go.type='button';
+   go.onclick=async()=>{go.disabled=true;try{const r=await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'start',service:d.id}});const w=window.open(r.url,'kairoq-oauth','width=520,height=720');if(!w)location.href=r.url}catch(err){box.append(el('p','error',err.message))}go.disabled=false};
+   box.append(go);
+  }else box.append(el('p','muted small','Kairoq has no '+d.name+' sign-in app yet. Use your own below, or ask Kairoq\'s team to add one.'));
+  const own=document.createElement('details');own.className='oauth-own';own.open=!s.app;
+  own.append(el('summary',null,'Use your own OAuth app'));
+  const form=el('div','oauth-form');
+  form.append(el('p','muted small','In '+d.name+'\'s developer settings, create an app and set its redirect (callback) address to:'),el('code','small',s.redirect_uri));
+  const f=(label,name,type='text')=>{const l=el('label',null,label),i=document.createElement('input');i.type=type;i.name=name;i.autocomplete='off';l.append(i);form.append(l);return i};
+  const cid=f('Client ID','client_id'),cs=f('Client Secret','client_secret','password');
+  const au=s.needs_urls?f('Authorize address (https://…)','auth_url'):null,tu=s.needs_urls?f('Token address (https://…)','token_url'):null;
+  const save=el('button','ghost','Save');save.type='button';
+  save.onclick=async()=>{try{await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'app',service:d.id,client_id:cid.value,client_secret:cs.value,...(au?{auth_url:au.value,token_url:tu.value}:{})}});draw()}catch(err){form.append(el('p','error',err.message))}};
+  form.append(save);own.append(form);box.append(own);
+ };
+ await draw();
+ const onMsg=e=>{if(e.origin===location.origin&&e.data&&e.data.kairoqOauth){draw()}};
+ window.addEventListener('message',onMsg);
+ return box;
 }
 $('integrations-open').onclick=()=>{$('menu-plus').open=false;if(state.project)openIntegrations()};
 

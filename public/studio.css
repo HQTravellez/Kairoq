@@ -275,3 +275,13 @@ body{font-family:Geist,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #apps-dialog .apps-action span{flex:1}
 #apps-dialog .apps-detail .ghost{border:1px solid var(--k-line-strong)!important;border-radius:999px!important}
 #apps-dialog .apps-detail .primary{background:var(--k-accent)!important;border-color:var(--k-accent)!important}
+#apps-dialog .oauth-box{margin:6px 0 10px;display:grid;gap:8px}
+#apps-dialog .oauth-on{color:#0f7a3d;font-weight:600;font-size:13.5px}
+#apps-dialog .oauth-own summary{cursor:pointer;font-size:13px;color:var(--k-ink-2)}
+#apps-dialog .oauth-form{display:grid;gap:6px;margin-top:6px}
+#apps-dialog .oauth-form label{display:grid;gap:2px;font-size:12.5px;color:var(--k-ink-2)}
+#apps-dialog .oauth-form code{word-break:break-all;background:var(--k-tint);padding:4px 6px;border-radius:6px}
+#apps-dialog .apps-pane{height:min(60vh,540px);max-height:none;grid-template-rows:minmax(0,1fr)}
+#apps-dialog .apps-list,#apps-dialog .apps-detail{min-height:0}
+@media (max-width:640px){#apps-dialog .apps-pane{height:auto;grid-template-rows:auto}}
+

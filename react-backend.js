@@ -534,6 +534,8 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
  const host={
   fetch:a=>samples.fetchFor(id,a,{mode:fetchMode}),
   secret:async n=>{const v=require('./project-secrets').get(id,'app_'+String(n).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,50));if(v&&String(v).length>=4)seen.add(String(v));return v},
+  // A service the owner connected with "Connect with …" (oauth-connect.js): a fresh access token.
+  oauth:async s=>{const t=await require('./oauth-connect').token(id,s);seen.add(t.access_token);return t},
   db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
   ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},
   extract:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-extract').extract(a,o=>appAi(meta,db,o))},
