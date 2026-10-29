@@ -131,6 +131,21 @@ function renderProjects(projects){
   li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
   if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
   if(p.published){const b=document.createElement('span');b.className='badge live';b.textContent='Live';li.append(b)}
+  if(p.role==='owner'){
+   const del=el('button','ghost link-btn','Delete');
+   del.type='button';del.setAttribute('aria-label','Delete project '+p.name);
+   del.onclick=async e=>{
+    e.stopPropagation();
+    if(!confirm('Permanently delete "'+p.name+'"? This removes the project and unpublishes its site. This cannot be undone.'))return;
+    del.disabled=true;del.textContent='Deleting…';
+    try{
+     await api('/projects/'+encodeURIComponent(p.id),{method:'DELETE'});
+     if(state.project?.id===p.id)state.project=null;
+     await loadHome();
+    }catch(err){del.disabled=false;del.textContent='Delete';alert('Could not delete project: '+err.message)}
+   };
+   li.append(del);
+  }
   list.append(li);
  }
  renderRecents(projects);
@@ -142,7 +157,22 @@ function renderRecents(projects){
   const li=document.createElement('li'),b=document.createElement('button');
   li.dataset.id=p.id;if(p.published)li.classList.add('live');if(state.project&&state.project.id===p.id)li.classList.add('active');
   b.type='button';b.append(el('i','diamond'),el('span',null,p.name));b.title=p.name;b.onclick=()=>openProject(p.id);
-  li.append(b);list.append(li);
+  li.append(b);
+  if(p.role==='owner'){
+   const del=el('button','recent-delete','×');del.type='button';del.title='Delete '+p.name;del.setAttribute('aria-label','Delete project '+p.name);
+   del.onclick=async e=>{
+    e.stopPropagation();
+    if(!confirm('Permanently delete "'+p.name+'"? This removes the project and unpublishes its site. This cannot be undone.'))return;
+    del.disabled=true;
+    try{
+     await api('/projects/'+encodeURIComponent(p.id),{method:'DELETE'});
+     if(state.project?.id===p.id)state.project=null;
+     await loadHome();
+    }catch(err){del.disabled=false;alert('Could not delete project: '+err.message)}
+   };
+   li.append(del);
+  }
+  list.append(li);
  }
 }
 function markRecent(id){for(const li of $('recents').children)li.classList.toggle('active',li.dataset.id===id)}
@@ -1131,7 +1161,9 @@ async function discussWhileBuilding(message){
    await new Promise(r=>setTimeout(r,300));
    current=(await api('/jobs/'+job.id)).job;
    if(state.project?.id!==projectId){answer.remove();return;}
-   const said=current.stream?.text?'Writing the answer…':'Thinking about your question…';if(answer.textContent!==said){const next=messageItem({role:'assistant',text:said});answer.replaceWith(next);answer=next;}
+   // Show text as soon as the model streams it instead of masking it behind a spinner.
+   const said=typeof current.stream?.text==='string'&&current.stream.text.trim()?current.stream.text:'Thinking about your question…';
+   if(answer.dataset.streamText!==said){const next=messageItem({role:'assistant',text:said});next.dataset.streamText=said;answer.replaceWith(next);answer=next;}
   }
   if(current.status==='failed'){if(current.saved){answer.remove();const k=(await api('/projects/'+projectId)).project.messages.at(-1);$('messages').append(messageItem(k&&k.failed?k:{role:'assistant',text:current.error,failed:true,retry:message,retry_mode:'discuss'}));return}throw Error(current.error)}
   // Reload the durable conversation, keeping the active build watcher intact.
