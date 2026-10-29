@@ -5,9 +5,8 @@ const api=fs.readFileSync(path.join(__dirname,'../create-api.js'),'utf8');
 const backend=fs.readFileSync(path.join(__dirname,'../react-backend.js'),'utf8');
 test('running build does not mute chat or show obstructing thinking overlay',()=>{
  assert.match(ui,/if\(state\.job\)\{\s*const msg=String\(message/);
- assert.match(ui,/I am still here/);
- assert.match(ui,/state\.pendingMessage=msg/);
- assert.match(ui,/Review it in the message box/);
+ assert.match(ui,/return discussWhileBuilding\(msg\)/);
+ assert.doesNotMatch(ui,/state\.pendingMessage=msg/);
  assert.match(ui,/overlay\.classList\.add\('hidden'\)/);
  assert.match(ui,/\$\('send'\)\.disabled=false/);
 });

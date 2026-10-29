@@ -25,6 +25,10 @@ jobs:
       - run: apt-get update && apt-get install -y chromium fonts-liberation
       - run: test -x /usr/bin/chromium
       - run: npm run check
+      - name: Conversation continuity and chat browser checks
+        run: node --test test/chat-continuity.test.js test/chat-conversation-browser.test.js test/concurrent-discuss-browser.test.js test/builder-question.test.js test/builder-smalltalk.test.js test/free-chat-orchestration.test.js test/responsive-builder-chat.test.js
+        env:
+          CHROMIUM_PATH: /usr/bin/chromium
       - run: node --test test/app-intent-routing.test.js
       - run: node --check app-builder.js && node --check hermes-learning-loop.js
       - run: node --test test/hermes-learning-loop.test.js test/api-skill-memory.test.js

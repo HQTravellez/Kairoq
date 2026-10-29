@@ -29,7 +29,8 @@ test('"hi" in Build gets a free reply and starts no build',async()=>{
  assert.equal(job.credits,0);
  assert.equal(called,false);
  const last=builder.loadMeta(meta.id).messages.at(-1);
- assert.match(last.text,/^Hi! I'm ready to work on Yoga Studio\./);
+ assert.match(last.text,/We’re continuing Yoga Studio\./);
+ assert.equal(last.conversation_kind,'social');
  assert.equal(last.credits,0);
 });
 

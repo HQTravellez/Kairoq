@@ -235,16 +235,16 @@ function supportAnswer(meta){
   'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
  ].join('\n');
 }
-function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
+function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false,implementFrom=null},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
  const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
+ if(active&&!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
+  const answer='I’m here. The current change is still running, and your earlier messages and plan are kept. You can keep chatting or stop the build.';
+  builder.addMessages(id,[{role:'user',text:String(message).trim(),conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',support:true,credits:0,conversation_kind:'status'}]);
+  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true}};
+  jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
+ }
  if(active&&!concurrentDiscuss){
-  // A greeting must never enter the build queue or block the chat UI.
-  if(!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
-   const answer='Hello! A build is currently '+active.status+'. You can watch or stop the active job; no new build was started.';
-   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true}};
-   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
-  }
   throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
  }
  if(!['build','discuss','agent','polish','autopilot'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
@@ -256,6 +256,12 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // An answer to the builder's open question ("ok", "yes", an option or its number) builds with
  // that answer, even from Discuss: the chat shows what the owner typed, the model gets a clear instruction.
  let shownText;
+ if(implementFrom){
+  const proposal=builder.loadMeta(id).messages.find(m=>m.at===implementFrom&&m.role==='assistant'&&m.proposal&&!m.question);
+  if(!proposal)throw Object.assign(Error('This plan is no longer available. Please describe the change you want.'),{status:409});
+  shownText=String(message).trim();message='Implement this agreed proposal in the current project, preserving its existing requirements:\n\n'+proposal.text;mode='build';
+ }
+
  if(!concurrentDiscuss&&!hooks&&(mode==='build'||mode==='discuss')){
   const Q=require('./builder-question'),a=Q.answer(message,Q.pending(builder.loadMeta(id)));
   if(a){shownText=String(message).trim();message=a.message;mode='build'}
@@ -270,11 +276,11 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  if(!hooks&&mode==='build'&&require('./code-structure').isTidy(message)){shownText='Tidy up the code';message=require('./code-structure').TIDY}
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
- if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&!shownText){
+ if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&!shownText){
   const S=require('./builder-smalltalk'),kind=S.smallTalk(message);
   if(kind){
    const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
-   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
+   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode,conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',credits:0,support:true,conversation_kind:'social'}]);
    const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
    jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
    return job;
@@ -1407,7 +1413,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   }
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
-  if(action==='/chat'&&method==='POST'){const b=await readJson(req,60000000);const context=await parseFiles(b.files);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',model:typeof b.model==='string'?b.model:null,images:parseImages(b.images),context,fix:b.fix===true},deps))}),true}
+  if(action==='/chat'&&method==='POST'){const b=await readJson(req,60000000);const context=await parseFiles(b.files);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',model:typeof b.model==='string'?b.model:null,images:parseImages(b.images),context,fix:b.fix===true,implementFrom:typeof b.implementFrom==='string'?b.implementFrom:null},deps))}),true}
   if(action==='/assets'&&method==='GET')return send(res,200,{assets:require('./react-assets').list(id)}),true;
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}
