@@ -173,3 +173,8 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
   opens the ones it needs with kairoq_skill.
 - **Helpers** (OpenCode sub-agents): a researcher (search, read, library) and a reviewer (reads the
   code, runs kairoq_check). Neither can change the app or run commands; only the builder edits.
+- **AI that uses the app's tools** (`app-ai-tools.js`): apps can declare server functions as
+  `"ai_tools"` in `src/backend.json`; `ai.chat({ messages, tools: true })` then lets the AI call them
+  as the visitor (declared arguments and types only, at most 5 calls per answer), for example a
+  hotel assistant that checks real availability. Tools marked `"confirm": true` (bookings, payments)
+  are never run by the AI: they come back as an `action` the app shows as a button.

@@ -23,6 +23,8 @@ function normalizeExtras(cfg,collections){
   out.storage={access};
  }
  if(cfg.ai!==undefined){if(cfg.ai!==true&&cfg.ai!==false)throw Error('"ai" must be true or false.');out.ai=cfg.ai}
+ // AI that can use the app's own server functions (app-ai-tools.js).
+ if(cfg.ai_tools!==undefined){if(cfg.ai!==true)throw Error('"ai_tools" needs "ai": true in src/backend.json.');out.ai_tools=require('./app-ai-tools').normalize(cfg.ai_tools)}
  if(cfg.email!==undefined){if(cfg.email!==true&&cfg.email!==false)throw Error('"email" must be true or false.');out.email=cfg.email}
  if(cfg.payments!==undefined){
   const products={};
