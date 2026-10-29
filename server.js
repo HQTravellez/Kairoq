@@ -6902,6 +6902,9 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
       return await callOpenRouterBuilder({...rest,only:model},parse);
     }catch(err){
       if(err.name==="AbortError"||rest.signal?.aborted)throw err;
+      // A selected paid model with an exhausted application budget cannot be rescued by
+      // repeatedly trying free models. Surface the actionable error to the owner promptly.
+      if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(err.message||err)))throw Error("Selected model blocked by Kairoq's application spending limit. Check DAILY_COST_LIMIT_USD, MONTHLY_COST_LIMIT_USD and KAIROQ_BUILDER_MONTHLY_LIMIT_USD; no fallback attempted.");
       console.log("[builder] chosen model "+model+" failed, using Auto: "+String(err.message||err).slice(0,200));
       onFallback?.(err);opts=rest;
     }
@@ -7122,7 +7125,12 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       const data=lastData||{},message=data.choices?.[0]?.message||{};
       if(!content.trim())throw Error("Empty response; finish="+data.choices?.[0]?.finish_reason+" reasoning="+String(message.reasoning||"").length);
       return parse(content,model);
-    }catch(e){console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160))}
+    }catch(e){
+      // Budget errors are deterministic configuration failures, not transient model outages.
+      // Do not iterate through other providers or retry after an avoidable long delay.
+      if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(e.message||e)))throw e;
+      console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160));
+    }
   }
   throw Error("No coding model returned usable project files. "+errors.join(" | "));
 }
