@@ -161,9 +161,10 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
   reading again; a tutorial the builder reads during a build is learned too. The notes are Kairoq's own
   words, not copies of the articles. Series are learned whole (up to 15 parts), GitHub projects from their
   README, docs and main code, and videos from their written version (bare videos are marked as not
-  learnable). Learning everything costs roughly $25 to $40 of AI once with
-  Claude Sonnet, and it stops when the daily or monthly AI budget is used up (raise
-  `DAILY_COST_LIMIT_USD` first, then press the button again to continue).
+  learnable). Learning is free: the notes are written by Kairoq Agent and the free models
+  (the chat's free route, never a paid model). Free models have rate and daily limits, so learning all
+  359 can take a few days; when a limit is hit the run pauses (nothing counts as failed) and pressing
+  the button again continues where it stopped.
 
 
 ## Site notes for the web agent

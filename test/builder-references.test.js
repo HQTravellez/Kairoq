@@ -55,6 +55,16 @@ test('"Learn the library" runs over what is not learned yet, shows progress, and
  assert.match(R.status().job.last_error.error,/budget/);assert.equal(R.status().learned+R.status().unlearnable,before+3);
 });
 
+test('learning with free models: their limit pauses the run (nothing counts as failed) and pressing again continues',async()=>{
+ const before=R.status().learned+R.status().unlearnable;
+ R.learnAll({remote,callModel:async()=>{throw Error('All builder models failed: openrouter/free: 429 Rate limit exceeded: free-models-per-day')},max:4});
+ await new Promise(r=>{const t=setInterval(()=>{if(!R.status().job.running){clearInterval(t);r()}},20)});
+ const s=R.status();assert.match(s.job.paused,/free AI models have reached their limit/);assert.equal(s.job.failed,0);assert.equal(s.learned+s.unlearnable,before);
+ R.learnAll({remote,callModel,max:2});
+ await new Promise(r=>{const t=setInterval(()=>{if(!R.status().job.running){clearInterval(t);r()}},20)});
+ assert.equal(R.status().learned+R.status().unlearnable,before+2,'continues where it stopped');assert.equal(R.status().job.paused,null);
+});
+
 test('the builder\'s tools: kairoq_tutorials answers from the library; reading a library tutorial learns it',async()=>{
  T.configure({callModel});
  const t=T.forProject('x',{remote});

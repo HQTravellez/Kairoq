@@ -2952,7 +2952,7 @@ async function renderRefs(){
  clearTimeout(refTimer);
  try{
   const s=await api('/admin/references'),j=s.job,on=Boolean(j&&j.running);
-  text($('ref-status'),s.learned+' of '+s.total+' tutorials learned in '+s.topics+' topics'+(s.pages?' ('+s.pages+' pages and files read)':'')+(s.unlearnable?' · '+s.unlearnable+' videos have no written version to learn from':'')+(j?(on?' · learning now: '+j.done+' done':' · last run: '+j.done+' learned')+(j.skipped?', '+j.skipped+' had no readable text':'')+(j.failed?', '+j.failed+' failed'+(j.last_error?' ('+j.last_error.error+')':''):''):'')+'.');
+  text($('ref-status'),s.learned+' of '+s.total+' tutorials learned in '+s.topics+' topics'+(s.pages?' ('+s.pages+' pages and files read)':'')+(s.unlearnable?' · '+s.unlearnable+' videos have no written version to learn from':'')+(j?(on?' · learning now: '+j.done+' done':' · last run: '+j.done+' learned')+(j.skipped?', '+j.skipped+' had no readable text':'')+(j.failed?', '+j.failed+' failed'+(j.last_error?' ('+j.last_error.error+')':''):''):'')+'.'+(j&&j.paused?' '+j.paused:''));
   $('ref-learn').classList.toggle('hidden',on||s.learned>=s.total);$('ref-stop').classList.toggle('hidden',!on);
   if(on&&$('admin-dialog').open)refTimer=setTimeout(renderRefs,4000);
  }catch(err){text($('ref-status'),err.message)}

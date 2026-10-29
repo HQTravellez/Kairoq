@@ -186,15 +186,17 @@ function status(){
  const all=catalog().tutorials,have=new Set(fs.readdirSync(notesDir()).filter(f=>f.endsWith('.json')).map(f=>f.slice(0,-5)));
  const files=all.filter(x=>have.has(keyOf(x.url))).map(x=>readFile(x.url)).filter(Boolean);
  const learned=files.filter(n=>!n.skipped).length,unlearnable=files.filter(n=>n.skipped).length,pages=files.reduce((a,n)=>a+(n.pages||0),0);
- return{total:all.length,learned,unlearnable,pages,topics:Object.keys(TOPICS).length,job:job?{running:job.running,done:job.done,failed:job.failed.length,skipped:job.skipped,started_at:job.started_at,finished_at:job.finished_at||null,last_error:job.failed.at(-1)||null}:null};
+ return{total:all.length,learned,unlearnable,pages,topics:Object.keys(TOPICS).length,job:job?{running:job.running,done:job.done,failed:job.failed.length,skipped:job.skipped,started_at:job.started_at,finished_at:job.finished_at||null,paused:job.paused||null,last_error:job.failed.at(-1)||null}:null};
 }
+// A free model's rate or daily limit: stop for now (nothing counts as failed); pressing again continues.
+const LIMITED=/\b429\b|rate.?limit|too many requests|quota|limit (?:reached|exceeded)|free-models-per-day/i;
 function learnAll({remote=(u,o)=>require('./builder-assets').remote(u,o),callModel,concurrency=2,max=Infinity}={}){
  if(!callModel)throw Object.assign(Error('No AI model is set up for learning'),{status:503});
  if(job&&job.running)return status();
  const todo=catalog().tutorials.filter(x=>!readFile(x.url)).slice(0,max);
  job={running:true,done:0,failed:[],skipped:0,started_at:new Date().toISOString()};
  const mine=job;let i=0;
- const worker=async()=>{while(i<todo.length&&mine.running){const item=todo[i++];try{await learn(item,{remote,callModel});mine.done++}catch(e){if(/budget/i.test(String(e.message))){mine.running=false;mine.failed.push({url:item.url,error:'Stopped: the AI budget for today or this month is used up'});return}if(e.status===422)mine.skipped++;else mine.failed.push({url:item.url,error:String(e.message||e).slice(0,160)})}}};
+ const worker=async()=>{while(i<todo.length&&mine.running){const item=todo[i++];try{await learn(item,{remote,callModel});mine.done++}catch(e){if(/budget/i.test(String(e.message))){mine.running=false;mine.failed.push({url:item.url,error:'Stopped: the AI budget for today or this month is used up'});return}if(LIMITED.test(String(e.message))){mine.running=false;mine.paused='The free AI models have reached their limit for now. Press Learn the library again later (tomorrow at the latest); it continues where it stopped.';return}if(e.status===422)mine.skipped++;else mine.failed.push({url:item.url,error:String(e.message||e).slice(0,160)})}}};
  mine.promise=Promise.all(Array.from({length:Math.max(1,concurrency)},worker)).then(()=>{mine.running=false;mine.finished_at=new Date().toISOString()});
  return status();
 }
@@ -232,4 +234,4 @@ function note(text){
  const list=topicsFor(text);if(!list.length)return'';
  return'\n\nFROM THE REFERENCE LIBRARY (build-your-own-x): this request touches '+list.join(', ')+'.\n'+list.map(n=>'- '+n+': '+TOPICS[n].text).join('\n')+'\nCall kairoq_tutorials with the topic for step-by-step tutorials to read before building.';
 }
-module.exports={gatherSeries,gatherGitHub,gatherVideo,seriesLinks,kindOf,readFile,catalog,TOPICS,topicsFor,tutorials,lookup,note,savedNotes,inCatalog,learn,learnFromText,learnAll,stopLearning,status,notesDir,NOTES_PROMPT};
+module.exports={LIMITED,gatherSeries,gatherGitHub,gatherVideo,seriesLinks,kindOf,readFile,catalog,TOPICS,topicsFor,tutorials,lookup,note,savedNotes,inCatalog,learn,learnFromText,learnAll,stopLearning,status,notesDir,NOTES_PROMPT};
