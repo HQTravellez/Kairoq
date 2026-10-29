@@ -7071,10 +7071,11 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   // Small, clear edits on the Standard tier ("make the button blue") go to a fast model first
   // (KAIROQ_FAST_MODELS); the usual models follow if it fails.
   const fastFirst=opts.fast&&allowPaid&&(!opts.tier||opts.tier==="standard")?String(process.env.KAIROQ_FAST_MODELS??"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):[];
-  let models=opts.only?[opts.only]:opts.tier==="chat"?freeCandidates.filter((m,i,a)=>m&&a.indexOf(m)===i):[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
+  const models=opts.only?[opts.only]:opts.tier==="chat"?freeCandidates.filter((m,i,a)=>m&&a.indexOf(m)===i):[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
   // With an Anthropic key but no OpenRouter key, only the Claude models can run.
-  if(!process.env.OPENROUTER_API_KEY){models=models.filter(m=>anthropic.isClaude(m));if(!models.length)return freeOnly()}
-  for(const model of models){
+  const runnable=process.env.OPENROUTER_API_KEY?models:models.filter(m=>anthropic.isClaude(m));
+  if(!process.env.OPENROUTER_API_KEY&&!runnable.length)return freeOnly();
+  for(const model of runnable){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
     const viaAnthropic=direct&&anthropic.isClaude(model);
