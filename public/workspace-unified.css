@@ -23,3 +23,5 @@ body.app.in-editor .stage-bar button[aria-pressed=true]{background:#eef1ff!impor
 body.app.in-editor .messages .assistant::before{background:#4257e8!important}
 @media(max-width:900px){body.app.in-editor #messages{padding:20px 14px!important}body.app.in-editor #chat-form{margin:0 10px 10px!important}body.app.in-editor .chat-head,body.app.in-editor .stage-bar{min-height:52px!important}}
 @media(prefers-reduced-motion:reduce){body.app.in-editor #build-overlay{backdrop-filter:none}}
+
+body.app #home-error.welcome{color:#4257a1!important;background:#eef2ff;border:1px solid #dae2fc;border-radius:10px;padding:10px 14px;max-width:760px;margin:14px auto 0;line-height:1.5}
