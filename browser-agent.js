@@ -92,7 +92,7 @@ async function judge({goal,claim,steps,o,shot,mode,callModel,tier,signal}){
  const sys=JUDGE.replace('%SHOT%',shot?' (screenshot attached)':'');
  const content=shot?[{type:'text',text},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}}]:text;
  try{
-  const v=await callModel({messages:[{role:'system',content:sys},{role:'user',content}],temperature:0,maxOutputTokens:300,signal,tier:shot?'vision':tier},json);
+  const v=await callModel({messages:[{role:'system',content:sys},{role:'user',content}],temperature:0,maxOutputTokens:300,signal,tier:shot&&tier!=='check'?'vision':tier},json);
   if(typeof v.verdict!=='boolean')throw Error('no verdict');
   return{ok:v.verdict,reason:clip(v.reason,300),blocked:v.blocked===true,checked:true};
  }catch(e){
@@ -136,7 +136,7 @@ async function run({session:s,goal,mode='task',persona='',notes:siteNotes='',cal
    nudge='';extra='';
    const messages=[{role:'system',content:systemPrompt(mode)},{role:'user',content:shot?[{type:'text',text},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}}]:text}];
    let reply;
-   try{reply=await callModel({messages,temperature:mode==='persona'?0.7:0.2,maxOutputTokens:700,signal,tier:shot?'vision':tier},json)}
+   try{reply=await callModel({messages,temperature:mode==='persona'?0.7:0.2,maxOutputTokens:700,signal,tier:shot&&tier!=='check'?'vision':tier},json)}
    catch(e){
     if(!shot||(signal&&signal.aborted))throw e;
     // No model that sees images: carry on with words only.
@@ -183,8 +183,14 @@ async function run({session:s,goal,mode='task',persona='',notes:siteNotes='',cal
     const before=fingerprint(o),layout=o.path+'|'+o.elements.map(e=>e.id).join(',');
     try{await s.act(a);failures=0}
     catch(e){step.error=clip(String(e.message||e).split('\n')[0],160);failures++}
-    o=await s.observe();
-    if(o.sent)step.sent=true;
+    // A click that sends a form often changes the page under the click, so the click itself can
+    // time out; once the page settles that is a success, not an error.
+    try{o=await s.observe()}catch{await new Promise(r=>setTimeout(r,800));o=await s.observe()}
+    if(o.sent){
+     step.sent=true;
+     if(step.error&&/timeout|detached|navigat|destroyed|closed/i.test(step.error)){delete step.error;failures=Math.max(0,failures-1)}
+     nudge='Your form was sent: the site received it. If that was what you came to do, you are done.';
+    }
     const after=fingerprint(o);
     if(!step.error&&after===before&&['click','key','select','hover','go_to'].includes(a.action))step.no_change=true;
     const key=before+'|'+a.action+'|'+(a.target??'')+'|'+a.value;

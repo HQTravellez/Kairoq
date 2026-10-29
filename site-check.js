@@ -14,7 +14,7 @@ const DAY=86400000;
 function enabled(){return String(process.env.KAIROQ_SITE_CHECK||'on').toLowerCase()!=='off'}
 function intEnv(k,d){const n=Number(process.env[k]);return Number.isFinite(n)&&n>=0?Math.floor(n):d}
 function visitors(){return Math.max(2,Math.min(10,intEnv('KAIROQ_SITE_CHECK_VISITORS',5)))}
-function tier(){return process.env.KAIROQ_SITE_CHECK_TIER||'standard'}
+function tier(){return process.env.KAIROQ_SITE_CHECK_TIER||'check'}
 function dir(){return process.env.KAIROQ_SITE_CHECKS_DIR||path.join(path.dirname(require('./react-builder').ROOT()),'site-checks')}
 function clip(v,n){return String(v??'').replace(/\s+/g,' ').trim().slice(0,n)}
 function hash(v){return crypto.createHash('sha256').update('kairoq-site-check:'+String(v||'').toLowerCase()).digest('hex').slice(0,24)}
@@ -117,6 +117,8 @@ async function look(url,device,browseSite){
  }finally{await s.close()}
 }
 async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
+ // The check's own model setting (tier "check": a cheap paid model, then the free ones) for every call.
+ const ask=callModel;callModel=(o,p)=>ask({tier:tier(),...o},p);
  // An overall time limit: a check never hangs on a model that does not answer.
  const signal=AbortSignal.timeout(Math.max(60000,Number(process.env.KAIROQ_SITE_CHECK_TIMEOUT_MS||900000)));
  browseSite=browseSite||((u,o)=>require('./runtime-check').session(u,o));
@@ -137,7 +139,7 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
    score:score(r.numbers,tech),numbers:r.numbers,...(r.numbers.visitors&&r.numbers.blocked>=r.numbers.visitors?{blocked:true}:{}),summary:r.summary,technical:tech,
    problems:(r.problems||[]).filter(p=>p.status==='confirmed').slice(0,6).map(p=>({title:p.title,path:p.path,device:p.device,visitors:p.visitors.length})),
    // The visitors' own words, shortened: who they were, what happened and what they thought.
-   visits:r.visits.filter(v=>v.outcome!=='skipped').map(v=>({name:v.persona.name,age:v.persona.age,device:v.persona.device,about:v.persona.about,outcome:v.outcome,...(v.verdict&&!v.verdict.ok?{judged:v.verdict.reason}:{}),steps:v.steps.slice(0,20).map(s=>({path:s.path,thought:s.thought,feeling:s.feeling,action:s.action,label:s.label||''}))})),
+   visits:r.visits.filter(v=>v.outcome!=='skipped').map(v=>({name:v.persona.name,age:v.persona.age,device:v.persona.device,about:v.persona.about,outcome:v.outcome,...(v.outcome==='error'&&v.error?{error:String(v.error).slice(0,200)}:{}),...(v.verdict&&!v.verdict.ok?{judged:v.verdict.reason}:{}),steps:v.steps.slice(0,20).map(s=>({path:s.path,thought:s.thought,feeling:s.feeling,action:s.action,label:s.label||''}))})),
    shots:['desktop','phone'].filter(n=>fs.existsSync(shotFile(state.id,n)))
   };
   fs.writeFileSync(reportFile(state.id),JSON.stringify(report));

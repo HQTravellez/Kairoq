@@ -213,3 +213,14 @@ browser-use's per-site "domain skills" (MIT), written for Kairoq.
   - Or the owner's own: they paste a Client ID and Secret under "Use your own OAuth app".
   Safety: random single-use state (10 minutes, bound to the project and the person), PKCE where the
   service supports it, a fixed redirect address. Visitors connecting their own accounts is not built.
+
+## Models for website checks and AI customers
+
+Website checks and AI customers (standard setting) use their own model setting, tier `check`:
+a cheap, reliable paid model first, then the free models. Builds are not affected.
+- `KAIROQ_CHECK_MODELS` (default `google/gemini-2.5-flash,deepseek/deepseek-v3.2`, via OpenRouter;
+  needs `OPENROUTER_API_KEY`). A check of 5 visitors costs a few cents.
+- `KAIROQ_CHECK_MONTHLY_LIMIT_USD` (default 20): its own monthly cap; past it, the free models are used.
+- `KAIROQ_CHECK_PAID=off` uses the free models only. `KAIROQ_SITE_CHECK_TIER` overrides the tier.
+- Time limits: `KAIROQ_PERSONA_TIMEOUT_MS` (2 minutes; built-in customers take over) and
+  `KAIROQ_SITE_CHECK_TIMEOUT_MS` (15 minutes for a whole check).

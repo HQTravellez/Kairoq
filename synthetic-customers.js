@@ -151,6 +151,8 @@ async function summarize(visits,goal,{callModel,tier,signal}){
 // site: test another website at `url` (a full link) instead of the app's preview path.
 async function run(id,url,test,{callModel,browse,tier='standard',signal,onProgress=()=>{},people:given=null,site=false,browseSite=(u,o)=>require('./runtime-check').session(u,o)}){
  if(site)browse=browseSite;
+ // AI customers on the standard setting use the website-check models (cheap and reliable).
+ if(tier==='standard')tier='check';
  if(!browse)throw Object.assign(Error('Synthetic customers need a browser on the server'),{status:409});
  onProgress({status:'personas',text:given?'Bringing back the same '+given.length+' customers':'Creating '+(Number(test.count)||10)+' personas'});
  const people=given?given.map(normalizePersona):await personas({...test,callModel,tier,signal});
