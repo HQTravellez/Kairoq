@@ -1,0 +1,93 @@
+/* Kairoq "fresh" look (loaded last on create.html), in the spirit of Lovable, Bolt and v0: a light
+   grey frame with a plain text sidebar, the page itself as one rounded white panel, a short
+   friendly line over one prompt box, a soft colour wash behind it, and the projects in a white
+   sheet below. Only the signed-in app (body.app) changes; the public landing keeps its look. */
+body.app{
+  --frame:#f4f4f3;
+  --k-bg:#f4f4f3;--k-tint:#ececea;--k-surface:#ffffff;--k-line:#e6e6e3;--k-line-strong:#d7d7d3;
+  --k-ink:#1c1c1c;--k-ink-2:#4b4b4a;--k-ink-3:#83837f;
+  --k-accent:#1c1c1c;--k-accent-hover:#000000;--k-accent-soft:#ececea;--k-accent-line:#cfcfcb;--k-ring:0 0 0 3px rgba(28,28,28,.1);
+  --k-shadow-2:0 2px 6px rgba(0,0,0,.04),0 18px 40px -18px rgba(0,0,0,.18);
+  /* the tokens the older layers read, re-pointed so they pick up the values above */
+  --bg:var(--k-bg);--panel:var(--k-surface);--side:var(--frame);--border:var(--k-line);--hover:var(--k-tint);
+  --text:var(--k-ink);--muted:var(--k-ink-3);--accent:var(--k-accent);--accent-2:var(--k-accent-hover);--accent-3:var(--k-accent-soft);
+  --ink:var(--k-ink);--grad:var(--k-accent);
+  --lk-wine:var(--k-accent);--lk-wine-d:var(--k-accent-hover);--lk-ink:var(--k-ink);--lk-muted:var(--k-ink-3);--lk-line:var(--k-line);--lk-line-2:var(--k-line-strong);--lk-soft:var(--k-tint);--lk-side:var(--frame);
+  background:var(--frame);color:var(--k-ink);
+}
+body.app #editor{--b-bg:var(--k-bg);--b-tint:var(--k-tint);--b-surface:var(--k-surface);--b-line:var(--k-line);--b-line-strong:var(--k-line-strong);--b-ink:var(--k-ink);--b-ink-2:var(--k-ink-2);--b-ink-3:var(--k-ink-3);--b-brand:var(--k-accent);--b-shadow-2:var(--k-shadow-2)}
+body.app :focus-visible{outline-color:var(--k-ink)!important}
+body.app button.primary,body.app .primary{background:var(--k-ink);border-color:var(--k-ink);color:#fff}
+body.app button.primary:hover{background:#000}
+body.app .brand::before{content:"K";display:grid;place-items:center;background:var(--k-ink);box-shadow:none;color:#fff;font:700 12px/1 Geist,ui-sans-serif,sans-serif}
+
+/* ---------- the frame: a plain sidebar on grey, the page as a rounded white panel ---------- */
+body.app .shell{background:var(--frame)}
+body.app .side{width:236px;background:var(--frame)!important;border-right:0!important;padding:12px 10px!important}
+body.app .side-brand .mark{background:var(--k-ink)!important;border-radius:8px!important}
+body.app .side-nav{gap:1px!important}
+body.app .side-nav button{height:34px;padding:0 10px!important;border-radius:9px!important;font:500 13.5px/1 Geist,ui-sans-serif,sans-serif!important;color:var(--k-ink)!important;gap:10px!important}
+body.app .side-nav .ico{width:17px!important;height:17px!important;color:var(--k-ink-2)!important}
+body.app .side-nav button:hover{background:#eaeae8!important}
+body.app .side-nav button[aria-current],body.app .side-nav button.on,body.app .side-nav button.active{background:#e6e6e3!important}
+body.app .side-label{margin:18px 10px 6px!important;font:500 12px/1 Geist,ui-sans-serif,sans-serif!important;color:var(--k-ink-3)!important;text-transform:none!important;letter-spacing:0!important}
+body.app .side-nav .side-group{margin:14px 10px 4px!important}
+body.app .recents button{font-size:13.5px;color:var(--k-ink-2)}
+body.app .side-card{background:#fff!important;border:1px solid var(--k-line)!important;border-radius:12px!important}
+body.app:not(.in-editor) .shell-main{margin:8px 8px 8px 0;border:1px solid var(--k-line);border-radius:16px;background:#fff;overflow:auto;min-height:0}
+
+/* ---------- home: a short line, one prompt box, a soft colour wash ---------- */
+#home .home{background:
+  radial-gradient(70% 50% at 50% 30%,rgba(255,255,255,.95) 0%,rgba(255,255,255,0) 70%) top/100% 880px no-repeat,
+  linear-gradient(180deg,#ffffff 0%,#e3e9ff 26%,#cdc2ff 52%,#ffc9ae 78%,rgba(255,255,255,0) 100%) top/100% 880px no-repeat;
+  min-height:100%}
+#home .home-hero{max-width:720px;margin-inline:auto;padding-top:clamp(64px,16vh,170px)!important}
+#home .home h1,#home h1{font-size:clamp(28px,3vw,36px)!important;font-weight:600!important;letter-spacing:-.025em!important;margin-bottom:22px!important}
+#home .home-sub{display:none}
+#home .prompt-box{max-width:660px;margin-inline:auto;background:#fff!important;border:0!important;border-radius:20px!important;box-shadow:0 1px 2px rgba(0,0,0,.05),0 20px 50px -20px rgba(40,30,90,.35)!important}
+#home .prompt-box:focus-within{box-shadow:0 0 0 3px rgba(255,255,255,.7),0 20px 50px -20px rgba(40,30,90,.4)!important}
+#home .prompt-box textarea{font-size:15.5px}
+#home .prompt-bar{gap:8px;align-items:center}
+#home .prompt-bar .kind-seg{margin:0!important;padding:3px!important;border-radius:999px!important;background:#f3f3f1}
+#home .prompt-bar .kind-seg button{height:28px!important;padding:0 11px!important;font-size:12.5px!important;border-radius:999px!important}
+#home .prompt-bar .kind-seg .seg-thumb{top:3px!important;bottom:3px!important;border-radius:999px!important}
+#home .prompt-note{display:none}
+#home .prompt-bar #new-submit{margin-left:auto;width:34px;height:34px;border-radius:999px}
+#home .prompt-bar .round{border:0!important;background:transparent!important}
+/* the three example ideas, as small chips under the box */
+#home #examples{display:flex!important;flex-wrap:wrap;justify-content:center;gap:8px;margin:18px auto 0;max-width:680px}
+#home #examples .example{background:rgba(255,255,255,.72)!important;border:1px solid rgba(255,255,255,.9)!important;backdrop-filter:blur(6px);font-size:13px;padding:7px 13px;color:var(--k-ink-2)!important}
+#home #examples .example:hover{background:#fff!important;color:var(--k-ink)!important}
+
+/* the projects: a white sheet with pill tabs and big pictures */
+#home .browser{width:calc(100% - 48px);max-width:1120px;box-sizing:border-box;align-self:center;margin:clamp(80px,18vh,190px) auto 24px!important;background:#fff!important;border:1px solid var(--k-line)!important;border-radius:20px!important;box-shadow:0 -10px 40px -24px rgba(40,30,90,.25)!important;padding:18px 20px 24px!important}
+#home .browser-tabs{background:#f3f3f1;border-radius:999px;padding:3px;display:inline-flex;gap:2px;margin-bottom:16px}
+#home .browser-tabs button{border-radius:999px!important;height:30px;padding:0 13px!important;font-size:13px!important;border:0!important}
+#home .browser-tabs button[aria-selected=true]{background:#fff!important;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+#home .browser-tabs #project-count{display:none}
+
+/* ---------- phone ---------- */
+@media (max-width:820px){
+  body.app:not(.in-editor) .shell-main{margin:0;border:0;border-radius:0}
+  #home .home-hero{padding-top:48px!important;padding-inline:16px}
+  #home .prompt-bar .kind-seg button{padding:0 8px!important;font-size:12px!important}
+  #home .browser{width:calc(100% - 24px);margin:56px 12px 16px!important;padding:14px!important}
+}
+
+/* ---------- editor chat, measured from Lovable's: your message is a white card with three round
+   corners and a near-square bottom-right one (like Apple Messages), a hairline ring and a tiny
+   shadow; replies are plain text; the reply box has the same ring and 26px corners ---------- */
+body.app #editor .chat{background:#f6f6f5!important}
+body.app #editor .messages{gap:20px!important;padding:20px 18px 8px!important}
+body.app #editor .messages li.user{background:#fff!important;border:0!important;border-radius:24px 24px 4px 24px!important;padding:12px 16px!important;font-size:16px!important;line-height:24px!important;max-width:75%!important;color:var(--k-ink)!important;
+  box-shadow:0 0 0 1px rgba(119,119,113,.28),0 1.5px 1px rgba(0,0,0,.04),0 1.5px 1px -.5px rgba(0,0,0,.04)!important}
+body.app #editor .messages li.user>*,body.app #editor .messages li.user .msg-text,body.app #editor .messages li.user .bubble{background:transparent!important;border:0!important;padding:0!important;box-shadow:none!important}
+body.app #editor .messages li.assistant{font-size:15px!important;line-height:1.6!important}
+body.app #editor .messages li.assistant .status-line{color:var(--k-ink-3)!important}
+body.app #editor .messages .q-opt{border-radius:999px!important;border:0!important;background:#fff!important;box-shadow:0 0 0 1px rgba(119,119,113,.28),0 1.5px 1px rgba(0,0,0,.04)!important}
+body.app #editor .chat #chat-form.composer{border:0!important;border-radius:26px!important;padding:14px 12px 10px 16px!important;background:#fff!important;
+  box-shadow:0 0 0 1px rgba(119,119,113,.28),0 1.5px 1px rgba(0,0,0,.04),0 1.5px 1px -.5px rgba(0,0,0,.04)!important}
+body.app #editor .chat #chat-form.composer:focus-within{box-shadow:0 0 0 1px rgba(119,119,113,.45),0 1.5px 1px rgba(0,0,0,.04),0 8px 24px -12px rgba(0,0,0,.18)!important}
+body.app #editor #chat-input,body.app #editor #chat-input:focus,body.app #editor #chat-input:focus-visible{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;caret-color:var(--k-ink)!important;font-size:16px!important;line-height:22px!important}
+body.app #editor #send{width:32px!important;height:32px!important;min-width:32px!important;border-radius:999px!important;background:rgba(0,0,0,.88)!important;color:#fff!important;border:0!important;box-shadow:none!important}
+body.app #editor #send:disabled{background:rgba(0,0,0,.25)!important}
