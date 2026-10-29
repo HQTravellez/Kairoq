@@ -34,7 +34,9 @@ function clean(raw){
  return out;
 }
 // Long, detailed requests are clear enough already.
-function worthAsking(prompt){const t=clip(prompt,4000);return t.length>=3&&t.length<=1500}
+// Long requirements already give the builder enough context; do not slow these down with generic questions.
+// Keep this bounded below the model's 1500-character context cap to avoid re-asking documented details.
+function worthAsking(prompt){const t=clip(prompt,4000);return t.length>=3&&t.length<=600}
 async function questions(prompt,{callModel,tier='standard'}={}){
  if(!callModel||!worthAsking(prompt))return[];
  const ask=callModel({messages:[{role:'system',content:SYSTEM},{role:'user',content:clip(prompt,1500)}],tier,temperature:0.2,maxOutputTokens:900,purpose:'clarify'},c=>{const t=String(c).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');return JSON.parse(t.slice(a,b+1))});
