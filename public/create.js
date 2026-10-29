@@ -1110,10 +1110,10 @@ function costHint(){
  // A model picked by name is priced at its own credits instead of the tier's.
  const t=picked?{credits:picked.credits}:tier;
  const p=Math.max(t?t.credits:1,state.me.polish_credits||1);$('polish').title=base+' ('+p+' credit'+(p===1?'':'s')+')';
- const n=(state.mode==='discuss'?((state.tier==='standard'&&!picked)||!t?state.me.discuss_credits:Math.max(t.credits,state.me.discuss_credits)):(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1))+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
+ const n=state.mode==='discuss'?0:(t?t.credits:1)*(state.mode==='agent'?state.me.agent_multiplier||3:1)+(state.attachments.some(a=>a.kind!=='file')?state.me.image_credits:0);
  // Before sending: what this message costs, and what could come on top.
  const img=state.mode!=='discuss'&&state.me.image_generation?.enabled&&state.me.image_generation.credits;
- text($('cost-hint'),'This message: '+n+' credit'+(n===1?'':'s')+(img?' (+'+img+' per AI image, if it makes any)':''));
+ text($('cost-hint'),state.mode==='discuss'?'Free chat · No project changes':'Build: '+n+' credit'+(n===1?'':'s')+(img?' (+'+img+' per AI image, if generated)':''));
  $('cost-hint').title=state.mode==='discuss'?'Discuss answers questions and plans; it does not change the app.':'Charged when the change is saved. A change that fails or is not kept is free, and so is the fix of a problem it causes.';
 }
 // What a message cost, for the line under it.
