@@ -157,7 +157,22 @@ function renderRecents(projects){
   const li=document.createElement('li'),b=document.createElement('button');
   li.dataset.id=p.id;if(p.published)li.classList.add('live');if(state.project&&state.project.id===p.id)li.classList.add('active');
   b.type='button';b.append(el('i','diamond'),el('span',null,p.name));b.title=p.name;b.onclick=()=>openProject(p.id);
-  li.append(b);list.append(li);
+  li.append(b);
+  if(p.role==='owner'){
+   const del=el('button','recent-delete','×');del.type='button';del.title='Delete '+p.name;del.setAttribute('aria-label','Delete project '+p.name);
+   del.onclick=async e=>{
+    e.stopPropagation();
+    if(!confirm('Permanently delete "'+p.name+'"? This removes the project and unpublishes its site. This cannot be undone.'))return;
+    del.disabled=true;
+    try{
+     await api('/projects/'+encodeURIComponent(p.id),{method:'DELETE'});
+     if(state.project?.id===p.id)state.project=null;
+     await loadHome();
+    }catch(err){del.disabled=false;alert('Could not delete project: '+err.message)}
+   };
+   li.append(del);
+  }
+  list.append(li);
  }
 }
 function markRecent(id){for(const li of $('recents').children)li.classList.toggle('active',li.dataset.id===id)}
