@@ -85,8 +85,9 @@ async function run({ url, task, callModel, onStatus = () => {}, onFrame = () => 
   try {
     await frame(`Opened ${host}`, 0, true);
     const pending = [];
+    const notes = require("./site-notes");
     const result = await require("./browser-agent").run({
-      session, goal: clip(task, 1000), mode: "task", callModel, signal,
+      session, goal: clip(task, 1000), mode: "task", notes: notes.note("owner", target), callModel, signal,
       maxSteps: maxSteps || Number(process.env.KAIROQ_WEB_TASK_STEPS) || 15,
       onStep: step => {
         const text = describeStep(step);
@@ -95,6 +96,7 @@ async function run({ url, task, callModel, onStatus = () => {}, onFrame = () => 
       },
     });
     await Promise.all(pending);
+    try { notes.record("owner", target, task, result); } catch {}
     await frame("Final page", result.steps.length, true);
 
     const note = OUTCOME_NOTE[result.outcome] ?? "";

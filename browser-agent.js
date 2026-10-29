@@ -103,12 +103,12 @@ async function judge({goal,claim,steps,o,shot,mode,callModel,tier,signal}){
 }
 
 // opts: {session, goal, mode:'persona'|'task', persona (text), callModel, tier, maxSteps,
-// signal, vision:'auto'|'off', judge:true, onStep}
+// signal, vision:'auto'|'off', judge:true, onStep, notes (site-notes.js: earlier visits to this site, task mode)}
 // Returns {outcome:'completed'|'gave_up'|'stuck'|'blocked'|'error', steps, answer, memory, verdict, error}.
 // handoff(reason): optional; a person takes over the browser (captcha, sign-in) and resolves
 // {ok:true} when they hand it back, {ok:false} when they cancel or do not come. wantsHandoff():
 // true when the person asked to take over; the agent pauses before its next step.
-async function run({session:s,goal,mode='task',persona='',callModel,tier='standard',maxSteps=12,signal,vision='auto',judge:useJudge=process.env.KAIROQ_BROWSER_JUDGE!=='off',onStep=()=>{},handoff=null,wantsHandoff=()=>false}){
+async function run({session:s,goal,mode='task',persona='',notes:siteNotes='',callModel,tier='standard',maxSteps=12,signal,vision='auto',judge:useJudge=process.env.KAIROQ_BROWSER_JUDGE!=='off',onStep=()=>{},handoff=null,wantsHandoff=()=>false}){
  const steps=[];let memory='',outcome='stuck',answer='',verdict=null,error=null,failures=0,nudge='',extra='',visionOn=vision!=='off';
  const seen=new Map();let handoffs=0;
  let o=await s.observe();
@@ -132,7 +132,7 @@ async function run({session:s,goal,mode='task',persona='',callModel,tier='standa
    const wantShot=visionOn&&s.screenshot&&turn>0&&(last&&(last.no_change||last.error)||turn%4===3);
    const shot=wantShot?await s.screenshot():null;
    const history=steps.slice(-8).map(x=>'- on '+x.path+': '+x.action+(x.label?' "'+x.label+'"':'')+(x.value&&x.action!=='done'?' "'+clip(x.value,60)+'"':'')+(x.error?' (did not work: '+x.error+')':'')+(x.no_change?' (nothing changed)':'')+(x.sent?' (sent)':'')).join('\n');
-   const text=(mode==='persona'?'You are: '+persona+'\nYour goal: ':'Task: ')+clip(goal,1200)+'\nStep '+(turn+1)+' of at most '+maxSteps+'.'+(memory?'\nYour notes: '+memory:'')+(history?'\nWhat you did so far:\n'+history:'')+(nudge?'\n\nNote: '+nudge:'')+(extra?'\n\nFull page text (from read):\n'+extra:'')+'\n\n'+describe(o);
+   const text=(mode==='persona'?'You are: '+persona+'\nYour goal: ':'Task: ')+clip(goal,1200)+(siteNotes&&mode==='task'?'\n\n'+clip(siteNotes,1500)+'\n':'')+'\nStep '+(turn+1)+' of at most '+maxSteps+'.'+(memory?'\nYour notes: '+memory:'')+(history?'\nWhat you did so far:\n'+history:'')+(nudge?'\n\nNote: '+nudge:'')+(extra?'\n\nFull page text (from read):\n'+extra:'')+'\n\n'+describe(o);
    nudge='';extra='';
    const messages=[{role:'system',content:systemPrompt(mode)},{role:'user',content:shot?[{type:'text',text},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}}]:text}];
    let reply;

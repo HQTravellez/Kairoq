@@ -144,6 +144,13 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
 - **kairoq_package**: add an npm package (MIT, ISC, BSD, Apache-2.0... never GPL/AGPL), installed
   without install scripts into `app-packages/` next to the projects; the app lists it in
   `src/kairoq.packages.json` and exports get it in `package.json`.
+- **kairoq_browse**: the builder uses its own app. Kairoq builds the current files as a scratch
+  version and the browser agent (`browser-agent.js`) tries a goal the builder gives ("colour the
+  T-Rex, then press Replay") on a test copy of the data, on desktop or phone. The builder gets back
+  whether it got there, each step, what did nothing and the page's errors, and fixes them before it
+  hands back; the reviewer helper uses it too. Up to 3 per change (`KAIROQ_OPENCODE_MAX_BROWSES`),
+  10 steps each (`KAIROQ_BROWSE_STEPS`); off with `KAIROQ_BUILDER_BROWSE=off`. The idea is
+  agent-browser's "dogfood" testing (Vercel, Apache-2.0), built on Kairoq's own browser agent.
 - **Playbooks** (`builder-playbooks.js`): short know-how for hard topics (3D characters, AR from a
   printed page, reading colours from a photo, printable pages), added when a request needs them.
 - Switch off with `KAIROQ_BUILDER_TOOLS=off`. Tool calls per change: `KAIROQ_BUILDER_TOOL_CALLS` (40).
@@ -158,6 +165,15 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
   Claude Sonnet, and it stops when the daily or monthly AI budget is used up (raise
   `DAILY_COST_LIMIT_USD` first, then press the button again to continue).
 
+
+## Site notes for the web agent
+
+`site-notes.js`: after a web task (chat "go to this site and…", or Web tasks and watches), Kairoq
+keeps the route that worked on that site for that account: the pages and the labels of what was
+clicked, and whether it got there (5 per site). The next task there starts with those notes, as data
+from earlier visits, not instructions. Never kept: what was typed, search words, answers or the
+agent's own notes. Stored in `web-tasks/site-notes/` (`KAIROQ_SITE_NOTES_DIR`). The idea is
+browser-use's per-site "domain skills" (MIT), written for Kairoq.
 
 ## Autopilot, skills and helpers
 

@@ -808,7 +808,7 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false,record=f
    await page.waitForTimeout(150);
   }
  };
- return{observe,act,audit,read,control,responses:async()=>(await Promise.all(recorded)).filter(Boolean),status:()=>status,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
+ return{observe,act,audit,read,control,errors:()=>errors.slice(),responses:async()=>(await Promise.all(recorded)).filter(Boolean),status:()=>status,url:()=>page.url(),screenshot:()=>page.screenshot({type:'jpeg',quality:55}).then(b=>b.toString('base64')).catch(()=>null),close:()=>context.close().catch(()=>{})};
 }
 // Renders a small HTML document offline (no network) to PNG, e.g. app icons.
 async function renderHtml(html,{width,height}){
