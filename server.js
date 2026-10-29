@@ -6868,7 +6868,8 @@ async function streamAppAi(body,onToken,onFirst){
 // in parallel, models per tier, the fast lane for small edits and live progress (it needs
 // KAIROQ_BUILDER_MODE=paid-first and KAIROQ_BUILDER_PAID_APPROVED=true to write whole apps).
 // OpenCode as the build engine (opencode-engine.js) counts its model calls against the same budget.
-require("./builder-tools").configure({webSearch:searchPublicWeb,callModel:(o,p)=>callBuilderModel({tier:"standard",...o},p)});
+// Notes from tutorials the builder reads are written by free models (tier "chat"), at no cost.
+require("./builder-tools").configure({webSearch:searchPublicWeb,callModel:(o,p)=>callBuilderModel({...o,tier:"chat",freeOnly:true},p)});
 require("./opencode-engine").configure({enforceBudget,recordUsage:u=>recordUsage(u,{purpose:"developer-build",model:u.model,provider:"opencode"}),checkUrl:"http://127.0.0.1:"+PORT+"/internal/opencode-check"});
 function builderProvider(){
   const chosen=String(process.env.KAIROQ_BUILDER_PROVIDER||"").trim().toLowerCase();
@@ -6971,7 +6972,8 @@ async function callChatAnswer(opts,parse){
       return parse(r.text,"kairoq-agent");
     }catch(err){if(opts.signal?.aborted)throw err;errors.push("Kairoq Agent: "+String(err.message||err).slice(0,120))}
   }
-  if(museReady()){
+  // freeOnly (learning notes): skip Muse, which is paid; Kairoq Agent and the free models stay.
+  if(museReady()&&!opts.freeOnly){
     try{const r=await callMuse({...opts,maxOutputTokens:Math.min(4000,Number(opts.maxOutputTokens)||2500)});return parse(r.text,r.model)}
     catch(err){if(opts.signal?.aborted)throw err;errors.push("Muse: "+String(err.message||err).slice(0,120))}
   }

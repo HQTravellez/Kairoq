@@ -1125,11 +1125,14 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    }
    // The reference library (builder-references.js): learn every tutorial once, see progress.
    if(route==='/admin/references'&&method==='GET')return send(res,200,require('./builder-references').status()),true;
+   // Notes made outside Kairoq (Hermes on the owner's computer): upload the file, Kairoq keeps them.
+   if(route==='/admin/references/import'&&method==='POST'){const b=await readJson(req,12000000);return send(res,200,require('./builder-references').importNotes(b.text,{replace:b.replace===true})),true}
    if(route==='/admin/references'&&method==='POST'){
     const b=await readJson(req,2000),R=require('./builder-references');
     if(b.stop)return send(res,200,R.stopLearning()),true;
     if(!callModel)throw Object.assign(Error('No AI model is set up on this server'),{status:503});
-    return send(res,202,R.learnAll({callModel:(o,p)=>callModel({tier:'standard',...o},p)})),true;
+    // Learning uses Kairoq Agent and free models only (tier 'chat', no paid fallback): notes are summaries, so they cost nothing.
+    return send(res,202,R.learnAll({concurrency:1,callModel:(o,p)=>callModel({...o,tier:'chat',freeOnly:true},p)})),true;
    }
    if(route==='/admin/backup'&&method==='POST')return send(res,200,{backup:backups.run()}),true;
    // AI cost per tier and model over the last 30 days, next to what one message of that tier sells for.

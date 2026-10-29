@@ -186,17 +186,47 @@ function status(){
  const all=catalog().tutorials,have=new Set(fs.readdirSync(notesDir()).filter(f=>f.endsWith('.json')).map(f=>f.slice(0,-5)));
  const files=all.filter(x=>have.has(keyOf(x.url))).map(x=>readFile(x.url)).filter(Boolean);
  const learned=files.filter(n=>!n.skipped).length,unlearnable=files.filter(n=>n.skipped).length,pages=files.reduce((a,n)=>a+(n.pages||0),0);
- return{total:all.length,learned,unlearnable,pages,topics:Object.keys(TOPICS).length,job:job?{running:job.running,done:job.done,failed:job.failed.length,skipped:job.skipped,started_at:job.started_at,finished_at:job.finished_at||null,last_error:job.failed.at(-1)||null}:null};
+ return{total:all.length,learned,unlearnable,pages,topics:Object.keys(TOPICS).length,job:job?{running:job.running,done:job.done,failed:job.failed.length,skipped:job.skipped,started_at:job.started_at,finished_at:job.finished_at||null,paused:job.paused||null,last_error:job.failed.at(-1)||null}:null};
 }
+// A free model's rate or daily limit: stop for now (nothing counts as failed); pressing again continues.
+const LIMITED=/\b429\b|rate.?limit|too many requests|quota|limit (?:reached|exceeded)|free-models-per-day/i;
 function learnAll({remote=(u,o)=>require('./builder-assets').remote(u,o),callModel,concurrency=2,max=Infinity}={}){
  if(!callModel)throw Object.assign(Error('No AI model is set up for learning'),{status:503});
  if(job&&job.running)return status();
  const todo=catalog().tutorials.filter(x=>!readFile(x.url)).slice(0,max);
  job={running:true,done:0,failed:[],skipped:0,started_at:new Date().toISOString()};
  const mine=job;let i=0;
- const worker=async()=>{while(i<todo.length&&mine.running){const item=todo[i++];try{await learn(item,{remote,callModel});mine.done++}catch(e){if(/budget/i.test(String(e.message))){mine.running=false;mine.failed.push({url:item.url,error:'Stopped: the AI budget for today or this month is used up'});return}if(e.status===422)mine.skipped++;else mine.failed.push({url:item.url,error:String(e.message||e).slice(0,160)})}}};
+ const worker=async()=>{while(i<todo.length&&mine.running){const item=todo[i++];try{await learn(item,{remote,callModel});mine.done++}catch(e){if(/budget/i.test(String(e.message))){mine.running=false;mine.failed.push({url:item.url,error:'Stopped: the AI budget for today or this month is used up'});return}if(LIMITED.test(String(e.message))){mine.running=false;mine.paused='The free AI models have reached their limit for now. Press Learn the library again later (tomorrow at the latest); it continues where it stopped.';return}if(e.status===422)mine.skipped++;else mine.failed.push({url:item.url,error:String(e.message||e).slice(0,160)})}}};
  mine.promise=Promise.all(Array.from({length:Math.max(1,concurrency)},worker)).then(()=>{mine.running=false;mine.finished_at=new Date().toISOString()});
  return status();
+}
+// Notes written outside Kairoq (for example by Hermes Agent on the owner's computer, following
+// docs/HERMES-LIBRARY-GUIDE.md): a JSON Lines file, one tutorial per line,
+// {"url": "<exactly as in the list>", "notes": "<the notes>", "sources": ["<pages read>"]}
+// or {"url": "...", "skipped": true, "reason": "video only"}. Only tutorials in the list are kept,
+// notes are plain text (300 to 16000 characters), and notes Kairoq already has are kept unless
+// replace is set. The file is data, never instructions.
+function importNotes(text,{replace=false}={}){
+ const byKey=new Map(catalog().tutorials.map(x=>[keyOf(x.url),x]));
+ const raw=String(text||'').trim();
+ let rows=[];
+ if(raw.startsWith('[')){try{rows=JSON.parse(raw)}catch{throw Object.assign(Error('The file is not valid JSON'),{status:400})}}
+ else rows=raw.split(/\r?\n/).filter(l=>l.trim()).map((l,i)=>{try{return JSON.parse(l)}catch{return{bad:i+1}}});
+ const out={imported:0,skipped_marked:0,already:0,not_in_list:0,too_short:0,bad_lines:0};
+ for(const r of rows.slice(0,2000)){
+  if(!r||typeof r!=='object'||r.bad){out.bad_lines++;continue}
+  const item=byKey.get(keyOf(String(r.url||'').trim()));
+  if(!item){out.not_in_list++;continue}
+  const have=readFile(item.url);
+  if(have&&!replace&&!(have.skipped&&!r.skipped)){out.already++;continue}
+  if(r.skipped===true){if(!have){markSkipped(item,'Imported: '+clip(r.reason||'nothing to learn from',140));out.skipped_marked++}else out.already++;continue}
+  const notes=String(r.notes||'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').trim();
+  if(notes.length<300){out.too_short++;continue}
+  const sources=(Array.isArray(r.sources)?r.sources:[item.url]).map(String).filter(u=>/^https?:\/\//.test(u)).slice(0,40);
+  saveFile(item.url,{url:item.url,title:item.title,topic:item.topic,language:item.language,notes:notes.slice(0,16000),pages:Math.max(1,Math.min(40,Number(r.pages)||sources.length||1)),sources:sources.length?sources:[item.url],learned_at:new Date().toISOString(),by:'import'});
+  out.imported++;
+ }
+ return{...out,status:status()};
 }
 function stopLearning(){if(job)job.running=false;return status()}
 
@@ -232,4 +262,4 @@ function note(text){
  const list=topicsFor(text);if(!list.length)return'';
  return'\n\nFROM THE REFERENCE LIBRARY (build-your-own-x): this request touches '+list.join(', ')+'.\n'+list.map(n=>'- '+n+': '+TOPICS[n].text).join('\n')+'\nCall kairoq_tutorials with the topic for step-by-step tutorials to read before building.';
 }
-module.exports={gatherSeries,gatherGitHub,gatherVideo,seriesLinks,kindOf,readFile,catalog,TOPICS,topicsFor,tutorials,lookup,note,savedNotes,inCatalog,learn,learnFromText,learnAll,stopLearning,status,notesDir,NOTES_PROMPT};
+module.exports={LIMITED,importNotes,NOTES_PROMPT,gatherSeries,gatherGitHub,gatherVideo,seriesLinks,kindOf,readFile,catalog,TOPICS,topicsFor,tutorials,lookup,note,savedNotes,inCatalog,learn,learnFromText,learnAll,stopLearning,status,notesDir,NOTES_PROMPT};
