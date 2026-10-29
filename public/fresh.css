@@ -1,6 +1,6 @@
 /* Kairoq "fresh" look (loaded last on create.html), in the spirit of Lovable, Bolt and v0: a light
    grey frame with a plain text sidebar, the page itself as one rounded white panel, a short
-   friendly line over one prompt box, a soft colour wash behind it, and the projects in a white
+   friendly line over one prompt box, a warm sand-and-apricot wash behind it (Kairoq's own), and the projects in a white
    sheet below. Only the signed-in app (body.app) changes; the public landing keeps its look. */
 body.app{
   --frame:#f4f4f3;
@@ -36,16 +36,16 @@ body.app .recents button{font-size:13.5px;color:var(--k-ink-2)}
 body.app .side-card{background:#fff!important;border:1px solid var(--k-line)!important;border-radius:12px!important}
 body.app:not(.in-editor) .shell-main{margin:8px 8px 8px 0;border:1px solid var(--k-line);border-radius:16px;background:#fff;overflow:auto;min-height:0}
 
-/* ---------- home: a short line, one prompt box, a soft colour wash ---------- */
+/* ---------- home: a short line, one prompt box, Kairoq's warm sand-and-apricot wash ---------- */
 #home .home{background:
   radial-gradient(70% 50% at 50% 30%,rgba(255,255,255,.95) 0%,rgba(255,255,255,0) 70%) top/100% 880px no-repeat,
-  linear-gradient(180deg,#ffffff 0%,#e3e9ff 26%,#cdc2ff 52%,#ffc9ae 78%,rgba(255,255,255,0) 100%) top/100% 880px no-repeat;
+  linear-gradient(180deg,#ffffff 0%,#fbf5ec 22%,#f6e4cf 48%,#f8cfaa 74%,rgba(255,255,255,0) 100%) top/100% 880px no-repeat;
   min-height:100%}
 #home .home-hero{max-width:720px;margin-inline:auto;padding-top:clamp(64px,16vh,170px)!important}
 #home .home h1,#home h1{font-size:clamp(28px,3vw,36px)!important;font-weight:600!important;letter-spacing:-.025em!important;margin-bottom:22px!important}
 #home .home-sub{display:none}
-#home .prompt-box{max-width:660px;margin-inline:auto;background:#fff!important;border:0!important;border-radius:20px!important;box-shadow:0 1px 2px rgba(0,0,0,.05),0 20px 50px -20px rgba(40,30,90,.35)!important}
-#home .prompt-box:focus-within{box-shadow:0 0 0 3px rgba(255,255,255,.7),0 20px 50px -20px rgba(40,30,90,.4)!important}
+#home .prompt-box{max-width:660px;margin-inline:auto;background:#fff!important;border:0!important;border-radius:20px!important;box-shadow:0 1px 2px rgba(0,0,0,.05),0 20px 50px -20px rgba(110,60,20,.28)!important}
+#home .prompt-box:focus-within{box-shadow:0 0 0 3px rgba(255,255,255,.7),0 20px 50px -20px rgba(110,60,20,.32)!important}
 #home .prompt-box textarea{font-size:15.5px}
 #home .prompt-bar{gap:8px;align-items:center}
 #home .prompt-bar .kind-seg{margin:0!important;padding:3px!important;border-radius:999px!important;background:#f3f3f1}
@@ -60,7 +60,7 @@ body.app:not(.in-editor) .shell-main{margin:8px 8px 8px 0;border:1px solid var(-
 #home #examples .example:hover{background:#fff!important;color:var(--k-ink)!important}
 
 /* the projects: a white sheet with pill tabs and big pictures */
-#home .browser{width:calc(100% - 48px);max-width:1120px;box-sizing:border-box;align-self:center;margin:clamp(80px,18vh,190px) auto 24px!important;background:#fff!important;border:1px solid var(--k-line)!important;border-radius:20px!important;box-shadow:0 -10px 40px -24px rgba(40,30,90,.25)!important;padding:18px 20px 24px!important}
+#home .browser{width:calc(100% - 48px);max-width:1120px;box-sizing:border-box;align-self:center;margin:clamp(80px,18vh,190px) auto 24px!important;background:#fff!important;border:1px solid var(--k-line)!important;border-radius:20px!important;box-shadow:0 -10px 40px -24px rgba(110,60,20,.18)!important;padding:18px 20px 24px!important}
 #home .browser-tabs{background:#f3f3f1;border-radius:999px;padding:3px;display:inline-flex;gap:2px;margin-bottom:16px}
 #home .browser-tabs button{border-radius:999px!important;height:30px;padding:0 13px!important;font-size:13px!important;border:0!important}
 #home .browser-tabs button[aria-selected=true]{background:#fff!important;box-shadow:0 1px 2px rgba(0,0,0,.08)}
@@ -91,3 +91,29 @@ body.app #editor .chat #chat-form.composer:focus-within{box-shadow:0 0 0 1px rgb
 body.app #editor #chat-input,body.app #editor #chat-input:focus,body.app #editor #chat-input:focus-visible{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;caret-color:var(--k-ink)!important;font-size:16px!important;line-height:22px!important}
 body.app #editor #send{width:32px!important;height:32px!important;min-width:32px!important;border-radius:999px!important;background:rgba(0,0,0,.88)!important;color:#fff!important;border:0!important;box-shadow:none!important}
 body.app #editor #send:disabled{background:rgba(0,0,0,.25)!important}
+
+/* ---------- the public landing page: the same black-and-white look with the warm sand-and-apricot
+   wash behind the hero; headline second halves and small labels in warm grey, black buttons, the
+   logo's "Create" in ink, and neutral (not navy) dark sections. No blue anywhere. ---------- */
+body:not(.app){
+  --k-accent:#1c1c1c;--k-accent-hover:#000;--k-accent-soft:#f3efe9;--k-accent-line:#d9d2c8;--k-ring:0 0 0 3px rgba(28,28,28,.1);
+  --k-ink:#1c1c1c;--k-ink-2:#4b4744;--k-ink-3:#8a817a;--k-line:#e8e4de;--k-tint:#f4f1ec;--k-bg:#f8f6f3;
+  --bg:#f8f6f3;--accent:var(--k-accent);--accent-2:var(--k-accent-hover);--accent-3:var(--k-accent-soft);--grad:var(--k-accent);
+  --lk-wine:var(--k-accent);--lk-wine-d:var(--k-accent-hover);
+}
+body:not(.app) .landing{--dark:#171513;--dark-2:#1e1b18;--dark-muted:#b3aaa1}
+body:not(.app) button.primary,body:not(.app) .primary,body:not(.app) #nav-start{background:#1c1c1c!important;border-color:#1c1c1c!important;color:#fff!important}
+body:not(.app) button.primary:hover,body:not(.app) #nav-start:hover{background:#000!important}
+body:not(.app) #landing-check-go{background:#fff!important;border-color:#fff!important;color:#1c1c1c!important}
+body:not(.app) .brand span,body:not(.app) .brand-foot b{background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;color:var(--k-ink-3)!important;-webkit-text-fill-color:var(--k-ink-3)!important}
+body:not(.app) .brand::before{content:"K";display:grid;place-items:center;background:#1c1c1c;box-shadow:none;color:#fff;font:700 12px/1 Geist,ui-sans-serif,sans-serif}
+body:not(.app) .landing h1 em,body:not(.app) .landing h2 em{background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;color:var(--k-ink-3)!important;-webkit-text-fill-color:var(--k-ink-3)!important}
+body:not(.app) .landing .compare h2 em,body:not(.app) .landing .cta h2 em,body:not(.app) .landing [class*=dark] h2 em{color:#f3c79f!important;-webkit-text-fill-color:#f3c79f!important}
+body:not(.app) .kicker{color:var(--k-ink-3)!important}body:not(.app) .kicker::before{background:var(--k-ink-3)!important}
+body:not(.app) .landing .aurora i:nth-child(1){background:radial-gradient(closest-side,#f9d2b0,transparent 70%)!important}
+body:not(.app) .landing .aurora i:nth-child(2){background:radial-gradient(closest-side,#f5e3cc,transparent 70%)!important}
+body:not(.app) .landing .aurora i:nth-child(3){background:radial-gradient(closest-side,#fbe6d2,transparent 70%)!important}
+body:not(.app) .landing .hero{background:linear-gradient(180deg,#ffffff 0%,#fbf5ec 30%,#f6e4cf 62%,#f8d6b6 84%,#f8f6f3 100%)}
+/* bars and progress on the landing: apricot, so they show on dark cards too */
+body:not(.app) .landing .funnel-row i,body:not(.app) .landing .tile.wide .funnel-row i{background:linear-gradient(90deg,#f3c79f,#e9a06a)!important}
+body:not(.app) .landing .mock-bar>span{background:#e9a06a!important}
