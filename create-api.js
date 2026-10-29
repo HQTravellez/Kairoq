@@ -109,7 +109,8 @@ function cost({mode,tier,images,model=null}){
  if(!t||!t.enabled)throw Object.assign(Error('That model tier is not available'),{status:400});
  const base=model?model.credits:t.credits;
  const image=images?intEnv('KAIROQ_IMAGE_CREDITS',1):0;
- if(mode==='discuss')return(tier==='standard'&&!model?intEnv('KAIROQ_DISCUSS_CREDITS',1):Math.max(base,intEnv('KAIROQ_DISCUSS_CREDITS',1)))+image;
+ // Free consultation; builds and code-changing actions remain paid.
+ if(mode==='discuss')return 0;
  if(mode==='polish')return Math.max(base,polishCredits())+image;
  // Autopilot: up to KAIROQ_AUTOPILOT_ROUNDS fixes, each like one build (pricing to be set later).
  if(mode==='autopilot')return base*require('./autopilot').maxRounds()+image;
