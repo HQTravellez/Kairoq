@@ -20,6 +20,7 @@ AVAILABLE CAPABILITIES (discoverable inventory, not automatic permission):\n${re
 - {"tool":"inspect_api_docs","url":"https://docs.example.com/openapi.json"}: fetch public API documentation through the existing guarded fetch_url transport and parse OpenAPI/Swagger/Postman or infer draft endpoints. This does NOT call supplier APIs or approve an operation.
 - {"tool":"read_files","paths":["src/App.jsx"]}: read up to 8 files.
 - {"tool":"search","query":"text or regex"}: search every project file; returns matching lines.
+- {"tool":"project_graph","action":"query","query":"authentication session"}: query Kairoq's structural project graph for symbols/files/relationships. Other actions: {"action":"path","from":"Auth","to":"Database"}, {"action":"impact","changed":["src/auth.js"]}, {"action":"stats"}. Use this before editing an unfamiliar multi-file area and use impact after structural changes. Graphify is deterministic AST analysis; if unavailable Kairoq falls back to its native import graph.
 - {"tool":"write_files","files":{"src/path.jsx":"full new content"},"delete":["src/old.jsx"]}: create or replace whole files (src/, functions/ and sql/ migrations).
 - {"tool":"edit_files","edits":{"src/path.jsx":[{"find":"exact current lines (unique in the file)","replace":"new lines"}]}}: change part of existing files. Prefer this over write_files for small changes: it is faster and cheaper. "find" must be copied exactly from the file (read it first) and match one place.
 - {"tool":"build_and_test","path":"#/optional-hash-route","steps":[...]}: build the project, open it in a real browser, run optional UI steps, and report errors and visible text${vision?' plus a screenshot':''}.
@@ -76,6 +77,7 @@ function describe(a){
  if(t==='inspect_api_docs')return'Inspected API documentation at '+String(a.url||'').slice(0,80);
  if(t==='read_files')return'Read '+(Array.isArray(a.paths)?a.paths.slice(0,8).join(', '):'files');
  if(t==='search')return'Searched for "'+String(a.query||'').slice(0,60)+'"';
+ if(t==='project_graph')return'Inspected the project graph ('+String(a.action||'query').slice(0,20)+')';
  if(t==='write_files'){const n=Object.keys(a.files||{});const d=Array.isArray(a.delete)?a.delete:[];return'Wrote '+(n.length?n.join(', '):'nothing')+(d.length?'; deleted '+d.join(', '):'')}
  if(t==='edit_files'){const f=Object.keys(a.edits||{});return'Edited '+(f.length?f.join(', '):'nothing')}
  if(t==='build_and_test')return'Built and tested the app'+(Array.isArray(a.steps)&&a.steps.length?' ('+a.steps.length+' UI steps)':'');
@@ -213,13 +215,24 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    for(const [name,code] of Object.entries(work)){code.split('\n').forEach((line,i)=>{if(hits.length<80&&re.test(line))hits.push(name+':'+(i+1)+': '+line.trim().slice(0,200))})}
    return{text:hits.length?hits.join('\n')+(hits.length>=80?'\n(first 80 matches)':''):'No matches for "'+q+'".'};
   }
+  if(t==='project_graph'){
+   const pg=require('./project-graph'),action=String(a.action||'query').toLowerCase();
+   try{
+    const g=await pg.build(work,{projectId:id});
+    tl.add({t:'note',icon:'search',text:'Inspected project graph via '+g.source});
+    if(action==='stats')return{text:JSON.stringify({source:g.source,version:g.version,mode:g.mode,stats:g.stats,warning:g.warning||null})};
+    if(action==='path')return{text:clip(JSON.stringify(pg.shortestPath(g,String(a.from||''),String(a.to||''),{maxDepth:8})),18000)};
+    if(action==='impact')return{text:clip(JSON.stringify(pg.impact(g,Array.isArray(a.changed)?a.changed.slice(0,30):[])),18000)};
+    return{text:clip(JSON.stringify(pg.query(g,String(a.query||''),{limit:12,neighbors:24})),22000)};
+   }catch(e){return{text:'project_graph failed: '+String(e.message||e).slice(0,500)}}
+  }
   if(t==='write_files'){
    const files=a.files&&typeof a.files==='object'&&!Array.isArray(a.files)?a.files:{};
    const before={...work};
    const written=[],bad=[];
    for(const [name,code] of Object.entries(files)){if(typeof code!=='string'){bad.push(name+' (content must be a string)');continue}work[name]=code;written.push(name)}
    for(const name of Array.isArray(a.delete)?a.delete:[])if(typeof name==='string'&&name!=='src/main.jsx'&&name!=='src/App.jsx'&&Object.hasOwn(work,name)){delete work[name];written.push('deleted '+name)}
-   if(written.length){dirty=true;lastUnitTests=null;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   if(written.length){dirty=true;lastUnitTests=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    tl.edits(before,work);
    const problems=builder.checkProject(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
@@ -229,7 +242,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const r=require('./react-edits').apply(work,edits);
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
    for(const f of r.changed)tl.add({t:'edit',file:f,kind:'edited'});
-   work=r.files;if(r.changed.length){dirty=true;lastUnitTests=null;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   work=r.files;if(r.changed.length){dirty=true;lastUnitTests=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
