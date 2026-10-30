@@ -113,8 +113,10 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const wb=require('./web').createBrowser({browseSite,maxOps:intEnv('KAIROQ_WEB_MAX_ACTIONS',30,5,100)});
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
  const started=new Date().toISOString();
- let work={...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=false,lastTest=null,finishWarned=false,invalidReplies=0;
- const steps=[];
+ const checkpointStore=require('./agent-checkpoint'),checkpoint=checkpointStore.load(id,{instruction:text,baseVersion:meta.current_version});
+ let work=checkpoint?checkpoint.files:{...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=Boolean(checkpoint),lastTest=null,finishWarned=false,invalidReplies=0;
+ const steps=[];let activeStep=checkpoint?.step||0;
+ if(checkpoint)tl.add({t:'note',icon:'code',text:'Resumed saved build progress from step '+checkpoint.step});
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=await require('./decision-router').suggest(text);
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
@@ -215,7 +217,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const written=[],bad=[];
    for(const [name,code] of Object.entries(files)){if(typeof code!=='string'){bad.push(name+' (content must be a string)');continue}work[name]=code;written.push(name)}
    for(const name of Array.isArray(a.delete)?a.delete:[])if(typeof name==='string'&&name!=='src/main.jsx'&&name!=='src/App.jsx'&&Object.hasOwn(work,name)){delete work[name];written.push('deleted '+name)}
-   if(written.length)dirty=true;
+   if(written.length){dirty=true;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    tl.edits(before,work);
    const problems=builder.checkProject(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
@@ -225,7 +227,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const r=require('./react-edits').apply(work,edits);
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
    for(const f of r.changed)tl.add({t:'edit',file:f,kind:'edited'});
-   work=r.files;if(r.changed.length)dirty=true;
+   work=r.files;if(r.changed.length){dirty=true;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
@@ -303,6 +305,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
   builder.saveMeta(fresh);
+  checkpointStore.clear(id);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
   const failedChecks=require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.enabled!==false&&c.last&&c.last.version===built.n&&!c.last.ok).map(c=>({name:c.name,step:c.last.step||'',error:c.last.error||''}));
   // Persist only executor-verified procedures; this background disk write does not call a model.
@@ -313,6 +316,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   return{version:built.n,message,changed,verification:completion,steps:steps.length,timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
  }
  function noChange(message){
+  checkpointStore.clear(id);
   if(built)fs.rmSync(built.dir,{recursive:true,force:true});
   message='No changes were made. '+message;
   builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}]);
@@ -322,7 +326,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
 
  try{
- for(let step=1;step<=limit;step++){
+ for(let step=Math.max(1,(checkpoint?.step||0)+1);step<=limit;step++){
+  activeStep=step;
   signal?.throwIfAborted();
   report({status:'thinking',step});
   trimContext();
