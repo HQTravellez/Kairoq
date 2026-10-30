@@ -59,3 +59,26 @@ FreeLLMAPI aggregates free tiers; it does not create provider allowance by itsel
 Run FreeLLMAPI as a separate service with its own persistent volume and provider keys. Keep it private; Kairoq only needs its private hostname and unified API key. The upstream project documents its own Docker/Railway deployment details.
 
 After both services are configured, Kairoq will automatically prefer the FreeLLMAPI pool for free chat and Standard builds.
+
+
+## Deterministic unified key on Railway
+
+The Kairoq repo includes `freellmapi-railway/`, a thin wrapper over the official FreeLLMAPI image. It does not fork or modify the upstream application. At boot it waits for FreeLLMAPI to initialize its SQLite settings table and then synchronizes the unified proxy key from:
+
+```env
+KAIROQ_FREELLMAPI_UNIFIED_KEY=freellmapi-<48+ hex characters>
+```
+
+Use the same secret as Kairoq's:
+
+```env
+FREELLMAPI_API_KEY=<same value>
+```
+
+This removes the need to expose the FreeLLMAPI dashboard just to copy the generated unified key. The wrapper never prints the key.
+
+Railway service settings:
+- Config-as-code: `freellmapi-railway/railway.json`
+- Persistent volume: `/app/server/data`
+- Private endpoint: e.g. `freellmapi.railway.internal`
+- Kairoq base URL: `http://freellmapi.railway.internal:3001/v1`
