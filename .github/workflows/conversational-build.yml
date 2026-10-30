@@ -3,6 +3,9 @@ on:
   push:
     paths:
       - 'react-builder.js'
+      - 'create-api.js'
+      - 'api-chat-routing.js'
+      - 'test/api-chat-routing.test.js'
       - 'react-agent.js'
       - 'conversational-build-contract.js'
       - 'test/conversational-build-contract.test.js'
@@ -10,6 +13,9 @@ on:
   pull_request:
     paths:
       - 'react-builder.js'
+      - 'create-api.js'
+      - 'api-chat-routing.js'
+      - 'test/api-chat-routing.test.js'
       - 'react-agent.js'
       - 'conversational-build-contract.js'
       - 'test/conversational-build-contract.test.js'
@@ -26,5 +32,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check react-builder.js && node --check react-agent.js && node --check conversational-build-contract.js
-      - run: node --test test/conversational-build-contract.test.js
+      - run: node --check react-builder.js && node --check react-agent.js && node --check create-api.js && node --check api-chat-routing.js && node --check conversational-build-contract.js
+      - run: node --test test/conversational-build-contract.test.js test/api-chat-routing.test.js

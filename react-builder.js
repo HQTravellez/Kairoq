@@ -977,7 +977,9 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+(perMessage?'\n\n'+perMessage:'')+'\n\nMessage: '+text,images)}];
  // Save what the owner said before inference, so failed model calls cannot make it vanish.
  addMessages(id,[{role:'user',text,mode:'discuss'}]);
- const answer=(await callModel({messages,temperature:0.4,maxOutputTokens:2500,cacheKey:'kairoq-'+id,signal,tier:require('./builder-response-policy').discussionTier(images,tier),onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
+ let answer=(await callModel({messages,temperature:0.4,maxOutputTokens:2500,cacheKey:'kairoq-'+id,signal,tier:require('./builder-response-policy').discussionTier(images,tier),onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
+ // Never let a generic model persona contradict Kairoq's real API/web capabilities.
+ answer=require('./api-chat-routing').guardDiscussAnswer(text,answer);
  const {text:plain,ideas}=splitIdeas(answer,text);
  const Q=require('./builder-question'),{text:said,question:asked}=Q.fromText(plain);
  const shown=Q.display(said,asked);

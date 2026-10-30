@@ -319,6 +319,16 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   message='The owner is not happy with how the app looks. Give it a completely new look following the NEW design brief (its colours and fonts are already in src/index.css): rebuild the layout and sections as the section recipes say and add the signature moment, keeping every page, feature, form and piece of real content. Start your message to the owner with one short, warm sentence saying sorry it was not right and that you have given it a completely new look, then say in plain words what changed.';
  }
  if(!hooks&&mode==='build'&&require('./code-structure').isTidy(message)){shownText='Tidy up the code';message=require('./code-structure').TIDY}
+ const apiChat=require('./api-chat-routing');
+ // Product capability questions are answered from Kairoq's actual server capabilities, not from a model persona.
+ // A public API-doc URL plus a request to inspect/use it must enter the tool-using agent, even from Discuss.
+ if(!hooks&&!images.length&&!context&&!shownText&&apiChat.capabilityQuestion(ownerText)){
+  const meta=builder.loadMeta(id),answer=apiChat.capabilityAnswer();
+  builder.addMessages(id,[{role:'user',text:String(ownerText).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true,conversation_kind:'api-capability'}]);
+  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
+  jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
+ }
+ if(!hooks&&apiChat.docsResearchRequest(ownerText)&&(mode==='build'||mode==='discuss'))mode='agent';
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
  if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&!shownText){
