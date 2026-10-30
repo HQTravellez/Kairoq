@@ -38,7 +38,9 @@ function status(id,instruction,{root}={}){
 function setStatus(id,instruction,taskId,next,{evidence="",root}={}){
  const opts=root?{root}:{},data=readAll(id,opts),g=data.graphs[key(instruction)];if(!g)throw Error("task graph is not defined");
  const t=g.tasks.find(x=>x.id===taskId);if(!t)throw Error("unknown task "+taskId);
- if(next==="active"&&!ready(g).some(x=>x.id===taskId))throw Error("task "+taskId+" is blocked");
+ const frontier=ready(g).some(x=>x.id===taskId);
+ if(next==="active"&&!frontier)throw Error("task "+taskId+" is blocked");
+ if(next==="done"&&t.status==="pending"&&!frontier)throw Error("task "+taskId+" is blocked");
  if(next==="done"&&t.status!=="active"&&t.status!=="pending")throw Error("task "+taskId+" cannot complete from "+t.status);
  t.status=next;t.evidence=clean(evidence,1000);t.updatedAt=new Date().toISOString();g.updatedAt=t.updatedAt;writeAll(id,data,opts);return status(id,instruction,{root});
 }
