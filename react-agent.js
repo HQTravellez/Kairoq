@@ -25,6 +25,7 @@ AVAILABLE CAPABILITIES (discoverable inventory, not automatic permission):\n${re
 - {"tool":"build_and_test","path":"#/optional-hash-route","steps":[...]}: build the project, open it in a real browser, run optional UI steps, and report errors and visible text${vision?' plus a screenshot':''}.
 - {"tool":"test_ui","path":"#/rooms","steps":[{"action":"click","text":"Book now"},{"action":"fill","label":"Email","value":"ana@example.com"},{"action":"select","label":"Room","value":"Suite"},{"action":"press","key":"Enter"},{"action":"expect","text":"Thank you"},{"action":"goto","path":"#/rooms"},{"action":"wait","ms":500}]}: run steps against the last build. Target elements by text, label, placeholder, role (+ text) or selector.
   Tests run on a test copy of the app's data: nothing they create is real, and emails and payments are simulated. Add "save_as":"Book a room" to a test_ui or build_and_test whose steps prove a main flow works (ending with expect steps): when it passes it becomes a saved check that is re-run after every future change.
+- {"tool":"run_tests"}: execute project verification files under src/verification/*.test.js against the CURRENT unsaved source. Verification tests must be pure JS and may import relative pure-JS modules from src/lib, src/utils, src/domain, src/core or src/verification. Use this for formulas, calculations, transformations and other deterministic logic. A failing test blocks VERIFIED completion.
 - {"tool":"view_logs"}: server logs: console.log output and errors from server functions, failed backend requests.
 - {"tool":"query_db","sql":"SELECT * FROM rooms LIMIT 5"}: read the app's SQL tables (SELECT only; the same test copy your tests use).
 - {"tool":"run_automation","name":"reminders"}: run one of the app's automations (src/backend.json "automations") now on the test copy, after build_and_test, and see its result and log lines. Use it to prove scheduled and record-triggered functions work.
@@ -79,6 +80,7 @@ function describe(a){
  if(t==='edit_files'){const f=Object.keys(a.edits||{});return'Edited '+(f.length?f.join(', '):'nothing')}
  if(t==='build_and_test')return'Built and tested the app'+(Array.isArray(a.steps)&&a.steps.length?' ('+a.steps.length+' UI steps)':'');
  if(t==='test_ui')return'Tested in the browser ('+(Array.isArray(a.steps)?a.steps.length:0)+' steps)';
+ if(t==='run_tests')return'Ran deterministic project verification tests';
  if(t==='view_logs')return'Checked server logs';
  if(t==='query_db')return'Queried the database';
  if(t==='run_automation')return'Ran the automation "'+String(a.name||'').slice(0,40)+'"';
@@ -114,7 +116,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
  const started=new Date().toISOString();
  const checkpointStore=require('./agent-checkpoint'),checkpoint=checkpointStore.load(id,{instruction:text,baseVersion:meta.current_version});
- let work=checkpoint?checkpoint.files:{...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=Boolean(checkpoint),lastTest=null,finishWarned=false,invalidReplies=0;
+ let work=checkpoint?checkpoint.files:{...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=Boolean(checkpoint),lastTest=null,lastUnitTests=null,finishWarned=false,invalidReplies=0;
  const steps=[];let activeStep=checkpoint?.step||0;
  if(checkpoint)tl.add({t:'note',icon:'code',text:'Resumed saved build progress from step '+checkpoint.step});
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
@@ -217,7 +219,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const written=[],bad=[];
    for(const [name,code] of Object.entries(files)){if(typeof code!=='string'){bad.push(name+' (content must be a string)');continue}work[name]=code;written.push(name)}
    for(const name of Array.isArray(a.delete)?a.delete:[])if(typeof name==='string'&&name!=='src/main.jsx'&&name!=='src/App.jsx'&&Object.hasOwn(work,name)){delete work[name];written.push('deleted '+name)}
-   if(written.length){dirty=true;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   if(written.length){dirty=true;lastUnitTests=null;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    tl.edits(before,work);
    const problems=builder.checkProject(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
@@ -227,12 +229,19 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const r=require('./react-edits').apply(work,edits);
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
    for(const f of r.changed)tl.add({t:'edit',file:f,kind:'edited'});
-   work=r.files;if(r.changed.length){dirty=true;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   work=r.files;if(r.changed.length){dirty=true;lastUnitTests=null;checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
   if(t==='build_and_test')return buildAndTest(a);
   if(t==='test_ui')return testBuild(a,'test_ui on version '+(built?built.n:'?')+':');
+  if(t==='run_tests'){
+   report({status:'testing'});
+   lastUnitTests=require('./project-test-runner').run(work);
+   tl.add({t:'test',ok:lastUnitTests.ok,text:lastUnitTests.ok?'Verification tests passed':'Verification tests failed',detail:lastUnitTests.ok?lastUnitTests.files:[lastUnitTests.output]});
+   const head='run_tests: '+(lastUnitTests.ok?'PASS':'FAIL')+' · '+lastUnitTests.passed+' passed · '+lastUnitTests.failed+' failed';
+   return{text:head+'\n'+clip(lastUnitTests.output||'',12000)};
+  }
   if(t==='view_logs'){
    tl.add({t:'note',icon:'logs',text:'Read the server logs'});
    const logs=require('./react-logs').list(id).slice(-60);
@@ -298,9 +307,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const changed=Object.keys(files).filter(k=>base[k]!==files[k]).concat(Object.keys(base).filter(k=>!Object.hasOwn(files,k)));
   const fresh=builder.loadMeta(id),now=new Date().toISOString();
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
-  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements});
+  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files});
   message=require('./engineering-completion-gate').resultMessage(message,completion);
-  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues},...(errors.length?{runtime_errors:errors}:{})});
+  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues,verification_evidence:completion.evidence,...(lastUnitTests?{unit_tests:{ok:lastUnitTests.ok,ran:lastUnitTests.ran,passed:lastUnitTests.passed,failed:lastUnitTests.failed,files:lastUnitTests.files}}:{})},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
   fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
@@ -355,15 +364,22 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     if(unchanged()){finished=noChange(message);break}
     if(dirty||!built){const r=await buildAndTest({});results.push(r.text);if(r.image)image=r.image}
     if(!built||dirty){results.push('finish: your latest changes do not build yet. Fix the problems above, then finish.');continue}
-    if(lastTest&&lastTest.errors.length&&!finishWarned){finishWarned=true;results.push('finish: the last test still shows problems (listed above). Fix them and test again, or call finish again to stop anyway.');continue}
+    if(lastTest&&lastTest.errors.length){finishWarned=true;results.push('finish: the last browser test still shows problems. Fix them and test again; finish cannot bypass verification.');continue}
     if(!checksWarned&&inspect&&require('./react-checks').list(builder.loadMeta(id)).length){
      checksWarned=true;report({status:'checking'});
      const cr=await require('./react-checks').run(id,built.url,{inspect,version:built.n});lastSavedChecks=cr;
-     if(cr.failed.length){results.push('finish: these saved checks (flows that worked before) now fail:\n'+require('./react-checks').failureText(cr.failed)+'\nFix them and test again, or call finish again to stop anyway.');continue}
+     if(cr.failed.length){results.push('finish: these saved checks (flows that worked before) now fail:\n'+require('./react-checks').failureText(cr.failed)+'\nFix them and test again; finish cannot bypass verification.');continue}
      results.push('Saved checks: all '+cr.ran+' passed.');
     }
-    const verdict=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements});
-    if(!verdict.verified&&!finishWarned){finishWarned=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Run real browser interactions, repair failures, and retest. If blocked, call finish again to save an explicitly UNVERIFIED draft.');continue}
+    const gate=require('./engineering-completion-gate');
+    if(gate.requiresUnitTests(ownerRequirements,work)&&!lastUnitTests){
+     lastUnitTests=require('./project-test-runner').run(work);
+     results.push('Automatic verification tests: '+(lastUnitTests.ok?'PASS':'FAIL')+'\n'+clip(lastUnitTests.output||'',12000));
+     tl.add({t:'test',ok:lastUnitTests.ok,text:lastUnitTests.ok?'Verification tests passed':'Verification tests failed',detail:lastUnitTests.ok?lastUnitTests.files:[lastUnitTests.output]});
+     if(!lastUnitTests.ok){results.push('finish: deterministic verification failed. Repair the implementation or tests based on the failure above, then run_tests again.');continue}
+    }
+    const verdict=gate.evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files:work});
+    if(!verdict.verified){finishWarned=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
     finished=save(message);break;
    }
    try{const r=await tool(a);results.push(clip(r.text,20000));if(r.image)image=r.image}
