@@ -1,0 +1,22 @@
+name: Restaurant proof (isolated)
+on:
+  pull_request:
+    paths:
+      - 'examples/restaurant-proof/**'
+      - '.github/workflows/restaurant-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reservation-persistence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax checks
+        run: node --check examples/restaurant-proof/server.js && node --check examples/restaurant-proof/restaurant.test.js
+      - name: HTTP, persistence, authorization and duplicate tests
+        run: node --test examples/restaurant-proof/restaurant.test.js
