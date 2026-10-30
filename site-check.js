@@ -142,6 +142,10 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   const real=r.visits.filter(v=>v.outcome!=='skipped');
   if(real.length&&real.every(v=>v.outcome==='error')){const first=String(real[0].error||'');throw Object.assign(Error(/429|limit|quota/i.test(first)?'The AI models have reached their limit for today, so the visitors could not run. Please try again later.':'The AI visitors could not run ('+clip(first,140)+'). Please try again later.'),{noScore:true})}
   const tech=technical(desktop.facts,phone.facts);
+  const invalid=real.filter(v=>v.outcome==='error'||v.outcome==='blocked');
+  const valid=real.filter(v=>!['error','blocked'].includes(v.outcome));
+  const inconclusive=valid.length<Math.max(3,Math.ceil(count*0.8))||invalid.length>0;
+  const safeNumbers={...r.numbers,inconclusive,valid_journeys:valid.length,agent_failures:invalid.length};
   const report={
    id:state.id,url:state.url,host:state.host,at:new Date().toISOString(),...about,
    score:score(safeNumbers,tech),numbers:safeNumbers,inconclusive,...(r.numbers.visitors&&r.numbers.blocked>=r.numbers.visitors?{blocked:true}:{}),summary:inconclusive?{headline:'Insufficient evidence: some AI visitors failed or were blocked. This is not a conversion score.',issues:[],fixes:[]}:r.summary,technical:tech,
