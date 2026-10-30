@@ -1,0 +1,21 @@
+name: Flagship domain proofs
+on:
+  pull_request:
+    paths:
+      - 'examples/physics-lab/**'
+      - 'examples/healthcare-staffing/**'
+      - 'examples/flagship-acceptance.test.js'
+      - '.github/workflows/flagship-domain-proofs.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference-math-and-business-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test examples/flagship-acceptance.test.js
