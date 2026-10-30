@@ -1,0 +1,11 @@
+"use strict";
+const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs");
+const p=require("./physics-lab/physics");
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
+test("pendulum doubles period when string length quadruples",()=>{const a=p.pendulum({length:1}),b=p.pendulum({length:4});near(b.period,2*a.period)});
+test("pendulum period decreases with stronger gravity",()=>{const a=p.pendulum({length:1,gravity:9.8}),b=p.pendulum({length:1,gravity:19.6});near(b.period,a.period/Math.sqrt(2))});
+test("pendulum rejects amplitudes outside small-angle regime",()=>assert.throws(()=>p.pendulum({length:1,amplitudeDeg:45})));
+test("spring period increases by two when mass quadruples",()=>{const a=p.spring({mass:1,stiffness:25}),b=p.spring({mass:4,stiffness:25});near(b.period,a.period*2)});
+test("spring kinetic and potential sum to invariant total energy",()=>{const o={mass:2,stiffness:30,amplitude:.2};for(const t of [0,.1,.4,.9,2]){const r=p.springAtTime(o,t);near(r.kinetic+r.potential,p.spring(o).maxEnergy)}});
+test("spring rejects negative mass and stiffness",()=>{assert.throws(()=>p.spring({mass:-1,stiffness:5}));assert.throws(()=>p.spring({mass:1,stiffness:0}))});
+test("visual studio offers all three interactive experiments",()=>{const html=fs.readFileSync(require("node:path").join(__dirname,"physics-lab/index.html"),"utf8");for(const mode of ["projectile","pendulum","spring"])assert.match(html,new RegExp('data-mode="'+mode+'"'));assert.match(html,/requestAnimationFrame/);assert.match(html,/aria-live/);});
