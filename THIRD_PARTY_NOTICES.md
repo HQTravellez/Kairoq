@@ -188,3 +188,14 @@ requirements. API/schema compatibility and offline tests do not establish produc
 ## Kairoq for Figma (figma-plugin/, figma-export.js)
 
 The plugin is Kairoq's own code and uses only Figma's plugin API. Figma lets plugins create designs; its public REST API cannot, which is why Kairoq → Figma goes through a plugin.
+
+
+## Graphify project intelligence
+
+Kairoq can install `graphifyy==0.1.14` from the Graphify project
+(https://github.com/Graphify-Labs/graphify) as a pinned external Python package in the
+server image. Kairoq uses only its deterministic AST extraction functions through
+`scripts/graphify-kairoq.py`; semantic LLM extraction, hooks, MCP serving and Graphify
+network workflows are not invoked. The upstream package metadata declares the package
+license as MIT. Kairoq does not vendor Graphify source code; `project-graph.js` is
+Kairoq's own adapter, query, path and impact layer.
