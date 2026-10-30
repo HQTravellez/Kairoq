@@ -7084,9 +7084,9 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
       // Pro and Max models can write whole apps in one reply, so they get a larger output cap.
       const designModel=designFirst.includes(model);
-      const premium=opts.tier==="pro"||opts.tier==="max"||designModel;
+      const premium=opts.tier==="pro"||opts.tier==="max"||designModel||Boolean(opts.only);
       const outputCap=premium?Math.max(4000,Number(process.env.KAIROQ_PREMIUM_OUTPUT_TOKENS)||32000):Math.max(2000,Number(process.env.KAIROQ_STANDARD_OUTPUT_TOKENS)||16000);
-      const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):10000;
+      const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):(opts.only?Math.min(outputCap,24000):10000);
       let rates=free?[0,0]:model.includes("gemini-2.5-flash")?[0.3,2.5]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
       if(viaAnthropic)rates=anthropic.rates(model,rates);
       if(!free){
