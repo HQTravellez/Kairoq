@@ -6882,7 +6882,7 @@ function builderProvider(){
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   try{return await callBuilderModelOnce(opts,parse)}
   catch(err){
-    if(err.name==="AbortError"||opts.signal?.aborted||!retryableModelError(err))throw err;
+    if(opts.model||process.env.KAIROQ_BUILDER_SINGLE_MODEL==="true"||err.name==="AbortError"||opts.signal?.aborted||!retryableModelError(err))throw err;
     console.log("[builder] every model failed, trying again: "+String(err.message||err).slice(0,300));
     opts.onRetry?.();
     await new Promise((resolve,reject)=>{const t=setTimeout(resolve,Number(process.env.KAIROQ_BUILDER_RETRY_MS??5000));opts.signal?.addEventListener("abort",()=>{clearTimeout(t);reject(opts.signal.reason||Error("Stopped."))},{once:true})});
@@ -6901,6 +6901,9 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
       if(!process.env.OPENROUTER_API_KEY&&!(require("./anthropic").isClaude(model)&&require("./anthropic").configured()))throw Error("OpenRouter is not set up");
       return await callOpenRouterBuilder({...rest,only:model},parse);
     }catch(err){
+      // A user-selected model is an explicit instruction: never silently reroute it.
+      // Preserve provider and parse errors so the user can correct the real problem.
+      throw err;
       if(err.name==="AbortError"||rest.signal?.aborted)throw err;
       // Selected-model timeouts must not cascade into an unrelated Auto/free-model workflow.
       if(/(?:aborted|timed? out|timeout|503|502)/i.test(String(err.message||err)))throw Error("The selected AI model did not respond in time. No automatic free-model fallback was attempted; retry once or choose another model.");
@@ -6911,6 +6914,7 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
       onFallback?.(err);opts=rest;
     }
   }
+  if(process.env.KAIROQ_BUILDER_SINGLE_MODEL==="true" && !opts.model && opts.tier!=="check")return callOpenRouterBuilder({...opts,only:String(process.env.KAIROQ_BUILDER_MODEL||"anthropic/claude-sonnet-4.6")},parse);
   if(opts.tier==="chat")return callChatAnswer(opts,parse);
   // Website checks and AI customers (tier "check") go straight to their own models on OpenRouter
   // (Gemini Flash, DeepSeek; see callOpenRouterBuilder), not to the builder's provider, whose free
