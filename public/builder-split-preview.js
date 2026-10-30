@@ -19,21 +19,23 @@ if(typeof module!=="undefined"&&module.exports)module.exports={kqSplitBounds};
  const handle=document.createElement("div");handle.id="kq-split-handle";handle.setAttribute("role","separator");handle.setAttribute("aria-label","Resize chat and live preview");handle.setAttribute("aria-orientation","vertical");handle.tabIndex=0;
  editor.insertBefore(handle,stage);
  const safeWidth=()=>{try{const v=Number(localStorage.getItem("kq-chat-width"));return Number.isFinite(v)&&v>=22&&v<=60?v:30}catch{return 30}};
- let desiredWidth=safeWidth(),dragging=false;
+ let preferredWidth=safeWidth(),appliedWidth=preferredWidth,dragging=false;
  function bounds(){return kqSplitBounds(editor.getBoundingClientRect().width,{chatMin:CHAT_MIN_PX,previewMin:PREVIEW_MIN_PX})}
- function width(v){
-  const raw=Number(v);if(Number.isFinite(raw))desiredWidth=Math.min(60,Math.max(22,raw));
+ function width(v,{keepPreferred=false}={}){
+  const raw=Number(v),target=Number.isFinite(raw)?Math.min(60,Math.max(22,raw)):preferredWidth;
+  if(!keepPreferred)preferredWidth=target;
   const b=bounds(),full=editor.classList.contains("kq-preview-full");
   editor.classList.toggle("kq-split-compact",b.compact&&!full);
   handle.setAttribute("aria-disabled",String(b.compact||full));
   if(b.compact&&!full){
    editor.style.removeProperty("grid-template-columns");
    handle.setAttribute("aria-valuemin","22");handle.setAttribute("aria-valuemax","60");
-   handle.setAttribute("aria-valuenow",String(Math.round(desiredWidth)));
+   handle.setAttribute("aria-valuenow",String(Math.round(appliedWidth)));
    handle.setAttribute("aria-valuetext","Compact workspace: preview and chat are stacked");
-   return desiredWidth;
+   return appliedWidth;
   }
-  const n=Math.min(b.max,Math.max(b.min,desiredWidth));desiredWidth=n;
+  const n=Math.min(b.max,Math.max(b.min,target));appliedWidth=n;
+  if(!keepPreferred)preferredWidth=n;
   editor.style.setProperty("--kq-chat-width",n+"%");
   if(!full)editor.style.setProperty("grid-template-columns","minmax("+CHAT_MIN_PX+"px, "+n+"%) minmax("+PREVIEW_MIN_PX+"px, 1fr)","important");
   handle.style.left=n+"%";
@@ -43,9 +45,9 @@ if(typeof module!=="undefined"&&module.exports)module.exports={kqSplitBounds};
   handle.setAttribute("aria-valuetext",Math.round(n)+" percent chat, "+Math.round(100-n)+" percent preview");
   return n;
  }
- width(desiredWidth);
+ width(preferredWidth,{keepPreferred:true});
  function changeFromClient(x){const r=editor.getBoundingClientRect(),b=bounds();if(!r.width||b.compact)return;width((x-r.left)/r.width*100)}
- function save(){try{localStorage.setItem("kq-chat-width",String(desiredWidth))}catch{}}
+ function save(){try{localStorage.setItem("kq-chat-width",String(preferredWidth))}catch{}}
  function stopDrag(){
   if(!dragging)return;
   dragging=false;editor.classList.remove("kq-resizing");document.body.classList.remove("kq-split-dragging");
@@ -60,17 +62,17 @@ if(typeof module!=="undefined"&&module.exports)module.exports={kqSplitBounds};
  handle.addEventListener("keydown",e=>{
   if(!["ArrowLeft","ArrowRight","Home","End"].includes(e.key))return;
   const b=bounds();if(b.compact||editor.classList.contains("kq-preview-full"))return;
-  e.preventDefault();const current=parseFloat(editor.style.getPropertyValue("--kq-chat-width"))||desiredWidth;
+  e.preventDefault();const current=parseFloat(editor.style.getPropertyValue("--kq-chat-width"))||appliedWidth;
   width(e.key==="Home"?b.min:e.key==="End"?b.max:current+(e.key==="ArrowRight"?2:-2));save();
  });
- const reflow=()=>{if(!dragging&&!editor.classList.contains("kq-preview-full"))width(desiredWidth)};
+ const reflow=()=>{if(!dragging&&!editor.classList.contains("kq-preview-full"))width(preferredWidth,{keepPreferred:true})};
  if(typeof ResizeObserver!=="undefined")new ResizeObserver(reflow).observe(editor);else window.addEventListener("resize",reflow);
  const testTab=document.createElement("button");testTab.type="button";testTab.id="kq-tests-tab";testTab.textContent="Tests";testTab.title="Open saved functional tests and checks";testTab.setAttribute("aria-pressed","false");tabs.append(testTab);
  testTab.addEventListener("click",()=>{document.getElementById("checks-open")?.click();testTab.setAttribute("aria-pressed","false")});
  const expand=document.createElement("button");expand.type="button";expand.id="kq-expand-preview";expand.className="ghost";expand.textContent="Expand";expand.setAttribute("aria-pressed","false");expand.setAttribute("aria-label","Expand live app preview");bar.append(expand);
  function full(on){
   editor.classList.toggle("kq-preview-full",on);editor.classList.remove("kq-split-compact");
-  if(on)editor.style.setProperty("grid-template-columns","0 minmax(0, 1fr)","important");else width(desiredWidth);
+  if(on)editor.style.setProperty("grid-template-columns","0 minmax(0, 1fr)","important");else width(preferredWidth,{keepPreferred:true});
   expand.textContent=on?"Show chat":"Expand";expand.setAttribute("aria-pressed",String(on));expand.setAttribute("aria-label",on?"Restore chat panel":"Expand live app preview");
  }
  expand.addEventListener("click",()=>full(!editor.classList.contains("kq-preview-full")));
