@@ -1,0 +1,39 @@
+name: Project intelligence proof
+on:
+  push:
+    paths:
+      - 'project-graph.js'
+      - 'scripts/graphify-kairoq.py'
+      - 'test/project-graph.test.js'
+      - 'test/graphify_bridge_test.py'
+      - 'Dockerfile'
+      - '.github/workflows/project-intelligence.yml'
+  pull_request:
+    paths:
+      - 'project-graph.js'
+      - 'scripts/graphify-kairoq.py'
+      - 'test/project-graph.test.js'
+      - 'test/graphify_bridge_test.py'
+      - 'Dockerfile'
+      - '.github/workflows/project-intelligence.yml'
+permissions:
+  contents: read
+jobs:
+  project-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: node --check project-graph.js
+      - run: python -m py_compile scripts/graphify-kairoq.py test/graphify_bridge_test.py
+      - name: Install pinned Graphify package
+        run: python -m pip install --disable-pip-version-check --no-input graphifyy==0.1.14
+      - name: Real Graphify bridge smoke
+        run: python test/graphify_bridge_test.py
+      - run: node --test test/project-graph.test.js

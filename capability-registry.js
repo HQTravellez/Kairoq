@@ -18,6 +18,7 @@ const CAPABILITIES = Object.freeze([
   {id:"mem0",label:"Mem0 optional memory enrichment",group:"Knowledge",status:"disabled-by-default",entry:"integrations/agent-stack/mem0.js",tools:[]},
   {id:"ruflo",label:"Ruflo MCP capability discovery",group:"Agents",status:"experimental-discovery-only",entry:"integrations/agent-stack/ruflo.js",tools:[]},
   {id:"autoharness",label:"AutoHarness skill staging",group:"Agents",status:"review-candidates-only",entry:"integrations/agent-stack/autoharness.js",tools:[]},
+  {id:"project_intelligence",label:"Graphify structural project intelligence and impact analysis",group:"Engineering",status:"configured-by-runtime",entry:"project-graph.js",tools:["project_graph"]},
   {id:"understand",label:"Static code dependency graph",group:"Engineering",status:"graph-export",entry:"integrations/agent-stack/understand.js",tools:[]},
   {id:"ecc",label:"Project context recall",group:"Knowledge",status:"concept-adaptation",entry:"ecc-context-recall.js",tools:[]},
   {id:"media",label:"AI media and Remotion workflows",group:"Creative",status:"feature-specific",entry:"hyperframes-video.js",tools:[]},
@@ -26,6 +27,7 @@ const CAPABILITIES = Object.freeze([
 ]);
 function runtimeStatus(c){
   if(c.id==="freellmapi_pool")return require("./freellmapi").enabled()?"wired":"not-configured";
+  if(c.id==="project_intelligence")return require("./project-graph").available()?"wired":"native-fallback";
   return c.status;
 }
 function listCapabilities({group}={}){return CAPABILITIES.filter(c=>!group||c.group===group).map(c=>({...c,status:runtimeStatus(c),tools:[...c.tools]}));}

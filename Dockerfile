@@ -48,6 +48,16 @@ RUN if [ "$KAIROQ_LAST30DAYS" = "on" ]; then \
       UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/python uv tool install --python 3.12 yt-dlp && \
       python3.12 --version && yt-dlp --version; fi
 ENV KAIROQ_PYTHON=/usr/local/bin/python3.12
+# Graphify project intelligence. Kairoq invokes only its deterministic AST extractor
+# through scripts/graphify-kairoq.py; semantic LLM extraction, hooks, MCP and network
+# features are not used. The package is pinned so graph behavior does not drift silently.
+ARG KAIROQ_GRAPHIFY_INSTALL=on
+RUN if [ "$KAIROQ_GRAPHIFY_INSTALL" = "on" ]; then \
+      UV_PYTHON_INSTALL_DIR=/opt/python uv python install 3.12 && \
+      UV_PYTHON_INSTALL_DIR=/opt/python uv venv --python 3.12 /opt/kairoq-graphify && \
+      UV_PYTHON_INSTALL_DIR=/opt/python uv pip install --no-cache --python /opt/kairoq-graphify/bin/python graphifyy==0.1.14 && \
+      /opt/kairoq-graphify/bin/python -c "import importlib.metadata, graphify; assert importlib.metadata.version('graphifyy') == '0.1.14'"; fi
+ENV KAIROQ_GRAPHIFY_PYTHON=/opt/kairoq-graphify/bin/python
 # Blender (blender.org, GPL; unmodified, as the "bpy" Python module) for 3D in Create
 # (blender.js, scripts/blender-kairoq.py): converts uploaded FBX/OBJ/STL/PLY/.blend/zipped glTF
 # to GLB, makes heavy models lighter and renders preview pictures, without a screen. About 1 GB;
