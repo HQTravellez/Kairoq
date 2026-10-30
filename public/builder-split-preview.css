@@ -1,0 +1,14 @@
+/* Kairoq wide live-workspace: progressive enhancement of the existing real iframe. */
+@media(min-width:901px){
+ body.app.in-editor #editor,body.in-editor #editor,#editor:not(.hidden){grid-template-columns:minmax(280px,var(--kq-chat-width,30%)) minmax(0,1fr)}
+ #editor{position:relative}
+ #kq-split-handle{position:absolute;left:var(--kq-chat-width,30%);top:0;bottom:0;z-index:40;width:12px;transform:translateX(-50%);cursor:col-resize;background:transparent;touch-action:none}
+ #kq-split-handle::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;background:transparent;transition:background .15s}
+ #kq-split-handle:hover::before,#kq-split-handle:focus-visible::before,#editor.kq-resizing #kq-split-handle::before{background:#6c83d6}
+ #kq-split-handle:focus-visible{outline:2px solid #6c83d6;outline-offset:-2px}
+ #editor.kq-preview-full{grid-template-columns:0 minmax(0,1fr)!important}
+ #editor.kq-preview-full>.chat,#editor.kq-preview-full>#kq-split-handle{display:none!important}
+}
+#kq-tests-tab[aria-pressed=true]{background:var(--accent-soft,#e7ebfa)}
+#kq-expand-preview{flex-shrink:0}
+@media(max-width:900px){#kq-split-handle,#kq-expand-preview{display:none!important}#editor{grid-template-columns:minmax(0,1fr)!important}}
