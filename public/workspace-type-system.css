@@ -1,0 +1,37 @@
+/* One coherent type and layout scale across Kairoq Create, inspired by
+   high-quality builder workspaces without copying another product. */
+body.app{
+ --kq-font:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+ --kq-mono:"Geist Mono",ui-monospace,SFMono-Regular,monospace;
+ --kq-tiny:11px;--kq-caption:12px;--kq-label:13px;--kq-body:14px;--kq-lead:16px;
+ --kq-heading:22px;--kq-title:clamp(32px,3.4vw,46px);
+ --kq-quiet:#6b7485;--kq-border:#e5e8ed;--kq-round:12px;
+ font-family:var(--kq-font);font-size:var(--kq-body);font-weight:400;
+ font-synthesis:none;font-feature-settings:"ss01" on;
+}
+body.app button,body.app textarea,body.app input,body.app select{font-family:var(--kq-font);letter-spacing:normal}
+body.app .side-brand .wordmark{font-size:17px!important;font-weight:700!important;letter-spacing:-.045em!important}
+body.app .side-nav button{font-size:13px!important;font-weight:520!important;letter-spacing:-.012em!important}
+body.app .side-label{font-size:10.5px!important;letter-spacing:.085em!important;font-weight:650!important}
+body.app .recents button{font-size:12.5px!important;font-weight:480!important;letter-spacing:-.01em!important}
+body.app #home h1{font-size:var(--kq-title)!important;font-weight:650!important;letter-spacing:-.052em!important;line-height:1.11!important}
+body.app #home .prompt-box textarea{font-size:15px!important;font-weight:430!important;line-height:1.6!important;letter-spacing:-.014em!important}
+body.app #home #examples .example{font-size:12px!important;font-weight:500!important;line-height:1.4!important}
+body.app #home .browser-tabs button{font-size:12px!important;font-weight:550!important}
+body.app #home #projects .open{font-size:13px!important;font-weight:620!important;letter-spacing:-.018em!important}
+body.app #home #projects .meta{font-size:11px!important;color:var(--kq-quiet)!important}
+body.app.in-editor #project-name{font-size:14px!important;font-weight:650!important;letter-spacing:-.025em!important}
+body.app.in-editor #messages{font-size:14px!important;line-height:1.7!important}
+body.app.in-editor #messages .md{font-size:14px!important;line-height:1.72!important}
+body.app.in-editor #messages .md h3{font-size:16px!important;font-weight:650!important;letter-spacing:-.025em!important;line-height:1.35!important}
+body.app.in-editor #messages .md h4{font-size:14px!important;font-weight:630!important;letter-spacing:-.015em!important}
+body.app.in-editor #messages .md p{line-height:1.7!important}
+body.app.in-editor #messages code,body.app.in-editor #messages pre{font-family:var(--kq-mono)!important;font-size:12px!important}
+body.app.in-editor #chat-input{font-size:14px!important;line-height:1.6!important;font-weight:450!important;letter-spacing:-.012em!important}
+body.app.in-editor #progress,body.app.in-editor #progress-text{font-size:12px!important;font-weight:520!important}
+body.app.in-editor .stage-bar button{font-size:12px!important;font-weight:560!important}
+body.app.in-editor .menu-panel button b{font-size:12.5px!important;font-weight:630!important}
+body.app.in-editor .menu-panel button span{font-size:11.5px!important;line-height:1.45!important}
+body.app.in-editor .cost-line{font-size:10.5px!important;line-height:1.45!important;color:var(--kq-quiet)!important}
+body.app.in-editor .bo-card{font-size:13px!important;line-height:1.55!important}
+@media(max-width:800px){body.app{--kq-title:34px}body.app.in-editor #messages{font-size:13.5px!important}}
