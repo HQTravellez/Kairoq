@@ -347,7 +347,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // The fix of a change that did not work is on Kairoq, once per problem.
  const onUs=fixing&&Boolean(sig)&&payMode()==='fix'&&Boolean(before.free_fix)&&before.free_fix.sig===sig;
  if(before.free_fix&&(onUs||!fixing&&mode!=='discuss')){delete before.free_fix;builder.saveMeta(before)}
- const chosen=require('./model-choices').pick(model);
+ const choices=require('./model-choices'),chosen=choices.pick(model);
+ if(model&&model!=='auto'&&!chosen)throw Object.assign(Error('The selected model '+String(model).slice(0,100)+' is not available. Choose another model or explicitly select Auto; Kairoq will not silently switch models.'),{status:409});
  const credits=onUs?0:cost({mode,tier,images:images.length>0,model:chosen})+extraCredits;
  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,execution_mode:executionMode,credits,status:'queued',seq:0,created_at:new Date().toISOString(),...(onUs?{on_us:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
  const update=patch=>{Object.assign(job,patch);job.seq++};
