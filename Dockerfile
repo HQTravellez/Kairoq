@@ -1,6 +1,17 @@
 FROM public.ecr.aws/docker/library/node:22-bookworm-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-liberation ca-certificates ffmpeg && rm -rf /var/lib/apt/lists/*
+# Optional, pinned external analysis tools. Disabled for ordinary production builds.
+# Only approved read-only adapter commands are callable from Kairoq.
+ARG KAIROQ_EXTERNAL_TOOLS_INSTALL=off
+RUN if [ "$KAIROQ_EXTERNAL_TOOLS_INSTALL" = "on" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv procps && rm -rf /var/lib/apt/lists/* && \
+      python3 -m venv /opt/kairoq-external-tools && \
+      /opt/kairoq-external-tools/bin/pip install --no-cache-dir cli-anything-hub==0.4.1 && \
+      ln -s /opt/kairoq-external-tools/bin/cli-hub /usr/local/bin/cli-hub && \
+      npm install -g --no-audit --no-fund rea-agents@6.8.0 && \
+      cli-hub --help >/dev/null && rea --help >/dev/null; fi
+ENV CLI_HUB_NO_ANALYTICS=1
 COPY package*.json ./
 RUN npm install --omit=dev
 # OpenCode as the build engine (opencode-engine.js) when the Railway variable KAIROQ_OPENCODE=on
