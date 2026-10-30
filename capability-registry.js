@@ -9,6 +9,7 @@ const CAPABILITIES = Object.freeze([
   {id:"api_intelligence",label:"Jev + ScaleDown API documentation triage and multi-provider orchestration",group:"API",status:"opt-in",entry:"api-intelligence-pipeline.js",tools:[]},
   {id:"api_execution",label:"Approved API operation testing",group:"API",status:"allowlist-gated",entry:"api-adapter.js",tools:[]},
   {id:"learning",label:"Verified procedural learning",group:"Knowledge",status:"partially-wired",entry:"hermes-learning-loop.js",tools:[]},
+  {id:"freellmapi_pool",label:"Internal FreeLLMAPI multi-provider inference pool",group:"AI",status:"configured-by-env",entry:"freellmapi.js",tools:["model_discovery","chat_completion","coding_completion"]},
   {id:"design_skills",label:"Design, accessibility, animation, dashboards",group:"Design",status:"skill-library",entry:"design-skills/",tools:[]},
   {id:"test_repair",label:"Browser QA, synthetic customers and repair",group:"Quality",status:"workflow-wired",entry:"react-agent.js",tools:["test_ui","view_logs"]},
   {id:"app_database",label:"Application SQL inspection",group:"Build",status:"wired-in-agent-mode",entry:"react-agent.js",tools:["query_db"]},
@@ -23,13 +24,17 @@ const CAPABILITIES = Object.freeze([
   {id:"sales",label:"Sales lead research and outreach drafting",group:"Business",status:"feature-specific",entry:"agent-brain.js",tools:[]},
   {id:"marketing",label:"Marketing content and approved publishing",group:"Business",status:"feature-specific",entry:"server.js",tools:[]}
 ]);
-function listCapabilities({group}={}){return CAPABILITIES.filter(c=>!group||c.group===group).map(c=>({...c,tools:[...c.tools]}));}
+function runtimeStatus(c){
+  if(c.id==="freellmapi_pool")return require("./freellmapi").enabled()?"wired":"not-configured";
+  return c.status;
+}
+function listCapabilities({group}={}){return CAPABILITIES.filter(c=>!group||c.group===group).map(c=>({...c,status:runtimeStatus(c),tools:[...c.tools]}));}
 function findCapabilities(query,limit=6){
   const words=new Set(String(query||"").toLowerCase().match(/[a-z0-9_]+/g)||[]);
   if(!words.size)return listCapabilities().slice(0,limit);
   return listCapabilities().map(c=>({c,score:[...words].filter(w=>(c.id+" "+c.label+" "+c.group+" "+c.tools.join(" ")).toLowerCase().includes(w)).length})).filter(x=>x.score).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.c);
 }
 function agentCapabilityContext(){
-  return CAPABILITIES.map(c=>c.label+" ["+c.status+"; "+c.entry+"]").join("\n");
+  return listCapabilities().map(c=>c.label+" ["+c.status+"; "+c.entry+"]").join("\n");
 }
 module.exports={listCapabilities,findCapabilities,agentCapabilityContext};
