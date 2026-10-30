@@ -7138,9 +7138,17 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
 }
 // Generates one image for a Create project (hero photos, illustrations) with an OpenRouter
 // image model. Returns {mime, data(base64)}. Counts against the builder budget.
-function builderImagesEnabled(){return Boolean(process.env.OPENROUTER_API_KEY)&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&process.env.KAIROQ_IMAGE_GENERATION!=="off"}
+function builderImagesEnabled(){
+ if(process.env.KAIROQ_IMAGE_GENERATION==="off")return false;
+ if(process.env.KAIROQ_IMAGE_PROVIDER==="cloudflare")return require("./cloudflare-image").configured();
+ return Boolean(process.env.OPENROUTER_API_KEY)&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+}
 // references: data: URLs of images to work from (a product photo to restage), sent with the prompt.
 async function generateBuilderImage({prompt,aspect="16:9",signal,references=[]}={}){
+  if(process.env.KAIROQ_IMAGE_PROVIDER==="cloudflare"){
+    if(references?.length)throw Error("Cloudflare FLUX Schnell does not support image editing. Choose text-to-image or a different image tool.");
+    return require("./cloudflare-image").generate({prompt,aspect,signal});
+  }
   if(!builderImagesEnabled())throw Error("Image generation needs OPENROUTER_API_KEY and KAIROQ_BUILDER_PAID_APPROVED=true");
   const refs=(Array.isArray(references)?references:[]).filter(u=>/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(u))).slice(0,3);
   const model=refs.length?OPENROUTER_IMAGE_EDIT_MODEL:String(process.env.KAIROQ_IMAGE_MODEL||"google/gemini-2.5-flash-image");
