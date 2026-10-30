@@ -109,13 +109,13 @@ async function pool(items,limit,fn){
 function funnel(visits){
  const real=visits.filter(v=>v.outcome!=='skipped');
  const count=o=>real.filter(v=>v.outcome===o).length;
- const left={};for(const v of real)if(v.outcome!=='completed'&&v.outcome!=='blocked'){const last=v.steps.at(-1);const where=last?last.path:'(start)';left[where]=(left[where]||0)+1}
+ const left={};for(const v of real)if(v.outcome!=='completed'&&v.outcome!=='blocked'&&v.outcome!=='error'){const last=v.steps.at(-1);const where=last?last.path:'(start)';left[where]=(left[where]||0)+1}
  const by={};for(const v of real){const d=v.persona.device;by[d]=by[d]||{visitors:0,completed:0};by[d].visitors++;if(v.outcome==='completed')by[d].completed++}
  const done=real.filter(v=>v.outcome==='completed').map(v=>v.steps.length).sort((a,b)=>a-b);
  return{
   visitors:real.length,completed:count('completed'),gave_up:count('gave_up'),stuck:count('stuck'),errors:count('error'),blocked:count('blocked'),
   // Visitors a site's bot protection turned away say nothing about the site's design.
-  completion_rate:real.length>count('blocked')?Math.round(count('completed')/(real.length-count('blocked'))*100):0,
+  completion_rate:real.length>count('blocked')+count('error')?Math.round(count('completed')/(real.length-count('blocked')-count('error'))*100):null,
   median_steps:done.length?done[Math.floor(done.length/2)]:null,
   drop_off:Object.entries(left).map(([path,n])=>({path,visitors:n})).sort((a,b)=>b.visitors-a.visitors).slice(0,8),
   by_device:by,
