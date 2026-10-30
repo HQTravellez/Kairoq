@@ -224,6 +224,14 @@ function supportQuestion(message){
  if(t.length>240||/https?:\/\//i.test(t)||/^(add|change|make|remove|update|create|build|replace|move|put|use|rename|delete|fix)\b/i.test(t))return false;
  return /\b(can'?t|cannot|can not|don'?t|do not|not able to|unable to|couldn'?t)\s+(see|view|open|find|load|access)\b|\bwant to (see|view|open)\b|\b(blank|white|empty|black)\s+(page|screen|preview|site)\b|\b(page|screen|preview|site|website|app)\s+(is|looks|stays|went|goes)\s+(blank|white|empty|black)\b|\b(preview|website|web site|site|app|page|screen)\b[^.]{0,40}\b(not|isn'?t|doesn'?t|won'?t|never)\s+(showing|show|loading|load|opening|open|appear|appearing|visible|there|work|working)\b|\bnothing (shows|appears|loads|is showing)\b|\bwhere is (the|my) (website|site|app|preview)\b/i.test(t);
 }
+function missingImageComplaint(message){
+ const t=String(message||'').trim();
+ return t.length<=500&&/\b(images?|photos?|pictures?|hero|banner|assets?)\b/i.test(t)&&/\b(missing|broken|not (?:showing|loading|visible|working)|can'?t see|cannot see|failed|blank|disappear|not there)\b/i.test(t);
+}
+function missingImageAnswer(meta){
+ const version=meta.current_version;
+ return 'I understand: the images are missing or broken in version '+version+'. A page opening without JavaScript errors does not prove its images loaded. Image generation may have failed because the configured image provider has no credits. This is an asset-generation or asset-link problem, not a reason to simply reload the preview. No changes were made and this diagnostic message is free. To repair it, request: "Fix the missing images using existing uploaded images or licensed image URLs; verify each image in the live preview. Do not generate paid images without approval."';
+}
 function supportAnswer(meta){
  const n=meta.current_version,ver=meta.versions.find(x=>x.n===n),errors=(ver&&ver.runtime_errors)||[];
  const url=builder.previewUrl(meta);
@@ -295,6 +303,13 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    return job;
   }
   if(mode==='build'&&(S.questionOnly(message)||S.conversation(message))&&!supportQuestion(message))mode='discuss';
+ }
+ // Missing images are not a healthy-preview issue: never assert that a successful page load proves images are present.
+ if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingImageComplaint(message)){
+  const meta=builder.loadMeta(id),answer=missingImageAnswer(meta);
+  builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
+  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
+  jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
  }
  if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&supportQuestion(message)){
   const meta=builder.loadMeta(id),answer=supportAnswer(meta);
