@@ -434,7 +434,7 @@ async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress
  }
  // Real photos for a new site (photo-finder.js): found, downloaded and licensed before the first
  // build, so the builder uses them instead of guessing stock links.
- if(!planned&&brief.signature&&(brief.photos||[]).length&&process.env.KAIROQ_PHOTOS!=='off'){
+ if(!planned&&(brief.photos||[]).length&&process.env.KAIROQ_PHOTOS!=='off'){
   onProgress('finding photos');
   try{
    const found=await require('./photo-finder').find(brief.photos);
