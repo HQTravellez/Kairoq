@@ -3,14 +3,20 @@ on:
   push:
     paths:
       - 'engineering-completion-gate.js'
+      - 'project-test-runner.js'
+      - 'conversational-build-contract.js'
       - 'react-agent.js'
       - 'test/engineering-completion-gate.test.js'
+      - 'test/verified-build-loop.test.js'
       - '.github/workflows/engineering-verification.yml'
   pull_request:
     paths:
       - 'engineering-completion-gate.js'
+      - 'project-test-runner.js'
+      - 'conversational-build-contract.js'
       - 'react-agent.js'
       - 'test/engineering-completion-gate.test.js'
+      - 'test/verified-build-loop.test.js'
       - '.github/workflows/engineering-verification.yml'
 permissions:
   contents: read
@@ -23,5 +29,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check engineering-completion-gate.js && node --check react-agent.js
-      - run: node --test test/engineering-completion-gate.test.js
+      - run: node --check engineering-completion-gate.js && node --check project-test-runner.js && node --check conversational-build-contract.js && node --check react-agent.js
+      - run: node --test test/engineering-completion-gate.test.js test/verified-build-loop.test.js
