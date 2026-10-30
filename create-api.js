@@ -338,6 +338,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   return job;
  }
  const before=builder.loadMeta(id),fixing=Boolean(fix)&&mode!=='discuss',sig=fixing?problemSignature(before,before.current_version):'';
+ const executionMode=require('./build-routing').executionMode({requestedMode:mode,meta:before,message,hooks:Boolean(hooks)});
+
  // The learning loop counts "it still doesn't work" messages as a sign builds are not landing.
  if(mode!=='discuss'&&!hooks&&require('./build-lessons').isComplaint(message))require('./build-lessons').recordComplaint(id);
  if(fixing&&sig&&before.loop&&before.loop.sig===sig&&before.loop.count>=loopLimit())throw stuckError(before);
@@ -345,9 +347,10 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // The fix of a change that did not work is on Kairoq, once per problem.
  const onUs=fixing&&Boolean(sig)&&payMode()==='fix'&&Boolean(before.free_fix)&&before.free_fix.sig===sig;
  if(before.free_fix&&(onUs||!fixing&&mode!=='discuss')){delete before.free_fix;builder.saveMeta(before)}
- const chosen=require('./model-choices').pick(model);
+ const choices=require('./model-choices'),chosen=choices.pick(model);
+ if(model&&model!=='auto'&&!chosen)throw Object.assign(Error('The selected model '+String(model).slice(0,100)+' is not available. Choose another model or explicitly select Auto; Kairoq will not silently switch models.'),{status:409});
  const credits=onUs?0:cost({mode,tier,images:images.length>0,model:chosen})+extraCredits;
- const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,credits,status:'queued',seq:0,created_at:new Date().toISOString(),...(onUs?{on_us:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,execution_mode:executionMode,credits,status:'queued',seq:0,created_at:new Date().toISOString(),...(onUs?{on_us:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
  const update=patch=>{Object.assign(job,patch);job.seq++};
  // Every model call for this message goes to the chosen model first; if it cannot run, the
  // usual builder (Auto) does the work and the chat says so.
@@ -425,11 +428,11 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    }
    else if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
    else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onVersion,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
-   else if(mode==='agent'){
+   else if(mode==='agent'||executionMode==='agent'){
     let extra='';
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra].filter(Boolean).join('\n\n');
-    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,
+    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,maxSteps:executionMode==='agent'&&mode==='build'?24:undefined,
      onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
