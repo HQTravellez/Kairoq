@@ -7,7 +7,7 @@ function assign(shift,staff,existing=[]){
  if(!staff||!staff.id)return{ok:false,reasons:["Missing staff"]};
  const reasons=[];
  if(!Array.isArray(staff.qualifications)||!staff.qualifications.includes(s.role))reasons.push("Required qualification missing");
- if(Array.isArray(staff.available)&&!staff.available.some(a=>minutes(a.start)<=s.startMs&&minutes(a.end)>=s.endMs))reasons.push("Staff not available for full shift");
+ if(!Array.isArray(staff.available)||!staff.available.some(a=>minutes(a.start)<=s.startMs&&minutes(a.end)>=s.endMs))reasons.push("Staff not available for full shift");
  for(const a of existing.filter(x=>x.staffId===staff.id)){const p=validateShift(a);if(s.startMs<p.endMs&&s.endMs>p.startMs)reasons.push("Overlapping assignment "+a.id)}
  return{ok:reasons.length===0,reasons};
 }
