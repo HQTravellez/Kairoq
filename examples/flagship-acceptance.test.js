@@ -1,0 +1,13 @@
+"use strict";
+const test=require("node:test"),assert=require("node:assert/strict");
+const physics=require("./physics-lab/physics");
+const staffing=require("./healthcare-staffing/scheduler");
+const approx=(a,b,tol=1e-8)=>assert.ok(Math.abs(a-b)<tol,`${a} != ${b}`);
+test("physics: 45° projectile analytical range and flight time",()=>{const p=physics.projectile({speed:20,angleDeg:45});approx(p.range,400/physics.g);approx(p.flightTime,20*Math.SQRT2/physics.g);approx(p.maxHeight,100/physics.g)});
+test("physics: 90° vertical launch stays at x=0 and lands after 2v/g",()=>{const p=physics.projectile({speed:10,angleDeg:90});approx(p.range,0);approx(physics.atTime({speed:10,angleDeg:90},p.flightTime).y,0)});
+test("physics: invalid gravity and negative speed fail closed",()=>{assert.throws(()=>physics.projectile({speed:2,angleDeg:20,gravity:0}));assert.throws(()=>physics.projectile({speed:-2,angleDeg:20}))});
+const shift={id:"a",role:"RN",site:"Clinic",start:"2030-07-01T09:00:00Z",end:"2030-07-01T17:00:00Z"};
+const nurse={id:"n1",qualifications:["RN"],available:[{start:"2030-07-01T08:00:00Z",end:"2030-07-01T19:00:00Z"}]};
+test("staffing: valid registered nurse assignment",()=>{assert.deepEqual(staffing.assign(shift,nurse).reasons,[]);assert.equal(staffing.assign(shift,nurse).ok,true)});
+test("staffing: no qualification or availability fails",()=>{assert.equal(staffing.assign(shift,{...nurse,qualifications:["PSW"]}).ok,false);assert.equal(staffing.assign(shift,{...nurse,available:[]}).ok,false)});
+test("staffing: overlapping shift rejected, adjacent shift allowed",()=>{const overlap={...shift,id:"old",staffId:"n1",start:"2030-07-01T16:00:00Z",end:"2030-07-01T19:00:00Z"};assert.match(staffing.assign(shift,nurse,[overlap]).reasons.join(" " ),/Overlapping/);const adjacent={...overlap,start:"2030-07-01T17:00:00Z"};assert.equal(staffing.assign(shift,nurse,[adjacent]).ok,true)});
