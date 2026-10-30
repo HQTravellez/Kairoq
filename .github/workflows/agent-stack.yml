@@ -7,6 +7,9 @@ on:
       - 'ecc-context-recall.js'
       - 'react-builder.js'
       - 'react-agent.js'
+      - 'capability-registry.js'
+      - 'data/capability-routing-evals.json'
+      - 'test/capability-routing.test.js'
       - 'project-graph.js'
       - 'scripts/graphify-kairoq.py'
       - 'test/project-graph.test.js'
@@ -40,7 +43,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
       - run: node --check project-graph.js && python3 -m py_compile scripts/graphify-kairoq.py
-      - run: node --test test/project-graph.test.js test/agent-stack.test.js test/agent-stack-builder.test.js test/ecc-context-recall.test.js test/hermes-learning-loop.test.js test/responsive-builder-chat.test.js test/builder-response-policy.test.js test/concurrent-discuss.test.js test/free-chat-orchestration.test.js test/model-output-guard.test.js test/batch-scaffold.test.js
+      - run: node --test test/project-graph.test.js test/capability-routing.test.js test/agent-stack.test.js test/agent-stack-builder.test.js test/ecc-context-recall.test.js test/hermes-learning-loop.test.js test/responsive-builder-chat.test.js test/builder-response-policy.test.js test/concurrent-discuss.test.js test/free-chat-orchestration.test.js test/model-output-guard.test.js test/batch-scaffold.test.js
       - run: node scripts/agent-stack.js status
       - run: node scripts/agent-stack.js graph > "$RUNNER_TEMP/agent-stack-graph.json"
       - uses: actions/upload-artifact@v4
