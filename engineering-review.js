@@ -5,7 +5,7 @@ const crypto=require("node:crypto");
 function changedFiles(base={},current={}){return [...new Set([...Object.keys(base),...Object.keys(current)])].filter(k=>base[k]!==current[k]).sort()}
 function required(base,current,request=""){
  const n=changedFiles(base,current).length,t=String(request||"");
- return n>=2||t.length>280||/\b(auth|payment|database|migration|api|security|permission|refactor|architecture|automation)\b/i.test(t);
+ return n>=2||t.length>280||/\b(auth|authentication|authorization|payment|database|migration|api|security|permission|permissions|refactor|architecture|automation)\b/i.test(t);
 }
 function clip(s,n){s=String(s||"");return s.length>n?s.slice(0,n)+"\n…(truncated)":s}
 function diffText(base={},current={},limit=52000){
