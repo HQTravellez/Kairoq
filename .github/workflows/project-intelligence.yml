@@ -5,6 +5,7 @@ on:
       - 'project-graph.js'
       - 'scripts/graphify-kairoq.py'
       - 'test/project-graph.test.js'
+      - 'test/graphify_bridge_test.py'
       - 'Dockerfile'
       - '.github/workflows/project-intelligence.yml'
   pull_request:
@@ -12,6 +13,7 @@ on:
       - 'project-graph.js'
       - 'scripts/graphify-kairoq.py'
       - 'test/project-graph.test.js'
+      - 'test/graphify_bridge_test.py'
       - 'Dockerfile'
       - '.github/workflows/project-intelligence.yml'
 permissions:
@@ -29,5 +31,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: node --check project-graph.js
-      - run: python -m py_compile scripts/graphify-kairoq.py
+      - run: python -m py_compile scripts/graphify-kairoq.py test/graphify_bridge_test.py
+      - name: Install pinned Graphify package
+        run: python -m pip install --disable-pip-version-check --no-input graphifyy==0.1.14
+      - name: Real Graphify bridge smoke
+        run: python test/graphify_bridge_test.py
       - run: node --test test/project-graph.test.js
