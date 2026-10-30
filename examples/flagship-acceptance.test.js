@@ -9,5 +9,5 @@ test("physics: invalid gravity and negative speed fail closed",()=>{assert.throw
 const shift={id:"a",role:"RN",site:"Clinic",start:"2030-07-01T09:00:00Z",end:"2030-07-01T17:00:00Z"};
 const nurse={id:"n1",qualifications:["RN"],available:[{start:"2030-07-01T08:00:00Z",end:"2030-07-01T19:00:00Z"}]};
 test("staffing: valid registered nurse assignment",()=>{assert.deepEqual(staffing.assign(shift,nurse).reasons,[]);assert.equal(staffing.assign(shift,nurse).ok,true)});
-test("staffing: no qualification or availability fails",()=>{assert.equal(staffing.assign(shift,{...nurse,qualifications:["PSW"]}).ok,false);assert.equal(staffing.assign(shift,{...nurse,available:[]}).ok,true)});
+test("staffing: no qualification or availability fails",()=>{assert.equal(staffing.assign(shift,{...nurse,qualifications:["PSW"]}).ok,false);assert.equal(staffing.assign(shift,{...nurse,available:[]}).ok,false)});
 test("staffing: overlapping shift rejected, adjacent shift allowed",()=>{const overlap={...shift,id:"old",staffId:"n1",start:"2030-07-01T16:00:00Z",end:"2030-07-01T19:00:00Z"};assert.match(staffing.assign(shift,nurse,[overlap]).reasons.join(" " ),/Overlapping/);const adjacent={...overlap,start:"2030-07-01T17:00:00Z"};assert.equal(staffing.assign(shift,nurse,[adjacent]).ok,true)});
