@@ -9,6 +9,7 @@ const CAPABILITIES = Object.freeze([
   {id:"api_intelligence",label:"Jev + ScaleDown API documentation triage and multi-provider orchestration",group:"API",status:"opt-in",entry:"api-intelligence-pipeline.js",tools:[]},
   {id:"api_execution",label:"Approved API operation testing",group:"API",status:"allowlist-gated",entry:"api-adapter.js",tools:[]},
   {id:"learning",label:"Verified procedural learning",group:"Knowledge",status:"partially-wired",entry:"hermes-learning-loop.js",tools:[]},
+  {id:"freellmapi_pool",label:"Internal FreeLLMAPI multi-provider inference pool",group:"AI",status:"configured-by-env",entry:"freellmapi.js",tools:["model_discovery","chat_completion","coding_completion"]},
   {id:"design_skills",label:"Design, accessibility, animation, dashboards",group:"Design",status:"skill-library",entry:"design-skills/",tools:[]},
   {id:"test_repair",label:"Browser QA, synthetic customers and repair",group:"Quality",status:"workflow-wired",entry:"react-agent.js",tools:["test_ui","view_logs"]},
   {id:"app_database",label:"Application SQL inspection",group:"Build",status:"wired-in-agent-mode",entry:"react-agent.js",tools:["query_db"]},
