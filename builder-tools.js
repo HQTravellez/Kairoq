@@ -130,10 +130,7 @@ function forProject(id,{webSearch=hooks.webSearch,remote=(u,o)=>require('./build
    if(item&&hooks.callModel&&!R.savedNotes(item.url))R.learnFromText(item,page.slice(page.indexOf('\n')+1),{callModel:hooks.callModel}).catch(()=>{});
    return page;
   }
-  // Read-only, opt-in external integrations. No command execution or install via agent.
-  if(tool==='cli_harness_list')return require('./external-agent-tools').cliHubList();
-  if(tool==='cli_harness_info')return require('./external-agent-tools').cliHubInfo(a.name);
-  if(tool==='rea_javascript_inspect')return require('./external-agent-tools').inspectJavascript(a.path,{workspaceRoot:ctx&&ctx.dir});
+  if(tool==='github_repo_analyze')return require('./github-repository-intelligence').analyze(a.url,{remote});
   if(tool==='integration')return require('./integrations').lookup(a.service,a.action,{remote});
   if(tool==='skill')return require('./builder-skills').open(a.name);
   if(tool==='tutorials')return require('./builder-references').lookup(a.topic||a.query);
