@@ -2577,9 +2577,9 @@ function openCheckForm(){
  const acct=state.me&&state.me.viewer&&state.me.viewer.account;if(acct&&!$('check-email').value)$('check-email').value=acct.email;
  $('check-url').focus();
 }
-async function startCheck({url,email,goal},errEl,btn){
+async function startCheck({url,email,goal,force=false},errEl,btn){
  text(errEl,'');btn.disabled=true;
- try{const r=await api('/site-check',{method:'POST',body:{url,email,goal}});history.pushState(null,'','/create/check/'+r.id);openCheck(r.id)}
+ try{const r=await api('/site-check',{method:'POST',body:{url,email,goal,force}});history.pushState(null,'','/create/check/'+r.id);openCheck(r.id)}
  catch(err){text(errEl,err.message)}
  finally{btn.disabled=false}
 }
@@ -2607,15 +2607,16 @@ function renderRecall(box,recall){
  for(const r of recall){const li=el('li',r.remembered*2>=r.asked?'ok':'bad');li.append(el('b',null,r.remembered+' of '+r.asked),' '+r.question.replace(/\?$/,'').replace(/^What does it cost$/,'the price').replace(/^Where is it, or how do you get there$/,'where it is').replace(/^How do you book or get in touch$/,'how to book or get in touch'));box.append(li)}
 }
 function renderCheck(c){
+ checkState.report=c;
  document.title=c.host+' website check · Kairoq Create';
  $('check-report').classList.remove('hidden');
- const sc=Math.max(0,Math.min(100,Number(c.score)||0)),ring=$('cr-ring'),C=2*Math.PI*52;
- ring.style.strokeDasharray=String(C);ring.style.strokeDashoffset=String(C*(1-sc/100));
- $('cr-score').className='cr-score '+(sc>=75?'good':sc>=50?'fair':'poor');text($('cr-score-n'),sc);
+ const inconclusive=c.inconclusive||c.score===null||c.score===undefined;const sc=inconclusive?null:Math.max(0,Math.min(100,Number(c.score)||0)),ring=$('cr-ring'),C=2*Math.PI*52;
+ ring.style.strokeDasharray=String(C);ring.style.strokeDashoffset=String(inconclusive?C:C*(1-sc/100));
+ $('cr-score').className='cr-score '+(sc>=75?'good':sc>=50?'fair':'poor');text($('cr-score-n'),inconclusive?'—':sc);
  text($('cr-host'),c.host);text($('cr-business'),c.business||'');text($('cr-goal'),String(c.goal||'').replace(/\.$/,''));
  const n=c.numbers||{};
  text($('cr-headline'),c.summary&&c.summary.headline?c.summary.headline:n.completed===n.visitors?'Every visitor managed it.':'Some visitors did not manage it.');
- text($('cr-numbers'),c.blocked?'The site\'s bot protection turned our AI customers away, so this score covers the technical basics only.':(n.completed||0)+' of '+((n.visitors||0)-(n.blocked||0))+' AI customers managed it'+(n.blocked?' ('+n.blocked+' blocked by bot protection)':'')+(n.by_device&&n.by_device.phone?' · on phones '+n.by_device.phone.completed+' of '+n.by_device.phone.visitors:'')+(n.median_steps?' · '+n.median_steps+' steps for those who did':''));
+ text($('cr-numbers'),inconclusive?'Insufficient evidence: '+(n.agent_failures||0)+' AI journeys failed or were blocked. No conversion score is assigned.':c.blocked?'The site\'s bot protection turned our AI customers away, so this score covers the technical basics only.':(n.completed||0)+' of '+((n.visitors||0)-(n.blocked||0))+' AI customers managed it'+(n.blocked?' ('+n.blocked+' blocked by bot protection)':'')+(n.by_device&&n.by_device.phone?' · on phones '+n.by_device.phone.completed+' of '+n.by_device.phone.visitors:'')+(n.median_steps?' · '+n.median_steps+' steps for those who did':''));
  renderRecall($('cr-recall'),n.recall);
  const shots=$('cr-shots');shots.replaceChildren();
  for(const name of c.shots||[]){const f=el('figure','cr-shot '+name),img=document.createElement('img');img.alt=c.host+' on '+(name==='phone'?'a phone':'a desktop');img.loading='lazy';img.src='/api/create/site-check/'+c.id+'/shot?name='+name;f.append(img,el('figcaption',null,name==='phone'?'Phone':'Desktop'));shots.append(f)}
@@ -2654,7 +2655,7 @@ async function rebuild(r){
 }
 $('landing-check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('landing-check-url').value.trim(),email:$('landing-check-email').value.trim()},$('landing-check-error'),$('landing-check-go'))};
 $('check-form').onsubmit=e=>{e.preventDefault();startCheck({url:$('check-url').value.trim(),email:$('check-email').value.trim(),goal:$('check-goal').value.trim()},$('check-error'),$('check-go'))};
-$('cr-again').onclick=openCheckForm;$('check-retry').onclick=openCheckForm;$('side-check').onclick=openCheckForm;
+$('cr-again').onclick=()=>{const c=checkState.report;if(!c)return openCheckForm();const email=window.prompt('Enter the email to receive the new report:');if(!email)return;startCheck({url:c.url,email,goal:c.goal,force:true},$('check-error'),$('cr-again'))};$('check-retry').onclick=openCheckForm;$('side-check').onclick=openCheckForm;
 window.addEventListener('popstate',()=>{const m=/^\/create\/check\/([a-f0-9]{24})\/?$/.exec(location.pathname);if(m)openCheck(m[1])});
 
 // ---------- WhatsApp ----------
