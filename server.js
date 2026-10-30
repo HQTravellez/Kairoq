@@ -6901,17 +6901,8 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
       if(!process.env.OPENROUTER_API_KEY&&!(require("./anthropic").isClaude(model)&&require("./anthropic").configured()))throw Error("OpenRouter is not set up");
       return await callOpenRouterBuilder({...rest,only:model},parse);
     }catch(err){
-      // A user-selected model is an explicit instruction: never silently reroute it.
-      // Preserve provider and parse errors so the user can correct the real problem.
+      // An explicitly selected model must never silently fall back to Auto.
       throw err;
-      if(err.name==="AbortError"||rest.signal?.aborted)throw err;
-      // Selected-model timeouts must not cascade into an unrelated Auto/free-model workflow.
-      if(/(?:aborted|timed? out|timeout|503|502)/i.test(String(err.message||err)))throw Error("The selected AI model did not respond in time. No automatic free-model fallback was attempted; retry once or choose another model.");
-      // A selected paid model with an exhausted application budget cannot be rescued by
-      // repeatedly trying free models. Surface the actionable error to the owner promptly.
-      if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(err.message||err)))throw Error("Selected model blocked by Kairoq's application spending limit. Check DAILY_COST_LIMIT_USD, MONTHLY_COST_LIMIT_USD and KAIROQ_BUILDER_MONTHLY_LIMIT_USD; no fallback attempted.");
-      console.log("[builder] chosen model "+model+" failed, using Auto: "+String(err.message||err).slice(0,200));
-      onFallback?.(err);opts=rest;
     }
   }
   if(process.env.KAIROQ_BUILDER_SINGLE_MODEL==="true" && !opts.model && opts.tier!=="check")return callOpenRouterBuilder({...opts,only:String(process.env.KAIROQ_BUILDER_MODEL||"anthropic/claude-sonnet-4.6")},parse);
