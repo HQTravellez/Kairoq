@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir https://github.com/explosion/spacy-models/release
 COPY . .
 ENV VOICE_MODEL_DIR=/models HF_HUB_DISABLE_TELEMETRY=1
 RUN python download_models.py
-RUN useradd --uid 10001 --create-home voice && chown -R voice:voice /app /models
-USER voice
+RUN useradd --uid 10001 --user-group --create-home kairoqvoice && chown -R kairoqvoice:kairoqvoice /app /models
+USER kairoqvoice
 ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 CMD ["sh","-c","uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --no-access-log"]

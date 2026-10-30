@@ -9,6 +9,8 @@ el('generate').onclick=()=>run(el('generate'),async()=>{
 });
 el('transcribe').onclick=()=>run(el('transcribe'),async()=>{
  const file=el('file').files[0];if(!file||file.size>10*1024*1024)throw Error('Choose an audio file up to 10 MB.');
- el('transcript').value='';const r=await checked('/api/voice/transcriptions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file});el('transcript').value=(await r.json()).text;
+ el('transcript').value='';const r=await checked('/api/voice/transcriptions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file});el('transcript').value=(await r.json()).text;el('use-transcript').disabled=!el('transcript').value.trim();
 });
 window.addEventListener('pagehide',()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);});
+
+el('use-transcript').onclick=()=>{try{localStorage.setItem('kairoq-voice-draft',JSON.stringify({text:el('transcript').value,at:Date.now()}));el('status').textContent='In the builder, open + and choose Insert transcript. Review it before sending.';}catch{el('status').textContent='Could not transfer the transcript. Copy it manually.';}};
