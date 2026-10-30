@@ -1,0 +1,14 @@
+/* Focused product shell: neutral workspace, distinctive but restrained accents. */
+body.app.in-editor{--workspace-bg:#f7f8fb!important;--workspace-edge:#e8eaf0!important}
+body.app.in-editor .shell-main,body.app.in-editor #editor{background:#f7f8fb!important}
+body.app.in-editor #editor>.chat{background:#fff!important;border-right:1px solid #e7eaf0!important}
+body.app.in-editor .chat-head,body.app.in-editor .stage-bar{background:#fff!important;border-bottom:1px solid #e7eaf0!important}
+body.app.in-editor #messages{background:linear-gradient(180deg,#fff 0%,#fff 78%,#fafbfe 100%)!important}
+body.app.in-editor #chat-form{background:#fff!important;border:1px solid #dce1ea!important;border-radius:19px!important;box-shadow:0 6px 25px #0e203b0c!important;transition:border-color .2s ease,box-shadow .2s ease!important}
+body.app.in-editor #chat-form:focus-within{border-color:#adb8d0!important;box-shadow:0 0 0 3px #6b8bea15,0 8px 35px #0f25400d!important}
+body.app.in-editor #canvas{background:radial-gradient(ellipse at 50% 20%,#fdfdff 0%,#f3f5f9 70%,#eef1f6 100%)!important}
+body.app.in-editor .stage-bar button{border-radius:9px!important}
+body.app.in-editor #progress{background:#f8faff!important;border:1px solid #e8ecf5!important}
+body.app.in-editor #cost-hint{font-size:11px!important;letter-spacing:-.01em;color:#6d7787!important}
+body.app .side{background:#fbfcfe!important;border-right:1px solid #e7eaf0!important}
+@media(prefers-reduced-motion:reduce){body.app.in-editor #chat-form{transition:none!important}}
