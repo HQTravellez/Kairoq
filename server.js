@@ -6902,6 +6902,8 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
       return await callOpenRouterBuilder({...rest,only:model},parse);
     }catch(err){
       if(err.name==="AbortError"||rest.signal?.aborted)throw err;
+      // Selected-model timeouts must not cascade into an unrelated Auto/free-model workflow.
+      if(/(?:aborted|timed? out|timeout|503|502)/i.test(String(err.message||err)))throw Error("The selected AI model did not respond in time. No automatic free-model fallback was attempted; retry once or choose another model.");
       // A selected paid model with an exhausted application budget cannot be rescued by
       // repeatedly trying free models. Surface the actionable error to the owner promptly.
       if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(err.message||err)))throw Error("Selected model blocked by Kairoq's application spending limit. Check DAILY_COST_LIMIT_USD, MONTHLY_COST_LIMIT_USD and KAIROQ_BUILDER_MONTHLY_LIMIT_USD; no fallback attempted.");
