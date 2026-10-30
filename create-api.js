@@ -265,6 +265,14 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   limitedKey('free-discuss-hour:'+v.owner,intEnv('KAIROQ_FREE_CHAT_HOURLY_LIMIT',25),3600000);
   limitedKey('free-discuss-day:'+v.owner,intEnv('KAIROQ_FREE_CHAT_DAILY_LIMIT',100),86400000);
  }
+ if(mode==='discuss'&&!hooks&&!images.length&&!context){
+  const answer=require('./calendar-conversation-guard').respond(message,builder.loadMeta(id).messages);
+  if(answer){
+   builder.addMessages(id,[{role:'user',text:String(message).trim(),conversation_kind:'calendar-support'},{role:'assistant',text:answer,mode:'support',support:true,credits:0,conversation_kind:'calendar-support'}]);
+   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true}};
+   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
+  }
+ }
  if(!concurrentDiscuss&&(mode==='build'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingFeatureComplaint(message)){
   const ownerComplaint=String(message).trim();
   mode='build';
