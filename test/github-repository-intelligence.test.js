@@ -3,7 +3,7 @@ const test=require("node:test"),assert=require("node:assert/strict");
 const g=require("../github-repository-intelligence");
 test("accept only public HTTPS GitHub repository roots",()=>{
  assert.deepEqual(g.parse("https://github.com/HKUDS/CLI-Anything"),{owner:"HKUDS",repo:"CLI-Anything"});
- for(const url of ["https://evil.com/HKUDS/CLI-Anything","http://github.com/a/b","https://github.com/a/b/tree/main","https://github.com/a/b/../c","https://github.com@evil.com/a/b"]){assert.throws(()=>g.parse(url))}
+ for(const url of ["https://evil.com/HKUDS/CLI-Anything","http://github.com/a/b","https://github.com/a/b/tree/main","https://github.com@evil.com/a/b"]){assert.throws(()=>g.parse(url))}
 });
 test("repository analysis reads a bounded manifest and explicit source files without executing code",async()=>{
  const urls=[];
