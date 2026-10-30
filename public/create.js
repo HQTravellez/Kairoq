@@ -228,8 +228,20 @@ $('new-form').onsubmit=async e=>{
   if(!typed)return;
   // Greetings are conversation openers, not failed app specifications.
   if(/^(hi|hello|hey|hey there|good morning|good afternoon|good evening)[!?.\s]*$/i.test(typed)){
-   $('home-error').classList.add('welcome');
-   text($('home-error'),"Hi! What would you like to create? Describe an idea, or choose an example below.");
+   // The home composer is an entry into the actual builder, never a dead-end greeting.
+   // Resume the latest project if one exists, avoiding an unnecessary quota-consuming project.
+   const recent=Array.isArray(state.projects)&&state.projects.length?state.projects[0]:null;
+   if(recent)await openProject(recent.id);
+   else{
+    const {project}=await api('/projects',{method:'POST',body:{name:'Untitled project'}});
+    await openProject(project.id);
+   }
+   $('new-prompt').value='';
+   setChatMode('discuss');
+   $('chat-input').value='';
+   $('chat-input').placeholder='Tell Kairoq what you want to build…';
+   $('chat-input').focus();
+   syncSend();
    return;
   }
   $('home-error').classList.remove('welcome');
