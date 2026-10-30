@@ -42,7 +42,29 @@ def main() -> int:
         return 0
 
     try:
-        result = extract(files)
+        result = extract(files, root=root, cache_root=root, parallel=False)
+
+        # Kairoq's graph API uses project-relative file identities. Graphify's
+        # language extractors may initially emit absolute paths; never retain
+        # the ephemeral /tmp workspace path after analysis.
+        def rel_source(value: object) -> str:
+            if not value:
+                return ""
+            try:
+                p = Path(str(value))
+                if not p.is_absolute():
+                    p = (root / p).resolve()
+                else:
+                    p = p.resolve()
+                return p.relative_to(root).as_posix()
+            except (ValueError, OSError):
+                return ""
+
+        for collection in ("nodes", "edges", "hyperedges"):
+            for item in result.get(collection, []) or []:
+                if isinstance(item, dict) and "source_file" in item:
+                    item["source_file"] = rel_source(item.get("source_file"))
+
         result["upstream_version"] = importlib.metadata.version("graphifyy")
         result["mode"] = "deterministic-ast-only"
         print(json.dumps(result, separators=(",", ":")))
