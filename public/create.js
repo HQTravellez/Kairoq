@@ -228,8 +228,20 @@ $('new-form').onsubmit=async e=>{
   if(!typed)return;
   // Greetings are conversation openers, not failed app specifications.
   if(/^(hi|hello|hey|hey there|good morning|good afternoon|good evening)[!?.\s]*$/i.test(typed)){
-   $('home-error').classList.add('welcome');
-   text($('home-error'),"Hi! What would you like to create? Describe an idea, or choose an example below.");
+   // The home composer is an entry into the actual builder, never a dead-end greeting.
+   // Resume the latest project if one exists, avoiding an unnecessary quota-consuming project.
+   const recent=Array.isArray(state.projects)&&state.projects.length?state.projects[0]:null;
+   if(recent)await openProject(recent.id);
+   else{
+    const {project}=await api('/projects',{method:'POST',body:{name:'Untitled project'}});
+    await openProject(project.id);
+   }
+   $('new-prompt').value='';
+   setChatMode('discuss');
+   $('chat-input').value='';
+   $('chat-input').placeholder='Tell Kairoq what you want to build…';
+   $('chat-input').focus();
+   syncSend();
    return;
   }
   $('home-error').classList.remove('welcome');
@@ -761,6 +773,12 @@ function device(mobile){
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
 $('device-model').onchange=()=>{state.deviceModel=$('device-model').value;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
 addEventListener('resize',fitDevice);
+// The preview column changes size when the sidebar, code panel, or browser chrome changes.
+// A window resize listener alone misses those transitions and leaves the iPhone clipped.
+if(typeof ResizeObserver!=='undefined'){
+ const previewObserver=new ResizeObserver(()=>fitDevice());
+ previewObserver.observe($('canvas'));
+}
 $('safari-shot').onclick=async()=>{
  const b=$('safari-shot'),m=MODELS[state.deviceModel];b.disabled=true;const was=b.textContent;b.textContent='Opening in Safari…';
  try{const r=await api('/projects/'+state.project.id+'/safari',{method:'POST',body:{width:m.w,height:m.h-m.top-m.bottom-m.urlTop,ipad:m.os==='ipados'}});

@@ -1,0 +1,42 @@
+/* Device preview polish. Scope to the editor to avoid changing generated customer apps. */
+body.app.in-editor .canvas.mobile{display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 20px!important;background:radial-gradient(ellipse at 50% 0%,#f8faff 0%,#edf1f7 75%)!important;scrollbar-width:thin}
+body.app.in-editor .device.phone{
+ background:linear-gradient(145deg,#383a42 0%,#111318 30%,#08090c 74%,#34363e 100%)!important;
+ border:1px solid #4b4e58!important;
+ box-shadow:0 0 0 1px #111318,0 0 0 3px #858b99,0 20px 30px -14px #15203655,0 44px 85px -27px #1827405c!important;
+ transition:box-shadow .28s ease,filter .28s ease!important;
+ filter:drop-shadow(0 3px 2px #17233b0a);
+}
+body.app.in-editor .device.phone::before{background:#fff!important;box-shadow:inset 0 0 0 1px #d5d7de;border-radius:var(--dev-radius)}
+body.app.in-editor .device.phone .dev-top{background:#fff!important;color:#0a0b0d!important}
+body.app.in-editor .device.phone.island .dev-island{background:#060608!important;box-shadow:inset 0 0 0 1px #22252d,0 0 0 1px #111}
+body.app.in-editor .device.phone .dev-bottom{background:#fbfbfd!important;box-shadow:inset 0 1px 0 #e4e5eb!important}
+body.app.in-editor .device.phone .dev-urlbar{background:#ecedf2!important;color:#343945!important}
+body.app.in-editor .device.phone .dev-home{background:#15151a!important}
+body.app.in-editor .device.phone #frame{background:white!important;border-radius:2px!important}
+/* Fade only view/preview entrances. Never fade the active iframe while users interact. */
+@keyframes kq-preview-reveal{from{opacity:.55;filter:blur(3px);transform:translateY(6px)}to{opacity:1;filter:blur(0);transform:translateY(0)}}
+body.app.in-editor .stage:has(#device.phone:not(.hidden)) .device.phone{animation:kq-preview-reveal .33s cubic-bezier(.2,.75,.25,1) both}
+body.app.in-editor .stage:has(.device.desktop) #frame:not(.hidden){animation:kq-preview-reveal .24s ease-out both}
+@media(prefers-reduced-motion:reduce){body.app.in-editor .device.phone,body.app.in-editor .stage #frame{animation:none!important;transition:none!important}}
+@media(max-width:700px){body.app.in-editor .canvas.mobile{padding:14px 8px!important}}
+
+/* Premium builder shell: hierarchy and whitespace, not decorative colour. */
+body.app{--workspace-edge:#e5e9f0;--workspace-muted:#667085;--workspace-bg:#f7f8fa}
+body.app .side{background:#fafbfc!important;border-right:1px solid #e8ebf0!important}
+body.app .side-brand{letter-spacing:-.035em}
+body.app .side-nav button{border-radius:10px!important;transition:background .16s ease,color .16s ease!important}
+body.app .side-nav button[aria-current]{background:#eef1fa!important;color:#27324b!important}
+body.app .shell-main{background:#fff}
+body.app:not(.in-editor) .shell-main{border:1px solid #e8ebf0!important;box-shadow:0 12px 34px #1b2c4808!important}
+body.app #home .home{background:radial-gradient(ellipse 70% 32% at 50% 23%,#f4f6fb,#fff 75%)!important}
+body.app #home .home-hero{padding-top:clamp(52px,9vh,108px)!important}
+body.app #home h1{font-weight:640!important;letter-spacing:-.055em!important}
+body.app #home .prompt-box{border:1px solid #e0e5ed!important;border-radius:18px!important;box-shadow:0 10px 38px #23334b0a!important}
+body.app #home .browser{border-radius:16px!important;box-shadow:0 5px 30px #24365008!important}
+body.app.in-editor #editor>.chat{box-shadow:6px 0 22px #1b263b05}
+body.app.in-editor .stage-bar{padding-inline:16px!important}
+body.app.in-editor #chat-form{border-radius:16px!important}
+body.app.in-editor #messages .assistant{line-height:1.68}
+body.app.in-editor #messages .user{line-height:1.55}
+@media(prefers-reduced-motion:reduce){body.app .side-nav button{transition:none!important}}
