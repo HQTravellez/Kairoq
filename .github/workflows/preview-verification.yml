@@ -3,11 +3,17 @@ on:
   push:
     paths:
       - 'public/create.js'
+      - 'public/builder-split-preview.js'
+      - 'public/builder-split-preview.css'
+      - 'test/builder-split-preview.test.js'
       - 'test/preview-verification-scope.test.js'
       - '.github/workflows/preview-verification.yml'
   pull_request:
     paths:
       - 'public/create.js'
+      - 'public/builder-split-preview.js'
+      - 'public/builder-split-preview.css'
+      - 'test/builder-split-preview.test.js'
       - 'test/preview-verification-scope.test.js'
       - '.github/workflows/preview-verification.yml'
 permissions:
@@ -20,5 +26,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check public/create.js
-      - run: node --test test/preview-verification-scope.test.js
+      - run: node --check public/create.js && node --check public/builder-split-preview.js
+      - run: node --test test/preview-verification-scope.test.js test/builder-split-preview.test.js
