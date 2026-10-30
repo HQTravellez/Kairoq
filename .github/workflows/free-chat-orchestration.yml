@@ -3,12 +3,18 @@ on:
   push:
     paths:
       - 'server.js'
+      - 'freellmapi.js'
+      - 'capability-registry.js'
+      - 'test/freellmapi.test.js'
       - 'react-builder.js'
       - 'test/free-chat-orchestration.test.js'
       - '.github/workflows/free-chat-orchestration.yml'
   pull_request:
     paths:
       - 'server.js'
+      - 'freellmapi.js'
+      - 'capability-registry.js'
+      - 'test/freellmapi.test.js'
       - 'react-builder.js'
       - 'test/free-chat-orchestration.test.js'
       - '.github/workflows/free-chat-orchestration.yml'
@@ -23,5 +29,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check server.js && node --check react-builder.js
-      - run: node --test test/free-chat-orchestration.test.js
+      - run: node --check server.js && node --check react-builder.js && node --check freellmapi.js && node --check capability-registry.js
+      - run: node --test test/free-chat-orchestration.test.js test/freellmapi.test.js
