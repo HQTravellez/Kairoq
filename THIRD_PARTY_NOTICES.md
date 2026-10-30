@@ -215,3 +215,17 @@ https://github.com/Shubhamsaboo/awesome-llm-apps (Apache-2.0). Kairoq does not
 vendor the example applications or execute their scripts. The capability definitions,
 trigger rules, safety statuses and evaluation cases in `capability-registry.js` and
 `data/capability-routing-evals.json` are Kairoq-specific implementations.
+
+
+## Matt Pocock engineering skills: project intelligence and review discipline
+
+Kairoq's `project-knowledge.js`, `task-graph.js`, `engineering-intelligence.js`,
+`engineering-review.js`, and `build-retro.js` are Kairoq-specific implementations informed
+by the engineering methods in Matt Pocock's Skills For Real Engineers,
+https://github.com/mattpocock/skills (MIT License, Copyright (c) 2026 Matt Pocock).
+
+The adapted concepts include project glossary/ADR discipline, tracer-bullet vertical task graphs,
+public test seams and anti-tautological tests, deep-module design, separate Standards and Spec
+review axes, and environment-focused retrospectives. Kairoq does not vendor or execute the
+upstream skill files; it implements these concepts inside its own builder, verification and
+project-storage boundaries.
