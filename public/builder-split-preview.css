@@ -12,3 +12,12 @@
 #kq-tests-tab[aria-pressed=true]{background:var(--accent-soft,#e7ebfa)}
 #kq-expand-preview{flex-shrink:0}
 @media(max-width:900px){#kq-split-handle,#kq-expand-preview{display:none!important}#editor{grid-template-columns:minmax(0,1fr)!important}}
+
+/* Active drag must continue across the actual cross-origin app iframe. */
+body.kq-split-dragging,body.kq-split-dragging *{cursor:col-resize!important;user-select:none!important}
+body.kq-split-dragging #editor iframe{pointer-events:none!important}
+@media(min-width:901px){
+ #kq-split-handle{width:18px;z-index:999;outline-offset:0}
+ #kq-split-handle::before{left:8px;background:#7787c3}
+ #editor.kq-resizing #kq-split-handle::before{width:3px;background:#4865d9}
+}
