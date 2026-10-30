@@ -122,6 +122,7 @@ function forProject(id,{webSearch=hooks.webSearch,remote=(u,o)=>require('./build
  const run=async(tool,args={},ctx={})=>{
   if(++calls>Number(process.env.KAIROQ_BUILDER_TOOL_CALLS||40))return'You have used the tools '+(calls-1)+' times in this change; build with what you have.';
   const a=args&&typeof args==='object'?args:{};
+  if(tool==='narrate')return require('./voice-assets').narrate(id,a);
   if(tool==='search')return search(a.query,{webSearch});
   if(tool==='read'){
    const page=await read(a.url,{remote});

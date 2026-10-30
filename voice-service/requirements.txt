@@ -1,0 +1,9 @@
+kokoro==0.9.4
+misaki[en]==0.9.4
+openai-whisper==20250625
+fastapi==0.115.12
+uvicorn==0.34.2
+soundfile==0.13.1
+huggingface-hub==0.36.0
+transformers==4.57.1
+numpy==2.2.6

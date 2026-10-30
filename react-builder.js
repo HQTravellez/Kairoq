@@ -248,7 +248,7 @@ async function runBuild(files,outDir,{projectId='000000000000'}={}){
  try{
   fs.writeFileSync(path.join(work,'index.html'),INDEX_HTML);
   fs.copyFileSync(path.join(__dirname,'builder-runtime','kairoq-reporter.js'),path.join(work,'kairoq-reporter.js'));
-  if(projectId!=='000000000000'){require('./react-assets').copyInto(projectId,path.join(work,'public'));require('./video-gen').copyInto(projectId,path.join(work,'public'));require('./explode-video').copyInto(projectId,path.join(work,'public'));require('./react-models').copyInto(projectId,path.join(work,'public'))}
+  if(projectId!=='000000000000'){require('./react-assets').copyInto(projectId,path.join(work,'public'));require('./voice-assets').copyInto(projectId,path.join(work,'public'));require('./video-gen').copyInto(projectId,path.join(work,'public'));require('./explode-video').copyInto(projectId,path.join(work,'public'));require('./react-models').copyInto(projectId,path.join(work,'public'))}
   // The 3D viewer script, only for apps that show 3D (react-model3d.js).
   if(require('./react-models').usesViewer(files))require('./react-models').copyViewer(path.join(work,'public'));
   for(const [name,code] of Object.entries(files)){const file=path.join(work,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,code)}
