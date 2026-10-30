@@ -453,6 +453,13 @@ async function streamLocalLlm({messages,temperature=0.7,model="",effort=""},res)
   return {emitted,finalModel:`local/${finalModel}`,usage,provider:"local"};
 }
 async function callFreeLlmText({messages,temperature=0.2,webSearch=false}={}){
+  const freePool=require("./freellmapi");
+  if(freePool.enabled()){
+    try{
+      const r=await freePool.complete(messages,{temperature,maxTokens:8000});
+      return r.text;
+    }catch(e){console.log("[freellmapi] free text route failed, continuing: "+String(e.message||e).slice(0,180))}
+  }
   if(ZERO_COST_MODE){
     try{
       const local=await localChatCompletion({messages,temperature});
@@ -480,6 +487,11 @@ async function callFreeLlmText({messages,temperature=0.2,webSearch=false}={}){
   return typeof data?.choices?.[0]?.message?.content==="string"?data.choices[0].message.content:JSON.stringify(data?.choices?.[0]?.message?.content??"");
 }
 async function callFreeLlmJSON({messages,temperature=0.1}={}){
+  const freePool=require("./freellmapi");
+  if(freePool.enabled()){
+    try{return (await freePool.json(messages,{temperature,maxTokens:16000,coding:true})).value}
+    catch(e){console.log("[freellmapi] free JSON route failed, continuing: "+String(e.message||e).slice(0,180))}
+  }
   if(ZERO_COST_MODE){
     try{
       const local=await localChatCompletion({messages,temperature,responseFormat:{type:"json_object"}});
@@ -589,6 +601,11 @@ async function getModels(force = false) {
   const fresh = Date.now() - modelCache.fetchedAt < MODEL_CACHE_MS;
   if (!force && fresh && modelCache.models.length) return modelCache.models;
 
+  const freePool=require("./freellmapi");
+  let freePoolModels=[];
+  if(freePool.enabled()){
+    try{freePoolModels=await freePool.models({force})}catch(e){console.log("[freellmapi] model discovery: "+String(e.message||e).slice(0,160))}
+  }
   const localNames=await getLocalLlmModels(force);
   const localModels=localNames.map((id,idx)=>({
     id:`local/${id}`,
@@ -616,6 +633,12 @@ async function getModels(force = false) {
   }
 
   const models=[
+    ...(freePool.enabled()?[{
+      id:"freellm/auto",name:"Kairoq Free Pool · FreeLLMAPI",context_length:null,isFree:true,
+      inputPrice:"0",outputPrice:"0",inputModalities:["text"],supportsVision:false,
+      supportsTools:true,supportsReasoning:true,source:"freellmapi",local:false,preferred:true,
+      poolSize:freePoolModels.length
+    }]:[]),
     ...(localModels.length?[{
       id:"local/auto",name:"Kairoq Local Auto · FREE",context_length:null,isFree:true,
       inputPrice:"0",outputPrice:"0",inputModalities:["text"],supportsVision:false,
@@ -6914,6 +6937,22 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
     try{return await callOpenRouterBuilder(opts,parse)}
     catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[check] website-check models failed, using the usual route: "+String(err.message||err).slice(0,200))}
   }
+  // FreeLLMAPI is an internal Standard-build pool. It gets one attempt; if the result is
+  // malformed or unavailable, Kairoq continues into the existing paid/free fallback chain.
+  const freePool=require("./freellmapi");
+  if(freePool.enabled()&&String(process.env.FREELLMAPI_BUILDS||"on").toLowerCase()!=="off"&&(!opts.tier||opts.tier==="standard")){
+    try{
+      const r=await freePool.complete(opts.messages,{
+        coding:true,temperature:opts.temperature??0.2,
+        maxTokens:Math.min(32000,Number(opts.maxOutputTokens)||16000),
+        signal:opts.signal,reasoningEffort:"low"
+      });
+      return parse(r.text,"freellm/"+r.model);
+    }catch(err){
+      if(err.name==="AbortError"||opts.signal?.aborted)throw err;
+      console.log("[builder] FreeLLMAPI pool failed, continuing: "+String(err.message||err).slice(0,200));
+    }
+  }
   // A fast model (Ollama Cloud, see fastBuilder) writes Standard builds first: it streams at
   // once, where the free OpenRouter models wait in line and think silently for minutes.
   const fb=fastBuilder();
@@ -6995,6 +7034,15 @@ async function callChatAnswer(opts,parse){
       const r=await hermes.streamChat({messages:opts.messages,onToken:opts.onToken?(d=>{opts._all=(opts._all||"")+d;opts.onToken(d,opts._all)}):undefined,signal:opts.signal?AbortSignal.any([opts.signal,AbortSignal.timeout(90000)]):AbortSignal.timeout(90000)});
       return parse(r.text,"kairoq-agent");
     }catch(err){if(opts.signal?.aborted)throw err;errors.push("Kairoq Agent: "+String(err.message||err).slice(0,120))}
+  }
+  // Internal FreeLLMAPI pool: one Kairoq route over many provider free tiers.
+  const freePool=require("./freellmapi");
+  if(freePool.enabled()){
+    try{
+      const r=await freePool.complete(opts.messages,{temperature:opts.temperature??0.4,maxTokens:Math.min(4000,Number(opts.maxOutputTokens)||2500),signal:opts.signal});
+      opts.onToken?.(r.text,r.text);
+      return parse(r.text,"freellm/"+r.model);
+    }catch(err){if(opts.signal?.aborted)throw err;errors.push("FreeLLMAPI: "+String(err.message||err).slice(0,140))}
   }
   // freeOnly (learning notes): skip Muse, which is paid; Kairoq Agent and the free models stay.
   if(museReady()&&!opts.freeOnly){
