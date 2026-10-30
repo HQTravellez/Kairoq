@@ -39,6 +39,6 @@ function resultMessage(message,result){
   const proof=["clean build",e.browser==="passed"?"browser interactions":null,e.unit_tests==="passed"?"verification tests":null,e.saved_checks==="passed"?"saved regression checks":null].filter(Boolean);
   return "VERIFIED BUILD · "+proof.join(" · ")+"\n\n"+text;
  }
- return "UNVERIFIED DRAFT · "+result.issues.join(" ")+"\n\nBuilder notes: "+text;
+ return "UNVERIFIED DRAFT · NOT functionally verified. "+result.issues.join(" ")+"\n\nBuilder notes: "+text;
 }
 module.exports={evaluate,resultMessage,requiresUnitTests};
