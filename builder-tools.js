@@ -130,6 +130,7 @@ function forProject(id,{webSearch=hooks.webSearch,remote=(u,o)=>require('./build
    if(item&&hooks.callModel&&!R.savedNotes(item.url))R.learnFromText(item,page.slice(page.indexOf('\n')+1),{callModel:hooks.callModel}).catch(()=>{});
    return page;
   }
+  if(tool==='github_repo_analyze')return require('./github-repository-intelligence').analyze(a.url,{remote});
   if(tool==='integration')return require('./integrations').lookup(a.service,a.action,{remote});
   if(tool==='skill')return require('./builder-skills').open(a.name);
   if(tool==='tutorials')return require('./builder-references').lookup(a.topic||a.query);
