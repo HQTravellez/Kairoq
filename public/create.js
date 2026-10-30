@@ -766,6 +766,12 @@ function device(mobile){
 $('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
 $('device-model').onchange=()=>{state.deviceModel=$('device-model').value;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
 addEventListener('resize',fitDevice);
+// The preview column changes size when the sidebar, code panel, or browser chrome changes.
+// A window resize listener alone misses those transitions and leaves the iPhone clipped.
+if(typeof ResizeObserver!=='undefined'){
+ const previewObserver=new ResizeObserver(()=>fitDevice());
+ previewObserver.observe($('canvas'));
+}
 $('safari-shot').onclick=async()=>{
  const b=$('safari-shot'),m=MODELS[state.deviceModel];b.disabled=true;const was=b.textContent;b.textContent='Opening in Safari…';
  try{const r=await api('/projects/'+state.project.id+'/safari',{method:'POST',body:{width:m.w,height:m.h-m.top-m.bottom-m.urlTop,ipad:m.os==='ipados'}});
