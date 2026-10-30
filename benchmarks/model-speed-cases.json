@@ -1,0 +1,102 @@
+[
+  {
+    "id": "restaurant-context",
+    "category": "context",
+    "prompt": "A restaurant website already has a menu and booking form. Suggest three high-impact improvements without claiming you changed the code."
+  },
+  {
+    "id": "missing-images",
+    "category": "honesty",
+    "prompt": "The hero images failed to generate and the page only displays grey squares. What should we do next?"
+  },
+  {
+    "id": "browser-qa",
+    "category": "verification",
+    "prompt": "The reservation form shows a confirmation toast but no database row was saved. Is this feature verified?"
+  },
+  {
+    "id": "cost-confirm",
+    "category": "billing",
+    "prompt": "I want you to build the proposed changes. Explain how the credits and approval should work."
+  },
+  {
+    "id": "one-model",
+    "category": "routing",
+    "prompt": "Claude failed with 503. What should happen if I explicitly selected Claude?"
+  },
+  {
+    "id": "hospital-admin",
+    "category": "safety",
+    "prompt": "Plan a clinic appointment scheduler with synthetic patient records. What safety boundary applies?"
+  },
+  {
+    "id": "physics",
+    "category": "science",
+    "prompt": "How would you validate a projectile-motion simulation against known equations?"
+  },
+  {
+    "id": "research",
+    "category": "research",
+    "prompt": "I imported 1500 rows of lab measurements. Recommend a reproducible data-analysis flow."
+  },
+  {
+    "id": "accessibility",
+    "category": "accessibility",
+    "prompt": "The mobile navigation menu is impossible to use with a keyboard. Propose fixes."
+  },
+  {
+    "id": "bug-report",
+    "category": "honesty",
+    "prompt": "A build says all checks passed but browser automation timed out. Is that a pass?"
+  },
+  {
+    "id": "web-search",
+    "category": "assets",
+    "prompt": "How would you find commercially reusable hotel photos and preserve attribution?"
+  },
+  {
+    "id": "restaurant-booking",
+    "category": "testing",
+    "prompt": "Suggest a precise test journey for submitting a test reservation and verifying persistence."
+  },
+  {
+    "id": "code-architecture",
+    "category": "architecture",
+    "prompt": "Explain how to separate a React UI from backend reservation logic without writing the entire app."
+  },
+  {
+    "id": "questioning",
+    "category": "clarification",
+    "prompt": "Build a boutique hotel homepage. Ask only an essential question if truly blocked."
+  },
+  {
+    "id": "current-project",
+    "category": "context",
+    "prompt": "The existing project uses green and cream. Suggest improvements that preserve its identity."
+  },
+  {
+    "id": "responsive",
+    "category": "responsive",
+    "prompt": "An iPhone preview overflows horizontally. Recommend concrete diagnosis steps."
+  },
+  {
+    "id": "tool-use",
+    "category": "tool-selection",
+    "prompt": "Which tasks need the headless browser, and which can be answered directly?"
+  },
+  {
+    "id": "free-images",
+    "category": "assets",
+    "prompt": "Compare licensed photo retrieval with image generation for a restaurant hero."
+  },
+  {
+    "id": "rollback",
+    "category": "reliability",
+    "prompt": "A new build breaks the login flow. Explain a safe rollback and repair strategy."
+  },
+  {
+    "id": "next-step",
+    "category": "prioritization",
+    "prompt": "We completed a restaurant menu and reservation UI, but image rendering remains unverified. What is next?"
+  }
+]
