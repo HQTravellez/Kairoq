@@ -247,7 +247,7 @@ function supportAnswer(meta){
 function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false,implementFrom=null},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
  const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
- if(active&&!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
+ if(active&&!model&&!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
   const answer='I’m here. The current change is still running, and your earlier messages and plan are kept. You can keep chatting or stop the build.';
   builder.addMessages(id,[{role:'user',text:String(message).trim(),conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',support:true,credits:0,conversation_kind:'status'}]);
   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true}};
@@ -257,6 +257,17 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   throw Object.assign(Error('A build is already '+active.status+'. Open the active job or stop it before starting another change.'),{status:409,activeJobId:active.id,activeStatus:active.status});
  }
  if(!['build','discuss','agent','polish','autopilot'].includes(mode))throw Object.assign(Error('Unknown mode'),{status:400});
+ // A model explicitly chosen for this project stays selected until the owner changes it.
+ // Never silently revert to Auto on subsequent messages.
+ const selection=require('./sticky-model-selection');
+ const selectionMeta=builder.loadMeta(id);
+ model=selection.resolve(model,selectionMeta.selected_chat_model);
+ if(model!==selectionMeta.selected_chat_model){
+  selectionMeta.selected_chat_model=model;
+  builder.saveMeta(selectionMeta);
+ }
+ const pinnedModel=Boolean(model);
+
  // Free chat is limited per signed-in customer to protect provider costs. Owner QA is exempt.
  // In-memory limits apply per server instance; distributed deployments need shared counters.
  if(mode==='discuss'&&v.kind==='customer'&&!hooks){
@@ -279,7 +290,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   shownText=String(message).trim();message='Implement this agreed proposal in the current project, preserving its existing requirements:\n\n'+proposal.text;mode='build';
  }
 
- if(!concurrentDiscuss&&!hooks&&(mode==='build'||mode==='discuss')){
+ if(!concurrentDiscuss&&!pinnedModel&&!hooks&&(mode==='build'||mode==='discuss')){
   const Q=require('./builder-question'),a=Q.answer(message,Q.pending(builder.loadMeta(id)));
   if(a){shownText=String(message).trim();message=a.message;mode='build'}
  }
@@ -293,7 +304,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  if(!hooks&&mode==='build'&&require('./code-structure').isTidy(message)){shownText='Tidy up the code';message=require('./code-structure').TIDY}
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
- if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&!shownText){
+ if((mode==='build'||mode==='agent'||mode==='discuss')&&!pinnedModel&&!hooks&&!images.length&&!context&&!shownText){
   const S=require('./builder-smalltalk'),kind=S.smallTalk(message);
   if(kind){
    const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
@@ -305,13 +316,13 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   if(mode==='build'&&(S.questionOnly(message)||S.conversation(message))&&!supportQuestion(message))mode='discuss';
  }
  // Missing images are not a healthy-preview issue: never assert that a successful page load proves images are present.
- if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&missingImageComplaint(message)){
+ if((mode==='build'||mode==='agent'||mode==='discuss')&&!pinnedModel&&!hooks&&!images.length&&!context&&missingImageComplaint(message)){
   const meta=builder.loadMeta(id),answer=missingImageAnswer(meta);
   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
  }
- if((mode==='build'||mode==='agent')&&!hooks&&!images.length&&!context&&supportQuestion(message)){
+ if((mode==='build'||mode==='agent')&&!pinnedModel&&!hooks&&!images.length&&!context&&supportQuestion(message)){
   const meta=builder.loadMeta(id),answer=supportAnswer(meta);
   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true}]);
   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
