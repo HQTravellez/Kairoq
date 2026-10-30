@@ -97,6 +97,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The complete Superpowers skill library (all skills in its `skills/` folder, unmodified, revision `2ce8aa1`) is also shipped to Kairoq's Hermes chat service in `hermes/skills/superpowers/`, with its MIT license in `hermes/skills/superpowers/LICENSE`.
 
+`execution-discipline.js`, `execution-ledger.js`, and `hermes-superpowers.js` extend that
+integration with Kairoq-specific adaptations of Superpowers' systematic-debugging,
+test-driven-development, subagent-driven-development and
+verification-before-completion methodology. The original Superpowers skill library remains
+unmodified; Kairoq's execution ledger and autonomous routing are Kairoq-owned code.
+
 ## Harvey: email gate and Find customers
 
 `email-gate.js` and the pipeline in `outreach.js` (listing businesses, reading their sites without AI, owner-confirmed signals, an outbox the owner approves, the bounce kill switch) follow Harvey by Ethan Rogers, https://github.com/ethanplusai/harvey, licensed under the MIT License (full text in `licenses/harvey-LICENSE.txt`). Kairoq's version is its own JavaScript implementation; Harvey's code, its subscription-based model calls, LinkedIn automation and "humanizer" are not used. Business listings come from OpenStreetMap (© OpenStreetMap contributors, ODbL), used through Nominatim and Overpass under their usage policies.
@@ -199,3 +205,27 @@ server image. Kairoq uses only its deterministic AST extraction functions throug
 network workflows are not invoked. The upstream package metadata declares the package
 license as MIT. Kairoq does not vendor Graphify source code; `project-graph.js` is
 Kairoq's own adapter, query, path and impact layer.
+
+
+## Awesome LLM Apps capability/eval patterns
+
+Kairoq's Capability OS routing/evidence model is informed by the skill registry and
+trigger-evaluation patterns in Shubham Saboo's Awesome LLM Apps,
+https://github.com/Shubhamsaboo/awesome-llm-apps (Apache-2.0). Kairoq does not
+vendor the example applications or execute their scripts. The capability definitions,
+trigger rules, safety statuses and evaluation cases in `capability-registry.js` and
+`data/capability-routing-evals.json` are Kairoq-specific implementations.
+
+
+## Matt Pocock engineering skills: project intelligence and review discipline
+
+Kairoq's `project-knowledge.js`, `task-graph.js`, `engineering-intelligence.js`,
+`engineering-review.js`, and `build-retro.js` are Kairoq-specific implementations informed
+by the engineering methods in Matt Pocock's Skills For Real Engineers,
+https://github.com/mattpocock/skills (MIT License, Copyright (c) 2026 Matt Pocock).
+
+The adapted concepts include project glossary/ADR discipline, tracer-bullet vertical task graphs,
+public test seams and anti-tautological tests, deep-module design, separate Standards and Spec
+review axes, and environment-focused retrospectives. Kairoq does not vendor or execute the
+upstream skill files; it implements these concepts inside its own builder, verification and
+project-storage boundaries.

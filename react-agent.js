@@ -21,6 +21,9 @@ AVAILABLE CAPABILITIES (discoverable inventory, not automatic permission):\n${re
 - {"tool":"read_files","paths":["src/App.jsx"]}: read up to 8 files.
 - {"tool":"search","query":"text or regex"}: search every project file; returns matching lines.
 - {"tool":"project_graph","action":"query","query":"authentication session"}: query Kairoq's structural project graph for symbols/files/relationships. Other actions: {"action":"path","from":"Auth","to":"Database"}, {"action":"impact","changed":["src/auth.js"]}, {"action":"stats"}. Use this before editing an unfamiliar multi-file area and use impact after structural changes. Graphify is deterministic AST analysis; if unavailable Kairoq falls back to its native import graph.
+- {"tool":"project_knowledge","action":"get"}: read the project glossary and architecture decisions. To persist a verified term use {"action":"term","term":"Journey","meaning":"...","source":"owner|code|verified-docs"}. To persist a hard-to-reverse decision use {"action":"decision","title":"...","decision":"...","rationale":"...","source":"owner|code|verified-docs"}. Never store guesses.
+- {"tool":"task_graph","action":"define","tasks":[{"id":"T1","title":"...","delivers":"one independently verifiable vertical behavior","blockedBy":[],"acceptance":["..."]}]}: define tracer-bullet work for substantial requests. Other actions: status, start, complete. Work only tasks on the ready frontier.
+- {"tool":"engineering_review"}: run two fresh independent reviewers: Standards (engineering quality) and Spec (requirements/scope). Blocking high-confidence findings must be repaired and reviewed again before VERIFIED completion.
 - {"tool":"write_files","files":{"src/path.jsx":"full new content"},"delete":["src/old.jsx"]}: create or replace whole files (src/, functions/ and sql/ migrations).
 - {"tool":"edit_files","edits":{"src/path.jsx":[{"find":"exact current lines (unique in the file)","replace":"new lines"}]}}: change part of existing files. Prefer this over write_files for small changes: it is faster and cheaper. "find" must be copied exactly from the file (read it first) and match one place.
 - {"tool":"build_and_test","path":"#/optional-hash-route","steps":[...]}: build the project, open it in a real browser, run optional UI steps, and report errors and visible text${vision?' plus a screenshot':''}.
@@ -78,6 +81,9 @@ function describe(a){
  if(t==='read_files')return'Read '+(Array.isArray(a.paths)?a.paths.slice(0,8).join(', '):'files');
  if(t==='search')return'Searched for "'+String(a.query||'').slice(0,60)+'"';
  if(t==='project_graph')return'Inspected the project graph ('+String(a.action||'query').slice(0,20)+')';
+ if(t==='project_knowledge')return'Updated/read project engineering knowledge';
+ if(t==='task_graph')return'Worked the tracer-bullet task graph ('+String(a.action||'status').slice(0,20)+')';
+ if(t==='engineering_review')return'Ran independent Standards and Spec reviews';
  if(t==='write_files'){const n=Object.keys(a.files||{});const d=Array.isArray(a.delete)?a.delete:[];return'Wrote '+(n.length?n.join(', '):'nothing')+(d.length?'; deleted '+d.join(', '):'')}
  if(t==='edit_files'){const f=Object.keys(a.edits||{});return'Edited '+(f.length?f.join(', '):'nothing')}
  if(t==='build_and_test')return'Built and tested the app'+(Array.isArray(a.steps)&&a.steps.length?' ('+a.steps.length+' UI steps)':'');
@@ -109,6 +115,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const brief=await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
  if(brief){meta=builder.loadMeta(id);tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'"'})}
  const base=builder.loadFiles(id,meta.current_version);
+ const discipline=require('./execution-discipline'),disciplinePlan=discipline.workflow(text),executionLedger=require('./execution-ledger');
+ const ledgerRun=executionLedger.start(id,{instruction:text,baseVersion:meta.current_version,workflow:disciplinePlan});
  const generated=[],pendingChecks=[];
  // The agent's browser tests and SQL reads use a test copy of the data, never the real one.
  const box=require('./react-sandbox').create(id);
@@ -118,12 +126,15 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
  const started=new Date().toISOString();
  const checkpointStore=require('./agent-checkpoint'),checkpoint=checkpointStore.load(id,{instruction:text,baseVersion:meta.current_version});
- let work=checkpoint?checkpoint.files:{...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=Boolean(checkpoint),lastTest=null,lastUnitTests=null,finishWarned=false,invalidReplies=0;
+ let work=checkpoint?checkpoint.files:{...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=Boolean(checkpoint),lastTest=null,lastUnitTests=null,lastReview=null,finishWarned=false,invalidReplies=0;
  const steps=[];let activeStep=checkpoint?.step||0;
  if(checkpoint)tl.add({t:'note',icon:'code',text:'Resumed saved build progress from step '+checkpoint.step});
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=await require('./decision-router').suggest(text);
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+
+ require('./capability-registry').taskContext(text)+discipline.prompt(text)+require('./engineering-intelligence').prompt(text)+
+ require('./project-knowledge').note(id)+require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
+ executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
@@ -226,23 +237,51 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     return{text:clip(JSON.stringify(pg.query(g,String(a.query||''),{limit:12,neighbors:24})),22000)};
    }catch(e){return{text:'project_graph failed: '+String(e.message||e).slice(0,500)}}
   }
+  if(t==='project_knowledge'){
+   const k=require('./project-knowledge'),action=String(a.action||'get').toLowerCase();
+   try{
+    if(action==='term')return{text:'Saved project term: '+JSON.stringify(k.putTerm(id,{term:a.term,meaning:a.meaning,source:a.source}))};
+    if(action==='decision')return{text:'Saved architecture decision: '+JSON.stringify(k.addDecision(id,{title:a.title,decision:a.decision,rationale:a.rationale,source:a.source}))};
+    return{text:k.note(id)||'Project engineering knowledge is empty.'};
+   }catch(e){return{text:'project_knowledge failed: '+String(e.message||e).slice(0,400)}}
+  }
+  if(t==='task_graph'){
+   const g=require('./task-graph'),action=String(a.action||'status').toLowerCase();
+   try{
+    if(action==='define')return{text:JSON.stringify(g.define(id,{instruction:text,tasks:a.tasks}))};
+    if(action==='start')return{text:JSON.stringify(g.start(id,text,String(a.id||'')))};
+    if(action==='complete')return{text:JSON.stringify(g.complete(id,text,String(a.id||''),{evidence:String(a.evidence||'').slice(0,900)}))};
+    return{text:JSON.stringify(g.status(id,text)||{status:'not-defined'})};
+   }catch(e){return{text:'task_graph failed: '+String(e.message||e).slice(0,500)}}
+  }
+  if(t==='engineering_review'){
+   try{
+    lastReview=await require('./engineering-review').run({callModel,base,current:work,request:text,ownerRequirements,knowledge:require('./project-knowledge').note(id),tier,signal});
+    tl.add({t:'test',ok:lastReview.ok,text:lastReview.ok?'Standards + Spec review passed':'Engineering review found blocking issues',detail:lastReview.blocking.map(x=>x.file+': '+x.message)});
+    return{text:require('./engineering-review').summary(lastReview)};
+   }catch(e){return{text:'engineering_review failed: '+String(e.message||e).slice(0,500)}}
+  }
   if(t==='write_files'){
+   const eng=require('./engineering-intelligence'),tg=require('./task-graph');
+   if(eng.substantial(text)&&!tg.get(id,text))return{text:'write_files: substantial work needs a tracer-bullet task graph first. Use task_graph define with independently verifiable vertical slices.'};
    const files=a.files&&typeof a.files==='object'&&!Array.isArray(a.files)?a.files:{};
    const before={...work};
    const written=[],bad=[];
    for(const [name,code] of Object.entries(files)){if(typeof code!=='string'){bad.push(name+' (content must be a string)');continue}work[name]=code;written.push(name)}
    for(const name of Array.isArray(a.delete)?a.delete:[])if(typeof name==='string'&&name!=='src/main.jsx'&&name!=='src/App.jsx'&&Object.hasOwn(work,name)){delete work[name];written.push('deleted '+name)}
-   if(written.length){dirty=true;lastUnitTests=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   if(written.length){dirty=true;lastUnitTests=null;lastReview=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    tl.edits(before,work);
    const problems=builder.checkProject(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
   if(t==='edit_files'){
+   const eng=require('./engineering-intelligence'),tg=require('./task-graph');
+   if(eng.substantial(text)&&!tg.get(id,text))return{text:'edit_files: substantial work needs a tracer-bullet task graph first. Use task_graph define before broad implementation.'};
    let edits;try{edits=require('./react-edits').normalize(a.edits)}catch(e){return{text:'edit_files: '+e.message}}
    const r=require('./react-edits').apply(work,edits);
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
    for(const f of r.changed)tl.add({t:'edit',file:f,kind:'edited'});
-   work=r.files;if(r.changed.length){dirty=true;lastUnitTests=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   work=r.files;if(r.changed.length){dirty=true;lastUnitTests=null;lastReview=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
@@ -320,13 +359,19 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const changed=Object.keys(files).filter(k=>base[k]!==files[k]).concat(Object.keys(base).filter(k=>!Object.hasOwn(files,k)));
   const fresh=builder.loadMeta(id),now=new Date().toISOString();
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
-  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files});
+  const reviewRequired=require('./engineering-review').required(base,files,text);
+  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files,review:lastReview,reviewRequired});
   message=require('./engineering-completion-gate').resultMessage(message,completion);
-  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues,verification_evidence:completion.evidence,...(lastUnitTests?{unit_tests:{ok:lastUnitTests.ok,ran:lastUnitTests.ran,passed:lastUnitTests.passed,failed:lastUnitTests.failed,files:lastUnitTests.files}}:{})},...(errors.length?{runtime_errors:errors}:{})});
+  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues,verification_evidence:completion.evidence,...(lastUnitTests?{unit_tests:{ok:lastUnitTests.ok,ran:lastUnitTests.ran,passed:lastUnitTests.passed,failed:lastUnitTests.failed,files:lastUnitTests.files}}:{}),...(lastReview?{engineering_review:{ok:lastReview.ok,standards:lastReview.standards,spec:lastReview.spec}}:{})},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
   fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
   builder.saveMeta(fresh);
+  executionLedger.complete(id,text,{verified:completion.verified&&!stopped,version:built.n,message});
+  try{
+   const run=executionLedger.read(id).runs[executionLedger.key(text)];
+   require('./build-retro').capture(id,{instruction:text,events:run?.events||[],changed,review:lastReview,verification:completion});
+  }catch{}
   checkpointStore.clear(id);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
   const failedChecks=require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.enabled!==false&&c.last&&c.last.version===built.n&&!c.last.ok).map(c=>({name:c.name,step:c.last.step||'',error:c.last.error||''}));
@@ -343,6 +388,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   message='No changes were made. '+message;
   builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}]);
   const fresh=builder.loadMeta(id);
+  executionLedger.complete(id,text,{verified:true,version:fresh.current_version,message});
   return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
@@ -367,7 +413,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   invalidReplies=0;
   messages.push({role:'assistant',content:JSON.stringify({thought:reply.thought,actions:reply.actions})});
   const entry={n:step,thought:reply.thought,actions:reply.actions.map(describe)};
-  steps.push({...entry,tools:reply.actions.map(a=>a.tool),summary:(reply.thought?reply.thought+' — ':'')+entry.actions.join('; ')});
+  const stepSummary=(reply.thought?reply.thought+' — ':'')+entry.actions.join('; ');
+  steps.push({...entry,tools:reply.actions.map(a=>a.tool),summary:stepSummary});
+  executionLedger.record(id,text,{step,status:'planned',summary:stepSummary,tools:reply.actions.map(a=>a.tool)});
   report({status:'working',step});
   const results=[];let image=null,finished=null;
   for(const a of reply.actions){
@@ -384,6 +432,17 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
      if(cr.failed.length){results.push('finish: these saved checks (flows that worked before) now fail:\n'+require('./react-checks').failureText(cr.failed)+'\nFix them and test again; finish cannot bypass verification.');continue}
      results.push('Saved checks: all '+cr.ran+' passed.');
     }
+    const taskState=require('./task-graph').status(id,text);
+    if(taskState&&!taskState.complete){results.push('finish: task graph is incomplete. Complete the ready tracer-bullet tasks first: '+(taskState.ready.join(', ')||'no ready task; inspect blockers')+'.');continue}
+    const engReview=require('./engineering-review'),reviewRequired=engReview.required(base,work,text);
+    if(reviewRequired&&!lastReview){
+     try{
+      lastReview=await engReview.run({callModel,base,current:work,request:text,ownerRequirements,knowledge:require('./project-knowledge').note(id),tier,signal});
+      results.push('Engineering review:\n'+engReview.summary(lastReview));
+      tl.add({t:'test',ok:lastReview.ok,text:lastReview.ok?'Standards + Spec review passed':'Engineering review found blocking issues',detail:lastReview.blocking.map(x=>x.file+': '+x.message)});
+     }catch(e){results.push('finish: engineering review could not run: '+String(e.message||e).slice(0,400));continue}
+    }
+    if(lastReview?.blocking?.length){results.push('finish: independent review has '+lastReview.blocking.length+' blocking finding(s). Repair them and run engineering_review again.');continue}
     const gate=require('./engineering-completion-gate');
     if(gate.requiresUnitTests(ownerRequirements,work)&&!lastUnitTests){
      lastUnitTests=require('./project-test-runner').run(work);
@@ -391,12 +450,18 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
      tl.add({t:'test',ok:lastUnitTests.ok,text:lastUnitTests.ok?'Verification tests passed':'Verification tests failed',detail:lastUnitTests.ok?lastUnitTests.files:[lastUnitTests.output]});
      if(!lastUnitTests.ok){results.push('finish: deterministic verification failed. Repair the implementation or tests based on the failure above, then run_tests again.');continue}
     }
-    const verdict=gate.evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files:work});
+    const verdict=gate.evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files:work,review:lastReview,reviewRequired});
     if(!verdict.verified){finishWarned=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
     finished=save(message);break;
    }
-   try{const r=await tool(a);results.push(clip(r.text,20000));if(r.image)image=r.image}
-   catch(e){if(e.name==='AbortError'||signal?.aborted)throw e;results.push(a.tool+' failed: '+String(e.message||e).slice(0,500))}
+   try{
+    const r=await tool(a),resultText=clip(r.text,20000);results.push(resultText);if(r.image)image=r.image;
+    executionLedger.record(id,text,{step,tool:a.tool,status:/\bFAILED\b|\bfailed\b|\berror\b/i.test(resultText)?'failed':'ok',result:resultText.slice(0,800)});
+   }catch(e){
+    if(e.name==='AbortError'||signal?.aborted)throw e;
+    const failure=String(e.message||e).slice(0,500);results.push(a.tool+' failed: '+failure);
+    executionLedger.record(id,text,{step,tool:a.tool,status:'failed',result:failure});
+   }
   }
   if(finished)return finished;
   dropOldImages();
