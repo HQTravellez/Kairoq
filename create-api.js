@@ -267,6 +267,15 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   builder.saveMeta(selectionMeta);
  }
  const pinnedModel=Boolean(model);
+ // The composer is conversational: an explicit action request must execute even if the UI
+ // is currently in Discuss, while questions can still be answered by the selected paid model.
+ const routing=require('./conversation-routing'),ownerText=String(message||'').trim();
+ if(!implementFrom&&routing.proposalApproval(ownerText)){
+  const latest=[...(builder.loadMeta(id).messages||[])].reverse().find(m=>m&&m.role==='assistant');
+  if(latest&&latest.proposal&&!latest.question&&latest.at)implementFrom=latest.at;
+ }
+ if(implementFrom)mode='build';
+ else if(mode==='discuss'&&routing.explicitExecution(ownerText))mode='build';
 
  // Free chat is limited per signed-in customer to protect provider costs. Owner QA is exempt.
  // In-memory limits apply per server instance; distributed deployments need shared counters.
@@ -298,7 +307,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   shownText=String(message).trim();message='Implement this agreed proposal in the current project, preserving its existing requirements:\n\n'+proposal.text;mode='build';
  }
 
- if(!concurrentDiscuss&&!pinnedModel&&!hooks&&(mode==='build'||mode==='discuss')){
+ if(!concurrentDiscuss&&!hooks&&(mode==='build'||mode==='discuss')){
   const Q=require('./builder-question'),a=Q.answer(message,Q.pending(builder.loadMeta(id)));
   if(a){shownText=String(message).trim();message=a.message;mode='build'}
  }
@@ -312,16 +321,22 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  if(!hooks&&mode==='build'&&require('./code-structure').isTidy(message)){shownText='Tidy up the code';message=require('./code-structure').TIDY}
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
- if((mode==='build'||mode==='agent'||mode==='discuss')&&!pinnedModel&&!hooks&&!images.length&&!context&&!shownText){
-  const S=require('./builder-smalltalk'),kind=S.smallTalk(message);
-  if(kind){
-   const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
-   builder.addMessages(id,[{role:'user',text:String(message).trim(),mode,conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',credits:0,support:true,conversation_kind:'social'}]);
-   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
-   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
-   return job;
+ if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&!shownText){
+  const S=require('./builder-smalltalk');
+  // Auto may use the zero-cost canned social reply. A pinned paid model answers the chat itself.
+  if(!pinnedModel){
+   const kind=S.smallTalk(message);
+   if(kind){
+    const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
+    builder.addMessages(id,[{role:'user',text:String(message).trim(),mode,conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',credits:0,support:true,conversation_kind:'social'}]);
+    const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
+    jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
+    return job;
+   }
   }
-  if(mode==='build'&&(S.questionOnly(message)||S.conversation(message))&&!supportQuestion(message))mode='discuss';
+  // Model pinning chooses the intelligence, not the product action. Questions remain chat;
+  // explicit execution requests were promoted above and must never be demoted here.
+  if(mode==='build'&&!routing.explicitExecution(ownerText)&&(S.questionOnly(message)||S.conversation(message))&&!supportQuestion(message))mode='discuss';
  }
  // Missing images are not a healthy-preview issue: never assert that a successful page load proves images are present.
  if((mode==='build'||mode==='agent'||mode==='discuss')&&!pinnedModel&&!hooks&&!images.length&&!context&&missingImageComplaint(message)){
