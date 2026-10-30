@@ -322,20 +322,21 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
  if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&!shownText){
-  const S=require('./builder-smalltalk');
-  // Auto may use the zero-cost canned social reply. A pinned paid model answers the chat itself.
-  if(!pinnedModel){
-   const kind=S.smallTalk(message);
-   if(kind){
+  const S=require('./builder-smalltalk'),kind=S.smallTalk(message);
+  // Intent is independent of model choice. Social acknowledgements such as "great work",
+  // "thanks", "perfect" or "looks good" are conversation even when the composer says Build.
+  if(kind){
+   if(!pinnedModel){
     const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
     builder.addMessages(id,[{role:'user',text:String(message).trim(),mode,conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',credits:0,support:true,conversation_kind:'social'}]);
     const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
     jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();
     return job;
    }
+   mode='discuss';
   }
-  // Model pinning chooses the intelligence, not the product action. Questions remain chat;
-  // explicit execution requests were promoted above and must never be demoted here.
+  // Model pinning chooses the intelligence, not the product action. Questions and ordinary
+  // conversation remain chat; explicit execution requests were promoted above and stay Build.
   if(mode==='build'&&!routing.explicitExecution(ownerText)&&(S.questionOnly(message)||S.conversation(message))&&!supportQuestion(message))mode='discuss';
  }
  // Missing images are not a healthy-preview issue: never assert that a successful page load proves images are present.

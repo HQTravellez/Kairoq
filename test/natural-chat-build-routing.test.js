@@ -35,3 +35,17 @@ test("paid model pinning does not disable intent routing or pending-answer execu
  assert.match(api,/if\(mode==='build'&&!routing\.explicitExecution\(ownerText\)/);
  assert.doesNotMatch(api,/!concurrentDiscuss&&!pinnedModel&&!hooks&&\(mode==='build'\|\|mode==='discuss'\)/);
 });
+
+
+test("social acknowledgements never enter code generation with a pinned paid model",()=>{
+ const api=fs.readFileSync(path.join(__dirname,"..","create-api.js"),"utf8");
+ assert.match(api,/const S=require\('\.\/builder-smalltalk'\),kind=S\.smallTalk\(message\)/);
+ assert.match(api,/if\(kind\)\{[\s\S]*mode='discuss'/);
+ const S=require("../builder-smalltalk");
+ for(const text of ["great work.","thanks","awesome","nice","perfect","love it","looks good","wow"]){
+  assert.ok(S.smallTalk(text),text+" should be classified as social chat");
+ }
+ for(const text of ["great work, now add login","nice, fix the mobile menu","perfect, build the next page"]){
+  assert.equal(S.smallTalk(text),null,text+" contains an execution request and must not be social-only");
+ }
+});
