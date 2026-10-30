@@ -4,6 +4,13 @@ on:
     paths:
       - 'engineering-workflows.js'
       - 'execution-discipline.js'
+      - 'engineering-intelligence.js'
+      - 'engineering-review.js'
+      - 'project-knowledge.js'
+      - 'task-graph.js'
+      - 'build-retro.js'
+      - 'engineering-completion-gate.js'
+      - 'test/engineering-intelligence.test.js'
       - 'execution-ledger.js'
       - 'hermes-superpowers.js'
       - 'hermes-chat.js'
@@ -17,6 +24,13 @@ on:
     paths:
       - 'engineering-workflows.js'
       - 'execution-discipline.js'
+      - 'engineering-intelligence.js'
+      - 'engineering-review.js'
+      - 'project-knowledge.js'
+      - 'task-graph.js'
+      - 'build-retro.js'
+      - 'engineering-completion-gate.js'
+      - 'test/engineering-intelligence.test.js'
       - 'execution-ledger.js'
       - 'hermes-superpowers.js'
       - 'hermes-chat.js'
@@ -37,5 +51,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check engineering-workflows.js && node --check execution-discipline.js && node --check execution-ledger.js && node --check hermes-superpowers.js && node --check hermes-chat.js && node --check capability-registry.js && node --check react-builder.js && node --check react-agent.js
-      - run: node --test test/engineering-workflows.test.js test/execution-discipline.test.js
+      - run: node --check engineering-workflows.js && node --check execution-discipline.js && node --check execution-ledger.js && node --check engineering-intelligence.js && node --check engineering-review.js && node --check project-knowledge.js && node --check task-graph.js && node --check build-retro.js && node --check engineering-completion-gate.js && node --check hermes-superpowers.js && node --check hermes-chat.js && node --check capability-registry.js && node --check react-builder.js && node --check react-agent.js
+      - run: node --test test/engineering-workflows.test.js test/execution-discipline.test.js test/engineering-intelligence.test.js test/engineering-completion-gate.test.js
