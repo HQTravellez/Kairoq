@@ -74,9 +74,11 @@ function technical(desktop,phone){
 // When the site's bot protection turned every AI customer away, journeys could not be judged,
 // so the score comes from the technical basics only.
 function score(numbers,tech){
+ if(numbers&&numbers.inconclusive)return null;
  const passed=tech.length?tech.filter(t=>t.ok).length/tech.length:0;
- if(numbers&&numbers.visitors&&numbers.blocked>=numbers.visitors)return Math.round(passed*100);
- const goal=numbers&&numbers.visitors?numbers.completion_rate:0;
+ if(numbers&&numbers.visitors&&numbers.blocked>=numbers.visitors)return null;
+ const goal=numbers&&Number.isFinite(numbers.completion_rate)?numbers.completion_rate:null;
+ if(goal===null)return null;
  return Math.round(goal*0.7+passed*30);
 }
 
@@ -94,7 +96,7 @@ async function start(opts,deps){
  const now=Date.now(),list=readIndex(),ipH=hash(opts.ip),emailH=hash(email);
  // Asking again about the same site the same day (without a new goal) returns the saved report.
  const same=list.find(x=>x.host===host&&((x.status==='running'&&running.has(x.id))||x.status==='complete')&&now-Date.parse(x.at)<DAY&&(!goal||x.goal===goal));
- if(same){appendLead({email,url,id:same.id,at:new Date().toISOString(),cached:true});return{id:same.id,status:same.status,cached:true}}
+ if(same&&!opts.force){appendLead({email,url,id:same.id,at:new Date().toISOString(),cached:true});return{id:same.id,status:same.status,cached:true}}
  const today=list.filter(x=>now-Date.parse(x.at)<DAY);
  // The Kairoq owner testing sites is not held to the free check's daily limits.
  if(!opts.owner){
@@ -142,7 +144,7 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   const tech=technical(desktop.facts,phone.facts);
   const report={
    id:state.id,url:state.url,host:state.host,at:new Date().toISOString(),...about,
-   score:score(r.numbers,tech),numbers:r.numbers,...(r.numbers.visitors&&r.numbers.blocked>=r.numbers.visitors?{blocked:true}:{}),summary:r.summary,technical:tech,
+   score:score(safeNumbers,tech),numbers:safeNumbers,inconclusive,...(r.numbers.visitors&&r.numbers.blocked>=r.numbers.visitors?{blocked:true}:{}),summary:inconclusive?{headline:'Insufficient evidence: some AI visitors failed or were blocked. This is not a conversion score.',issues:[],fixes:[]}:r.summary,technical:tech,
    problems:(r.problems||[]).filter(p=>p.status==='confirmed').slice(0,6).map(p=>({title:p.title,path:p.path,device:p.device,visitors:p.visitors.length})),
    // The visitors' own words, shortened: who they were, what happened and what they thought.
    visits:r.visits.filter(v=>v.outcome!=='skipped').map(v=>({name:v.persona.name,age:v.persona.age,device:v.persona.device,about:v.persona.about,outcome:v.outcome,...(v.outcome==='error'&&v.error?{error:String(v.error).slice(0,200)}:{}),...(v.verdict&&!v.verdict.ok?{judged:v.verdict.reason}:{}),steps:v.steps.slice(0,20).map(s=>({path:s.path,thought:s.thought,feeling:s.feeling,action:s.action,label:s.label||''}))})),
@@ -151,7 +153,7 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   fs.writeFileSync(reportFile(state.id),JSON.stringify(report));
   setEntry(state.id,{status:'complete',score:report.score});
   state.status='complete';
-  if(mail&&origin)mail(email,'Your website check for '+state.host+': '+report.score+'/100',
+  if(mail&&origin)mail(email,'Your website check for '+state.host+': '+(report.score===null?'insufficient evidence':report.score+'/100'),
    'Your free website check is ready.\n\n'+(report.summary.headline||'')+'\n'+report.numbers.completed+' of '+report.numbers.visitors+' AI customers managed to '+report.goal.toLowerCase().replace(/\.$/,'')+'.\n\nSee the full report, with what to fix:\n'+origin+'/create/check/'+state.id+'\n\nKairoq can rebuild the site with these problems fixed, tested in a real browser before you pay.').catch(()=>{});
  }catch(e){
   state.status='failed';state.error=signal.aborted?'The check took too long (the AI models did not answer in time). Please try again in a few minutes.':clip(e.message||e,300);
