@@ -359,14 +359,19 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const changed=Object.keys(files).filter(k=>base[k]!==files[k]).concat(Object.keys(base).filter(k=>!Object.hasOwn(files,k)));
   const fresh=builder.loadMeta(id),now=new Date().toISOString();
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
-  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files});
+  const reviewRequired=require('./engineering-review').required(base,files,text);
+  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files,review:lastReview,reviewRequired});
   message=require('./engineering-completion-gate').resultMessage(message,completion);
-  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues,verification_evidence:completion.evidence,...(lastUnitTests?{unit_tests:{ok:lastUnitTests.ok,ran:lastUnitTests.ran,passed:lastUnitTests.passed,failed:lastUnitTests.failed,files:lastUnitTests.files}}:{})},...(errors.length?{runtime_errors:errors}:{})});
+  fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues,verification_evidence:completion.evidence,...(lastUnitTests?{unit_tests:{ok:lastUnitTests.ok,ran:lastUnitTests.ran,passed:lastUnitTests.passed,failed:lastUnitTests.failed,files:lastUnitTests.files}}:{}),...(lastReview?{engineering_review:{ok:lastReview.ok,standards:lastReview.standards,spec:lastReview.spec}}:{})},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
   fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
   builder.saveMeta(fresh);
   executionLedger.complete(id,text,{verified:completion.verified&&!stopped,version:built.n,message});
+  try{
+   const run=executionLedger.read(id).runs[executionLedger.key(text)];
+   require('./build-retro').capture(id,{instruction:text,events:run?.events||[],changed,review:lastReview,verification:completion});
+  }catch{}
   checkpointStore.clear(id);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
   const failedChecks=require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.enabled!==false&&c.last&&c.last.version===built.n&&!c.last.ok).map(c=>({name:c.name,step:c.last.step||'',error:c.last.error||''}));
