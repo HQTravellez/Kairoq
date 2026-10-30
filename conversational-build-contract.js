@@ -7,7 +7,9 @@ const FEATURE_PATTERNS=[
  {id:'calorie',re:/\b(calori(?:e|es)|nutrition|food diar(?:y|ies))\b/i,label:'Calorie and food logging'},
  {id:'food_search',re:/\b(food database|search food|searchable food|food catalog)\b/i,label:'Searchable food catalog'},
  {id:'macro',re:/\b(macros?|protein|carbs?|nutrition targets)\b/i,label:'Macro tracking'},
- {id:'weight',re:/\b(weight history|weight tracking|track weight|weigh[- ]?ins?)\b/i,label:'Weight tracking'}
+ {id:'weight',re:/\b(weight history|weight tracking|track weight|weigh[- ]?ins?)\b/i,label:'Weight tracking'},
+ {id:'automated_tests',re:/\b(automated tests?|test suite|unit tests?|verification checks?|numerical tests?)\b/i,label:'Automated verification tests'},
+ {id:'numerical_accuracy',re:/\b(physics|simulation|numerical|formula|calculation|scientific accuracy|expected value)\b/i,label:'Numerical and calculation accuracy'}
 ];
 function fromRequest(text){
  const t=String(text||'').slice(0,6000);
