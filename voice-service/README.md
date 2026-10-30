@@ -8,14 +8,17 @@ interaction is implemented by this change; narration assets can be used in a lat
 
 ## Run
 
-Build from the repository root with `docker build -f voice-service/Dockerfile -t kairoq-voice .`.
+Build with `docker build -t kairoq-voice voice-service`.
 Run with a random `VOICE_SERVICE_KEY` of at least 32 characters and port 8080.
 The build downloads pinned models. Startup loads them and warms Kokoro before `/health`
 becomes ready. Allow 2 CPU cores and at least 4 GB RAM initially; measure before scaling.
 One worker and one inference job at a time; concurrent requests receive 429.
 
-For Railway use `voice-service/railway.json` as the service config path, repository root
-as build context, and a separate staging project. Set `VOICE_SERVICE_KEY` securely.
+For Railway set root directory `/voice-service`, Dockerfile path `Dockerfile`,
+start command `uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1 --no-access-log`,
+and healthcheck `/health` (300 seconds) in service settings. Use an isolated staging
+project and set `VOICE_SERVICE_KEY` securely. Legacy railway.json files are retained
+as configuration references; the connected Railway API rejects setting a config-file path.
 On Kairoq set `KAIROQ_VOICE_URL` and the matching `KAIROQ_VOICE_KEY` server-side.
 Use a private Railway URL when both services share an environment; otherwise HTTPS.
 Never put the key in frontend code or generated apps.
