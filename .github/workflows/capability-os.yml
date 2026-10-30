@@ -1,0 +1,29 @@
+name: Capability OS routing proof
+on:
+  push:
+    paths:
+      - 'capability-registry.js'
+      - 'data/capability-routing-evals.json'
+      - 'test/capability-routing.test.js'
+      - 'react-agent.js'
+      - '.github/workflows/capability-os.yml'
+  pull_request:
+    paths:
+      - 'capability-registry.js'
+      - 'data/capability-routing-evals.json'
+      - 'test/capability-routing.test.js'
+      - 'react-agent.js'
+      - '.github/workflows/capability-os.yml'
+permissions:
+  contents: read
+jobs:
+  routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check capability-registry.js && node --check react-agent.js
+      - run: node --test test/capability-routing.test.js
