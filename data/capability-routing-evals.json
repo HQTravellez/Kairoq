@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "api-docs-url",
+      "prompt": "Inspect this Swagger API documentation https://example.com/openapi.json and tell me how to integrate it",
+      "must": [
+        "api_docs",
+        "browser"
+      ]
+    },
+    {
+      "id": "api-live-test",
+      "prompt": "Test this API endpoint and tell me whether the POST request actually works",
+      "must": [
+        "api_execution",
+        "api_docs"
+      ]
+    },
+    {
+      "id": "ui-regression",
+      "prompt": "Fix the broken mobile layout and verify the form still works",
+      "must": [
+        "app_builder",
+        "test_repair",
+        "design_skills"
+      ]
+    },
+    {
+      "id": "database",
+      "prompt": "Check why the booking record is not persisting in the SQL database",
+      "must": [
+        "app_database",
+        "test_repair"
+      ]
+    },
+    {
+      "id": "architecture-impact",
+      "prompt": "Before refactoring auth, show me what depends on the session module and the impact across the codebase",
+      "must": [
+        "project_intelligence",
+        "app_builder"
+      ]
+    },
+    {
+      "id": "free-models",
+      "prompt": "Use our free model pool for cheap workers and fall back if they fail",
+      "must": [
+        "freellmapi_pool"
+      ]
+    },
+    {
+      "id": "automation",
+      "prompt": "Build and test a scheduled reminder automation",
+      "must": [
+        "automation",
+        "app_builder"
+      ]
+    },
+    {
+      "id": "mcp",
+      "prompt": "Connect an MCP tool server for this integration",
+      "must": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "media",
+      "prompt": "Add a 3D product viewer and generate a short product video",
+      "must": [
+        "media",
+        "app_builder"
+      ]
+    },
+    {
+      "id": "learning",
+      "prompt": "Learn this successful repair process so Kairoq can reuse it next time",
+      "must": [
+        "learning"
+      ]
+    },
+    {
+      "id": "simple-chat",
+      "prompt": "Thanks, that answers my question",
+      "mustNot": [
+        "api_execution",
+        "app_builder",
+        "test_repair",
+        "marketing",
+        "sales"
+      ]
+    }
+  ]
+}

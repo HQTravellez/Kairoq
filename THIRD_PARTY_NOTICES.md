@@ -199,3 +199,13 @@ server image. Kairoq uses only its deterministic AST extraction functions throug
 network workflows are not invoked. The upstream package metadata declares the package
 license as MIT. Kairoq does not vendor Graphify source code; `project-graph.js` is
 Kairoq's own adapter, query, path and impact layer.
+
+
+## Awesome LLM Apps capability/eval patterns
+
+Kairoq's Capability OS routing/evidence model is informed by the skill registry and
+trigger-evaluation patterns in Shubham Saboo's Awesome LLM Apps,
+https://github.com/Shubhamsaboo/awesome-llm-apps (Apache-2.0). Kairoq does not
+vendor the example applications or execute their scripts. The capability definitions,
+trigger rules, safety statuses and evaluation cases in `capability-registry.js` and
+`data/capability-routing-evals.json` are Kairoq-specific implementations.
