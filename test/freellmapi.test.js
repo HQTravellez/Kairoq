@@ -60,3 +60,20 @@ test("Kairoq routes free chat and Standard builds through FreeLLMAPI without hij
  assert.match(registry,/freellmapi_pool/);
  assert.match(registry,/Internal FreeLLMAPI multi-provider inference pool/);
 });
+
+
+test("Railway wrapper keeps FreeLLMAPI private and synchronizes a deterministic key",()=>{
+ const root=path.join(__dirname,"..","freellmapi-railway");
+ const docker=fs.readFileSync(path.join(root,"Dockerfile"),"utf8");
+ const entry=fs.readFileSync(path.join(root,"entrypoint.sh"),"utf8");
+ const sync=fs.readFileSync(path.join(root,"sync-unified-key.cjs"),"utf8");
+ const railway=JSON.parse(fs.readFileSync(path.join(root,"railway.json"),"utf8"));
+ assert.match(docker,/ghcr\.io\/tashfeenahmed\/freellmapi:latest/);
+ assert.match(entry,/KAIROQ_FREELLMAPI_UNIFIED_KEY/);
+ assert.match(entry,/docker-entrypoint\.sh/);
+ assert.match(sync,/unified_api_key/);
+ assert.match(sync,/better-sqlite3/);
+ assert.doesNotMatch(sync,/console\.log\([^\n]*secret/);
+ assert.equal(railway.build.dockerfilePath,"freellmapi-railway/Dockerfile");
+ assert.equal(railway.deploy.healthcheckPath,"/api/ping");
+});
