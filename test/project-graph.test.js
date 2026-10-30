@@ -70,3 +70,12 @@ test("capability registry advertises project_graph with an honest runtime state"
  assert.ok(["wired","native-fallback"].includes(c.status));
  assert.ok(c.tools.includes("project_graph"));
 });
+
+
+test("Graphify bridge pins scan root and strips ephemeral workspace paths",()=>{
+ const fs=require("node:fs"),path=require("node:path");
+ const py=fs.readFileSync(path.join(__dirname,"..","scripts","graphify-kairoq.py"),"utf8");
+ assert.match(py,/extract\(files, root=root, cache_root=root, parallel=False\)/);
+ assert.match(py,/relative_to\(root\)\.as_posix\(\)/);
+ assert.match(py,/for collection in \("nodes", "edges", "hyperedges"\)/);
+});
