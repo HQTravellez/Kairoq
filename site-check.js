@@ -146,9 +146,12 @@ async function run(state,{email,goal},{callModel,browseSite,origin,mail}){
   const valid=real.filter(v=>!['error','blocked'].includes(v.outcome));
   const inconclusive=valid.length<Math.max(3,Math.ceil(count*0.8))||invalid.length>0;
   const safeNumbers={...r.numbers,inconclusive,valid_journeys:valid.length,agent_failures:invalid.length};
+  // Only independently replayed failures may be described as confirmed site defects.
+  const reproduced=(r.problems||[]).filter(p=>p.status==='confirmed');
+  const summary=inconclusive?{headline:'Insufficient evidence: AI customers encountered tool errors or blocking.',issues:[],fixes:[]}:reproduced.length?{...r.summary,issues:(r.summary?.issues||[]).filter(i=>reproduced.some(p=>String(i.title||'').toLowerCase()===String(p.title||'').toLowerCase())),fixes:r.summary?.fixes||[]}: {headline:'No site defects were independently reproduced. Review the visitor journeys before drawing conclusions.',issues:[],fixes:[]};
   const report={
    id:state.id,url:state.url,host:state.host,at:new Date().toISOString(),...about,
-   score:score(safeNumbers,tech),numbers:safeNumbers,inconclusive,...(r.numbers.visitors&&r.numbers.blocked>=r.numbers.visitors?{blocked:true}:{}),summary:inconclusive?{headline:'Insufficient evidence: some AI visitors failed or were blocked. This is not a conversion score.',issues:[],fixes:[]}:r.summary,technical:tech,
+   score:score(safeNumbers,tech),numbers:safeNumbers,inconclusive,...(r.numbers.visitors&&r.numbers.blocked>=r.numbers.visitors?{blocked:true}:{}),summary,technical:tech,
    problems:(r.problems||[]).filter(p=>p.status==='confirmed').slice(0,6).map(p=>({title:p.title,path:p.path,device:p.device,visitors:p.visitors.length})),
    // The visitors' own words, shortened: who they were, what happened and what they thought.
    visits:r.visits.filter(v=>v.outcome!=='skipped').map(v=>({name:v.persona.name,age:v.persona.age,device:v.persona.device,about:v.persona.about,outcome:v.outcome,...(v.outcome==='error'&&v.error?{error:String(v.error).slice(0,200)}:{}),...(v.verdict&&!v.verdict.ok?{judged:v.verdict.reason}:{}),steps:v.steps.slice(0,20).map(s=>({path:s.path,thought:s.thought,feeling:s.feeling,action:s.action,label:s.label||''}))})),
