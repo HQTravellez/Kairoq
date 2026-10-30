@@ -6882,7 +6882,7 @@ function builderProvider(){
 async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   try{return await callBuilderModelOnce(opts,parse)}
   catch(err){
-    if(err.name==="AbortError"||opts.signal?.aborted||!retryableModelError(err))throw err;
+    if(opts.model||process.env.KAIROQ_BUILDER_SINGLE_MODEL==="true"||err.name==="AbortError"||opts.signal?.aborted||!retryableModelError(err))throw err;
     console.log("[builder] every model failed, trying again: "+String(err.message||err).slice(0,300));
     opts.onRetry?.();
     await new Promise((resolve,reject)=>{const t=setTimeout(resolve,Number(process.env.KAIROQ_BUILDER_RETRY_MS??5000));opts.signal?.addEventListener("abort",()=>{clearTimeout(t);reject(opts.signal.reason||Error("Stopped."))},{once:true})});
@@ -6901,16 +6901,11 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
       if(!process.env.OPENROUTER_API_KEY&&!(require("./anthropic").isClaude(model)&&require("./anthropic").configured()))throw Error("OpenRouter is not set up");
       return await callOpenRouterBuilder({...rest,only:model},parse);
     }catch(err){
-      if(err.name==="AbortError"||rest.signal?.aborted)throw err;
-      // Selected-model timeouts must not cascade into an unrelated Auto/free-model workflow.
-      if(/(?:aborted|timed? out|timeout|503|502)/i.test(String(err.message||err)))throw Error("The selected AI model did not respond in time. No automatic free-model fallback was attempted; retry once or choose another model.");
-      // A selected paid model with an exhausted application budget cannot be rescued by
-      // repeatedly trying free models. Surface the actionable error to the owner promptly.
-      if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(err.message||err)))throw Error("Selected model blocked by Kairoq's application spending limit. Check DAILY_COST_LIMIT_USD, MONTHLY_COST_LIMIT_USD and KAIROQ_BUILDER_MONTHLY_LIMIT_USD; no fallback attempted.");
-      console.log("[builder] chosen model "+model+" failed, using Auto: "+String(err.message||err).slice(0,200));
-      onFallback?.(err);opts=rest;
+      // An explicitly selected model must never silently fall back to Auto.
+      throw err;
     }
   }
+  if(process.env.KAIROQ_BUILDER_SINGLE_MODEL==="true" && !opts.model && opts.tier!=="check")return callOpenRouterBuilder({...opts,only:String(process.env.KAIROQ_BUILDER_MODEL||"anthropic/claude-sonnet-4.6")},parse);
   if(opts.tier==="chat")return callChatAnswer(opts,parse);
   // Website checks and AI customers (tier "check") go straight to their own models on OpenRouter
   // (Gemini Flash, DeepSeek; see callOpenRouterBuilder), not to the builder's provider, whose free
@@ -7138,9 +7133,17 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
 }
 // Generates one image for a Create project (hero photos, illustrations) with an OpenRouter
 // image model. Returns {mime, data(base64)}. Counts against the builder budget.
-function builderImagesEnabled(){return Boolean(process.env.OPENROUTER_API_KEY)&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&process.env.KAIROQ_IMAGE_GENERATION!=="off"}
+function builderImagesEnabled(){
+ if(process.env.KAIROQ_IMAGE_GENERATION==="off")return false;
+ if(process.env.KAIROQ_IMAGE_PROVIDER==="cloudflare")return require("./cloudflare-image").configured();
+ return Boolean(process.env.OPENROUTER_API_KEY)&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+}
 // references: data: URLs of images to work from (a product photo to restage), sent with the prompt.
 async function generateBuilderImage({prompt,aspect="16:9",signal,references=[]}={}){
+  if(process.env.KAIROQ_IMAGE_PROVIDER==="cloudflare"){
+    if(references?.length)throw Error("Cloudflare FLUX Schnell does not support image editing. Choose text-to-image or a different image tool.");
+    return require("./cloudflare-image").generate({prompt,aspect,signal});
+  }
   if(!builderImagesEnabled())throw Error("Image generation needs OPENROUTER_API_KEY and KAIROQ_BUILDER_PAID_APPROVED=true");
   const refs=(Array.isArray(references)?references:[]).filter(u=>/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(u))).slice(0,3);
   const model=refs.length?OPENROUTER_IMAGE_EDIT_MODEL:String(process.env.KAIROQ_IMAGE_MODEL||"google/gemini-2.5-flash-image");

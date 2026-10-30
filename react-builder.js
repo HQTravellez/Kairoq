@@ -434,7 +434,7 @@ async function prepareDesign(id,text,{callModel,tier,signal,images=[],onProgress
  }
  // Real photos for a new site (photo-finder.js): found, downloaded and licensed before the first
  // build, so the builder uses them instead of guessing stock links.
- if(!planned&&brief.signature&&(brief.photos||[]).length&&process.env.KAIROQ_PHOTOS!=='off'){
+ if(!planned&&(brief.photos||[]).length&&process.env.KAIROQ_PHOTOS!=='off'){
   onProgress('finding photos');
   try{
    const found=await require('./photo-finder').find(brief.photos);
@@ -810,7 +810,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    markTesting(id,n,next);
    var testStart=Date.now();
    try{
-    if(checkRuntime){try{const r=await runtimeProblems(id,previewUrl(meta,n),checkRuntime);runtimeErrors=r.errors;verified=r.verified}catch(e){runtimeErrors=[];verified=null}}
+    if(checkRuntime){try{const r=await runtimeProblems(id,previewUrl(meta,n),checkRuntime);runtimeErrors=r.errors;verified=r.verified}catch(e){runtimeErrors=['Browser verification unavailable: '+String(e.message||e).slice(0,250)];verified={opens:false,menus:null,phone:null,signup:null,saves:null}}}
     // Photo links that do not exist (other sites' photos the browser check cannot see failing).
     if(checkRuntime&&process.env.KAIROQ_IMAGE_LINK_CHECK!=='off'){try{runtimeErrors.push(...await require('./image-links').broken(next))}catch{}}
     // The first build of a new design: its signature moment must really be on the page.
@@ -820,7 +820,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
     // Saved checks: flows that worked before must still work (run on a test copy of the data).
     if(!runtimeErrors.length&&inspect&&require('./react-checks').list(loadMeta(id)).length){onProgress('checking');try{checkResult=await require('./react-checks').run(id,previewUrl(meta,n),{inspect,version:n})}catch(e){checkResult=null}}
    }finally{clearTesting(id,n)}
-   if(checkRuntime)tl.add({t:'test',ok:!runtimeErrors.length,detail:runtimeErrors,ms:Date.now()-testStart});
+   if(checkRuntime)tl.add({t:'test',ok:!runtimeErrors.length,detail:runtimeErrors.length?runtimeErrors:['Browser opened; only explicitly recorded interactions count as verified.'],ms:Date.now()-testStart});
    if(checkResult&&checkResult.ran)tl.add({t:'check',ok:!checkResult.failed.length,text:checkResult.failed.length?'Broke '+checkResult.failed.length+' of '+checkResult.ran+' saved checks':'All '+checkResult.ran+' saved check'+(checkResult.ran===1?'':'s')+' passed',detail:checkResult.failed.length?require('./react-checks').failureText(checkResult.failed):''});
    if(runtimeErrors.length&&attempt<MAX_ATTEMPTS){
     fs.rmSync(dir,{recursive:true,force:true});
