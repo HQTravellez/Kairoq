@@ -109,6 +109,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const brief=await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
  if(brief){meta=builder.loadMeta(id);tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'"'})}
  const base=builder.loadFiles(id,meta.current_version);
+ const discipline=require('./execution-discipline'),disciplinePlan=discipline.workflow(text),executionLedger=require('./execution-ledger');
+ const ledgerRun=executionLedger.start(id,{instruction:text,baseVersion:meta.current_version,workflow:disciplinePlan});
  const generated=[],pendingChecks=[];
  // The agent's browser tests and SQL reads use a test copy of the data, never the real one.
  const box=require('./react-sandbox').create(id);
@@ -124,7 +126,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=await require('./decision-router').suggest(text);
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+
- require('./capability-registry').taskContext(text)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
+ require('./capability-registry').taskContext(text)+discipline.prompt(text)+executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
@@ -328,6 +330,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
   builder.saveMeta(fresh);
+  executionLedger.complete(id,text,{verified:completion.verified&&!stopped,version:built.n,message});
   checkpointStore.clear(id);
   const saved=[];for(const c of pendingChecks){try{require('./react-checks').save(id,c,{source:'agent'});saved.push(c.name)}catch{}}
   const failedChecks=require('./react-checks').list(builder.loadMeta(id)).filter(c=>c.enabled!==false&&c.last&&c.last.version===built.n&&!c.last.ok).map(c=>({name:c.name,step:c.last.step||'',error:c.last.error||''}));
@@ -344,6 +347,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   message='No changes were made. '+message;
   builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}]);
   const fresh=builder.loadMeta(id);
+  executionLedger.complete(id,text,{verified:true,version:fresh.current_version,message});
   return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
@@ -368,7 +372,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   invalidReplies=0;
   messages.push({role:'assistant',content:JSON.stringify({thought:reply.thought,actions:reply.actions})});
   const entry={n:step,thought:reply.thought,actions:reply.actions.map(describe)};
-  steps.push({...entry,tools:reply.actions.map(a=>a.tool),summary:(reply.thought?reply.thought+' — ':'')+entry.actions.join('; ')});
+  const stepSummary=(reply.thought?reply.thought+' — ':'')+entry.actions.join('; ');
+  steps.push({...entry,tools:reply.actions.map(a=>a.tool),summary:stepSummary});
+  executionLedger.record(id,text,{step,status:'planned',summary:stepSummary,tools:reply.actions.map(a=>a.tool)});
   report({status:'working',step});
   const results=[];let image=null,finished=null;
   for(const a of reply.actions){
@@ -396,8 +402,14 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     if(!verdict.verified){finishWarned=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
     finished=save(message);break;
    }
-   try{const r=await tool(a);results.push(clip(r.text,20000));if(r.image)image=r.image}
-   catch(e){if(e.name==='AbortError'||signal?.aborted)throw e;results.push(a.tool+' failed: '+String(e.message||e).slice(0,500))}
+   try{
+    const r=await tool(a),resultText=clip(r.text,20000);results.push(resultText);if(r.image)image=r.image;
+    executionLedger.record(id,text,{step,tool:a.tool,status:/\bFAILED\b|\bfailed\b|\berror\b/i.test(resultText)?'failed':'ok',result:resultText.slice(0,800)});
+   }catch(e){
+    if(e.name==='AbortError'||signal?.aborted)throw e;
+    const failure=String(e.message||e).slice(0,500);results.push(a.tool+' failed: '+failure);
+    executionLedger.record(id,text,{step,tool:a.tool,status:'failed',result:failure});
+   }
   }
   if(finished)return finished;
   dropOldImages();

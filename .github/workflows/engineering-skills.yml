@@ -3,6 +3,12 @@ on:
   push:
     paths:
       - 'engineering-workflows.js'
+      - 'execution-discipline.js'
+      - 'execution-ledger.js'
+      - 'hermes-superpowers.js'
+      - 'hermes-chat.js'
+      - 'capability-registry.js'
+      - 'test/execution-discipline.test.js'
       - 'react-builder.js'
       - 'react-agent.js'
       - 'test/engineering-workflows.test.js'
@@ -10,6 +16,12 @@ on:
   pull_request:
     paths:
       - 'engineering-workflows.js'
+      - 'execution-discipline.js'
+      - 'execution-ledger.js'
+      - 'hermes-superpowers.js'
+      - 'hermes-chat.js'
+      - 'capability-registry.js'
+      - 'test/execution-discipline.test.js'
       - 'react-builder.js'
       - 'react-agent.js'
       - 'test/engineering-workflows.test.js'
@@ -25,5 +37,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check engineering-workflows.js && node --check react-builder.js && node --check react-agent.js
-      - run: node --test test/engineering-workflows.test.js
+      - run: node --check engineering-workflows.js && node --check execution-discipline.js && node --check execution-ledger.js && node --check hermes-superpowers.js && node --check hermes-chat.js && node --check capability-registry.js && node --check react-builder.js && node --check react-agent.js
+      - run: node --test test/engineering-workflows.test.js test/execution-discipline.test.js

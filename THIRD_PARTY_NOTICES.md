@@ -97,6 +97,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The complete Superpowers skill library (all skills in its `skills/` folder, unmodified, revision `2ce8aa1`) is also shipped to Kairoq's Hermes chat service in `hermes/skills/superpowers/`, with its MIT license in `hermes/skills/superpowers/LICENSE`.
 
+`execution-discipline.js`, `execution-ledger.js`, and `hermes-superpowers.js` extend that
+integration with Kairoq-specific adaptations of Superpowers' systematic-debugging,
+test-driven-development, subagent-driven-development and
+verification-before-completion methodology. The original Superpowers skill library remains
+unmodified; Kairoq's execution ledger and autonomous routing are Kairoq-owned code.
+
 ## Harvey: email gate and Find customers
 
 `email-gate.js` and the pipeline in `outreach.js` (listing businesses, reading their sites without AI, owner-confirmed signals, an outbox the owner approves, the bounce kill switch) follow Harvey by Ethan Rogers, https://github.com/ethanplusai/harvey, licensed under the MIT License (full text in `licenses/harvey-LICENSE.txt`). Kairoq's version is its own JavaScript implementation; Harvey's code, its subscription-based model calls, LinkedIn automation and "humanizer" are not used. Business listings come from OpenStreetMap (© OpenStreetMap contributors, ODbL), used through Nominatim and Overpass under their usage policies.
