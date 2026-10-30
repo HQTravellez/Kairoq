@@ -5,6 +5,7 @@ on:
       - 'examples/physics-lab/**'
       - 'examples/healthcare-staffing/**'
       - 'examples/flagship-acceptance.test.js'
+      - 'examples/physics-studio.test.js'
       - '.github/workflows/flagship-domain-proofs.yml'
   workflow_dispatch:
 permissions:
@@ -18,4 +19,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test examples/flagship-acceptance.test.js
+      - run: node --test examples/flagship-acceptance.test.js examples/physics-studio.test.js
