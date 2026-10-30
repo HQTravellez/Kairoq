@@ -24,13 +24,17 @@ const CAPABILITIES = Object.freeze([
   {id:"sales",label:"Sales lead research and outreach drafting",group:"Business",status:"feature-specific",entry:"agent-brain.js",tools:[]},
   {id:"marketing",label:"Marketing content and approved publishing",group:"Business",status:"feature-specific",entry:"server.js",tools:[]}
 ]);
-function listCapabilities({group}={}){return CAPABILITIES.filter(c=>!group||c.group===group).map(c=>({...c,tools:[...c.tools]}));}
+function runtimeStatus(c){
+  if(c.id==="freellmapi_pool")return require("./freellmapi").enabled()?"wired":"not-configured";
+  return c.status;
+}
+function listCapabilities({group}={}){return CAPABILITIES.filter(c=>!group||c.group===group).map(c=>({...c,status:runtimeStatus(c),tools:[...c.tools]}));}
 function findCapabilities(query,limit=6){
   const words=new Set(String(query||"").toLowerCase().match(/[a-z0-9_]+/g)||[]);
   if(!words.size)return listCapabilities().slice(0,limit);
   return listCapabilities().map(c=>({c,score:[...words].filter(w=>(c.id+" "+c.label+" "+c.group+" "+c.tools.join(" ")).toLowerCase().includes(w)).length})).filter(x=>x.score).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.c);
 }
 function agentCapabilityContext(){
-  return CAPABILITIES.map(c=>c.label+" ["+c.status+"; "+c.entry+"]").join("\n");
+  return listCapabilities().map(c=>c.label+" ["+c.status+"; "+c.entry+"]").join("\n");
 }
 module.exports={listCapabilities,findCapabilities,agentCapabilityContext};
