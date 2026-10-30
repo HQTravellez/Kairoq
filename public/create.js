@@ -237,7 +237,8 @@ $('new-form').onsubmit=async e=>{
     await openProject(project.id);
    }
    $('new-prompt').value='';
-   setChatMode('discuss');
+   // Return to the normal composer. The backend decides whether each message is chat or a build.
+   setChatMode('build');
    $('chat-input').value='';
    $('chat-input').placeholder='Tell Kairoq what you want to build…';
    $('chat-input').focus();

@@ -5,6 +5,8 @@ on:
       - 'create-api.js'
       - 'react-backend.js'
       - 'public/create.js'
+      - 'conversation-routing.js'
+      - 'test/natural-chat-build-routing.test.js'
       - 'test/responsive-builder-chat.test.js'
       - '.github/workflows/responsive-builder-chat.yml'
   pull_request:
@@ -12,6 +14,8 @@ on:
       - 'create-api.js'
       - 'react-backend.js'
       - 'public/create.js'
+      - 'conversation-routing.js'
+      - 'test/natural-chat-build-routing.test.js'
       - 'test/responsive-builder-chat.test.js'
       - '.github/workflows/responsive-builder-chat.yml'
 permissions:
@@ -26,5 +30,5 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
-      - run: node --check create-api.js && node --check react-backend.js && node --check public/create.js
-      - run: node --test test/responsive-builder-chat.test.js
+      - run: node --check create-api.js && node --check react-backend.js && node --check public/create.js && node --check conversation-routing.js
+      - run: node --test test/natural-chat-build-routing.test.js test/responsive-builder-chat.test.js
