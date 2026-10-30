@@ -122,7 +122,7 @@ async function streamChat({ messages, onToken = () => {}, onStatus = () => {}, o
           Accept: "text/event-stream",
           "X-Hermes-Session-Key": s.sessionKey,
         },
-        body: JSON.stringify({ model: "hermes-agent", stream: true, messages: toHermesMessages(messages) }),
+        body: JSON.stringify({ model: "hermes-agent", stream: true, messages: toHermesMessages(require("./hermes-superpowers").inject(messages)) }),
       });
     } catch (e) {
       throw new HermesError(controller.signal.reason?.message || `Kairoq Agent is unreachable (${e.cause?.code || e.message}).`);
