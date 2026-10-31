@@ -7,6 +7,8 @@ on:
       - 'react-agent.js'
       - 'test/github-repository-intelligence.test.js'
       - 'test/agent-capability-routing.test.js'
+      - 'repository-review-contract.js'
+      - 'test/repository-review-contract.test.js'
       - '.github/workflows/github-api-intelligence.yml'
   pull_request:
     paths:
@@ -15,6 +17,8 @@ on:
       - 'react-agent.js'
       - 'test/github-repository-intelligence.test.js'
       - 'test/agent-capability-routing.test.js'
+      - 'repository-review-contract.js'
+      - 'test/repository-review-contract.test.js'
       - '.github/workflows/github-api-intelligence.yml'
 permissions:
   contents: read
@@ -30,4 +34,5 @@ jobs:
       - run: node --check github-repository-intelligence.js
       - run: node --check capability-registry.js
       - run: node --check react-agent.js
-      - run: node --test test/github-repository-intelligence.test.js test/agent-capability-routing.test.js test/capability-routing.test.js test/api-chat-routing.test.js
+      - run: node --check repository-review-contract.js
+      - run: node --test test/github-repository-intelligence.test.js test/repository-review-contract.test.js test/agent-capability-routing.test.js test/capability-routing.test.js test/api-chat-routing.test.js
