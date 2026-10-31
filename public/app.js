@@ -1958,7 +1958,7 @@ function setWorkspaceBrowserMode(mode="live"){
   live?.classList.toggle("hidden",workspaceBrowserMode!=="live"||!has);
   frame?.classList.toggle("hidden",workspaceBrowserMode!=="preview"||!has);
   empty?.classList.toggle("hidden",has);
-  $("[data-browser-mode]").forEach(b=>{const on=b.dataset.browserMode===workspaceBrowserMode;b.classList.toggle("active",on);b.setAttribute("aria-selected",String(on))});
+  $$("[data-browser-mode]").forEach(b=>{const on=b.dataset.browserMode===workspaceBrowserMode;b.classList.toggle("active",on);b.setAttribute("aria-selected",String(on))});
   const title=$("#browserWorkspaceTitle");if(title)title.textContent=workspaceBrowserMode==="preview"?"Preview":"Browser";
 }
 function clearBrowserSelection(){
@@ -2059,7 +2059,7 @@ $("#browserAddress")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preve
 $("#browserRefreshBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){const f=$("#browserPreviewFrame");if(f?.src)f.src=f.src}else if($("#browserAddress")?.value)openWorkspaceAddress($("#browserAddress").value)});
 $("#browserBackBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){try{$("#browserPreviewFrame")?.contentWindow?.history?.back()}catch{}}});
 $("#browserPopoutBtn")?.addEventListener("click",()=>{const u=normalizeWorkspaceUrl($("#browserAddress")?.value||"");if(u)window.open(u.href,"_blank","noopener,noreferrer")});
-$("[data-browser-mode]").forEach(b=>b.addEventListener("click",()=>setWorkspaceBrowserMode(b.dataset.browserMode)));
+$$("[data-browser-mode]").forEach(b=>b.addEventListener("click",()=>setWorkspaceBrowserMode(b.dataset.browserMode)));
 $("#browserPreviewFrame")?.addEventListener("load",()=>{setWorkspaceBrowserMode("preview");installPreviewInspector()});
 $("#workspaceInspectBtn")?.addEventListener("click",e=>{const b=e.currentTarget,on=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",String(on));clearBrowserSelection();if(on&&workspaceBrowserMode==="preview")installPreviewInspector()});
 $("#browserLiveImage")?.addEventListener("click",e=>{
