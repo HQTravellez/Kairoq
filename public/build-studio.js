@@ -1,7 +1,32 @@
 'use strict';
 const $=id=>document.getElementById(id);const initialEmpty=$('empty').innerHTML;let latest=null,projects=[],busy=false,selectedAssets=[];
 async function api(url,data){const response=await fetch(url,{method:data?'POST':'GET',headers:{'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});const result=await response.json();if(!response.ok)throw Error(result.error||'Request failed');return result;}
-function status(text){$('status').textContent=text;}
+function status(text){$('status').textContent=text;setBuildStageFromStatus(text);}
+const BUILD_STAGES=['understand','design','build','verify','repair','ready'];
+function safeStageText(value){return String(value||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function setBuildStage(stage,message,{failed=false}={}){
+ const index=BUILD_STAGES.indexOf(stage);
+ for(const el of document.querySelectorAll('.mission-step')){
+  const i=BUILD_STAGES.indexOf(el.dataset.stage);
+  el.classList.toggle('done',index>=0&&i<index&&!failed);
+  el.classList.toggle('active',el.dataset.stage===stage&&!failed);
+  el.classList.toggle('failed',el.dataset.stage===stage&&failed);
+  const dot=el.querySelector('.mission-dot');if(dot)dot.textContent=i<index&&!failed?'✓':String(i+1);
+ }
+ const current=$('execution-current');
+ if(current){const label=stage?stage[0].toUpperCase()+stage.slice(1):'Waiting';current.innerHTML='<b>'+label+'</b><br>'+safeStageText(message||'Execution evidence will appear here as Kairoq works.');}
+}
+function setBuildStageFromStatus(text){
+ const t=String(text||'').toLowerCase();let stage='understand';
+ if(/planning|mapping|scenario|requirements/.test(t))stage='understand';
+ if(/design|layout|visual|sourcing/.test(t))stage='design';
+ if(/writing|generating|build queued|starting build/.test(t))stage='build';
+ if(/checking|testing|reviewing|browser|mobile|verify/.test(t))stage='verify';
+ if(/repair|refin|polish|diagnos/.test(t))stage='repair';
+ if(/passed|completed|published|launched|ready/.test(t))stage='ready';
+ if(/failed|error|attention/.test(t))return setBuildStage(stage,text,{failed:true});
+ setBuildStage(stage,text);
+}
 function setBusy(value){busy=value;for(const id of ['build','revise','launch','publish','projects','rollback','repair','load-inbox','asset-search','git-push','git-pull'])$(id).disabled=value;}
 function show(project){latest=project;$('inbox-panel').classList.toggle('hidden',project.kind!=='website');$('inbox-entries').replaceChildren();$('git-panel').classList.remove('hidden');$('source-download').href='/api/developer/export/'+project.id;loadGit().catch(e=>{$('git-status').textContent=e.message;});showReviewDetails(project);showBuildReport(project);const full=project.kind==='fullstack',visualLabel=project.qa?.visual_review?.coverage?.mode==='deterministic-browser-fallback'?'Browser inspection':'AI visual review';$('preview-title').textContent=project.project_name;$('quality').textContent=project.qa?.visual_review?.passed?visualLabel+' '+project.qa.visual_review.score+'/5 · QA passed':project.qa?.passed?'Functional QA passed':'Review needed';$('report').classList.remove('hidden');$('report').textContent=(project.summary||'')+(project.qa?.visual_review?' | '+visualLabel+' '+project.qa.visual_review.score+'/5 · '+project.qa.visual_review.summary:'')+' | '+(project.qa?.tested?.join(' • ')||project.qa?.findings?.join(' • ')||'Browser QA completed')+(full?' | Preview v'+project.version+' · Live '+(project.deployed_version?'v'+project.deployed_version:project.status==='live'?'v'+project.version:'not deployed'):'');$('revise-panel').classList.remove('hidden');$('open').classList.remove('hidden');$('publish').classList.toggle('hidden',full);$('launch').classList.toggle('hidden',!full&&project.kind!=='website');$('launch').textContent=full?(project.deployed_version===project.version?'Live · open app ↗':'Deploy version '+project.version):(project.status==='live'?'Live · open website ↗':'Launch website');$('release-panel').classList.toggle('hidden',!full);if(full)loadReleases(project.id).catch(e=>{$('release-status').textContent=e.message});$('frame').classList.toggle('hidden',full);$('empty').classList.toggle('hidden',!full);if(full){$('empty').replaceChildren();const heading=document.createElement('h2');heading.textContent=project.project_name;const copy=document.createElement('p');copy.textContent='Your working app has its own login and saved data. Open it to review, then launch when ready.';const open=document.createElement('button');open.className='small';open.textContent='Open working app ↗';open.onclick=()=>window.open(project.preview_url,'_blank','noopener');$('empty').append(heading,copy,open);}else $('frame').src=project.preview_url+'?version='+Date.now();}
 async function refresh(){const data=await api('/api/developer/projects');projects=data.projects;$('projects').replaceChildren(new Option('Start a new project',''));for(const p of projects)$('projects').add(new Option(p.project_name+' · '+(p.kind==='fullstack'?'v'+p.version+' · ':'')+p.status,p.id));if(latest)$('projects').value=latest.id;}
