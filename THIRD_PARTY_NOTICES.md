@@ -229,3 +229,16 @@ public test seams and anti-tautological tests, deep-module design, separate Stan
 review axes, and environment-focused retrospectives. Kairoq does not vendor or execute the
 upstream skill files; it implements these concepts inside its own builder, verification and
 project-storage boundaries.
+
+
+## K-Dense scientific specialist skills
+
+Kairoq can load a curated subset of K-Dense AI's scientific-agent-skills
+(https://github.com/K-Dense-AI/scientific-agent-skills, MIT License, Copyright (c) 2025 K-Dense Inc.)
+from pinned revision `5f2bc0341354fd5590aef76a533ada1e1e5b4e62`.
+
+The skills are not globally injected into Kairoq prompts. `specialist-skill-packs.js` exposes only
+task-matched scientific skills, fetches the pinned `SKILL.md` on demand, removes frontmatter tool
+declarations, runs Kairoq's prompt-injection scan, caps prompt size, and treats installation/shell/API
+examples as reference guidance rather than tool authorization. The upstream license text is retained
+in `licenses/scientific-agent-skills-LICENSE.txt`.
