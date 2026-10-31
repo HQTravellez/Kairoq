@@ -244,6 +244,38 @@ function applyShellMode(){
 
 
 
+function moveComposerSmooth(shell,target){
+  if(!shell||!target||shell.parentElement===target)return;
+  const reduce=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const first=shell.getBoundingClientRect();
+  target.appendChild(shell);
+  if(reduce||typeof shell.animate!=="function")return;
+  const last=shell.getBoundingClientRect();
+  const dx=first.left-last.left,dy=first.top-last.top;
+  const sx=last.width?Math.min(1.08,Math.max(.92,first.width/last.width)):1;
+  shell.animate([
+    {transform:`translate(${dx}px,${dy}px) scale(${sx})`,opacity:.72},
+    {transform:"translate(0,0) scale(1)",opacity:1}
+  ],{duration:240,easing:"cubic-bezier(.22,.8,.22,1)"});
+}
+function animateViewIn(){
+  const main=$(".main");if(!main)return;
+  main.classList.remove("view-entering");
+  requestAnimationFrame(()=>{main.classList.add("view-entering");setTimeout(()=>main.classList.remove("view-entering"),260)});
+}
+function animateHomeModeChange(){
+  if(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)return;
+  $("#khGreeting")?.animate?.([{opacity:.55,transform:"translateY(3px)"},{opacity:1,transform:"translateY(0)"}],{duration:180,easing:"ease-out"});
+  $("#khComposerSlot")?.animate?.([{transform:"translateY(2px)"},{transform:"translateY(0)"}],{duration:190,easing:"cubic-bezier(.2,.8,.2,1)"});
+}
+function preloadHomeSky(){
+  const src="https://images.pexels.com/photos/20884933/pexels-photo-20884933.jpeg?auto=compress&cs=tinysrgb&w=2400";
+  const img=new Image();img.decoding="async";img.src=src;
+  const ready=()=>document.body.classList.add("home-sky-ready");
+  if(img.decode)img.decode().then(ready).catch(()=>{img.onload=ready});else img.onload=ready;
+}
+preloadHomeSky();
+
 function setMainView(view="command"){
   if(view==="command") document.body.classList.remove("history-focus");
   mainView = ["chat","command","studio","build","plugins","testing"].includes(view) ? view : "command";
@@ -272,10 +304,11 @@ function setMainView(view="command"){
   // Home uses the large central composer. Other views keep the composer docked.
   const shell=$(".composer-shell"), slot=$("#khComposerSlot"), main=$(".main");
   if(shell && slot && main){
-    if(mainView==="command" && shell.parentElement!==slot) slot.appendChild(shell);
-    else if(mainView!=="command" && shell.parentElement!==main) main.appendChild(shell);
+    if(mainView==="command")moveComposerSmooth(shell,slot);
+    else moveComposerSmooth(shell,main);
   }
   updateWorkspaceTabState();
+  animateViewIn();
 
   $("#commandCenterBtn")?.classList.toggle("active", mainView === "command");
   $("#chatViewBtn")?.classList.toggle("active", mainView === "chat");
@@ -3397,14 +3430,19 @@ function openAppBuilder(mode="web"){
 // The builder frame is emptied first and covered by a plain "Setting up" panel until the
 // builder says its editor is on screen, so nothing from a previous visit shows in between.
 let builderTimer=null;
-function builderReady(){clearTimeout(builderTimer);$("#buildView")?.classList.remove("loading")}
+function builderReady(){
+  clearTimeout(builderTimer);
+  const view=$("#buildView"),frame=$("#buildFrame");
+  view?.classList.remove("loading");
+  frame?.classList.remove("frame-loading");
+}
 function openBuilder(url){
   const frame=$("#buildFrame"),view=$("#buildView");
   view.classList.add("loading");
-  frame.src="about:blank";
+  frame.classList.add("frame-loading");
   try{const u=new URL(url,location.origin),pid=u.searchParams.get("project");activeBuilderProjectId=pid||""}catch{activeBuilderProjectId=""}
   setMainView("build");
-  setTimeout(()=>{frame.src=url},30);
+  requestAnimationFrame(()=>{if(frame.src!==new URL(url,location.origin).href)frame.src=url});
   clearTimeout(builderTimer);builderTimer=setTimeout(builderReady,30000);
 }
 function launchAppBuild(prompt){
@@ -3446,6 +3484,7 @@ function showProjectsTab(tab){
 let activeBuilderProjectId="";
 function renderWorkspaceProjectTabs(projects){
   const host=$("#workspaceProjectTabs");if(!host)return;
+  host.classList.add("tabs-updating");
   host.replaceChildren(...projects.slice(0,5).map(p=>{
     const b=document.createElement("button");b.type="button";b.className="workspace-tab project-tab";
     b.dataset.projectId=String(p.id||"");
@@ -3455,6 +3494,7 @@ function renderWorkspaceProjectTabs(projects){
     b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
     return b;
   }));
+  requestAnimationFrame(()=>{host.classList.remove("tabs-updating");host.classList.add("tabs-ready")});
   updateWorkspaceTabState();
 }
 function updateWorkspaceTabState(){
@@ -3462,7 +3502,7 @@ function updateWorkspaceTabState(){
   const build=mainView==="build";
   $$(".project-tab").forEach(t=>t.classList.toggle("active",build&&String(t.dataset.projectId||"")===String(activeBuilderProjectId||"")));
 }
-$("#workspaceHomeTab")?.addEventListener("click",()=>setMainView("command"));
+$("#workspaceHomeTab")?.addEventListener("click",()=>{setMainView("command");$("#commandCenter")?.scrollTo?.({top:0,behavior:"smooth"})});
 $("#workspaceNewTab")?.addEventListener("click",()=>openAppBuilder("web"));
 
 async function loadHomeApps(){
@@ -3498,9 +3538,10 @@ window.addEventListener("message",e=>{
   const err=$("#khError");if(err){err.textContent=e.data.error?"The build could not start: "+String(e.data.error).slice(0,300).replace(/[.\s]*$/,".")+" Try again, or change the request.":"";err.classList.toggle("hidden",!e.data.error)}
   loadHomeApps();
 });
-$$(".kh-mode").forEach(t=>t.onclick=()=>{
+$(".kh-mode").forEach(t=>t.onclick=()=>{
   if(videoMode)setVideoMode(false);
   setAppBuildMode(t.dataset.mode);
+  animateHomeModeChange();
   promptEl.focus();
 });
 $$("[data-build-app]").forEach(b=>b.onclick=()=>openAppBuilder("web"));
