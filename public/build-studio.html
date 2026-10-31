@@ -64,7 +64,7 @@ summary{color:var(--mb-text)!important}
 @media(max-width:850px){.app{display:block!important}.mission-grid{display:block}.execution-panel{margin-bottom:14px}.execution-steps{grid-template-columns:repeat(3,1fr)}.panel{padding:20px!important}.preview{padding:16px!important}.builder-mode-row{grid-template-columns:1fr}}
 </style>
 <style id="builder-simple-override">
-:root{--mb-bg:#ffffff;--mb-panel:#f8f8f9;--mb-panel2:#fbfbfc;--mb-line:#e5e5e7;--mb-text:#171719;--mb-muted:#6f6f78;--mb-cyan:#5f67d8;--mb-blue:#5f67d8;--mb-violet:#5f67d8;--mb-green:#3f9c63;--mb-amber:#b8852d}
+:root{color-scheme:light;--mb-bg:#ffffff;--mb-panel:#f8f8f9;--mb-panel2:#fbfbfc;--mb-line:#e5e5e7;--mb-text:#171719;--mb-muted:#6f6f78;--mb-cyan:#5f67d8;--mb-blue:#5f67d8;--mb-violet:#5f67d8;--mb-green:#3f9c63;--mb-amber:#b8852d}
 body{background:#fff!important;color:#171719!important}
 .app{grid-template-columns:400px minmax(0,1fr)!important;background:#fff!important}
 .panel{background:#f8f8f9!important;border-color:#e5e5e7!important;padding:22px!important}
@@ -115,6 +115,11 @@ summary{color:#3f3f46!important}
 .report{color:#52525b!important}
 a{color:#5f67d8!important}
 @media(max-width:850px){.app{display:block!important}.execution-steps{display:flex!important}.mission-step:not(:last-child)::after{display:block!important}}
+
+button:focus-visible,a:focus-visible,summary:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{
+  outline:2px solid #8b8fd8!important;outline-offset:2px!important;
+}
+input[type=file]::file-selector-button{background:#f4f4f5!important;color:#27272a!important;border:0!important;border-right:1px solid #e4e4e7!important;padding:8px 10px!important}
 </style></head><body><main class="app"><section class="panel"><a href="/" class="crumb">← Kairoq / Build Studio</a><div style="margin-top:16px"><a href="/api-studio.html" class="small" style="display:inline-block;text-decoration:none">API Intelligence · OAuth &amp; SDKs ↗</a></div><h1>From idea<br>to launch.</h1><p class="sub">Build a polished multi-page website with your brand images and enquiry forms, or a business app with login and saved records. Review tested versions before launch.</p><label class="label" for="projects">Your saved projects</label><select id="projects"><option value="">Start a new project</option></select><p class="muted">Supports trackers, inventories, CRMs and other CRUD apps. Describe your scenario and optionally attach API documentation. Atlas plans the data, login, UI and connected workflows before building. Provider credentials and testing may be required before launch.</p><details><summary>Login &amp; database setup</summary><p id="backend-status" class="muted">Checking connection…</p><p class="muted">Supabase uses the project URL, publishable key and builder credential set in Railway. Existing apps keep their current database.</p><a href="/api/developer/supabase-migration" target="_blank" rel="noopener">Database setup SQL ↗</a><button id="check-setup" class="small" type="button">Check connection</button></details><form id="form">
 <div class="objective-card">
   <div class="objective-head"><strong>Objective</strong><span>Tell Kairoq the outcome</span></div>
