@@ -10,11 +10,17 @@ on:
       - 'react-builder.js'
       - 'react-agent.js'
       - 'docs/design/KAIROQ-CONVERSATION-EXPERIENCE.md'
+      - 'telegram.js'
+      - 'create-api.js'
+      - 'server.js'
+      - 'setup-status.js'
       - 'test/clarify.test.js'
       - 'test/looks.test.js'
       - 'test/clean-conversational-start.test.js'
       - 'test/conversation-experience.test.js'
       - 'test/agent-response-contract.test.js'
+      - 'test/telegram.test.js'
+      - 'test/setup-status.test.js'
       - '.github/workflows/clean-conversational-start.yml'
   pull_request:
     paths:
@@ -48,4 +54,8 @@ jobs:
       - run: node --check agent-response-contract.js
       - run: node --check react-builder.js
       - run: node --check react-agent.js
-      - run: node --test test/clarify.test.js test/looks.test.js test/clean-conversational-start.test.js test/conversation-experience.test.js test/agent-response-contract.test.js test/natural-chat-build-routing.test.js
+      - run: node --check telegram.js
+      - run: node --check create-api.js
+      - run: node --check server.js
+      - run: node --check setup-status.js
+      - run: node --test test/clarify.test.js test/looks.test.js test/clean-conversational-start.test.js test/conversation-experience.test.js test/agent-response-contract.test.js test/telegram.test.js test/setup-status.test.js test/natural-chat-build-routing.test.js
