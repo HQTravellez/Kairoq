@@ -116,6 +116,30 @@ async function tells(page,screen='desktop'){
   const numbered=shown.filter(el=>/^0\d$/.test(own(el)));
   if(numbered.length>=3)add('minor','numbers','Numbered markers (01, 02, 03…) on '+numbered.length+' items','Keep numbers only for real steps in order; otherwise remove them.');
 
+  // 13. UI UX Pro Max critical/high UX floor: deterministic checks on the rendered interface.
+  const interactive=shown.filter(el=>el.matches('a,button,input,select,textarea,[role="button"],[role="link"],[tabindex]')&&!el.matches('[tabindex="-1"]'));
+  if(screen==='phone'){
+   const tiny=interactive.filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&(r.width<44||r.height<44)}).slice(0,8);
+   if(tiny.length>=2)add('major','touch-targets',tiny.length+' visible controls are smaller than 44px on the phone','Increase the clickable/tappable area to at least 44×44px without making the visual design bulky; use padding or an enlarged hit area.');
+   const smallText=shown.filter(el=>{const tag=el.tagName; if(/^(H1|H2|H3|H4|H5|H6|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(tag))return false; const t=own(el);if(!t||t.length<20)return false;return parseFloat(getComputedStyle(el).fontSize)<16}).slice(0,8);
+   if(smallText.length>=2)add('major','mobile-text',smallText.length+' blocks of reading text are below 16px on the phone','Raise normal mobile reading text to at least 16px and preserve hierarchy with weight/spacing rather than tiny type.');
+  }
+  const iconOnly=interactive.filter(el=>{const t=text(el);const hasGraphic=Boolean(el.querySelector('svg,img'));const named=el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')||el.getAttribute('title');return hasGraphic&&!t&& !named;});
+  if(iconOnly.length)add('major','icon-labels',iconOnly.length+' icon-only controls have no accessible name','Add a clear aria-label (or equivalent visible label) describing each control action.');
+  const inputs=shown.filter(el=>el.matches('input,select,textarea')&&el.getAttribute('type')!=='hidden');
+  const unlabeled=inputs.filter(el=>{const id=el.id;return !(el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')||(id&&document.querySelector('label[for="'+CSS.escape(id)+'"]'))||el.closest('label'));});
+  if(unlabeled.length)add('major','form-labels',unlabeled.length+' form fields have no visible or accessible label','Give every field a real label associated with the control; placeholders are examples, not labels.');
+  const imgs=shown.filter(el=>el.tagName==='IMG'&&!el.closest('[aria-hidden="true"]'));
+  const missingAlt=imgs.filter(el=>!el.hasAttribute('alt'));
+  if(missingAlt.length)add('major','image-alt',missingAlt.length+' meaningful images have no alt attribute','Add concise alt text for meaningful images; use alt="" only for purely decorative images.');
+  const levels=heads.map(h=>Number(h.tagName.slice(1)));let skip=false;
+  for(let i=1;i<levels.length;i++)if(levels[i]>levels[i-1]+1){skip=true;break}
+  if(skip)add('minor','heading-order','Heading levels skip in the visible page hierarchy','Use a logical heading sequence (h1, then h2 sections, then h3 subsections) without jumping levels.');
+  const overflow=document.documentElement.scrollWidth>document.documentElement.clientWidth+2;
+  if(screen==='phone'&&overflow)add('major','horizontal-overflow','The phone layout scrolls horizontally','Make every region fit the viewport: allow flex/grid children to shrink, wrap long content, and use intentional table scrolling only where needed.');
+  const fixed=shown.filter(el=>['fixed','sticky'].includes(getComputedStyle(el).position));
+  if(screen==='phone'&&fixed.some(el=>{const r=el.getBoundingClientRect();return r.bottom>innerHeight-2&&r.height>0&&r.width>innerWidth*.5})&&parseFloat(getComputedStyle(document.body).paddingBottom||'0')<32)add('minor','fixed-safe-area','A fixed bottom control sits over content without reserved bottom space','Reserve bottom padding (including safe-area inset) so content and focused controls are never hidden behind the fixed bar.');
+
   // Plain measurements, compared with what the best sites of the kind do (craft-norms.js).
   // A faded headline: the main heading (or a wrapper around it, such as a hero backdrop given an
   // opacity) is see-through, so the most important words on the page look washed out.

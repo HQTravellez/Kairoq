@@ -1,0 +1,30 @@
+name: UI UX Pro Max quality floor
+on:
+  push:
+    paths:
+      - 'react-design.js'
+      - 'design-tells.js'
+      - 'craft-check.js'
+      - 'test/ui-ux-pro-max-floor.test.js'
+      - '.github/workflows/ui-ux-pro-max-floor.yml'
+  pull_request:
+    paths:
+      - 'react-design.js'
+      - 'design-tells.js'
+      - 'craft-check.js'
+      - 'test/ui-ux-pro-max-floor.test.js'
+      - '.github/workflows/ui-ux-pro-max-floor.yml'
+permissions:
+  contents: read
+jobs:
+  ux-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --check react-design.js && node --check design-tells.js && node --check craft-check.js && node --check test/ui-ux-pro-max-floor.test.js
+      - run: node --test test/ui-ux-pro-max-floor.test.js
