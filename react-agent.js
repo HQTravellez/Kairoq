@@ -103,7 +103,7 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
@@ -120,8 +120,10 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const generated=[],pendingChecks=[];
  // The agent's browser tests and SQL reads use a test copy of the data, never the real one.
  const box=require('./react-sandbox').create(id);
- let checksWarned=false,lastSavedChecks=null;
- const limit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
+ let checksWarned=false,lastSavedChecks=null,lastVisualQuality=null,repairAttempts=0,needsRepair=false;
+ const normalLimit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
+ const recoverySteps=researchOnly?0:intEnv('KAIROQ_AGENT_RECOVERY_STEPS',4,0,8);
+ const limit=normalLimit+recoverySteps;
  const wb=require('./web').createBrowser({browseSite,maxOps:intEnv('KAIROQ_WEB_MAX_ACTIONS',30,5,100)});
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
  let webAttempted=false,webObserved=false;
@@ -302,7 +304,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const written=[],bad=[];
    for(const [name,code] of Object.entries(files)){if(typeof code!=='string'){bad.push(name+' (content must be a string)');continue}work[name]=code;written.push(name)}
    for(const name of Array.isArray(a.delete)?a.delete:[])if(typeof name==='string'&&name!=='src/main.jsx'&&name!=='src/App.jsx'&&Object.hasOwn(work,name)){delete work[name];written.push('deleted '+name)}
-   if(written.length){dirty=true;lastUnitTests=null;lastReview=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   if(written.length){if(needsRepair){repairAttempts++;needsRepair=false}dirty=true;lastUnitTests=null;lastReview=null;lastVisualQuality=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    tl.edits(before,work);
    const problems=builder.checkProject(work);
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
@@ -314,7 +316,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const r=require('./react-edits').apply(work,edits);
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
    for(const f of r.changed)tl.add({t:'edit',file:f,kind:'edited'});
-   work=r.files;if(r.changed.length){dirty=true;lastUnitTests=null;lastReview=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
+   work=r.files;if(r.changed.length){if(needsRepair){repairAttempts++;needsRepair=false}dirty=true;lastUnitTests=null;lastReview=null;lastVisualQuality=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
@@ -411,7 +413,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const fresh=builder.loadMeta(id),now=new Date().toISOString();
   const errors=lastTest&&lastTest.errors.length?lastTest.errors:[];
   const reviewRequired=require('./engineering-review').required(base,files,text);
-  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files,review:lastReview,reviewRequired});
+  const visualGate=require('./visual-quality-gate'),visualRequired=visualGate.required({base,current:files,request:text});
+  const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files,review:lastReview,reviewRequired,
+    visualQuality:lastVisualQuality,visualRequired,repairs:repairAttempts});
   message=require('./engineering-completion-gate').resultMessage(message,completion);
   fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues,verification_evidence:completion.evidence,...(lastUnitTests?{unit_tests:{ok:lastUnitTests.ok,ran:lastUnitTests.ran,passed:lastUnitTests.passed,failed:lastUnitTests.failed,files:lastUnitTests.files}}:{}),...(lastReview?{engineering_review:{ok:lastReview.ok,standards:lastReview.standards,spec:lastReview.spec}}:{})},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
@@ -449,7 +453,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  for(let step=Math.max(1,(checkpoint?.step||0)+1);step<=limit;step++){
   activeStep=step;
   signal?.throwIfAborted();
-  report({status:'thinking',step});
+  report({status:step>normalLimit?'repairing':'thinking',step});
   trimContext();
   // Streaming keeps long steps (several files) under the provider's streaming timeout.
   const asked=Date.now();let reasoning='';
@@ -487,11 +491,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     if(unchanged()){finished=noChange(message);break}
     if(dirty||!built){const r=await buildAndTest({});results.push(r.text);if(r.image)image=r.image}
     if(!built||dirty){results.push('finish: your latest changes do not build yet. Fix the problems above, then finish.');continue}
-    if(lastTest&&lastTest.errors.length){finishWarned=true;results.push('finish: the last browser test still shows problems. Fix them and test again; finish cannot bypass verification.');continue}
+    if(lastTest&&lastTest.errors.length){finishWarned=true;needsRepair=true;results.push('finish: the last browser test still shows problems. Fix them and test again; finish cannot bypass verification.');continue}
     if(!checksWarned&&inspect&&require('./react-checks').list(builder.loadMeta(id)).length){
      checksWarned=true;report({status:'checking'});
      const cr=await require('./react-checks').run(id,built.url,{inspect,version:built.n});lastSavedChecks=cr;
-     if(cr.failed.length){results.push('finish: these saved checks (flows that worked before) now fail:\n'+require('./react-checks').failureText(cr.failed)+'\nFix them and test again; finish cannot bypass verification.');continue}
+     if(cr.failed.length){needsRepair=true;results.push('finish: these saved checks (flows that worked before) now fail:\n'+require('./react-checks').failureText(cr.failed)+'\nFix them and test again; finish cannot bypass verification.');continue}
      results.push('Saved checks: all '+cr.ran+' passed.');
     }
     const taskState=require('./task-graph').status(id,text);
@@ -504,16 +508,34 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
       tl.add({t:'test',ok:lastReview.ok,text:lastReview.ok?'Standards + Spec review passed':'Engineering review found blocking issues',detail:lastReview.blocking.map(x=>x.file+': '+x.message)});
      }catch(e){results.push('finish: engineering review could not run: '+String(e.message||e).slice(0,400));continue}
     }
-    if(lastReview?.blocking?.length){results.push('finish: independent review has '+lastReview.blocking.length+' blocking finding(s). Repair them and run engineering_review again.');continue}
+    if(lastReview?.blocking?.length){needsRepair=true;results.push('finish: independent review has '+lastReview.blocking.length+' blocking finding(s). Repair them and run engineering_review again.');continue}
     const gate=require('./engineering-completion-gate');
     if(gate.requiresUnitTests(ownerRequirements,work)&&!lastUnitTests){
      lastUnitTests=require('./project-test-runner').run(work);
      results.push('Automatic verification tests: '+(lastUnitTests.ok?'PASS':'FAIL')+'\n'+clip(lastUnitTests.output||'',12000));
      tl.add({t:'test',ok:lastUnitTests.ok,text:lastUnitTests.ok?'Verification tests passed':'Verification tests failed',detail:lastUnitTests.ok?lastUnitTests.files:[lastUnitTests.output]});
-     if(!lastUnitTests.ok){results.push('finish: deterministic verification failed. Repair the implementation or tests based on the failure above, then run_tests again.');continue}
+     if(!lastUnitTests.ok){needsRepair=true;results.push('finish: deterministic verification failed. Repair the implementation or tests based on the failure above, then run_tests again.');continue}
     }
-    const verdict=gate.evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files:work,review:lastReview,reviewRequired});
-    if(!verdict.verified){finishWarned=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
+    const visualGate=require('./visual-quality-gate');
+    const visualRequired=visualGate.required({base,current:work,request:text});
+    if(visualRequired&&(!lastVisualQuality||lastVisualQuality.version!==built.n)){
+      report({status:'reviewing'});
+      lastVisualQuality=await visualGate.evaluate({
+        url:built.url,request:text,meta:builder.loadMeta(id),designShots,reviewLook,signal
+      });
+      lastVisualQuality.version=built.n;
+      tl.add({t:'test',ok:lastVisualQuality.passed,text:lastVisualQuality.passed?'Visual quality passed':'Visual quality needs repair',
+        detail:lastVisualQuality.passed?[]:[visualGate.failureText(lastVisualQuality)]});
+      if(!lastVisualQuality.passed){
+        finishWarned=true;needsRepair=true;
+        results.push('finish: visual quality gate did not pass. Repair these visible problems and build/test again:\n'+visualGate.failureText(lastVisualQuality));
+        continue;
+      }
+      results.push('Visual quality: PASS on '+lastVisualQuality.screenshots+' captured view(s).');
+    }
+    const verdict=gate.evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files:work,review:lastReview,reviewRequired,
+      visualQuality:lastVisualQuality,visualRequired,repairs:repairAttempts});
+    if(!verdict.verified){finishWarned=true;needsRepair=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
     finished=save(message);break;
    }
    try{
@@ -527,7 +549,10 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   }
   if(finished)return finished;
   dropOldImages();
-  const body='Results of step '+step+' of '+limit+':\n\n'+clip(results.join('\n\n'),60000)+(step===limit-1?'\n\nYou have one step left: fix what you can and call finish.':'');
+  const recoveryNote=step===normalLimit&&recoverySteps
+   ?'\n\nNORMAL EXECUTION BUDGET ENDED. Enter bounded recovery mode now: do not add scope. Repair only the remaining build/test/visual/review blockers, rerun evidence, and finish when the gate passes.'
+   :'';
+  const body='Results of step '+step+' of '+limit+':\n\n'+clip(results.join('\n\n'),60000)+recoveryNote+(step===limit-1?'\n\nYou have one recovery step left: repair the remaining blocker and call finish only if evidence passes.':'');
   messages.push({role:'user',content:image?[{type:'text',text:body},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+image}}]:body});
  }
  // Out of steps: keep the work if it builds.
