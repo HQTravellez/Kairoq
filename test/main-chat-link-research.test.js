@@ -21,9 +21,11 @@ test("main website reader follows canonical redirects internally",()=>{
 });
 
 test("main chat capability truth is resolved before model personalities",()=>{
- const capability=source.indexOf('browserCapabilities.capabilityQuestion(capabilityText)');
+ const apiCapability=source.indexOf('apiCapabilities.capabilityQuestion(capabilityText)');
+ const browserCapability=source.indexOf('browserCapabilities.capabilityQuestion(capabilityText)');
  const hermes=source.indexOf('const hermes=require("./hermes-chat")');
- assert.ok(capability>=0&&hermes>capability);
+ assert.ok(apiCapability>=0&&browserCapability>apiCapability&&hermes>browserCapability);
+ assert.match(source,/apiCapabilities\.capabilityAnswer\(\)/);
  assert.match(source,/model:"kairoq\/capability-runtime"/);
  assert.match(source,/browser:require\("\.\/runtime-check"\)\.available\(\),search:true/);
 });
