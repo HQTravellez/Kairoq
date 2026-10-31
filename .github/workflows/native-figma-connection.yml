@@ -1,0 +1,68 @@
+name: Native Figma connection
+on:
+  push:
+    paths:
+      - 'native-connections.js'
+      - 'oauth-connect.js'
+      - 'figma-connection.js'
+      - 'react-figma.js'
+      - 'figma-export.js'
+      - 'figma-plugin/**'
+      - 'react-agent.js'
+      - 'build-routing.js'
+      - 'capability-registry.js'
+      - 'create-api.js'
+      - 'public/create.js'
+      - 'public/create.html'
+      - 'setup-status.js'
+      - 'docs/connections/figma.md'
+      - 'test/figma-connection.test.js'
+      - 'test/figma-export.test.js'
+      - 'test/oauth-connect.test.js'
+      - 'test/agent-capability-routing.test.js'
+      - 'test/goal-build-routing.test.js'
+      - '.github/workflows/native-figma-connection.yml'
+  pull_request:
+    paths:
+      - 'native-connections.js'
+      - 'oauth-connect.js'
+      - 'figma-connection.js'
+      - 'react-figma.js'
+      - 'figma-export.js'
+      - 'figma-plugin/**'
+      - 'react-agent.js'
+      - 'build-routing.js'
+      - 'capability-registry.js'
+      - 'create-api.js'
+      - 'public/create.js'
+      - 'public/create.html'
+      - 'setup-status.js'
+      - 'docs/connections/figma.md'
+      - 'test/figma-connection.test.js'
+      - 'test/figma-export.test.js'
+      - 'test/oauth-connect.test.js'
+      - 'test/agent-capability-routing.test.js'
+      - 'test/goal-build-routing.test.js'
+      - '.github/workflows/native-figma-connection.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check native-connections.js
+      - run: node --check oauth-connect.js
+      - run: node --check figma-connection.js
+      - run: node --check react-figma.js
+      - run: node --check react-agent.js
+      - run: node --check build-routing.js
+      - run: node --check capability-registry.js
+      - run: node --check create-api.js
+      - run: node --check public/create.js
+      - run: node --check setup-status.js
+      - run: node --test test/figma-connection.test.js test/oauth-connect.test.js test/figma-export.test.js test/agent-capability-routing.test.js test/goal-build-routing.test.js

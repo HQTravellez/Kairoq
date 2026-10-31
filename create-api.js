@@ -68,7 +68,7 @@ const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DE
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','GET:/oauth':'owner','POST:/oauth':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/apis':'viewer','POST:/apis':'editor','DELETE:/apis':'editor','POST:/apitry':'editor','POST:/apicheck':'editor','POST:/apirules':'editor','POST:/apicurl':'editor','POST:/apitest':'editor','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'owner','POST:/figma':'owner','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','GET:/oauth':'owner','POST:/oauth':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/apis':'viewer','POST:/apis':'editor','DELETE:/apis':'editor','POST:/apitry':'editor','POST:/apicheck':'editor','POST:/apirules':'editor','POST:/apicurl':'editor','POST:/apitest':'editor','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,thumb:require('./project-thumbs').url(p),role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -477,7 +477,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     const continuity=browserDecision.execute&&browserDecision.message!==message?browserDecision.message.slice(String(message||'').length).trim():'';
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra,continuity].filter(Boolean).join('\n\n');
     const researchOnly=browserResearchOnly&&!hooks;
-    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,designShots,reviewLook,fetchUrl:url=>require('./public-web-fetch').fetchPublic(url,{maxRedirects:5,maxBytes:2000000,accept:"application/json, text/html, text/markdown, text/plain"}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
+    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,designShots,reviewLook,fetchUrl:url=>require('./public-web-fetch').fetchPublic(url,{maxRedirects:5,maxBytes:2000000,accept:"application/json, text/html, text/markdown, text/plain"}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',figmaAccess:builder.loadMeta(id).owner===v.owner,maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
      onStep:p=>update({status:p.status,stream:null,...(p.browser?{browser:p.browser}:{}),agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
@@ -1697,24 +1697,40 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    }
    throw Object.assign(Error('Unknown step (use analyze or build)'),{status:400});
   }
-  if(action==='/figma'&&method==='GET'){let saved=false;try{saved=Boolean(require('./project-secrets').status(id).figma_token)}catch{}return send(res,200,{token_saved:saved}),true}
+  if(action==='/figma'&&method==='GET'){
+   const F=require('./figma-connection'),host='http://'+String(req.headers.host||'localhost'),connection=F.status(id,{fallbackOrigin:host});
+   let profile=null,token_saved=false;
+   try{token_saved=Boolean(require('./project-secrets').status(id).figma_token)}catch{}
+   if(connection.connected)try{profile=await F.profile(id,{fetchImpl:figmaFetch||fetch})}catch{}
+   return send(res,200,{connection,profile,token_saved}),true
+  }
   if(action==='/figma'&&method==='POST'){
    // Import a Figma frame: render it, save its images, describe its layers, then build it.
-   const b=await readJson(req,20000),secrets=require('./project-secrets'),figma=require('./react-figma');
+   const b=await readJson(req,20000),secrets=require('./project-secrets'),figma=require('./react-figma'),F=require('./figma-connection');
+   const host='http://'+String(req.headers.host||'localhost'),connection=F.status(id,{fallbackOrigin:host});
    let token=String(b.token||'').trim();
-   if(token&&b.save_token){if(role!=='owner')throw Object.assign(Error('Only the project owner can save the Figma token'),{status:403});secrets.set(id,'figma_token',token)}
+   if(token&&b.save_token){if(role!=='owner')throw Object.assign(Error('Only the project owner can save a legacy Figma token'),{status:403});secrets.set(id,'figma_token',token)}
    if(!token&&role==='owner'){try{token=secrets.get(id,'figma_token')||''}catch{}}
+   if(!connection.connected&&!token)throw Object.assign(Error(connection.configured?'Connect Figma first, then import the frame.':'Figma OAuth is not configured on this Kairoq server yet.'),{status:409,data:{connection}});
    for(const job of jobs.values())if(job.projectId===id&&ACTIVE.has(job.status))throw Object.assign(Error('This project is already being updated'),{status:409});
    const price=cost({mode:b.mode==='agent'?'agent':'build',tier:b.tier||'standard',images:process.env.KAIROQ_BUILDER_PAID_APPROVED==='true'});
    if(v.kind==='customer'&&v.account.credits<price)throw Object.assign(Error('You need '+price+' credits for this import.'),{status:402});
-   const frame=await figma.importFrame({url:b.url,token},{fetchImpl:figmaFetch||fetch});
+   const frame=connection.connected
+    ?await F.importFrame(id,b.url,{fetchImpl:figmaFetch||fetch})
+    :await figma.importFrame({url:b.url,token,auth:'pat'},{fetchImpl:figmaFetch||fetch});
    const saved=frame.images.length?require('./react-assets').save(id,frame.images.map(({name,mime,data})=>({name,mime,data}))):[];
    const names=new Map(frame.images.map((img,i)=>[img.ref,saved[i]]));
    const paid=process.env.KAIROQ_BUILDER_PAID_APPROVED==='true';
    const message=String(b.message||'').trim().slice(0,4000)||'Build the Figma design "'+frame.name+'" as a responsive page. Match its layout, spacing, colours, fonts and text closely and use the images from the design.';
-   const context='Figma design spec for the frame "'+frame.name+'". Sizes are px at the design width; turn them into a responsive Tailwind layout (mobile first). Load Google Fonts with an https @import at the top of src/index.css when the design uses them.'+(paid&&frame.screenshot?' The attached image is the rendered frame.':'')+'\n'+figma.spec(frame.root,names).slice(0,40000)+(saved.length?'\nImages from the design (saved as uploads): '+saved.map(n=>'./uploads/'+n).join(', '):'');
+   const systemEvidence=[
+    frame.components.length?'Components: '+frame.components.slice(0,40).map(x=>x.name).filter(Boolean).join(', '):'',
+    frame.componentSets.length?'Component sets: '+frame.componentSets.slice(0,30).map(x=>x.name).filter(Boolean).join(', '):'',
+    frame.styles.length?'Styles: '+frame.styles.slice(0,40).map(x=>x.name+(x.styleType?' ['+x.styleType+']':'')).filter(Boolean).join(', '):''
+   ].filter(Boolean).join('\n');
+   const context='Figma design spec for the frame "'+frame.name+'". Sizes are px at the design width; turn them into a responsive Tailwind layout (mobile first). Load Google Fonts with an https @import at the top of src/index.css when the design uses them.'+(paid&&frame.screenshot?' The attached image is the rendered frame.':'')+'\n'+figma.spec(frame.root,names).slice(0,40000)+(systemEvidence?'\n\nDesign-system evidence from Figma:\n'+systemEvidence:'')+(saved.length?'\nImages from the design (saved as uploads): '+saved.map(n=>'./uploads/'+n).join(', '):'');
    const job=startJob(v,id,{message,mode:b.mode==='agent'?'agent':'build',tier:b.tier||'standard',images:paid&&frame.screenshot?[frame.screenshot]:[],context,referenceOnly:true},deps);
-   return send(res,202,{job:publicJob(job),frame:{name:frame.name,images:saved,rendered:Boolean(frame.screenshot)}}),true;
+   const m=builder.loadMeta(id);m.figma={file_key:frame.key,node_id:frame.nodeId,name:frame.name,connected:connection.connected,imported_at:new Date().toISOString()};builder.saveMeta(m);
+   return send(res,202,{job:publicJob(job),frame:{name:frame.name,images:saved,rendered:Boolean(frame.screenshot),components:frame.components.length,styles:frame.styles.length},connection:{connected:connection.connected}}),true;
   }
   // The files a version changed, before and after (the Details panel's Changes tab).
   if(action==='/changes'&&method==='GET'){

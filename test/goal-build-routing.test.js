@@ -13,7 +13,8 @@ test("short outcome goals enter Agent Mode automatically",()=>{
   "Migrate authentication without breaking users",
   "Automate this approval workflow end to end",
   "Build an internal CRM system",
-  "Create a customer portal with authentication"
+  "Create a customer portal with authentication",
+  "Build this design https://www.figma.com/design/AbC1234567890/Product?node-id=12-34"
  ];
  for(const message of cases){
   assert.equal(routing.goalLike(message),true,message);

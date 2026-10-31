@@ -1343,12 +1343,18 @@
 </dialog>
 <dialog id="figma-dialog">
   <form method="dialog" class="dialog" id="figma-form">
-    <h2>Import from Figma</h2>
-    <p class="muted small">In Figma, select a frame, then Share → Copy link to selection. Kairoq reads the frame's layout, colours, fonts, text and images and builds it.</p>
+    <h2>Figma</h2>
+    <p class="muted small">Connect once, then paste any Figma frame you can access. Kairoq reads its layout, colours, fonts, text, images, components and styles and uses them as design evidence.</p>
+    <div class="oauth-box" id="figma-connection">
+      <p class="muted small" id="figma-connect-status">Checking Figma connection…</p>
+      <div class="row">
+        <button class="primary hidden" id="figma-connect" type="button">Connect Figma</button>
+        <button class="ghost hidden" id="figma-disconnect" type="button">Disconnect</button>
+      </div>
+      <p class="muted small hidden" id="figma-admin-note"></p>
+    </div>
     <label>Frame link<input id="figma-url" type="url" required placeholder="https://www.figma.com/design/…?node-id=12-34"></label>
-    <label>Personal access token <span class="muted small" id="figma-token-status"></span><input id="figma-token" type="password" autocomplete="off" placeholder="figd_… (File content: read)"></label>
-    <label class="check"><input type="checkbox" id="figma-save" checked> Save the token for this project (encrypted)</label>
-    <label>Notes for the AI <span class="muted small">(optional)</span><textarea id="figma-message" rows="2" placeholder="Make the booking button open a form that saves to the database"></textarea></label>
+    <label>Notes for Kairoq <span class="muted small">(optional)</span><textarea id="figma-message" rows="2" placeholder="Keep this design, but make the booking button save to the database"></textarea></label>
     <p class="muted small" id="figma-cost"></p>
     <p class="error" id="figma-error" role="alert"></p>
     <div class="row end"><button class="primary" id="figma-import" type="button">Import and build</button><button class="ghost" value="close">Cancel</button></div>

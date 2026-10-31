@@ -1533,24 +1533,58 @@ $('mobile-save').onclick=async()=>{
   setTimeout(()=>{$('mobile-icon-preview').src='/api/create/projects/'+state.project.id+'/appicon?t='+Date.now()},1500);
  }catch(err){text($('mobile-error'),err.message)}
 };
-// ---------- Figma import ----------
-$('figma-open').onclick=async()=>{
- text($('figma-error'),'');
+// ---------- Figma connection + import ----------
+let figmaState=null;
+async function renderFigmaConnection(){
  const owner=state.project.role==='owner'||!state.project.role;
- $('figma-save').closest('label').classList.toggle('hidden',!owner);
- text($('figma-cost'),'Builds with the '+(state.mode==='agent'?'Agent':'Build')+' mode and the tier selected in the chat.');
- try{const {token_saved}=await api('/projects/'+state.project.id+'/figma');text($('figma-token-status'),token_saved?'(saved; leave empty to reuse)':'')}catch{}
+ try{
+  const r=await api('/projects/'+state.project.id+'/figma');figmaState=r;
+  const s=r.connection||{},p=r.profile||null,connected=Boolean(s.connected);
+  text($('figma-connect-status'),connected
+   ?'Connected'+(p&&(p.handle||p.email)?' as '+(p.handle||p.email):'')+'. Kairoq can read Figma files this account can access.'
+   :s.configured?'Not connected yet. Connect Figma once for this project.':'Figma OAuth is not configured on this Kairoq server yet.');
+  $('figma-connect').classList.toggle('hidden',connected||!owner||!s.configured);
+  $('figma-disconnect').classList.toggle('hidden',!connected||!owner);
+  $('figma-import').disabled=!connected&&!r.token_saved;
+  $('figma-admin-note').classList.toggle('hidden',Boolean(s.configured)||!owner);
+  if(!s.configured&&owner)text($('figma-admin-note'),'Kairoq admin needs KAIROQ_OAUTH_FIGMA_CLIENT_ID and KAIROQ_OAUTH_FIGMA_CLIENT_SECRET, with the displayed OAuth callback registered in Figma.');
+  return r;
+ }catch(err){text($('figma-connect-status'),'Could not read the Figma connection.');text($('figma-error'),err.message);return null}
+}
+$('figma-open').onclick=async()=>{
+ if(state.project.role&&state.project.role!=='owner'){text($('chat-error'),'Only the project owner can connect or inspect Figma in this release.');return}
+ text($('figma-error'),'');
+ text($('figma-cost'),'Builds with the '+(state.mode==='agent'?'Agent':'Build')+' mode and the model selected in chat.');
  $('figma-dialog').showModal();
+ await renderFigmaConnection();
 };
+$('figma-connect').onclick=async()=>{
+ text($('figma-error'),'');$('figma-connect').disabled=true;
+ try{
+  const r=await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'start',service:'figma'}});
+  const w=window.open(r.url,'kairoq-oauth','width=560,height=760');
+  if(!w)location.href=r.url;
+ }catch(err){text($('figma-error'),err.message)}
+ finally{$('figma-connect').disabled=false}
+};
+$('figma-disconnect').onclick=async()=>{
+ text($('figma-error'),'');
+ try{await api('/projects/'+state.project.id+'/oauth',{method:'POST',body:{op:'disconnect',service:'figma'}});await renderFigmaConnection()}
+ catch(err){text($('figma-error'),err.message)}
+};
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin||!e.data||!e.data.kairoqOauth||e.data.kairoqOauth.service!=='figma')return;
+ renderFigmaConnection();
+});
 $('figma-import').onclick=async()=>{
  if(state.job)return;
  text($('figma-error'),'');
  const url=$('figma-url').value.trim();if(!url){text($('figma-error'),'Paste the frame link.');return}
  $('figma-import').disabled=true;
  try{
-  const r=await api('/projects/'+state.project.id+'/figma',{method:'POST',body:{url,token:$('figma-token').value.trim()||undefined,save_token:$('figma-save').checked,message:$('figma-message').value.trim(),mode:state.mode==='agent'?'agent':'build',tier:state.tier}});
-  $('figma-dialog').close();$('figma-token').value='';
-  $('messages').append(messageItem({role:'user',text:'Import from Figma: '+r.frame.name+(r.frame.images.length?' ('+r.frame.images.length+' images)':'')}));
+  const r=await api('/projects/'+state.project.id+'/figma',{method:'POST',body:{url,message:$('figma-message').value.trim(),mode:state.mode==='agent'?'agent':'build',tier:state.tier}});
+  $('figma-dialog').close();
+  $('messages').append(messageItem({role:'user',text:'Import from Figma: '+r.frame.name+(r.frame.images.length?' ('+r.frame.images.length+' images)':'')+(r.frame.components?' · '+r.frame.components+' components':'')}));
   watch(r.job);
  }catch(err){text($('figma-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
  finally{$('figma-import').disabled=false}
@@ -2886,7 +2920,7 @@ const CONNECTORS=[
  {id:'stripe',name:'Stripe payments',desc:'Take card payments and subscriptions with your own Stripe account.',open:()=>openSettingsAt('stripe-key')},
  {id:'email',name:'Email',desc:'Booking confirmations, password resets and owner notifications.',open:()=>openSettingsAt('email-status')},
  {id:'secrets',name:'API keys for your app',desc:'Keys for other services your server functions call (maps, SMS, AI…).',open:()=>openSettingsAt('secret-name')},
- {id:'figma',name:'Figma',desc:'Build a screen from a Figma frame.',open:()=>$('figma-open').click()},
+ {id:'figma',name:'Figma',desc:'Connect your Figma account, build from frames, and use components/styles as design evidence.',open:()=>$('figma-open').click(),owner:true},
  {id:'apps',name:'744 apps',desc:'Mailchimp, HubSpot, Slack, Airtable, Shopify, Twilio and more: pick one and say what should happen.',open:()=>openApps()},
  {id:'partners',name:'Integrations',desc:'Booking, payments, reviews and more from our partners.',open:()=>openIntegrations()},
  {id:'whatsapp',name:'WhatsApp',desc:'Answer customers on WhatsApp with your app\'s assistant.',open:()=>openWhatsApp()},
@@ -2906,7 +2940,7 @@ $('connect-open').onclick=()=>{
   if(c.owner&&state.project.role!=='owner')continue;
   const li=el('li','connector'),ico=el('span','connector-ico',c.name.slice(0,1));ico.dataset.id=c.id;
   const t=el('div','skill-text');t.append(el('b',null,c.name),el('span',null,c.desc));
-  const go=el('button','ghost',c.id==='github'?'Connect':'Open');go.type='button';
+  const go=el('button','ghost',['github','figma'].includes(c.id)?'Connect':'Open');go.type='button';
   go.onclick=()=>{if(!['github','stripe','email','secrets','mcp'].includes(c.id))$('connectors-dialog').close();c.open()};
   li.append(ico,t,go);ul.append(li);
  }
