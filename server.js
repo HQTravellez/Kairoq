@@ -689,6 +689,63 @@ function normalizeMessages(messages, limit = 50) {
   }));
 }
 
+function runtimeConversationCapabilities(req){
+  const caps=[
+    "Conversation continuity, Kairoq personality and settled-decision enforcement",
+    "Workspace, project and chat memory supplied by the Kairoq runtime",
+    "Public website reading and API documentation research",
+    "Web research and source-reading routes",
+    "Discuss, Build, Agent and OpenCode execution modes",
+    "Runtime-owned tool and capability routing independent of the selected language model"
+  ];
+  try{
+    const native=require("./native-connections").list();
+    if(native.some(x=>x.id==="figma"))caps.push("Native Figma connection and Figma design evidence import");
+  }catch{}
+  try{if(require("./telegram").enabled())caps.push("Telegram channel connected to the same Kairoq project/job engine")}catch{}
+  try{if(isAuthenticated(req)&&require("./runtime-check").available())caps.push("Guarded browser-use execution")}catch{}
+  try{if(require("./hermes-chat").configured())caps.push("Kairoq Agent execution")}catch{}
+  return caps;
+}
+
+async function handleModelSwitchHandoff(req,res){
+  try{
+    enforceRateLimit(req);
+    const body=await getBody(req,1_500_000);
+    const messages=normalizeMessages(body.messages,80);
+    const fromModel=typeof body.fromModel==="string"?body.fromModel:"";
+    const toModel=typeof body.toModel==="string"?body.toModel:"";
+    if(!toModel)return json(res,400,{error:"Choose a model to switch to."});
+    if(toModel==="hermes/agent"){
+      if(!require("./hermes-chat").configured())return json(res,400,{error:"Kairoq Agent is not connected."});
+    }else if(!["openrouter/free","smart-auto","openrouter/auto"].includes(toModel)&&!isLocalModelId(toModel)){
+      const models=await getModels();
+      const selected=models.find(m=>m.id===toModel);
+      if(!selected||!require("./chat-model-eligibility").isConversationalModel(selected))return json(res,400,{error:"That conversational model is not available right now."});
+    }
+    const modelHandoff=require("./model-switch-handoff");
+    const prepared=modelHandoff.prepare({
+      messages,
+      current:modelHandoff.contentText([...messages].reverse().find(m=>m.role==="user")?.content),
+      project:typeof body.currentProject==="string"?body.currentProject:"",
+      fromModel,
+      toModel,
+      capabilities:runtimeConversationCapabilities(req)
+    });
+    if(!prepared.ready)return json(res,409,{error:"Kairoq could not verify enough conversation context for a safe model handoff.",...prepared});
+    return json(res,200,{
+      ok:true,
+      ready:true,
+      version:prepared.handoff.version,
+      checklist:prepared.checklist,
+      handoff:prepared.handoff,
+      message:"The new model is caught up. Kairoq will continue the same conversation."
+    });
+  }catch(err){
+    return json(res,err.status||500,{error:err.message||"Could not prepare the model handoff."});
+  }
+}
+
 function writeSSE(res, event, data) {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -4301,7 +4358,25 @@ async function handleChat(req, res) {
       ?"ZERO COST MODE is active. Do not claim a paid external search or paid model was used. If current web information is required but no free/local web tool is available, say so rather than inventing current facts."
       :"";
     const capabilitySystem="Kairoq has an existing guarded public website reader, web research path and API documentation tooling. Do not claim Kairoq categorically cannot browse or read external documentation. If the request needs public API docs, use the application-provided research results when available; if fetching fails, report that specific failure. Never claim sandbox requests or generated integration code have been executed unless there is execution evidence. Current user project context may be incomplete: do not assume the active app is about nutrition when the user asks about Sabre travel APIs.";
-    const system=[presetSystem,capabilitySystem,customPresetPrompt,memorySystem,zeroCostSystem,userSystem].filter(Boolean).join("\n\n");
+    const handoffModule=require("./model-switch-handoff");
+    const latestUserText=handoffModule.contentText([...messages].reverse().find(m=>m.role==="user")?.content);
+    const continuityMeta={
+      name:typeof body.currentProject==="string"?body.currentProject:"",
+      messages:handoffModule.normalizeMessages(messages),
+      pending_question:null
+    };
+    const conversationSystem=require("./conversation-handoff").note(continuityMeta,latestUserText);
+    const switchSystem=body.modelSwitch&&body.modelSwitch.confirmed===true
+      ? handoffModule.note({
+          messages,
+          current:latestUserText,
+          project:typeof body.currentProject==="string"?body.currentProject:"",
+          fromModel:body.modelSwitch.fromModel,
+          toModel:requestedModel,
+          capabilities:runtimeConversationCapabilities(req)
+        })
+      : "";
+    const system=[presetSystem,capabilitySystem,conversationSystem,switchSystem,customPresetPrompt,memorySystem,zeroCostSystem,userSystem].filter(Boolean).join("\n\n");
     const finalMessages=system?[{role:"system",content:system},...messages]:messages;
     const temperature=Number.isFinite(Number(body.temperature))?Math.max(0,Math.min(2,Number(body.temperature))):0.7;
 
@@ -7647,6 +7722,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === "GET" && url === "/api/plugins") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,pluginStatus()); }
   if (req.method === "GET" && url === "/api/hermes/status") { if (!isAuthenticated(req)) return json(res,401,{error:"Authentication required."}); return json(res,200,await require("./hermes-chat").health()); }
+  if (req.method === "POST" && url === "/api/chat/model-handoff") return handleModelSwitchHandoff(req, res);
   if (req.method === "POST" && url === "/api/chat/stream") return handleChat(req, res);
   if (req.method === "GET") return serveStatic(req, res);
 

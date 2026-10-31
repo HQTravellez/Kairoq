@@ -31,6 +31,7 @@ let currentChatId = localStorage.getItem("or-final-current") || null;
 let settings = JSON.parse(localStorage.getItem("or-final-settings") || '{"systemPrompt":"","temperature":0.7,"responsePace":"natural"}');
 let routing = JSON.parse(localStorage.getItem("or-final-routing") || '{"freeOnly":true,"smartFallback":true,"webSearch":false}');
 let ui = JSON.parse(localStorage.getItem("or-final-ui") || '{"effort":"low","purpose":"general","preset":"quick","lastModel":"local/auto"}');
+let pendingModelSwitch = null;
 let favorites = JSON.parse(localStorage.getItem("or-final-favorites") || "[]");
 let memoryStore = JSON.parse(localStorage.getItem("or-memory-store") || '{"global":[],"projects":{"General":[]},"settings":{"autoMemory":true,"autoSummarize":true}}');
 let workspaceMemory = (memoryStore.global || []).join("\n");
@@ -1205,6 +1206,121 @@ function updateModelUI(){
 
 }
 
+function ensureModelSwitchDialog(){
+  let d=$("#modelSwitchDialog");
+  if(d)return d;
+  if(!$("#modelSwitchDialogStyle")){
+    const style=document.createElement("style");
+    style.id="modelSwitchDialogStyle";
+    style.textContent=`
+      .kq-switch-dialog{border:0;border-radius:22px;padding:0;width:min(560px,calc(100vw - 28px));box-shadow:0 24px 80px rgba(0,0,0,.28);background:var(--panel,#fff);color:var(--text,#111)}
+      .kq-switch-dialog::backdrop{background:rgba(15,18,24,.48);backdrop-filter:blur(5px)}
+      .kq-switch-card{padding:24px}.kq-switch-eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.55}
+      .kq-switch-title{font-size:24px;line-height:1.2;margin:7px 0 8px}.kq-switch-copy{font-size:14px;line-height:1.55;opacity:.78;margin:0 0 16px}
+      .kq-switch-steps{display:grid;gap:8px;margin:16px 0 20px}.kq-switch-step{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border,#e2e5ea);border-radius:12px;font-size:13px}
+      .kq-switch-dot{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--muted,#f1f3f6);font-size:11px}.kq-switch-step.ok .kq-switch-dot{background:#e8f7ee}.kq-switch-step.working .kq-switch-dot{animation:kqSpin 1s linear infinite}
+      .kq-switch-error{display:none;margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fff0f0;color:#a11;font-size:13px}.kq-switch-error.show{display:block}
+      .kq-switch-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.kq-switch-actions button{border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+      .kq-switch-stay{border:1px solid var(--border,#d8dce3);background:transparent;color:inherit}.kq-switch-go{border:0;background:var(--accent,#111);color:var(--accent-contrast,#fff)}
+      .kq-switch-actions button:disabled{opacity:.55;cursor:default}@keyframes kqSpin{to{transform:rotate(360deg)}}
+    `;
+    document.head.appendChild(style);
+  }
+  d=document.createElement("dialog");
+  d.id="modelSwitchDialog";
+  d.className="kq-switch-dialog";
+  d.innerHTML=`<div class="kq-switch-card">
+    <div class="kq-switch-eyebrow">Model handoff</div>
+    <h2 class="kq-switch-title"></h2>
+    <p class="kq-switch-copy"></p>
+    <div class="kq-switch-steps"></div>
+    <div class="kq-switch-error" role="alert"></div>
+    <div class="kq-switch-actions"><button type="button" class="kq-switch-stay"></button><button type="button" class="kq-switch-go">Switch & sync context</button></div>
+  </div>`;
+  document.body.appendChild(d);
+  return d;
+}
+const MODEL_SYNC_STEPS=[
+  ["conversation_history","Reading this conversation"],
+  ["decisions_and_corrections","Loading decisions & corrections"],
+  ["project_context","Loading project context"],
+  ["kairoq_capabilities","Syncing Kairoq capabilities"],
+  ["pending_work","Checking unfinished work"],
+  ["personality_and_behavior","Loading Kairoq behavior"]
+];
+function renderModelSyncSteps(d,checklist=null,working=false){
+  const host=d.querySelector(".kq-switch-steps");host.replaceChildren();
+  MODEL_SYNC_STEPS.forEach(([key,label],i)=>{
+    const row=document.createElement("div");row.className="kq-switch-step";
+    if(checklist&&checklist[key])row.classList.add("ok");
+    else if(working&&i===0)row.classList.add("working");
+    const dot=document.createElement("span");dot.className="kq-switch-dot";dot.textContent=checklist&&checklist[key]?"✓":working&&i===0?"↻":"·";
+    const text=document.createElement("span");text.textContent=label;
+    row.append(dot,text);host.appendChild(row);
+  });
+}
+function commitModelSelection(id,name){
+  const m=allModels.find(x=>x.id===id);
+  if(freeOnlyEl.checked&&m&&!m.isFree&&!m.local){freeOnlyEl.checked=false;updateRouting()}
+  if(![...modelSelect.options].some(o=>o.value===id))modelSelect.appendChild(option(id,name||pickerLabel(id)));
+  modelSelect.value=id;updateModelUI();return true;
+}
+async function requestModelSwitch(id,name,{silent=false}={}){
+  const target=String(id||"").trim();if(!target)return false;
+  const from=ui.lastModel||"openrouter/free";
+  if(target===from){modelSelect.value=from;updateModelUI();return true}
+  const chat=getChat();
+  if(silent||!chat||!Array.isArray(chat.messages)||!chat.messages.length){
+    pendingModelSwitch=null;
+    return commitModelSelection(target,name);
+  }
+  modelSelect.value=from;
+  const d=ensureModelSwitchDialog();
+  const fromName=pickerLabel(from),toName=name||pickerLabel(target);
+  d.querySelector(".kq-switch-title").textContent="Switch to "+toName+"?";
+  d.querySelector(".kq-switch-copy").textContent="Kairoq will sync this chat before the new model answers. It will reread the relevant history, decisions, project context and Kairoq capabilities. The first reply after switching can take longer — up to about 30 seconds on slower models.";
+  const stay=d.querySelector(".kq-switch-stay"),go=d.querySelector(".kq-switch-go"),error=d.querySelector(".kq-switch-error");
+  stay.textContent="Continue with "+fromName;go.textContent="Switch & sync context";stay.disabled=false;go.disabled=false;error.classList.remove("show");error.textContent="";
+  renderModelSyncSteps(d);
+  if(!d.open)d.showModal();
+  return await new Promise(resolve=>{
+    const finish=value=>{if(d.open)d.close();resolve(value)};
+    stay.onclick=()=>finish(false);
+    d.oncancel=e=>{e.preventDefault();finish(false)};
+    go.onclick=async()=>{
+      stay.disabled=true;go.disabled=true;go.textContent="Syncing…";renderModelSyncSteps(d,null,true);
+      try{
+        const response=await fetch("/api/chat/model-handoff",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            fromModel:from,
+            toModel:target,
+            currentProject,
+            messages:chat.messages.map(m=>({role:m.role,content:m.content})),
+            workspaceMemory,
+            projectMemory:getProjectMemoryText(),
+            chatSummary:getChatSummary()
+          })
+        });
+        const data=await response.json().catch(()=>({}));
+        if(response.status===401){await checkSession(true);throw new Error("Please unlock Kairoq and try the switch again.")}
+        if(!response.ok||!data.ready)throw new Error(data.error||"Kairoq could not verify the handoff.");
+        renderModelSyncSteps(d,data.checklist||{},false);
+        pendingModelSwitch={confirmed:true,fromModel:from,toModel:target,version:data.version||1};
+        commitModelSelection(target,toName);
+        setStatus(toName+" is caught up — continuing the same conversation");
+        finish(true);
+      }catch(err){
+        modelSelect.value=from;updateModelUI();
+        error.textContent=err.message||"Model handoff failed.";error.classList.add("show");
+        stay.disabled=false;go.disabled=false;go.textContent="Try sync again";
+      }
+    };
+  });
+}
+
+
 // ---- Model picker (like Hermes): the model name as plain text, opening a searchable list
 // grouped by provider, with favourites and "Edit models" to choose which models show up.
 const PROVIDER_NAMES={anthropic:"Anthropic",openai:"OpenAI",google:"Google","meta-llama":"Meta",deepseek:"DeepSeek",qwen:"Qwen",mistralai:"Mistral","x-ai":"xAI",moonshotai:"Moonshot","z-ai":"Z.ai",nousresearch:"Nous Research",openrouter:"OpenRouter",microsoft:"Microsoft",nvidia:"NVIDIA",cohere:"Cohere",amazon:"Amazon",perplexity:"Perplexity",minimax:"MiniMax"};
@@ -1215,7 +1331,7 @@ const AUTO_MODELS=[{id:"openrouter/free",name:"Auto (free)",hint:"Kairoq picks a
 let hermesState={configured:false,ok:false,checked:false};
 async function loadHermesState(){
   try{const r=await fetch("/api/hermes/status");if(r.ok)hermesState={...(await r.json()),checked:true}}catch{}
-  if(hermesState.configured&&["openrouter/free","smart-auto"].includes(modelSelect.value)&&!ui.pickedModel){pickModel("hermes/agent")}
+  if(hermesState.configured&&["openrouter/free","smart-auto"].includes(modelSelect.value)&&!ui.pickedModel&&!(getChat()?.messages||[]).length){commitModelSelection("hermes/agent","Kairoq Agent")}
   const ft=$("#hermesFooterText"),fd=$("#hermesFooter .status-dot");
   if(ft){ft.textContent=!hermesState.checked?"Agent status unknown":hermesState.configured?(hermesState.ok?"Kairoq Agent ready":"Agent not reachable"):"Agent not connected";fd?.classList.toggle("off",!(hermesState.configured&&hermesState.ok))}
   renderModelPicker();
@@ -1248,12 +1364,7 @@ function modelShown(m){
   if(m.local||favorites.includes(m.id))return true;
   return DEFAULT_PROVIDERS.includes(providerKey(m));
 }
-function pickModel(id,name){
-  const m=allModels.find(x=>x.id===id);
-  if(freeOnlyEl.checked&&m&&!m.isFree&&!m.local){freeOnlyEl.checked=false;updateRouting()} // picking a paid model by search means "allow paid"
-  if(![...modelSelect.options].some(o=>o.value===id))modelSelect.appendChild(option(id,name||pickerLabel(id)));
-  modelSelect.value=id;updateModelUI();return true;
-}
+async function pickModel(id,name){return requestModelSwitch(id,name)}
 function pickerRow(m,{hint="",auto=false}={}){
   const row=document.createElement("div");row.className="kq-row"+(modelSelect.value===m.id?" selected":"");row.setAttribute("role","option");row.setAttribute("aria-selected",modelSelect.value===m.id?"true":"false");row.tabIndex=-1;row.dataset.id=m.id;
   const star=document.createElement("button");star.type="button";star.className="kq-star"+(favorites.includes(m.id)?" on":"");
@@ -1268,7 +1379,7 @@ function pickerRow(m,{hint="",auto=false}={}){
     const b=document.createElement("span");b.className="kq-badge "+flag.toLowerCase();b.textContent=flag;row.appendChild(b);
   }
   if(m.disabled){row.classList.add("disabled");row.setAttribute("aria-disabled","true");const h=document.createElement("span");h.className="kq-row-note";h.textContent=m.disabled;row.appendChild(h);row.onclick=null;return row}
-  row.onclick=()=>{ui.pickedModel=true;if(pickModel(m.id,m.label))closeModelPicker()};
+  row.onclick=async()=>{ui.pickedModel=true;if(await pickModel(m.id,m.label))closeModelPicker()};
   return row;
 }
 function renderModelPicker(){
@@ -1373,18 +1484,12 @@ function renderModelResults(){
     const meta=document.createElement("div");meta.className="model-result-meta";
     meta.textContent=[m.isFree?"Free":"Paid/unknown",m.supportsVision?"Vision":"",m.supportsReasoning?"Reasoning":"",Number(m.context_length)>0?Number(m.context_length).toLocaleString()+" context":"", "Quota not reported"].filter(Boolean).join(" · ");
     b.append(left,meta);
-    b.onclick=()=>{
+    b.onclick=async()=>{
       if(freeOnlyEl.checked&&!m.isFree&&m.id!=="openrouter/free"){
         setStatus("Free Only is enabled. Choose a verified free model or disable Free Only first.");
         return;
       }
-      // Advanced dialog results are not necessarily in the compact <select>.
-      // Insert the chosen model as an option BEFORE assigning its value.
-      if(![...modelSelect.options].some(o=>o.value===m.id))
-        modelSelect.appendChild(option(m.id,compactModelLabel(m)));
-      modelSelect.value=m.id;
-      updateModelUI();
-      $("#modelDialog").close();
+      if(await requestModelSwitch(m.id,compactModelLabel(m)))$("#modelDialog").close();
     };
     host.appendChild(b);
   });
@@ -1420,7 +1525,7 @@ function renderCustomPresets(){
   host.appendChild(add);
 }
 
-function chooseRecommended(type){
+async function chooseRecommended(type){
   let candidates=[...allModels];
   if(type==="bestfree") candidates=candidates.filter(m=>m.isFree);
   if(type==="vision") candidates=candidates.filter(m=>m.supportsVision);
@@ -1447,9 +1552,7 @@ function chooseRecommended(type){
       freeOnlyEl.checked=false;
       updateRouting();
     }
-    modelSelect.value=pick.id;
-    updateModelUI();
-    setStatus(`${type} recommendation: ${cleanText(pick.name)}`);
+    if(await requestModelSwitch(pick.id,compactModelLabel(pick)))setStatus(`${type} recommendation: ${cleanText(pick.name)}`);
   }else{
     setStatus(`No ${type} model found in the current catalog`,true);
   }
@@ -1598,16 +1701,17 @@ workspaceMemory=memoryLinesToText(memoryStore.global);
 
 // keepChoices: on page load, keep the model and thinking effort the person last picked
 // (the preset used to reset them to Free Auto / Low on every refresh).
-function applyPreset(name,{keepChoices=false}={}){
+async function applyPreset(name,{keepChoices=false}={}){
   const p=PRESETS[name];if(!p)return;
   ui.preset=name;ui.purpose=p.purpose;
   if(!keepChoices||!ui.effort)ui.effort=p.effort;
   effortSelect.value=ui.effort;purposeSelect.value=p.purpose;webSearchEl.checked=p.web;
   routing.webSearch=p.web;
-  if(p.model&&!(keepChoices&&ui.lastModel)){modelSelect.value=p.model;updateModelUI();}
-  $$(".preset").forEach(b=>b.classList.toggle("active",b.dataset.preset===name));
+  let modelChanged=true;
+  if(p.model&&!(keepChoices&&ui.lastModel))modelChanged=await requestModelSwitch(p.model,pickerLabel(p.model));
+  $(".preset").forEach(b=>b.classList.toggle("active",b.dataset.preset===name));
   saveAll();
-  setStatus(`${name[0].toUpperCase()+name.slice(1)} preset selected`);
+  setStatus(modelChanged?`${name[0].toUpperCase()+name.slice(1)} preset selected`:`${name[0].toUpperCase()+name.slice(1)} preset selected · model unchanged`);
 }
 
 function resizePrompt(){promptEl.style.height="auto";promptEl.style.height=Math.min(promptEl.scrollHeight,180)+"px"}
@@ -2009,6 +2113,8 @@ async function send(regenerateFrom=null){
         workspaceMemory,
         projectMemory:getProjectMemoryText(),
         chatSummary:getChatSummary(),
+        currentProject,
+        modelSwitch:pendingModelSwitch,
         customPresetPrompt:activeCustomPreset?.prompt || ""
       })
     });
@@ -2065,6 +2171,7 @@ async function send(regenerateFrom=null){
     if(thoughtSteps.length)finalMsg.thoughtSteps=thoughtSteps.slice(-30);
     if(thoughtPanel)finalMsg.thoughtMs=Math.round(thoughtMs);
     chat.messages.push(finalMsg);
+    pendingModelSwitch=null;
     addAnswerActions(box,chat.messages.length-1);
     saveAll();renderHistory();loadUsage();
 
@@ -3316,7 +3423,18 @@ function updateRouting(){
   freePill.classList.toggle("off",!routing.freeOnly);
   saveAll();
 }
-freeOnlyEl.onchange=()=>{updateRouting();if(freeOnlyEl.checked&&!modelInfo(modelSelect.value).isFree&&modelSelect.value!=="openrouter/free"){modelSelect.value="openrouter/free";updateModelUI();setStatus("Paid model blocked — switched to Free Auto")}else setStatus(freeOnlyEl.checked?"Paid models blocked":"Paid models allowed")};
+freeOnlyEl.onchange=async()=>{
+  updateRouting();
+  if(freeOnlyEl.checked&&!modelInfo(modelSelect.value).isFree&&modelSelect.value!=="openrouter/free"){
+    const switched=await requestModelSwitch("openrouter/free","Auto (free)");
+    if(!switched){
+      freeOnlyEl.checked=false;updateRouting();
+      setStatus("Free Only unchanged — kept the current model");
+      return;
+    }
+    setStatus("Free Only enabled — switched to Free Auto");
+  }else setStatus(freeOnlyEl.checked?"Paid models blocked":"Paid models allowed");
+};
 smartFallbackEl.onchange=updateRouting;
 webSearchEl.onchange=()=>{updateRouting();setStatus(webSearchEl.checked?"Web search enabled — may incur tool charges":"Web search off")};
 effortSelect.onchange=()=>{ui.effort=effortSelect.value;saveAll()};
@@ -3325,7 +3443,7 @@ $("#shellModeBtn").onclick=()=>{simpleMode=!simpleMode;localStorage.setItem("pai
 const spendModeSelect2=$("#spendModeSelect");
 if(spendModeSelect2) spendModeSelect2.onchange=()=>{spendMode=spendModeSelect2.value;localStorage.setItem("pai-spend-mode", spendMode);updateSpendModeUI()};
 $$(".atlas-chip").forEach(btn=>btn.onclick=()=>useCommandPrompt(btn));
-modelSelect.onchange=updateModelUI;
+modelSelect.onchange=()=>{const target=modelSelect.value;modelSelect.value=ui.lastModel||"openrouter/free";requestModelSwitch(target)};
 
 $$(".preset").forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));
 
