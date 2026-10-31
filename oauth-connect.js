@@ -47,10 +47,10 @@ function saveClient(id,service,{client_id,client_secret,auth_url,token_url,scope
  return status(id,p.id);
 }
 function urls(p,c){
- const auth=String(c&&c.auth_url||p.auth.authUrl||''),token=String(c&&c.token_url||p.auth.tokenUrl||''),refresh=String(c&&c.refresh_url||p.auth.refreshUrl||token);
- if(/\{|\$\{/.test(auth+token+refresh))throw fail(409,p.displayName+'\'s sign-in address depends on your account (it has a placeholder). Add your own authorize and token addresses in "Use your own OAuth app".');
- if(!/^https:\/\//.test(auth)||!/^https:\/\//.test(token)||!/^https:\/\//.test(refresh))throw fail(409,'Kairoq does not know '+p.displayName+'\'s sign-in addresses. Add them in "Use your own OAuth app".');
- return{auth,token,refresh};
+ const auth=String(c&&c.auth_url||p.auth.authUrl||''),token=String(c&&c.token_url||p.auth.tokenUrl||''),refresh=String(c&&c.refresh_url||p.auth.refreshUrl||token),refreshFallback=String(p.auth.refreshFallbackUrl||'');
+ if(/\{|\$\{/.test(auth+token+refresh+refreshFallback))throw fail(409,p.displayName+'\'s sign-in address depends on your account (it has a placeholder). Add your own authorize and token addresses in "Use your own OAuth app".');
+ if(!/^https:\/\//.test(auth)||!/^https:\/\//.test(token)||!/^https:\/\//.test(refresh)||(refreshFallback&&!/^https:\/\//.test(refreshFallback)))throw fail(409,'Kairoq does not know '+p.displayName+'\'s sign-in addresses. Add them in "Use your own OAuth app".');
+ return{auth,token,refresh,refreshFallback};
 }
 // Step 1: the link to the service's sign-in page.
 function start(id,service,{who,fallbackOrigin}={}){
@@ -68,12 +68,22 @@ function start(id,service,{who,fallbackOrigin}={}){
  return{url:u.href,service:p.id,expires_in:STATE_TTL/1000};
 }
 async function tokenRequest(p,c,params,fetchImpl){
- const u=urls(p,c),endpoint=params.refresh_token?u.refresh:u.token;
- const body=new URLSearchParams(params),headers={'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'};
+ const u=urls(p,c),refreshing=Boolean(params.refresh_token),endpoint=refreshing?u.refresh:u.token;
+ const headers={'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'};
  if(p.auth.method==='HEADER')headers.Authorization='Basic '+Buffer.from(c.id+':'+c.secret).toString('base64');
- else{body.set('client_id',c.id);body.set('client_secret',c.secret)}
- const r=await fetchImpl(endpoint,{method:'POST',headers,body:body.toString(),signal:AbortSignal.timeout(20000)});
- const text=await r.text();let j;try{j=JSON.parse(text)}catch{j=Object.fromEntries(new URLSearchParams(text))}
+ const request=async(url,values)=>{
+  const body=new URLSearchParams(values);
+  if(p.auth.method!=='HEADER'){body.set('client_id',c.id);body.set('client_secret',c.secret)}
+  const r=await fetchImpl(url,{method:'POST',headers,body:body.toString(),signal:AbortSignal.timeout(20000)});
+  const text=await r.text();let j;try{j=JSON.parse(text)}catch{j=Object.fromEntries(new URLSearchParams(text))}
+  return{r,j};
+ };
+ let {r,j}=await request(endpoint,params);
+ if((!r.ok||!j.access_token)&&refreshing&&u.refreshFallback&&u.refreshFallback!==endpoint){
+  const fallback={...params};
+  if(p.auth.refreshFallbackWithoutGrant)delete fallback.grant_type;
+  ({r,j}=await request(u.refreshFallback,fallback));
+ }
  if(!r.ok||!j.access_token)throw fail(502,p.displayName+' did not give a token'+(j.error_description||j.error?': '+String(j.error_description||j.error).slice(0,160):' (HTTP '+r.status+')'));
  return j;
 }
