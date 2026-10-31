@@ -1,0 +1,31 @@
+name: Hybrid OS design shell
+on:
+  push:
+    paths:
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/hybrid-os.css'
+      - 'docs/design/KAIROQ-HYBRID-OS.md'
+      - 'test/hybrid-os-design.test.js'
+      - '.github/workflows/hybrid-os-design.yml'
+  pull_request:
+    paths:
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/hybrid-os.css'
+      - 'docs/design/KAIROQ-HYBRID-OS.md'
+      - 'test/hybrid-os-design.test.js'
+      - '.github/workflows/hybrid-os-design.yml'
+permissions:
+  contents: read
+jobs:
+  hybrid-os:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check public/app.js
+      - run: node --test test/hybrid-os-design.test.js
