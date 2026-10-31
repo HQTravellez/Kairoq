@@ -16,18 +16,25 @@ test("three-pane browser workspace shell is present",()=>{
   ]) assert.match(html,new RegExp('id="'+id+'"'),id+" must exist");
 });
 
-test("browser control is not permanently exposed in the top bar",()=>{\n  const html=read("public/index.html");\n  assert.doesNotMatch(html,/id="workspaceBrowserBtn"/);\n  assert.match(html,/id="browserWorkspace"/);\n});\n\ntest("browser workspace is contextual, routes live frames, and supports add-to-chat references",()=>{
+test("browser control is not permanently exposed in the top bar",()=>{
+  const html=read("public/index.html");
+  assert.doesNotMatch(html,/id="workspaceBrowserBtn"/);
+  assert.match(html,/id="browserWorkspace"/);
+});
+
+test("browser workspace is contextual, routes live frames, and supports add-to-chat references",()=>{
   const js=read("public/app.js");
   for(const symbol of [
     "updateWorkspaceBrowserVisibility","updateBrowserLiveFrame","openWorkspaceAddress",
     "installPreviewInspector","addBrowserSelectionToChat","annotatedBrowserFrame"
   ]) assert.match(js,new RegExp("function\\s+"+symbol+"\\b"),symbol+" must exist");
   assert.match(js,/if\(updateBrowserLiveFrame\(data\)\)return;/);
-  assert.ok(js.includes('$("[data-browser-mode]").forEach'),"browser mode tabs must use list selector");
+  assert.ok(js.includes('$$("[data-browser-mode]").forEach'),"browser mode tabs must use list selector");
   assert.match(js,/let workspaceBrowserOpen = false;/);
   assert.doesNotMatch(js,/kairoq-browser-pane-open/);
   assert.doesNotMatch(js,/workspaceBrowserBtn/);
   assert.match(js,/setWorkspaceBrowserOpen\(false\);\n  clearBrowserSelection\(\);/);
+  assert.match(js,/setWorkspaceBrowserOpen\(true\);setWorkspaceBrowserMode\("live"\)/);
   assert.match(js,/attachments\.push\(\{kind:"image",name:"browser-selection\.jpg"/);
 });
 
