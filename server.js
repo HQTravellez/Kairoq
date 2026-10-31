@@ -4314,7 +4314,14 @@ async function handleChat(req, res) {
     sseStarted=true;
 
     const capabilityText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
-    const browserCapabilities=require("./browser-chat-routing");
+    const apiCapabilities=require("./api-chat-routing"),browserCapabilities=require("./browser-chat-routing");
+    if(isAuthenticated(req)&&apiCapabilities.capabilityQuestion(capabilityText)){
+      const answer=apiCapabilities.capabilityAnswer();
+      writeSSE(res,"token",{text:answer});
+      writeSSE(res,"meta",{model:"kairoq/capability-runtime",usage:{cost:0}});
+      writeSSE(res,"done",{ok:true,provider:"capability-runtime",zeroCost:true});
+      return res.end();
+    }
     if(isAuthenticated(req)&&browserCapabilities.capabilityQuestion(capabilityText)){
       const answer=browserCapabilities.capabilityAnswer({browser:require("./runtime-check").available(),search:true});
       writeSSE(res,"token",{text:answer});
