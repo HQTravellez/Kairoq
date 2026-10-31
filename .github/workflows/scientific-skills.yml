@@ -1,0 +1,33 @@
+name: Scientific specialist skill pack
+on:
+  push:
+    paths:
+      - 'specialist-skill-packs.js'
+      - 'builder-skills.js'
+      - 'builder-tools.js'
+      - 'react-builder.js'
+      - 'capability-registry.js'
+      - 'test/specialist-skill-packs.test.js'
+      - '.github/workflows/scientific-skills.yml'
+  pull_request:
+    paths:
+      - 'specialist-skill-packs.js'
+      - 'builder-skills.js'
+      - 'builder-tools.js'
+      - 'react-builder.js'
+      - 'capability-registry.js'
+      - 'test/specialist-skill-packs.test.js'
+      - '.github/workflows/scientific-skills.yml'
+permissions:
+  contents: read
+jobs:
+  scientific-skills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check specialist-skill-packs.js && node --check builder-skills.js && node --check builder-tools.js && node --check react-builder.js && node --check capability-registry.js
+      - run: node --test test/specialist-skill-packs.test.js
