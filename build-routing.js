@@ -24,9 +24,20 @@ function complexity(message){
  for(const re of groups)if(re.test(t))score++;
  return score;
 }
+function goalLike(message){
+ const t=String(message||"").trim();
+ if(!t)return false;
+ // Short outcome statements can still be substantial. Route goals by consequence, not prompt length.
+ const outcome=/\b(integrate|connect|migrate|production[- ]?ready|production ready|end[- ]to[- ]end|automate|workflow|fix|repair|debug|launch|deploy|rebuild|refactor|secure|authenticate|sync|import|export)\b/i.test(t);
+ const system=/\b(api|oauth|webhook|database|auth|authentication|payment|stripe|calendar|crm|github|repo|repository|backend|multi[- ]page|automation|booking|checkout|customer portal|admin dashboard)\b/i.test(t);
+ const proof=/\b(test|verify|retest|browser|regression|proof|working|actually works?|finish(?:ed)?|ready)\b/i.test(t);
+ const broad=/\b(build|create|make|implement)\b/i.test(t)&&/\b(app|system|platform|dashboard|portal|workflow|website|internal tool)\b/i.test(t);
+ return broad||(outcome&&system)||(outcome&&proof)||(system&&proof);
+}
 function executionMode({requestedMode="build",meta,message,hooks=false}={}){
  if(requestedMode!=="build"||hooks)return requestedMode;
  if(isStarter(meta))return"agent";
+ if(goalLike(message))return"agent";
  return complexity(message)>=4?"agent":"build";
 }
-module.exports={isStarter,complexity,executionMode};
+module.exports={isStarter,complexity,goalLike,executionMode};
