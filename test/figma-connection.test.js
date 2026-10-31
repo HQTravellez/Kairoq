@@ -19,7 +19,7 @@ test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 
 test("native Figma connection requests only the scopes Kairoq currently uses",()=>{
  const p=native.find("figma");
- assert.deepEqual(p.auth.scope,["current_user:read","file_content:read","file_metadata:read","library_content:read"]);
+ assert.deepEqual(p.auth.scope,["current_user:read","file_content:read"]);
  assert.equal(p.auth.authUrl,"https://www.figma.com/oauth");
  assert.equal(p.auth.tokenUrl,"https://api.figma.com/v1/oauth/token");
  assert.equal(p.auth.refreshUrl,"https://api.figma.com/v1/oauth/refresh");
@@ -32,9 +32,8 @@ test("Figma OAuth start uses PKCE, the registered callback, and granular scopes"
  assert.equal(u.origin+u.pathname,"https://www.figma.com/oauth");
  assert.equal(u.searchParams.get("client_id"),"figma-client");
  assert.equal(u.searchParams.get("redirect_uri"),"https://kairoq.example/api/create/oauth/callback");
- assert.match(u.searchParams.get("scope"),/file_content:read/);
- assert.match(u.searchParams.get("scope"),/file_metadata:read/);
- assert.match(u.searchParams.get("scope"),/library_content:read/);
+ assert.equal(u.searchParams.get("scope"),"current_user:read file_content:read");
+ assert.doesNotMatch(u.searchParams.get("scope"),/files:read|file_read|file_metadata:read|library_content:read/);
  assert.equal(u.searchParams.get("code_challenge_method"),"S256");
  assert.ok(u.searchParams.get("code_challenge"));
 });
