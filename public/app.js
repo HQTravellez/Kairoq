@@ -2028,7 +2028,11 @@ async function addBrowserSelectionToChat(){
 function normalizeWorkspaceUrl(raw=""){
   let value=String(raw||"").trim();if(!value)return null;
   if(/^localhost(?::\d+)?(?:\/|$)/i.test(value)||/^127\.0\.0\.1(?::\d+)?(?:\/|$)/.test(value))value="http://"+value;
-  try{return new URL(value,location.href)}catch{return null}
+  else if(!/^[a-z][a-z0-9+.-]*:/i.test(value)&&/^[^\s/]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value))value="https://"+value;
+  try{
+    const url=new URL(value,location.href);
+    return ["http:","https:"].includes(url.protocol)?url:null;
+  }catch{return null}
 }
 function openWorkspaceAddress(raw=$("#browserAddress")?.value||""){
   const u=normalizeWorkspaceUrl(raw);if(!u){setStatus("Enter a website or localhost URL",true);return}
