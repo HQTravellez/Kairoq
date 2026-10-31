@@ -47,6 +47,8 @@ test("website checks route to the read-only agent before Discuss",()=>{
  assert.match(src,/browserResearchOnly/);
  assert.match(src,/researchOnly=browserResearchOnly/);
  assert.match(src,/initialBrowserUrl:researchOnly\?browserDecision\.reference/);
+ assert.match(src,/browserRuntime=\{browser:require\('\.\/runtime-check'\)\.available\(\)/);
+ assert.doesNotMatch(src,/browser:Boolean\(browseSite\)/);
  assert.match(src,/executionMode='agent'/);
  const agentAt=src.indexOf("else if(mode==='agent'||executionMode==='agent')");
  const discussAt=src.indexOf("else if(mode==='discuss')",agentAt);
@@ -62,6 +64,8 @@ test("research-only agent cannot mutate the project and publishes browser state"
  assert.match(src,/async function publishBrowser/);
  assert.match(src,/researchOnly&&initialBrowserUrl&&wb\.available\(\)/);
  assert.match(src,/Opened .* before model reasoning/);
+ assert.match(src,/introMsg\.content/);
+ assert.doesNotMatch(src,/messages\.push\(\{role:'user',content:'Kairoq already opened/);
  assert.match(src,/screenshot=await wb\.screenshot/);
  assert.match(src,/report\(\{status:'researching',browser\}\)/);
  assert.match(src,/const storedMode=researchOnly\?'discuss':'agent'/);

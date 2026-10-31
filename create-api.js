@@ -330,7 +330,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  }
  if(!hooks&&apiChat.docsResearchRequest(ownerText)&&(mode==='build'||mode==='discuss'))mode='agent';
  const browserChat=require('./browser-chat-routing');
- const browserRuntime={browser:Boolean(browseSite)||require('./runtime-check').available(),search:typeof webSearch==='function'};
+ const browserRuntime={browser:require('./runtime-check').available(),search:typeof webSearch==='function'};
  // Browser capability belongs to Kairoq, not to the selected model. Answer capability questions
  // from the runtime itself so no model can claim Kairoq "cannot browse" when the tools are wired.
  if(!hooks&&!images.length&&!context&&!shownText&&browserChat.capabilityQuestion(ownerText)){
