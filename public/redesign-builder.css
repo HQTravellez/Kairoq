@@ -1,0 +1,38 @@
+/* A quiet workspace: conversation left, live app right, composer anchored in chat. */
+body.app.in-editor{--accent:#287ac3;--accent-soft:#edf5ff;--border:#dce6ef;--text:#17324c;--muted:#71869a;background:#f7faff}
+body.app.in-editor #editor>.chat{display:flex!important;flex-direction:column!important;min-height:0;min-width:0;background:#fff!important}
+body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:#fff!important;border-color:#dce6ef!important}
+body.app.in-editor #editor #messages{flex:1!important;min-height:0!important;overflow-y:auto!important;background:white!important;padding:24px 20px!important}
+body.app.in-editor #chat-form.composer{flex:none!important;margin:12px!important;padding:12px!important;background:#fff!important;border:1px solid #dce6ef!important;border-radius:16px!important;box-shadow:0 4px 20px #17324c08!important}
+body.app.in-editor #chat-form #chat-input{box-sizing:border-box;min-height:42px!important;max-height:180px!important;height:auto;width:100%;padding:4px!important;resize:none;overflow-y:auto;font-size:14px!important;line-height:1.6!important}
+body.app.in-editor #chat-form .composer-bar{display:flex;align-items:center;gap:6px;margin-top:8px}
+body.app.in-editor #chat-form .send{margin-left:auto;background:#287ac3!important;color:white!important;border-radius:10px!important}
+body.app.in-editor #attach-clip,body.app.in-editor #menu-tier>summary{display:none!important}
+body.app.in-editor #menu-tier{position:static!important}
+body.app.in-editor #menu-tier[open]>.menu-panel{position:fixed!important;left:16px!important;bottom:100px!important;top:auto!important;width:min(360px,calc(100vw - 32px))!important;max-height:60dvh!important;overflow:auto;z-index:1000}
+body.app.in-editor .menu-panel{border-color:#dce6ef!important;border-radius:12px!important;box-shadow:0 12px 40px #17324c24!important}
+body.app.in-editor #menu-plus>.menu-panel{max-height:min(460px,60dvh);overflow-y:auto}
+body.app.in-editor #view-settings{height:32px;padding:0 10px;font-size:12px;flex:none}
+body.app.in-editor .stage{background:#f5f8fc!important;min-width:0!important}
+body.app.in-editor #frame{border:1px solid #dce6ef!important;border-radius:12px!important;box-shadow:0 3px 18px #17324c0a!important}
+body.app.in-editor #editor .messages .user{background:#edf5ff!important;border-color:#dce9f7!important;color:#17324c!important;border-radius:14px!important}
+body.app.in-editor #editor #stream .stages{display:none!important}
+body.app.in-editor #editor .status-line{color:#287ac3!important}
+body.app.in-editor #editor #build-overlay{display:none!important}
+body.app.in-editor #editor .chat #progress:not(.hidden){display:block!important;margin:0 20px;padding:5px 0;color:#63809b;font-size:12px}
+body.app.in-editor :is(button,summary,a){transition:background-color .2s,color .2s,border-color .2s!important}
+body.app.in-editor :is(button,summary,a):focus-visible{outline:2px solid #3b88c8;outline-offset:3px}
+body.app.in-editor #editor{animation:kq-workspace-in .22s ease both}
+@keyframes kq-workspace-in{from{opacity:.6;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:900px){
+ body.app.in-editor #editor{display:flex!important;flex-direction:column!important;overflow:auto!important}
+ body.app.in-editor #editor>.chat{order:0;flex:1 0 48dvh!important;max-height:none!important;border:0!important}
+ body.app.in-editor #editor>.stage{order:1;flex:1 0 46dvh!important;min-height:320px!important;border-top:1px solid #dce6ef}
+ body.app.in-editor .stage-bar{flex-wrap:wrap;gap:5px!important;min-height:48px!important;padding:8px!important}
+ body.app.in-editor #chat-form.composer{margin:8px 12px!important}
+}
+@media(prefers-reduced-motion:reduce){body.app.in-editor *,body.app.in-editor *::before{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+body.app.in-editor .tabs-seg .lbl{display:inline!important;font-size:12px!important}
+body.app.in-editor .tabs-seg button{display:inline-flex;align-items:center;gap:6px;padding:0 10px!important}
+body.app.in-editor #editor .chat-head .mark,body.app.in-editor .messages .assistant::before{background:#286ba5!important}
+body.app.in-editor #editor #menu-tier[open]>.menu-panel{position:fixed!important;left:16px!important;bottom:100px!important;top:auto!important;width:min(360px,calc(100vw - 32px))!important;min-width:260px!important;max-height:60dvh!important;overflow:auto!important;z-index:1000!important}

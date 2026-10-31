@@ -293,75 +293,11 @@ function morph(card,fill,dir=1){
   setTimeout(()=>{card.style.height='';card.classList.remove('morphing')},340);
  },150);
 }
-// Started from the main Kairoq page: open the editor straight away and ask any quick questions
-// inside the chat, one at a time, before the first build starts.
+// Start immediately. The build agent can ask for genuinely blocking information in chat.
 async function askThenBuild(prompt){
- const name=shortName(prompt);
- const {project}=await api('/projects',{method:'POST',body:{name}});
+ const {project}=await api('/projects',{method:'POST',body:{name:shortName(prompt)}});
  await openProject(project.id);
- const list=$('messages');list.replaceChildren();
- let mine=messageItem({role:'user',text:prompt});list.append(mine);
- const card=document.createElement('li');card.className='assistant ask-card';
- card.classList.add('enter');card.dataset.dir='0';card.append(el('p','ask-head k-shimmer','Reading your request…'));list.append(card);
- const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
- // The picked look (if any) becomes the project's colours and fonts; then the plan (build-plan.js)
- // is shown with Review, Skip and Approve, and the build starts on Approve (or Skip).
- const request=answers=>answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
- const go=(answers,plan)=>{mine.remove();card.remove();planWaiting(false);send(plan?withPlan(request(answers),plan):request(answers),'build')};
- const build=async(answers,look)=>{
-  if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
-  if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
-  morph(card,()=>card.append(el('p','ask-head k-shimmer','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
-  planWaiting(true);
-  const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
-  if(!plan)return go(answers,null);
-  // A character the owner picked in the plan is added to the project's 3D files first.
-  const approve=async()=>{
-   if(plan.pick){try{const d=await api('/projects/'+project.id+'/models?op=polypizza',{method:'POST',body:{id:plan.pick.id}});plan.picked=d.added.title}catch(err){card.querySelector('.char-pick')?.append(el('p','char-note char-err',err.message));return false}}
-   go(answers,plan);
-  };
-  showBuildPlan(card,plan,{onApprove:approve,onSkip:()=>go(answers,null),projectId:project.id});
-  list.scrollTop=list.scrollHeight;
- };
- const picked=questions.map(()=>new Set()),other=questions.map(()=>'');let at=0;
- const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
- // The last question is always the look: "How should it feel?" (create-look.js).
- const total=questions.length+(window.KairoqLook?1:0);
- const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:total>1?'Question '+total+' of '+total:'One quick question',
-  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw(-1)}:null});
- if(!questions.length)return window.KairoqLook?lookStep():build([]);
- const draw=(dir=1)=>morph(card,()=>{
-  const q=questions[at];
-  // Like superapp: the question, option cards (a label and one sentence), "Other…", then
-  // Back and forward arrows, Skip all and Next.
-  const head=el('div','ask-top');head.append(el('span','ask-count',total>1?'Question '+(at+1)+' of '+total:'One quick question'));
-  const opts=el('div','ask-opts');
-  const mark=()=>{for(const r of opts.querySelectorAll('.ask-opt'))r.classList.toggle('on',r.querySelector('input').checked)};
-  (q.options||[]).forEach((o,i)=>{
-   const row=el('label','ask-opt');const input=document.createElement('input');
-   input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
-   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o);mark()};
-   const words=el('span','ask-words');words.append(el('span','ask-label',o+(i===q.recommended?' (Recommended)':'')));
-   if(q.details&&q.details[i])words.append(el('span','ask-detail',q.details[i]));
-   row.append(input,words);opts.append(row);
-  });
-  const own=document.createElement('input');own.className='ask-other';own.placeholder='Other…';own.value=other[at];own.setAttribute('aria-label','Another answer');
-  own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false;mark()}};
-  mark();
-  const foot=el('div','ask-foot');
-  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw(-1)};
-  const fwd=el('button','ask-arrow','›');fwd.type='button';fwd.setAttribute('aria-label','Next question');fwd.disabled=at===questions.length-1&&!window.KairoqLook;
-  const last=at===questions.length-1,final=last&&!window.KairoqLook;
-  const forward=()=>{if(final)build(answers());else if(last){morph(card,()=>card.append(el('p','ask-head k-shimmer','Finding looks that fit…')),1);setTimeout(lookStep,STILL?0:170)}else{at++;draw(1)}};fwd.onclick=forward;
-  const skip=el('button','ask-link','Skip all');skip.type='button';skip.onclick=()=>build(answers());
-  const next=el('button','ask-next',final?'Submit':'Next');next.type='button';next.onclick=forward;
-  foot.append(back,fwd,el('span','ask-gap'),skip,next);
-  // Thin progress segments, one per question (and the look).
-  const bar=el('div','ask-progress');for(let k=0;k<total;k++)bar.append(el('i',k<=at?'on':null));
-  card.append(bar,head,el('p','ask-q',q.q),opts,own,foot);
-  list.scrollTop=list.scrollHeight;
- },dir);
- draw(0);
+ await send(prompt,'build');
 }
 // A first request with the owner's answers and the approved plan, shown like superapp: the request,
 // each question small with its answer under it, then the plan's title.
@@ -523,7 +459,8 @@ async function openProject(id,{pendingText,job}={}){
  state.project=project;
  if(previousProject&&previousProject!==project.id)window.kairoqBrowserPane?.reset();
  if(account)renderCredits(account);
- show('editor');history.replaceState(null,'','/create?project='+id);
+ show('editor');history.replaceState(null,'','/create?'+(EMBED?'embed=1&':'')+'project='+encodeURIComponent(id));
+ if(window.parent!==window)window.parent.postMessage({kairoq:'project',id:project.id,name:project.name},location.origin);
  applyRole();
  $('project-name').value=project.name;
  if(!state.projects)api('/projects').then(r=>renderRecents(r.projects)).catch(()=>{});else markRecent(id);
@@ -1101,7 +1038,7 @@ $('file-new').onclick=()=>{
 // ---------- chat ----------
 state.mode='build';state.tier='standard';state.attachments=[];state.runtimeErrors=[];
 // The send button stays quiet until there is something to send.
-const syncSend=()=>$('send').classList.toggle('is-empty',!$('chat-input').value.trim());
+const syncSend=()=>{const input=$('chat-input');$('send').classList.toggle('is-empty',!input.value.trim());input.style.height='auto';input.style.height=Math.min(input.scrollHeight,180)+'px'};
 $('chat-input').addEventListener('input',syncSend);syncSend();
 $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('chat-form').requestSubmit()}});
 const PLACEHOLDERS={build:'Message Kairoq…',discuss:'Ask about this project…',agent:'Describe what you want to build…'};
@@ -1118,10 +1055,12 @@ function renderTiers(){
  for(const m of models){
   const b=document.createElement('button');b.type='button';b.disabled=!m.enabled;b.setAttribute('aria-pressed',String(m.id===state.model));
   const name=el('b',null,m.label);
+  if(m.id==='auto')name.append(el('i','model-tag top','Recommended'));
+  if(m.free===true||m.isFree===true||m.credits===0)name.append(el('i','model-tag free','Free'));
   if(m.top)name.append(el('i','model-tag top','Top pick'));
   const credits=m.credits?m.credits+' credit'+(m.credits===1?'':'s')+' a message':'';
   const bits=[m.note,credits].filter(Boolean).join(' · ');
-  const line=el('span',null,bits+(m.enabled?'':m.provider==='meta'?' · needs the Muse key (META_MODEL_API_KEY) on the server':' · needs OpenRouter and paid builds switched on'));
+  const line=el('span',null,bits+(m.enabled?'':' · unavailable on this account'));
   if(m.costlier&&m.enabled)line.append(el('i','model-tag cost','costlier'));
   b.append(name,line);
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
@@ -1235,7 +1174,7 @@ async function send(message,mode,path='/chat',extra={}){
 }
 const LABELS={autopilot:'Autopilot: testing the app against your request…',researching:'Looking things up on the web…',pitching:'Writing the pitch and launch posts…',watching:'Running the growth watch…',reproducing:'Replaying what visitors did to confirm the problems…',retesting:'Replaying the same steps on the new version…',locking:'Saving checks so fixed problems cannot come back…',personas:'Creating synthetic customers…',visiting:'Synthetic customers are using your app…',reporting:'Writing the report…',queued:'Starting…',working:'Working…',thinking:'Thinking…',designing:'Choosing the design direction…',modelling:'Modelling a 3D object in Blender…',images:'Generating images…',reviewing:'Reviewing the design on desktop and phone…',checking:'Re-running your saved checks…',writing:'Writing code…',fixing:'Fixing a problem and retrying…',building:'Building preview…',testing:'Testing the app in a browser…',analyzing:'Studying the reference in a browser…',reviews:'Reading what its users say in public reviews…',scoring:'Checking each planned feature against the code…',sweeping:'Checking nothing of the original is left…',planning:'Writing the feature inventory and build plan…',assets:'Finding openly licensed images and assets…',verifying:'Testing the user journeys on desktop and phone…',repairing:'Repairing the journeys that failed…',comparing:'Comparing the design with the reference…',publishing:'Publishing and checking the live app…'};
 // ---------- the AI at work: activity rail, Details panel (Timeline / Changes) ----------
-const PHASES={autopilot:'Autopilot',queued:'Getting started',thinking:'Thinking',designing:'Choosing a design direction',modelling:'Modelling in Blender',writing:'Writing code',fixing:'Fixing a problem',images:'Generating images',building:'Building the preview',testing:'Testing in a browser',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
+const PHASES={autopilot:'Autopilot',queued:'Getting started',thinking:'Understanding your idea',designing:'Designing the interface',modelling:'Modelling in Blender',writing:'Building the application',fixing:'Fixing issues',images:'Generating images',building:'Building the application',testing:'Testing interactions',checking:'Re-running saved checks',reviewing:'Reviewing the design',working:'Working',analyzing:'Studying the reference',reviews:'Reading reviews',scoring:'Match score',sweeping:'Checking for leftovers',planning:'Writing the plan',assets:'Finding licensed images',verifying:'Testing user journeys',repairing:'Repairing failed journeys',comparing:'Comparing with the reference',publishing:'Publishing'};
 const work={started:0,timer:null,job:null,files:[],current:null,message:'',tail:'',thinking:''};
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 // "12s" or "2m 05s" (for "Thought for …"; secs() below gives " in 4.0 s").
@@ -1316,7 +1255,7 @@ function workCard(){
  return li;
 }
 // The stages of a build, shown as a checklist while it works (and over the preview on a first build).
-const STAGES=[['thinking','Understanding what you asked'],['designing','Choosing the design'],['writing','Writing the code'],['building','Building the preview'],['testing','Testing it in a browser']];
+const STAGES=[['thinking','Understanding your idea'],['designing','Designing the interface'],['writing','Building the application'],['building','Building the application'],['testing','Testing interactions']];
 function stageOf(p){return{designing:'designing',modelling:'designing',images:'designing',writing:'writing',fixing:'writing',building:'building',testing:'testing',checking:'testing',reviewing:'testing',autopilot:'testing',verifying:'testing',repairing:'writing'}[p]||'thinking'}
 function stageList(j){
  const p=phaseOf(j),cur=stageOf(p);work.seen=work.seen||new Set();work.seen.add(cur);
@@ -1324,7 +1263,7 @@ function stageList(j){
  const ol=el('ol','stages');
  shown.forEach(([id,label],i)=>{
   const li=el('li',i<at?'done':i===at?'now':'todo');
-  li.append(el('span','st-dot'),el('span','st-label',i===at&&p==='fixing'?'Fixing a problem the test found':label));
+  li.append(el('span','st-dot'),el('span','st-label',i===at&&p==='fixing'?'Fixing issues':label));
   // The AI's plan, under "Writing the code", as soon as it has written it.
   if(id==='writing'&&(work.plan||[]).length&&i<=at){const ul=el('ul','st-plan');for(const step of work.plan)ul.append(el('li',null,step));li.append(ul)}
   ol.append(li);
@@ -1509,7 +1448,7 @@ async function watch(job){
   state.runtimeErrors=[];
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
-  if(done.mode!=='discuss'){if(project.preview_url!==state.previewBase)swapPreview(project.preview_url)}
+  if(done.mode!=='discuss'){if(project.preview_url!==state.previewBase)swapPreview(project.preview_url);if(done.status==='complete'&&!done.problem&&project.preview_url){const ready=el('li','assistant preview-ready','Preview ready');ready.setAttribute('role','status');$('messages').append(ready)}}
   if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')+(done.fix_on_us?' The fix is on us: the next Fix costs nothing.':'')}));
   else if(done.free)$('messages').append(messageItem({role:'assistant',text:done.free}));
   if(done.model_fallback)$('messages').append(messageItem({role:'assistant',text:done.model_fallback}));
@@ -2034,6 +1973,7 @@ $('nav-start').onclick=()=>{if($('auth').classList.contains('hidden')){location.
   for(const el of items){el.classList.add('rv');io.observe(el)}
  }
  for(const t of document.querySelectorAll('.landing .tile'))t.addEventListener('pointermove',e=>{const r=t.getBoundingClientRect();t.style.setProperty('--mx',(e.clientX-r.left)+'px');t.style.setProperty('--my',(e.clientY-r.top)+'px')});
+
 })();
 $('plans-open').onclick=()=>{
  text($('plans-error'),'');
@@ -3588,6 +3528,11 @@ $('models-style').onchange=async()=>{try{modelsData=await api('/projects/'+state
 // Autopilot (autopilot.js): test against the request, fix what is missing, repeat.
 $('autopilot-run').onclick=()=>{$('menu-project').open=false;if(!state.project||!state.project.current_version){text($('chat-error'),'Build the app first.');return}const note=$('chat-input').value.trim();send(note?"Keep going until it's right: "+note:"Keep going until it's right",'autopilot',undefined,{message:note})};
 $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The design review needs a browser on the server (Chromium), which is not available here.');return}const note=$('chat-input').value.trim();send(note?'Polish the design: '+note:'Polish the design','polish',undefined,{message:note})};
+
+// Model and advanced choices open from the plus menu without duplicating their state.
+$('builder-model-open').onclick=e=>{e.stopPropagation();$('menu-plus').open=false;$('menu-tier').open=true;$('tier-panel').querySelector('button')?.focus()};
+$('builder-advanced-open').onclick=()=>{$('menu-plus').open=false;$('settings-open').click()};
+$('view-settings').onclick=()=>$('settings-open').click();
 
 })();
 

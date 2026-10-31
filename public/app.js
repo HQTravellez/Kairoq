@@ -30,7 +30,7 @@ let chats = JSON.parse(localStorage.getItem("or-final-chats") || "[]");
 let currentChatId = localStorage.getItem("or-final-current") || null;
 let settings = JSON.parse(localStorage.getItem("or-final-settings") || '{"systemPrompt":"","temperature":0.7,"responsePace":"natural"}');
 let routing = JSON.parse(localStorage.getItem("or-final-routing") || '{"freeOnly":true,"smartFallback":true,"webSearch":false}');
-let ui = JSON.parse(localStorage.getItem("or-final-ui") || '{"effort":"low","purpose":"general","preset":"quick","lastModel":"local/auto"}');
+let ui = JSON.parse(localStorage.getItem("or-final-ui") || '{"effort":"low","purpose":"general","preset":"quick","lastModel":"openrouter/free"}');
 let favorites = JSON.parse(localStorage.getItem("or-final-favorites") || "[]");
 let memoryStore = JSON.parse(localStorage.getItem("or-memory-store") || '{"global":[],"projects":{"General":[]},"settings":{"autoMemory":true,"autoSummarize":true}}');
 let workspaceMemory = (memoryStore.global || []).join("\n");
@@ -42,7 +42,7 @@ let selectedAgentType = "atlas";
 let currentApproval = null;
 let imageMode = false;
 let videoMode = false;
-let mainView = localStorage.getItem("pai-main-view") || "chat";
+let mainView = localStorage.getItem("pai-main-view") || "command";
 let workspaceBrowserOpen = false;
 let workspaceBrowserMode = localStorage.getItem("kairoq-browser-mode") || "live";
 let lastBrowserFrameDataUrl = "";
@@ -1269,7 +1269,7 @@ function updateModelUI(){
 const PROVIDER_NAMES={anthropic:"Anthropic",openai:"OpenAI",google:"Google","meta-llama":"Meta",deepseek:"DeepSeek",qwen:"Qwen",mistralai:"Mistral","x-ai":"xAI",moonshotai:"Moonshot","z-ai":"Z.ai",nousresearch:"Nous Research",openrouter:"OpenRouter",microsoft:"Microsoft",nvidia:"NVIDIA",cohere:"Cohere",amazon:"Amazon",perplexity:"Perplexity",minimax:"MiniMax"};
 // Shown by default; everything else is one switch away in Edit models.
 const DEFAULT_PROVIDERS=["anthropic","openai","google","meta-llama","deepseek","qwen","mistralai","x-ai","moonshotai","z-ai","nousresearch"];
-const AUTO_MODELS=[{id:"openrouter/free",name:"Auto (free)",hint:"Kairoq picks an available free model",isFree:true},{id:"smart-auto",name:"Auto (best)",hint:"Kairoq picks the best model for the question",isFree:false}];
+const AUTO_MODELS=[{id:"openrouter/free",name:"Auto · Recommended",hint:"Free · Kairoq chooses for you",isFree:true},{id:"smart-auto",name:"Auto (best)",hint:"Kairoq picks the best model for the question",isFree:false}];
 // Hermes Agent runs as its own service (docs/HERMES.md); the picker shows whether it is connected.
 let hermesState={configured:false,ok:false,checked:false};
 async function loadHermesState(){
@@ -1330,9 +1330,22 @@ function pickerRow(m,{hint="",auto=false}={}){
   row.onclick=()=>{ui.pickedModel=true;if(pickModel(m.id,m.label))closeModelPicker()};
   return row;
 }
+let builderPickerModels=null;
 function renderModelPicker(){
   const host=$("#modelPickerList");if(!host)return;
   const q=$("#modelPickerSearch").value.trim().toLowerCase();
+  if(builderPickerModels){
+    host.replaceChildren();
+    const selected=localStorage.getItem("kairoq-model")||"auto";
+    for(const m of builderPickerModels.filter(m=>!q||(m.label+" "+(m.note||"")).toLowerCase().includes(q))){
+      const row=document.createElement("button");row.type="button";row.className="kq-row"+(selected===m.id?" selected":"");row.disabled=!m.enabled;row.setAttribute("role","option");row.setAttribute("aria-selected",String(selected===m.id));
+      const name=document.createElement("span");name.className="kq-row-name";name.textContent=m.label+(m.id==="auto"?" · Recommended":"");row.append(name);
+      const hint=document.createElement("span");hint.className="kq-row-note";hint.textContent=!m.enabled?"Unavailable":m.free===true||m.isFree===true||m.credits===0?"Free":m.credits?m.credits+" credits per message":m.note||"Automatic routing";row.append(hint);
+      row.onclick=()=>{localStorage.setItem("kairoq-model",m.id);closeModelPicker(true)};host.append(row);
+    }
+    if(!host.children.length)host.textContent="No models match your search.";
+    return;
+  }
   const match=m=>!q||`${pickerLabel(m.id)} ${m.id} ${providerName(providerKey(m))}`.toLowerCase().includes(q);
   host.replaceChildren();
   const section=(title,rows)=>{if(!rows.length)return;const h=document.createElement("div");h.className="kq-group";h.textContent=title;host.append(h,...rows)};
@@ -1354,13 +1367,16 @@ function renderModelPicker(){
   for(const k of order)section(providerName(k),groups.get(k).slice(0,q?60:PER_PROVIDER).map(m=>pickerRow(m)));
   if(!host.querySelector(".kq-row")){const e=document.createElement("div");e.className="kq-empty";e.textContent=q?`No models match “${$("#modelPickerSearch").value}”.`:"No models yet. Use Refresh models.";host.appendChild(e)}
 }
-function openModelPicker(){
+async function openModelPicker(){
+  builderPickerModels=null;
+  if(appBuildMode){const data=await ccFetch("/api/create/me");builderPickerModels=data?.models||[{id:"auto",label:"Auto",enabled:true,note:"Kairoq chooses for you"}]}
+  $("#modelPickerEdit").hidden=Boolean(builderPickerModels);
   const p=$("#modelPicker");p.hidden=false;$("#modelPickerBtn").setAttribute("aria-expanded","true");
   $("#modelPickerSearch").value="";renderModelPicker();
   requestAnimationFrame(()=>{$("#modelPickerSearch").focus();p.querySelector(".kq-row.selected")?.scrollIntoView({block:"nearest"})});
 }
 function closeModelPicker(focusButton=false){
-  const p=$("#modelPicker");if(!p||p.hidden)return;p.hidden=true;$("#modelPickerBtn").setAttribute("aria-expanded","false");if(focusButton)$("#modelPickerBtn").focus();
+  const p=$("#modelPicker");if(!p||p.hidden)return;p.hidden=true;$("#modelPickerBtn").setAttribute("aria-expanded","false");if(focusButton)$("#attachBtn").focus();
 }
 function renderModelsEdit(){
   const host=$("#modelsEditList");const q=$("#modelsEditSearch").value.trim().toLowerCase();host.replaceChildren();
@@ -1384,8 +1400,8 @@ $("#modelPickerSearch").onkeydown=e=>{
   if(e.key==="Enter"){e.preventDefault();(rows[i]||rows[0]).click()}
 };
 $("#modelPicker").onkeydown=e=>{if(e.key==="Escape"){e.stopPropagation();closeModelPicker(true)}};
-document.addEventListener("click",e=>{if(!e.target.closest(".kq-model"))closeModelPicker()});
-$("#modelPickerRefresh").onclick=async()=>{await loadModels();renderModelPicker()};
+document.addEventListener("click",e=>{if(!e.target.closest(".kq-model,#modelPicker"))closeModelPicker()});
+$("#modelPickerRefresh").onclick=async()=>{if(builderPickerModels)return openModelPicker();await loadModels();renderModelPicker()};
 $("#modelPickerEdit").onclick=()=>{closeModelPicker();$("#modelsEditSearch").value="";renderModelsEdit();$("#modelsEditDialog").showModal()};
 $("#modelsEditSearch").oninput=renderModelsEdit;
 $("#modelsEditReset").onclick=()=>{modelVisibility={};saveModelVisibility();renderModelsEdit()};
@@ -3357,7 +3373,7 @@ $$(".cc-quick").forEach(btn=>btn.onclick=()=>useCommandPrompt(btn));
 $("#clearChats").onclick=()=>{if(confirm("Delete all local chats?")){chats=[];currentChatId=null;newChat()}};
 // "+" opens a small menu (file, image, video), like Hermes' single "+" in the message box.
 $("#attachBtn").onclick=e=>{e.stopPropagation();const m=$("#plusMenu");m.hidden=!m.hidden;$("#attachBtn").setAttribute("aria-expanded",String(!m.hidden));if(!m.hidden)m.querySelector("button")?.focus()};
-$$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else if(k==="github"){setStatus("Open Connections to import or sync a GitHub repository.");$("#connectorsBtn")?.click()}else if(k==="model")$("#modelPickerBtn")?.click();else if(k==="advanced")$("#settingsBtn")?.click();else if(k==="pdf")openPdfTools();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
+$$("#plusMenu [data-plus]").forEach(b=>b.onclick=e=>{e.stopPropagation();$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else if(k==="github"){setStatus("Open Connections to import or sync a GitHub repository.");$("#connectorsBtn")?.click()}else if(k==="model")openModelPicker();else if(k==="advanced")$("#settingsBtn")?.click();else if(k==="pdf")openPdfTools();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
 // PDF tools (Stirling PDF on the server, stirling-pdf.js): pick a tool and PDFs, get the result back as a download.
 async function openPdfTools(){
   let info={on:false,tools:[]};try{info=await (await fetch("/api/pdf/tools",{credentials:"same-origin"})).json()}catch{}
@@ -3400,7 +3416,8 @@ async function openPdfTools(){
   document.body.append(dlg);dlg.showModal();
 }
 document.addEventListener("click",e=>{if(!e.target.closest(".kq-plus")){const m=$("#plusMenu");if(m&&!m.hidden){m.hidden=true;$("#attachBtn").setAttribute("aria-expanded","false")}}});
-$("#plusMenu")?.addEventListener("keydown",e=>{if(e.key==="Escape"){$("#plusMenu").hidden=true;$("#attachBtn").focus()}});
+$("#plusMenu")?.addEventListener("keydown",e=>{if(e.key==="Escape"){$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");$("#attachBtn").focus()}
+  if(["ArrowDown","ArrowUp","Home","End"].includes(e.key)){e.preventDefault();const items=$$("#plusMenu button"),i=items.indexOf(document.activeElement);items[e.key==="Home"?0:e.key==="End"?items.length-1:(i+(e.key==="ArrowDown"?1:-1)+items.length)%items.length]?.focus()}});
 $("#imageModeBtn").onclick=()=>setImageMode(!imageMode);
 $("#videoModeBtn").onclick=()=>setVideoMode(!videoMode);
 $("#fileInput").onchange=e=>{handleFiles(e.target.files);e.target.value=""};
@@ -3443,6 +3460,7 @@ function openBuilder(url){
   try{
     const u=new URL(url,location.origin);absolute=u.href;
     activeBuilderProjectId=u.searchParams.get("project")||"";
+    if(closedWorkspaceProjects.delete(activeBuilderProjectId))loadHomeApps();
   }catch{activeBuilderProjectId=""}
   const same=Boolean(absolute&&frame.src===absolute&&frame.src!=="about:blank");
   if(!same){view.classList.add("loading");frame.classList.add("frame-loading")}
@@ -3465,7 +3483,7 @@ function launchAppBuild(prompt){
 function appCard(name,{thumbUrl,sub,onOpen}){
   const li=document.createElement("li");const b=document.createElement("button");b.type="button";b.className="kh-app";
   // Before Kairoq has a picture of the app: its initials on one of five ember tints, picked by name.
-  const TINTS=[["#f4d6cb","#e4a28a","#6e2a1c"],["#f8ddc8","#eda574","#7a3410"],["#fae8c8","#f0c27a","#7a4a0c"],["#f1d9dc","#d79aa3","#5e2230"],["#f3ebe0","#dcc8ae","#5a4630"]];
+  const TINTS=[["#e4f2ff","#afdaff","#18568a"],["#e7edff","#c4d3ff","#354f94"],["#def5f2","#a9dfd5","#23645d"],["#f0eaff","#d6c7f4","#605087"],["#e9f2fb","#bfd5eb","#355c82"]];
   let hash=0;for(const ch of name)hash=(hash*31+ch.charCodeAt(0))>>>0;
   const [t1,t2,t3]=TINTS[hash%TINTS.length];
   const thumb=document.createElement("span");thumb.className="kh-app-thumb";thumb.style.setProperty("--t1",t1);thumb.style.setProperty("--t2",t2);thumb.style.setProperty("--t3",t3);thumb.setAttribute("aria-hidden","true");
@@ -3488,25 +3506,29 @@ function showProjectsTab(tab){
   $("#wpTemplates")?.classList.toggle("hidden",mine);
 }
 let activeBuilderProjectId="";
+const closedWorkspaceProjects=new Set();
 function renderWorkspaceProjectTabs(projects){
   const host=$("#workspaceProjectTabs");if(!host)return;
   host.classList.add("tabs-updating");
-  host.replaceChildren(...projects.slice(0,5).map(p=>{
-    const b=document.createElement("button");b.type="button";b.className="workspace-tab project-tab";
+  host.replaceChildren(...projects.filter(p=>!closedWorkspaceProjects.has(String(p.id))).map(p=>{
+    const b=document.createElement("div");b.className="workspace-tab project-tab";
     b.dataset.projectId=String(p.id||"");
     const dot=document.createElement("span");dot.className="workspace-tab-dot";
     const label=document.createElement("span");label.className="workspace-tab-label";label.textContent=String(p.name||"Untitled app");
-    b.append(dot,label);
-    b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
+    const open=document.createElement("button");open.type="button";open.className="project-tab-open";open.title=String(p.name||"Untitled app");open.append(dot,label);
+    open.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
+    const close=document.createElement("button");close.type="button";close.className="project-tab-close";close.textContent="×";close.setAttribute("aria-label","Close "+String(p.name||"Untitled app"));
+    close.onclick=()=>{closedWorkspaceProjects.add(String(p.id));const active=mainView==="build"&&activeBuilderProjectId===String(p.id);b.remove();if(active)setMainView("command");$("#workspaceHomeTab")?.focus()};
+    b.append(open,close);
     return b;
   }));
   requestAnimationFrame(()=>{host.classList.remove("tabs-updating");host.classList.add("tabs-ready")});
   updateWorkspaceTabState();
 }
 function updateWorkspaceTabState(){
-  const home=$("#workspaceHomeTab");if(home)home.classList.toggle("active",mainView==="command");
+  const home=$("#workspaceHomeTab");if(home){home.classList.toggle("active",mainView==="command");home.setAttribute("aria-current",mainView==="command"?"page":"false")}
   const build=mainView==="build";
-  $$(".project-tab").forEach(t=>t.classList.toggle("active",build&&String(t.dataset.projectId||"")===String(activeBuilderProjectId||"")));
+  $$(".project-tab").forEach(t=>{const active=build&&String(t.dataset.projectId||"")===String(activeBuilderProjectId||"");t.classList.toggle("active",active);t.querySelector(".project-tab-open")?.setAttribute("aria-current",active?"page":"false");if(active)t.scrollIntoView({block:"nearest",inline:"nearest"})});
 }
 $("#workspaceHomeTab")?.addEventListener("click",()=>{setMainView("command");$("#commandCenter")?.scrollTo?.({top:0,behavior:"smooth"})});
 $("#workspaceNewTab")?.addEventListener("click",()=>openAppBuilder("web"));
@@ -3537,6 +3559,7 @@ loadHomeApps();
 window.addEventListener("message",e=>{
   if(e.origin!==location.origin||!e.data)return;
   if(e.data.kairoq==="ready")return builderReady();
+  if(e.data.kairoq==="project"){activeBuilderProjectId=String(e.data.id||"");closedWorkspaceProjects.delete(activeBuilderProjectId);loadHomeApps();return}
   if(e.data.kairoq!=="home")return;
   builderReady();
   setMainView("command");$("#commandCenter")?.classList.remove("show-work");
@@ -3602,6 +3625,7 @@ $("#closeModelDialog").onclick=()=>$("#modelDialog").close();
 $("#modelSearch").oninput=renderModelResults;
 $$(".filter-chip").forEach(b=>b.onclick=()=>{currentModelFilter=b.dataset.filter;$$(".filter-chip").forEach(x=>x.classList.toggle("active",x===b));renderModelResults()});
 
+applyShellMode();
 updateRouting();
 if(!currentChatId&&chats.length)currentChatId=chats[0].id;
 if(!getChat())newChat();else{renderHistory();renderChat()}
@@ -4174,3 +4198,11 @@ $('#salesImportForm')?.addEventListener('submit',async event=>{
  await refreshStudio();note.textContent=`${result.imported} imported · ${result.duplicates} duplicates skipped. Research and qualify next.`;setStatus(note.textContent);
  }catch(err){note.textContent=err.message;setStatus(err.message,true)}finally{if(button)button.disabled=false}
 });
+
+// Keep advanced choices in Settings, while preserving the existing select listeners.
+const advancedHost=document.createElement("div");advancedHost.className="advanced-composer-controls";
+for(const [id,label] of [["effortSelect","Reasoning effort"],["purposeSelect","Purpose"]]){const select=$("#"+id);if(select){const field=document.createElement("label");field.textContent=label;field.append(select);advancedHost.append(field)}}
+$("#settingsDialog .settings-card")?.append(advancedHost);
+resizePrompt();
+// Portal the picker above Home's animated sections so tabs never overlap it.
+document.body.append($("#modelPicker"));
