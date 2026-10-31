@@ -974,13 +974,15 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  const codeContext=codeQuestion?contextFiles(files,24000):require('./project-memory').note(meta,files);
  // Stable instructions first and per-message notes last, so the start of the prompt can be cached.
  const perMessage=(await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)).trim();
- const messages=[{role:'system',content:DISCUSS_PROMPT+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+(perMessage?'\n\n'+perMessage:'')+'\n\nMessage: '+text,images)}];
+ const messages=[{role:'system',content:DISCUSS_PROMPT+require('./agent-response-contract').prompt()+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+(perMessage?'\n\n'+perMessage:'')+'\n\nMessage: '+text,images)}];
  // Save what the owner said before inference, so failed model calls cannot make it vanish.
  addMessages(id,[{role:'user',text,mode:'discuss'}]);
  let answer=(await callModel({messages,temperature:0.4,maxOutputTokens:2500,cacheKey:'kairoq-'+id,signal,tier:require('./builder-response-policy').discussionTier(images,tier),onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
  // Never let a generic model persona contradict Kairoq's real API/web capabilities.
  answer=require('./api-chat-routing').guardDiscussAnswer(text,answer);
  answer=require('./browser-chat-routing').guardDiscussAnswer(text,answer,{...browserRuntime,context});
+ const responseContract=require('./agent-response-contract');
+ answer=responseContract.guard(text,answer,{technical:responseContract.technicalRequest(text)});
  const {text:plain,ideas}=splitIdeas(answer,text);
  const Q=require('./builder-question'),{text:said,question:asked}=Q.fromText(plain);
  const shown=Q.display(said,asked);
