@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="/premium-workspace.css?v=1">
 <link rel="stylesheet" href="/workspace-unified.css?v=1">
 <link rel="stylesheet" href="/free-chat-clean-workspace.css?v=1">
-<link rel="stylesheet" href="/builder-split-preview.css?v=3">
+<link rel="stylesheet" href="/builder-split-preview.css?v=4">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -592,6 +592,31 @@
       </div>
     </div>
   </main>
+  <aside class="web-browser-pane hidden" id="web-browser-pane" aria-label="Kairoq browser">
+    <div class="web-browser-head">
+      <div class="web-browser-heading">
+        <span class="web-browser-live" aria-hidden="true"></span>
+        <strong>Browser</strong>
+        <span class="web-browser-title" id="web-browser-title">Public website</span>
+      </div>
+      <div class="web-browser-actions">
+        <a class="ghost small-btn hidden" id="web-browser-external" target="_blank" rel="noopener noreferrer" aria-label="Open website in a new tab">Open ↗</a>
+        <button class="ghost icon-btn" id="web-browser-close" type="button" aria-label="Close browser pane" title="Close browser">×</button>
+      </div>
+    </div>
+    <div class="web-browser-address">
+      <span aria-hidden="true">⌕</span>
+      <span id="web-browser-url">Waiting for Kairoq to open a website…</span>
+    </div>
+    <div class="web-browser-viewport" id="web-browser-viewport">
+      <img class="hidden" id="web-browser-shot" alt="Live view of the website Kairoq is browsing">
+      <div class="web-browser-empty" id="web-browser-empty">
+        <strong>Live browser</strong>
+        <span>When Kairoq opens a public website, the same browser session it is using will appear here.</span>
+      </div>
+      <div class="web-browser-status hidden" id="web-browser-status" role="status"></div>
+    </div>
+  </aside>
 </section>
 </div><!-- /shell-main -->
 </div><!-- /shell -->
@@ -1364,7 +1389,8 @@
 
 <script src="/voice-builder.js" defer></script>
 <script src="/create-look.js?v=6"></script>
-<script src="/create.js?v=20261136"></script>
-<script src="/builder-split-preview.js?v=3"></script>
+<script src="/builder-browser-pane.js?v=1"></script>
+<script src="/create.js?v=20261137"></script>
+<script src="/builder-split-preview.js?v=4"></script>
 </body>
 </html>
