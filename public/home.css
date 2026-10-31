@@ -731,3 +731,32 @@ body.home-sky-ready .main[data-view=command] > .kh-sky::before{opacity:1;transfo
   .kh-composer-slot .composer,.kh-apps .kh-app,.kh-apps li,
   .main[data-view=build] .build-view iframe{animation:none!important;transition:none!important;transform:none!important}
 }
+
+
+/* ---------- Builder loading continuity ---------- */
+.main[data-view=build] .build-view.loading iframe{
+  visibility:visible!important;
+}
+.main[data-view=build] .build-view .build-loading{
+  display:flex!important;
+  opacity:0;
+  pointer-events:none;
+  background:rgba(247,249,251,.70)!important;
+  backdrop-filter:blur(10px);
+  transition:opacity .18s ease;
+}
+.main[data-view=build] .build-view.loading .build-loading{
+  opacity:1;
+  pointer-events:auto;
+}
+.main[data-view=build] .build-view iframe.frame-loading{
+  opacity:.48!important;
+  filter:saturate(.92) blur(.35px);
+}
+.main[data-view=build] .build-view iframe:not(.frame-loading){
+  filter:none;
+}
+.main[data-view=build] .build-view.loading::after{
+  content:none!important;
+  display:none!important;
+}
