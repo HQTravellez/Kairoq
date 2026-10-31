@@ -62,6 +62,51 @@ details{border-color:var(--mb-line)!important;background:rgba(13,19,34,.52)!impo
 summary{color:var(--mb-text)!important}
 @media(max-width:1180px){.mission-grid{grid-template-columns:1fr}.execution-panel{order:-1}.execution-steps{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}.mission-step{display:block;padding:0}.mission-step:not(:last-child)::after{display:none}.mission-dot{margin-bottom:6px}}
 @media(max-width:850px){.app{display:block!important}.mission-grid{display:block}.execution-panel{margin-bottom:14px}.execution-steps{grid-template-columns:repeat(3,1fr)}.panel{padding:20px!important}.preview{padding:16px!important}.builder-mode-row{grid-template-columns:1fr}}
+</style>
+<style id="builder-simple-override">
+:root{--mb-bg:#0f0f10;--mb-panel:#151516;--mb-panel2:#1a1a1c;--mb-line:#2a2a2d;--mb-text:#f5f5f4;--mb-muted:#a1a1aa;--mb-cyan:#8b9cff;--mb-blue:#8b9cff;--mb-violet:#8b9cff;--mb-green:#72d98b;--mb-amber:#e7bd66}
+body{background:#0f0f10!important}
+.app{grid-template-columns:400px minmax(0,1fr)!important;background:#0f0f10!important}
+.panel{background:#121213!important;border-color:#242427!important;padding:22px!important}
+.preview{background:#0f0f10!important;padding:18px!important}
+.panel h1{font-size:34px!important;line-height:1.05!important;margin:18px 0 8px!important;letter-spacing:-.04em!important}
+.sub{font-size:14px!important;color:#a1a1aa!important;margin-bottom:16px!important}
+.objective-card{background:transparent!important;border:0!important;padding:0!important;margin:14px 0 10px!important}
+.objective-head strong{color:#d4d4d8!important;font-size:11px!important}
+.builder-mode-row{grid-template-columns:repeat(3,1fr)!important;gap:6px!important}
+.builder-mode{min-height:48px!important;background:#171719!important;border:1px solid #2a2a2d!important;border-radius:8px!important;padding:8px!important}
+.builder-mode.on{background:#222225!important;border-color:#3c3c42!important;box-shadow:none!important}
+.builder-mode strong{font-size:12px!important}
+.builder-mode span{font-size:10px!important;color:#8c8c96!important}
+textarea,input,select{background:#171719!important;border:1px solid #2a2a2d!important;border-radius:8px!important;color:#f5f5f4!important}
+#brief{min-height:126px!important}
+.primary{background:#f4f4f5!important;color:#111!important;border-radius:8px!important;box-shadow:none!important}
+.small{background:#19191b!important;border-color:#2d2d31!important;border-radius:8px!important;color:#e4e4e7!important}
+.mission-grid{display:flex!important;flex-direction:column!important;gap:10px!important}
+.execution-panel{order:-1!important;background:#121213!important;border:1px solid #242427!important;border-radius:9px!important;padding:10px 12px!important}
+.execution-panel h2{display:none!important}
+.execution-steps{display:flex!important;align-items:center!important;gap:0!important;overflow-x:auto!important}
+.mission-step{display:flex!important;align-items:center!important;grid-template-columns:none!important;gap:6px!important;padding:0!important;min-width:max-content!important}
+.mission-step:not(:last-child)::after{content:"";position:static!important;width:34px!important;height:1px!important;background:#2b2b2e!important;margin:0 8px!important}
+.mission-dot{width:17px!important;height:17px!important;font-size:9px!important;box-shadow:none!important;background:#18181a!important}
+.mission-step strong{font-size:11px!important;font-weight:500!important}
+.mission-step small{display:none!important}
+.mission-step.active .mission-dot{border-color:#8b9cff!important;color:#b7c0ff!important}
+.mission-step.done .mission-dot{background:#72d98b!important;border-color:#72d98b!important;color:#0a120c!important}
+.execution-current{margin:8px 0 0!important;padding:8px 0 0!important;font-size:11px!important;color:#8c8c96!important}
+.execution-current b{color:#d4d4d8!important}
+.top{margin-bottom:10px!important}
+.top b{font-size:14px!important}
+.pill{font-size:11px!important;background:#171719!important;border-color:#2a2a2d!important}
+.canvas{background:#151516!important;border:1px solid #242427!important;border-radius:10px!important;box-shadow:none!important}
+.empty{padding:38px!important;max-width:620px!important}
+.empty h2{font-size:28px!important}
+.example{background:#171719!important;border-color:#2a2a2d!important;border-radius:8px!important;font-size:14px!important}
+.example:hover{background:#1d1d20!important;border-color:#38383d!important}
+.status{color:#aeb4c7!important;font-size:12px!important}
+details{background:#151516!important;border-color:#2a2a2d!important;border-radius:8px!important}
+summary{color:#d4d4d8!important}
+@media(max-width:850px){.app{display:block!important}.execution-steps{display:flex!important}.mission-step:not(:last-child)::after{display:block!important}}
 </style></head><body><main class="app"><section class="panel"><a href="/" class="crumb">← Kairoq / Build Studio</a><div style="margin-top:16px"><a href="/api-studio.html" class="small" style="display:inline-block;text-decoration:none">API Intelligence · OAuth &amp; SDKs ↗</a></div><h1>From idea<br>to launch.</h1><p class="sub">Build a polished multi-page website with your brand images and enquiry forms, or a business app with login and saved records. Review tested versions before launch.</p><label class="label" for="projects">Your saved projects</label><select id="projects"><option value="">Start a new project</option></select><p class="muted">Supports trackers, inventories, CRMs and other CRUD apps. Describe your scenario and optionally attach API documentation. Atlas plans the data, login, UI and connected workflows before building. Provider credentials and testing may be required before launch.</p><details><summary>Login &amp; database setup</summary><p id="backend-status" class="muted">Checking connection…</p><p class="muted">Supabase uses the project URL, publishable key and builder credential set in Railway. Existing apps keep their current database.</p><a href="/api/developer/supabase-migration" target="_blank" rel="noopener">Database setup SQL ↗</a><button id="check-setup" class="small" type="button">Check connection</button></details><form id="form">
 <div class="objective-card">
   <div class="objective-head"><strong>Objective</strong><span>Tell Kairoq the outcome</span></div>
