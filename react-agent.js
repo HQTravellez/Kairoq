@@ -20,7 +20,7 @@ AVAILABLE CAPABILITIES (discoverable inventory, not automatic permission):\n${re
 - {"tool":"inspect_api_docs","url":"https://docs.example.com/openapi.json"}: fetch public API documentation through the existing guarded fetch_url transport and parse OpenAPI/Swagger/Postman or infer draft endpoints. This does NOT call supplier APIs or approve an operation.
 - {"tool":"read_files","paths":["src/App.jsx"]}: read up to 8 files.
 - {"tool":"search","query":"text or regex"}: search every project file; returns matching lines.
-- {"tool":"project_graph","action":"query","query":"authentication session"}: query Kairoq's structural project graph for symbols/files/relationships. Other actions: {"action":"path","from":"Auth","to":"Database"}, {"action":"impact","changed":["src/auth.js"]}, {"action":"stats"}. Use this before editing an unfamiliar multi-file area and use impact after structural changes. Graphify is deterministic AST analysis; if unavailable Kairoq falls back to its native import graph.
+- {"tool":"project_graph","action":"query","query":"authentication session"}: query Kairoq's structural project graph for symbols/files/relationships. Other actions: {"action":"path","from":"Auth","to":"Database"}, {"action":"impact","changed":["src/auth.js"]}, {"action":"map"}, {"action":"delta"}, {"action":"stats"}. "map" returns a source-backed architecture summary; "delta" compares the original task source graph with current unsaved source. Use this before editing an unfamiliar multi-file area and use impact/delta after structural changes. Graphify is deterministic AST analysis; if unavailable Kairoq falls back to its native import graph. Architecture views never claim measured runtime traffic, deployment topology, risk or merge safety.
 - {"tool":"project_knowledge","action":"get"}: read the project glossary and architecture decisions. To persist a verified term use {"action":"term","term":"Journey","meaning":"...","source":"owner|code|verified-docs"}. To persist a hard-to-reverse decision use {"action":"decision","title":"...","decision":"...","rationale":"...","source":"owner|code|verified-docs"}. Never store guesses.
 - {"tool":"task_graph","action":"define","tasks":[{"id":"T1","title":"...","delivers":"one independently verifiable vertical behavior","blockedBy":[],"acceptance":["..."]}]}: define tracer-bullet work for substantial requests. Other actions: status, start, complete. Work only tasks on the ready frontier.
 - {"tool":"engineering_review"}: run two fresh independent reviewers: Standards (engineering quality) and Spec (requirements/scope). Blocking high-confidence findings must be repaired and reviewed again before VERIFIED completion.
@@ -265,7 +265,13 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     const g=await pg.build(work,{projectId:id});
     tl.add({t:'note',icon:'search',text:'Inspected project graph via '+g.source});
     if(action==='stats')return{text:JSON.stringify({source:g.source,version:g.version,mode:g.mode,stats:g.stats,warning:g.warning||null})};
-    if(action==='path')return{text:clip(JSON.stringify(pg.shortestPath(g,String(a.from||''),String(a.to||''),{maxDepth:8})),18000)};
+    const arch=require('./architecture-evidence');
+    if(action==='map')return{text:clip(JSON.stringify(arch.map(g,{limit:12})),22000)};
+    if(action==='delta'){
+     const original=await pg.build(base,{projectId:id+':task-base',force:true});
+     return{text:clip(JSON.stringify(arch.delta(original,g)),24000)};
+    }
+    if(action==='path')return{text:clip(JSON.stringify(arch.path(g,String(a.from||''),String(a.to||''),pg)),18000)};
     if(action==='impact')return{text:clip(JSON.stringify(pg.impact(g,Array.isArray(a.changed)?a.changed.slice(0,30):[])),18000)};
     return{text:clip(JSON.stringify(pg.query(g,String(a.query||''),{limit:12,neighbors:24})),22000)};
    }catch(e){return{text:'project_graph failed: '+String(e.message||e).slice(0,500)}}
