@@ -1,0 +1,28 @@
+name: Multi-agent consultation
+on:
+  push:
+    paths:
+      - 'agent-team.js'
+      - 'react-agent.js'
+      - 'test/agent-team.test.js'
+      - '.github/workflows/multi-agent-consultation.yml'
+  pull_request:
+    paths:
+      - 'agent-team.js'
+      - 'react-agent.js'
+      - 'test/agent-team.test.js'
+      - '.github/workflows/multi-agent-consultation.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check agent-team.js
+      - run: node --check react-agent.js
+      - run: node --test test/agent-team.test.js test/agent-capability-routing.test.js
