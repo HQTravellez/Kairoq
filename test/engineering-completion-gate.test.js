@@ -19,3 +19,26 @@ test('nutrition features need verified feature-specific workflows',()=>{
  assert.equal(gate.evaluate({...clear,checks:{ran:1,failed:[]},requirements:req}).verified,false);
  assert.equal(gate.evaluate({...clear,requirements:req}).verified,true);
 });
+
+test('UI completion requires visual quality evidence when requested',()=>{
+ const missing=gate.evaluate({...clear,visualRequired:true,visualQuality:null});
+ assert.equal(missing.verified,false);
+ assert.match(missing.issues.join(' '),/Visual quality was not evaluated/);
+ const failed=gate.evaluate({...clear,visualRequired:true,visualQuality:{passed:false,reason:'Generic card grid remains.'}});
+ assert.equal(failed.verified,false);
+ const passed=gate.evaluate({...clear,visualRequired:true,visualQuality:{passed:true},repairs:2});
+ assert.equal(passed.verified,true);
+ assert.equal(passed.evidence.visual_quality,'passed');
+ assert.equal(passed.evidence.repairs,2);
+});
+
+test('proof message exposes browser, visual, repair, and unresolved evidence',()=>{
+ const result=gate.evaluate({...clear,visualRequired:true,visualQuality:{passed:true},repairs:1});
+ const message=gate.resultMessage('Ready to use.',result);
+ assert.match(message,/VERIFIED BUILD/);
+ assert.match(message,/PROOF/);
+ assert.match(message,/Browser: passed · 3 interaction step/);
+ assert.match(message,/Visual quality: passed/);
+ assert.match(message,/Repair attempts: 1/);
+ assert.match(message,/Unresolved: none/);
+});
