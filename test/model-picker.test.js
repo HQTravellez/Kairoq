@@ -41,7 +41,7 @@ test("the picker is short like Hermes: no batch or dated copies, a few models pe
   assert.equal(isCopyVariant({ id: "anthropic/claude-opus-5.5", name: "Claude Opus 5.5" }), false);
   assert.equal(isCopyVariant({ id: "google/gemma-4-31b-it:free", name: "Gemma 4 31B (free)" }), false);
   assert.match(app, /const PER_PROVIDER=6;/);
-  assert.match(app, /if\(freeOnlyEl\.checked&&!m\.isFree&&!m\.local&&!m\.allowedPaid\)continue;/, "Free Only hides paid models instead of a red error");
+  assert.match(app, /disabled:freeOnlyEl\.checked&&!m\.isFree&&!m\.local&&!m\.allowedPaid\?"Free only is on"/, "Free Only keeps paid models visible but unavailable");
   assert.match(app, /section\("Agent"/);
   assert.doesNotMatch(app, /Free Only is on\. Choose a free model/);
 });

@@ -7,15 +7,12 @@ const path=require("node:path");
 const root=path.resolve(__dirname,"..");
 const read=file=>fs.readFileSync(path.join(root,file),"utf8");
 
-test("Home preloads and reveals the sky background smoothly",()=>{
-  const html=read("public/index.html");
-  const css=read("public/home.css");
-  const js=read("public/app.js");
-  assert.match(html,/rel="preload" as="image"/);
-  assert.match(html,/images\.pexels\.com\/photos\/20884933/);
-  assert.match(js,/function preloadHomeSky\(\)/);
-  assert.match(js,/home-sky-ready/);
-  assert.match(css,/body\.home-sky-ready/);
+test("Home renders the local Horizon graphic without a stock-photo preload",()=>{
+  const html=read("public/index.html"),css=read("public/redesign.css"),js=read("public/app.js");
+  assert.doesNotMatch(html,/images\.pexels\.com/);
+  assert.doesNotMatch(js,/function preloadHomeSky/);
+  assert.match(css,/assets\/kairoq-horizon\.svg/);
+  assert.match(css,/radial-gradient/);
 });
 
 test("composer moves between Home and docked views with FLIP motion",()=>{

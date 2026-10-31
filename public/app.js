@@ -41,6 +41,7 @@ let cloudMemoryConfigured = false;
 let selectedAgentType = "atlas";
 let currentApproval = null;
 let imageMode = false;
+let appBuildMode=false;
 let videoMode = false;
 let mainView = localStorage.getItem("pai-main-view") || "command";
 let workspaceBrowserOpen = false;
@@ -269,13 +270,6 @@ function animateHomeModeChange(){
   $("#khGreeting")?.animate?.([{opacity:.55,transform:"translateY(3px)"},{opacity:1,transform:"translateY(0)"}],{duration:180,easing:"ease-out"});
   $("#khComposerSlot")?.animate?.([{transform:"translateY(2px)"},{transform:"translateY(0)"}],{duration:190,easing:"cubic-bezier(.2,.8,.2,1)"});
 }
-function preloadHomeSky(){
-  const src="https://images.pexels.com/photos/20884933/pexels-photo-20884933.jpeg?auto=compress&cs=tinysrgb&w=2400";
-  const img=new Image();img.decoding="async";img.src=src;
-  const ready=()=>document.body.classList.add("home-sky-ready");
-  if(img.decode)img.decode().then(ready).catch(ready);else{img.onload=ready;img.onerror=ready}
-}
-preloadHomeSky();
 
 function setMainView(view="command"){
   if(view==="command") document.body.classList.remove("history-focus");
@@ -1244,6 +1238,7 @@ function updateModelUI(){
     const flags=modelFlags(selected||modelSelect.value).filter(x=>x!=="AGENT");
     $("#modelPickerLabel").textContent=pickerLabel(modelSelect.value)+(flags.length&&modelSelect.value!=="openrouter/free"?" · "+flags.join(" · "):"");
   }
+  updateVisibleModelLabel();
   $("#favoriteBtn").classList.toggle("active",favorites.includes(modelSelect.value));
   $("#favoriteBtn").textContent=favorites.includes(modelSelect.value)?"★":"☆";
   const details=$("#activeModelDetails");
@@ -1331,6 +1326,12 @@ function pickerRow(m,{hint="",auto=false}={}){
   return row;
 }
 let builderPickerModels=null;
+function updateVisibleModelLabel(builderLabel){
+ const label=$("#modelPickerLabel");if(!label)return;
+ if(appBuildMode){const id=localStorage.getItem("kairoq-model")||"auto";label.textContent=builderLabel||builderPickerModels?.find(m=>m.id===id)?.label||(id==="auto"?"Auto":id);}
+ else label.textContent=pickerLabel(modelSelect.value);
+}
+
 function renderModelPicker(){
   const host=$("#modelPickerList");if(!host)return;
   const q=$("#modelPickerSearch").value.trim().toLowerCase();
@@ -1341,7 +1342,7 @@ function renderModelPicker(){
       const row=document.createElement("button");row.type="button";row.className="kq-row"+(selected===m.id?" selected":"");row.disabled=!m.enabled;row.setAttribute("role","option");row.setAttribute("aria-selected",String(selected===m.id));
       const name=document.createElement("span");name.className="kq-row-name";name.textContent=m.label+(m.id==="auto"?" · Recommended":"");row.append(name);
       const hint=document.createElement("span");hint.className="kq-row-note";hint.textContent=!m.enabled?"Unavailable":m.free===true||m.isFree===true||m.credits===0?"Free":m.credits?m.credits+" credits per message":m.note||"Automatic routing";row.append(hint);
-      row.onclick=()=>{localStorage.setItem("kairoq-model",m.id);closeModelPicker(true)};host.append(row);
+      row.onclick=()=>{localStorage.setItem("kairoq-model",m.id);updateVisibleModelLabel(m.label);closeModelPicker(true)};host.append(row);
     }
     if(!host.children.length)host.textContent="No models match your search.";
     return;
@@ -1359,12 +1360,11 @@ function renderModelPicker(){
   const groups=new Map();
   for(const m of allModels){
     if(m.id==="local/auto"||favorites.includes(m.id)||m.allowedPaid||!match(m))continue;
-    if(freeOnlyEl.checked&&!m.isFree&&!m.local&&!m.allowedPaid)continue; // Free Only: paid models just aren't listed (except the few the owner chose to try)
     if(!q&&(!modelShown(m)||isCopyVariant(m)))continue;
     const k=providerKey(m);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
   }
   const order=[...groups.keys()].sort((a,b)=>(a==="ollama"?-1:b==="ollama"?1:0)||((DEFAULT_PROVIDERS.indexOf(a)+1||99)-(DEFAULT_PROVIDERS.indexOf(b)+1||99))||a.localeCompare(b));
-  for(const k of order)section(providerName(k),groups.get(k).slice(0,q?60:PER_PROVIDER).map(m=>pickerRow(m)));
+  for(const k of order)section(providerName(k),groups.get(k).slice(0,q?60:PER_PROVIDER).map(m=>pickerRow({...m,disabled:freeOnlyEl.checked&&!m.isFree&&!m.local&&!m.allowedPaid?"Free only is on":m.disabled})));
   if(!host.querySelector(".kq-row")){const e=document.createElement("div");e.className="kq-empty";e.textContent=q?`No models match “${$("#modelPickerSearch").value}”.`:"No models yet. Use Refresh models.";host.appendChild(e)}
 }
 async function openModelPicker(){
@@ -1376,7 +1376,7 @@ async function openModelPicker(){
   requestAnimationFrame(()=>{$("#modelPickerSearch").focus();p.querySelector(".kq-row.selected")?.scrollIntoView({block:"nearest"})});
 }
 function closeModelPicker(focusButton=false){
-  const p=$("#modelPicker");if(!p||p.hidden)return;p.hidden=true;$("#modelPickerBtn").setAttribute("aria-expanded","false");if(focusButton)$("#attachBtn").focus();
+  const p=$("#modelPicker");if(!p||p.hidden)return;p.hidden=true;$("#modelPickerBtn").setAttribute("aria-expanded","false");if(focusButton)$("#modelPickerBtn").focus();
 }
 function renderModelsEdit(){
   const host=$("#modelsEditList");const q=$("#modelsEditSearch").value.trim().toLowerCase();host.replaceChildren();
@@ -3426,7 +3426,7 @@ initWorkspaceBrowserControls();
 
 // Build an app from the main page: pick Web app or Mobile app above the box, say what to build,
 // then open the conversational builder immediately with the request running.
-let appBuildMode=false;
+
 const APP_PLACEHOLDERS={web:"Describe your web app…",mobile:"Describe your mobile app…"};
 const chatPlaceholder=promptEl.placeholder;
 function setAppBuildMode(mode){
@@ -3436,8 +3436,8 @@ function setAppBuildMode(mode){
   promptEl.placeholder=appBuildMode?APP_PLACEHOLDERS[appBuildMode]:chatPlaceholder;
   $(".kh-hero .kh-pills:not(.kh-app-ideas)")?.classList.toggle("hidden",!!appBuildMode);
   $(".kh-app-ideas")?.classList.toggle("hidden",!appBuildMode);
-  if($("#khGreeting"))$("#khGreeting").innerHTML=appBuildMode?"What do you want to <em>build</em>?":"What should we <em>get done</em>?";
-  $(".kh-hero>p")?.classList.toggle("hidden",!!appBuildMode);
+  $(".kh-hero>p")?.classList.remove("hidden");
+  updateVisibleModelLabel();
 }
 function openAppBuilder(mode="web"){
   setMainView("command");
@@ -3542,7 +3542,7 @@ async function loadHomeApps(){
   if(box&&list){list.replaceChildren(...cards(6));box.classList.toggle("hidden",!projects.length)}
   if(grid){
     grid.replaceChildren(...cards(12));
-    const ideas=[...document.querySelectorAll(".kh-app-ideas [data-idea]")].map(b=>b.textContent.trim()).filter(Boolean);
+    const ideas=[...document.querySelectorAll(".kh-app-ideas [data-idea]")].map(b=>b.dataset.prompt||b.textContent.trim()).filter(Boolean);
     $("#wpTemplates")?.replaceChildren(...ideas.map(idea=>appCard(idea,{sub:"Start from this",onOpen:()=>startAppBuild(idea)})));
     showProjectsTab(projects.length?"mine":"templates");
   }
@@ -3574,7 +3574,7 @@ $$(".kh-mode").forEach(t=>t.onclick=()=>{
   promptEl.focus();
 });
 $$("[data-build-app]").forEach(b=>b.onclick=()=>openAppBuilder("web"));
-$$("[data-idea]").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent.trim();resizePrompt();promptEl.focus()});
+$$("[data-idea]").forEach(b=>b.onclick=()=>{promptEl.value=b.dataset.prompt||b.textContent.trim();resizePrompt();promptEl.focus()});
 $("#stopBtn").onclick=()=>abortController?.abort();
 promptEl.addEventListener("input",resizePrompt);
 promptEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
@@ -4206,3 +4206,7 @@ $("#settingsDialog .settings-card")?.append(advancedHost);
 resizePrompt();
 // Portal the picker above Home's animated sections so tabs never overlap it.
 document.body.append($("#modelPicker"));
+
+// Home has one integrated composer, with its model choice always visible.
+const homeModes=$(".kh-modes");if(homeModes)$(".composer-tools .kq-plus")?.after(homeModes);
+updateVisibleModelLabel();
