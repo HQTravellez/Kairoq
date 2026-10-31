@@ -155,11 +155,16 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const observed=await wb.open(u),shot=await publishBrowser();
    webObserved=true;
    tl.add({t:'note',icon:'web',text:'Opened '+require('./web').hostOf(wb.url)+' before model reasoning'});
-   messages.push({role:'user',content:'Kairoq already opened the requested public website in its browser. Use this observed page state as evidence; continue browsing if needed, then answer.\n\n'+clip(observed,18000)});
-   if(vision&&shot)messages.at(-1).content=[{type:'text',text:messages.at(-1).content},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}}];
+   const evidence='Kairoq already opened the requested public website in its browser. Use this observed page state as evidence; continue browsing if needed, then answer.\n\n'+clip(observed,18000);
+   if(Array.isArray(introMsg.content)){
+    introMsg.content.push({type:'text',text:evidence});
+    if(vision&&shot)introMsg.content.push({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}});
+   }else if(vision&&shot)introMsg.content=[{type:'text',text:String(introMsg.content||'')+'\n\n'+evidence},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}}];
+   else introMsg.content=String(introMsg.content||'')+'\n\n'+evidence;
   }catch(e){
    await publishBrowser(e.message||e).catch(()=>{});
-   messages.push({role:'user',content:'Kairoq attempted to open '+u+' before model reasoning, but the browser returned this concrete error: '+String(e.message||e).slice(0,500)+'. Report this specific failure or try another web tool; do not claim Kairoq has no browser capability.'});
+   const failure='Kairoq attempted to open '+u+' before model reasoning, but the browser returned this concrete error: '+String(e.message||e).slice(0,500)+'. Report this specific failure or try another web tool; do not claim Kairoq has no browser capability.';
+   if(Array.isArray(introMsg.content))introMsg.content.push({type:'text',text:failure});else introMsg.content=String(introMsg.content||'')+'\n\n'+failure;
   }
  }
  function trimContext(){
