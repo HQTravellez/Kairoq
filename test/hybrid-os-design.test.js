@@ -11,28 +11,25 @@ test("main shell loads hybrid OS as the final visual layer",()=>{
  assert.ok(hybrid>ui,"hybrid OS must load after existing visual layers");
 });
 
-test("shell mode switch exposes Space OS and Operator Console",()=>{
+test("shell mode switch exposes simple and advanced workspace",()=>{
  const js=read("public/app.js");
- assert.match(js,/simpleMode \? "Operator" : "Space OS"/);
- assert.match(js,/Switch to Operator Console/);
- assert.match(js,/Switch to Space OS/);
+ assert.match(js,/simpleMode \? "Advanced" : "Simple"/);
+ assert.match(js,/Switch to advanced workspace/);
+ assert.match(js,/Switch to simple workspace/);
 });
 
-test("hybrid stylesheet separates default and operator identities",()=>{
+test("workspace stylesheet stays neutral and supports both density modes",()=>{
  const css=read("public/hybrid-os.css");
  assert.match(css,/body\.simple-mode/);
- assert.match(css,/Space OS/);
  assert.match(css,/body\.advanced-mode/);
- assert.match(css,/Operator Console/);
  assert.match(css,/prefers-reduced-motion/);
- assert.doesNotMatch(css,/animation:\s*[^;]*infinite/i);
+ assert.doesNotMatch(css,/radial-gradient\(circle/i);
+ assert.doesNotMatch(css,/scanline|starfield|orbital/i);
 });
 
-test("redesign blueprint keeps factual product states and progressive rollout",()=>{
+test("redesign blueprint remains implementation-oriented",()=>{
  const doc=read("docs/design/KAIROQ-HYBRID-OS.md");
  assert.match(doc,/Do not claim model\/tool\/deploy states that are not observed/);
  assert.match(doc,/Slice 1 — shared shell/);
  assert.match(doc,/Slice 6 — visual QA/);
- assert.match(doc,/Space OS/);
- assert.match(doc,/Operator Console/);
 });
