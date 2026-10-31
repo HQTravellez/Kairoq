@@ -1,42 +1,61 @@
 "use strict";
-// Before a first build: up to three quick questions whose answers change what gets built
-// (who signs in, which parts, payments, emails), each with tap-to-answer options. A request that
-// is already clear gets none and is built at once. Free; when the AI is slow or unsure, nothing
-// is asked and the build starts as before.
-const SYSTEM=`You help a small-business owner describe the app or website they want built.
-Read their request. Ask at most 3 short questions, only where the answer changes what gets built.
-Ask first about the heart of the app: how its main moment should work when the request leaves it
-open (for example how a drawing's colours get onto a character, how a booking is confirmed), whether
-it is a phone app or a website when that is unclear, who uses it and signs in, which parts or pages,
-what data it keeps, payments, emails or reminders. Never ask what the request already says, and never
-ask about colours, style or wording: the builder chooses those. A short, simple request that is
-clear gets no questions.
-Each question has 2 to 4 options the owner can tap: a short label (a few words) and one plain
-sentence saying what it means for the app. Put the option you recommend first and set
-"recommended": 0. Set "multi": true when several options can apply together.
+// Before a first build: normally ask nothing. Kairoq chooses safe, reversible defaults and starts.
+// One short question is allowed only when the owner's goal itself is too vague to know what to build.
+// Visual choices are never an onboarding gate: if the owner cares about colour, style, 3D, layout,
+// motion or device, they can say it naturally in the request or change it later.
+const SYSTEM=`You help a person start building with Kairoq.
+Default behavior: ask NO question and let Kairoq start.
+
+Ask at most ONE short question only when the request is so vague that you cannot identify the
+product's core job or first useful outcome. Prefer a safe, reversible default over asking.
+
+Never ask about:
+- colours, fonts, style, visual mood, corners or spacing
+- 3D versus no 3D, animation or visual effects
+- desktop versus mobile when a responsive web experience is a safe default
+- page lists, wording, layout or other choices Kairoq can sensibly decide
+- technical stacks, databases, frameworks or AI models
+
+If the owner already named what the product should do (for example CRM, booking system, dashboard,
+restaurant menu, customer portal, landing page, inventory tool, API integration), ask nothing.
+If they explicitly mention a visual preference such as "blue and white" or "3D", preserve it and
+ask nothing.
+
+When a question is truly necessary, make it plain and outcome-focused, with 2 to 3 short options.
+Put the safest useful recommendation first and set "recommended": 0.
 Respond with ONLY JSON: {"questions":[{"q":"…?","options":[{"label":"…","detail":"…"},{"label":"…","detail":"…"}],"recommended":0,"multi":false}]}`;
 const TIMEOUT_MS=20000;
 
 function clip(v,n){return String(v??'').replace(/\s+/g,' ').trim().slice(0,n)}
-// The AI's answer, cleaned: at most 3 questions, 2 to 4 distinct options each.
+// The AI's answer, cleaned: at most one question, with 2 to 3 distinct options.
 function clean(raw){
  const out=[];
  for(const x of Array.isArray(raw&&raw.questions)?raw.questions:[]){
   // Options are a label and one sentence ({label, detail}) or, from older models, a plain label.
   const raw=(Array.isArray(x&&x.options)?x.options:[]).map(o=>typeof o==='string'?{label:clip(o,48),detail:''}:{label:clip(o&&(o.label||o.text),48),detail:clip(o&&(o.detail||o.description),140)}).filter(o=>o.label);
-  const seen=new Set(),list=raw.filter(o=>!seen.has(o.label.toLowerCase())&&seen.add(o.label.toLowerCase())).slice(0,4);
+  const seen=new Set(),list=raw.filter(o=>!seen.has(o.label.toLowerCase())&&seen.add(o.label.toLowerCase())).slice(0,3);
   const q=clip(x&&x.q,140),opts=list.map(o=>o.label);
   if(q.length<6||opts.length<2)continue;
   const r=Number(x.recommended);
   out.push({q:/[?]$/.test(q)?q:q+'?',options:opts,...(list.some(o=>o.detail)?{details:list.map(o=>o.detail)}:{}),...(Number.isInteger(r)&&r>=0&&r<opts.length?{recommended:r}:{}),multi:x.multi===true});
-  if(out.length>=3)break;
+  if(out.length>=1)break;
  }
  return out;
 }
 // Long, detailed requests are clear enough already.
 // Long requirements already give the builder enough context; do not slow these down with generic questions.
 // Keep this bounded below the model's 1500-character context cap to avoid re-asking documented details.
-function worthAsking(prompt){const t=clip(prompt,4000);return t.length>=3&&t.length<=600}
+function worthAsking(prompt){
+ const t=clip(prompt,4000);
+ if(t.length<3||t.length>600)return false;
+ // A named product/job is enough for Kairoq to choose a sensible first version.
+ if(/\b(crm|booking|reservation|dashboard|website|landing page|portal|store|shop|menu|inventory|calendar|scheduler|marketplace|saas|api|integration|workflow|automation|tracker|calculator|assistant|chatbot|gallery|portfolio|blog|form|directory|learning app|game)\b/i.test(t))return false;
+ // Explicit visual/device instructions are preferences, not reasons to ask more.
+ if(/\b(blue|red|green|black|white|purple|orange|pink|yellow|dark|light|3d|animation|mobile|iphone|android|responsive)\b/i.test(t)&&t.split(/\s+/).length>4)return false;
+ // Only near-empty outcome descriptions should interrupt the user.
+ return /^(?:(?:please|can you|could you|i want|i need|make|build|create)\s+)*(?:me\s+)?(?:an?\s+)?(?:app|website|web app|mobile app|platform|system|something)(?:\s+for me)?[.!?]*$/i.test(t)
+   || t.split(/\s+/).length<=3&&!/\b(for|to|that|with)\b/i.test(t);
+}
 async function questions(prompt,{callModel,tier='standard'}={}){
  if(!callModel||!worthAsking(prompt))return[];
  const ask=callModel({messages:[{role:'system',content:SYSTEM},{role:'user',content:clip(prompt,1500)}],tier,temperature:0.2,maxOutputTokens:900,purpose:'clarify'},c=>{const t=String(c).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');return JSON.parse(t.slice(a,b+1))});
