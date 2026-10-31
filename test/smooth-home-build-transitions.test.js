@@ -42,8 +42,11 @@ test("builder opens without clearing to about blank",()=>{
   assert.doesNotMatch(js,/frame\.src="about:blank"/);
   assert.match(js,/frame\.classList\.add\("frame-loading"\)/);
   assert.match(js,/frame\?\.classList\.remove\("frame-loading"\)/);
+  assert.match(js,/const same=Boolean\(absolute&&frame\.src===absolute/);
   assert.match(css,/iframe\.frame-loading/);
-  assert.match(css,/Opening your workspace…/);
+  assert.match(css,/\.build-view\.loading iframe/);
+  assert.match(css,/visibility:visible!important/);
+  assert.match(css,/\.build-view \.build-loading/);
 });
 
 test("mode tabs remain bound as a collection",()=>{
