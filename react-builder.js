@@ -536,7 +536,7 @@ function historyMessages(meta){
  const tail=recent.filter(m=>m!==first).map(m=>({role:m.role,content:Q.historyText(m).slice(0,6000)})).reverse().map(m=>{const content=m.content.slice(0,Math.max(0,budget));budget-=content.length;return{...m,content}}).reverse().filter(m=>m.content);
  return anchor?[anchor,...tail]:tail;
 }
-function conversationNote(meta){return '\nPROJECT CONVERSATION (owner requests and prior replies, not implementation evidence):\n'+JSON.stringify(historyMessages(meta))+'\nContinue the latest agreed direction. A greeting does not cancel it. Resolve "it", "that" and "the plan" from this conversation; never silently restart the project. The current owner request wins when it changes an earlier decision.';}
+function conversationNote(meta,current=''){return require('./conversation-handoff').note(meta,current)}
 function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
@@ -698,7 +698,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  }catch(e){console.warn('[react-builder] learning recall unavailable: '+String(e.message||e).slice(0,120));}}
  const imageCache=new Map();let imageNotes=[];
  const perMessage=(learningNote+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)).trim();
- const messages=[{role:'system',content:SYSTEM_PROMPT+require('./agent-response-contract').prompt(text)+'\n\n'+projectFiles+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent((perMessage?perMessage+'\n\n':'')+request,images)}];
+ const messages=[{role:'system',content:SYSTEM_PROMPT+require('./agent-response-contract').prompt(text)+'\n\n'+projectFiles+knowledgeNote(meta)+require('./app-concept').note(meta)+conversationNote(meta,text)},...historyMessages(meta),{role:'user',content:userContent((perMessage?perMessage+'\n\n':'')+request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null,securityTries=0,structureTries=0;
  // The files a fix applies to: the request's base, then the last try that built (a fix for a
  // build or browser error changes that try; it does not start again from the base).
@@ -710,7 +710,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // The builder's research and fetch tools (builder-tools.js), shown in the timeline as it works.
  const builderTools=oc&&process.env.KAIROQ_BUILDER_TOOLS!=='off'?require('./builder-tools').forProject(id):null;let toolsShown=0;
  const TOOL_NOTES={kairoq_browse:['test','Tried the app in a browser'],kairoq_integration:['plug','Looked up an integration'],task:['users','Sent a helper'],kairoq_skill:['book','Opened a skill'],kairoq_tutorials:['book','Looked in the reference library'],kairoq_search:['search','Searched the web'],kairoq_read:['globe','Read a page'],kairoq_download:['download','Downloaded a file into the app'],kairoq_package:['package','Added a package']};
- let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./app-concept').note(meta)+conversationNote(meta)+require('./builder-playbooks').note(text)+require('./builder-references').note(text)+require('./builder-skills').menu()),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),browse:browse&&process.env.KAIROQ_BUILDER_BROWSE!=='off'?(files,a)=>selfBrowse(id,meta,files,a,{browse,callModel,tier}):null,onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./app-concept').note(meta)+conversationNote(meta,text)+require('./builder-playbooks').note(text)+require('./builder-references').note(text)+require('./builder-skills').menu()),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),browse:browse&&process.env.KAIROQ_BUILDER_BROWSE!=='off'?(files,a)=>selfBrowse(id,meta,files,a,{browse,callModel,tier}):null,onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
  let usedOpenCode=false,usedFallback=false,usedModel=null;
  const ocRequest=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{
@@ -986,7 +986,7 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  const codeContext=codeQuestion?contextFiles(files,24000):require('./project-memory').note(meta,files);
  // Stable instructions first and per-message notes last, so the start of the prompt can be cached.
  const perMessage=(await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)).trim();
- const messages=[{role:'system',content:DISCUSS_PROMPT+require('./agent-response-contract').prompt(text)+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+(perMessage?'\n\n'+perMessage:'')+'\n\nMessage: '+text,images)}];
+ const messages=[{role:'system',content:DISCUSS_PROMPT+require('./agent-response-contract').prompt(text)+knowledgeNote(meta)+require('./app-concept').note(meta)+conversationNote(meta,text)},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+(perMessage?'\n\n'+perMessage:'')+'\n\nMessage: '+text,images)}];
  // Save what the owner said before inference, so failed model calls cannot make it vanish.
  addMessages(id,[{role:'user',text,mode:'discuss'}]);
  let answer=(await callModel({messages,temperature:0.4,maxOutputTokens:2500,cacheKey:'kairoq-'+id,signal,tier:require('./builder-response-policy').discussionTier(images,tier),onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
