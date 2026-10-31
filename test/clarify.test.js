@@ -1,28 +1,54 @@
 "use strict";
-// Quick questions before a first build: only useful ones, cleaned, and folded into the request.
+// First-build clarification should be rare: Kairoq normally chooses sensible defaults and starts.
 const test=require('node:test'),assert=require('node:assert/strict');
 const clarify=require('../clarify');
 
-test('questions are cleaned: at most three, two to four options each, nothing asked for detailed requests',async()=>{
- const raw={questions:[{q:'Do your staff need to sign in',options:['Yes','No','Yes']},{q:'Which parts?',options:['Contacts','Deals','Follow-ups','Reports','Invoices'],multi:true},{q:'Bad',options:['x']},{q:'Payments?',options:['Card','Later']},{q:'Fourth?',options:['a','b']}]};
+test('clarification is capped at one simple outcome question',()=>{
+ const raw={questions:[
+  {q:'What should people do first?',options:['Book something','Track something','Browse information','Another option']},
+  {q:'Second question?',options:['A','B']}
+ ]};
  const qs=clarify.clean(raw);
- assert.equal(qs.length,3);
- assert.deepEqual(qs[0],{q:'Do your staff need to sign in?',options:['Yes','No'],multi:false});
- assert.equal(qs[1].options.length,4);assert.equal(qs[1].multi,true);
- const callModel=async(o,parse)=>parse(JSON.stringify(raw));
- assert.equal((await clarify.questions('A CRM',{callModel})).length,3);
- assert.deepEqual(await clarify.questions('x'.repeat(700),{callModel}),[]);
- // A failing or broken AI means no questions: the build simply starts.
- assert.deepEqual(await clarify.questions('A CRM',{callModel:async()=>{throw Error('down')}}),[]);
- assert.deepEqual(await clarify.questions('A CRM',{callModel:async(o,parse)=>parse('not json')}),[]);
-});
-test('answers are added to the request the builder reads',()=>{
- const p=clarify.withAnswers('A CRM',[{q:'Do your staff need to sign in?',a:['Yes']},{q:'Which parts?',a:['Contacts','Deals']},{q:'Empty?',a:[]}]);
- assert.equal(p,'A CRM\n\nDetails from the owner:\n- Do your staff need to sign in? Yes\n- Which parts? Contacts, Deals');
- assert.equal(clarify.withAnswers('A CRM',[]),'A CRM');
+ assert.equal(qs.length,1);
+ assert.deepEqual(qs[0],{q:'What should people do first?',options:['Book something','Track something','Browse information'],multi:false});
 });
 
-test('options can carry one sentence each and a recommended one',()=>{
- const [q]=clarify.clean({questions:[{q:'Who is it for?',options:[{label:'Kids: watch and play',detail:'A child scans a page and taps the animal.'},{label:'Anyone: realistic AR',detail:'A life-size animal on the paper.'}],recommended:0}]});
- assert.deepEqual(q,{q:'Who is it for?',options:['Kids: watch and play','Anyone: realistic AR'],details:['A child scans a page and taps the animal.','A life-size animal on the paper.'],recommended:0,multi:false});
+test('clear product requests do not interrupt the user',async()=>{
+ const callModel=async()=>{throw Error('should not be called')};
+ for(const prompt of [
+  'Build a CRM for my sales team',
+  'Make a booking website, blue and white',
+  'Create a 3D restaurant menu',
+  'Build an inventory dashboard',
+  'Connect our booking app to an API',
+  'Make a responsive mobile-friendly customer portal'
+ ]){
+  assert.equal(clarify.worthAsking(prompt),false,prompt);
+  assert.deepEqual(await clarify.questions(prompt,{callModel}),[],prompt);
+ }
+});
+
+test('only truly vague requests can trigger one question',async()=>{
+ assert.equal(clarify.worthAsking('Build an app'),true);
+ assert.equal(clarify.worthAsking('Make a website'),true);
+ const raw={questions:[{q:'What should the app help people do',options:[
+  {label:'Book or request something',detail:'A simple request or booking flow.'},
+  {label:'Track information',detail:'Save and manage records.'},
+  {label:'Show information',detail:'A clear website or directory.'}
+ ],recommended:0}]};
+ const callModel=async(o,parse)=>parse(JSON.stringify(raw));
+ const qs=await clarify.questions('Build an app',{callModel});
+ assert.equal(qs.length,1);
+ assert.equal(qs[0].q,'What should the app help people do?');
+ assert.equal(qs[0].recommended,0);
+});
+
+test('clarification never becomes a blocker when the model fails',async()=>{
+ assert.deepEqual(await clarify.questions('Build an app',{callModel:async()=>{throw Error('down')}}),[]);
+ assert.deepEqual(await clarify.questions('Build an app',{callModel:async(o,parse)=>parse('not json')}),[]);
+});
+
+test('one answer can still be folded into the request',()=>{
+ const p=clarify.withAnswers('Build an app',[{q:'What should people do first?',a:['Track customers']}]);
+ assert.equal(p,'Build an app\n\nDetails from the owner:\n- What should people do first? Track customers');
 });
