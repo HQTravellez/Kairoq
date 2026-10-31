@@ -18,7 +18,7 @@ test("Home exposes only supported primary modes",()=>{
 test("Home mode tabs use the list selector helper",()=>{
   const js=read("public/app.js");
   assert.ok(js.includes('$$(".kh-mode").forEach(t=>t.onclick'),"mode tabs must bind with $$()");
-  assert.doesNotMatch(js,/\$\("\.kh-mode"\)\.forEach/);
+  assert.doesNotMatch(js,/(^|[^$])\$\("\.kh-mode"\)\.forEach/m);
 });
 
 test("project tabs remain visible on Home and Build despite legacy topbar rules",()=>{
@@ -28,11 +28,11 @@ test("project tabs remain visible on Home and Build despite legacy topbar rules"
   assert.match(css,/visibility:visible!important/);
 });
 
-test("Home uses a real background image with fallbacks",()=>{
-  const css=read("public/home.css");
-  assert.match(css,/images\.pexels\.com\/photos\/20884933/);
-  assert.match(css,/linear-gradient\(180deg/);
-  assert.match(css,/background-position:center top/);
+test("Home uses an original local graphic with a gradient fallback",()=>{
+  const css=read("public/redesign.css");
+  assert.match(css,/assets\/kairoq-horizon\.svg/);
+  assert.match(css,/radial-gradient/);
+  assert.doesNotMatch(read("public/home.css"),/images\.pexels\.com/);
 });
 
 test("Testing Ground and project tabs remain present",()=>{

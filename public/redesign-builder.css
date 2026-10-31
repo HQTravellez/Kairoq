@@ -7,7 +7,9 @@ body.app.in-editor #chat-form.composer{flex:none!important;margin:12px!important
 body.app.in-editor #chat-form #chat-input{box-sizing:border-box;min-height:42px!important;max-height:180px!important;height:auto;width:100%;padding:4px!important;resize:none;overflow-y:auto;font-size:14px!important;line-height:1.6!important}
 body.app.in-editor #chat-form .composer-bar{display:flex;align-items:center;gap:6px;margin-top:8px}
 body.app.in-editor #chat-form .send{margin-left:auto;background:#287ac3!important;color:white!important;border-radius:10px!important}
-body.app.in-editor #attach-clip,body.app.in-editor #menu-tier>summary{display:none!important}
+body.app.in-editor #attach-clip{display:none!important}
+body.app.in-editor #menu-tier>summary{display:flex!important;align-items:center;gap:5px;border:1px solid #dce6ef;border-radius:8px;background:#f5f8fc;color:#294c6b;padding:7px 10px;font-size:12px}
+body.app.in-editor #tier-label{display:block!important;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.app.in-editor #menu-tier{position:static!important}
 body.app.in-editor #menu-tier[open]>.menu-panel{position:fixed!important;left:16px!important;bottom:100px!important;top:auto!important;width:min(360px,calc(100vw - 32px))!important;max-height:60dvh!important;overflow:auto;z-index:1000}
 body.app.in-editor .menu-panel{border-color:#dce6ef!important;border-radius:12px!important;box-shadow:0 12px 40px #17324c24!important}
@@ -36,3 +38,6 @@ body.app.in-editor .tabs-seg .lbl{display:inline!important;font-size:12px!import
 body.app.in-editor .tabs-seg button{display:inline-flex;align-items:center;gap:6px;padding:0 10px!important}
 body.app.in-editor #editor .chat-head .mark,body.app.in-editor .messages .assistant::before{background:#286ba5!important}
 body.app.in-editor #editor #menu-tier[open]>.menu-panel{position:fixed!important;left:16px!important;bottom:100px!important;top:auto!important;width:min(360px,calc(100vw - 32px))!important;min-width:260px!important;max-height:60dvh!important;overflow:auto!important;z-index:1000!important}
+
+body.app.in-editor #editor .tabs-seg button[aria-pressed=true]{background:#e9f2fa!important;color:#21649e!important}
+body.app.in-editor #editor #publish{background:#256aa3!important}

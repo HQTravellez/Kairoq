@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 720" fill="none">
+ <defs>
+  <linearGradient id="stem" x1="318" y1="170" x2="443" y2="568" gradientUnits="userSpaceOnUse"><stop stop-color="#f4fcff" stop-opacity=".95"/><stop offset=".42" stop-color="#8dc9eb" stop-opacity=".5"/><stop offset="1" stop-color="#236499" stop-opacity=".65"/></linearGradient>
+  <linearGradient id="upper" x1="645" y1="145" x2="388" y2="425" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity=".85"/><stop offset=".5" stop-color="#a2d9f4" stop-opacity=".8"/><stop offset="1" stop-color="#347fb9" stop-opacity=".7"/></linearGradient>
+  <linearGradient id="lower" x1="445" y1="338" x2="652" y2="590" gradientUnits="userSpaceOnUse"><stop stop-color="#367db4" stop-opacity=".65"/><stop offset=".55" stop-color="#96d3ee" stop-opacity=".8"/><stop offset="1" stop-color="#f7fdff" stop-opacity=".95"/></linearGradient>
+  <linearGradient id="edge" x1="350" y1="150" x2="570" y2="580"><stop stop-color="white" stop-opacity=".85"/><stop offset="1" stop-color="#8cc4e9" stop-opacity=".25"/></linearGradient>
+  <radialGradient id="halo"><stop stop-color="#a7e0f9" stop-opacity=".6"/><stop offset="1" stop-color="#c2e7fc" stop-opacity="0"/></radialGradient>
+  <filter id="shadow" x="210" y="100" width="530" height="590" filterUnits="userSpaceOnUse"><feGaussianBlur stdDeviation="24"/></filter>
+ </defs>
+ <ellipse cx="480" cy="420" rx="350" ry="285" fill="url(#halo)"/>
+ <ellipse cx="493" cy="594" rx="180" ry="17" fill="#46799c" opacity=".09" filter="url(#shadow)"/>
+ <circle cx="480" cy="354" r="242" stroke="#fff" stroke-opacity=".5"/>
+ <circle cx="480" cy="354" r="288" stroke="#639bc0" stroke-opacity=".1"/>
+ <path d="M315 202 406 164 406 535 315 574Z" fill="url(#stem)" stroke="url(#edge)"/>
+ <path d="M406 350 581 151 672 190 497 389Z" fill="url(#upper)" stroke="url(#edge)"/>
+ <path d="M406 350 497 389 672 575 581 615Z" fill="url(#lower)" stroke="url(#edge)"/>
+ <path d="M315 202 337 215 337 561 315 574Z" fill="#fff" opacity=".25"/>
+ <path d="M406 350 497 389" stroke="#f3fcff" stroke-opacity=".9"/>
+ <path d="m581 151 91 39M581 615l91-40" stroke="white" stroke-opacity=".85"/>
+ <path d="M137 552h103M705 260h70" stroke="#719ebd" stroke-opacity=".25"/>
+ <circle cx="240" cy="552" r="3" fill="#6498be" opacity=".5"/>
+ <circle cx="705" cy="260" r="3" fill="#6498be" opacity=".5"/>
+</svg>
