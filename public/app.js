@@ -43,7 +43,7 @@ let currentApproval = null;
 let imageMode = false;
 let videoMode = false;
 let mainView = localStorage.getItem("pai-main-view") || "chat";
-let workspaceBrowserOpen = JSON.parse(localStorage.getItem("kairoq-browser-pane-open") || "false");
+let workspaceBrowserOpen = false;
 let workspaceBrowserMode = localStorage.getItem("kairoq-browser-mode") || "live";
 let lastBrowserFrameDataUrl = "";
 let browserSelection = null;
@@ -249,6 +249,7 @@ function setMainView(view="command"){
   mainView = ["chat","command","studio","build","plugins"].includes(view) ? view : "command";
   localStorage.setItem("pai-main-view", mainView);
   $(".main").dataset.view = mainView;
+  if(mainView!=="chat")workspaceBrowserOpen=false;
   updateWorkspaceBrowserVisibility();
   document.body.classList.remove("nav-open");
   $("#sidebarToggle")?.setAttribute("aria-expanded", "false");
@@ -1934,16 +1935,14 @@ function isAppCreationRequest(message){
 // shown above the answer while the agent works, and left there as the final page.
 // Three-pane browser workspace: live Chromium research beside chat, plus local/same-origin preview.
 function updateWorkspaceBrowserVisibility(){
-  const main=$(".main"),pane=$("#browserWorkspace"),btn=$("#workspaceBrowserBtn");
+  const main=$(".main"),pane=$("#browserWorkspace");
   if(!main||!pane)return;
   const visible=mainView==="chat"&&workspaceBrowserOpen;
   main.classList.toggle("workspace-browser-open",visible);
   pane.classList.toggle("hidden",!visible);
-  if(btn){btn.setAttribute("aria-pressed",String(visible));btn.classList.toggle("active",visible)}
 }
-function setWorkspaceBrowserOpen(open,{persist=true}={}){
+function setWorkspaceBrowserOpen(open){
   workspaceBrowserOpen=Boolean(open);
-  if(persist)localStorage.setItem("kairoq-browser-pane-open",JSON.stringify(workspaceBrowserOpen));
   updateWorkspaceBrowserVisibility();
 }
 function browserModeAvailable(mode){
@@ -2057,7 +2056,6 @@ function updateBrowserLiveFrame(data={}){
   setWorkspaceBrowserOpen(true);setWorkspaceBrowserMode("live");return true;
 }
 function initWorkspaceBrowserControls(){
-  $("#workspaceBrowserBtn")?.addEventListener("click",()=>{setWorkspaceBrowserOpen(!workspaceBrowserOpen);if(workspaceBrowserOpen)setWorkspaceBrowserMode(workspaceBrowserMode)});
   $("#browserCloseBtn")?.addEventListener("click",()=>setWorkspaceBrowserOpen(false));
   $("#browserGoBtn")?.addEventListener("click",()=>openWorkspaceAddress());
   $("#browserAddress")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();openWorkspaceAddress()}});
@@ -2111,6 +2109,10 @@ async function send(regenerateFrom=null){
   setMainView("chat");
   const raw=promptEl.value.trim();
   if(busy || (!raw && !attachments.length))return;
+  // Browser/preview is contextual: hide evidence from the previous task. If this
+  // turn actually uses the browser, the first live frame opens the pane again.
+  setWorkspaceBrowserOpen(false);
+  clearBrowserSelection();
   if(regenerateFrom===null && (videoMode || isLikelyVideoRequest(raw))){
     return generateVideoFromPrompt(raw);
   }
