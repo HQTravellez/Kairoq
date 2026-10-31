@@ -230,6 +230,8 @@ function applyShellMode(){
   const btn=$("#shellModeBtn");
   if(btn){
     btn.textContent = simpleMode ? "Advanced" : "Simple";
+    btn.setAttribute("aria-label", simpleMode ? "Switch to advanced workspace" : "Switch to simple workspace");
+    btn.title = simpleMode ? "Advanced workspace" : "Simple workspace";
     btn.classList.toggle("active", !simpleMode);
   }
 }
