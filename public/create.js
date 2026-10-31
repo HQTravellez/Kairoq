@@ -40,6 +40,7 @@ async function loadMe(){
  text($('home-title'),name?'What should Kairoq get done, '+cap(name.split(' ')[0])+'?':'What should Kairoq get done?');
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
  const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
+ const tg=state.me.telegram;$('side-tg').classList.toggle('hidden',!(tg&&v&&v.kind==='customer'));
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
  text($('free-note'),state.me.free_credits?'New accounts get '+state.me.free_credits+' free credits. One credit = one change.':'');
@@ -2654,6 +2655,25 @@ function renderWhatsApp(w){
 $('wa-go').onclick=async()=>{text($('wa-error'),'');try{const r=await api('/whatsapp/code',{method:'POST'});text($('wa-code'),'link '+r.code);text($('wa-number'),r.number?'+'+r.number:'Kairoq');$('wa-code-line').classList.remove('hidden');if(r.link)window.open(r.link,'_blank','noopener')}catch(err){text($('wa-error'),err.message)}};
 $('wa-disconnect').onclick=async()=>{try{await api('/whatsapp/disconnect',{method:'POST'});renderWhatsApp({connected:false})}catch(err){text($('wa-error'),err.message)}};
 $('side-wa').onclick=openWhatsApp;
+
+// ---------- Telegram ----------
+async function openTelegram(){text($('tg-error'),'');$('tg-dialog').showModal();$('tg-code-line').classList.add('hidden');try{renderTelegram((await api('/telegram')).telegram)}catch(err){text($('tg-error'),err.message)}}
+function renderTelegram(t){
+ text($('tg-status'),t.connected?'Connected. You can message Kairoq from Telegram any time.':'Not connected yet.');
+ $('tg-connect').classList.toggle('hidden',t.connected);$('tg-connected-row').classList.toggle('hidden',!t.connected);
+ if(t.start)$('tg-open').href=t.start;
+}
+$('tg-go').onclick=async()=>{
+ text($('tg-error'),'');
+ try{
+  const r=await api('/telegram/code',{method:'POST'});
+  text($('tg-code'),'/start '+r.code);text($('tg-username'),r.username?'@'+r.username:'Kairoq on Telegram');
+  $('tg-code-line').classList.remove('hidden');
+  if(r.link)window.open(r.link,'_blank','noopener');
+ }catch(err){text($('tg-error'),err.message)}
+};
+$('tg-disconnect').onclick=async()=>{try{await api('/telegram/disconnect',{method:'POST'});renderTelegram({connected:false,start:state.me.telegram&&state.me.telegram.start})}catch(err){text($('tg-error'),err.message)}};
+$('side-tg').onclick=openTelegram;
 
 // ---------- memory: preferences and recipes ----------
 async function openMemory(){text($('mem-error'),'');$('memory-dialog').showModal();try{renderMemory((await api('/memory')).memory)}catch(err){text($('mem-error'),err.message)}}
