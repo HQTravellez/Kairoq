@@ -6,9 +6,12 @@ on:
       - 'create-api.js'
       - 'engineering-completion-gate.js'
       - 'visual-quality-gate.js'
+      - 'agent-response-contract.js'
+      - 'react-builder.js'
       - 'test/visual-quality-gate.test.js'
       - 'test/engineering-completion-gate.test.js'
       - 'test/execution-recovery-budget.test.js'
+      - 'test/agent-response-contract.test.js'
       - '.github/workflows/golden-path-release-hardening.yml'
   pull_request:
     paths:
@@ -35,4 +38,6 @@ jobs:
       - run: node --check create-api.js
       - run: node --check engineering-completion-gate.js
       - run: node --check visual-quality-gate.js
-      - run: node --test test/visual-quality-gate.test.js test/engineering-completion-gate.test.js test/execution-recovery-budget.test.js
+      - run: node --check agent-response-contract.js
+      - run: node --check react-builder.js
+      - run: node --test test/visual-quality-gate.test.js test/engineering-completion-gate.test.js test/execution-recovery-budget.test.js test/agent-response-contract.test.js
