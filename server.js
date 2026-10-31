@@ -7695,6 +7695,7 @@ setInterval(() => { require("./web-tasks").tick({ callModel: callBuilderModel })
   server.listen(PORT, () => {
     console.log(`${SITE_NAME} running at http://localhost:${PORT}`);
     console.log(`Free Only defaults to ON.`);
+    {const tg=require("./telegram");if(tg.enabled())tg.configureWebhook().then(()=>console.log("[telegram-kairoq] webhook ready")).catch(e=>console.warn("[telegram-kairoq] webhook setup failed: "+e.message));}
     console.log(openAccessUntil() ? "Password protection: OPEN TO EVERYONE until "+new Date(openAccessUntil()).toISOString()+" (KAIROQ_OPEN_ACCESS_UNTIL)" : authEnabled() ? "Password protection: ON" : "Password protection: OFF (set APP_PASSWORD for deployment)");
     {const sites=String(process.env.KAIROQ_SITES_DOMAIN||"").toLowerCase().replace(/^\.+|\.+$/g,"");let main="";try{main=new URL(process.env.KAIROQ_PUBLIC_URL||"").hostname}catch{}
      const parent=h=>h.split(".").slice(-2).join(".");
