@@ -44,7 +44,7 @@ const RULES=Object.freeze({
   requires:["api_docs"],evidence:["explicit operation approval","allowlisted host/operation","observed response"],fallback:"Generate integration code and mark live execution unverified."},
  freellmapi_pool:{risk:"low",auto:true,when:[/\b(free models?|free llm|cheap models?|model pool|provider fallback|free inference)\b/i],
   requires:[],evidence:["actual served model/provider metadata when available"],fallback:"Continue through Kairoq's existing model fallback chain."},
- test_repair:{risk:"low",auto:true,when:[/\b(test|verify|qa|regression|broken|bug|fix|repair|doesn.?t work|failing|validate)\b/i],
+ test_repair:{risk:"low",auto:true,when:[/\b(test|verify|qa|regression|broken|bug|fix|repair|doesn.?t work|failing|validate)\b/i,/\b(?:not|isn.?t|aren.?t|won.?t|can.?t)\b[^.\n]{0,60}\b(?:persist(?:ing)?|sav(?:e|ing)|load(?:ing)?|work(?:ing)?|update|sync(?:ing)?)\b/i],
   requires:["app_builder"],evidence:["fresh test output","browser evidence when UI is involved","no known blocking failures"],fallback:"Mark UNVERIFIED; never convert missing evidence into success."},
  app_database:{risk:"medium",auto:true,when:[/\b(database|sql|table|query|record|persistence|persist|schema|migration)\b/i],
   requires:[],evidence:["observed query/schema result when inspecting"],fallback:"Inspect source/schema files if runtime DB access is unavailable."},
