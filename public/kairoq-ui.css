@@ -565,3 +565,17 @@ input.kq-switch:checked{background:var(--k-wine)!important}
   #browserRefreshBtn{display:none}
   .browser-workspace-foot{align-items:flex-start;flex-direction:column}
 }
+
+
+/* ---------- Testing Ground embedded workspace ---------- */
+.kn-new-badge{margin-left:auto;padding:2px 6px;border-radius:999px;background:#efeafe;color:#5b3fd4;font-size:8px;font-weight:800;letter-spacing:.06em;line-height:1.4}
+.testing-ground-view{grid-column:1/-1;min-width:0;min-height:0;height:calc(100vh - 54px);overflow:hidden;background:#f6f6f2}
+.testing-ground-shell{position:relative;width:100%;height:100%;overflow:hidden}
+.testing-ground-shell iframe{width:100%;height:100%;border:0;background:#f6f6f2;display:block}
+.testing-ground-loading{position:absolute;z-index:2;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;background:#f6f6f2;color:var(--k-ink);font-size:13px}
+.testing-ground-loading div{display:flex;flex-direction:column;gap:3px}
+.testing-ground-loading small{color:var(--k-faint);font-size:11px}
+.main[data-view="testing"]>.composer-shell,.main[data-view="testing"]>#messages,.main[data-view="testing"]>#browserWorkspace{display:none!important}
+.main[data-view="testing"]>#testingGroundView{display:block!important}
+.sidebar.kn #testingGroundNavBtn.active .kn-new-badge{background:#fff;color:#4c35c9}
+@media(max-width:760px){.testing-ground-view{height:calc(100vh - 50px)}}
