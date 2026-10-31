@@ -524,7 +524,7 @@ async function openProject(id,{pendingText,job}={}){
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
  const msgs=state.project.messages;
- if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='What would you like Kairoq to get done?';list.append(li)}
+ if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.append(el('div','message-bubble','What would you like Kairoq to get done?'));list.append(li)}
  const questionIndex=msgs.findLastIndex(m=>m.role==='assistant'&&m.question&&m.question.text===state.project.pending_question?.text);
  msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1||i===questionIndex,i)));
  if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
@@ -550,22 +550,22 @@ function messageItem(m,last,index){
   const think=tl.find(e=>e.t==='think');
   const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
   if(thoughtMs!=null&&index>=0){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secsShort(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
-  li.append(renderMarkdown(readable(m.text)));
+  const reply=renderMarkdown(readable(m.text));reply.classList.add('message-bubble');li.append(reply);
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
    const q=el('div','question-options');
-   m.question.options.forEach((o,i)=>{
+   m.question.options.slice(0,3).forEach((o,i)=>{
     const rec=i===m.question.recommended,b=el('button','q-opt'+(rec?' recommended':''),o);b.type='button';
     if(rec)b.append(el('span','q-tag','Recommended'));
     b.onclick=()=>{q.querySelectorAll('button').forEach(x=>{x.disabled=true});send(o,'build')};
     q.append(b);
    });
-   li.append(q,el('p','q-hint','Pick one, or type your own answer. "ok" goes with the recommended option.'));
+   li.append(q,el('p','q-hint','Choose one, or type your own answer.'));
   }
   // Suggested next steps: one click builds that idea.
   if(last&&Array.isArray(m.ideas)&&m.ideas.length){
    const q=el('div','idea-list');
-   for(const idea of m.ideas){
+   for(const idea of m.ideas.slice(0,3)){
     const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
     const b=el('button','q-opt idea',idea);b.type='button';b.title='Build this: '+ask;
     b.onclick=()=>{q.querySelectorAll('button').forEach(x=>{x.disabled=true});send(ask,'build')};
