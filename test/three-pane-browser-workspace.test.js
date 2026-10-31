@@ -23,6 +23,7 @@ test("browser workspace routes live frames and supports add-to-chat references",
     "installPreviewInspector","addBrowserSelectionToChat","annotatedBrowserFrame"
   ]) assert.match(js,new RegExp("function\\s+"+symbol+"\\b"),symbol+" must exist");
   assert.match(js,/if\(updateBrowserLiveFrame\(data\)\)return;/);
+  assert.ok(js.includes('$("[data-browser-mode]").forEach'),"browser mode tabs must use list selector");
   assert.match(js,/attachments\.push\(\{kind:"image",name:"browser-selection\.jpg"/);
 });
 
