@@ -91,9 +91,9 @@ async function loadHome(){
  // The owner is warned when a deploy would wipe everything (no persistent volume).
  $('storage-warn').classList.toggle('hidden',!(state.me.storage&&state.me.storage.persistent===false));
  renderSetup(state.me.setup);
- // The first build's price, before typing (the questions before it are free).
+ // The first build's price, before typing. A rare clarification question is free.
  const firstNote=document.querySelector('#new-form .prompt-note'),std=(state.me.tiers||[]).find(t=>t.id==='standard'&&t.enabled);
- if(firstNote)firstNote.textContent='Every change is tested in a real browser before you pay for it.'+(acct&&std?' First build: '+std.credits+' credit'+(std.credits===1?'':'s')+'; the questions before it are free.':'');
+ if(firstNote)firstNote.textContent='Every change is tested in a real browser before you pay for it.'+(acct&&std?' First build: '+std.credits+' credit'+(std.credits===1?'':'s')+'; any clarification is free.':'');
  renderTemplates($('home-templates'),id=>startFromTemplate(id),id=>startFromSponsored(id));
  homeTab(state.homeTab||'projects');
  const {projects}=await api('/projects');
@@ -223,8 +223,8 @@ function typeExamples(){
 // No pre-build kind selector: the request itself determines the product format.
 $('new-prompt').addEventListener('focus',()=>{clearTimeout(home.typing);$('new-prompt').placeholder=KINDS[home.kind].examples[0]});
 $('new-prompt').addEventListener('blur',typeExamples);
-// A new app from the home box: the editor opens straight away and any quick questions, then
-// "How should it feel?" (the look), are asked inside the chat before the first build starts.
+// A new goal from the home box: the editor opens straight away. Clear requests start immediately;
+// only a genuinely vague goal may get one short clarification in the chat.
 $('new-form').onsubmit=async e=>{
  e.preventDefault();text($('home-error'),'');$('new-submit').disabled=true;
  try{
