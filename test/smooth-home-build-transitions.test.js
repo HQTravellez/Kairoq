@@ -46,7 +46,13 @@ test("builder opens without clearing to about blank",()=>{
   assert.match(css,/Opening your workspace…/);
 });
 
-test("mode tabs remain bound as a collection",()=>{\n  const js=read("public/app.js");\n  assert.ok(js.includes('$(".kh-mode").forEach(t=>t.onclick'),"Home modes must bind with $()");\n  assert.doesNotMatch(js,/\\$\\("\\.kh-mode"\\)\\.forEach/);\n});\n\ntest("motion respects reduced-motion users and preserves current product sections",()=>{
+test("mode tabs remain bound as a collection",()=>{
+  const js=read("public/app.js");
+  assert.ok(js.includes('$$(".kh-mode").forEach(t=>t.onclick'),"Home modes must bind with $$()");
+  assert.doesNotMatch(js,/(^|[^$])\$\("\.kh-mode"\)\.forEach/m);
+});
+
+test("motion respects reduced-motion users and preserves current product sections",()=>{
   const html=read("public/index.html");
   const css=read("public/home.css");
   assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
