@@ -12,7 +12,7 @@ const NATIVE=Object.freeze({
       authUrl:"https://www.figma.com/oauth",
       tokenUrl:"https://api.figma.com/v1/oauth/token",
       refreshUrl:"https://api.figma.com/v1/oauth/refresh",
-      scope:["current_user:read","file_content:read","file_metadata:read","library_content:read"],
+      scope:["current_user:read","file_content:read"],
       pkce:true,
       method:"HEADER",
       refreshWithoutGrant:true
