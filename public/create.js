@@ -2939,7 +2939,7 @@ $('connect-open').onclick=()=>{
   if(c.owner&&state.project.role!=='owner')continue;
   const li=el('li','connector'),ico=el('span','connector-ico',c.name.slice(0,1));ico.dataset.id=c.id;
   const t=el('div','skill-text');t.append(el('b',null,c.name),el('span',null,c.desc));
-  const go=el('button','ghost',c.id==='github'?'Connect':'Open');go.type='button';
+  const go=el('button','ghost',['github','figma'].includes(c.id)?'Connect':'Open');go.type='button';
   go.onclick=()=>{if(!['github','stripe','email','secrets','mcp'].includes(c.id))$('connectors-dialog').close();c.open()};
   li.append(ico,t,go);ul.append(li);
  }
