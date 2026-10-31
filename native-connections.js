@@ -11,11 +11,13 @@ const NATIVE=Object.freeze({
       type:"OAuth2",
       authUrl:"https://www.figma.com/oauth",
       tokenUrl:"https://api.figma.com/v1/oauth/token",
-      refreshUrl:"https://api.figma.com/v1/oauth/refresh",
+      refreshUrl:"https://api.figma.com/v1/oauth/token",
+      refreshFallbackUrl:"https://api.figma.com/v1/oauth/refresh",
       scope:["current_user:read","file_content:read"],
       pkce:true,
       method:"HEADER",
-      refreshWithoutGrant:true
+      refreshWithoutGrant:false,
+      refreshFallbackWithoutGrant:true
     }
   }
 });
