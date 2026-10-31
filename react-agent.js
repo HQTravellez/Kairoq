@@ -40,7 +40,7 @@ ${images?`- {"tool":"generate_images","images":[{"name":"hero-terrace.jpg","prom
 - {"tool":"web_act","steps":[{"action":"click","target":12},{"action":"click","target":"Pricing"},{"action":"fill","target":"Search","value":"..."},{"action":"select","target":9,"value":"..."},{"action":"scroll","value":"down"},{"action":"back"}]}: click around the page that is open (by number or by its text) and read the result. Reading only: nothing is sent to other sites.
 - {"tool":"fetch_url","url":"https://..."}: read a raw page or a JSON API response as text (no JavaScript).
 `:''}- {"tool":"finish","message":"for the user: what you built and how to use it"}: end when the request is done and the last build_and_test or test_ui passed.
-Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. When a user provides a GitHub repository URL, inspect_github_repo is the first repository-reading step. If it exposes API documentation candidates, inspect the relevant contract before writing integration code. Do not answer from the README alone when the task depends on deeper source or API evidence. For an initial app or a cohesive feature, put all needed files in ONE write_files action and then build_and_test; do not spend one model/tool round trip per file. Only split over two or three steps when the complete source cannot fit the response limit. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors, and keep the saved checks passing. Be economical: you have at most ${maxSteps} steps.`;
+Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. When a user provides a GitHub repository URL, inspect_github_repo is the first repository-reading step. If it exposes API documentation candidates, inspect the relevant contract before writing integration code. Do not answer from the README alone when the task depends on deeper source or API evidence. After repository inspection, follow the returned REPOSITORY REVIEW RESPONSE CONTRACT for repo-analysis answers. For an initial app or a cohesive feature, put all needed files in ONE write_files action and then build_and_test; do not spend one model/tool round trip per file. Only split over two or three steps when the complete source cannot fit the response limit. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors, and keep the saved checks passing. Be economical: you have at most ${maxSteps} steps.`;
 }
 
 // Never throws: a reply that is not valid JSON comes back as {invalid} so the loop can ask again.
@@ -245,6 +245,10 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
       const result=await require('./github-repository-intelligence').analyze(raw,{remote});
       webObserved=true;
       tl.add({t:'note',icon:'web',text:'Inspected GitHub repository: '+result.repository});
+      const reviewContract=require('./repository-review-contract').contract({
+        repository:result.repository,
+        hasApiDocs:Boolean((result.documentationCandidates||[]).length)
+      });
       return{text:clip(JSON.stringify({
         repository:result.repository,url:result.url,defaultBranch:result.defaultBranch,
         description:result.description,license:result.license,languageCounts:result.languageCounts,
@@ -254,8 +258,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
         securityNote:result.securityNote,
         nextStep:(result.documentationCandidates||[]).length
           ?'If the task involves an API, inspect the discovered OpenAPI/Swagger/Postman/API documentation candidate before implementing.'
-          :'Use the inspected README/manifests/source evidence to plan; do not assume undocumented APIs.'
-      }),36000)};
+          :'Use the inspected README/manifests/source evidence to plan; do not assume undocumented APIs.',
+        responseContract:reviewContract
+      }),38000)};
     }catch(e){return{text:'inspect_github_repo failed: '+String(e.message||e).slice(0,500)}}
   }
   if(t==='inspect_api_docs'){
