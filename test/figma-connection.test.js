@@ -103,3 +103,8 @@ test("Figma UI is OAuth-first and no longer asks customers for a personal token"
  assert.match(js,/service:'figma'/);
  assert.match(js,/renderFigmaConnection/);
 });
+
+test("Figma OAuth reads stay owner-scoped so editors cannot borrow the owner's Figma identity",()=>{
+ const api=fs.readFileSync(path.join(__dirname,"..","create-api.js"),"utf8");
+ assert.match(api,/'GET:\/figma':'owner','POST:\/figma':'owner'/);
+});
