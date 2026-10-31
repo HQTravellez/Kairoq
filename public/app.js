@@ -246,7 +246,7 @@ function applyShellMode(){
 
 function setMainView(view="command"){
   if(view==="command") document.body.classList.remove("history-focus");
-  mainView = ["chat","command","studio","build","plugins"].includes(view) ? view : "command";
+  mainView = ["chat","command","studio","build","plugins","testing"].includes(view) ? view : "command";
   localStorage.setItem("pai-main-view", mainView);
   $(".main").dataset.view = mainView;
   updateWorkspaceBrowserVisibility();
@@ -259,10 +259,13 @@ function setMainView(view="command"){
   command?.classList.toggle("hidden", mainView !== "command");
   messages?.classList.toggle("hidden", mainView !== "chat");
   studio?.classList.toggle("hidden", mainView !== "studio");
+  $("#testingGroundView")?.classList.toggle("hidden", mainView !== "testing");
   $("#buildView")?.classList.toggle("hidden", mainView !== "build");
   $("#pluginsView")?.classList.toggle("hidden", mainView !== "plugins");
   $("#pluginsNavBtn")?.classList.toggle("active", mainView === "plugins");
   if(mainView==="plugins")loadPlugins();
+  $("#testingGroundNavBtn")?.classList.toggle("active", mainView === "testing");
+  if(mainView==="testing")loadTestingGround();
   $("#buildNavBtn")?.classList.toggle("active", mainView === "build");
   if(mainView!=="command") $("#commandCenter")?.classList.remove("show-work");
   // On the home view the chat box sits under the headline; everywhere else it is docked at the bottom.
@@ -278,9 +281,10 @@ function setMainView(view="command"){
   $("#studioNavBtn")?.classList.toggle("active", mainView === "studio");
   $("#studioSideBtn")?.classList.toggle("active", mainView === "studio");
 
-  if($("#mainViewTitle")) $("#mainViewTitle").textContent = mainView === "build" ? "Build an app" : mainView === "plugins" ? "Plugins" : mainView === "command" ? "Home" : mainView === "studio" ? "Studio" : (getChat()?.title || "Ask Kairoq");
+  if($("#mainViewTitle")) $("#mainViewTitle").textContent = mainView === "build" ? "Build an app" : mainView === "testing" ? "Testing Ground" : mainView === "plugins" ? "Plugins" : mainView === "command" ? "Home" : mainView === "studio" ? "Studio" : (getChat()?.title || "Ask Kairoq");
   if($("#mainViewSubtitle")) $("#mainViewSubtitle").textContent = mainView === "command"
     ? ""
+    : mainView === "testing" ? "New AI launches · live challenges · direct provider tests"
     : mainView === "studio" ? "Create images, videos, avatars, and UGC from one place."
     : `${AGENT_TEAM[selectedAgentType]?.name || "Kairoq"} · ${currentProject}`;
 
@@ -292,8 +296,19 @@ function setMainView(view="command"){
 
   if(mainView === "command") refreshCommandCenter();
   else if(mainView === "studio") window.refreshStudio?.();
-  else requestAnimationFrame(()=>followLatest(true));
+  else if(mainView !== "testing") requestAnimationFrame(()=>followLatest(true));
 }
+
+function loadTestingGround(){
+  const frame=$("#testingGroundFrame"),loading=$("#testingGroundLoading");
+  if(!frame)return;
+  const target=String(frame.dataset.src||"").trim();
+  if((frame.getAttribute("src")||"")==="about:blank"&&target){
+    loading?.classList.remove("hidden");
+    frame.src=target;
+  }
+}
+$("#testingGroundFrame")?.addEventListener("load",()=>$("#testingGroundLoading")?.classList.add("hidden"));
 
 function workflowNeedsAttention(card){
   const s=String(card?.status||"").toLowerCase();
@@ -3280,6 +3295,7 @@ $("#historyNavBtn").onclick=()=>{
 };
 $("#chatViewBtn").onclick=()=>setMainView("chat");
 $("#studioNavBtn")?.addEventListener("click",()=>setMainView("studio"));
+$("#testingGroundNavBtn")?.addEventListener("click",()=>setMainView("testing"));
 $("#studioSideBtn")?.addEventListener("click",()=>setMainView("studio"));
 $("#newChat").onclick=()=>{document.body.classList.remove("history-focus");newChat();setMainView("chat")};
 
