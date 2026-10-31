@@ -19,6 +19,7 @@ function items({env=process.env}={}){
   {id:'videos',label:'Launch and hero videos from your photos',ok:require('./video-gen').configured(env),required:false,fix:'Add FAL_KEY in Railway (service, Variables) with a key from fal.ai. Videos are made with Wan 2.2; each clip costs KAIROQ_VIDEO_CREDITS credits (10 unless you set it).'},
   {id:'outreach',label:'Find customers can send approved emails',ok:Boolean(env.KAIROQ_OUTREACH_FROM)&&accounts.mailReady(),required:false,fix:'Verify a separate sending domain in Resend (for example mail.yourbrand.com, with SPF, DKIM and DMARC) and add KAIROQ_OUTREACH_FROM with an address on it in Railway (service, Variables). Cold email from your main domain can push your app\'s own emails into spam. Until then, owners copy approved emails into their own email.'},
   {id:'google',label:'Sign in with Google',ok:require('./google-oauth').configured(),required:false,fix:'Add KAIROQ_GOOGLE_CLIENT_ID and KAIROQ_GOOGLE_CLIENT_SECRET in Railway (service, Variables).'},
+  {id:'telegram',label:'Customers can use Kairoq from Telegram',ok:Boolean(env.KAIROQ_TELEGRAM_BOT_TOKEN&&env.KAIROQ_TELEGRAM_BOT_USERNAME&&env.KAIROQ_TELEGRAM_WEBHOOK_SECRET),required:false,fix:'Create a bot with @BotFather, then add KAIROQ_TELEGRAM_BOT_TOKEN, KAIROQ_TELEGRAM_BOT_USERNAME and KAIROQ_TELEGRAM_WEBHOOK_SECRET in Railway and redeploy. Kairoq registers the webhook automatically.'},
  ];
  // The temporary open door (server.js openAccessUntil): shown while it lasts, as a reminder.
  const open=Date.parse(String(env.KAIROQ_OPEN_ACCESS_UNTIL||''));

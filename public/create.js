@@ -37,9 +37,10 @@ async function loadMe(){
  text($('who'),v?(v.kind==='owner'?'Owner':v.account.email):'');
  const name=v?(v.kind==='owner'?'':v.account.email.split('@')[0].replace(/\d+$/,'').replace(/[._-]+/g,' ').trim().slice(0,24)):'';
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
- text($('home-title'),name?'What should we build, '+cap(name.split(' ')[0])+'?':'What should we build?');
+ text($('home-title'),name?'What should Kairoq get done, '+cap(name.split(' ')[0])+'?':'What should Kairoq get done?');
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
  const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
+ const tg=state.me.telegram;$('side-tg').classList.toggle('hidden',!(tg&&v&&v.kind==='customer'));
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
  text($('free-note'),state.me.free_credits?'New accounts get '+state.me.free_credits+' free credits. One credit = one change.':'');
@@ -91,9 +92,9 @@ async function loadHome(){
  // The owner is warned when a deploy would wipe everything (no persistent volume).
  $('storage-warn').classList.toggle('hidden',!(state.me.storage&&state.me.storage.persistent===false));
  renderSetup(state.me.setup);
- // The first build's price, before typing (the questions before it are free).
+ // The first build's price, before typing. A rare clarification question is free.
  const firstNote=document.querySelector('#new-form .prompt-note'),std=(state.me.tiers||[]).find(t=>t.id==='standard'&&t.enabled);
- if(firstNote)firstNote.textContent='Every change is tested in a real browser before you pay for it.'+(acct&&std?' First build: '+std.credits+' credit'+(std.credits===1?'':'s')+'; the questions before it are free.':'');
+ if(firstNote)firstNote.textContent='Every change is tested in a real browser before you pay for it.'+(acct&&std?' First build: '+std.credits+' credit'+(std.credits===1?'':'s')+'; any clarification is free.':'');
  renderTemplates($('home-templates'),id=>startFromTemplate(id),id=>startFromSponsored(id));
  homeTab(state.homeTab||'projects');
  const {projects}=await api('/projects');
@@ -190,18 +191,22 @@ $('side-templates').onclick=async()=>{if($('home').classList.contains('hidden'))
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
-// What to build (like superapp's first question): a website, a web app or a phone app. Each has
-// its own examples, typed into the empty box one after another (they stop when you type or focus).
+// One natural-language starting point. Kairoq infers website/app/phone and visual choices from
+// the request instead of making the user classify the job before speaking.
 const KINDS={
- site:{prefix:'',examples:['A restaurant site with the menu, opening hours and reservations','A landing page for my renovation company with photos and a quote form','A portfolio for my photography studio with bookings']},
- app:{prefix:'',examples:['A CRM to track leads, deals and follow-ups','A booking system for my salon with staff calendars','An inventory tracker for my café with low-stock alerts']},
- phone:{prefix:'Build a mobile app: ',examples:['An iPhone app for my café: order ahead and see the menu','A gym app with class bookings and a membership card','A tour guide app with maps of the stops']}};
-const home={kind:'site',typing:null};
-function setKind(kind){
- home.kind=KINDS[kind]?kind:'site';
- for(const b of document.querySelectorAll('#new-kind button'))b.setAttribute('aria-pressed',String(b.dataset.kind===home.kind));
+ auto:{prefix:'',examples:[
+  'Build a CRM for my sales team to track leads and follow-ups',
+  'Fix our booking flow and make sure it works on mobile',
+  'Connect Stripe checkout and verify the payment journey',
+  'Create a blue and white website for my restaurant with reservations',
+  'Build an iPhone-friendly habit tracker',
+  'Make this GitHub repo production ready'
+ ]}};
+const home={kind:'auto',typing:null};
+function setKind(){
+ home.kind='auto';
  const ex=$('examples');ex.replaceChildren();
- for(const t of KINDS[home.kind].examples){const b=el('button','example',t);b.type='button';b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)}
+ for(const t of KINDS.auto.examples){const b=el('button','example',t);b.type='button';b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)}
  typeExamples();
 }
 function typeExamples(){
@@ -216,11 +221,11 @@ function typeExamples(){
   home.typing=setTimeout(tick,back?18:38)};
  home.typing=setTimeout(tick,500);
 }
-for(const b of document.querySelectorAll('#new-kind button'))b.onclick=()=>setKind(b.dataset.kind);
+// No pre-build kind selector: the request itself determines the product format.
 $('new-prompt').addEventListener('focus',()=>{clearTimeout(home.typing);$('new-prompt').placeholder=KINDS[home.kind].examples[0]});
 $('new-prompt').addEventListener('blur',typeExamples);
-// A new app from the home box: the editor opens straight away and any quick questions, then
-// "How should it feel?" (the look), are asked inside the chat before the first build starts.
+// A new goal from the home box: the editor opens straight away. Clear requests start immediately;
+// only a genuinely vague goal may get one short clarification in the chat.
 $('new-form').onsubmit=async e=>{
  e.preventDefault();text($('home-error'),'');$('new-submit').disabled=true;
  try{
@@ -240,14 +245,14 @@ $('new-form').onsubmit=async e=>{
    // Return to the normal composer. The backend decides whether each message is chat or a build.
    setChatMode('build');
    $('chat-input').value='';
-   $('chat-input').placeholder='Tell Kairoq what you want to build…';
+   $('chat-input').placeholder='Tell Kairoq what you want to get done…';
    $('chat-input').focus();
    syncSend();
    return;
   }
   $('home-error').classList.remove('welcome');
-  // A phone app is asked for in words the builder knows (react-native-app.js wanted()).
-  const prompt=(KINDS[home.kind].prefix&&!/^Build a mobile app:/i.test(typed)?KINDS[home.kind].prefix:'')+typed;
+  // The user's own words are the specification; Kairoq infers website/app/mobile and design intent.
+  const prompt=typed;
   await askThenBuild(prompt);
   $('new-prompt').value='';
  }catch(err){text($('home-error'),err.message)}
@@ -279,7 +284,7 @@ slideSegs();
 // to fit the next one, and the new step slides in from the side it comes from (dir 1 forward,
 // -1 back, 0 fade). The slide-in itself is CSS (.ask-card[data-dir] > *). Reduced motion: instant.
 const STILL=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-setKind('site');
+setKind();
 function morph(card,fill,dir=1){
  card.dataset.dir=String(dir);
  if(STILL||!card.isConnected||!card.children.length){card.replaceChildren();fill();return}
@@ -293,75 +298,54 @@ function morph(card,fill,dir=1){
   setTimeout(()=>{card.style.height='';card.classList.remove('morphing')},340);
  },150);
 }
-// Started from the main Kairoq page: open the editor straight away and ask any quick questions
-// inside the chat, one at a time, before the first build starts.
+// Started from the main Kairoq page: open the editor and begin naturally.
+// Most requests build immediately. One short clarification is shown only when the goal itself
+// is too vague to identify a useful first outcome. Visual/style/3D choices are never required.
 async function askThenBuild(prompt){
  const name=shortName(prompt);
  const {project}=await api('/projects',{method:'POST',body:{name}});
  await openProject(project.id);
  const list=$('messages');list.replaceChildren();
  let mine=messageItem({role:'user',text:prompt});list.append(mine);
- const card=document.createElement('li');card.className='assistant ask-card';
- card.classList.add('enter');card.dataset.dir='0';card.append(el('p','ask-head k-shimmer','Reading your request…'));list.append(card);
+ const card=document.createElement('li');card.className='assistant ask-card enter';card.dataset.dir='0';
+ card.append(el('p','ask-head k-shimmer','Understanding what you want…'));list.append(card);
+
  const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
- // The picked look (if any) becomes the project's colours and fonts; then the plan (build-plan.js)
- // is shown with Review, Skip and Approve, and the build starts on Approve (or Skip).
- const request=answers=>answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
- const go=(answers,plan)=>{mine.remove();card.remove();planWaiting(false);send(plan?withPlan(request(answers),plan):request(answers),'build')};
- const build=async(answers,look)=>{
-  if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
-  if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
-  morph(card,()=>card.append(el('p','ask-head k-shimmer','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
-  planWaiting(true);
-  const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
-  if(!plan)return go(answers,null);
-  // A character the owner picked in the plan is added to the project's 3D files first.
-  const approve=async()=>{
-   if(plan.pick){try{const d=await api('/projects/'+project.id+'/models?op=polypizza',{method:'POST',body:{id:plan.pick.id}});plan.picked=d.added.title}catch(err){card.querySelector('.char-pick')?.append(el('p','char-note char-err',err.message));return false}}
-   go(answers,plan);
-  };
-  showBuildPlan(card,plan,{onApprove:approve,onSkip:()=>go(answers,null),projectId:project.id});
-  list.scrollTop=list.scrollHeight;
+ const q=questions[0]||null;
+ const request=answer=>answer
+  ?prompt+'\n\nOne detail from the owner:\n- '+q.q+' '+answer
+  :prompt;
+ const go=answer=>{
+  mine.remove();card.remove();
+  send(request(answer),'build');
  };
- const picked=questions.map(()=>new Set()),other=questions.map(()=>'');let at=0;
- const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
- // The last question is always the look: "How should it feel?" (create-look.js).
- const total=questions.length+(window.KairoqLook?1:0);
- const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:total>1?'Question '+total+' of '+total:'One quick question',
-  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw(-1)}:null});
- if(!questions.length)return window.KairoqLook?lookStep():build([]);
- const draw=(dir=1)=>morph(card,()=>{
-  const q=questions[at];
-  // Like superapp: the question, option cards (a label and one sentence), "Other…", then
-  // Back and forward arrows, Skip all and Next.
-  const head=el('div','ask-top');head.append(el('span','ask-count',total>1?'Question '+(at+1)+' of '+total:'One quick question'));
+
+ // Clear requests go straight to Kairoq's normal goal/build engine.
+ if(!q)return go('');
+
+ morph(card,()=>{
+  card.append(el('p','ask-count','One quick question'),el('p','ask-q',q.q));
   const opts=el('div','ask-opts');
-  const mark=()=>{for(const r of opts.querySelectorAll('.ask-opt'))r.classList.toggle('on',r.querySelector('input').checked)};
-  (q.options||[]).forEach((o,i)=>{
-   const row=el('label','ask-opt');const input=document.createElement('input');
-   input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
-   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o);mark()};
-   const words=el('span','ask-words');words.append(el('span','ask-label',o+(i===q.recommended?' (Recommended)':'')));
+  (q.options||[]).slice(0,3).forEach((o,i)=>{
+   const b=el('button','ask-opt'+(i===q.recommended?' recommended':''));b.type='button';
+   const words=el('span','ask-words');words.append(el('span','ask-label',o));
    if(q.details&&q.details[i])words.append(el('span','ask-detail',q.details[i]));
-   row.append(input,words);opts.append(row);
+   if(i===q.recommended)words.append(el('span','q-tag','Recommended'));
+   b.append(words);b.onclick=()=>{opts.querySelectorAll('button').forEach(x=>x.disabled=true);go(o)};
+   opts.append(b);
   });
-  const own=document.createElement('input');own.className='ask-other';own.placeholder='Other…';own.value=other[at];own.setAttribute('aria-label','Another answer');
-  own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false;mark()}};
-  mark();
+  const own=document.createElement('input');own.className='ask-other';own.placeholder='Or type a short answer…';own.setAttribute('aria-label','Your answer');
   const foot=el('div','ask-foot');
-  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw(-1)};
-  const fwd=el('button','ask-arrow','›');fwd.type='button';fwd.setAttribute('aria-label','Next question');fwd.disabled=at===questions.length-1&&!window.KairoqLook;
-  const last=at===questions.length-1,final=last&&!window.KairoqLook;
-  const forward=()=>{if(final)build(answers());else if(last){morph(card,()=>card.append(el('p','ask-head k-shimmer','Finding looks that fit…')),1);setTimeout(lookStep,STILL?0:170)}else{at++;draw(1)}};fwd.onclick=forward;
-  const skip=el('button','ask-link','Skip all');skip.type='button';skip.onclick=()=>build(answers());
-  const next=el('button','ask-next',final?'Submit':'Next');next.type='button';next.onclick=forward;
-  foot.append(back,fwd,el('span','ask-gap'),skip,next);
-  // Thin progress segments, one per question (and the look).
-  const bar=el('div','ask-progress');for(let k=0;k<total;k++)bar.append(el('i',k<=at?'on':null));
-  card.append(bar,head,el('p','ask-q',q.q),opts,own,foot);
+  const skip=el('button','ask-link','Build anyway');skip.type='button';skip.onclick=()=>go('');
+  const sendAnswer=el('button','ask-next','Continue');sendAnswer.type='button';sendAnswer.disabled=true;
+  own.oninput=()=>{sendAnswer.disabled=!own.value.trim()};
+  own.onkeydown=e=>{if(e.key==='Enter'&&own.value.trim()){e.preventDefault();go(own.value.trim())}};
+  sendAnswer.onclick=()=>{if(own.value.trim())go(own.value.trim())};
+  foot.append(el('span','ask-gap'),skip,sendAnswer);
+  card.append(opts,own,foot);
   list.scrollTop=list.scrollHeight;
- },dir);
- draw(0);
+  own.focus({preventScroll:true});
+ },0);
 }
 // A first request with the owner's answers and the approved plan, shown like superapp: the request,
 // each question small with its answer under it, then the plan's title.
@@ -541,7 +525,7 @@ async function openProject(id,{pendingText,job}={}){
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
  const msgs=state.project.messages;
- if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. Switch to Discuss to plan without changing code.';list.append(li)}
+ if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.append(el('div','message-bubble','What would you like Kairoq to get done?'));list.append(li)}
  const questionIndex=msgs.findLastIndex(m=>m.role==='assistant'&&m.question&&m.question.text===state.project.pending_question?.text);
  msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1||i===questionIndex,i)));
  if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
@@ -567,22 +551,22 @@ function messageItem(m,last,index){
   const think=tl.find(e=>e.t==='think');
   const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
   if(thoughtMs!=null&&index>=0){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secsShort(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
-  li.append(renderMarkdown(readable(m.text)));
+  const reply=renderMarkdown(readable(m.text));reply.classList.add('message-bubble');li.append(reply);
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
    const q=el('div','question-options');
-   m.question.options.forEach((o,i)=>{
+   m.question.options.slice(0,3).forEach((o,i)=>{
     const rec=i===m.question.recommended,b=el('button','q-opt'+(rec?' recommended':''),o);b.type='button';
     if(rec)b.append(el('span','q-tag','Recommended'));
     b.onclick=()=>{q.querySelectorAll('button').forEach(x=>{x.disabled=true});send(o,'build')};
     q.append(b);
    });
-   li.append(q,el('p','q-hint','Pick one, or type your own answer. "ok" goes with the recommended option.'));
+   li.append(q,el('p','q-hint','Choose one, or type your own answer.'));
   }
   // Suggested next steps: one click builds that idea.
   if(last&&Array.isArray(m.ideas)&&m.ideas.length){
    const q=el('div','idea-list');
-   for(const idea of m.ideas){
+   for(const idea of m.ideas.slice(0,3)){
     const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
     const b=el('button','q-opt idea',idea);b.type='button';b.title='Build this: '+ask;
     b.onclick=()=>{q.querySelectorAll('button').forEach(x=>{x.disabled=true});send(ask,'build')};
@@ -2671,6 +2655,25 @@ function renderWhatsApp(w){
 $('wa-go').onclick=async()=>{text($('wa-error'),'');try{const r=await api('/whatsapp/code',{method:'POST'});text($('wa-code'),'link '+r.code);text($('wa-number'),r.number?'+'+r.number:'Kairoq');$('wa-code-line').classList.remove('hidden');if(r.link)window.open(r.link,'_blank','noopener')}catch(err){text($('wa-error'),err.message)}};
 $('wa-disconnect').onclick=async()=>{try{await api('/whatsapp/disconnect',{method:'POST'});renderWhatsApp({connected:false})}catch(err){text($('wa-error'),err.message)}};
 $('side-wa').onclick=openWhatsApp;
+
+// ---------- Telegram ----------
+async function openTelegram(){text($('tg-error'),'');$('tg-dialog').showModal();$('tg-code-line').classList.add('hidden');try{renderTelegram((await api('/telegram')).telegram)}catch(err){text($('tg-error'),err.message)}}
+function renderTelegram(t){
+ text($('tg-status'),t.connected?'Connected. You can message Kairoq from Telegram any time.':'Not connected yet.');
+ $('tg-connect').classList.toggle('hidden',t.connected);$('tg-connected-row').classList.toggle('hidden',!t.connected);
+ if(t.start)$('tg-open').href=t.start;
+}
+$('tg-go').onclick=async()=>{
+ text($('tg-error'),'');
+ try{
+  const r=await api('/telegram/code',{method:'POST'});
+  text($('tg-code'),'/start '+r.code);text($('tg-username'),r.username?'@'+r.username:'Kairoq on Telegram');
+  $('tg-code-line').classList.remove('hidden');
+  if(r.link)window.open(r.link,'_blank','noopener');
+ }catch(err){text($('tg-error'),err.message)}
+};
+$('tg-disconnect').onclick=async()=>{try{await api('/telegram/disconnect',{method:'POST'});renderTelegram({connected:false,start:state.me.telegram&&state.me.telegram.start})}catch(err){text($('tg-error'),err.message)}};
+$('side-tg').onclick=openTelegram;
 
 // ---------- memory: preferences and recipes ----------
 async function openMemory(){text($('mem-error'),'');$('memory-dialog').showModal();try{renderMemory((await api('/memory')).memory)}catch(err){text($('mem-error'),err.message)}}

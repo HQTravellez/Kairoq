@@ -44,3 +44,54 @@ test("Agent Mode protocol embeds the same Kairoq response contract",()=>{
  assert.match(p,/KAIROQ RESPONSE CONTRACT/);
  assert.match(p,/Speak as Kairoq, the product/);
 });
+
+test("explicit frustration gets a specific apology-first conversation signal",()=>{
+ assert.equal(response.frustrated("This still doesn't work and I'm not happy"),true);
+ assert.equal(response.frustrated("Can you fix the checkout bug?"),false);
+ const p=response.prompt("Why the heck do you keep asking me this again?");
+ assert.match(p,/CURRENT USER SIGNAL/);
+ assert.match(p,/Begin with one brief, specific apology/);
+ assert.match(p,/restate what the user actually wants/);
+ assert.match(p,/at most 3 options/);
+});
+
+test("normal messages keep the warm conversation rules without forced apology",()=>{
+ const p=response.prompt("Please add a booking calendar");
+ assert.doesNotMatch(p,/CURRENT USER SIGNAL/);
+ assert.match(p,/thoughtful teammate in a real chat/);
+ assert.match(p,/Do not ask questions Kairoq can safely decide itself/);
+ assert.match(p,/Offer up to 3/);
+});
+
+test("empty or rude model output never reaches the user unchanged",()=>{
+ const empty=response.guard("Build a CRM","");
+ assert.ok(empty.length>20);
+ assert.match(empty,/Kairoq|understand/i);
+
+ const rude=response.guard("Please fix the booking flow","That is your problem. Figure it out.");
+ assert.doesNotMatch(rude,/your problem|figure it out/i);
+ assert.match(rude,/Sorry/);
+});
+
+test("frustrated user gets apology even when the selected model forgets it",()=>{
+ const out=response.guard("This still doesn't work and I'm not happy","I will inspect the checkout again.");
+ assert.match(out,/^Sorry/);
+ assert.match(out,/corrected|explained away/i);
+});
+
+test("empty or rude model replies are replaced before the user sees them",()=>{
+ const empty=response.guard("Can you inspect this API?","");
+ assert.ok(empty.length>20);
+ assert.doesNotMatch(empty,/^\s*$/);
+ const rude=response.guard("Please help me fix this","Figure it out yourself, that's your problem.");
+ assert.doesNotMatch(rude,/figure it out|your problem/i);
+ assert.match(rude,/response was not appropriate/i);
+});
+
+test("frustrated turns cannot reach the user without acknowledgement",()=>{
+ const guarded=response.guard("This still doesn't work and I'm not happy","I will inspect the flow again.");
+ assert.match(guarded,/^Sorry/i);
+ assert.match(guarded,/corrected, not explained away/i);
+ const already=response.guard("This still doesn't work","Sorry — I missed the broken checkout. I’ll fix it.");
+ assert.equal(already,"Sorry — I missed the broken checkout. I’ll fix it.");
+});
