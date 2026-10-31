@@ -67,7 +67,9 @@ function createBrowser({browseSite,maxOps=25,viewport}={}){
 // Whether a message needs the web at all: a link, or words that ask to look something up.
 function needsWeb(text){
  const t=String(text||'');
- return /https?:\/\/[^\s)]+/i.test(t)||/\b(search|look ?up|find out|research|latest|current|today'?s|news|online|on the web|internet|website|web ?site|site|docs|documentation|api reference|pricing of|prices? (?:of|for)|compare|competitors?|what does .* (?:do|cost)|like [a-z0-9.-]+\.(?:com|io|app|co|ai|net|org))\b/i.test(t);
+ const bareDomain=/(?<![@\w])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|io|app|co|ai|net|org|ca|dev|tech|travel|co\.uk)(?:\/[^\s)\]}>]*)?/i;
+ return /https?:\/\/[^\s)]+/i.test(t)||bareDomain.test(t)
+  ||/\b(search|look ?up|find out|research|latest|current|today'?s|news|online|on the web|internet|website|web ?site|site|docs|documentation|api reference|pricing of|prices? (?:of|for)|compare|competitors?|what does .* (?:do|cost))\b/i.test(t);
 }
 const RESEARCH_PROMPT=`You decide what to look up on the web before an app builder answers a user or changes their app. You can search the web and open public web pages in a real browser (reading only).
 Reply with ONLY a JSON object: {"web":[{"search":"query"},{"open":"https://..."}],"why":"short reason"}.
@@ -82,7 +84,7 @@ function parseWeb(content){
 
 // Research before answering or building: the model picks what to search and open, Kairoq
 // does it (up to maxOps actions over two rounds) and returns a context block plus the sources.
-async function gather(message,{callModel,tier='standard',signal,webSearch,browseSite,onProgress=()=>{},maxOps=6,force=false}={}){
+async function gather(message,{callModel,tier='standard',signal,webSearch,browseSite,onProgress=()=>{},onBrowser=()=>{},maxOps=6,force=false}={}){
  const text=String(message||'').trim();
  if(!text||(!force&&!needsWeb(text)))return{context:'',sources:[]};
  const canSearch=typeof webSearch==='function';
@@ -102,7 +104,11 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
     const u=it.open.trim();if(seen.has(u))continue;seen.add(u);
     if(!browser.available()){blocks.push('Opening websites is not available on this server.');continue}
     ops++;onProgress('Reading '+hostOf(u));
-    try{const page=await browser.open(u);sources.push({url:browser.url,title:browser.title||hostOf(u)});blocks.push(page)}catch(e){blocks.push('Could not open '+u+': '+String(e.message||e).slice(0,200))}
+    try{
+     const page=await browser.open(u),shot=await browser.screenshot().catch(()=>null);
+     sources.push({url:browser.url,title:browser.title||hostOf(u)});blocks.push(page);
+     onBrowser({url:browser.url,title:browser.title||hostOf(u),screenshot:shot,at:new Date().toISOString()});
+    }catch(e){blocks.push('Could not open '+u+': '+String(e.message||e).slice(0,200))}
    }
   }
  }
