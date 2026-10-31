@@ -12,7 +12,7 @@ function changedFiles(base={},current={}){
 function required({base={},current={},request=""}={}){
   const changed=changedFiles(base,current);
   if(changed.some(f=>UI_FILE.test(f)))return true;
-  return /\b(ui|ux|design|layout|page|website|app|dashboard|form|screen|responsive|mobile|landing|visual|style|redesign)\b/i.test(String(request||""));
+  return /\b(ui|ux|design|layout|page|website|dashboard|form|screen|responsive|mobile|landing|visual|style|redesign)\b/i.test(String(request||""));
 }
 
 function factsFromMeta(meta={}){
