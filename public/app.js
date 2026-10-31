@@ -43,6 +43,12 @@ let currentApproval = null;
 let imageMode = false;
 let videoMode = false;
 let mainView = localStorage.getItem("pai-main-view") || "chat";
+let workspaceBrowserOpen = JSON.parse(localStorage.getItem("kairoq-browser-pane-open") || "false");
+let workspaceBrowserMode = localStorage.getItem("kairoq-browser-mode") || "live";
+let lastBrowserFrameDataUrl = "";
+let browserSelection = null;
+let previewSelectedElement = null;
+let previewInspectorHandler = null;
 let simpleMode = JSON.parse(localStorage.getItem("pai-simple-mode") || "true");
 let spendMode = localStorage.getItem("pai-spend-mode") || "cheap";
 
@@ -243,6 +249,7 @@ function setMainView(view="command"){
   mainView = ["chat","command","studio","build","plugins"].includes(view) ? view : "command";
   localStorage.setItem("pai-main-view", mainView);
   $(".main").dataset.view = mainView;
+  updateWorkspaceBrowserVisibility();
   document.body.classList.remove("nav-open");
   $("#sidebarToggle")?.setAttribute("aria-expanded", "false");
 
@@ -1925,9 +1932,151 @@ function isAppCreationRequest(message){
 }
 // Live view of a browser-use run: the latest screenshot from Kairoq's headless Chromium,
 // shown above the answer while the agent works, and left there as the final page.
+// Three-pane browser workspace: live Chromium research beside chat, plus local/same-origin preview.
+function updateWorkspaceBrowserVisibility(){
+  const main=$(".main"),pane=$("#browserWorkspace"),btn=$("#workspaceBrowserBtn");
+  if(!main||!pane)return;
+  const visible=mainView==="chat"&&workspaceBrowserOpen;
+  main.classList.toggle("workspace-browser-open",visible);
+  pane.classList.toggle("hidden",!visible);
+  if(btn){btn.setAttribute("aria-pressed",String(visible));btn.classList.toggle("active",visible)}
+}
+function setWorkspaceBrowserOpen(open,{persist=true}={}){
+  workspaceBrowserOpen=Boolean(open);
+  if(persist)localStorage.setItem("kairoq-browser-pane-open",JSON.stringify(workspaceBrowserOpen));
+  updateWorkspaceBrowserVisibility();
+}
+function browserModeAvailable(mode){
+  if(mode==="preview")return Boolean($("#browserPreviewFrame")?.src&&$("#browserPreviewFrame").src!=="about:blank");
+  return Boolean(lastBrowserFrameDataUrl);
+}
+function setWorkspaceBrowserMode(mode="live"){
+  workspaceBrowserMode=mode==="preview"?"preview":"live";
+  localStorage.setItem("kairoq-browser-mode",workspaceBrowserMode);
+  const live=$("#browserLiveWrap"),frame=$("#browserPreviewFrame"),empty=$("#browserEmpty");
+  const has=browserModeAvailable(workspaceBrowserMode);
+  live?.classList.toggle("hidden",workspaceBrowserMode!=="live"||!has);
+  frame?.classList.toggle("hidden",workspaceBrowserMode!=="preview"||!has);
+  empty?.classList.toggle("hidden",has);
+  $("[data-browser-mode]").forEach(b=>{const on=b.dataset.browserMode===workspaceBrowserMode;b.classList.toggle("active",on);b.setAttribute("aria-selected",String(on))});
+  const title=$("#browserWorkspaceTitle");if(title)title.textContent=workspaceBrowserMode==="preview"?"Preview":"Browser";
+}
+function clearBrowserSelection(){
+  browserSelection=null;
+  $("#browserSelectionBar")?.classList.add("hidden");
+  $("#browserPointMarker")?.classList.add("hidden");
+  if(previewSelectedElement){
+    previewSelectedElement.style.outline=previewSelectedElement.dataset.kqOldOutline||"";
+    previewSelectedElement.style.outlineOffset=previewSelectedElement.dataset.kqOldOutlineOffset||"";
+    delete previewSelectedElement.dataset.kqOldOutline;delete previewSelectedElement.dataset.kqOldOutlineOffset;
+    previewSelectedElement=null;
+  }
+}
+function browserElementSelector(el){
+  if(!el||el.nodeType!==1)return "";
+  if(el.id)return el.tagName.toLowerCase()+"#"+CSS.escape(el.id);
+  const cls=[...el.classList].filter(Boolean).slice(0,3);
+  let out=el.tagName.toLowerCase()+(cls.length?"."+cls.map(CSS.escape).join("."):"");
+  const parent=el.parentElement;
+  if(parent){const same=[...parent.children].filter(x=>x.tagName===el.tagName);if(same.length>1)out+=`:nth-of-type(${same.indexOf(el)+1})`}
+  return out;
+}
+function installPreviewInspector(){
+  const frame=$("#browserPreviewFrame"),btn=$("#workspaceInspectBtn");
+  if(!frame||workspaceBrowserMode!=="preview")return;
+  let doc;try{doc=frame.contentDocument}catch{doc=null}
+  if(!doc){if(btn)btn.title="Element selection is available for Kairoq and same-origin previews";return}
+  if(previewInspectorHandler)try{doc.removeEventListener("click",previewInspectorHandler,true)}catch{}
+  previewInspectorHandler=ev=>{
+    if(btn?.getAttribute("aria-pressed")!=="true")return;
+    ev.preventDefault();ev.stopPropagation();clearBrowserSelection();
+    const el=ev.target;if(!el||el===doc.documentElement||el===doc.body)return;
+    previewSelectedElement=el;el.dataset.kqOldOutline=el.style.outline||"";el.dataset.kqOldOutlineOffset=el.style.outlineOffset||"";
+    el.style.outline="2px solid #ff5b57";el.style.outlineOffset="2px";
+    const selector=browserElementSelector(el);
+    const text=String(el.innerText||el.getAttribute("aria-label")||"").trim().replace(/\s+/g," ").slice(0,500);
+    const html=String(el.outerHTML||"").slice(0,2500);
+    browserSelection={kind:"element",selector,text,html};
+    const label=$("#browserSelectionLabel");if(label)label.textContent=(selector||el.tagName.toLowerCase())+(text?" · "+text.slice(0,80):"");
+    $("#browserSelectionBar")?.classList.remove("hidden");
+  };
+  doc.addEventListener("click",previewInspectorHandler,true);
+}
+async function annotatedBrowserFrame(){
+  if(!browserSelection||browserSelection.kind!=="point"||!lastBrowserFrameDataUrl)return lastBrowserFrameDataUrl;
+  const img=new Image();img.src=lastBrowserFrameDataUrl;await img.decode();
+  const c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;
+  const ctx=c.getContext("2d");ctx.drawImage(img,0,0);
+  const x=browserSelection.x*c.width,y=browserSelection.y*c.height,r=Math.max(16,Math.min(c.width,c.height)*.026);
+  ctx.strokeStyle="#ff3b30";ctx.lineWidth=Math.max(4,c.width/360);ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle="#ff3b30";ctx.beginPath();ctx.arc(x,y,Math.max(4,r*.18),0,Math.PI*2);ctx.fill();
+  return c.toDataURL("image/jpeg",.9);
+}
+async function addBrowserSelectionToChat(){
+  if(!browserSelection)return;
+  if(browserSelection.kind==="element"){
+    const ref=[`Selected preview element: ${browserSelection.selector}`,browserSelection.text?`Visible text: ${browserSelection.text}`:"",browserSelection.html?`HTML: ${browserSelection.html}`:""].filter(Boolean).join("\n");
+    promptEl.value=(promptEl.value?promptEl.value+"\n\n":"")+"Please work on this exact selected element.\n"+ref;
+  }else{
+    const image=await annotatedBrowserFrame();
+    if(image)attachments.push({kind:"image",name:"browser-selection.jpg",type:"image/jpeg",data:image});
+    promptEl.value=(promptEl.value?promptEl.value+"\n\n":"")+`Please inspect the marked area in the browser screenshot (about ${Math.round(browserSelection.x*100)}% from the left and ${Math.round(browserSelection.y*100)}% from the top) and apply my request to that exact part.`;
+    renderAttachments();
+  }
+  resizePrompt();promptEl.focus();clearBrowserSelection();
+}
+function normalizeWorkspaceUrl(raw=""){
+  let value=String(raw||"").trim();if(!value)return null;
+  if(/^localhost(?::\d+)?(?:\/|$)/i.test(value)||/^127\.0\.0\.1(?::\d+)?(?:\/|$)/.test(value))value="http://"+value;
+  try{return new URL(value,location.href)}catch{return null}
+}
+function openWorkspaceAddress(raw=$("#browserAddress")?.value||""){
+  const u=normalizeWorkspaceUrl(raw);if(!u){setStatus("Enter a website or localhost URL",true);return}
+  const local=["localhost","127.0.0.1"].includes(u.hostname)||u.origin===location.origin;
+  setMainView("chat");setWorkspaceBrowserOpen(true);
+  const address=$("#browserAddress");if(address)address.value=u.href;
+  if(local){
+    const frame=$("#browserPreviewFrame");if(frame){clearBrowserSelection();frame.src=u.href;setWorkspaceBrowserMode("preview")}
+    const cap=$("#browserCaption");if(cap)cap.textContent="Previewing "+u.href;return;
+  }
+  setWorkspaceBrowserMode("live");
+  promptEl.value=`Open ${u.href} in the browser. Inspect the website carefully, navigate as needed, and give me a concise evidence-based report of what you find.`;
+  resizePrompt();send();
+}
+function updateBrowserLiveFrame(data={}){
+  const image=String(data.image||"");if(!image||!/^[A-Za-z0-9+/=]+$/.test(image))return false;
+  lastBrowserFrameDataUrl="data:image/jpeg;base64,"+image;
+  const img=$("#browserLiveImage");if(img)img.src=lastBrowserFrameDataUrl;
+  if(data.url&&$("#browserAddress"))$("#browserAddress").value=String(data.url);
+  const cap=$("#browserCaption");if(cap)cap.textContent=(data.step?`Step ${Number(data.step)} · `:"")+String(data.caption||"Kairoq is using the browser").slice(0,180);
+  const state=$("#browserWorkspaceState");if(state)state.textContent=data.step?`Step ${Number(data.step)}`:"Live";
+  setWorkspaceBrowserOpen(true);setWorkspaceBrowserMode("live");return true;
+}
+$("#workspaceBrowserBtn")?.addEventListener("click",()=>{setWorkspaceBrowserOpen(!workspaceBrowserOpen);if(workspaceBrowserOpen)setWorkspaceBrowserMode(workspaceBrowserMode)});
+$("#browserCloseBtn")?.addEventListener("click",()=>setWorkspaceBrowserOpen(false));
+$("#browserGoBtn")?.addEventListener("click",()=>openWorkspaceAddress());
+$("#browserAddress")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();openWorkspaceAddress()}});
+$("#browserRefreshBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){const f=$("#browserPreviewFrame");if(f?.src)f.src=f.src}else if($("#browserAddress")?.value)openWorkspaceAddress($("#browserAddress").value)});
+$("#browserBackBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){try{$("#browserPreviewFrame")?.contentWindow?.history?.back()}catch{}}});
+$("#browserPopoutBtn")?.addEventListener("click",()=>{const u=normalizeWorkspaceUrl($("#browserAddress")?.value||"");if(u)window.open(u.href,"_blank","noopener,noreferrer")});
+$("[data-browser-mode]").forEach(b=>b.addEventListener("click",()=>setWorkspaceBrowserMode(b.dataset.browserMode)));
+$("#browserPreviewFrame")?.addEventListener("load",()=>{setWorkspaceBrowserMode("preview");installPreviewInspector()});
+$("#workspaceInspectBtn")?.addEventListener("click",e=>{const b=e.currentTarget,on=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",String(on));clearBrowserSelection();if(on&&workspaceBrowserMode==="preview")installPreviewInspector()});
+$("#browserLiveImage")?.addEventListener("click",e=>{
+  if($("#workspaceInspectBtn")?.getAttribute("aria-pressed")!=="true")return;
+  const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
+  browserSelection={kind:"point",x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y))};
+  const m=$("#browserPointMarker");if(m){m.style.left=(browserSelection.x*100)+"%";m.style.top=(browserSelection.y*100)+"%";m.classList.remove("hidden")}
+  const label=$("#browserSelectionLabel");if(label)label.textContent=`Browser area · ${Math.round(browserSelection.x*100)}% × ${Math.round(browserSelection.y*100)}%`;
+  $("#browserSelectionBar")?.classList.remove("hidden");
+});
+$("#browserAddToChatBtn")?.addEventListener("click",addBrowserSelectionToChat);
+$("#browserClearSelectionBtn")?.addEventListener("click",clearBrowserSelection);
+updateWorkspaceBrowserVisibility();
 function showBrowserFrame(box,data){
   const image=String(data&&data.image||"");
   if(!image||!/^[A-Za-z0-9+/=]+$/.test(image))return;
+  if(updateBrowserLiveFrame(data))return;
   let view=box.querySelector(".browser-live");
   if(!view){
     view=document.createElement("figure");view.className="browser-live";
