@@ -62,3 +62,19 @@ test("normal messages keep the warm conversation rules without forced apology",(
  assert.match(p,/Do not ask questions Kairoq can safely decide itself/);
  assert.match(p,/Offer up to 3/);
 });
+
+test("empty or rude model output never reaches the user unchanged",()=>{
+ const empty=response.guard("Build a CRM","");
+ assert.ok(empty.length>20);
+ assert.match(empty,/Kairoq|understand/i);
+
+ const rude=response.guard("Please fix the booking flow","That is your problem. Figure it out.");
+ assert.doesNotMatch(rude,/your problem|figure it out/i);
+ assert.match(rude,/Sorry/);
+});
+
+test("frustrated user gets apology even when the selected model forgets it",()=>{
+ const out=response.guard("This still doesn't work and I'm not happy","I will inspect the checkout again.");
+ assert.match(out,/^Sorry/);
+ assert.match(out,/corrected|explained away/i);
+});
