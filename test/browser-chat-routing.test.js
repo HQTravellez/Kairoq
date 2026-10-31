@@ -34,6 +34,7 @@ test("browser capability answers come from Kairoq runtime, not model persona",()
 test("generic model browser denials are blocked",()=>{
  const bad="I cannot browse live websites or check travellez.com directly. I can only work with content you paste.";
  assert.equal(routing.falseCapabilityDenial(bad),true);
+ assert.equal(routing.falseCapabilityDenial("I don't have web browsing capabilities."),true);
  const fixed=routing.guardDiscussAnswer("check travellez.com",bad,{browser:true,search:true});
  assert.notEqual(fixed,bad);
  assert.match(fixed,/Kairoq can/i);
@@ -45,6 +46,7 @@ test("website checks route to the read-only agent before Discuss",()=>{
  assert.match(src,/browserChat\.route\(ownerText/);
  assert.match(src,/browserResearchOnly/);
  assert.match(src,/researchOnly=browserResearchOnly/);
+ assert.match(src,/initialBrowserUrl:researchOnly\?browserDecision\.reference/);
  assert.match(src,/executionMode='agent'/);
  const agentAt=src.indexOf("else if(mode==='agent'||executionMode==='agent')");
  const discussAt=src.indexOf("else if(mode==='discuss')",agentAt);
@@ -58,6 +60,8 @@ test("research-only agent cannot mutate the project and publishes browser state"
  assert.match(src,/RESEARCH-ONLY TASK/);
  assert.match(src,/research-only browser task; project mutation\/runtime app tools are disabled/);
  assert.match(src,/async function publishBrowser/);
+ assert.match(src,/researchOnly&&initialBrowserUrl&&wb\.available\(\)/);
+ assert.match(src,/Opened .* before model reasoning/);
  assert.match(src,/screenshot=await wb\.screenshot/);
  assert.match(src,/report\(\{status:'researching',browser\}\)/);
  assert.match(src,/const storedMode=researchOnly\?'discuss':'agent'/);
