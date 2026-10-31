@@ -5,6 +5,7 @@
 
 const DENIAL=/\b(?:i\s+)?(?:can(?:not|'t)|am unable to|do not|don't)\b[^.\n]{0,120}\b(?:browse|search|access|open|read|inspect|test|verify|build|edit|use|connect|integrate|call|run|deploy)\b/i;
 const INTERNAL=/\b(?:hermes|ruflo|mem0|autoharness|ecc|superpowers)\b/ig;
+const RUDE=/\b(?:that's your problem|that is your problem|figure it out|obviously you|you should have known|stupid question|dumb question|i don't care|i do not care|stop wasting|your fault|you failed to|idiot)\b/i;
 const FRUSTRATION=/\b(?:i(?:'m| am) (?:frustrated|annoyed|upset|not happy)|not happy|still (?:doesn'?t|does not|isn'?t|is not) work(?:ing)?|you keep|again\??|why (?:the hell|the heck|can'?t|cannot|won'?t|will not)|this is (?:bad|wrong|terrible|awful|useless|stupid|ridiculous)|worst|fed up|waste of time|fuck|fucking|shit|damn)\b/i;
 
 function frustrated(message){
@@ -72,12 +73,28 @@ function hideInternals(answer,{technical=false}={}){
  return text.replace(INTERNAL,"Kairoq's internal tooling");
 }
 
+function apologyNeeded(message,answer){
+ if(!frustrated(message))return false;
+ return !/^(?:sorry|i'm sorry|i am sorry|apologies|my apologies)\b/i.test(String(answer||"").trim());
+}
+function fallback(message){
+ const rows=capabilityRows(message),labels=[...new Set(rows.map(r=>r.label).filter(Boolean))].slice(0,3);
+ if(labels.length)return "I understand what you want. Kairoq has a runtime path for this through "+labels.join(", ")+". I’ll use the available capability and report the observed result rather than guess.";
+ return "I understand what you’re asking. The selected model did not return a usable reply, so Kairoq should not pass that through as an answer. Please send the same request again and Kairoq can route it through another available model.";
+}
+function toneGuard(message,answer){
+ let text=String(answer||"").trim();
+ if(!text)return fallback(message);
+ if(RUDE.test(text))return "Sorry — that response was not appropriate. "+fallback(message);
+ if(apologyNeeded(message,text))text="Sorry — I missed what you needed. I understand you want this corrected, not explained away.\n\n"+text;
+ return text;
+}
 function guard(message,answer,{technical=false}={}){
- return hideInternals(capabilityCorrection(message,answer),{technical});
+ return hideInternals(toneGuard(message,capabilityCorrection(message,answer)),{technical});
 }
 
 function technicalRequest(message){
  return /\b(internals?|architecture|implementation|framework|library|repo|repository|source|code|agent stack|sub[- ]?agents?|how does .* work)\b/i.test(String(message||""));
 }
 
-module.exports={prompt,situation,frustrated,guard,capabilityCorrection,capabilityRows,hideInternals,technicalRequest,usable};
+module.exports={prompt,situation,frustrated,guard,toneGuard,fallback,apologyNeeded,capabilityCorrection,capabilityRows,hideInternals,technicalRequest,usable};
