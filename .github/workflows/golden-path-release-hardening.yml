@@ -1,0 +1,46 @@
+name: Golden path release hardening
+on:
+  push:
+    paths:
+      - 'react-agent.js'
+      - 'create-api.js'
+      - 'engineering-completion-gate.js'
+      - 'visual-quality-gate.js'
+      - 'agent-response-contract.js'
+      - 'react-builder.js'
+      - 'test/visual-quality-gate.test.js'
+      - 'test/engineering-completion-gate.test.js'
+      - 'test/execution-recovery-budget.test.js'
+      - 'test/agent-response-contract.test.js'
+      - '.github/workflows/golden-path-release-hardening.yml'
+  pull_request:
+    paths:
+      - 'react-agent.js'
+      - 'react-builder.js'
+      - 'create-api.js'
+      - 'engineering-completion-gate.js'
+      - 'visual-quality-gate.js'
+      - 'agent-response-contract.js'
+      - 'test/visual-quality-gate.test.js'
+      - 'test/engineering-completion-gate.test.js'
+      - 'test/execution-recovery-budget.test.js'
+      - 'test/agent-response-contract.test.js'
+      - '.github/workflows/golden-path-release-hardening.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check react-agent.js
+      - run: node --check create-api.js
+      - run: node --check engineering-completion-gate.js
+      - run: node --check visual-quality-gate.js
+      - run: node --check agent-response-contract.js
+      - run: node --check react-builder.js
+      - run: node --test test/visual-quality-gate.test.js test/engineering-completion-gate.test.js test/execution-recovery-budget.test.js test/agent-response-contract.test.js
