@@ -2052,27 +2052,30 @@ function updateBrowserLiveFrame(data={}){
   const state=$("#browserWorkspaceState");if(state)state.textContent=data.step?`Step ${Number(data.step)}`:"Live";
   setWorkspaceBrowserOpen(true);setWorkspaceBrowserMode("live");return true;
 }
-$("#workspaceBrowserBtn")?.addEventListener("click",()=>{setWorkspaceBrowserOpen(!workspaceBrowserOpen);if(workspaceBrowserOpen)setWorkspaceBrowserMode(workspaceBrowserMode)});
-$("#browserCloseBtn")?.addEventListener("click",()=>setWorkspaceBrowserOpen(false));
-$("#browserGoBtn")?.addEventListener("click",()=>openWorkspaceAddress());
-$("#browserAddress")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();openWorkspaceAddress()}});
-$("#browserRefreshBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){const f=$("#browserPreviewFrame");if(f?.src)f.src=f.src}else if($("#browserAddress")?.value)openWorkspaceAddress($("#browserAddress").value)});
-$("#browserBackBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){try{$("#browserPreviewFrame")?.contentWindow?.history?.back()}catch{}}});
-$("#browserPopoutBtn")?.addEventListener("click",()=>{const u=normalizeWorkspaceUrl($("#browserAddress")?.value||"");if(u)window.open(u.href,"_blank","noopener,noreferrer")});
-$$("[data-browser-mode]").forEach(b=>b.addEventListener("click",()=>setWorkspaceBrowserMode(b.dataset.browserMode)));
-$("#browserPreviewFrame")?.addEventListener("load",()=>{setWorkspaceBrowserMode("preview");installPreviewInspector()});
-$("#workspaceInspectBtn")?.addEventListener("click",e=>{const b=e.currentTarget,on=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",String(on));clearBrowserSelection();if(on&&workspaceBrowserMode==="preview")installPreviewInspector()});
-$("#browserLiveImage")?.addEventListener("click",e=>{
-  if($("#workspaceInspectBtn")?.getAttribute("aria-pressed")!=="true")return;
-  const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
-  browserSelection={kind:"point",x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y))};
-  const m=$("#browserPointMarker");if(m){m.style.left=(browserSelection.x*100)+"%";m.style.top=(browserSelection.y*100)+"%";m.classList.remove("hidden")}
-  const label=$("#browserSelectionLabel");if(label)label.textContent=`Browser area · ${Math.round(browserSelection.x*100)}% × ${Math.round(browserSelection.y*100)}%`;
-  $("#browserSelectionBar")?.classList.remove("hidden");
-});
-$("#browserAddToChatBtn")?.addEventListener("click",addBrowserSelectionToChat);
-$("#browserClearSelectionBtn")?.addEventListener("click",clearBrowserSelection);
-updateWorkspaceBrowserVisibility();
+function initWorkspaceBrowserControls(){
+  $("#workspaceBrowserBtn")?.addEventListener("click",()=>{setWorkspaceBrowserOpen(!workspaceBrowserOpen);if(workspaceBrowserOpen)setWorkspaceBrowserMode(workspaceBrowserMode)});
+  $("#browserCloseBtn")?.addEventListener("click",()=>setWorkspaceBrowserOpen(false));
+  $("#browserGoBtn")?.addEventListener("click",()=>openWorkspaceAddress());
+  $("#browserAddress")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();openWorkspaceAddress()}});
+  $("#browserRefreshBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){const f=$("#browserPreviewFrame");if(f?.src)f.src=f.src}else if($("#browserAddress")?.value)openWorkspaceAddress($("#browserAddress").value)});
+  $("#browserBackBtn")?.addEventListener("click",()=>{if(workspaceBrowserMode==="preview"){try{$("#browserPreviewFrame")?.contentWindow?.history?.back()}catch{}}});
+  $("#browserPopoutBtn")?.addEventListener("click",()=>{const u=normalizeWorkspaceUrl($("#browserAddress")?.value||"");if(u)window.open(u.href,"_blank","noopener,noreferrer")});
+  $$("[data-browser-mode]").forEach(b=>b.addEventListener("click",()=>setWorkspaceBrowserMode(b.dataset.browserMode)));
+  $("#browserPreviewFrame")?.addEventListener("load",()=>{setWorkspaceBrowserMode("preview");installPreviewInspector()});
+  $("#workspaceInspectBtn")?.addEventListener("click",e=>{const b=e.currentTarget,on=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",String(on));clearBrowserSelection();if(on&&workspaceBrowserMode==="preview")installPreviewInspector()});
+  $("#browserLiveImage")?.addEventListener("click",e=>{
+    if($("#workspaceInspectBtn")?.getAttribute("aria-pressed")!=="true")return;
+    const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
+    browserSelection={kind:"point",x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y))};
+    const m=$("#browserPointMarker");if(m){m.style.left=(browserSelection.x*100)+"%";m.style.top=(browserSelection.y*100)+"%";m.classList.remove("hidden")}
+    const label=$("#browserSelectionLabel");if(label)label.textContent=`Browser area · ${Math.round(browserSelection.x*100)}% × ${Math.round(browserSelection.y*100)}%`;
+    $("#browserSelectionBar")?.classList.remove("hidden");
+  });
+  $("#browserAddToChatBtn")?.addEventListener("click",addBrowserSelectionToChat);
+  $("#browserClearSelectionBtn")?.addEventListener("click",clearBrowserSelection);
+  updateWorkspaceBrowserVisibility();
+}
+
 function showBrowserFrame(box,data){
   const image=String(data&&data.image||"");
   if(!image||!/^[A-Za-z0-9+/=]+$/.test(image))return;
@@ -3346,6 +3349,7 @@ $("#imageModeBtn").onclick=()=>setImageMode(!imageMode);
 $("#videoModeBtn").onclick=()=>setVideoMode(!videoMode);
 $("#fileInput").onchange=e=>{handleFiles(e.target.files);e.target.value=""};
 $("#sendBtn").onclick=()=>send();
+initWorkspaceBrowserControls();
 
 // Build an app from the main page: pick Web app or Mobile app above the box, say what to build,
 // answer any quick questions here, then the builder opens inside this page with the request running.
