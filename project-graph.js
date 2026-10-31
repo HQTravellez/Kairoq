@@ -41,8 +41,10 @@ function materialize(files,root){
 }
 function normNode(n){
  const id=String(n?.id||n?.name||n?.label||"").slice(0,500);
+ const line=Number(n?.line||n?.start_line||n?.startLine||n?.lineno||0),end=Number(n?.end_line||n?.endLine||0);
  return{id,label:String(n?.label||n?.name||id).slice(0,240),file:String(n?.source_file||n?.filePath||n?.file_path||"").slice(0,300),
-  kind:String(n?.kind||n?.type||n?.file_type||"symbol").slice(0,80)};
+  kind:String(n?.kind||n?.type||n?.file_type||"symbol").slice(0,80),
+  ...(Number.isInteger(line)&&line>0?{line}:{}),...(Number.isInteger(end)&&end>=line&&line>0?{endLine:end}:{})};
 }
 function normalize(raw,source,fp){
  const nodes=(Array.isArray(raw?.nodes)?raw.nodes:[]).map(normNode).filter(n=>n.id);
