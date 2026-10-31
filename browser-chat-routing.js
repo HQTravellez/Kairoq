@@ -2,7 +2,7 @@
 // Browser intent and capability truth are owned by Kairoq, not by whichever LLM is selected.
 // This keeps "can you browse?" and "check this site" behavior identical across models.
 
-const DOMAIN_RE=/(?<![@\w])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|io|app|co|ai|net|org|ca|dev|tech|travel|co\.uk))(?:\/[^\s)\]}>]*)?/i;
+const DOMAIN_RE=/(?<![@\w])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:co\.uk|com|io|app|co|ai|net|org|ca|dev|tech|travel))(?:\/[^\s)\]}>]*)?/i;
 const URL_RE=/https?:\/\/[^\s)\]}>]+/i;
 const DENIAL_RE=/\b(?:i\s+)?(?:can(?:not|'t)|am unable to|do not|don't)\b[^.\n]{0,110}\b(?:browse|access|open|check|visit|search|look up|fetch|read)\b[^.\n]{0,100}\b(?:live\s+)?(?:web|internet|website|websites|site|sites|url|urls|external)/i;
 
@@ -43,7 +43,7 @@ function directIntent(message){
   // A bare domain in chat is itself enough to mean "look at this" when accompanied by a
   // browsing verb; explicit URLs also count because users commonly paste a link alone.
   if(URL_RE.test(t))return true;
-  if(/\b(check|open|browse|visit|look(?: at)?|inspect|review|research|search|read|see|analyse|analyze|tell me about|what(?:'s| is) (?:on|happening with))\b/i.test(t))return true;
+  if(/\b(check|open|browse|visit|look(?: at)?|inspect|review|research|search|read|see|analyse|analyze|tell me about|what(?:'s| is) (?:on|happening with)|what is|who is|how does|what does)\b/i.test(t))return true;
   if(t.replace(DOMAIN_RE,"").trim().length<4)return true;
  }
  return /\b(search (?:the )?(?:web|internet)|look ?up|find (?:this|that|it) online|browse (?:the )?web|check (?:the )?website|open (?:the )?site)\b/i.test(t);
@@ -65,7 +65,12 @@ function route(message,messages=[]){
    : clean(message)
  };
 }
-function falseCapabilityDenial(answer){return DENIAL_RE.test(clean(answer))}
+function falseCapabilityDenial(answer){
+ const a=clean(answer);
+ return DENIAL_RE.test(a)
+  ||/\b(?:can(?:not|'t)|do not|don't)\s+(?:have|possess)\b[^.\n]{0,80}\b(?:web|browser|browsing|internet)\b/i.test(a)
+  ||/\bno\s+(?:live\s+)?(?:web|browser|internet)\s+access\b/i.test(a);
+}
 function capabilityAnswer({browser=true,search=true}={}){
  if(browser||search){
   const abilities=[
