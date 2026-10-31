@@ -37,7 +37,7 @@ async function loadMe(){
  text($('who'),v?(v.kind==='owner'?'Owner':v.account.email):'');
  const name=v?(v.kind==='owner'?'':v.account.email.split('@')[0].replace(/\d+$/,'').replace(/[._-]+/g,' ').trim().slice(0,24)):'';
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
- text($('home-title'),name?'What should we build, '+cap(name.split(' ')[0])+'?':'What should we build?');
+ text($('home-title'),name?'What should Kairoq get done, '+cap(name.split(' ')[0])+'?':'What should Kairoq get done?');
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
  const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
@@ -190,18 +190,22 @@ $('side-templates').onclick=async()=>{if($('home').classList.contains('hidden'))
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
-// What to build (like superapp's first question): a website, a web app or a phone app. Each has
-// its own examples, typed into the empty box one after another (they stop when you type or focus).
+// One natural-language starting point. Kairoq infers website/app/phone and visual choices from
+// the request instead of making the user classify the job before speaking.
 const KINDS={
- site:{prefix:'',examples:['A restaurant site with the menu, opening hours and reservations','A landing page for my renovation company with photos and a quote form','A portfolio for my photography studio with bookings']},
- app:{prefix:'',examples:['A CRM to track leads, deals and follow-ups','A booking system for my salon with staff calendars','An inventory tracker for my café with low-stock alerts']},
- phone:{prefix:'Build a mobile app: ',examples:['An iPhone app for my café: order ahead and see the menu','A gym app with class bookings and a membership card','A tour guide app with maps of the stops']}};
-const home={kind:'site',typing:null};
-function setKind(kind){
- home.kind=KINDS[kind]?kind:'site';
- for(const b of document.querySelectorAll('#new-kind button'))b.setAttribute('aria-pressed',String(b.dataset.kind===home.kind));
+ auto:{prefix:'',examples:[
+  'Build a CRM for my sales team to track leads and follow-ups',
+  'Fix our booking flow and make sure it works on mobile',
+  'Connect Stripe checkout and verify the payment journey',
+  'Create a blue and white website for my restaurant with reservations',
+  'Build an iPhone-friendly habit tracker',
+  'Make this GitHub repo production ready'
+ ]}};
+const home={kind:'auto',typing:null};
+function setKind(){
+ home.kind='auto';
  const ex=$('examples');ex.replaceChildren();
- for(const t of KINDS[home.kind].examples){const b=el('button','example',t);b.type='button';b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)}
+ for(const t of KINDS.auto.examples){const b=el('button','example',t);b.type='button';b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)}
  typeExamples();
 }
 function typeExamples(){
@@ -216,7 +220,7 @@ function typeExamples(){
   home.typing=setTimeout(tick,back?18:38)};
  home.typing=setTimeout(tick,500);
 }
-for(const b of document.querySelectorAll('#new-kind button'))b.onclick=()=>setKind(b.dataset.kind);
+// No pre-build kind selector: the request itself determines the product format.
 $('new-prompt').addEventListener('focus',()=>{clearTimeout(home.typing);$('new-prompt').placeholder=KINDS[home.kind].examples[0]});
 $('new-prompt').addEventListener('blur',typeExamples);
 // A new app from the home box: the editor opens straight away and any quick questions, then
@@ -246,8 +250,8 @@ $('new-form').onsubmit=async e=>{
    return;
   }
   $('home-error').classList.remove('welcome');
-  // A phone app is asked for in words the builder knows (react-native-app.js wanted()).
-  const prompt=(KINDS[home.kind].prefix&&!/^Build a mobile app:/i.test(typed)?KINDS[home.kind].prefix:'')+typed;
+  // The user's own words are the specification; Kairoq infers website/app/mobile and design intent.
+  const prompt=typed;
   await askThenBuild(prompt);
   $('new-prompt').value='';
  }catch(err){text($('home-error'),err.message)}
@@ -279,7 +283,7 @@ slideSegs();
 // to fit the next one, and the new step slides in from the side it comes from (dir 1 forward,
 // -1 back, 0 fade). The slide-in itself is CSS (.ask-card[data-dir] > *). Reduced motion: instant.
 const STILL=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-setKind('site');
+setKind();
 function morph(card,fill,dir=1){
  card.dataset.dir=String(dir);
  if(STILL||!card.isConnected||!card.children.length){card.replaceChildren();fill();return}
