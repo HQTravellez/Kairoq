@@ -964,7 +964,7 @@ function splitIdeas(answer,question=''){
  return{text:keep.join('\n').trim(),ideas:[...new Set(ideas)].filter(x=>x.length>=4).slice(0,5).map(x=>x.slice(0,140))};
 }
 function parseText(content){return require('./model-output-guard').conversation(typeof content==='string'?content:String(content?.message||content?.answer||JSON.stringify(content)))}
-async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[],context=''}={}){
+async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[],context='',browserRuntime={browser:false,search:false}}={}){
  const meta=loadMeta(id);
  const text=String(question||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Ask a question or describe an idea'),{status:400});
@@ -980,6 +980,7 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  let answer=(await callModel({messages,temperature:0.4,maxOutputTokens:2500,cacheKey:'kairoq-'+id,signal,tier:require('./builder-response-policy').discussionTier(images,tier),onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
  // Never let a generic model persona contradict Kairoq's real API/web capabilities.
  answer=require('./api-chat-routing').guardDiscussAnswer(text,answer);
+ answer=require('./browser-chat-routing').guardDiscussAnswer(text,answer,{...browserRuntime,context});
  const {text:plain,ideas}=splitIdeas(answer,text);
  const Q=require('./builder-question'),{text:said,question:asked}=Q.fromText(plain);
  const shown=Q.display(said,asked);
