@@ -698,7 +698,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  }catch(e){console.warn('[react-builder] learning recall unavailable: '+String(e.message||e).slice(0,120));}}
  const imageCache=new Map();let imageNotes=[];
  const perMessage=(learningNote+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)).trim();
- const messages=[{role:'system',content:SYSTEM_PROMPT+'\n\n'+projectFiles+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent((perMessage?perMessage+'\n\n':'')+request,images)}];
+ const messages=[{role:'system',content:SYSTEM_PROMPT+require('./agent-response-contract').prompt(text)+'\n\n'+projectFiles+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent((perMessage?perMessage+'\n\n':'')+request,images)}];
  let lastError='',runtimeErrors=[],checkResult=null,editFailures=0,verified=null,securityTries=0,structureTries=0;
  // The files a fix applies to: the request's base, then the last try that built (a fix for a
  // build or browser error changes that try; it does not start again from the base).
@@ -733,6 +733,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   if(!reply)reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,cacheKey:'kairoq-'+id,...(design?{design:true}:{}),
    onToken:onStream?(_d,all)=>{if(firstToken===null)firstToken=Date.now();onStream(all,attempt)}:undefined,
    onReasoning:(_d,all)=>{if(attempt===1){thinking=all;if(onThinking)onThinking(all)}}},(c,m)=>{const r=parseEdit(c);if(m)r.model=String(m);return r});
+  {const rc=require('./agent-response-contract');reply.message=rc.guard(text,reply.message,{technical:rc.technicalRequest(text)})}
   if(reply.model)usedModel=reply.model;
   if(attempt===1){thoughtMs=(firstToken||Date.now())-started;firstPlan=reply.plan}
   tl.add({t:'think',ms:(firstToken||Date.now())-started,text:attempt===1?thinking:''});
