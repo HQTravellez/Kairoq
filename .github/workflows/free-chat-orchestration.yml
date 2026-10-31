@@ -10,6 +10,8 @@ on:
       - 'public/kairoq-ui.css'
       - 'test/public-web-fetch.test.js'
       - 'test/main-chat-link-research.test.js'
+      - 'chat-url.js'
+      - 'test/chat-url.test.js'
       - 'test/free-model-picker.test.js'
       - 'test/model-picker.test.js'
       - 'freellmapi.js'
@@ -30,6 +32,8 @@ on:
       - 'public/kairoq-ui.css'
       - 'test/public-web-fetch.test.js'
       - 'test/main-chat-link-research.test.js'
+      - 'chat-url.js'
+      - 'test/chat-url.test.js'
       - 'test/free-model-picker.test.js'
       - 'test/model-picker.test.js'
       - 'freellmapi.js'
@@ -52,4 +56,4 @@ jobs:
         with:
           node-version: '22'
       - run: node --check server.js && node --check public-web-fetch.js && node --check public/app.js && node --check runtime-check.js && node --check react-builder.js && node --check freellmapi.js && node --check capability-registry.js && node --check api-chat-routing.js && node --check browser-chat-routing.js
-      - run: node --test test/free-chat-orchestration.test.js test/freellmapi.test.js test/public-web-fetch.test.js test/main-chat-link-research.test.js test/free-model-picker.test.js test/model-picker.test.js
+      - run: node --test test/free-chat-orchestration.test.js test/freellmapi.test.js test/public-web-fetch.test.js test/main-chat-link-research.test.js test/chat-url.test.js test/free-model-picker.test.js test/model-picker.test.js
