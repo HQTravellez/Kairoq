@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "principle": "A digital business/software goal is complete only when the requested outcome reaches executor-verified Ready or a concrete Blocked state.",
+  "cases": [
+    {
+      "id": "payments-integration",
+      "goal": "Integrate Stripe payments and verify checkout works end to end",
+      "route": "agent",
+      "roles": [
+        "api",
+        "security",
+        "qa"
+      ],
+      "mustCapabilities": [
+        "app_builder",
+        "test_repair"
+      ]
+    },
+    {
+      "id": "broken-persistence",
+      "goal": "Fix why booking records are not persisting in the SQL database and prove the workflow works",
+      "route": "agent",
+      "mustCapabilities": [
+        "app_database",
+        "test_repair"
+      ]
+    },
+    {
+      "id": "repo-production",
+      "goal": "Make https://github.com/example/sample-app production ready and verify the main user flow",
+      "route": "agent",
+      "mustCapabilities": [
+        "github_repository",
+        "browser",
+        "test_repair"
+      ]
+    },
+    {
+      "id": "business-automation",
+      "goal": "Automate the customer approval workflow and test the scheduled job",
+      "route": "agent",
+      "mustCapabilities": [
+        "automation",
+        "app_builder"
+      ]
+    },
+    {
+      "id": "internal-tool",
+      "goal": "Build an internal CRM system for our operations team with saved customer records",
+      "route": "agent",
+      "mustCapabilities": [
+        "app_builder",
+        "app_database"
+      ]
+    },
+    {
+      "id": "auth-migration",
+      "goal": "Migrate authentication without breaking existing users and verify login",
+      "route": "agent",
+      "roles": [
+        "security",
+        "architect",
+        "qa"
+      ],
+      "mustCapabilities": [
+        "app_builder",
+        "test_repair"
+      ]
+    },
+    {
+      "id": "dashboard-redesign",
+      "goal": "Redesign the customer dashboard for mobile and verify the main form still works",
+      "route": "agent",
+      "roles": [
+        "design",
+        "qa"
+      ],
+      "mustCapabilities": [
+        "design_skills",
+        "test_repair"
+      ]
+    },
+    {
+      "id": "small-edit-control",
+      "goal": "Change the primary button text to Continue",
+      "route": "build",
+      "mustCapabilities": [
+        "app_builder"
+      ]
+    }
+  ]
+}

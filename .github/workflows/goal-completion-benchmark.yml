@@ -1,0 +1,36 @@
+name: Goal completion benchmark
+on:
+  push:
+    paths:
+      - 'benchmarks/goal-completion-cases.json'
+      - 'goal-orchestrator.js'
+      - 'build-routing.js'
+      - 'capability-registry.js'
+      - 'react-agent.js'
+      - 'test/goal-completion-benchmark.test.js'
+      - '.github/workflows/goal-completion-benchmark.yml'
+  pull_request:
+    paths:
+      - 'benchmarks/goal-completion-cases.json'
+      - 'goal-orchestrator.js'
+      - 'build-routing.js'
+      - 'capability-registry.js'
+      - 'react-agent.js'
+      - 'test/goal-completion-benchmark.test.js'
+      - '.github/workflows/goal-completion-benchmark.yml'
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check goal-orchestrator.js
+      - run: node --check build-routing.js
+      - run: node --check capability-registry.js
+      - run: node --check react-agent.js
+      - run: node --test test/goal-completion-benchmark.test.js test/goal-orchestrator.test.js test/goal-build-routing.test.js test/agent-team.test.js test/agent-capability-routing.test.js
