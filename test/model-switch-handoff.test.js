@@ -110,3 +110,12 @@ test("handoff capability inventory includes native Figma and Telegram when avail
   assert.match(server,/Native Figma connection and Figma design evidence import/);
   assert.match(server,/Telegram channel connected to the same Kairoq project\/job engine/);
 });
+
+
+test("preset and Free Only model changes cannot bypass the handoff",()=>{
+  const app=read("public/app.js");
+  assert.match(app,/async function applyPreset\(/);
+  assert.match(app,/modelChanged=await requestModelSwitch\(p\.model,pickerLabel\(p\.model\)\)/);
+  assert.match(app,/freeOnlyEl\.onchange=async\(\)=>/);
+  assert.match(app,/await requestModelSwitch\("openrouter\/free","Auto \(free\)"\)/);
+});
