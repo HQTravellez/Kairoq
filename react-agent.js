@@ -103,16 +103,16 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
  const ownerContract=require('./conversational-build-contract');
- const ownerRequirements=ownerContract.merge(meta.owner_requirements||[],text);
+ const ownerRequirements=researchOnly?(meta.owner_requirements||[]):ownerContract.merge(meta.owner_requirements||[],text);
  if(!meta.current_version){await builder.initialize(meta);meta=builder.loadMeta(id)}
  const tl=require('./react-timeline').create(onEvent);
  // A new project gets its design brief first (colours and fonts go into src/index.css).
- const brief=await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
+ const brief=researchOnly?null:await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
  if(brief){meta=builder.loadMeta(id);tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'"'})}
  const base=builder.loadFiles(id,meta.current_version);
  const discipline=require('./execution-discipline'),disciplinePlan=discipline.workflow(text),executionLedger=require('./execution-ledger');
@@ -130,14 +130,21 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const steps=[];let activeStep=checkpoint?.step||0;
  if(checkpoint)tl.add({t:'note',icon:'code',text:'Resumed saved build progress from step '+checkpoint.step});
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
- const decision=await require('./decision-router').suggest(text);
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+
- require('./capability-registry').taskContext(text)+discipline.prompt(text)+require('./engineering-intelligence').prompt(text)+
- require('./project-knowledge').note(id)+require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
- executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
+ const decision=researchOnly?null:await require('./decision-router').suggest(text);
+ const researchRule=researchOnly?'\n\nRESEARCH-ONLY TASK: Do not write, edit, build, test, query the app database, run automations, or generate assets. Use web_search/web_open/web_act/fetch_url as needed, answer from observed evidence, then finish. If a browser action fails, report that failure; never replace it with a claim that Kairoq cannot browse.':'';
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
+ require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
+ require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
+ executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision));
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
+ async function publishBrowser(error=''){
+  const screenshot=await wb.screenshot().catch(()=>null);
+  const browser={url:wb.url,title:wb.title||require('./web').hostOf(wb.url),screenshot,at:new Date().toISOString(),...(error?{error:String(error).slice(0,300)}:{})};
+  report({status:'researching',browser});
+  return screenshot;
+ }
 
  function dropOldImages(){for(const m of messages)if(Array.isArray(m.content)&&m!==introMsg)m.content=m.content.filter(p=>p.type==='text').map(p=>p.text).join('\n')+'\n(screenshot omitted)'}
  function trimContext(){
@@ -184,6 +191,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  }
  async function tool(a){
   const t=a.tool;
+  if(researchOnly&&['write_files','edit_files','build_and_test','test_ui','run_tests','query_db','run_automation','generate_images'].includes(t))
+   return{text:t+': this is a research-only browser task; project mutation/runtime app tools are disabled.'};
   if(t==='research_pages'){
     try{
       const r=await require('./multi-page-research').researchPages(a.urls,{browseSite,maxPages:6});
@@ -331,15 +340,27 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    return{text:'generate_images: saved '+saved.join(', ')+'. Use exactly these paths in the code.'+(notes.length?'\n'+notes.join('\n'):'')};
   }
   if(t==='web_open'){
-   if(!wb.available())return{text:'web_open is not available on this server (no browser).'};
+   if(!wb.available())return{text:'web_open is not available on this server (no browser runtime).'};
    const u=String(a.url||'').slice(0,500);
    tl.add({t:'note',icon:'web',text:'Opened '+u.slice(0,120)});
-   try{const text=await wb.open(u);return{text,image:vision?await wb.screenshot():null}}catch(e){return{text:'web_open failed: '+String(e.message||e).slice(0,300)}}
+   try{
+    const text=await wb.open(u),shot=await publishBrowser();
+    return{text,image:vision?shot:null};
+   }catch(e){
+    await publishBrowser(e.message||e).catch(()=>{});
+    return{text:'web_open failed: '+String(e.message||e).slice(0,300)};
+   }
   }
   if(t==='web_act'){
-   if(!wb.available())return{text:'web_act is not available on this server (no browser).'};
+   if(!wb.available())return{text:'web_act is not available on this server (no browser runtime).'};
    tl.add({t:'note',icon:'web',text:'Clicked around '+require('./web').hostOf(wb.url)});
-   try{const text=await wb.act(a.steps||[]);return{text,image:vision?await wb.screenshot():null}}catch(e){return{text:'web_act failed: '+String(e.message||e).slice(0,300)}}
+   try{
+    const text=await wb.act(a.steps||[]),shot=await publishBrowser();
+    return{text,image:vision?shot:null};
+   }catch(e){
+    await publishBrowser(e.message||e).catch(()=>{});
+    return{text:'web_act failed: '+String(e.message||e).slice(0,300)};
+   }
   }
   if(t==='web_search'){
    if(typeof webSearch!=='function')return{text:'web_search is not available on this server.'};
@@ -385,11 +406,12 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  function noChange(message){
   checkpointStore.clear(id);
   if(built)fs.rmSync(built.dir,{recursive:true,force:true});
-  message='No changes were made. '+message;
-  builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}]);
+  if(!researchOnly)message='No changes were made. '+message;
+  const storedMode=researchOnly?'discuss':'agent';
+  builder.addMessages(id,[{role:'user',text,mode:storedMode},{role:'assistant',text:message,mode:storedMode,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),...(researchOnly?{research:true}:{})}]);
   const fresh=builder.loadMeta(id);
   executionLedger.complete(id,text,{verified:true,version:fresh.current_version,message});
-  return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
+  return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],...(researchOnly?{research:true}:{}),preview_url:builder.previewUrl(fresh)};
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
 
