@@ -3402,7 +3402,7 @@ function openBuilder(url){
   const frame=$("#buildFrame"),view=$("#buildView");
   view.classList.add("loading");
   frame.src="about:blank";
-  try{const u=new URL(url,location.origin),pid=u.searchParams.get("project");if(pid)currentProject=pid}catch{}
+  try{const u=new URL(url,location.origin),pid=u.searchParams.get("project");activeBuilderProjectId=pid||""}catch{activeBuilderProjectId=""}
   setMainView("build");
   setTimeout(()=>{frame.src=url},30);
   clearTimeout(builderTimer);builderTimer=setTimeout(builderReady,30000);
@@ -3443,6 +3443,7 @@ function showProjectsTab(tab){
   $("#wpEmpty")?.classList.toggle("hidden",!mine||has);
   $("#wpTemplates")?.classList.toggle("hidden",mine);
 }
+let activeBuilderProjectId="";
 function renderWorkspaceProjectTabs(projects){
   const host=$("#workspaceProjectTabs");if(!host)return;
   host.replaceChildren(...projects.slice(0,5).map(p=>{
