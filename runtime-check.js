@@ -582,13 +582,18 @@ async function checkSite(raw){
 // human(): true while a person has taken over the browser (see session().control): their own
 // clicks may send forms and leave the site (a captcha check, a sign-in page), like in their own browser.
 async function guardSite(context,url,{onSent,human=()=>false}={}){
- const origin=new URL(url).origin,local=KAIROQ_TEST_LOCAL();
- await context.route('**/*',r=>{
+ let origin=new URL(url).origin;const local=KAIROQ_TEST_LOCAL();
+ await context.route('**/*',async r=>{
   const req=r.request();let u;try{u=new URL(req.url())}catch{return r.abort()}
   if(u.protocol==='data:'||u.protocol==='blob:')return r.continue();
   if(!(u.protocol==='https:'||(local&&u.origin===origin)))return r.abort();
-  // The visitor stays on the site: links to other sites do nothing.
-  if(req.isNavigationRequest()&&req.frame()===req.frame().page().mainFrame()&&u.origin!==origin&&!human())return r.abort();
+  // The browser stays on the site, but an HTTP redirect may legitimately move the site to its
+  // canonical public HTTPS origin (example.com -> www.example.com). Validate that redirect hop
+  // with the same SSRF guard, adopt the canonical origin, and keep blocking ordinary off-site links.
+  if(req.isNavigationRequest()&&req.frame()===req.frame().page().mainFrame()&&u.origin!==origin&&!human()){
+   if(!req.redirectedFrom())return r.abort();
+   try{await checkSite(u.href);origin=u.origin}catch{return r.abort()}
+  }
   if(!['GET','HEAD','OPTIONS'].includes(req.method())&&!human()){
    if(onSent)onSent(req);
    return req.resourceType()==='document'?r.fulfill({status:204,body:''}):r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{}'});
@@ -760,7 +765,8 @@ async function session(url,{sandbox,viewport,timeoutMs=15000,site=false,record=f
   else if(a.action==='go_to'){
    // Same site only: a path or a full link on the site being visited.
    const next=new URL(String(a.value||''),page.url());
-   if(next.origin!==new URL(url).origin||(!site&&!next.pathname.startsWith(root.pathname)))throw Error('go_to stays on this site');
+   const allowedOrigin=site?new URL(page.url()).origin:new URL(url).origin;
+   if(next.origin!==allowedOrigin||(!site&&!next.pathname.startsWith(root.pathname)))throw Error('go_to stays on this site');
    await page.goto(next.href,{waitUntil:'load',timeout:timeoutMs});
   }
   else throw Error('Unknown action');
