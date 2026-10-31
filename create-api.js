@@ -477,7 +477,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     const continuity=browserDecision.execute&&browserDecision.message!==message?browserDecision.message.slice(String(message||'').length).trim():'';
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra,continuity].filter(Boolean).join('\n\n');
     const researchOnly=browserResearchOnly&&!hooks;
-    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
+    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./public-web-fetch').fetchPublic(url,{maxRedirects:5,maxBytes:2000000,accept:"application/json, text/html, text/markdown, text/plain"}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
      onStep:p=>update({status:p.status,stream:null,...(p.browser?{browser:p.browser}:{}),agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
