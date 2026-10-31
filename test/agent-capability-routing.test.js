@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const {protocol,parseStep}=require("../react-agent");
 const {findCapabilities}=require("../capability-registry");
 test("agent advertises capability discovery and API document inspection",()=>{
- const prompt=protocol({vision:false,web:true,maxSteps:10,images:false});
+ const prompt=protocol({vision:false,web:true,maxSteps:10,images:false,figmaAccess:true});
  assert.match(prompt,/"tool":"list_capabilities"/);
  assert.match(prompt,/"tool":"inspect_github_repo"/);
  assert.match(prompt,/"tool":"inspect_figma"/);
@@ -40,4 +40,9 @@ test("Figma URLs route to the connected design capability",()=>{
  assert.ok(figma,rows.map(x=>x.id).join(", "));
  assert.ok(figma.tools.includes("inspect_figma"));
  assert.ok(rows.some(x=>x.id==="design_skills"));
+});
+
+test("Figma inspection is not advertised to non-owner Agent sessions",()=>{
+ const prompt=protocol({vision:false,web:true,maxSteps:10,images:false,figmaAccess:false});
+ assert.doesNotMatch(prompt,/"tool":"inspect_figma"/);
 });
