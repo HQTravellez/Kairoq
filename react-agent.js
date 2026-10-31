@@ -8,6 +8,7 @@ const builder=require('./react-builder');
 
 function intEnv(name,fallback,min,max){const n=Number(process.env[name]);return Number.isInteger(n)?Math.min(max,Math.max(min,n)):fallback}
 function maxStepsDefault(){return intEnv('KAIROQ_AGENT_MAX_STEPS',15,2,40)}
+function recoveryStepsDefault(){return intEnv('KAIROQ_AGENT_RECOVERY_STEPS',4,0,8)}
 function codingRules(){return builder.SYSTEM_PROMPT.replace(/\nRespond with ONLY a JSON object[\s\S]*$/,'')}
 function protocol({vision,web,maxSteps,images}){
  return `
@@ -122,7 +123,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const box=require('./react-sandbox').create(id);
  let checksWarned=false,lastSavedChecks=null,lastVisualQuality=null,repairAttempts=0,needsRepair=false;
  const normalLimit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
- const recoverySteps=researchOnly?0:intEnv('KAIROQ_AGENT_RECOVERY_STEPS',4,0,8);
+ const recoverySteps=researchOnly?0:recoveryStepsDefault();
  const limit=normalLimit+recoverySteps;
  const wb=require('./web').createBrowser({browseSite,maxOps:intEnv('KAIROQ_WEB_MAX_ACTIONS',30,5,100)});
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
@@ -564,4 +565,4 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token);await wb.close().catch(()=>{})}
 }
-module.exports={run,parseStep,parseStepSafe,protocol,htmlToText,describe};
+module.exports={run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
