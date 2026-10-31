@@ -120,6 +120,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const discipline=require('./execution-discipline'),disciplinePlan=discipline.workflow(text),executionLedger=require('./execution-ledger');
  const ledgerRun=executionLedger.start(id,{instruction:text,baseVersion:meta.current_version,workflow:disciplinePlan});
  const generated=[],pendingChecks=[];
+ const goalOrchestrator=require('./goal-orchestrator');
+ let goalState=researchOnly?null:goalOrchestrator.create(text);
+ let goalTeamConsulted=false;
+ function goalAdvance(type,event={}){if(!goalState)return;try{goalState=goalOrchestrator.next(goalState,{type,...event})}catch{}}
+ function goalSummary(){return goalState?goalOrchestrator.summary(goalState):null}
  // The agent's browser tests and SQL reads use a test copy of the data, never the real one.
  const box=require('./react-sandbox').create(id);
  let checksWarned=false,lastSavedChecks=null;
@@ -138,10 +143,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
  require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
- executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision));
+ executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision)+
+ (goalState?'\n\nGOAL ORCHESTRATION: phase='+goalState.phase+'; specialist team='+goalState.team.join(', ')+'. The runtime owns phase/team selection. Specialists advise in parallel; only the Lead Agent writes or claims verification.':''));
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
- const report=patch=>onStep({steps:steps.slice(-40),...patch});
+ const report=patch=>onStep({steps:steps.slice(-40),...(goalState?{goal:goalSummary()}:{}),...patch});
  async function publishBrowser(error=''){
   const screenshot=await wb.screenshot().catch(()=>null);
   const browser={url:wb.url,title:wb.title||require('./web').hostOf(wb.url),screenshot,at:new Date().toISOString(),...(error?{error:String(error).slice(0,300)}:{})};
@@ -309,6 +315,19 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   if(t==='write_files'){
    const eng=require('./engineering-intelligence'),tg=require('./task-graph');
    if(eng.substantial(text)&&!tg.get(id,text))return{text:'write_files: substantial work needs a tracer-bullet task graph first. Use task_graph define with independently verifiable vertical slices.'};
+   if(eng.substantial(text)&&goalState&&!goalTeamConsulted){
+    const brief=goalOrchestrator.specialistQuestion(goalState);
+    try{
+     const team=await require('./agent-team').consult({callModel,request:text,files:work,question:brief.question,roles:brief.roles,tier,signal});
+     goalTeamConsulted=true;
+     if(goalState.phase==='understand')goalAdvance('understood',{evidence:'Specialists independently reviewed the goal.'});
+     if(goalState.phase==='plan')goalAdvance('planned',{evidence:'Lead Agent received specialist findings before implementation.'});
+     tl.add({t:'note',icon:'search',text:'Goal team reviewed the implementation plan: '+team.roles.join(', ')});
+     return{text:'Goal team consultation completed before implementation. Incorporate these findings, then retry write_files:\n'+clip(JSON.stringify(team),22000)};
+    }catch(e){return{text:'Goal team consultation failed before implementation: '+String(e.message||e).slice(0,500)}}
+   }
+   if(goalState?.phase==='understand'){goalAdvance('understood');goalAdvance('planned')}
+   else if(goalState?.phase==='plan')goalAdvance('planned');
    const files=a.files&&typeof a.files==='object'&&!Array.isArray(a.files)?a.files:{};
    const before={...work};
    const written=[],bad=[];
@@ -322,6 +341,19 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   if(t==='edit_files'){
    const eng=require('./engineering-intelligence'),tg=require('./task-graph');
    if(eng.substantial(text)&&!tg.get(id,text))return{text:'edit_files: substantial work needs a tracer-bullet task graph first. Use task_graph define before broad implementation.'};
+   if(eng.substantial(text)&&goalState&&!goalTeamConsulted){
+    const brief=goalOrchestrator.specialistQuestion(goalState);
+    try{
+     const team=await require('./agent-team').consult({callModel,request:text,files:work,question:brief.question,roles:brief.roles,tier,signal});
+     goalTeamConsulted=true;
+     if(goalState.phase==='understand')goalAdvance('understood',{evidence:'Specialists independently reviewed the goal.'});
+     if(goalState.phase==='plan')goalAdvance('planned',{evidence:'Lead Agent received specialist findings before implementation.'});
+     tl.add({t:'note',icon:'search',text:'Goal team reviewed the implementation plan: '+team.roles.join(', ')});
+     return{text:'Goal team consultation completed before implementation. Incorporate these findings, then retry edit_files:\n'+clip(JSON.stringify(team),22000)};
+    }catch(e){return{text:'Goal team consultation failed before implementation: '+String(e.message||e).slice(0,500)}}
+   }
+   if(goalState?.phase==='understand'){goalAdvance('understood');goalAdvance('planned')}
+   else if(goalState?.phase==='plan')goalAdvance('planned');
    let edits;try{edits=require('./react-edits').normalize(a.edits)}catch(e){return{text:'edit_files: '+e.message}}
    const r=require('./react-edits').apply(work,edits);
    if(r.errors.length)return{text:'edit_files: nothing was changed:\n'+r.errors.join('\n')+'\nRead the file again and copy "find" exactly, or use write_files.'};
@@ -330,8 +362,18 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
-  if(t==='build_and_test')return buildAndTest(a);
-  if(t==='test_ui')return testBuild(a,'test_ui on version '+(built?built.n:'?')+':');
+  if(t==='build_and_test'){
+   const r=await buildAndTest(a);
+   if(goalState?.phase==='execute')goalAdvance('implemented',{evidence:/built OK/i.test(r.text)?'Project built and entered verification.':'Build attempt completed.'});
+   if(/failed|error|problems, nothing was built/i.test(r.text)&&goalState?.phase==='verify')goalAdvance('verified',{ok:false,evidence:r.text.slice(0,700)});
+   return r;
+  }
+  if(t==='test_ui'){
+   const r=await testBuild(a,'test_ui on version '+(built?built.n:'?')+':');
+   if(goalState?.phase==='execute')goalAdvance('implemented');
+   if(goalState?.phase==='verify'&&/FAILED|Problems in the browser/i.test(r.text))goalAdvance('verified',{ok:false,evidence:r.text.slice(0,700)});
+   return r;
+  }
   if(t==='run_tests'){
    report({status:'testing'});
    lastUnitTests=require('./project-test-runner').run(work);
@@ -443,7 +485,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    tools:steps.flatMap(s=>s.tools||[]),evidence:{built:!dirty,verified:completion.verified&&!stopped,skipped:false,
     errors,failed:lastTest?.failed||0,interactions:lastTest?.steps||0,assertions:lastTest?.assertions||0,
     version:built.n,sourceDigest:require('./verified-learning').sourceDigest(files)}}).catch(()=>({status:'unavailable'})));
-  return{version:built.n,message,changed,verification:completion,steps:steps.length,timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
+  return{version:built.n,message,changed,verification:completion,...(goalState?{goal:goalSummary()}:{}),steps:steps.length,timeline:tl.stored(),duration_ms:tl.elapsed(),runtime_errors:errors,...(saved.length?{checks_saved:saved}:{}),...(failedChecks.length?{check_failures:failedChecks}:{}),preview_url:builder.previewUrl(fresh)};
  }
  function noChange(message){
   checkpointStore.clear(id);
@@ -525,7 +567,15 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
      if(!lastUnitTests.ok){results.push('finish: deterministic verification failed. Repair the implementation or tests based on the failure above, then run_tests again.');continue}
     }
     const verdict=gate.evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files:work,review:lastReview,reviewRequired});
-    if(!verdict.verified){finishWarned=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
+    if(!verdict.verified){
+     finishWarned=true;
+     if(goalState?.phase==='execute')goalAdvance('implemented');
+     if(goalState?.phase==='verify')goalAdvance('verified',{ok:false,evidence:verdict.issues.join(' ')});
+     results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue
+    }
+    if(goalState?.phase==='execute')goalAdvance('implemented');
+    if(goalState?.phase==='repair')goalAdvance('repaired',{evidence:'Repair completed and verification gate passed.'});
+    if(goalState?.phase==='verify')goalAdvance('verified',{ok:true,evidence:'Executor-owned completion gate passed.'});
     finished=save(message);break;
    }
    try{
