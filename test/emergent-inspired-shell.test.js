@@ -12,7 +12,7 @@ test("home shell has project tabs and central builder modes",()=>{
   for(const id of ["workspaceHomeTab","workspaceProjectTabs","workspaceNewTab","khComposerSlot"]){
     assert.match(html,new RegExp('id="'+id+'"'),id+" must exist");
   }
-  for(const mode of ["ask","web","mobile","video"])assert.match(html,new RegExp('data-mode="'+mode+'"'));
+  for(const mode of ["ask","web","mobile"])assert.match(html,new RegExp('data-mode="'+mode+'"'));\n  assert.doesNotMatch(html,/data-mode="video"/);
 });
 
 test("plus menu exposes the compact workflow controls",()=>{
@@ -34,7 +34,7 @@ test("top project tabs use live projects without changing memory context",()=>{
   assert.match(js,/function renderWorkspaceProjectTabs\(projects\)/);
   assert.match(js,/renderWorkspaceProjectTabs\(projects\)/);
   assert.ok(js.includes('$$(".project-tab").forEach'),"project tabs must use list selector");
-  assert.ok(js.includes('$$(".kh-mode").forEach'),"home modes must use list selector");
+  assert.ok(js.includes('$(".kh-mode").forEach'),"home modes must use list selector");\n  assert.doesNotMatch(js,/mode==="video"/);
   assert.ok(js.includes('$$("#plusMenu [data-plus]").forEach'),"plus menu must use list selector");
   assert.match(js,/let activeBuilderProjectId=""/);
   assert.match(js,/activeBuilderProjectId\|\|""/);
