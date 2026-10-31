@@ -20,10 +20,16 @@ Object.assign(process.env,{
 });
 const tg=require("../telegram"),accounts=require("../builder-accounts"),builder=require("../react-builder");
 
-let buildNo=0;
-const callModel=async(opts,parse)=>{
- buildNo++;
- return parse(JSON.stringify({plan:[],message:"Built Telegram version "+buildNo+".",files:{"src/App.jsx":"export default function App(){return <h1>Telegram "+buildNo+"</h1>}\n"}}));
+const fakeCreateApi={
+ async createProject(v,{prompt}={}){
+  const meta=builder.create({name:String(prompt||"Telegram project").slice(0,80),owner:v.owner});
+  await builder.initialize(meta);
+  return{meta:builder.loadMeta(meta.id),job:{status:"complete",support:false,result:{message:"Built through the Kairoq project engine."}}};
+ },
+ startJob(v,id,{message}={}){
+  return{status:"complete",support:false,result:{message:"Updated through the Kairoq project engine: "+String(message||"").slice(0,80)}};
+ },
+ async publishProject(){return{urls:{path:"https://kairoq.example/sites/test/"}}}
 };
 const sent=[],apiCalls=[];
 const fetchImpl=async(url,opts={})=>{
@@ -35,7 +41,7 @@ const fetchImpl=async(url,opts={})=>{
  if(url.endsWith("/setWebhook"))return{ok:true,status:200,json:async()=>({ok:true,result:true})};
  throw Error("unexpected Telegram API call "+url);
 };
-const deps={callModel,fetchImpl,wait:()=>new Promise(r=>setTimeout(r,5))};
+const deps={fetchImpl,createApi:fakeCreateApi,wait:()=>new Promise(r=>setTimeout(r,1))};
 
 test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 
@@ -71,7 +77,7 @@ test("private Telegram chat pairs once, never stores the raw chat id, then build
  await tg.onUpdate({update_id:2,message:{chat:{id:987654321,type:"private"},text:"new: a simple booking dashboard"}},deps);
  const replies=sent.slice(before).map(x=>x.text);
  assert.match(replies[0],/I’m on it/);
- assert.match(replies.at(-1),/Built Telegram version 1[\s\S]*Preview:/);
+ assert.match(replies.at(-1),/Built through the Kairoq project engine[\s\S]*Preview:/);
  assert.ok(builder.list().some(p=>/simple booking dashboard/i.test(p.name)));
 });
 
