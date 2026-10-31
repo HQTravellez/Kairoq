@@ -1042,7 +1042,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},explode_generation:{enabled:require('./explode-video').configured(process.env,{images:Boolean(generateImage)}),credits:require('./explode-video').prices()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,telegram:require('./telegram').enabled()?{start:require('./telegram').botLink()}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},explode_generation:{enabled:require('./explode-video').configured(process.env,{images:Boolean(generateImage)}),credits:require('./explode-video').prices()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -1142,6 +1142,19 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    return send(res,200,wa.issueCode(v.account.id)),true;
   }
   if(route==='/whatsapp/disconnect'&&method==='POST'){if(v.kind==='customer')require('./whatsapp').disconnect(v.account.id);return send(res,200,{ok:true}),true}
+  // ----- Telegram -----
+  if(route==='/telegram'&&method==='GET'){
+   const tg=require('./telegram');
+   return send(res,200,{telegram:{enabled:tg.enabled(),connected:v.kind==='customer'?tg.connected(v.account.id):false,start:tg.botLink(),username:tg.cfg().username||null}}),true;
+  }
+  if(route==='/telegram/code'&&method==='POST'){
+   const tg=require('./telegram');
+   if(!tg.enabled())throw Object.assign(Error('Telegram is not set up on this server'),{status:409});
+   if(v.kind!=='customer')throw Object.assign(Error('Connect Telegram from a customer account'),{status:400});
+   limited(req,'tg-code',10);
+   return send(res,200,tg.issueCode(v.account.id)),true;
+  }
+  if(route==='/telegram/disconnect'&&method==='POST'){if(v.kind==='customer')require('./telegram').disconnect(v.account.id);return send(res,200,{ok:true}),true}
   // ----- partner integrations -----
   if(route==='/partners'&&method==='GET')return send(res,200,{partners:require('./partners').publicPartners()}),true;
   const padd=/^\/partners\/([a-f0-9]{10})\/add$/.exec(route);
