@@ -84,13 +84,14 @@ function imageType(buf){
  if(buf.length>6&&buf.toString('ascii',0,3)==='GIF')return['gif','image/gif'];
  return null;
 }
-async function importFrame({url,token},{fetchImpl=fetch}={}){
+async function importFrame({url,token,auth='pat'},{fetchImpl=fetch}={}){
  const {key,nodeId:linked}=parseUrl(url);
- if(!/^[A-Za-z0-9_-]{20,200}$/.test(String(token||'')))throw fail(400,'Add a Figma personal access token (Figma → Settings → Security → Personal access tokens, with "File content: read").');
+ if(!/^[A-Za-z0-9._~-]{20,20000}$/.test(String(token||'')))throw fail(400,auth==='oauth'?'Reconnect Figma and try again.':'Add a valid Figma access token.');
+ const headers=auth==='oauth'?{Authorization:'Bearer '+String(token)}:{'X-Figma-Token':String(token)};
  const api=async p=>{
-  const r=await fetchImpl(API+p,{headers:{'X-Figma-Token':String(token)},signal:AbortSignal.timeout(30000)});
+  const r=await fetchImpl(API+p,{headers,signal:AbortSignal.timeout(30000)});
   const body=await r.json().catch(()=>({}));
-  if(r.status===403||r.status===401)throw fail(400,'Figma refused the token. Check that it is valid and can read this file.');
+  if(r.status===403||r.status===401)throw fail(400,auth==='oauth'?'Figma connection cannot read this file. Reconnect Figma or check that the connected account has access.':'Figma refused the token. Check that it is valid and can read this file.');
   if(r.status===404)throw fail(404,'Figma could not find that file or frame. Check the link and that your account can open it.');
   if(r.status===429)throw fail(429,'Figma rate limit reached. Try again in a minute.');
   if(!r.ok)throw fail(502,'Figma API error '+r.status+(body.err?': '+body.err:''));
