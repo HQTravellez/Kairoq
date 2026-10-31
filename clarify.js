@@ -64,7 +64,7 @@ async function questions(prompt,{callModel,tier='standard'}={}){
 }
 // The owner's answers, added to the request the builder reads.
 function withAnswers(prompt,answers){
- const lines=(Array.isArray(answers)?answers:[]).slice(0,3).map(a=>({q:clip(a&&a.q,140),a:(Array.isArray(a&&a.a)?a.a:[a&&a.a]).map(x=>clip(x,60)).filter(Boolean)})).filter(x=>x.q&&x.a.length);
+ const lines=(Array.isArray(answers)?answers:[]).slice(0,1).map(a=>({q:clip(a&&a.q,140),a:(Array.isArray(a&&a.a)?a.a:[a&&a.a]).map(x=>clip(x,60)).filter(Boolean)})).filter(x=>x.q&&x.a.length);
  if(!lines.length)return String(prompt||'');
  return String(prompt||'').trim()+'\n\nDetails from the owner:\n'+lines.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n');
 }
