@@ -229,9 +229,9 @@ function applyShellMode(){
   document.body.classList.toggle("advanced-mode", !simpleMode);
   const btn=$("#shellModeBtn");
   if(btn){
-    btn.textContent = simpleMode ? "Operator" : "Space OS";
-    btn.setAttribute("aria-label", simpleMode ? "Switch to Operator Console" : "Switch to Space OS");
-    btn.title = simpleMode ? "Operator Console" : "Space OS";
+    btn.textContent = simpleMode ? "Advanced" : "Simple";
+    btn.setAttribute("aria-label", simpleMode ? "Switch to advanced workspace" : "Switch to simple workspace");
+    btn.title = simpleMode ? "Advanced workspace" : "Simple workspace";
     btn.classList.toggle("active", !simpleMode);
   }
 }
