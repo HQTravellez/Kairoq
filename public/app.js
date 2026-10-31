@@ -3460,7 +3460,7 @@ function renderWorkspaceProjectTabs(projects){
 function updateWorkspaceTabState(){
   const home=$("#workspaceHomeTab");if(home)home.classList.toggle("active",mainView==="command");
   const build=mainView==="build";
-  $(".project-tab").forEach(t=>t.classList.toggle("active",build&&String(t.dataset.projectId||"")===String(currentProject||"")));
+  $(".project-tab").forEach(t=>t.classList.toggle("active",build&&String(t.dataset.projectId||"")===String(activeBuilderProjectId||"")));
 }
 $("#workspaceHomeTab")?.addEventListener("click",()=>setMainView("command"));
 $("#workspaceNewTab")?.addEventListener("click",()=>openAppBuilder("web"));
