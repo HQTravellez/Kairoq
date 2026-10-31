@@ -326,7 +326,7 @@ function setMainView(view="command"){
   if(!imageMode && !videoMode && promptEl){
     promptEl.placeholder = mainView === "studio"
       ? "Studio is open above — or ask Kairoq anything here."
-      : "How can I help you today?";
+      : mainView==="command"&&appBuildMode?APP_PLACEHOLDERS[appBuildMode]:"How can I help you today?";
   }
 
   if(mainView === "command") refreshCommandCenter();
@@ -3425,7 +3425,7 @@ $("#sendBtn").onclick=()=>send();
 initWorkspaceBrowserControls();
 
 // Build an app from the main page: pick Web app or Mobile app above the box, say what to build,
-// answer any quick questions here, then the builder opens inside this page with the request running.
+// then open the conversational builder immediately with the request running.
 let appBuildMode=false;
 const APP_PLACEHOLDERS={web:"Describe your web app…",mobile:"Describe your mobile app…"};
 const chatPlaceholder=promptEl.placeholder;
@@ -3471,7 +3471,7 @@ function openBuilder(url){
 }
 function launchAppBuild(prompt){
   $("#khError")?.classList.add("hidden");
-  // The builder opens here and asks any quick questions inside its own chat before building.
+  // The builder starts immediately; blocking questions can be handled in its conversation.
   const text=appBuildMode==="mobile"?"Build a mobile app: "+prompt:prompt;
   try{sessionStorage.setItem("kairoq-pending",JSON.stringify({prompt:text,ask:true}))}catch{}
   promptEl.value="";resizePrompt();
