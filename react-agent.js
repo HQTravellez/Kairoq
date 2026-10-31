@@ -103,7 +103,7 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
@@ -148,6 +148,20 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  }
 
  function dropOldImages(){for(const m of messages)if(Array.isArray(m.content)&&m!==introMsg)m.content=m.content.filter(p=>p.type==='text').map(p=>p.text).join('\n')+'\n(screenshot omitted)'}
+ if(researchOnly&&initialBrowserUrl&&wb.available()){
+  webAttempted=true;
+  const u=require('./browser-chat-routing').normalizeUrl(initialBrowserUrl)||String(initialBrowserUrl);
+  try{
+   const observed=await wb.open(u),shot=await publishBrowser();
+   webObserved=true;
+   tl.add({t:'note',icon:'web',text:'Opened '+require('./web').hostOf(wb.url)+' before model reasoning'});
+   messages.push({role:'user',content:'Kairoq already opened the requested public website in its browser. Use this observed page state as evidence; continue browsing if needed, then answer.\n\n'+clip(observed,18000)});
+   if(vision&&shot)messages.at(-1).content=[{type:'text',text:messages.at(-1).content},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}}];
+  }catch(e){
+   await publishBrowser(e.message||e).catch(()=>{});
+   messages.push({role:'user',content:'Kairoq attempted to open '+u+' before model reasoning, but the browser returned this concrete error: '+String(e.message||e).slice(0,500)+'. Report this specific failure or try another web tool; do not claim Kairoq has no browser capability.'});
+  }
+ }
  function trimContext(){
   const size=m=>typeof m.content==='string'?m.content.length:m.content.reduce((n,p)=>n+(p.type==='text'?p.text.length:0),0);
   let total=messages.reduce((n,m)=>n+size(m),0);
@@ -212,7 +226,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   if(t==='inspect_api_docs'){
     webAttempted=true;
     if(!fetchUrl)return{text:'inspect_api_docs is unavailable: the guarded URL fetch transport is not configured.'};
-    const u=String(a.url||'').slice(0,500);
+    const raw=String(a.url||'').slice(0,500),u=require('./browser-chat-routing').normalizeUrl(raw)||raw;
     try{
       // Reuse server-provided URL fetcher; never fetch directly or with model supplied credentials.
       const parsed=require('./api-docs').validUrl(u);
