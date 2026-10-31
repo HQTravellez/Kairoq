@@ -249,8 +249,9 @@ function moveComposerSmooth(shell,target){
   const reduce=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   const first=shell.getBoundingClientRect();
   target.appendChild(shell);
-  if(reduce||typeof shell.animate!=="function")return;
+  if(reduce||typeof shell.animate!=="function"||first.width<2||first.height<2)return;
   const last=shell.getBoundingClientRect();
+  if(last.width<2||last.height<2)return;
   const dx=first.left-last.left,dy=first.top-last.top;
   const sx=last.width?Math.min(1.08,Math.max(.92,first.width/last.width)):1;
   shell.animate([
@@ -272,7 +273,7 @@ function preloadHomeSky(){
   const src="https://images.pexels.com/photos/20884933/pexels-photo-20884933.jpeg?auto=compress&cs=tinysrgb&w=2400";
   const img=new Image();img.decoding="async";img.src=src;
   const ready=()=>document.body.classList.add("home-sky-ready");
-  if(img.decode)img.decode().then(ready).catch(()=>{img.onload=ready});else img.onload=ready;
+  if(img.decode)img.decode().then(ready).catch(ready);else{img.onload=ready;img.onerror=ready}
 }
 preloadHomeSky();
 
@@ -3438,11 +3439,16 @@ function builderReady(){
 }
 function openBuilder(url){
   const frame=$("#buildFrame"),view=$("#buildView");
-  view.classList.add("loading");
-  frame.classList.add("frame-loading");
-  try{const u=new URL(url,location.origin),pid=u.searchParams.get("project");activeBuilderProjectId=pid||""}catch{activeBuilderProjectId=""}
+  let absolute="";
+  try{
+    const u=new URL(url,location.origin);absolute=u.href;
+    activeBuilderProjectId=u.searchParams.get("project")||"";
+  }catch{activeBuilderProjectId=""}
+  const same=Boolean(absolute&&frame.src===absolute&&frame.src!=="about:blank");
+  if(!same){view.classList.add("loading");frame.classList.add("frame-loading")}
   setMainView("build");
-  requestAnimationFrame(()=>{if(frame.src!==new URL(url,location.origin).href)frame.src=url});
+  if(same){builderReady();return}
+  requestAnimationFrame(()=>{frame.src=url});
   clearTimeout(builderTimer);builderTimer=setTimeout(builderReady,30000);
 }
 function launchAppBuild(prompt){
