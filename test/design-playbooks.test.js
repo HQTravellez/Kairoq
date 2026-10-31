@@ -47,6 +47,19 @@ test('the brief keeps the playbook, and every later change sees it', async () =>
   // The model can turn it down; it cannot pick a business that was not offered.
   assert.equal((await design.createBrief('website for our pizzeria', { projectName: 'Nonna', callModel: reply({ playbook: '' }) })).playbook, undefined);
   assert.equal((await design.createBrief('website for our pizzeria', { projectName: 'Nonna', callModel: reply({ playbook: 'Dental Practice' }) })).playbook, 'Restaurant/Food Service');
+  const directed = await design.createBrief('website for our pizzeria', { projectName: 'Nonna', callModel: reply({
+    thesis: 'Warm neighbourhood confidence with editorial restraint',
+    signature: 'One oversized food photograph cuts into the headline grid',
+    density: 'spacious',
+    rhythm: 'Large quiet hero, tighter menu section, then a full-width photographic pause',
+    interaction: 'Fast restrained hover states with one deliberate hero entrance'
+  }) });
+  const directedNote = design.designNote(directed);
+  assert.match(directedNote, /Design thesis: Warm neighbourhood confidence/);
+  assert.match(directedNote, /Signature move: One oversized food photograph/);
+  assert.match(directedNote, /Density: spacious/);
+  assert.match(directedNote, /Section\/screen rhythm: Large quiet hero/);
+  assert.match(directedNote, /Interaction language: Fast restrained hover states/);
   const note = design.designNote(offered);
   // The brief also got an art direction: its blueprints set the sections and the look, so the
   // playbook adds the button, what visitors look for and what to avoid.
