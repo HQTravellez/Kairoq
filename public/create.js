@@ -293,75 +293,54 @@ function morph(card,fill,dir=1){
   setTimeout(()=>{card.style.height='';card.classList.remove('morphing')},340);
  },150);
 }
-// Started from the main Kairoq page: open the editor straight away and ask any quick questions
-// inside the chat, one at a time, before the first build starts.
+// Started from the main Kairoq page: open the editor and begin naturally.
+// Most requests build immediately. One short clarification is shown only when the goal itself
+// is too vague to identify a useful first outcome. Visual/style/3D choices are never required.
 async function askThenBuild(prompt){
  const name=shortName(prompt);
  const {project}=await api('/projects',{method:'POST',body:{name}});
  await openProject(project.id);
  const list=$('messages');list.replaceChildren();
  let mine=messageItem({role:'user',text:prompt});list.append(mine);
- const card=document.createElement('li');card.className='assistant ask-card';
- card.classList.add('enter');card.dataset.dir='0';card.append(el('p','ask-head k-shimmer','Reading your request…'));list.append(card);
+ const card=document.createElement('li');card.className='assistant ask-card enter';card.dataset.dir='0';
+ card.append(el('p','ask-head k-shimmer','Understanding what you want…'));list.append(card);
+
  const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt}}).catch(()=>({questions:[]}));
- // The picked look (if any) becomes the project's colours and fonts; then the plan (build-plan.js)
- // is shown with Review, Skip and Approve, and the build starts on Approve (or Skip).
- const request=answers=>answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
- const go=(answers,plan)=>{mine.remove();card.remove();planWaiting(false);send(plan?withPlan(request(answers),plan):request(answers),'build')};
- const build=async(answers,look)=>{
-  if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
-  if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
-  morph(card,()=>card.append(el('p','ask-head k-shimmer','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
-  planWaiting(true);
-  const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
-  if(!plan)return go(answers,null);
-  // A character the owner picked in the plan is added to the project's 3D files first.
-  const approve=async()=>{
-   if(plan.pick){try{const d=await api('/projects/'+project.id+'/models?op=polypizza',{method:'POST',body:{id:plan.pick.id}});plan.picked=d.added.title}catch(err){card.querySelector('.char-pick')?.append(el('p','char-note char-err',err.message));return false}}
-   go(answers,plan);
-  };
-  showBuildPlan(card,plan,{onApprove:approve,onSkip:()=>go(answers,null),projectId:project.id});
-  list.scrollTop=list.scrollHeight;
+ const q=questions[0]||null;
+ const request=answer=>answer
+  ?prompt+'\n\nOne detail from the owner:\n- '+q.q+' '+answer
+  :prompt;
+ const go=answer=>{
+  mine.remove();card.remove();
+  send(request(answer),'build');
  };
- const picked=questions.map(()=>new Set()),other=questions.map(()=>'');let at=0;
- const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
- // The last question is always the look: "How should it feel?" (create-look.js).
- const total=questions.length+(window.KairoqLook?1:0);
- const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:total>1?'Question '+total+' of '+total:'One quick question',
-  onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{at=questions.length-1;draw(-1)}:null});
- if(!questions.length)return window.KairoqLook?lookStep():build([]);
- const draw=(dir=1)=>morph(card,()=>{
-  const q=questions[at];
-  // Like superapp: the question, option cards (a label and one sentence), "Other…", then
-  // Back and forward arrows, Skip all and Next.
-  const head=el('div','ask-top');head.append(el('span','ask-count',total>1?'Question '+(at+1)+' of '+total:'One quick question'));
+
+ // Clear requests go straight to Kairoq's normal goal/build engine.
+ if(!q)return go('');
+
+ morph(card,()=>{
+  card.append(el('p','ask-count','One quick question'),el('p','ask-q',q.q));
   const opts=el('div','ask-opts');
-  const mark=()=>{for(const r of opts.querySelectorAll('.ask-opt'))r.classList.toggle('on',r.querySelector('input').checked)};
-  (q.options||[]).forEach((o,i)=>{
-   const row=el('label','ask-opt');const input=document.createElement('input');
-   input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
-   input.onchange=()=>{if(!q.multi)picked[at].clear();input.checked?picked[at].add(o):picked[at].delete(o);mark()};
-   const words=el('span','ask-words');words.append(el('span','ask-label',o+(i===q.recommended?' (Recommended)':'')));
+  (q.options||[]).slice(0,3).forEach((o,i)=>{
+   const b=el('button','ask-opt'+(i===q.recommended?' recommended':''));b.type='button';
+   const words=el('span','ask-words');words.append(el('span','ask-label',o));
    if(q.details&&q.details[i])words.append(el('span','ask-detail',q.details[i]));
-   row.append(input,words);opts.append(row);
+   if(i===q.recommended)words.append(el('span','q-tag','Recommended'));
+   b.append(words);b.onclick=()=>{opts.querySelectorAll('button').forEach(x=>x.disabled=true);go(o)};
+   opts.append(b);
   });
-  const own=document.createElement('input');own.className='ask-other';own.placeholder='Other…';own.value=other[at];own.setAttribute('aria-label','Another answer');
-  own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false;mark()}};
-  mark();
+  const own=document.createElement('input');own.className='ask-other';own.placeholder='Or type a short answer…';own.setAttribute('aria-label','Your answer');
   const foot=el('div','ask-foot');
-  const back=el('button','ask-arrow','‹');back.type='button';back.setAttribute('aria-label','Previous question');back.disabled=at===0;back.onclick=()=>{at--;draw(-1)};
-  const fwd=el('button','ask-arrow','›');fwd.type='button';fwd.setAttribute('aria-label','Next question');fwd.disabled=at===questions.length-1&&!window.KairoqLook;
-  const last=at===questions.length-1,final=last&&!window.KairoqLook;
-  const forward=()=>{if(final)build(answers());else if(last){morph(card,()=>card.append(el('p','ask-head k-shimmer','Finding looks that fit…')),1);setTimeout(lookStep,STILL?0:170)}else{at++;draw(1)}};fwd.onclick=forward;
-  const skip=el('button','ask-link','Skip all');skip.type='button';skip.onclick=()=>build(answers());
-  const next=el('button','ask-next',final?'Submit':'Next');next.type='button';next.onclick=forward;
-  foot.append(back,fwd,el('span','ask-gap'),skip,next);
-  // Thin progress segments, one per question (and the look).
-  const bar=el('div','ask-progress');for(let k=0;k<total;k++)bar.append(el('i',k<=at?'on':null));
-  card.append(bar,head,el('p','ask-q',q.q),opts,own,foot);
+  const skip=el('button','ask-link','Build anyway');skip.type='button';skip.onclick=()=>go('');
+  const sendAnswer=el('button','ask-next','Continue');sendAnswer.type='button';sendAnswer.disabled=true;
+  own.oninput=()=>{sendAnswer.disabled=!own.value.trim()};
+  own.onkeydown=e=>{if(e.key==='Enter'&&own.value.trim()){e.preventDefault();go(own.value.trim())}};
+  sendAnswer.onclick=()=>{if(own.value.trim())go(own.value.trim())};
+  foot.append(el('span','ask-gap'),skip,sendAnswer);
+  card.append(opts,own,foot);
   list.scrollTop=list.scrollHeight;
- },dir);
- draw(0);
+  own.focus({preventScroll:true});
+ },0);
 }
 // A first request with the owner's answers and the approved plan, shown like superapp: the request,
 // each question small with its answer under it, then the plan's title.
