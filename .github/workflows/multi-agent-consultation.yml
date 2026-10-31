@@ -3,8 +3,10 @@ on:
   push:
     paths:
       - 'agent-team.js'
+      - 'goal-orchestrator.js'
       - 'react-agent.js'
       - 'test/agent-team.test.js'
+      - 'test/goal-orchestrator.test.js'
       - '.github/workflows/multi-agent-consultation.yml'
   pull_request:
     paths:
@@ -24,5 +26,6 @@ jobs:
         with:
           node-version: '22'
       - run: node --check agent-team.js
+      - run: node --check goal-orchestrator.js
       - run: node --check react-agent.js
-      - run: node --test test/agent-team.test.js test/agent-capability-routing.test.js
+      - run: node --test test/agent-team.test.js test/goal-orchestrator.test.js test/agent-capability-routing.test.js
