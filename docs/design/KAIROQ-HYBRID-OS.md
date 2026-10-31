@@ -171,7 +171,7 @@ Keep motion almost invisible:
 
 ## Implementation order
 
-### Slice 1 — shell
+### Slice 1 — shared shell
 - light visual system
 - sidebar/top bar
 - chat/composer
