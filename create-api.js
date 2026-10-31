@@ -342,6 +342,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // Resolve direct site requests and short follow-ups such as "check again" against recent chat.
  // The decision is carried to execution below; ordinary discussion remains ordinary discussion.
  const browserDecision=browserChat.route(ownerText,builder.loadMeta(id).messages||[]);
+ const browserResearchOnly=browserDecision.execute&&!routing.explicitExecution(ownerText);
+ if(browserResearchOnly&&!hooks&&(mode==='build'||mode==='agent'))mode='discuss';
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
  if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&!shownText){
@@ -474,7 +476,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
     const continuity=browserDecision.execute&&browserDecision.message!==message?browserDecision.message.slice(String(message||'').length).trim():'';
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra,continuity].filter(Boolean).join('\n\n');
-    const researchOnly=mode==='discuss'&&browserDecision.execute&&!hooks;
+    const researchOnly=browserResearchOnly&&!hooks;
     job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
      onStep:p=>update({status:p.status,stream:null,...(p.browser?{browser:p.browser}:{}),agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
