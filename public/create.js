@@ -519,7 +519,9 @@ $('store-android').onclick=e=>storeCall({action:'publish',platform:'android'},e.
 // ---------- editor ----------
 async function openProject(id,{pendingText,job}={}){
  const {project,account,active_job}=await api('/projects/'+id);
+ const previousProject=state.project&&state.project.id;
  state.project=project;
+ if(previousProject&&previousProject!==project.id)window.kairoqBrowserPane?.reset();
  if(account)renderCredits(account);
  show('editor');history.replaceState(null,'','/create?project='+id);
  applyRole();
@@ -1477,7 +1479,7 @@ async function watch(job){
  const done=await new Promise(resolve=>{
   let finished=false;
   const finish=j=>{if(!finished){finished=true;resolve(j)}};
-  const apply=j=>{if(state.watchToken!==watchToken||state.project?.id!==id){finish(null);return;}if(j.preview&&j.preview.url&&j.mode!=='discuss')swapPreview(j.preview.url);renderBuildOverlay(j);text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(j.progress||LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
+  const apply=j=>{if(state.watchToken!==watchToken||state.project?.id!==id){finish(null);return;}if(j.preview&&j.preview.url&&j.mode!=='discuss')swapPreview(j.preview.url);if(j.browser)window.kairoqBrowserPane?.show(j.browser);renderBuildOverlay(j);text($('progress-text'),(j.mode==='agent'&&j.agent&&j.agent.step?'Step '+j.agent.step+' · ':'')+(j.progress||LABELS[j.status]||'Working…'));if(j.status!=='complete'&&j.status!=='failed')renderWork(j);if(j.status==='complete'||j.status==='failed')finish(j)};
   apply(job);
   if(finished)return;
   if(window.EventSource){
