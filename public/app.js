@@ -3538,7 +3538,7 @@ window.addEventListener("message",e=>{
   const err=$("#khError");if(err){err.textContent=e.data.error?"The build could not start: "+String(e.data.error).slice(0,300).replace(/[.\s]*$/,".")+" Try again, or change the request.":"";err.classList.toggle("hidden",!e.data.error)}
   loadHomeApps();
 });
-$(".kh-mode").forEach(t=>t.onclick=()=>{
+$$(".kh-mode").forEach(t=>t.onclick=()=>{
   if(videoMode)setVideoMode(false);
   setAppBuildMode(t.dataset.mode);
   animateHomeModeChange();
