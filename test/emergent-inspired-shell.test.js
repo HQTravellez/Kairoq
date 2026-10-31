@@ -35,9 +35,9 @@ test("home composer is moved into the hero only on Home",()=>{
 test("top project tabs come from live Kairoq projects without changing memory context",()=>{
   const js=read("public/app.js");
   assert.match(js,/function renderWorkspaceProjectTabs\(projects\)/);
-  assert.match(js,/renderWorkspaceProjectTabs\(projects\)/);
+  assert.match(js,/renderWorkspaceProjectTabs\(projects\)/);\n  assert.ok(js.includes('$(".project-tab").forEach'),"project tabs must use list selector");\n  assert.ok(js.includes('$(".kh-mode").forEach'),"home modes must use list selector");\n  assert.ok(js.includes('$("#plusMenu [data-plus]").forEach'),"plus menu must use list selector");
   assert.match(js,/let activeBuilderProjectId=""/);
-  assert.doesNotMatch(js,/if\(pid\)currentProject=pid/);
+  assert.doesNotMatch(js,/if\(pid\)currentProject=pid/);\n  assert.match(js,/activeBuilderProjectId\|\|""/);
 });
 
 test("new shell visual contract exists and Testing Ground remains intact",()=>{
