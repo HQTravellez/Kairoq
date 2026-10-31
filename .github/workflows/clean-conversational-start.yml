@@ -1,0 +1,34 @@
+name: Clean conversational start
+on:
+  push:
+    paths:
+      - 'clarify.js'
+      - 'public/create.js'
+      - 'public/create.html'
+      - 'test/clarify.test.js'
+      - 'test/looks.test.js'
+      - 'test/clean-conversational-start.test.js'
+      - '.github/workflows/clean-conversational-start.yml'
+  pull_request:
+    paths:
+      - 'clarify.js'
+      - 'public/create.js'
+      - 'public/create.html'
+      - 'test/clarify.test.js'
+      - 'test/looks.test.js'
+      - 'test/clean-conversational-start.test.js'
+      - '.github/workflows/clean-conversational-start.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check clarify.js
+      - run: node --check public/create.js
+      - run: node --test test/clarify.test.js test/looks.test.js test/clean-conversational-start.test.js test/natural-chat-build-routing.test.js
