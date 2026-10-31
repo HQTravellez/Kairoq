@@ -12,10 +12,7 @@ test("home shell has project tabs and central builder modes",()=>{
   for(const id of ["workspaceHomeTab","workspaceProjectTabs","workspaceNewTab","khComposerSlot"]){
     assert.match(html,new RegExp('id="'+id+'"'),id+" must exist");
   }
-  assert.match(html,/data-mode="ask"/);
-  assert.match(html,/data-mode="web"/);
-  assert.match(html,/data-mode="mobile"/);
-  assert.match(html,/data-mode="video"/);
+  for(const mode of ["ask","web","mobile","video"])assert.match(html,new RegExp('data-mode="'+mode+'"'));
 });
 
 test("plus menu exposes the compact workflow controls",()=>{
@@ -32,12 +29,16 @@ test("home composer is moved into the hero only on Home",()=>{
   assert.match(js,/else if\(mainView!=="command" && shell\.parentElement!==main\) main\.appendChild\(shell\)/);
 });
 
-test("top project tabs come from live Kairoq projects without changing memory context",()=>{
+test("top project tabs use live projects without changing memory context",()=>{
   const js=read("public/app.js");
   assert.match(js,/function renderWorkspaceProjectTabs\(projects\)/);
-  assert.match(js,/renderWorkspaceProjectTabs\(projects\)/);\n  assert.ok(js.includes('$(".project-tab").forEach'),"project tabs must use list selector");\n  assert.ok(js.includes('$(".kh-mode").forEach'),"home modes must use list selector");\n  assert.ok(js.includes('$("#plusMenu [data-plus]").forEach'),"plus menu must use list selector");
+  assert.match(js,/renderWorkspaceProjectTabs\(projects\)/);
+  assert.ok(js.includes('$$(".project-tab").forEach'),"project tabs must use list selector");
+  assert.ok(js.includes('$$(".kh-mode").forEach'),"home modes must use list selector");
+  assert.ok(js.includes('$$("#plusMenu [data-plus]").forEach'),"plus menu must use list selector");
   assert.match(js,/let activeBuilderProjectId=""/);
-  assert.doesNotMatch(js,/if\(pid\)currentProject=pid/);\n  assert.match(js,/activeBuilderProjectId\|\|""/);
+  assert.match(js,/activeBuilderProjectId\|\|""/);
+  assert.doesNotMatch(js,/if\(pid\)currentProject=pid/);
 });
 
 test("new shell visual contract exists and Testing Ground remains intact",()=>{
