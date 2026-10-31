@@ -1,0 +1,156 @@
+/* Kairoq conversation bubbles: light, human, and easy to continue. */
+.messages{
+  gap:9px;
+  padding:18px 14px 24px;
+}
+.messages>li{
+  padding:0;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+  white-space:normal;
+}
+.messages .user{
+  align-self:flex-end;
+  max-width:min(82%,560px);
+  padding:9px 13px;
+  border:0;
+  border-radius:20px 20px 6px 20px;
+  background:#171719;
+  color:#fff;
+  font-size:14.5px;
+  line-height:1.45;
+}
+.messages .assistant,
+.messages .work{
+  align-self:flex-start;
+  width:auto;
+  max-width:min(92%,680px);
+  background:transparent!important;
+  border:0!important;
+  padding:0!important;
+}
+.messages .assistant>.message-bubble,
+.messages .assistant>.md.message-bubble,
+.work-msg:not(.hidden){
+  display:block;
+  width:fit-content;
+  max-width:100%;
+  padding:10px 13px;
+  border-radius:20px 20px 20px 6px;
+  background:#f2f2f4;
+  color:#171719;
+  border:0;
+  box-shadow:none;
+}
+.messages .assistant.failed>.message-bubble,
+.messages .assistant.failed>.md.message-bubble{
+  background:#fff2f3;
+  color:#9f2431;
+}
+.messages .assistant .message-bubble .md,
+.messages .assistant .message-bubble{
+  font-size:14.5px;
+  line-height:1.55;
+}
+.messages .assistant .message-bubble p{
+  margin:0 0 8px;
+}
+.messages .assistant .message-bubble p:last-child{
+  margin-bottom:0;
+}
+.messages .assistant .message-bubble h3,
+.messages .assistant .message-bubble h4{
+  margin:10px 0 5px;
+}
+.messages .assistant .message-bubble ul,
+.messages .assistant .message-bubble ol{
+  margin:5px 0 5px;
+  padding-left:20px;
+}
+.status-line.done,
+.acts,
+.msg-meta,
+.message-details{
+  margin-left:6px;
+}
+.question-options,
+.idea-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin:8px 0 2px 6px;
+  counter-reset:quick-reply;
+}
+.q-opt{
+  counter-increment:quick-reply;
+  width:auto;
+  max-width:100%;
+  min-height:34px;
+  justify-content:flex-start;
+  gap:7px;
+  padding:7px 11px 7px 8px;
+  border:1px solid #dedee2;
+  border-radius:999px;
+  background:#fff;
+  color:#242428;
+  font:500 13px/1.25 inherit;
+  box-shadow:0 1px 2px rgba(0,0,0,.035);
+}
+.q-opt::before{
+  content:counter(quick-reply);
+  display:inline-grid;
+  place-items:center;
+  flex:none;
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  background:#f0f0f2;
+  color:#66666f;
+  font-size:11px;
+  font-weight:700;
+}
+.q-opt:hover{
+  background:#f8f8f9;
+  border-color:#c9c9cf;
+}
+.q-opt.recommended{
+  border-color:#b8b8c1;
+  box-shadow:none;
+}
+.q-opt.recommended::before{
+  background:#171719;
+  color:#fff;
+}
+.q-tag{
+  margin-left:3px;
+  padding:1px 6px;
+  background:#eeeeF1;
+  color:#5f5f68;
+  font-size:10px;
+  font-weight:650;
+}
+.q-hint{
+  margin:5px 0 0 8px;
+  color:#8a8a93;
+  font-size:11.5px;
+}
+.q-opt.idea::after{
+  content:"";
+}
+.work{
+  padding-top:2px!important;
+}
+.work-head{
+  margin-left:6px;
+}
+.work-msg{
+  margin:7px 0 0;
+  white-space:normal;
+}
+@media (max-width:820px){
+  .messages{padding:14px 12px 20px}
+  .messages .user{max-width:88%}
+  .messages .assistant,.messages .work{max-width:94%}
+  .q-opt{font-size:12.5px}
+}
