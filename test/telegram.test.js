@@ -46,23 +46,21 @@ test("Telegram config and webhook secret are deterministic",()=>{
  assert.equal(tg.secretOk("wrong"),false);
 });
 
+let accountId="";
 test("a signed-in Kairoq account gets a one-time Telegram deep link",()=>{
  const s=accounts.signup("telegram@example.com","password1");
- accounts.grantFreeCredits(s.account.id);
- const pair=tg.issueCode(s.account.id);
+ accountId=s.account.id;
+ accounts.grantFreeCredits(accountId);
+ const pair=tg.issueCode(accountId);
  assert.match(pair.code,/^[A-Za-z0-9_-]{8,20}$/);
  assert.equal(pair.link,"https://t.me/KairoqTestBot?start="+pair.code);
  assert.equal(pair.username,"KairoqTestBot");
- assert.equal(tg.connected(s.account.id),false);
+ assert.equal(tg.connected(accountId),false);
 });
 
 test("private Telegram chat pairs once, never stores the raw chat id, then builds through Kairoq",async()=>{
- const account=accounts.getByEmail?accounts.getByEmail("telegram@example.com"):null;
- const a=account||accounts.list?.().find(x=>x.email==="telegram@example.com");
- const acct=a||Object.values(accounts).find?.(()=>false);
- // Retrieve from the pairing code's account without depending on account-list helpers.
  const state=JSON.parse(fs.readFileSync(path.join(tmp,"telegram","state.json"),"utf8"));
- const code=Object.keys(state.codes)[0],accountId=state.codes[code].account;
+ const code=Object.keys(state.codes)[0];
  await tg.onUpdate({update_id:1,message:{chat:{id:987654321,type:"private"},text:"/start "+code}},deps);
  assert.match(sent.at(-1).text,/Connected to Kairoq/);
  assert.equal(tg.connected(accountId),true);
