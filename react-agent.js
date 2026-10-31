@@ -10,7 +10,7 @@ function intEnv(name,fallback,min,max){const n=Number(process.env[name]);return 
 function maxStepsDefault(){return intEnv('KAIROQ_AGENT_MAX_STEPS',15,2,40)}
 function recoveryStepsDefault(){return intEnv('KAIROQ_AGENT_RECOVERY_STEPS',4,0,8)}
 function codingRules(){return builder.SYSTEM_PROMPT.replace(/\nRespond with ONLY a JSON object[\s\S]*$/,'')}
-function protocol({vision,web,maxSteps,images,message=''}){
+function protocol({vision,web,maxSteps,images,message='',figmaAccess=false}){
  return `
 
 You are working in AGENT MODE: keep working in steps until the request is fully done and verified, like a careful senior engineer.
@@ -21,7 +21,7 @@ AVAILABLE CAPABILITIES (discoverable inventory, not automatic permission):\n${re
 - {"tool":"research_pages","urls":["https://docs.example.com/overview","https://docs.example.com/reference"]}: open and read up to 6 public HTTPS documentation pages with guarded Chromium, reporting individual sources and failures. This does not execute API requests or code.\n- {"tool":"list_capabilities","query":"browser API"}: discover Kairoq's existing capabilities, their real availability and entrypoints. Read-only; do not assume a listed capability is callable.
 - {"tool":"consult_agents","roles":["architect","product","qa"],"question":"Review my planned implementation before I edit."}: ask up to 3 read-only specialist sub-agents in parallel. Available roles: architect, product, qa, security, api, design. They cannot edit, build, deploy, call tools, or verify runtime facts; the Lead Agent owns all writes and evidence.
 - {"tool":"inspect_github_repo","url":"https://github.com/owner/repo"}: inspect a public GitHub repository end to end without executing its code. Reads repository metadata, a bounded file tree, README/manifests and likely OpenAPI/Swagger/Postman/API-doc files. Use this before ordinary web browsing when the user gives a GitHub repository URL.
-- {"tool":"inspect_figma","url":"https://www.figma.com/design/FILE/Name?node-id=12-34"}: inspect a Figma frame through the project's connected Figma account. Reads observed frame layout, text, images, components and styles; imported image fills are saved as project uploads. Use this before coding whenever the request includes a Figma design link.
+${figmaAccess?`- {"tool":"inspect_figma","url":"https://www.figma.com/design/FILE/Name?node-id=12-34"}: inspect a Figma frame through the project owner's connected Figma account. Reads observed frame layout, text, images, components and styles; imported image fills are saved as project uploads. Use this before coding whenever the request includes a Figma design link.\n`:''}
 - {"tool":"inspect_api_docs","url":"https://docs.example.com/openapi.json"}: fetch public API documentation through the existing guarded fetch_url transport and parse OpenAPI/Swagger/Postman or infer draft endpoints. This does NOT call supplier APIs or approve an operation.
 - {"tool":"read_files","paths":["src/App.jsx"]}: read up to 8 files.
 - {"tool":"search","query":"text or regex"}: search every project file; returns matching lines.
@@ -111,7 +111,7 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl='',figmaAccess=false}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
@@ -153,7 +153,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
  executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision)+
  (goalState?'\n\nGOAL ORCHESTRATION: phase='+goalState.phase+'; specialist team='+goalState.team.join(', ')+'. The runtime owns phase/team selection. Specialists advise in parallel; only the Lead Agent writes or claims verification.':''));
- const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen),message:text})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
+ const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen),message:text,figmaAccess})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...(goalState?{goal:goalSummary()}:{}),...patch});
  async function publishBrowser(error=''){
@@ -291,6 +291,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     }catch(e){return{text:'inspect_github_repo failed: '+String(e.message||e).slice(0,500)}}
   }
   if(t==='inspect_figma'){
+    if(!figmaAccess)return{text:'inspect_figma is not available in this session: only the project owner can use the connected Figma identity.'};
     const raw=String(a.url||'').slice(0,800);
     try{
       const figma=require('./react-figma'),frame=await require('./figma-connection').importFrame(id,raw);
