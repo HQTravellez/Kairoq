@@ -1552,6 +1552,7 @@ async function renderFigmaConnection(){
  }catch(err){text($('figma-connect-status'),'Could not read the Figma connection.');text($('figma-error'),err.message);return null}
 }
 $('figma-open').onclick=async()=>{
+ if(state.project.role&&state.project.role!=='owner'){text($('chat-error'),'Only the project owner can connect or inspect Figma in this release.');return}
  text($('figma-error'),'');
  text($('figma-cost'),'Builds with the '+(state.mode==='agent'?'Agent':'Build')+' mode and the model selected in chat.');
  $('figma-dialog').showModal();
@@ -2919,7 +2920,7 @@ const CONNECTORS=[
  {id:'stripe',name:'Stripe payments',desc:'Take card payments and subscriptions with your own Stripe account.',open:()=>openSettingsAt('stripe-key')},
  {id:'email',name:'Email',desc:'Booking confirmations, password resets and owner notifications.',open:()=>openSettingsAt('email-status')},
  {id:'secrets',name:'API keys for your app',desc:'Keys for other services your server functions call (maps, SMS, AI…).',open:()=>openSettingsAt('secret-name')},
- {id:'figma',name:'Figma',desc:'Connect your Figma account, build from frames, and use components/styles as design evidence.',open:()=>$('figma-open').click()},
+ {id:'figma',name:'Figma',desc:'Connect your Figma account, build from frames, and use components/styles as design evidence.',open:()=>$('figma-open').click(),owner:true},
  {id:'apps',name:'744 apps',desc:'Mailchimp, HubSpot, Slack, Airtable, Shopify, Twilio and more: pick one and say what should happen.',open:()=>openApps()},
  {id:'partners',name:'Integrations',desc:'Booking, payments, reviews and more from our partners.',open:()=>openIntegrations()},
  {id:'whatsapp',name:'WhatsApp',desc:'Answer customers on WhatsApp with your app\'s assistant.',open:()=>openWhatsApp()},
