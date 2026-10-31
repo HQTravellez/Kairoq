@@ -422,9 +422,11 @@ body,button,input,select,textarea{font-family:var(--font)!important;font-feature
 
 /* ---------- Emergent-inspired Kairoq shell ---------- */
 .workspace-tabs{
-  display:flex;align-items:center;gap:5px;min-width:0;flex:1;overflow:hidden;
+  display:none;align-items:center;gap:5px;min-width:0;flex:1;overflow:hidden;
   margin-left:4px
 }
+.main[data-view=command] .workspace-tabs,
+.main[data-view=build] .workspace-tabs{display:flex!important;visibility:visible!important}
 .workspace-project-tabs{display:flex;align-items:center;gap:5px;min-width:0;overflow-x:auto;scrollbar-width:none}
 .workspace-project-tabs::-webkit-scrollbar{display:none}
 .workspace-tab{
@@ -439,7 +441,9 @@ body,button,input,select,textarea{font-family:var(--font)!important;font-feature
 .workspace-tab-dot{width:7px;height:7px;border-radius:50%;background:#62768a;flex:none}
 .workspace-tab-dot.home-dot{width:14px;height:14px;border-radius:4px;background:#3189d9;box-shadow:inset 0 0 0 3px #ffffff70}
 .project-tab.active .workspace-tab-dot{background:#27a765}
-.topbar-context{min-width:0;display:none}
+.topbar-context{min-width:0;display:block}
+.main[data-view=command] .topbar-context,
+.main[data-view=build] .topbar-context{display:none!important}
 .main[data-view=command]>.topbar,
 .main[data-view=build]>.topbar{
   min-height:60px!important;padding:8px 12px!important;background:#a9d3f7e8!important;
