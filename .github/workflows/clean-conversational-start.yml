@@ -5,9 +5,16 @@ on:
       - 'clarify.js'
       - 'public/create.js'
       - 'public/create.html'
+      - 'public/conversation-bubbles.css'
+      - 'agent-response-contract.js'
+      - 'react-builder.js'
+      - 'react-agent.js'
+      - 'docs/design/KAIROQ-CONVERSATION-EXPERIENCE.md'
       - 'test/clarify.test.js'
       - 'test/looks.test.js'
       - 'test/clean-conversational-start.test.js'
+      - 'test/conversation-experience.test.js'
+      - 'test/agent-response-contract.test.js'
       - '.github/workflows/clean-conversational-start.yml'
   pull_request:
     paths:
@@ -31,4 +38,7 @@ jobs:
           node-version: '22'
       - run: node --check clarify.js
       - run: node --check public/create.js
-      - run: node --test test/clarify.test.js test/looks.test.js test/clean-conversational-start.test.js test/natural-chat-build-routing.test.js
+      - run: node --check agent-response-contract.js
+      - run: node --check react-builder.js
+      - run: node --check react-agent.js
+      - run: node --test test/clarify.test.js test/looks.test.js test/clean-conversational-start.test.js test/conversation-experience.test.js test/agent-response-contract.test.js test/natural-chat-build-routing.test.js
