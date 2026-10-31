@@ -3323,7 +3323,7 @@ $$(".cc-quick").forEach(btn=>btn.onclick=()=>useCommandPrompt(btn));
 $("#clearChats").onclick=()=>{if(confirm("Delete all local chats?")){chats=[];currentChatId=null;newChat()}};
 // "+" opens a small menu (file, image, video), like Hermes' single "+" in the message box.
 $("#attachBtn").onclick=e=>{e.stopPropagation();const m=$("#plusMenu");m.hidden=!m.hidden;$("#attachBtn").setAttribute("aria-expanded",String(!m.hidden));if(!m.hidden)m.querySelector("button")?.focus()};
-$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else if(k==="github"){setStatus("Open Connections to import or sync a GitHub repository.");$("#connectorsBtn")?.click()}else if(k==="model")$("#modelPickerBtn")?.click();else if(k==="advanced")$("#settingsBtn")?.click();else if(k==="pdf")openPdfTools();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
+$$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else if(k==="github"){setStatus("Open Connections to import or sync a GitHub repository.");$("#connectorsBtn")?.click()}else if(k==="model")$("#modelPickerBtn")?.click();else if(k==="advanced")$("#settingsBtn")?.click();else if(k==="pdf")openPdfTools();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
 // PDF tools (Stirling PDF on the server, stirling-pdf.js): pick a tool and PDFs, get the result back as a download.
 async function openPdfTools(){
   let info={on:false,tools:[]};try{info=await (await fetch("/api/pdf/tools",{credentials:"same-origin"})).json()}catch{}
@@ -3460,7 +3460,7 @@ function renderWorkspaceProjectTabs(projects){
 function updateWorkspaceTabState(){
   const home=$("#workspaceHomeTab");if(home)home.classList.toggle("active",mainView==="command");
   const build=mainView==="build";
-  $(".project-tab").forEach(t=>t.classList.toggle("active",build&&String(t.dataset.projectId||"")===String(activeBuilderProjectId||"")));
+  $$(".project-tab").forEach(t=>t.classList.toggle("active",build&&String(t.dataset.projectId||"")===String(activeBuilderProjectId||"")));
 }
 $("#workspaceHomeTab")?.addEventListener("click",()=>setMainView("command"));
 $("#workspaceNewTab")?.addEventListener("click",()=>openAppBuilder("web"));
