@@ -133,7 +133,7 @@ function forProject(id,{webSearch=hooks.webSearch,remote=(u,o)=>require('./build
   }
   if(tool==='github_repo_analyze')return require('./github-repository-intelligence').analyze(a.url,{remote});
   if(tool==='integration')return require('./integrations').lookup(a.service,a.action,{remote});
-  if(tool==='skill')return require('./builder-skills').open(a.name);
+  if(tool==='skill')return await require('./builder-skills').openAsync(a.name,{fetchImpl:fetch});
   if(tool==='tutorials')return require('./builder-references').lookup(a.topic||a.query);
   if(tool==='download'){if(log.filter(x=>x.kind==='download').length>=MAX_PER_SESSION)return'Enough downloads for one change.';return download(id,a,{remote,log})}
   if(tool==='package')return addPackage(id,a,{fetchJson,install,log,dir:ctx&&ctx.dir});
