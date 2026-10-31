@@ -31,3 +31,12 @@ test("main chat capability truth is resolved before model personalities",()=>{
 test("browser failures disclose the concrete website error instead of pretending the model lacks tools",()=>{
  assert.match(source,/This is a website access error, not a limitation of the text model/);
 });
+
+test("interactive browser accepts only validated canonical redirect origins",()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,"../runtime-check.js"),"utf8");
+ const guard=runtime.slice(runtime.indexOf("async function guardSite"),runtime.indexOf("// What a browsing agent sees",runtime.indexOf("async function guardSite")));
+ assert.match(guard,/req\.redirectedFrom\(\)/);
+ assert.match(guard,/await checkSite\(u\.href\)/);
+ assert.match(guard,/origin=u\.origin/);
+ assert.match(runtime,/const allowedOrigin=site\?new URL\(page\.url\(\)\)\.origin/);
+});
