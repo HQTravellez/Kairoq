@@ -1701,16 +1701,17 @@ workspaceMemory=memoryLinesToText(memoryStore.global);
 
 // keepChoices: on page load, keep the model and thinking effort the person last picked
 // (the preset used to reset them to Free Auto / Low on every refresh).
-function applyPreset(name,{keepChoices=false}={}){
+async function applyPreset(name,{keepChoices=false}={}){
   const p=PRESETS[name];if(!p)return;
   ui.preset=name;ui.purpose=p.purpose;
   if(!keepChoices||!ui.effort)ui.effort=p.effort;
   effortSelect.value=ui.effort;purposeSelect.value=p.purpose;webSearchEl.checked=p.web;
   routing.webSearch=p.web;
-  if(p.model&&!(keepChoices&&ui.lastModel)){modelSelect.value=p.model;updateModelUI();}
-  $$(".preset").forEach(b=>b.classList.toggle("active",b.dataset.preset===name));
+  let modelChanged=true;
+  if(p.model&&!(keepChoices&&ui.lastModel))modelChanged=await requestModelSwitch(p.model,pickerLabel(p.model));
+  $(".preset").forEach(b=>b.classList.toggle("active",b.dataset.preset===name));
   saveAll();
-  setStatus(`${name[0].toUpperCase()+name.slice(1)} preset selected`);
+  setStatus(modelChanged?`${name[0].toUpperCase()+name.slice(1)} preset selected`:`${name[0].toUpperCase()+name.slice(1)} preset selected · model unchanged`);
 }
 
 function resizePrompt(){promptEl.style.height="auto";promptEl.style.height=Math.min(promptEl.scrollHeight,180)+"px"}
@@ -3422,7 +3423,18 @@ function updateRouting(){
   freePill.classList.toggle("off",!routing.freeOnly);
   saveAll();
 }
-freeOnlyEl.onchange=()=>{updateRouting();if(freeOnlyEl.checked&&!modelInfo(modelSelect.value).isFree&&modelSelect.value!=="openrouter/free"){modelSelect.value="openrouter/free";updateModelUI();setStatus("Paid model blocked — switched to Free Auto")}else setStatus(freeOnlyEl.checked?"Paid models blocked":"Paid models allowed")};
+freeOnlyEl.onchange=async()=>{
+  updateRouting();
+  if(freeOnlyEl.checked&&!modelInfo(modelSelect.value).isFree&&modelSelect.value!=="openrouter/free"){
+    const switched=await requestModelSwitch("openrouter/free","Auto (free)");
+    if(!switched){
+      freeOnlyEl.checked=false;updateRouting();
+      setStatus("Free Only unchanged — kept the current model");
+      return;
+    }
+    setStatus("Free Only enabled — switched to Free Auto");
+  }else setStatus(freeOnlyEl.checked?"Paid models blocked":"Paid models allowed");
+};
 smartFallbackEl.onchange=updateRouting;
 webSearchEl.onchange=()=>{updateRouting();setStatus(webSearchEl.checked?"Web search enabled — may incur tool charges":"Web search off")};
 effortSelect.onchange=()=>{ui.effort=effortSelect.value;saveAll()};
