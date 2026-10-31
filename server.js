@@ -718,9 +718,10 @@ async function handleModelSwitchHandoff(req,res){
       const selected=models.find(m=>m.id===toModel);
       if(!selected||!require("./chat-model-eligibility").isConversationalModel(selected))return json(res,400,{error:"That conversational model is not available right now."});
     }
-    const prepared=require("./model-switch-handoff").prepare({
+    const modelHandoff=require("./model-switch-handoff");
+    const prepared=modelHandoff.prepare({
       messages,
-      current:String([...messages].reverse().find(m=>m.role==="user")?.content||""),
+      current:modelHandoff.contentText([...messages].reverse().find(m=>m.role==="user")?.content),
       project:typeof body.currentProject==="string"?body.currentProject:"",
       fromModel,
       toModel,
@@ -4353,7 +4354,7 @@ async function handleChat(req, res) {
       :"";
     const capabilitySystem="Kairoq has an existing guarded public website reader, web research path and API documentation tooling. Do not claim Kairoq categorically cannot browse or read external documentation. If the request needs public API docs, use the application-provided research results when available; if fetching fails, report that specific failure. Never claim sandbox requests or generated integration code have been executed unless there is execution evidence. Current user project context may be incomplete: do not assume the active app is about nutrition when the user asks about Sabre travel APIs.";
     const handoffModule=require("./model-switch-handoff");
-    const latestUserText=String([...messages].reverse().find(m=>m.role==="user")?.content||"");
+    const latestUserText=handoffModule.contentText([...messages].reverse().find(m=>m.role==="user")?.content);
     const continuityMeta={
       name:typeof body.currentProject==="string"?body.currentProject:"",
       messages:handoffModule.normalizeMessages(messages),
