@@ -153,7 +153,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
  executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision)+
  (goalState?'\n\nGOAL ORCHESTRATION: phase='+goalState.phase+'; specialist team='+goalState.team.join(', ')+'. The runtime owns phase/team selection. Specialists advise in parallel; only the Lead Agent writes or claims verification.':''));
- const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen),message:text})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
+ const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+builder.conversationNote(meta,text)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen),message:text})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...(goalState?{goal:goalSummary()}:{}),...patch});
  async function publishBrowser(error=''){
