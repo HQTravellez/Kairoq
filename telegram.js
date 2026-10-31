@@ -100,7 +100,7 @@ async function onUpdate(update,deps={}){
 }
 
 async function command(chatId,st,d,text,deps){
- const reply=t=>send(chatId,t,deps).catch(()=>{}),c=cfg(),builder=require("./react-builder"),create=require("./create-api"),accounts=require("./builder-accounts");
+ const reply=t=>send(chatId,t,deps).catch(()=>{}),c=cfg(),builder=require("./react-builder"),create=deps.createApi||require("./create-api"),accounts=require("./builder-accounts");
  const account=accounts.get(st.account);
  if(!account){delete d.chats[chatKey(chatId)];save(d);return reply("Your Kairoq account could not be found. Reconnect Telegram from the Kairoq web app.");}
  const t=text.trim(),lower=t.toLowerCase(),list=projectsOf(account.id);
@@ -135,7 +135,7 @@ async function command(chatId,st,d,text,deps){
 }
 
 async function build(chatId,accountId,message,deps,{fresh=false,fix=false}={}){
- const reply=t=>send(chatId,t,deps).catch(()=>{}),c=cfg(),builder=require("./react-builder"),create=require("./create-api"),v=viewerFor(accountId);if(!v)return;
+ const reply=t=>send(chatId,t,deps).catch(()=>{}),c=cfg(),builder=require("./react-builder"),create=deps.createApi||require("./create-api"),v=viewerFor(accountId);if(!v)return;
  const d=load(),st=d.chats[chatKey(chatId)],list=projectsOf(accountId);
  let id=fresh?null:(st.project||(list[0]&&list[0].id)||null),job;
  const jobDeps={
