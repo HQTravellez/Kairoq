@@ -78,3 +78,20 @@ test("frustrated user gets apology even when the selected model forgets it",()=>
  assert.match(out,/^Sorry/);
  assert.match(out,/corrected|explained away/i);
 });
+
+test("empty or rude model replies are replaced before the user sees them",()=>{
+ const empty=response.guard("Can you inspect this API?","");
+ assert.ok(empty.length>20);
+ assert.doesNotMatch(empty,/^\s*$/);
+ const rude=response.guard("Please help me fix this","Figure it out yourself, that's your problem.");
+ assert.doesNotMatch(rude,/figure it out|your problem/i);
+ assert.match(rude,/response was not appropriate/i);
+});
+
+test("frustrated turns cannot reach the user without acknowledgement",()=>{
+ const guarded=response.guard("This still doesn't work and I'm not happy","I will inspect the flow again.");
+ assert.match(guarded,/^Sorry/i);
+ assert.match(guarded,/corrected, not explained away/i);
+ const already=response.guard("This still doesn't work","Sorry — I missed the broken checkout. I’ll fix it.");
+ assert.equal(already,"Sorry — I missed the broken checkout. I’ll fix it.");
+});
