@@ -79,7 +79,8 @@ async function run({ url, task, callModel, onStatus = () => {}, onFrame = () => 
     if (!force && Date.now() - lastFrame < 700) return; // keep the stream light
     lastFrame = Date.now();
     const image = await session.screenshot().catch(() => null);
-    if (image) onFrame({ image, caption, step });
+    const currentUrl = typeof session.url === "function" ? session.url() : target;
+    if (image) onFrame({ image, caption, step, url: currentUrl });
   };
 
   try {

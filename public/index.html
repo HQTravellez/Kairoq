@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/composer.css?v=4">
   <link rel="stylesheet" href="/home.css?v=13">
   <link rel="stylesheet" href="/design.css?v=17">
-  <link rel="stylesheet" href="/kairoq-ui.css?v=21">
+  <link rel="stylesheet" href="/kairoq-ui.css?v=22">
   <link rel="stylesheet" href="/hybrid-os.css?v=1">
 </head>
 <body>
@@ -140,6 +140,7 @@
         <div class="header-actions">
           <button type="button" id="studioNavBtn" class="topbar-chat-btn">Studio</button>
           <button type="button" id="chatViewBtn" class="topbar-chat-btn">Ask Kairoq</button>
+          <button type="button" id="workspaceBrowserBtn" class="topbar-chat-btn ghost" aria-pressed="false">Browser</button>
           <button id="shellModeBtn" class="topbar-chat-btn ghost">Simple</button>
           <span id="zeroCostPill" class="zero-cost-pill">LOCAL + FREE</span><div id="freePill" class="free-pill">FREE FIRST</div>
           <button type="button" id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -725,6 +726,50 @@
       </section>
 
       <section id="messages" class="messages hidden"></section>
+      <section id="browserWorkspace" class="browser-workspace hidden" aria-label="Browser and preview workspace">
+        <header class="browser-workspace-head">
+          <div class="browser-workspace-title">
+            <span class="browser-live-dot" aria-hidden="true"></span>
+            <strong id="browserWorkspaceTitle">Browser</strong>
+            <span id="browserWorkspaceState">Ready</span>
+          </div>
+          <div class="browser-workspace-actions">
+            <button type="button" id="workspaceInspectBtn" class="browser-tool-btn" aria-pressed="false" title="Select something to add to chat">Select</button>
+            <button type="button" id="browserPopoutBtn" class="browser-tool-btn" title="Open current page in a new tab" aria-label="Open current page in a new tab">↗</button>
+            <button type="button" id="browserCloseBtn" class="browser-tool-btn" title="Close browser pane" aria-label="Close browser pane">×</button>
+          </div>
+        </header>
+        <div class="browser-addressbar">
+          <button type="button" id="browserBackBtn" class="browser-nav-btn" title="Back" aria-label="Back">‹</button>
+          <button type="button" id="browserRefreshBtn" class="browser-nav-btn" title="Refresh" aria-label="Refresh">↻</button>
+          <input id="browserAddress" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a website, localhost URL, or Kairoq preview">
+          <button type="button" id="browserGoBtn" class="browser-go-btn">Open</button>
+        </div>
+        <div id="browserStage" class="browser-stage">
+          <div id="browserEmpty" class="browser-empty">
+            <div class="browser-empty-icon">◎</div>
+            <strong>Kairoq’s browser opens here.</strong>
+            <p>Ask Kairoq to inspect a website, or paste a localhost / preview URL above. Research stays visible while the report is written beside it.</p>
+          </div>
+          <div id="browserLiveWrap" class="browser-live-wrap hidden">
+            <img id="browserLiveImage" alt="Live page Kairoq is inspecting">
+            <div id="browserPointMarker" class="browser-point-marker hidden" aria-hidden="true"></div>
+          </div>
+          <iframe id="browserPreviewFrame" class="browser-preview-frame hidden" title="Local or Kairoq app preview" sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts allow-downloads"></iframe>
+          <div id="browserSelectionBar" class="browser-selection-bar hidden" aria-live="polite">
+            <span id="browserSelectionLabel">Selection ready</span>
+            <button type="button" id="browserAddToChatBtn">Add to chat</button>
+            <button type="button" id="browserClearSelectionBtn" aria-label="Clear selection">×</button>
+          </div>
+        </div>
+        <footer class="browser-workspace-foot">
+          <span id="browserCaption">Browser activity and previews stay here while Kairoq works.</span>
+          <div class="browser-workspace-tabs" role="tablist" aria-label="Browser view">
+            <button type="button" class="active" data-browser-mode="live" role="tab" aria-selected="true">Live browser</button>
+            <button type="button" data-browser-mode="preview" role="tab" aria-selected="false">Preview</button>
+          </div>
+        </footer>
+      </section>
       <button id="jumpLatestBtn" class="jump-latest hidden" type="button">↓ Latest</button>
 
       <div class="composer-shell">
@@ -1407,7 +1452,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=41"></script>
+  <script src="/app.js?v=42"></script>
 <script src="/connections.js?v=20"></script>
 </body>
 </html>
