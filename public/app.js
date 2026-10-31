@@ -1331,7 +1331,7 @@ const AUTO_MODELS=[{id:"openrouter/free",name:"Auto (free)",hint:"Kairoq picks a
 let hermesState={configured:false,ok:false,checked:false};
 async function loadHermesState(){
   try{const r=await fetch("/api/hermes/status");if(r.ok)hermesState={...(await r.json()),checked:true}}catch{}
-  if(hermesState.configured&&["openrouter/free","smart-auto"].includes(modelSelect.value)&&!ui.pickedModel){pickModel("hermes/agent")}
+  if(hermesState.configured&&["openrouter/free","smart-auto"].includes(modelSelect.value)&&!ui.pickedModel&&!(getChat()?.messages||[]).length){commitModelSelection("hermes/agent","Kairoq Agent")}
   const ft=$("#hermesFooterText"),fd=$("#hermesFooter .status-dot");
   if(ft){ft.textContent=!hermesState.checked?"Agent status unknown":hermesState.configured?(hermesState.ok?"Kairoq Agent ready":"Agent not reachable"):"Agent not connected";fd?.classList.toggle("off",!(hermesState.configured&&hermesState.ok))}
   renderModelPicker();
@@ -1799,8 +1799,6 @@ async function compareOne(model,prompt,host){
         projectMemory:getProjectMemoryText(),
       companyPlaybook: await getCompanyPlaybookText(),
         chatSummary:getChatSummary(),
-        currentProject,
-        modelSwitch:pendingModelSwitch,
         customPresetPrompt:activeCustomPreset?.prompt || ""
       })
     });
@@ -2114,6 +2112,8 @@ async function send(regenerateFrom=null){
         workspaceMemory,
         projectMemory:getProjectMemoryText(),
         chatSummary:getChatSummary(),
+        currentProject,
+        modelSwitch:pendingModelSwitch,
         customPresetPrompt:activeCustomPreset?.prompt || ""
       })
     });
