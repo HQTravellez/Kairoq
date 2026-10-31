@@ -1,248 +1,280 @@
-/* Kairoq Hybrid OS — Aerospace Control default + Operator Console advanced mode.
-   Loaded last. This is a visual shell only: no product behavior changes. */
+/* Kairoq workspace — restrained builder-first shell.
+   Inspired by the simplicity of modern agentic app builders: neutral surfaces,
+   strong typography, minimal chrome. No decorative theme layer. */
 
 :root{
-  --os-bg:#070a12;
-  --os-bg-2:#0b1020;
-  --os-panel:#0d1322;
-  --os-panel-2:#11192b;
-  --os-panel-3:#151f34;
-  --os-line:#202d46;
-  --os-line-soft:#172238;
-  --os-text:#eef4ff;
-  --os-muted:#91a0b8;
-  --os-faint:#64748b;
-  --os-cyan:#8bd8ff;
-  --os-blue:#5f7cff;
-  --os-violet:#8a78ff;
-  --os-mint:#72f1b8;
-  --os-amber:#f6c76e;
-  --os-red:#ff7b86;
-  --os-radius:14px;
-  --os-radius-sm:9px;
-  --os-mono:"JetBrains Mono","SFMono-Regular",Consolas,monospace;
-  --os-font:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-  --os-shadow:0 20px 60px rgba(0,0,0,.28);
+  --kq-bg:#0f0f10;
+  --kq-panel:#151516;
+  --kq-panel-2:#1a1a1c;
+  --kq-hover:#202023;
+  --kq-line:#2a2a2d;
+  --kq-line-soft:#222225;
+  --kq-text:#f5f5f4;
+  --kq-muted:#a1a1aa;
+  --kq-faint:#71717a;
+  --kq-accent:#8b9cff;
+  --kq-success:#72d98b;
+  --kq-warning:#e7bd66;
+  --kq-danger:#ef7b86;
+  --kq-radius:10px;
+  --kq-font:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --kq-mono:"JetBrains Mono","SFMono-Regular",Consolas,monospace;
 }
 
-/* ---------- Space OS / default ---------- */
-body.simple-mode{
-  color-scheme:dark;
-  background:linear-gradient(180deg,#080b12 0%,#07090e 100%)!important;
-  color:var(--os-text)!important;
-}
-body.simple-mode::before{
-  content:"";
-  position:fixed;inset:0;pointer-events:none;z-index:0;
-  opacity:.2;
-  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px);
-  background-size:100% 56px;
-  mask-image:linear-gradient(to bottom,black,transparent 70%);
-}
-body.simple-mode .app,body.simple-mode .main,
-body.simple-mode .main[data-view=chat],body.simple-mode .main[data-view=command],
-body.simple-mode .main[data-view=studio],body.simple-mode .main[data-view=build],
-body.simple-mode .main[data-view=plugins]{
-  background:transparent!important;color:var(--os-text)!important;font-family:var(--os-font)!important;
-}
-body.simple-mode .sidebar.kn{
-  background:rgba(8,12,22,.92)!important;
-  border-right:1px solid var(--os-line-soft)!important;
-  box-shadow:18px 0 50px rgba(0,0,0,.16)!important;
-  backdrop-filter:blur(20px);
-}
-body.simple-mode .sidebar.kn .brand-mark{
-  background:#e8eef8!important;
-  color:#06101a!important;
-  box-shadow:none!important;
-}
-body.simple-mode .sidebar.kn .brand-title,
-body.simple-mode .sidebar.kn .kn-item,
-body.simple-mode .sidebar.kn .kn-fold>summary,
-body.simple-mode .sidebar.kn .kn-settings>summary{color:var(--os-text)!important}
-body.simple-mode .sidebar.kn .kn-label,
-body.simple-mode .sidebar.kn .kn-cap,
-body.simple-mode .sidebar.kn .kn-hint,
-body.simple-mode .sidebar.kn .history-list button,
-body.simple-mode .sidebar.kn .history-list .history-item{color:var(--os-muted)!important}
-body.simple-mode .sidebar.kn .kn-item:hover,
-body.simple-mode .sidebar.kn .kn-fold>summary:hover,
-body.simple-mode .sidebar.kn .kn-settings>summary:hover,
-body.simple-mode .sidebar.kn .history-list button:hover{background:rgba(124,140,255,.08)!important;color:var(--os-text)!important}
-body.simple-mode .sidebar.kn .kn-item.active{
-  background:linear-gradient(90deg,rgba(110,231,255,.12),rgba(124,140,255,.08))!important;
-  box-shadow:inset 2px 0 0 var(--os-cyan)!important;
-}
-body.simple-mode .sidebar.kn .kn-ico{stroke:currentColor!important}
-body.simple-mode .sidebar.kn .kn-new{
-  background:#111723!important;
-  border:1px solid #263247!important;color:var(--os-text)!important;
-  box-shadow:none!important;
-}
-body.simple-mode .kn-search input,
-body.simple-mode .sidebar select{
-  background:rgba(255,255,255,.035)!important;border-color:var(--os-line)!important;color:var(--os-text)!important;
-}
-
-body.simple-mode .topbar.simple-topbar{
-  background:rgba(8,11,18,.96)!important;
-  border-bottom:1px solid var(--os-line-soft)!important;
-  backdrop-filter:blur(18px)!important;
-}
-body.simple-mode .topbar-title{color:var(--os-text)!important}
-body.simple-mode .topbar-subtitle{color:var(--os-muted)!important}
-body.simple-mode .topbar .icon-btn,
-body.simple-mode .topbar-chat-btn{
-  color:var(--os-muted)!important;border-color:transparent!important;background:transparent!important;
-}
-body.simple-mode .topbar .icon-btn:hover,
-body.simple-mode .topbar-chat-btn:hover{color:var(--os-text)!important;background:rgba(124,140,255,.09)!important}
-body.simple-mode #shellModeBtn{
-  border:1px solid rgba(110,231,255,.2)!important;
-  background:#0e1522!important;color:#c7d7ee!important;
-}
-body.simple-mode .zero-cost-pill,body.simple-mode .free-pill{
-  background:rgba(114,241,184,.08)!important;color:var(--os-mint)!important;border:1px solid rgba(114,241,184,.18)!important;
-}
-
-body.simple-mode .command-center-view{position:relative;z-index:1}
-body.simple-mode .kh-shell{max-width:1220px!important}
-body.simple-mode .kh-hero{position:relative}
-
-body.simple-mode .kh-hero h1{
-  color:var(--os-text)!important;font-weight:580!important;letter-spacing:-.055em!important;
-  text-shadow:none;
-}
-body.simple-mode .kh-hero h1 em{color:var(--os-text)!important;font-style:normal!important}
-body.simple-mode .kh-hero>p,body.simple-mode .kh-work-title{color:var(--os-muted)!important}
-body.simple-mode .kh-mode,
-body.simple-mode .kh-pill{
-  background:rgba(13,19,34,.72)!important;border:1px solid var(--os-line)!important;color:var(--os-muted)!important;
-  box-shadow:none!important;
-}
-body.simple-mode .kh-mode:hover,body.simple-mode .kh-pill:hover{
-  border-color:rgba(110,231,255,.28)!important;color:var(--os-text)!important;background:rgba(17,25,43,.9)!important;
-}
-body.simple-mode .kh-mode[aria-selected=true]{
-  color:var(--os-text)!important;border-color:rgba(110,231,255,.36)!important;
-  background:#131b29!important;
-}
-body.simple-mode .kh-card,body.simple-mode .kh-stat,
-body.simple-mode .cc-card,body.simple-mode .studio-card,
-body.simple-mode .plugin-card{
-  background:linear-gradient(180deg,rgba(17,25,43,.82),rgba(10,15,27,.88))!important;
-  border:1px solid var(--os-line)!important;color:var(--os-text)!important;
-  box-shadow:none!important;
-}
-body.simple-mode .kh-card:hover,body.simple-mode .kh-stat:hover{
-  border-color:rgba(124,140,255,.38)!important;
-}
-body.simple-mode .kh-card small,body.simple-mode .kh-card p,
-body.simple-mode .kh-stat span,body.simple-mode .cc-empty{color:var(--os-muted)!important}
-body.simple-mode .kh-link{color:var(--os-cyan)!important}
-
-/* Chat + composer */
-body.simple-mode .composer-shell,
-body.simple-mode #chat-form,
-body.simple-mode .chat #chat-form.composer{
-  background:rgba(11,16,32,.9)!important;border:1px solid var(--os-line)!important;
-  box-shadow:0 18px 55px rgba(0,0,0,.22)!important;backdrop-filter:blur(18px);
-}
-body.simple-mode #chat-input,body.simple-mode .chat #chat-input{color:var(--os-text)!important}
-body.simple-mode #chat-input::placeholder{color:var(--os-faint)!important}
-body.simple-mode .composer-bar .menu>summary,
-body.simple-mode .composer-bar select{color:var(--os-muted)!important;background:transparent!important}
-body.simple-mode .composer-bar .send{background:#e8eef8!important;color:#0b0f16!important}
-body.simple-mode .messages .assistant .md,body.simple-mode .messages .assistant{color:var(--os-text)!important}
-body.simple-mode .messages .user{
-  background:rgba(124,140,255,.11)!important;border:1px solid rgba(124,140,255,.16)!important;color:var(--os-text)!important;
-}
-body.simple-mode .messages .assistant::before{background:#e8eef8!important}
-
-/* Builder/editor surfaces */
-body.simple-mode.in-editor .shell-main,
-body.simple-mode.in-editor #editor,
-body.simple-mode.in-editor .stage,
-body.simple-mode.in-editor #canvas{background:var(--os-bg)!important}
-body.simple-mode.in-editor #editor>.chat,
-body.simple-mode.in-editor #editor .chat-head,
-body.simple-mode.in-editor .stage-bar{background:var(--os-panel)!important;border-color:var(--os-line)!important}
-body.simple-mode.in-editor #project-name{color:var(--os-text)!important}
-body.simple-mode.in-editor #messages{background:linear-gradient(180deg,var(--os-bg),var(--os-bg-2))!important}
-body.simple-mode.in-editor #frame{box-shadow:0 18px 48px rgba(0,0,0,.28)!important;border-color:var(--os-line)!important}
-
-/* ---------- Operator Console / advanced ---------- */
+body.simple-mode,
 body.advanced-mode{
   color-scheme:dark;
-  --op-bg:#030805;--op-panel:#06100a;--op-line:#14331f;--op-text:#d7ffe4;--op-muted:#6da77c;--op-green:#73ff9b;--op-amber:#ffd166;
-  background:var(--op-bg)!important;color:var(--op-text)!important;font-family:var(--os-mono)!important;
+  background:var(--kq-bg)!important;
+  color:var(--kq-text)!important;
+  font-family:var(--kq-font)!important;
 }
-body.advanced-mode::before{
-  content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:.08;
-  background:repeating-linear-gradient(to bottom,transparent 0,transparent 2px,#9affb5 3px,#9affb5 4px);
-  mix-blend-mode:screen;
-}
-body.advanced-mode .app,body.advanced-mode .main,
-body.advanced-mode .main[data-view]{background:var(--op-bg)!important;color:var(--op-text)!important;font-family:var(--os-mono)!important}
-body.advanced-mode .sidebar.kn{background:#040c07!important;border-right:1px solid var(--op-line)!important;box-shadow:none!important}
-body.advanced-mode .brand-mark{border-radius:3px!important;background:var(--op-green)!important;color:#031007!important;box-shadow:0 0 18px rgba(115,255,155,.22)!important}
-body.advanced-mode .brand-title::after{content:" / OPERATOR";color:var(--op-green);font-size:10px;font-weight:500;letter-spacing:.08em}
-body.advanced-mode .sidebar.kn .kn-item,
-body.advanced-mode .sidebar.kn .kn-fold>summary,
-body.advanced-mode .sidebar.kn .kn-settings>summary,
-body.advanced-mode .sidebar.kn .history-list button{font-family:var(--os-mono)!important;color:var(--op-muted)!important;border-radius:2px!important}
-body.advanced-mode .sidebar.kn .kn-item:hover,
-body.advanced-mode .sidebar.kn .kn-item.active{background:#0a1b10!important;color:var(--op-green)!important;box-shadow:inset 2px 0 0 var(--op-green)!important}
-body.advanced-mode .kn-search input,
-body.advanced-mode .sidebar select{background:#050d08!important;color:var(--op-text)!important;border:1px solid var(--op-line)!important;border-radius:2px!important}
-body.advanced-mode .topbar.simple-topbar{background:#040b06!important;border-bottom:1px solid var(--op-line)!important;backdrop-filter:none!important}
-body.advanced-mode .topbar-title,body.advanced-mode .topbar-subtitle{font-family:var(--os-mono)!important;color:var(--op-text)!important}
-body.advanced-mode #shellModeBtn{background:#08190e!important;border:1px solid var(--op-green)!important;color:var(--op-green)!important;border-radius:2px!important}
-body.advanced-mode #shellModeBtn::before{content:"> ";opacity:.7}
-body.advanced-mode .kh-hero h1,body.advanced-mode h1,body.advanced-mode h2,body.advanced-mode h3{
-  font-family:var(--os-mono)!important;letter-spacing:-.035em!important;color:var(--op-text)!important;
-}
-body.advanced-mode .kh-hero h1 em{color:var(--op-green)!important;font-style:normal!important}
-body.advanced-mode .kh-hero h1::before{content:"SYS:// ";font-size:.28em;color:var(--op-green);letter-spacing:.08em;vertical-align:top}
-body.advanced-mode .kh-card,body.advanced-mode .kh-stat,
-body.advanced-mode .composer-shell,body.advanced-mode #chat-form,
-body.advanced-mode .chat #chat-form.composer,
-body.advanced-mode .studio-card,body.advanced-mode .plugin-card{
-  background:var(--op-panel)!important;border:1px solid var(--op-line)!important;color:var(--op-text)!important;
-  border-radius:3px!important;box-shadow:none!important;
-}
-body.advanced-mode .kh-card *,body.advanced-mode .kh-stat *,body.advanced-mode .kh-hero>p{font-family:var(--os-mono)!important}
-body.advanced-mode .kh-pill,body.advanced-mode .kh-mode,body.advanced-mode button,body.advanced-mode select{
-  border-radius:2px!important;font-family:var(--os-mono)!important;
-}
-body.advanced-mode .kh-pill,body.advanced-mode .kh-mode{
-  background:#06100a!important;border:1px solid var(--op-line)!important;color:var(--op-muted)!important;
-}
-body.advanced-mode .kh-pill:hover,body.advanced-mode .kh-mode:hover,
-body.advanced-mode .kh-mode[aria-selected=true]{color:var(--op-green)!important;border-color:var(--op-green)!important;background:#0a1b10!important}
-body.advanced-mode .composer-bar .send{background:var(--op-green)!important;color:#031007!important;border-radius:2px!important}
-body.advanced-mode .messages .user{background:#0a1b10!important;border:1px solid var(--op-line)!important;color:var(--op-text)!important;border-radius:2px!important}
-body.advanced-mode .messages .assistant::before{background:var(--op-green)!important;border-radius:1px!important;box-shadow:none!important}
-body.advanced-mode code,body.advanced-mode pre{color:var(--op-green)!important}
-body.advanced-mode .zero-cost-pill,body.advanced-mode .free-pill{
-  background:#07140b!important;color:var(--op-green)!important;border:1px solid var(--op-line)!important;border-radius:2px!important;
-}
-body.advanced-mode.in-editor .shell-main,
-body.advanced-mode.in-editor #editor,
-body.advanced-mode.in-editor .stage,
-body.advanced-mode.in-editor #canvas,
-body.advanced-mode.in-editor #messages{background:var(--op-bg)!important}
-body.advanced-mode.in-editor #editor>.chat,
-body.advanced-mode.in-editor #editor .chat-head,
-body.advanced-mode.in-editor .stage-bar{background:var(--op-panel)!important;border-color:var(--op-line)!important}
-body.advanced-mode.in-editor #frame{border:1px solid var(--op-line)!important;border-radius:2px!important;box-shadow:none!important}
 
-/* Accessibility / motion */
+body.simple-mode::before,
+body.advanced-mode::before{display:none!important}
+
+body.simple-mode .app,
+body.advanced-mode .app,
+body.simple-mode .main,
+body.advanced-mode .main,
+body.simple-mode .main[data-view],
+body.advanced-mode .main[data-view]{
+  background:var(--kq-bg)!important;
+  color:var(--kq-text)!important;
+  font-family:var(--kq-font)!important;
+}
+
+/* Sidebar */
+body.simple-mode .sidebar.kn,
+body.advanced-mode .sidebar.kn{
+  background:#121213!important;
+  border-right:1px solid var(--kq-line-soft)!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+}
+body.simple-mode .sidebar.kn .brand-mark,
+body.advanced-mode .sidebar.kn .brand-mark{
+  background:#f4f4f5!important;
+  color:#111!important;
+  box-shadow:none!important;
+  border-radius:8px!important;
+}
+body.simple-mode .sidebar.kn .brand-title,
+body.advanced-mode .sidebar.kn .brand-title,
+body.simple-mode .sidebar.kn .kn-item,
+body.advanced-mode .sidebar.kn .kn-item,
+body.simple-mode .sidebar.kn .kn-fold>summary,
+body.advanced-mode .sidebar.kn .kn-fold>summary,
+body.simple-mode .sidebar.kn .kn-settings>summary,
+body.advanced-mode .sidebar.kn .kn-settings>summary{color:var(--kq-text)!important}
+body.simple-mode .sidebar.kn .brand-title::after,
+body.advanced-mode .sidebar.kn .brand-title::after{content:none!important}
+body.simple-mode .sidebar.kn .kn-label,
+body.advanced-mode .sidebar.kn .kn-label,
+body.simple-mode .sidebar.kn .kn-cap,
+body.advanced-mode .sidebar.kn .kn-cap,
+body.simple-mode .sidebar.kn .kn-hint,
+body.advanced-mode .sidebar.kn .kn-hint,
+body.simple-mode .sidebar.kn .history-list button,
+body.advanced-mode .sidebar.kn .history-list button{color:var(--kq-muted)!important}
+body.simple-mode .sidebar.kn .kn-item,
+body.advanced-mode .sidebar.kn .kn-item,
+body.simple-mode .sidebar.kn .kn-fold>summary,
+body.advanced-mode .sidebar.kn .kn-fold>summary,
+body.simple-mode .sidebar.kn .kn-settings>summary,
+body.advanced-mode .sidebar.kn .kn-settings>summary{
+  border-radius:8px!important;
+  font-family:var(--kq-font)!important;
+}
+body.simple-mode .sidebar.kn .kn-item:hover,
+body.advanced-mode .sidebar.kn .kn-item:hover,
+body.simple-mode .sidebar.kn .kn-fold>summary:hover,
+body.advanced-mode .sidebar.kn .kn-fold>summary:hover,
+body.simple-mode .sidebar.kn .kn-settings>summary:hover,
+body.advanced-mode .sidebar.kn .kn-settings>summary:hover,
+body.simple-mode .sidebar.kn .history-list button:hover,
+body.advanced-mode .sidebar.kn .history-list button:hover{
+  background:var(--kq-hover)!important;color:var(--kq-text)!important;
+}
+body.simple-mode .sidebar.kn .kn-item.active,
+body.advanced-mode .sidebar.kn .kn-item.active{
+  background:#242426!important;
+  color:var(--kq-text)!important;
+  box-shadow:none!important;
+}
+body.simple-mode .sidebar.kn .kn-new,
+body.advanced-mode .sidebar.kn .kn-new{
+  background:#1b1b1d!important;border:1px solid var(--kq-line)!important;color:var(--kq-text)!important;
+  box-shadow:none!important;border-radius:9px!important;
+}
+body.simple-mode .kn-search input,
+body.advanced-mode .kn-search input,
+body.simple-mode .sidebar select,
+body.advanced-mode .sidebar select{
+  background:#171719!important;border-color:var(--kq-line)!important;color:var(--kq-text)!important;
+}
+
+/* Top bar */
+body.simple-mode .topbar.simple-topbar,
+body.advanced-mode .topbar.simple-topbar{
+  background:rgba(15,15,16,.96)!important;
+  border-bottom:1px solid var(--kq-line-soft)!important;
+  box-shadow:none!important;backdrop-filter:blur(10px)!important;
+}
+body.simple-mode .topbar-title,
+body.advanced-mode .topbar-title{color:var(--kq-text)!important}
+body.simple-mode .topbar-subtitle,
+body.advanced-mode .topbar-subtitle{color:var(--kq-faint)!important}
+body.simple-mode .topbar .icon-btn,
+body.advanced-mode .topbar .icon-btn,
+body.simple-mode .topbar-chat-btn,
+body.advanced-mode .topbar-chat-btn{
+  color:var(--kq-muted)!important;background:transparent!important;border-color:transparent!important;
+}
+body.simple-mode .topbar .icon-btn:hover,
+body.advanced-mode .topbar .icon-btn:hover,
+body.simple-mode .topbar-chat-btn:hover,
+body.advanced-mode .topbar-chat-btn:hover{
+  background:var(--kq-hover)!important;color:var(--kq-text)!important;
+}
+body.simple-mode #shellModeBtn,
+body.advanced-mode #shellModeBtn{
+  background:transparent!important;border:1px solid var(--kq-line)!important;color:var(--kq-muted)!important;border-radius:8px!important;
+}
+body.simple-mode .zero-cost-pill,
+body.advanced-mode .zero-cost-pill,
+body.simple-mode .free-pill,
+body.advanced-mode .free-pill{
+  background:#171b18!important;color:#9ddcac!important;border:1px solid #253529!important;border-radius:7px!important;
+}
+
+/* Home */
+body.simple-mode .command-center-view,
+body.advanced-mode .command-center-view{background:var(--kq-bg)!important}
+body.simple-mode .kh-hero::before,
+body.advanced-mode .kh-hero::before{display:none!important}
+body.simple-mode .kh-hero h1,
+body.advanced-mode .kh-hero h1{
+  color:var(--kq-text)!important;
+  font-family:var(--kq-font)!important;
+  font-weight:600!important;
+  letter-spacing:-.045em!important;
+  text-shadow:none!important;
+}
+body.simple-mode .kh-hero h1 em,
+body.advanced-mode .kh-hero h1 em{color:var(--kq-text)!important;font-style:normal!important}
+body.simple-mode .kh-hero>p,
+body.advanced-mode .kh-hero>p{color:var(--kq-muted)!important}
+body.simple-mode .kh-mode,
+body.advanced-mode .kh-mode,
+body.simple-mode .kh-pill,
+body.advanced-mode .kh-pill{
+  background:#171719!important;border:1px solid var(--kq-line)!important;color:var(--kq-muted)!important;
+  border-radius:9px!important;box-shadow:none!important;
+}
+body.simple-mode .kh-mode:hover,
+body.advanced-mode .kh-mode:hover,
+body.simple-mode .kh-pill:hover,
+body.advanced-mode .kh-pill:hover{
+  background:var(--kq-hover)!important;color:var(--kq-text)!important;border-color:#35353a!important;
+}
+body.simple-mode .kh-mode[aria-selected=true],
+body.advanced-mode .kh-mode[aria-selected=true]{
+  background:#242426!important;color:var(--kq-text)!important;border-color:#3a3a3f!important;
+}
+body.simple-mode .kh-card,
+body.advanced-mode .kh-card,
+body.simple-mode .kh-stat,
+body.advanced-mode .kh-stat,
+body.simple-mode .cc-card,
+body.advanced-mode .cc-card,
+body.simple-mode .studio-card,
+body.advanced-mode .studio-card,
+body.simple-mode .plugin-card,
+body.advanced-mode .plugin-card{
+  background:var(--kq-panel)!important;border:1px solid var(--kq-line)!important;color:var(--kq-text)!important;
+  border-radius:10px!important;box-shadow:none!important;
+}
+body.simple-mode .kh-card:hover,
+body.advanced-mode .kh-card:hover,
+body.simple-mode .kh-stat:hover,
+body.advanced-mode .kh-stat:hover{border-color:#39393d!important}
+body.simple-mode .kh-card p,
+body.advanced-mode .kh-card p,
+body.simple-mode .kh-card small,
+body.advanced-mode .kh-card small,
+body.simple-mode .kh-stat span,
+body.advanced-mode .kh-stat span{color:var(--kq-muted)!important}
+
+/* Chat */
+body.simple-mode .composer-shell,
+body.advanced-mode .composer-shell,
+body.simple-mode #chat-form,
+body.advanced-mode #chat-form,
+body.simple-mode .chat #chat-form.composer,
+body.advanced-mode .chat #chat-form.composer{
+  background:#171719!important;border:1px solid var(--kq-line)!important;
+  border-radius:12px!important;box-shadow:none!important;backdrop-filter:none!important;
+}
+body.simple-mode #chat-input,
+body.advanced-mode #chat-input,
+body.simple-mode .chat #chat-input,
+body.advanced-mode .chat #chat-input{color:var(--kq-text)!important}
+body.simple-mode #chat-input::placeholder,
+body.advanced-mode #chat-input::placeholder{color:var(--kq-faint)!important}
+body.simple-mode .composer-bar .send,
+body.advanced-mode .composer-bar .send{
+  background:#f4f4f5!important;color:#111!important;border-radius:8px!important;box-shadow:none!important;
+}
+body.simple-mode .messages .user,
+body.advanced-mode .messages .user{
+  background:#1c1c1f!important;border:1px solid var(--kq-line)!important;color:var(--kq-text)!important;
+  border-radius:10px!important;
+}
+body.simple-mode .messages .assistant,
+body.advanced-mode .messages .assistant,
+body.simple-mode .messages .assistant .md,
+body.advanced-mode .messages .assistant .md{color:var(--kq-text)!important}
+body.simple-mode .messages .assistant::before,
+body.advanced-mode .messages .assistant::before{background:#d4d4d8!important;box-shadow:none!important;border-radius:5px!important}
+
+/* Project/editor */
+body.simple-mode.in-editor .shell-main,
+body.advanced-mode.in-editor .shell-main,
+body.simple-mode.in-editor #editor,
+body.advanced-mode.in-editor #editor,
+body.simple-mode.in-editor .stage,
+body.advanced-mode.in-editor .stage,
+body.simple-mode.in-editor #canvas,
+body.advanced-mode.in-editor #canvas,
+body.simple-mode.in-editor #messages,
+body.advanced-mode.in-editor #messages{background:var(--kq-bg)!important}
+body.simple-mode.in-editor #editor>.chat,
+body.advanced-mode.in-editor #editor>.chat,
+body.simple-mode.in-editor #editor .chat-head,
+body.advanced-mode.in-editor #editor .chat-head,
+body.simple-mode.in-editor .stage-bar,
+body.advanced-mode.in-editor .stage-bar{
+  background:var(--kq-panel)!important;border-color:var(--kq-line)!important;
+}
+body.simple-mode.in-editor #project-name,
+body.advanced-mode.in-editor #project-name{color:var(--kq-text)!important}
+body.simple-mode.in-editor #frame,
+body.advanced-mode.in-editor #frame{
+  border:1px solid var(--kq-line)!important;border-radius:10px!important;box-shadow:none!important;
+}
+
+/* Advanced mode is denser, not a different visual theme. */
+body.advanced-mode{
+  --kq-panel:#121213;
+  --kq-panel-2:#171719;
+}
+body.advanced-mode .topbar-subtitle,
+body.advanced-mode .msg-meta,
+body.advanced-mode .cost-line,
+body.advanced-mode code,
+body.advanced-mode pre{font-family:var(--kq-mono)!important}
+body.advanced-mode #shellModeBtn{color:var(--kq-text)!important}
+
 @media(prefers-reduced-motion:reduce){
   body.simple-mode *,body.advanced-mode *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-  body.simple-mode::before,body.advanced-mode::before{display:none}
-}
-@media(max-width:820px){
-  body.simple-mode::before{background-size:34px 34px}
-  body.simple-mode .kh-hero::before{display:none}
 }
