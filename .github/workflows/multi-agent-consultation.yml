@@ -13,8 +13,12 @@ on:
   pull_request:
     paths:
       - 'agent-team.js'
+      - 'goal-orchestrator.js'
+      - 'build-routing.js'
       - 'react-agent.js'
       - 'test/agent-team.test.js'
+      - 'test/goal-orchestrator.test.js'
+      - 'test/goal-build-routing.test.js'
       - '.github/workflows/multi-agent-consultation.yml'
 permissions:
   contents: read
