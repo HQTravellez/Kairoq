@@ -698,6 +698,11 @@ function runtimeConversationCapabilities(req){
     "Discuss, Build, Agent and OpenCode execution modes",
     "Runtime-owned tool and capability routing independent of the selected language model"
   ];
+  try{
+    const native=require("./native-connections").list();
+    if(native.some(x=>x.id==="figma"))caps.push("Native Figma connection and Figma design evidence import");
+  }catch{}
+  try{if(require("./telegram").enabled())caps.push("Telegram channel connected to the same Kairoq project/job engine")}catch{}
   try{if(isAuthenticated(req)&&require("./runtime-check").available())caps.push("Guarded browser-use execution")}catch{}
   try{if(require("./hermes-chat").configured())caps.push("Kairoq Agent execution")}catch{}
   return caps;
