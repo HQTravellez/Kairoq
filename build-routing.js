@@ -27,6 +27,7 @@ function complexity(message){
 function goalLike(message){
  const t=String(message||"").trim();
  if(!t)return false;
+ if(/https:\/\/(?:www\.)?figma\.com\/(?:design|file|proto)\//i.test(t))return true;
  // Short outcome statements can still be substantial. Route goals by consequence, not prompt length.
  const outcome=/\b(integrate|connect|migrate|production[- ]?ready|production ready|end[- ]to[- ]end|automate|workflow|fix|repair|debug|launch|deploy|rebuild|refactor|secure|authenticate|sync|import|export)\b/i.test(t);
  const system=/\b(api|oauth|webhook|database|auth|authentication|payment|stripe|calendar|crm|github|repo|repository|backend|multi[- ]page|automation|booking|checkout|customer portal|admin dashboard)\b/i.test(t);
