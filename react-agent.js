@@ -124,6 +124,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const limit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
  const wb=require('./web').createBrowser({browseSite,maxOps:intEnv('KAIROQ_WEB_MAX_ACTIONS',30,5,100)});
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
+ let webAttempted=false,webObserved=false;
  const started=new Date().toISOString();
  const checkpointStore=require('./agent-checkpoint'),checkpoint=checkpointStore.load(id,{instruction:text,baseVersion:meta.current_version});
  let work=checkpoint?checkpoint.files:{...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=Boolean(checkpoint),lastTest=null,lastUnitTests=null,lastReview=null,finishWarned=false,invalidReplies=0;
@@ -194,9 +195,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   if(researchOnly&&['write_files','edit_files','build_and_test','test_ui','run_tests','query_db','run_automation','generate_images'].includes(t))
    return{text:t+': this is a research-only browser task; project mutation/runtime app tools are disabled.'};
   if(t==='research_pages'){
+    webAttempted=true;
     try{
       const r=await require('./multi-page-research').researchPages(a.urls,{browseSite,maxPages:6});
       tl.add({t:'note',icon:'web',text:'Read '+r.sourceCount+' of '+r.pages.length+' web pages'});
+      webObserved=Boolean(r.sourceCount);
       return{text:JSON.stringify(r).slice(0,35000)};
     }catch(e){return{text:'research_pages failed: '+String(e.message||e).slice(0,300)}}
   }
@@ -207,6 +210,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     return{text:JSON.stringify({status:'inventory-only',capabilities:rows,warning:'A listed capability is not necessarily enabled or executable; use only advertised, authorized tools.'}).slice(0,11000)};
   }
   if(t==='inspect_api_docs'){
+    webAttempted=true;
     if(!fetchUrl)return{text:'inspect_api_docs is unavailable: the guarded URL fetch transport is not configured.'};
     const u=String(a.url||'').slice(0,500);
     try{
@@ -217,6 +221,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
       const body=String(response.body||'');
       if(Buffer.byteLength(body,'utf8')>2000000)return{text:'Documentation exceeds the 2 MB parsing limit.'};
       const result=require('./api-docs').infer(body);
+      webObserved=true;
       tl.add({t:'note',icon:'web',text:'Inspected API documentation: '+parsed.hostname});
       return{text:JSON.stringify({documentationUrl:parsed.href,format:result.format||'unknown',title:result.title||'',operations:(result.operations||[]).slice(0,60),auth:result.auth||[],limitations:[...(result.limitations||[]),'No supplier API call or sandbox execution was performed. Inferred operations require contract verification.']}).slice(0,18000)};
     }catch(e){return{text:'inspect_api_docs failed: '+String(e.message||e).slice(0,350)}}
@@ -340,11 +345,13 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    return{text:'generate_images: saved '+saved.join(', ')+'. Use exactly these paths in the code.'+(notes.length?'\n'+notes.join('\n'):'')};
   }
   if(t==='web_open'){
+   webAttempted=true;
    if(!wb.available())return{text:'web_open is not available on this server (no browser runtime).'};
    const u=String(a.url||'').slice(0,500);
    tl.add({t:'note',icon:'web',text:'Opened '+u.slice(0,120)});
    try{
     const text=await wb.open(u),shot=await publishBrowser();
+    webObserved=true;
     return{text,image:vision?shot:null};
    }catch(e){
     await publishBrowser(e.message||e).catch(()=>{});
@@ -352,10 +359,12 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    }
   }
   if(t==='web_act'){
+   webAttempted=true;
    if(!wb.available())return{text:'web_act is not available on this server (no browser runtime).'};
    tl.add({t:'note',icon:'web',text:'Clicked around '+require('./web').hostOf(wb.url)});
    try{
     const text=await wb.act(a.steps||[]),shot=await publishBrowser();
+    webObserved=true;
     return{text,image:vision?shot:null};
    }catch(e){
     await publishBrowser(e.message||e).catch(()=>{});
@@ -363,14 +372,16 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    }
   }
   if(t==='web_search'){
+   webAttempted=true;
    if(typeof webSearch!=='function')return{text:'web_search is not available on this server.'};
    tl.add({t:'note',icon:'web',text:'Searched the web for "'+String(a.query||'').slice(0,80)+'"'});
-   try{const urls=await webSearch(String(a.query||'').slice(0,240));return{text:urls.length?'Results:\n'+urls.join('\n'):'No results.'}}catch(e){return{text:'web_search failed: '+String(e.message||e).slice(0,300)}}
+   try{const urls=await webSearch(String(a.query||'').slice(0,240));webObserved=true;return{text:urls.length?'Results:\n'+urls.join('\n'):'No results.'}}catch(e){return{text:'web_search failed: '+String(e.message||e).slice(0,300)}}
   }
   if(t==='fetch_url'){
+   webAttempted=true;
    if(!fetchUrl)return{text:'fetch_url is not available.'};
    tl.add({t:'note',icon:'web',text:'Read '+String(a.url||'').slice(0,120)});
-   try{const r=await fetchUrl(String(a.url||''));const body=/html/i.test(r.headers?.['content-type']||'')||/^\s*</.test(r.body)?htmlToText(r.body):r.body;return{text:'HTTP '+r.status+'\n'+clip(body,12000)}}catch(e){return{text:'fetch_url failed: '+String(e.message||e).slice(0,300)}}
+   try{const r=await fetchUrl(String(a.url||''));webObserved=true;const body=/html/i.test(r.headers?.['content-type']||'')||/^\s*</.test(r.body)?htmlToText(r.body):r.body;return{text:'HTTP '+r.status+'\n'+clip(body,12000)}}catch(e){return{text:'fetch_url failed: '+String(e.message||e).slice(0,300)}}
   }
   return{text:'Unknown tool "'+t+'". Use one of the listed tools.'};
  }
@@ -443,7 +454,17 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   for(const a of reply.actions){
    signal?.throwIfAborted();
    if(a.tool==='finish'){
-    const message=String(a.message||reply.thought||'Done.').slice(0,2000);
+    let message=String(a.message||reply.thought||'Done.').slice(0,2000);
+    if(researchOnly&&web&&!webAttempted){
+     results.push('finish: this research task has live web/browser tools. Attempt web_search, web_open, fetch_url, inspect_api_docs, or research_pages before answering. Do not claim Kairoq cannot browse.');continue;
+    }
+    if(researchOnly&&web&&require('./browser-chat-routing').falseCapabilityDenial(message)){
+     results.push('finish: the answer contradicts Kairoq\'s live browser capability. Report the observed browser/search result or the specific tool error instead.');continue;
+    }
+    if(researchOnly&&!web&&require('./browser-chat-routing').falseCapabilityDenial(message))
+     message=require('./browser-chat-routing').capabilityAnswer({browser:false,search:false});
+    if(researchOnly&&webAttempted&&!webObserved&&/\bworked|success|verified|confirmed\b/i.test(message))
+     message='The browser/search attempt did not produce verified page evidence. '+message;
     if(unchanged()){finished=noChange(message);break}
     if(dirty||!built){const r=await buildAndTest({});results.push(r.text);if(r.image)image=r.image}
     if(!built||dirty){results.push('finish: your latest changes do not build yet. Fix the problems above, then finish.');continue}
