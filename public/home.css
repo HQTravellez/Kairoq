@@ -632,3 +632,131 @@ body,button,input,select,textarea{font-family:var(--font)!important;font-feature
 @media(max-width:760px){
   .main[data-view=command] > .kh-sky{height:560px!important;background-position:center top!important}
 }
+
+
+/* ---------- Smooth Home / Build motion pass ---------- */
+.main[data-view=command] > .kh-sky{
+  background:linear-gradient(180deg,#2f94e9 0%,#86c7f8 62%,#eef7ff 100%)!important;
+  overflow:hidden;
+}
+.main[data-view=command] > .kh-sky::before{
+  content:"";position:absolute;inset:-2%;
+  background:
+    linear-gradient(180deg,rgba(16,112,207,.08) 0%,rgba(28,139,231,.04) 46%,rgba(238,247,255,.88) 100%),
+    url("https://images.pexels.com/photos/20884933/pexels-photo-20884933.jpeg?auto=compress&cs=tinysrgb&w=2400") center 34% / cover no-repeat;
+  opacity:0;transform:scale(1.015);
+  transition:opacity .42s ease,transform .7s cubic-bezier(.2,.75,.2,1);
+  will-change:opacity,transform;
+}
+body.home-sky-ready .main[data-view=command] > .kh-sky::before{opacity:1;transform:scale(1)}
+.main[data-view=command] > .kh-sky::after{display:none!important}
+
+.main.view-entering > .command-center-view:not(.hidden),
+.main.view-entering > .build-view:not(.hidden),
+.main.view-entering > #messages:not(.hidden),
+.main.view-entering > #studioView:not(.hidden),
+.main.view-entering > #testingGroundView:not(.hidden),
+.main.view-entering > #pluginsView:not(.hidden){
+  animation:kq-view-enter .22s cubic-bezier(.2,.75,.2,1) both;
+}
+@keyframes kq-view-enter{
+  from{opacity:.72;transform:translateY(4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+.workspace-tab{
+  transition:background-color .16s ease,color .16s ease,box-shadow .18s ease,transform .16s ease!important;
+}
+.workspace-tab:hover{transform:translateY(-1px)}
+.workspace-tab:active{transform:translateY(0) scale(.985)}
+.workspace-project-tabs.tabs-updating{opacity:.35;transform:translateX(-3px)}
+.workspace-project-tabs{
+  transition:opacity .2s ease,transform .22s cubic-bezier(.2,.75,.2,1);
+}
+.workspace-project-tabs.tabs-ready .project-tab{
+  animation:kq-tab-in .24s cubic-bezier(.2,.75,.2,1) both;
+}
+.workspace-project-tabs.tabs-ready .project-tab:nth-child(2){animation-delay:22ms}
+.workspace-project-tabs.tabs-ready .project-tab:nth-child(3){animation-delay:44ms}
+.workspace-project-tabs.tabs-ready .project-tab:nth-child(4){animation-delay:66ms}
+.workspace-project-tabs.tabs-ready .project-tab:nth-child(5){animation-delay:88ms}
+@keyframes kq-tab-in{from{opacity:0;transform:translateX(5px)}to{opacity:1;transform:translateX(0)}}
+
+.kh-mode{
+  transition:background-color .16s ease,color .16s ease,border-color .16s ease,transform .16s ease,box-shadow .18s ease!important;
+}
+.kh-mode:hover{transform:translateY(-1px)}
+.kh-mode[aria-selected=true]{transform:translateY(0)}
+.kh-composer-slot .composer{
+  transition:box-shadow .22s ease,border-color .2s ease,transform .2s ease!important;
+}
+.kh-composer-slot .composer:focus-within{
+  transform:translateY(-1px);
+  box-shadow:0 22px 60px #115b9530!important;
+}
+
+.kh-apps .kh-app{
+  transition:transform .18s cubic-bezier(.2,.75,.2,1),box-shadow .18s ease,border-color .18s ease,background-color .18s ease!important;
+}
+.kh-apps .kh-app:hover{transform:translateY(-3px)!important;box-shadow:0 10px 26px #314b6218!important}
+.kh-apps li{animation:kq-card-in .26s cubic-bezier(.2,.75,.2,1) both}
+.kh-apps li:nth-child(2){animation-delay:25ms}.kh-apps li:nth-child(3){animation-delay:50ms}
+.kh-apps li:nth-child(4){animation-delay:75ms}.kh-apps li:nth-child(5){animation-delay:100ms}
+.kh-apps li:nth-child(6){animation-delay:125ms}
+@keyframes kq-card-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+
+.main[data-view=build] .build-view{
+  position:relative;overflow:hidden;
+}
+.main[data-view=build] .build-view iframe{
+  opacity:1;transform:scale(1);
+  transition:opacity .22s ease,transform .28s cubic-bezier(.2,.75,.2,1)!important;
+  will-change:opacity,transform;
+}
+.main[data-view=build] .build-view iframe.frame-loading{opacity:.18;transform:scale(.996)}
+.main[data-view=build] .build-view.loading::after{
+  content:"Opening your workspace…";
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  z-index:4;padding:10px 14px;border-radius:999px;
+  background:rgba(255,255,255,.88);border:1px solid rgba(203,214,223,.9);
+  box-shadow:0 10px 30px rgba(34,56,74,.08);
+  color:#536373;font-size:11px;font-weight:650;letter-spacing:.01em;
+  backdrop-filter:blur(10px);
+}
+
+@media(prefers-reduced-motion:reduce){
+  .main[data-view=command] > .kh-sky::before,
+  .main.view-entering > *,
+  .workspace-tab,.workspace-project-tabs,.project-tab,.kh-mode,
+  .kh-composer-slot .composer,.kh-apps .kh-app,.kh-apps li,
+  .main[data-view=build] .build-view iframe{animation:none!important;transition:none!important;transform:none!important}
+}
+
+
+/* ---------- Builder loading continuity ---------- */
+.main[data-view=build] .build-view.loading iframe{
+  visibility:visible!important;
+}
+.main[data-view=build] .build-view .build-loading{
+  display:flex!important;
+  opacity:0;
+  pointer-events:none;
+  background:rgba(247,249,251,.70)!important;
+  backdrop-filter:blur(10px);
+  transition:opacity .18s ease;
+}
+.main[data-view=build] .build-view.loading .build-loading{
+  opacity:1;
+  pointer-events:auto;
+}
+.main[data-view=build] .build-view iframe.frame-loading{
+  opacity:.48!important;
+  filter:saturate(.92) blur(.35px);
+}
+.main[data-view=build] .build-view iframe:not(.frame-loading){
+  filter:none;
+}
+.main[data-view=build] .build-view.loading::after{
+  content:none!important;
+  display:none!important;
+}
