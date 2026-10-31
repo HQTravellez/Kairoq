@@ -22,7 +22,8 @@ test("native Figma connection requests only the scopes Kairoq currently uses",()
  assert.deepEqual(p.auth.scope,["current_user:read","file_content:read"]);
  assert.equal(p.auth.authUrl,"https://www.figma.com/oauth");
  assert.equal(p.auth.tokenUrl,"https://api.figma.com/v1/oauth/token");
- assert.equal(p.auth.refreshUrl,"https://api.figma.com/v1/oauth/refresh");
+ assert.equal(p.auth.refreshUrl,"https://api.figma.com/v1/oauth/token");
+ assert.equal(p.auth.refreshFallbackUrl,"https://api.figma.com/v1/oauth/refresh");
  assert.equal(p.auth.pkce,true);
 });
 
@@ -55,7 +56,7 @@ test("Figma code exchange uses Basic auth and stores tokens encrypted",async()=>
  assert.doesNotMatch(fs.readFileSync(path.join(builder.projectDir(meta.id),"secrets.json"),"utf8"),/oauth-token|refresh-token/);
 });
 
-test("Figma refresh uses its dedicated refresh endpoint without a grant_type",async()=>{
+test("Figma refresh prefers the current token endpoint with OAuth refresh grant",async()=>{
  const saved=JSON.parse(secrets.get(meta.id,"oauth_figma"));saved.expires_at=Date.now()+500;secrets.set(meta.id,"oauth_figma",JSON.stringify(saved));
  let seen=null;
  const token=await O.token(meta.id,"figma",{fetchImpl:async(url,o)=>{
@@ -63,10 +64,27 @@ test("Figma refresh uses its dedicated refresh endpoint without a grant_type",as
   return{ok:true,status:200,text:async()=>JSON.stringify({access_token:"oauth-token-refreshed-123456789012345",expires_in:3600,token_type:"bearer"})};
  }});
  assert.equal(token.access_token,"oauth-token-refreshed-123456789012345");
- assert.equal(seen.url,"https://api.figma.com/v1/oauth/refresh");
+ assert.equal(seen.url,"https://api.figma.com/v1/oauth/token");
  assert.equal(seen.body.refresh_token,"refresh-token-12345678901234567890");
- assert.equal(seen.body.grant_type,undefined);
+ assert.equal(seen.body.grant_type,"refresh_token");
  assert.match(seen.headers.Authorization,/^Basic /);
+});
+
+
+test("Figma refresh falls back to the documented legacy refresh route when needed",async()=>{
+ const saved=JSON.parse(secrets.get(meta.id,"oauth_figma"));saved.expires_at=Date.now()+500;saved.refresh_token="legacy-refresh-token-1234567890";secrets.set(meta.id,"oauth_figma",JSON.stringify(saved));
+ const calls=[];
+ const token=await O.token(meta.id,"figma",{fetchImpl:async(url,o)=>{
+  const body=Object.fromEntries(new URLSearchParams(o.body));calls.push({url,body});
+  if(url.endsWith("/oauth/token"))return{ok:false,status:400,text:async()=>JSON.stringify({error:"unsupported_grant_type"})};
+  return{ok:true,status:200,text:async()=>JSON.stringify({access_token:"legacy-fallback-access-token-123456",expires_in:3600,token_type:"bearer"})};
+ }});
+ assert.equal(token.access_token,"legacy-fallback-access-token-123456");
+ assert.equal(calls[0].url,"https://api.figma.com/v1/oauth/token");
+ assert.equal(calls[0].body.grant_type,"refresh_token");
+ assert.equal(calls[1].url,"https://api.figma.com/v1/oauth/refresh");
+ assert.equal(calls[1].body.grant_type,undefined);
+ assert.equal(calls[1].body.refresh_token,"legacy-refresh-token-1234567890");
 });
 
 test("connected Figma imports frames with Bearer auth and preserves components/styles",async()=>{
