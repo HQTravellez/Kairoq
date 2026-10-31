@@ -8,12 +8,19 @@ on:
       - 'react-figma.js'
       - 'figma-export.js'
       - 'figma-plugin/**'
+      - 'react-agent.js'
+      - 'build-routing.js'
+      - 'capability-registry.js'
       - 'create-api.js'
       - 'public/create.js'
       - 'public/create.html'
+      - 'setup-status.js'
+      - 'docs/connections/figma.md'
       - 'test/figma-connection.test.js'
       - 'test/figma-export.test.js'
       - 'test/oauth-connect.test.js'
+      - 'test/agent-capability-routing.test.js'
+      - 'test/goal-build-routing.test.js'
       - '.github/workflows/native-figma-connection.yml'
   pull_request:
     paths:
@@ -23,12 +30,19 @@ on:
       - 'react-figma.js'
       - 'figma-export.js'
       - 'figma-plugin/**'
+      - 'react-agent.js'
+      - 'build-routing.js'
+      - 'capability-registry.js'
       - 'create-api.js'
       - 'public/create.js'
       - 'public/create.html'
+      - 'setup-status.js'
+      - 'docs/connections/figma.md'
       - 'test/figma-connection.test.js'
       - 'test/figma-export.test.js'
       - 'test/oauth-connect.test.js'
+      - 'test/agent-capability-routing.test.js'
+      - 'test/goal-build-routing.test.js'
       - '.github/workflows/native-figma-connection.yml'
 permissions:
   contents: read
@@ -45,6 +59,10 @@ jobs:
       - run: node --check oauth-connect.js
       - run: node --check figma-connection.js
       - run: node --check react-figma.js
+      - run: node --check react-agent.js
+      - run: node --check build-routing.js
+      - run: node --check capability-registry.js
       - run: node --check create-api.js
       - run: node --check public/create.js
-      - run: node --test test/figma-connection.test.js test/oauth-connect.test.js test/figma-export.test.js
+      - run: node --check setup-status.js
+      - run: node --test test/figma-connection.test.js test/oauth-connect.test.js test/figma-export.test.js test/agent-capability-routing.test.js test/goal-build-routing.test.js
