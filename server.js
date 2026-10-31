@@ -4167,47 +4167,35 @@ async function handleLogin(req, res) {
 
 
 async function readPublicWebsiteForChat(rawUrl){
-  const dns=require("dns").promises,net=require("net");
-  const u=new URL(rawUrl);
-  if(u.protocol!=="https:" || u.username || u.password || u.port)throw new Error("Only public HTTPS websites are supported.");
-  const host=u.hostname.toLowerCase();
-  if(host==="localhost"||host.endsWith(".local")||host.endsWith(".internal")||!host.includes(".")||net.isIP(host))throw new Error("Private hostnames are blocked.");
-  const addresses=await dns.lookup(host,{all:true});
-  if(!addresses.length||addresses.some(({address,family})=>{
-    if(family===4){
-      const a=address.split(".").map(Number);
-      return a[0]===0||a[0]===10||a[0]===127||a[0]>=224||(a[0]===169&&a[1]===254)||(a[0]===172&&a[1]>=16&&a[1]<=31)||(a[0]===192&&a[1]===168)||(a[0]===100&&a[1]>=64&&a[1]<=127);
-    }
-    return /^(::1|fe80:|fc|fd|::ffff:|2001:db8:)/i.test(address);
-  }))throw new Error("Private network destinations are blocked.");
-  const response=await fetch(u.toString(),{redirect:"manual",signal:AbortSignal.timeout(12000),headers:{"Accept":"text/html","User-Agent":"KairoqPublicWebsiteReader/1.0"}});
-  if(response.status>=300&&response.status<400)throw new Error("Website redirected. Please send its final HTTPS URL.");
-  if(!response.ok)throw new Error("Website returned HTTP "+response.status);
-  if(!String(response.headers.get("content-type")||"").toLowerCase().includes("text/html"))throw new Error("The URL did not return an HTML page.");
-  const reader=response.body.getReader();const decoder=new TextDecoder();let html="",bytes=0;
-  while(bytes<220000){const {value,done}=await reader.read();if(done)break;const take=Math.min(value.byteLength,220000-bytes);bytes+=take;html+=decoder.decode(value.subarray(0,take),{stream:true})}
-  await reader.cancel().catch(()=>{});
+  // Public website reading uses the same redirect-safe transport as Kairoq's builder research.
+  // Ordinary canonical redirects (for example GitHub repo .git -> repo page) are followed
+  // automatically; every hop is re-validated as public HTTPS before connecting.
+  const fetched=await require("./public-web-fetch").fetchPublic(rawUrl,{
+    maxRedirects:5,timeoutMs:15000,maxBytes:220000,
+    headers:{"Accept":"text/html,application/xhtml+xml","User-Agent":"KairoqPublicWebsiteReader/2.0"}
+  });
+  if(fetched.status<200||fetched.status>=300)throw new Error("Website returned HTTP "+fetched.status);
+  const mime=String(fetched.headers["content-type"]||"").toLowerCase();
+  if(mime&&!mime.includes("text/html")&&!mime.includes("application/xhtml+xml"))throw new Error("The URL did not return an HTML page.");
+  const pageUrl=fetched.url,host=new URL(pageUrl).hostname.toLowerCase(),html=String(fetched.body||"");
   const title=(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||host;
   const meta=(html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)/i)||html.match(/<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description/i)||[])[1]||"";
   const headings=[...html.matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/gi)].slice(0,12).map(m=>m[1].replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
   const content=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/\s+/g," ").trim();
   let browserContent="",browserHeadings=[];
-  // Crawl4AI, when connected (crawl4ai.js), reads thin or script-built pages as clean Markdown.
   const crawl4ai=require("./crawl4ai");
   if(crawl4ai.configured()&&(content.length<800 || (headings.length===0&&content.length<1800))){
-    try{const md=await crawl4ai.markdown(u.toString());if(md.length>content.length+80){browserContent=md.slice(0,12000);browserHeadings=[...md.matchAll(/^#{1,3}\s+(.+)$/gm)].slice(0,18).map(m=>m[1].trim())}}
+    try{const md=await crawl4ai.markdown(pageUrl);if(md.length>content.length+80){browserContent=md.slice(0,12000);browserHeadings=[...md.matchAll(/^#{1,3}\s+(.+)$/gm)].slice(0,18).map(m=>m[1].trim())}}
     catch(e){console.warn("Crawl4AI reader:",e.message)}
   }
   if(!browserContent&&(content.length<800 || (headings.length===0&&content.length<1800))){
-    try{const result=await require("./browser-reader").renderPage(u.toString());browserContent=String(result.body||"").slice(0,12000);browserHeadings=Array.isArray(result.headings)?result.headings:[]}
+    try{const result=await require("./browser-reader").renderPage(pageUrl);browserContent=String(result.body||"").slice(0,12000);browserHeadings=Array.isArray(result.headings)?result.headings:[]}
     catch(e){console.warn("Chromium renderer unavailable:",e.message)}
   }
-  // JavaScript-heavy sites render an empty HTML shell. Use Jina's browser-rendered
-  // public Reader endpoint as a free, rate-limited fallback; no API key is sent.
   let readable=browserContent.length>content.length+80?browserContent:content,rendered=browserContent.length>content.length+80,readerError="";
   if(!rendered&&(content.length<500 || (headings.length===0&&content.length<1400))){
     try{
-      const renderUrl="https://r.jina.ai/"+u.toString();
+      const renderUrl="https://r.jina.ai/"+pageUrl;
       const renderedResponse=await fetch(renderUrl,{redirect:"error",signal:AbortSignal.timeout(25000),headers:{"Accept":"text/plain","X-Return-Format":"markdown","X-No-Cache":"true"}});
       if(!renderedResponse.ok)throw new Error("rendered reader HTTP "+renderedResponse.status);
       const result=await renderedResponse.text();
@@ -4215,9 +4203,8 @@ async function readPublicWebsiteForChat(rawUrl){
       else readerError="The rendered reader returned no additional page content.";
     }catch(e){readerError=e.message}
   }
-  return {url:u.toString(),title:title.replace(/<[^>]*>/g," ").trim().slice(0,250),description:meta.trim().slice(0,750),headings:browserHeadings.length?browserHeadings:headings,excerpt:readable.slice(0,12000),rendered,readerError};
+  return {url:pageUrl,requestedUrl:String(rawUrl),redirects:fetched.redirects||[],title:title.replace(/<[^>]*>/g," ").trim().slice(0,250),description:meta.trim().slice(0,750),headings:browserHeadings.length?browserHeadings:headings,excerpt:readable.slice(0,12000),rendered,readerError};
 }
-
 
 async function searchPublicWeb(query){
   const phrase=String(query||"").trim().slice(0,240);
@@ -4325,6 +4312,16 @@ async function handleChat(req, res) {
       "X-Accel-Buffering":"no"
     });
     sseStarted=true;
+
+    const capabilityText=String([...messages].reverse().find(x=>x.role==="user")?.content||"");
+    const browserCapabilities=require("./browser-chat-routing");
+    if(isAuthenticated(req)&&browserCapabilities.capabilityQuestion(capabilityText)){
+      const answer=browserCapabilities.capabilityAnswer({browser:require("./runtime-check").available(),search:true});
+      writeSSE(res,"token",{text:answer});
+      writeSSE(res,"meta",{model:"kairoq/capability-runtime",usage:{cost:0}});
+      writeSSE(res,"done",{ok:true,provider:"capability-runtime",zeroCost:true});
+      return res.end();
+    }
 
     // "/last30days <topic>": what people said in the last 30 days (last30days.js). The evidence
     // replaces the request, and the chat model below (Hermes or the picked model) writes it up.
