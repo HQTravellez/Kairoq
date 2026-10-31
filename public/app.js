@@ -3498,19 +3498,9 @@ window.addEventListener("message",e=>{
   const err=$("#khError");if(err){err.textContent=e.data.error?"The build could not start: "+String(e.data.error).slice(0,300).replace(/[.\s]*$/,".")+" Try again, or change the request.":"";err.classList.toggle("hidden",!e.data.error)}
   loadHomeApps();
 });
-$(".kh-mode").forEach(t=>t.onclick=()=>{
-  const mode=t.dataset.mode;
-  if(mode==="video"){
-    setAppBuildMode(false);
-    setImageMode(false);
-    setVideoMode(true);
-    $(".kh-mode").forEach(x=>x.setAttribute("aria-selected",String(x===t)));
-    promptEl.placeholder="Describe the video you want Kairoq to make…";
-    if($("#khGreeting"))$("#khGreeting").innerHTML="What do you want to <em>create</em>?";
-  }else{
-    if(videoMode)setVideoMode(false);
-    setAppBuildMode(mode);
-  }
+$$(".kh-mode").forEach(t=>t.onclick=()=>{
+  if(videoMode)setVideoMode(false);
+  setAppBuildMode(t.dataset.mode);
   promptEl.focus();
 });
 $$("[data-build-app]").forEach(b=>b.onclick=()=>openAppBuilder("web"));

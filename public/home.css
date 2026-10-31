@@ -580,3 +580,55 @@ body,button,input,select,textarea{font-family:var(--font)!important;font-feature
   .kh-composer-slot .composer{min-height:160px}
   .kh-composer-slot #prompt{min-height:82px!important}
 }
+
+
+/* ---------- Home tabs + real sky background fixes ---------- */
+.main[data-view=command] .topbar > .workspace-tabs,
+.main[data-view=build] .topbar > .workspace-tabs{
+  visibility:visible!important;
+  display:flex!important;
+}
+.main[data-view=command] .topbar > .workspace-tabs:first-of-type,
+.main[data-view=build] .topbar > .workspace-tabs:first-of-type{
+  visibility:visible!important;
+}
+.main[data-view=command] .topbar > .topbar-context,
+.main[data-view=build] .topbar > .topbar-context{
+  display:none!important;
+}
+.main[data-view=command] > .kh-sky{
+  display:block!important;
+  height:610px!important;
+  opacity:1!important;
+  background:
+    linear-gradient(180deg,rgba(16,112,207,.12) 0%,rgba(28,139,231,.06) 46%,rgba(238,247,255,.96) 100%),
+    url("https://images.pexels.com/photos/20884933/pexels-photo-20884933.jpeg?auto=compress&cs=tinysrgb&w=2400") center 34% / cover no-repeat!important;
+}
+.main[data-view=command] > .kh-sky::after{display:none!important}
+.main[data-view=command] > .kh-sky i{display:none!important}
+.main[data-view=command] .workspace-tab{
+  transition:background .14s ease,color .14s ease,box-shadow .14s ease;
+}
+.main[data-view=command] .workspace-tab.active,
+.main[data-view=build] .workspace-tab.active{
+  background:#fff!important;
+  color:#17202b!important;
+  box-shadow:0 1px 2px #20354f14,0 8px 20px #20354f12!important;
+}
+.main[data-view=command] .kh-modes{
+  margin-bottom:0!important;
+  padding-left:14px!important;
+}
+.main[data-view=command] .kh-mode{
+  border-radius:11px 11px 0 0!important;
+}
+.main[data-view=command] .kh-mode[aria-selected=true]{
+  position:relative;
+  z-index:3;
+}
+.main[data-view=command] .kh-composer-slot{
+  margin-top:0!important;
+}
+@media(max-width:760px){
+  .main[data-view=command] > .kh-sky{height:560px!important;background-position:center top!important}
+}
