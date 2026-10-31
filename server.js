@@ -4461,6 +4461,19 @@ async function handleChat(req, res) {
         return res.end();
       }
     }
+    // FreeLLMAPI is a real selectable free route, not an OpenRouter model ID.
+    // Keep the UI label and the executor honest: selecting the free pool always runs that pool.
+    if(requestedModel==="freellm/auto"){
+      const pool=require("./freellmapi");
+      if(!pool.enabled())throw Object.assign(new Error("Kairoq Free Pool is not connected right now. Pick another FREE model or Auto (free)."),{status:503});
+      writeSSE(res,"status",{message:"FREE · Kairoq Free Pool"});
+      const reply=await pool.complete(finalMessages,{temperature,maxTokens:12000,reasoningEffort:effort});
+      writeSSE(res,"token",{text:reply.text});
+      writeSSE(res,"meta",{model:reply.model,usage:{...(reply.usage||{}),cost:0}});
+      writeSSE(res,"done",{ok:true,provider:"freellmapi",model:reply.model,zeroCost:true});
+      return res.end();
+    }
+
     // A model picked by name in the picker is used as picked (ported from #146): Zero Cost
     // mode used to swap any choice for Local Auto / Free Auto without saying so.
     if(ZERO_COST_MODE&&!["openrouter/free","smart-auto","openrouter/auto","local/auto"].includes(requestedModel)){
