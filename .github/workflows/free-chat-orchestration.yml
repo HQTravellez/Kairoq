@@ -3,6 +3,13 @@ on:
   push:
     paths:
       - 'server.js'
+      - 'public-web-fetch.js'
+      - 'public/app.js'
+      - 'public/kairoq-ui.css'
+      - 'test/public-web-fetch.test.js'
+      - 'test/main-chat-link-research.test.js'
+      - 'test/free-model-picker.test.js'
+      - 'test/model-picker.test.js'
       - 'freellmapi.js'
       - 'capability-registry.js'
       - 'test/freellmapi.test.js'
@@ -12,6 +19,13 @@ on:
   pull_request:
     paths:
       - 'server.js'
+      - 'public-web-fetch.js'
+      - 'public/app.js'
+      - 'public/kairoq-ui.css'
+      - 'test/public-web-fetch.test.js'
+      - 'test/main-chat-link-research.test.js'
+      - 'test/free-model-picker.test.js'
+      - 'test/model-picker.test.js'
       - 'freellmapi.js'
       - 'capability-registry.js'
       - 'test/freellmapi.test.js'
@@ -29,5 +43,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check server.js && node --check react-builder.js && node --check freellmapi.js && node --check capability-registry.js
-      - run: node --test test/free-chat-orchestration.test.js test/freellmapi.test.js
+      - run: node --check server.js && node --check public-web-fetch.js && node --check public/app.js && node --check react-builder.js && node --check freellmapi.js && node --check capability-registry.js
+      - run: node --test test/free-chat-orchestration.test.js test/freellmapi.test.js test/public-web-fetch.test.js test/main-chat-link-research.test.js test/free-model-picker.test.js test/model-picker.test.js
