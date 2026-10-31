@@ -47,11 +47,11 @@ Scopes requested by Kairoq v1:
 ```
 current_user:read
 file_content:read
-file_metadata:read
-library_content:read
 ```
 
 Kairoq uses Authorization Code + PKCE. OAuth access/refresh tokens are encrypted server-side through the existing project secret store and are never returned to the browser.
+
+The Figma OAuth identity is owner-scoped in v1. Project collaborators cannot use the owner's connected Figma identity to inspect other Figma files.
 
 ## Why Variables are not requested in v1
 
@@ -68,6 +68,7 @@ Agent Mode exposes:
 ```
 
 The tool:
+- is available only to the project owner in v1;
 - requires the project's connected Figma account;
 - reads the frame before UI code is written;
 - returns observed layer/component/style evidence;
