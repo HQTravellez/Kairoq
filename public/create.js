@@ -244,7 +244,7 @@ $('new-form').onsubmit=async e=>{
    // Return to the normal composer. The backend decides whether each message is chat or a build.
    setChatMode('build');
    $('chat-input').value='';
-   $('chat-input').placeholder='Tell Kairoq what you want to build…';
+   $('chat-input').placeholder='Tell Kairoq what you want to get done…';
    $('chat-input').focus();
    syncSend();
    return;
@@ -524,7 +524,7 @@ async function openProject(id,{pendingText,job}={}){
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
  const msgs=state.project.messages;
- if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. Switch to Discuss to plan without changing code.';list.append(li)}
+ if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='What would you like Kairoq to get done?';list.append(li)}
  const questionIndex=msgs.findLastIndex(m=>m.role==='assistant'&&m.question&&m.question.text===state.project.pending_question?.text);
  msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1||i===questionIndex,i)));
  if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
