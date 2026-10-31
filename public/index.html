@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/calm.css?v=20">
   <link rel="stylesheet" href="/sidebar.css?v=4">
   <link rel="stylesheet" href="/composer.css?v=4">
-  <link rel="stylesheet" href="/home.css?v=13">
+  <link rel="stylesheet" href="/home.css?v=14">
   <link rel="stylesheet" href="/design.css?v=17">
   <link rel="stylesheet" href="/kairoq-ui.css?v=23">
   <link rel="stylesheet" href="/hybrid-os.css?v=1">
@@ -134,7 +134,12 @@
       <div class="kh-sky" aria-hidden="true"><i></i><i></i><i></i></div>
       <header class="topbar simple-topbar">
         <button id="sidebarToggle" class="icon-btn sidebar-toggle" aria-label="Menu" aria-expanded="false"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-        <div>
+        <div class="workspace-tabs" aria-label="Open Kairoq work">
+          <button type="button" id="workspaceHomeTab" class="workspace-tab active"><span class="workspace-tab-dot home-dot"></span>Home</button>
+          <div id="workspaceProjectTabs" class="workspace-project-tabs"></div>
+          <button type="button" id="workspaceNewTab" class="workspace-tab workspace-tab-new" title="Start a new app" aria-label="Start a new app">+</button>
+        </div>
+        <div class="topbar-context">
           <div id="mainViewTitle" class="topbar-title">Home</div>
           <div id="mainViewSubtitle" class="topbar-subtitle"></div>
         </div>
@@ -157,6 +162,7 @@
               <button type="button" role="tab" class="kh-mode" data-mode="ask" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Ask</button>
               <button type="button" role="tab" class="kh-mode" data-mode="web" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg>Web app</button>
               <button type="button" role="tab" class="kh-mode" data-mode="mobile" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>Mobile app</button>
+              <button type="button" role="tab" class="kh-mode" data-mode="video" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>Video <span class="kh-new">NEW</span></button>
             </div>
             <div id="khComposerSlot" class="kh-composer-slot"></div>
             <p id="khError" class="kh-error hidden" role="alert"></p>
@@ -791,7 +797,7 @@
           <div class="composer-bottom">
             <div class="composer-tools inline-controls">
               <input id="fileInput" type="file" multiple hidden accept="image/*,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.py,.html,.css,.xml,.yaml,.yml,.log">
-              <div class="kq-plus"><button type="button" id="attachBtn" class="tool-btn" title="Add" aria-label="Add a file, image or video" aria-haspopup="menu" aria-expanded="false"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><div id="plusMenu" class="kq-plus-menu" role="menu" hidden><button type="button" role="menuitem" data-plus="file">Attach a file</button><button type="button" role="menuitem" data-plus="image">Make an image</button><button type="button" role="menuitem" data-plus="video">Make a video</button><button type="button" role="menuitem" data-plus="pdf">PDF tools</button></div></div>
+              <div class="kq-plus"><button type="button" id="attachBtn" class="tool-btn" title="Add" aria-label="Add a file, image or video" aria-haspopup="menu" aria-expanded="false"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><div id="plusMenu" class="kq-plus-menu" role="menu" hidden><button type="button" role="menuitem" data-plus="file">Upload file</button><button type="button" role="menuitem" data-plus="github">Import from GitHub</button><button type="button" role="menuitem" data-plus="model">Auto · select model</button><button type="button" role="menuitem" data-plus="advanced">Advanced controls</button><span class="kq-plus-sep" aria-hidden="true"></span><button type="button" role="menuitem" data-plus="image">Make an image</button><button type="button" role="menuitem" data-plus="video">Make a video</button><button type="button" role="menuitem" data-plus="pdf">PDF tools</button></div></div>
               <button type="button" id="imageModeBtn" class="tool-btn image-mode-btn" title="Make or edit an image" aria-label="Make or edit an image"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg></button>
               <button type="button" id="videoModeBtn" class="tool-btn video-mode-btn" title="Make a video" aria-label="Make a video"><svg class="kc-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg></button>
 
@@ -1462,7 +1468,7 @@
     </div>
   </dialog>
 
-  <script src="/app.js?v=45"></script>
+  <script src="/app.js?v=46"></script>
 <script src="/connections.js?v=20"></script>
 </body>
 </html>

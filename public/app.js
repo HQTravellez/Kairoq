@@ -269,13 +269,13 @@ function setMainView(view="command"){
   if(mainView==="testing")loadTestingGround();
   $("#buildNavBtn")?.classList.toggle("active", mainView === "build");
   if(mainView!=="command") $("#commandCenter")?.classList.remove("show-work");
-  // On the home view the chat box sits under the headline; everywhere else it is docked at the bottom.
-  const shell=$(".composer-shell"), slot=$("#khComposerSlot");
-  if(shell && slot){
-    // The message box stays docked full width at the bottom on every screen (like Hermes),
-    // including Home and "Build an app"; it no longer floats as a box in the middle.
-    if(shell.parentElement===slot) $(".main").appendChild(shell);
+  // Home uses the large central composer. Other views keep the composer docked.
+  const shell=$(".composer-shell"), slot=$("#khComposerSlot"), main=$(".main");
+  if(shell && slot && main){
+    if(mainView==="command" && shell.parentElement!==slot) slot.appendChild(shell);
+    else if(mainView!=="command" && shell.parentElement!==main) main.appendChild(shell);
   }
+  updateWorkspaceTabState();
 
   $("#commandCenterBtn")?.classList.toggle("active", mainView === "command");
   $("#chatViewBtn")?.classList.toggle("active", mainView === "chat");
@@ -3323,7 +3323,7 @@ $$(".cc-quick").forEach(btn=>btn.onclick=()=>useCommandPrompt(btn));
 $("#clearChats").onclick=()=>{if(confirm("Delete all local chats?")){chats=[];currentChatId=null;newChat()}};
 // "+" opens a small menu (file, image, video), like Hermes' single "+" in the message box.
 $("#attachBtn").onclick=e=>{e.stopPropagation();const m=$("#plusMenu");m.hidden=!m.hidden;$("#attachBtn").setAttribute("aria-expanded",String(!m.hidden));if(!m.hidden)m.querySelector("button")?.focus()};
-$$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else if(k==="pdf")openPdfTools();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
+$$("#plusMenu [data-plus]").forEach(b=>b.onclick=()=>{$("#plusMenu").hidden=true;$("#attachBtn").setAttribute("aria-expanded","false");const k=b.dataset.plus;if(k==="file")$("#fileInput").click();else if(k==="github"){setStatus("Open Connections to import or sync a GitHub repository.");$("#connectorsBtn")?.click()}else if(k==="model")$("#modelPickerBtn")?.click();else if(k==="advanced")$("#settingsBtn")?.click();else if(k==="pdf")openPdfTools();else $(k==="image"?"#imageModeBtn":"#videoModeBtn")?.click()});
 // PDF tools (Stirling PDF on the server, stirling-pdf.js): pick a tool and PDFs, get the result back as a download.
 async function openPdfTools(){
   let info={on:false,tools:[]};try{info=await (await fetch("/api/pdf/tools",{credentials:"same-origin"})).json()}catch{}
@@ -3402,6 +3402,7 @@ function openBuilder(url){
   const frame=$("#buildFrame"),view=$("#buildView");
   view.classList.add("loading");
   frame.src="about:blank";
+  try{const u=new URL(url,location.origin),pid=u.searchParams.get("project");activeBuilderProjectId=pid||""}catch{activeBuilderProjectId=""}
   setMainView("build");
   setTimeout(()=>{frame.src=url},30);
   clearTimeout(builderTimer);builderTimer=setTimeout(builderReady,30000);
@@ -3442,10 +3443,33 @@ function showProjectsTab(tab){
   $("#wpEmpty")?.classList.toggle("hidden",!mine||has);
   $("#wpTemplates")?.classList.toggle("hidden",mine);
 }
+let activeBuilderProjectId="";
+function renderWorkspaceProjectTabs(projects){
+  const host=$("#workspaceProjectTabs");if(!host)return;
+  host.replaceChildren(...projects.slice(0,5).map(p=>{
+    const b=document.createElement("button");b.type="button";b.className="workspace-tab project-tab";
+    b.dataset.projectId=String(p.id||"");
+    const dot=document.createElement("span");dot.className="workspace-tab-dot";
+    const label=document.createElement("span");label.className="workspace-tab-label";label.textContent=String(p.name||"Untitled app");
+    b.append(dot,label);
+    b.onclick=()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id));
+    return b;
+  }));
+  updateWorkspaceTabState();
+}
+function updateWorkspaceTabState(){
+  const home=$("#workspaceHomeTab");if(home)home.classList.toggle("active",mainView==="command");
+  const build=mainView==="build";
+  $$(".project-tab").forEach(t=>t.classList.toggle("active",build&&String(t.dataset.projectId||"")===String(activeBuilderProjectId||"")));
+}
+$("#workspaceHomeTab")?.addEventListener("click",()=>setMainView("command"));
+$("#workspaceNewTab")?.addEventListener("click",()=>openAppBuilder("web"));
+
 async function loadHomeApps(){
   const box=$("#khApps"),list=$("#khAppList"),grid=$("#wpList");
   let projects=[];
   try{const r=await fetch("/api/create/projects",{credentials:"same-origin"});({projects=[]}=r.ok?await r.json():{})}catch{}
+  renderWorkspaceProjectTabs(projects);
   const cards=n=>projects.slice(0,n).map(p=>{const name=String(p.name||"Untitled app");return appCard(name,{thumbUrl:p.thumb,sub:p.updated_at?"Edited "+prettyRelativeTime(p.updated_at):"",onOpen:()=>openBuilder("/create?embed=1&project="+encodeURIComponent(p.id))})});
   if(box&&list){list.replaceChildren(...cards(6));box.classList.toggle("hidden",!projects.length)}
   if(grid){
@@ -3474,7 +3498,21 @@ window.addEventListener("message",e=>{
   const err=$("#khError");if(err){err.textContent=e.data.error?"The build could not start: "+String(e.data.error).slice(0,300).replace(/[.\s]*$/,".")+" Try again, or change the request.":"";err.classList.toggle("hidden",!e.data.error)}
   loadHomeApps();
 });
-$$(".kh-mode").forEach(t=>t.onclick=()=>{setAppBuildMode(t.dataset.mode);promptEl.focus()});
+$(".kh-mode").forEach(t=>t.onclick=()=>{
+  const mode=t.dataset.mode;
+  if(mode==="video"){
+    setAppBuildMode(false);
+    setImageMode(false);
+    setVideoMode(true);
+    $(".kh-mode").forEach(x=>x.setAttribute("aria-selected",String(x===t)));
+    promptEl.placeholder="Describe the video you want Kairoq to make…";
+    if($("#khGreeting"))$("#khGreeting").innerHTML="What do you want to <em>create</em>?";
+  }else{
+    if(videoMode)setVideoMode(false);
+    setAppBuildMode(mode);
+  }
+  promptEl.focus();
+});
 $$("[data-build-app]").forEach(b=>b.onclick=()=>openAppBuilder("web"));
 $$("[data-idea]").forEach(b=>b.onclick=()=>{promptEl.value=b.textContent.trim();resizePrompt();promptEl.focus()});
 $("#stopBtn").onclick=()=>abortController?.abort();
