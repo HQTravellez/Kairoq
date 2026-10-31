@@ -32,3 +32,9 @@ test("Discuss mode recommends no more than three next ideas",()=>{
  assert.match(js,/slice\(0,3\)\.map/);
  assert.doesNotMatch(js,/give 3 to 5 ideas/);
 });
+
+test("ordinary Build mode uses the same Kairoq response contract as chat and Agent Mode",()=>{
+ const js=read("react-builder.js");
+ assert.match(js,/SYSTEM_PROMPT\+require\('\.\/agent-response-contract'\)\.prompt\(text\)/);
+ assert.match(js,/reply\.message=rc\.guard\(text,reply\.message/);
+});
