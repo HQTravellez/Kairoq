@@ -3,31 +3,42 @@ on:
   push:
     paths:
       - 'conversation-handoff.js'
+      - 'model-switch-handoff.js'
       - 'react-builder.js'
       - 'react-agent.js'
+      - 'server.js'
+      - 'public/app.js'
       - 'agent-response-contract.js'
       - 'test/conversation-handoff.test.js'
+      - 'test/model-switch-handoff.test.js'
       - '.github/workflows/model-conversation-continuity.yml'
   pull_request:
     paths:
       - 'conversation-handoff.js'
+      - 'model-switch-handoff.js'
       - 'react-builder.js'
       - 'react-agent.js'
+      - 'server.js'
+      - 'public/app.js'
       - 'agent-response-contract.js'
       - 'test/conversation-handoff.test.js'
+      - 'test/model-switch-handoff.test.js'
       - '.github/workflows/model-conversation-continuity.yml'
 permissions:
   contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - run: node --check conversation-handoff.js
+      - run: node --check model-switch-handoff.js
       - run: node --check react-builder.js
       - run: node --check react-agent.js
-      - run: node --test test/conversation-handoff.test.js test/agent-response-contract.test.js
+      - run: node --check server.js
+      - run: node --check public/app.js
+      - run: node --test test/conversation-handoff.test.js test/model-switch-handoff.test.js test/agent-response-contract.test.js
