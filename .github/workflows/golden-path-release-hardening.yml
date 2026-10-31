@@ -16,12 +16,15 @@ on:
   pull_request:
     paths:
       - 'react-agent.js'
+      - 'react-builder.js'
       - 'create-api.js'
       - 'engineering-completion-gate.js'
       - 'visual-quality-gate.js'
+      - 'agent-response-contract.js'
       - 'test/visual-quality-gate.test.js'
       - 'test/engineering-completion-gate.test.js'
       - 'test/execution-recovery-budget.test.js'
+      - 'test/agent-response-contract.test.js'
       - '.github/workflows/golden-path-release-hardening.yml'
 permissions:
   contents: read
