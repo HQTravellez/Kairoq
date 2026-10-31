@@ -12,7 +12,7 @@ const CAPABILITIES=Object.freeze([
   {id:"learning",label:"Verified procedural learning",group:"Knowledge",status:"partially-wired",entry:"hermes-learning-loop.js",tools:[]},
   {id:"freellmapi_pool",label:"Internal FreeLLMAPI multi-provider inference pool",group:"AI",status:"configured-by-env",entry:"freellmapi.js",tools:["model_discovery","chat_completion","coding_completion"]},
   {id:"design_skills",label:"Design, accessibility, animation, dashboards",group:"Design",status:"skill-library",entry:"design-skills/",tools:[]},
-  {id:"figma_design",label:"Connected Figma design inspection and frame import",group:"Design",status:"available-when-connected",entry:"figma-connection.js",tools:[]},
+  {id:"figma_design",label:"Connected Figma design inspection and frame import",group:"Design",status:"available-when-connected",entry:"figma-connection.js",tools:["inspect_figma"]},
   {id:"test_repair",label:"Browser QA, deterministic tests and repair",group:"Quality",status:"workflow-wired",entry:"react-agent.js",tools:["run_tests","test_ui","view_logs"]},
   {id:"app_database",label:"Application SQL inspection",group:"Build",status:"wired-in-agent-mode",entry:"react-agent.js",tools:["query_db"]},
   {id:"automation",label:"Application automation testing",group:"Build",status:"wired-in-agent-mode",entry:"react-agent.js",tools:["run_automation"]},
