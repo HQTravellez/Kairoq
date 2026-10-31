@@ -21,9 +21,16 @@ on:
       - 'clarify.js'
       - 'public/create.js'
       - 'public/create.html'
+      - 'public/conversation-bubbles.css'
+      - 'agent-response-contract.js'
+      - 'react-builder.js'
+      - 'react-agent.js'
+      - 'docs/design/KAIROQ-CONVERSATION-EXPERIENCE.md'
       - 'test/clarify.test.js'
       - 'test/looks.test.js'
       - 'test/clean-conversational-start.test.js'
+      - 'test/conversation-experience.test.js'
+      - 'test/agent-response-contract.test.js'
       - '.github/workflows/clean-conversational-start.yml'
 permissions:
   contents: read
