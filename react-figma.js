@@ -114,8 +114,12 @@ async function importFrame({url,token,auth='pat'},{fetchImpl=fetch}={}){
   nodeId=frame.id;
  }
  const nodes=await api('/files/'+key+'/nodes?ids='+encodeURIComponent(nodeId));
- const root=nodes.nodes?.[nodeId]?.document;
+ const bundle=nodes.nodes?.[nodeId];
+ const root=bundle?.document;
  if(!root)throw fail(404,'Figma could not find that frame. Copy the link with the frame selected.');
+ const components=Object.values(bundle.components||{}).slice(0,120).map(x=>({name:String(x.name||'').slice(0,120),description:String(x.description||'').slice(0,300),key:x.key||null}));
+ const componentSets=Object.values(bundle.componentSets||{}).slice(0,80).map(x=>({name:String(x.name||'').slice(0,120),description:String(x.description||'').slice(0,300),key:x.key||null}));
+ const styles=Object.values(bundle.styles||{}).slice(0,120).map(x=>({name:String(x.name||'').slice(0,120),description:String(x.description||'').slice(0,300),styleType:x.styleType||null,key:x.key||null}));
  // Rendered frame, used as the visual reference.
  let screenshot=null;
  for(const scale of [1,0.5]){
@@ -137,6 +141,6 @@ async function importFrame({url,token,auth='pat'},{fetchImpl=fetch}={}){
    images.push({ref,name:base+'.'+type[0],mime:type[1],data:buf.toString('base64')});
   }
  }
- return{key,nodeId,name:String(root.name||'Frame').slice(0,80),root,screenshot,images};
+ return{key,nodeId,name:String(root.name||'Frame').slice(0,80),root,screenshot,images,components,componentSets,styles};
 }
 module.exports={parseUrl,importFrame,spec,collectImageRefs,hex};
