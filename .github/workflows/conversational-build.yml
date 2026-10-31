@@ -5,6 +5,9 @@ on:
       - 'react-builder.js'
       - 'create-api.js'
       - 'api-chat-routing.js'
+      - 'browser-chat-routing.js'
+      - 'web.js'
+      - 'test/browser-chat-routing.test.js'
       - 'test/api-chat-routing.test.js'
       - 'react-agent.js'
       - 'conversational-build-contract.js'
@@ -15,6 +18,9 @@ on:
       - 'react-builder.js'
       - 'create-api.js'
       - 'api-chat-routing.js'
+      - 'browser-chat-routing.js'
+      - 'web.js'
+      - 'test/browser-chat-routing.test.js'
       - 'test/api-chat-routing.test.js'
       - 'react-agent.js'
       - 'conversational-build-contract.js'
@@ -32,5 +38,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check react-builder.js && node --check react-agent.js && node --check create-api.js && node --check api-chat-routing.js && node --check conversational-build-contract.js
-      - run: node --test test/conversational-build-contract.test.js test/api-chat-routing.test.js
+      - run: node --check react-builder.js && node --check react-agent.js && node --check create-api.js && node --check api-chat-routing.js && node --check browser-chat-routing.js && node --check web.js && node --check conversational-build-contract.js
+      - run: node --test test/conversational-build-contract.test.js test/api-chat-routing.test.js test/browser-chat-routing.test.js

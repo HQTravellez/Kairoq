@@ -103,16 +103,16 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote=''}={}){
+async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
  const ownerContract=require('./conversational-build-contract');
- const ownerRequirements=ownerContract.merge(meta.owner_requirements||[],text);
+ const ownerRequirements=researchOnly?(meta.owner_requirements||[]):ownerContract.merge(meta.owner_requirements||[],text);
  if(!meta.current_version){await builder.initialize(meta);meta=builder.loadMeta(id)}
  const tl=require('./react-timeline').create(onEvent);
  // A new project gets its design brief first (colours and fonts go into src/index.css).
- const brief=await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
+ const brief=researchOnly?null:await builder.prepareDesign(id,text,{callModel,tier,signal,images,onProgress:s=>onStep({steps:[],status:s})});
  if(brief){meta=builder.loadMeta(id);tl.add({t:'note',icon:'design',text:'Chose the design direction "'+brief.name+'"'})}
  const base=builder.loadFiles(id,meta.current_version);
  const discipline=require('./execution-discipline'),disciplinePlan=discipline.workflow(text),executionLedger=require('./execution-ledger');
@@ -124,22 +124,44 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const limit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
  const wb=require('./web').createBrowser({browseSite,maxOps:intEnv('KAIROQ_WEB_MAX_ACTIONS',30,5,100)});
  const vision=tier!=='standard',web=typeof webSearch==='function'||wb.available();
+ let webAttempted=false,webObserved=false;
  const started=new Date().toISOString();
  const checkpointStore=require('./agent-checkpoint'),checkpoint=checkpointStore.load(id,{instruction:text,baseVersion:meta.current_version});
  let work=checkpoint?checkpoint.files:{...base,...(brief?{'src/index.css':require('./react-design').applyToCss(base['src/index.css'],brief)}:{})},built=null,dirty=Boolean(checkpoint),lastTest=null,lastUnitTests=null,lastReview=null,finishWarned=false,invalidReplies=0;
  const steps=[];let activeStep=checkpoint?.step||0;
  if(checkpoint)tl.add({t:'note',icon:'code',text:'Resumed saved build progress from step '+checkpoint.step});
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
- const decision=await require('./decision-router').suggest(text);
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+
- require('./capability-registry').taskContext(text)+discipline.prompt(text)+require('./engineering-intelligence').prompt(text)+
- require('./project-knowledge').note(id)+require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
- executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision);
+ const decision=researchOnly?null:await require('./decision-router').suggest(text);
+ const researchRule=researchOnly?'\n\nRESEARCH-ONLY TASK: Do not write, edit, build, test, query the app database, run automations, or generate assets. Use web_search/web_open/web_act/fetch_url as needed, answer from observed evidence, then finish. If a browser action fails, report that failure; never replace it with a claim that Kairoq cannot browse.':'';
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
+ require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
+ require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
+ executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision));
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
+ async function publishBrowser(error=''){
+  const screenshot=await wb.screenshot().catch(()=>null);
+  const browser={url:wb.url,title:wb.title||require('./web').hostOf(wb.url),screenshot,at:new Date().toISOString(),...(error?{error:String(error).slice(0,300)}:{})};
+  report({status:'researching',browser});
+  return screenshot;
+ }
 
  function dropOldImages(){for(const m of messages)if(Array.isArray(m.content)&&m!==introMsg)m.content=m.content.filter(p=>p.type==='text').map(p=>p.text).join('\n')+'\n(screenshot omitted)'}
+ if(researchOnly&&initialBrowserUrl&&wb.available()){
+  webAttempted=true;
+  const u=require('./browser-chat-routing').normalizeUrl(initialBrowserUrl)||String(initialBrowserUrl);
+  try{
+   const observed=await wb.open(u),shot=await publishBrowser();
+   webObserved=true;
+   tl.add({t:'note',icon:'web',text:'Opened '+require('./web').hostOf(wb.url)+' before model reasoning'});
+   messages.push({role:'user',content:'Kairoq already opened the requested public website in its browser. Use this observed page state as evidence; continue browsing if needed, then answer.\n\n'+clip(observed,18000)});
+   if(vision&&shot)messages.at(-1).content=[{type:'text',text:messages.at(-1).content},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+shot}}];
+  }catch(e){
+   await publishBrowser(e.message||e).catch(()=>{});
+   messages.push({role:'user',content:'Kairoq attempted to open '+u+' before model reasoning, but the browser returned this concrete error: '+String(e.message||e).slice(0,500)+'. Report this specific failure or try another web tool; do not claim Kairoq has no browser capability.'});
+  }
+ }
  function trimContext(){
   const size=m=>typeof m.content==='string'?m.content.length:m.content.reduce((n,p)=>n+(p.type==='text'?p.text.length:0),0);
   let total=messages.reduce((n,m)=>n+size(m),0);
@@ -184,10 +206,14 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  }
  async function tool(a){
   const t=a.tool;
+  if(researchOnly&&['write_files','edit_files','build_and_test','test_ui','run_tests','query_db','run_automation','generate_images'].includes(t))
+   return{text:t+': this is a research-only browser task; project mutation/runtime app tools are disabled.'};
   if(t==='research_pages'){
+    webAttempted=true;
     try{
       const r=await require('./multi-page-research').researchPages(a.urls,{browseSite,maxPages:6});
       tl.add({t:'note',icon:'web',text:'Read '+r.sourceCount+' of '+r.pages.length+' web pages'});
+      webObserved=Boolean(r.sourceCount);
       return{text:JSON.stringify(r).slice(0,35000)};
     }catch(e){return{text:'research_pages failed: '+String(e.message||e).slice(0,300)}}
   }
@@ -198,8 +224,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     return{text:JSON.stringify({status:'inventory-only',capabilities:rows,warning:'A listed capability is not necessarily enabled or executable; use only advertised, authorized tools.'}).slice(0,11000)};
   }
   if(t==='inspect_api_docs'){
+    webAttempted=true;
     if(!fetchUrl)return{text:'inspect_api_docs is unavailable: the guarded URL fetch transport is not configured.'};
-    const u=String(a.url||'').slice(0,500);
+    const raw=String(a.url||'').slice(0,500),u=require('./browser-chat-routing').normalizeUrl(raw)||raw;
     try{
       // Reuse server-provided URL fetcher; never fetch directly or with model supplied credentials.
       const parsed=require('./api-docs').validUrl(u);
@@ -208,6 +235,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
       const body=String(response.body||'');
       if(Buffer.byteLength(body,'utf8')>2000000)return{text:'Documentation exceeds the 2 MB parsing limit.'};
       const result=require('./api-docs').infer(body);
+      webObserved=true;
       tl.add({t:'note',icon:'web',text:'Inspected API documentation: '+parsed.hostname});
       return{text:JSON.stringify({documentationUrl:parsed.href,format:result.format||'unknown',title:result.title||'',operations:(result.operations||[]).slice(0,60),auth:result.auth||[],limitations:[...(result.limitations||[]),'No supplier API call or sandbox execution was performed. Inferred operations require contract verification.']}).slice(0,18000)};
     }catch(e){return{text:'inspect_api_docs failed: '+String(e.message||e).slice(0,350)}}
@@ -331,25 +359,43 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    return{text:'generate_images: saved '+saved.join(', ')+'. Use exactly these paths in the code.'+(notes.length?'\n'+notes.join('\n'):'')};
   }
   if(t==='web_open'){
-   if(!wb.available())return{text:'web_open is not available on this server (no browser).'};
+   webAttempted=true;
+   if(!wb.available())return{text:'web_open is not available on this server (no browser runtime).'};
    const u=String(a.url||'').slice(0,500);
    tl.add({t:'note',icon:'web',text:'Opened '+u.slice(0,120)});
-   try{const text=await wb.open(u);return{text,image:vision?await wb.screenshot():null}}catch(e){return{text:'web_open failed: '+String(e.message||e).slice(0,300)}}
+   try{
+    const text=await wb.open(u),shot=await publishBrowser();
+    webObserved=true;
+    return{text,image:vision?shot:null};
+   }catch(e){
+    await publishBrowser(e.message||e).catch(()=>{});
+    return{text:'web_open failed: '+String(e.message||e).slice(0,300)};
+   }
   }
   if(t==='web_act'){
-   if(!wb.available())return{text:'web_act is not available on this server (no browser).'};
+   webAttempted=true;
+   if(!wb.available())return{text:'web_act is not available on this server (no browser runtime).'};
    tl.add({t:'note',icon:'web',text:'Clicked around '+require('./web').hostOf(wb.url)});
-   try{const text=await wb.act(a.steps||[]);return{text,image:vision?await wb.screenshot():null}}catch(e){return{text:'web_act failed: '+String(e.message||e).slice(0,300)}}
+   try{
+    const text=await wb.act(a.steps||[]),shot=await publishBrowser();
+    webObserved=true;
+    return{text,image:vision?shot:null};
+   }catch(e){
+    await publishBrowser(e.message||e).catch(()=>{});
+    return{text:'web_act failed: '+String(e.message||e).slice(0,300)};
+   }
   }
   if(t==='web_search'){
+   webAttempted=true;
    if(typeof webSearch!=='function')return{text:'web_search is not available on this server.'};
    tl.add({t:'note',icon:'web',text:'Searched the web for "'+String(a.query||'').slice(0,80)+'"'});
-   try{const urls=await webSearch(String(a.query||'').slice(0,240));return{text:urls.length?'Results:\n'+urls.join('\n'):'No results.'}}catch(e){return{text:'web_search failed: '+String(e.message||e).slice(0,300)}}
+   try{const urls=await webSearch(String(a.query||'').slice(0,240));webObserved=true;return{text:urls.length?'Results:\n'+urls.join('\n'):'No results.'}}catch(e){return{text:'web_search failed: '+String(e.message||e).slice(0,300)}}
   }
   if(t==='fetch_url'){
+   webAttempted=true;
    if(!fetchUrl)return{text:'fetch_url is not available.'};
    tl.add({t:'note',icon:'web',text:'Read '+String(a.url||'').slice(0,120)});
-   try{const r=await fetchUrl(String(a.url||''));const body=/html/i.test(r.headers?.['content-type']||'')||/^\s*</.test(r.body)?htmlToText(r.body):r.body;return{text:'HTTP '+r.status+'\n'+clip(body,12000)}}catch(e){return{text:'fetch_url failed: '+String(e.message||e).slice(0,300)}}
+   try{const r=await fetchUrl(String(a.url||''));webObserved=true;const body=/html/i.test(r.headers?.['content-type']||'')||/^\s*</.test(r.body)?htmlToText(r.body):r.body;return{text:'HTTP '+r.status+'\n'+clip(body,12000)}}catch(e){return{text:'fetch_url failed: '+String(e.message||e).slice(0,300)}}
   }
   return{text:'Unknown tool "'+t+'". Use one of the listed tools.'};
  }
@@ -385,11 +431,12 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  function noChange(message){
   checkpointStore.clear(id);
   if(built)fs.rmSync(built.dir,{recursive:true,force:true});
-  message='No changes were made. '+message;
-  builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}]);
+  if(!researchOnly)message='No changes were made. '+message;
+  const storedMode=researchOnly?'discuss':'agent';
+  builder.addMessages(id,[{role:'user',text,mode:storedMode},{role:'assistant',text:message,mode:storedMode,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),...(researchOnly?{research:true}:{})}]);
   const fresh=builder.loadMeta(id);
   executionLedger.complete(id,text,{verified:true,version:fresh.current_version,message});
-  return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
+  return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],...(researchOnly?{research:true}:{}),preview_url:builder.previewUrl(fresh)};
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
 
@@ -421,7 +468,17 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   for(const a of reply.actions){
    signal?.throwIfAborted();
    if(a.tool==='finish'){
-    const message=String(a.message||reply.thought||'Done.').slice(0,2000);
+    let message=String(a.message||reply.thought||'Done.').slice(0,2000);
+    if(researchOnly&&web&&!webAttempted){
+     results.push('finish: this research task has live web/browser tools. Attempt web_search, web_open, fetch_url, inspect_api_docs, or research_pages before answering. Do not claim Kairoq cannot browse.');continue;
+    }
+    if(researchOnly&&web&&require('./browser-chat-routing').falseCapabilityDenial(message)){
+     results.push('finish: the answer contradicts Kairoq\'s live browser capability. Report the observed browser/search result or the specific tool error instead.');continue;
+    }
+    if(researchOnly&&!web&&require('./browser-chat-routing').falseCapabilityDenial(message))
+     message=require('./browser-chat-routing').capabilityAnswer({browser:false,search:false});
+    if(researchOnly&&webAttempted&&!webObserved&&/\bworked|success|verified|confirmed\b/i.test(message))
+     message='The browser/search attempt did not produce verified page evidence. '+message;
     if(unchanged()){finished=noChange(message);break}
     if(dirty||!built){const r=await buildAndTest({});results.push(r.text);if(r.image)image=r.image}
     if(!built||dirty){results.push('finish: your latest changes do not build yet. Fix the problems above, then finish.');continue}

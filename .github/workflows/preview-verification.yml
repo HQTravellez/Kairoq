@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'public/create.js'
+      - 'public/create.html'
+      - 'public/builder-browser-pane.js'
       - 'public/builder-split-preview.js'
       - 'public/builder-split-preview.css'
       - 'test/builder-split-preview.test.js'
@@ -11,6 +13,8 @@ on:
   pull_request:
     paths:
       - 'public/create.js'
+      - 'public/create.html'
+      - 'public/builder-browser-pane.js'
       - 'public/builder-split-preview.js'
       - 'public/builder-split-preview.css'
       - 'test/builder-split-preview.test.js'
@@ -26,5 +30,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check public/create.js && node --check public/builder-split-preview.js
+      - run: node --check public/create.js && node --check public/builder-browser-pane.js && node --check public/builder-split-preview.js
       - run: node --test test/preview-verification-scope.test.js test/builder-split-preview.test.js

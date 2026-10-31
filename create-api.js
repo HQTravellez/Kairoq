@@ -329,6 +329,21 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
  }
  if(!hooks&&apiChat.docsResearchRequest(ownerText)&&(mode==='build'||mode==='discuss'))mode='agent';
+ const browserChat=require('./browser-chat-routing');
+ const browserRuntime={browser:Boolean(browseSite)||require('./runtime-check').available(),search:typeof webSearch==='function'};
+ // Browser capability belongs to Kairoq, not to the selected model. Answer capability questions
+ // from the runtime itself so no model can claim Kairoq "cannot browse" when the tools are wired.
+ if(!hooks&&!images.length&&!context&&!shownText&&browserChat.capabilityQuestion(ownerText)){
+  const meta=builder.loadMeta(id),answer=browserChat.capabilityAnswer(browserRuntime);
+  builder.addMessages(id,[{role:'user',text:String(ownerText).trim(),mode},{role:'assistant',text:answer,mode:'support',credits:0,support:true,conversation_kind:'browser-capability'}]);
+  const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true,version:meta.current_version,preview_url:builder.previewUrl(meta)}};
+  jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
+ }
+ // Resolve direct site requests and short follow-ups such as "check again" against recent chat.
+ // The decision is carried to execution below; ordinary discussion remains ordinary discussion.
+ const browserDecision=browserChat.route(ownerText,builder.loadMeta(id).messages||[]);
+ const browserResearchOnly=browserDecision.execute&&!routing.explicitExecution(ownerText);
+ if(browserResearchOnly&&!hooks&&(mode==='build'||mode==='agent'))mode='discuss';
  // Conversation is not a change: "hi", "thanks" or "what can you do" gets a short free reply (no
  // build, no design pick), and a question that asks for no change gets an answer instead of a build.
  if((mode==='build'||mode==='agent'||mode==='discuss')&&!hooks&&!images.length&&!context&&!shownText){
@@ -364,7 +379,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   return job;
  }
  const before=builder.loadMeta(id),fixing=Boolean(fix)&&mode!=='discuss',sig=fixing?problemSignature(before,before.current_version):'';
- const executionMode=require('./build-routing').executionMode({requestedMode:mode,meta:before,message,hooks:Boolean(hooks)});
+ let executionMode=require('./build-routing').executionMode({requestedMode:mode,meta:before,message,hooks:Boolean(hooks)});
+ if(!hooks&&browserDecision.execute&&(mode==='build'||mode==='discuss'))executionMode='agent';
 
  // The learning loop counts "it still doesn't work" messages as a sign builds are not landing.
  if(mode!=='discuss'&&!hooks&&require('./build-lessons').isComplaint(message))require('./build-lessons').recordComplaint(id);
@@ -416,9 +432,12 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    // Build and Discuss look things up first when the message asks for it (links, "search", "latest", docs...).
    let research={context:'',sources:[]};
    const versionBefore=builder.loadMeta(id).current_version;
-   if((mode==='build'||mode==='discuss')&&!referenceOnly&&process.env.KAIROQ_WEB_RESEARCH!=='off'){
+   if((mode==='build'||mode==='discuss')&&!referenceOnly&&executionMode!=='agent'&&process.env.KAIROQ_WEB_RESEARCH!=='off'){
     update({status:'researching'});
-    research=await require('./web').gather(message,{callModel,tier:modelTier,signal,webSearch,browseSite,onProgress:p=>update({status:'researching',progress:p})}).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
+    research=await require('./web').gather(browserDecision.execute?browserDecision.message:message,{callModel,tier:modelTier,signal,webSearch,browseSite,
+     onProgress:p=>update({status:'researching',progress:p}),
+     onBrowser:b=>update({status:'researching',browser:b})
+    }).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
     update({progress:null});
     if(research.context)context=[context,research.context].filter(Boolean).join('\n\n');
    }
@@ -452,16 +471,22 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     const out=await autopilotRun([ownerRequest(),message].filter(Boolean).join('\n\n'),null);
     job.result={...(out.result||{version:builder.loadMeta(id).current_version}),autopilot:{rounds:out.rounds,summary:out.summary},message:out.summary};
    }
-   else if(mode==='discuss'){update({status:'thinking'});job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context})}
-   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onVersion,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else if(mode==='agent'||executionMode==='agent'){
     let extra='';
     if(hooks&&hooks.before){update({status:'assets'});extra=await hooks.before({signal})||''}
-    const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra].filter(Boolean).join('\n\n');
-    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,maxSteps:executionMode==='agent'&&mode==='build'?24:undefined,
-     onStep:p=>update({status:p.status,stream:null,agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
+    const continuity=browserDecision.execute&&browserDecision.message!==message?browserDecision.message.slice(String(message||'').length).trim():'';
+    const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra,continuity].filter(Boolean).join('\n\n');
+    const researchOnly=browserResearchOnly&&!hooks;
+    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,fetchUrl:url=>require('./react-functions').guardedFetch({url}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
+     onStep:p=>update({status:p.status,stream:null,...(p.browser?{browser:p.browser}:{}),agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
+   else if(mode==='discuss'){
+    update({status:'thinking'});
+    job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context,
+     browserRuntime});
+   }
+   else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onVersion,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
    else{
     // "Build the missing features" after a reference build: the match score's list (react-parity.js).
     if(mode==='build'&&/\bmissing (features?|ones?|parts?)\b|\bfinish (the )?(plan|features)\b/i.test(message)){const mm=builder.loadMeta(id).reference;const todo=mm&&mm.match?require('./react-parity').missingMessage(mm.match):'';if(todo)context=[context,todo].filter(Boolean).join('\n\n')}
