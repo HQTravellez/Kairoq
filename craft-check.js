@@ -5,7 +5,7 @@
 // studio would ship it and what still looks generated, and fixes that once. All free, before the
 // owner sees the site. The owner gets one plain line about it.
 
-const TELLS=new Set(['norm-h1','norm-words','norm-radius','norm-shadows','norm-sections','eyebrow','dots','arrows','accent-word','gradient-text','blobs','emoji','card-grids','icon-cards','round','shadows','boxed','fonts','pill','filler','sections','numbers','made-up-number','faded-headline']);
+const TELLS=new Set(['norm-h1','norm-words','norm-radius','norm-shadows','norm-sections','eyebrow','dots','arrows','accent-word','gradient-text','blobs','emoji','card-grids','icon-cards','round','shadows','boxed','fonts','pill','filler','sections','numbers','made-up-number','faded-headline','touch-targets','mobile-text','icon-labels','form-labels','image-alt','heading-order','horizontal-overflow','fixed-safe-area']);
 
 // The giveaways on the screenshots, plus big numbers the owner never gave.
 function found(pictures,facts,type){
