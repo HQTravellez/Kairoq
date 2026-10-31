@@ -64,13 +64,21 @@ test("a site font Kairoq cannot load gets the closest free match, and says so", 
   assert.equal(looks.closestFont(["Inter"]).exact, true);
 });
 
-test("the builder asks how the app should feel before the first build and saves the pick", () => {
+test("look tools remain available but are not a mandatory first-build step", () => {
   const js = read("public/create.js"), html = read("public/create.html"), api = read("create-api.js");
+  // The optional design tooling can stay loaded for later use.
   assert.match(html, /<script src="\/create-look\.js\?v=\d+"><\/script>\s*<script src="\/create\.js/);
-  assert.match(js, /window\.KairoqLook\.step\(/);
-  assert.match(js, /api\('\/projects\/'\+project\.id\+'\/look',\{method:'POST'/);
   assert.match(api, /action==='\/look'&&method==='POST'/);
   assert.match(api, /meta\.planned_design=require\('\.\/looks'\)\.toDesign/);
-  const ui = read("public/create-look.js");
-  for (const s of ["How should it feel?", "Show 3 more", "Browse all ", "From a website", "Fine-tune colours and fonts", "Decide for me", "Easy to read?", "Save as my brand for future apps", "Kairoq will not copy"]) assert.ok(ui.includes(s), s);
+  // But the first-build chat must never invoke the look/3D wizard automatically.
+  const start=js.indexOf("async function askThenBuild(prompt)");
+  const end=js.indexOf("// A first request with the owner's answers",start);
+  const first=js.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.doesNotMatch(first,/KairoqLook\.step/);
+  assert.doesNotMatch(first,/\/look/);
+  assert.doesNotMatch(first,/three_d/);
+  assert.doesNotMatch(first,/\/plan/);
+  assert.doesNotMatch(first,/Decide for me/);
+  assert.match(first,/Build anyway/);
 });
