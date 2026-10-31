@@ -88,6 +88,10 @@ test("Figma refresh falls back to the documented legacy refresh route when neede
 });
 
 test("connected Figma imports frames with Bearer auth and preserves components/styles",async()=>{
+ const savedToken=JSON.parse(secrets.get(meta.id,"oauth_figma"));
+ savedToken.access_token="figma-import-access-token-1234567890";
+ savedToken.expires_at=Date.now()+3600000;
+ secrets.set(meta.id,"oauth_figma",JSON.stringify(savedToken));
  const calls=[];
  const fetchImpl=async(url,o={})=>{
   calls.push({url,headers:o.headers||{}});
@@ -108,7 +112,7 @@ test("connected Figma imports frames with Bearer auth and preserves components/s
  assert.equal(frame.componentSets[0].name,"Button states");
  assert.equal(frame.styles[0].name,"Brand / Blue");
  const apiCall=calls.find(x=>x.url.includes("/files/"));
- assert.equal(apiCall.headers.Authorization,"Bearer oauth-token-refreshed-123456789012345");
+ assert.equal(apiCall.headers.Authorization,"Bearer figma-import-access-token-1234567890");
 });
 
 test("Figma UI is OAuth-first and no longer asks customers for a personal token",()=>{
