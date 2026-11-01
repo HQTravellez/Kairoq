@@ -74,7 +74,11 @@ test('in the editor: questions, the plan, Approve, and the build gets the answer
   await page.locator('.q').nth(1).locator('.ask-other').fill('Kids and parents together');
   assert.equal(await page.locator('.q-answer').nth(1).innerText(),'Kids and parents together');
   await page.click('.ask-next');
-  await page.locator('.ask-card button:has-text("Skip")').first().click();
+  // The brand step: Kairoq's pick with a real page preview; "Not now" goes on without a look.
+  await page.waitForSelector('.brand-opts',{timeout:20000});
+  assert.equal(await page.locator('.brand-opt.on b').innerText(),'Design it for me (Recommended)');
+  assert.ok(await page.locator('.lk-page .lk-p-h1').count(),'a page preview, not a sample screen');
+  await page.locator('.ask-card button:has-text("Not now")').first().click();
   await page.waitForSelector('.plan-card .plan-title',{timeout:20000});
   assert.equal(await page.locator('.plan-title').innerText(),PLAN.title);
   assert.ok(await page.locator('#plan-wait:has-text("Approve the plan to start building")').count(),'the preview waits for the plan');

@@ -1304,7 +1304,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- projects -----
   if(route==='/projects'&&method==='GET')return send(res,200,{projects:listFor(v)}),true;
   // Before a first build: a few quick questions when the request leaves something important open (free).
-  if(route==='/clarify'&&method==='POST'){limitedKey('clarify:'+v.owner,30,3600000);const b=await readJson(req,8000);return send(res,200,{questions:process.env.KAIROQ_CLARIFY==='off'?[]:await require('./clarify').questions(b.prompt,{callModel:(o,parse)=>callModel({...o,fast:true},parse),tier:b.tier})}),true}
+  if(route==='/clarify'&&method==='POST'){limitedKey('clarify:'+v.owner,30,3600000);const b=await readJson(req,8000);return send(res,200,process.env.KAIROQ_CLARIFY==='off'?{opening:'',questions:[]}:await require('./clarify').ask(b.prompt,{callModel:(o,parse)=>callModel({...o,fast:true},parse),tier:b.tier})),true}
   // Looks: the colours and fonts picked before a first build (looks.js).
   if(route==='/looks'&&method==='GET'){
    const looks=require('./looks'),recent=[];

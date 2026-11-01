@@ -26,3 +26,11 @@ test('options can carry one sentence each and a recommended one',()=>{
  const [q]=clarify.clean({questions:[{q:'Who is it for?',options:[{label:'Kids: watch and play',detail:'A child scans a page and taps the animal.'},{label:'Anyone: realistic AR',detail:'A life-size animal on the paper.'}],recommended:0}]});
  assert.deepEqual(q,{q:'Who is it for?',options:['Kids: watch and play','Anyone: realistic AR'],details:['A child scans a page and taps the animal.','A life-size animal on the paper.'],recommended:0,multi:false});
 });
+
+test('ask() returns the opening line with the questions; a bad line is dropped',async()=>{
+ const raw={opening:'A field guide for Ontario birds with sighting tables — lovely. Two things so I get the data right:',questions:[{q:'Who adds sightings?',options:[{label:'Just you',detail:'You sign in; visitors read.'},{label:'Any birder',detail:'Anyone can sign up.'}],recommended:0}]};
+ const r=await clarify.ask('A field guide for Ontario birds',{callModel:async(o,parse)=>{assert.match(o.messages[0].content,/warm, quick and specific/);return parse(JSON.stringify(raw))}});
+ assert.equal(r.opening,raw.opening);assert.equal(r.questions.length,1);
+ assert.equal(clarify.opening({opening:'{'}),'');assert.equal(clarify.opening({}),'');
+ assert.deepEqual(await clarify.ask('x'.repeat(700),{callModel:async()=>{throw Error('no')}}),{opening:'',questions:[]});
+});
