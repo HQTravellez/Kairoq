@@ -378,3 +378,13 @@ body.app .lk-seg button.on{background:#242830;color:#ECEEF1;box-shadow:none}
 body.app .lk-swatch.on{box-shadow:0 0 0 2px #15171B,0 0 0 4px #35E0CF}
 body.app .lk-switch i{background:#ECEEF1}
 body.app .lk-preview{background:#0E0F11}
+
+/* Design moves: one-tap instructions above the composer bar (design-moves.js). */
+body.app #editor .design-moves{display:flex;flex-wrap:wrap;gap:6px;padding:4px 10px 0}
+body.app #editor .design-moves .move{height:26px;padding:0 10px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(21,23,27,.9);color:#C4C8CF;font:500 12px/1 Geist,ui-sans-serif,sans-serif;cursor:pointer;box-shadow:none}
+body.app #editor .design-moves .move:hover{background:#242830;color:#fff;border-color:rgba(255,255,255,.18)}
+body.app #editor .design-moves .move:focus-visible{outline:2px solid #35E0CF;outline-offset:1px}
+body.app.in-editor #editor .messages li .audit-fix{display:inline-block;width:auto!important;max-width:max-content!important;margin:8px 0 0!important;height:30px!important;padding:0 14px!important;border-radius:999px!important;border:0!important;background:#35E0CF!important;color:#0E0F11!important;font:600 12.5px/30px Geist,ui-sans-serif,sans-serif!important;cursor:pointer;box-shadow:none!important}
+body.app.in-editor #editor .messages li .audit-fix:hover{background:#5BEADB!important}
+body.app.in-editor #editor .messages li .audit-fix:disabled{opacity:.5;cursor:default}
+@media (max-width:720px){body.app #editor .design-moves{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:4px 10px 0}body.app #editor .design-moves .move{flex:0 0 auto}}

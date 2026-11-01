@@ -3605,6 +3605,30 @@ $('models-query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchMod
 $('models-style').onchange=async()=>{try{modelsData=await api('/projects/'+state.project.id+'/models?op=style',{method:'POST',body:{style:$('models-style').value}});renderModels();text($('models-status'),$('models-style').value==='none'?'Saved.':'Saved. Ask the chat to "add the 3D" to put it on the pages.')}catch(err){text($('models-status'),err.message)}};
 // Autopilot (autopilot.js): test against the request, fix what is missing, repeat.
 $('autopilot-run').onclick=()=>{$('menu-project').open=false;if(!state.project||!state.project.current_version){text($('chat-error'),'Build the app first.');return}const note=$('chat-input').value.trim();send(note?"Keep going until it's right: "+note:"Keep going until it's right",'autopilot',undefined,{message:note})};
+// Design moves (design-moves.js, from Impeccable's command vocabulary): one tap, with the
+// owner's note in the box as the scope ("Bolder: the hero"). Audit runs the detector, no model.
+const MOVES=[['polish','Polish','Finish what is there: alignment, spacing, states, consistency'],['bolder','Bolder','Give one part real conviction without changing the brand'],['quieter','Quieter','Calm it down without making it generic'],['distill','Distill','Strip it to what earns its place'],['clarify','Clarify','Rewrite unclear words: labels, errors, empty states'],['critique','Critique','A scored design review; nothing changes'],['audit','Audit',"Impeccable's 62 rules and Kairoq's measurements, no model"]];
+(function(){const host=$('design-moves');if(!host)return;
+ for(const [id,label,hint] of MOVES){const b=el('button','move',label);b.type='button';b.title=hint;b.dataset.move=id;b.onclick=()=>{const note=$('chat-input').value.trim();if(id==='audit')return runAudit(note);send(label+(note?': '+note:''),id==='critique'?'discuss':'build','/chat',{move:id,message:note})};host.append(b)}
+})();
+async function runAudit(note){
+ if(state.sending||state.job)return;
+ if(!state.project||!state.project.current_version){text($('chat-error'),'Build the app first, then audit it.');return}
+ state.sending=true;syncSend();text($('chat-error'),'');
+ const projectId=state.project.id,shown='Audit'+(note?': '+note:'');
+ $('messages').append(messageItem({role:'user',text:shown,mode:'audit'}));$('chat-input').value='';
+ const wait=messageItem({role:'assistant',text:'Checking the current version against Impeccable\'s rules and measuring the page…'});wait.classList.add('audit-wait');$('messages').append(wait);$('messages').scrollTop=$('messages').scrollHeight;
+ try{
+  const r=await api('/projects/'+projectId+'/audit',{method:'POST',body:{message:note}});
+  if(state.project?.id!==projectId)return;
+  wait.remove();
+  const li=messageItem({role:'assistant',text:r.report});
+  if(r.count>0){const fix=el('button','small-btn audit-fix','Fix these '+r.count);fix.type='button';fix.onclick=()=>{fix.disabled=true;send('Fix the audit findings','build')};li.append(fix)}
+  if(r.impeccable===false){const n=el('p','look-note','Impeccable\'s detector is not installed on this server; only Kairoq\'s measurements ran.');li.append(n)}
+  $('messages').append(li);$('messages').scrollTop=$('messages').scrollHeight;
+ }catch(err){wait.remove();$('messages').append(messageItem({role:'assistant',text:err.message,failed:true}))}
+ finally{state.sending=false;syncSend()}
+}
 $('polish').onclick=()=>{if(!state.me.design_review){text($('chat-error'),'The design review needs a browser on the server (Chromium), which is not available here.');return}const note=$('chat-input').value.trim();send(note?'Polish the design: '+note:'Polish the design','polish',undefined,{message:note})};
 
 // Model and advanced choices open from the plus menu without duplicating their state.

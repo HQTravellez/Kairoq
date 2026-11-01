@@ -21,7 +21,7 @@ function found(pictures,facts,type){
 function major(list){return list.filter(i=>i.severity==='major')}
 
 function fixMessage(list){
- return'Craft pass: the page still has the generic "made by AI" look. Measured on the real page:\n'+list.map((i,n)=>(n+1)+'. '+i.issue+'. Fix: '+i.fix).join('\n')+'\nFix exactly these, across every page and section where they appear. Keep all content, sections, features and data working. Do not add new boxes, labels, badges or effects while fixing. In "message", say in one sentence what you refined, in plain words (no code, files or design jargon).';
+ return'Craft pass: the page still has the generic "made by AI" look. Measured on the real page and in the code (Impeccable rules are named impeccable:<rule>):\n'+list.map((i,n)=>(n+1)+'. '+(String(i.kind||'').startsWith('impeccable:')?'['+i.kind+'] ':'')+i.issue+'. Fix: '+i.fix).join('\n')+'\nFix exactly these, across every page and section where they appear. Keep all content, sections, features and data working. Do not add new boxes, labels, badges or effects while fixing. In "message", say in one sentence what you refined, in plain words (no code, files or design jargon).';
 }
 
 // The reviewer's question: would a top studio ship this, and what still looks generated?
@@ -44,13 +44,16 @@ Respond with ONLY JSON: {"ok":true} if you would ship it, or {"ok":false,"proble
 }
 
 // Run the check. edit(message, displayText) makes one builder change and returns its result.
-async function run({url,request,facts,type=null,designShots,reviewLook,edit,avoid=[],signal,onProgress=()=>{}}){
- const out={passes:0,fixed:[],remaining:[],review:null};
+// detect(url) adds the deterministic findings of Impeccable's detector (impeccable.js) to the
+// measured list each round: the same issue shape, fixed and measured again the same way.
+async function run({url,request,facts,type=null,designShots,reviewLook,edit,detect=null,avoid=[],signal,onProgress=()=>{}}){
+ const out={passes:0,fixed:[],remaining:[],review:null,detected:0};
  if(!designShots||!url)return out;
  onProgress('Checking it looks hand-made');
  let pictures=await designShots(url());
  if(!pictures.length)return out;
- let list=found(pictures,facts,type);
+ const measure=async()=>{const d=detect?await detect(url()).catch(()=>[]):[];out.detected=d.length;return found(pictures,facts,type).concat(d)};
+ let list=await measure();
  // 1. Measured giveaways: fixed, then measured again (twice at most).
  for(let round=0;round<2&&major(list).length;round++){
   if(signal&&signal.aborted)return out;
@@ -58,7 +61,7 @@ async function run({url,request,facts,type=null,designShots,reviewLook,edit,avoi
   const r=await edit(fixMessage(list.filter(i=>i.severity==='major').concat(list.filter(i=>i.severity==='minor')).slice(0,8)),'Refine the design so it looks hand-made');
   if(!r||r.unchanged||r.rolled_back)break;
   out.passes++;out.fixed.push(...major(list).map(i=>i.kind));
-  pictures=await designShots(url());list=found(pictures,facts,type);
+  pictures=await designShots(url());list=await measure();
  }
  out.remaining=major(list).map(i=>i.issue);
  // 2. A design director looks at the screenshots once.

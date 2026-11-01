@@ -63,7 +63,7 @@ function ownedProject(v,id,need='owner'){
  return{meta,role};
 }
 const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/figmaexport':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
- 'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
+ 'POST:/safari':'viewer','POST:/chat':'editor','POST:/audit':'editor','GET:/moves':'viewer','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
@@ -244,7 +244,7 @@ function supportAnswer(meta){
   'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
  ].join('\n');
 }
-function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false,implementFrom=null},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
+function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false,implementFrom=null,move=null},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
  const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
  if(active&&!model&&!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
@@ -301,6 +301,14 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // An answer to the builder's open question ("ok", "yes", an option or its number) builds with
  // that answer, even from Discuss: the chat shows what the owner typed, the model gets a clear instruction.
  let shownText;
+ // A design move (design-moves.js): the chat shows "Bolder: the hero", the builder gets the
+ // full instruction. "Fix the audit findings" builds exactly what the last audit listed.
+ const moves=require('./design-moves');
+ if(move&&moves.get(move)&&moves.get(move).mode!=='audit'){shownText=moves.shown(move,message);mode=moves.get(move).mode;message=moves.instruction(move,message)}
+ else if(!hooks&&(mode==='build'||mode==='discuss')&&/^fix (the )?audit findings/i.test(String(message).trim())){
+  const last=[...builder.loadMeta(id).messages].reverse().find(m=>m.role==='assistant'&&m.audit);
+  if(last){shownText=String(message).trim();mode='build';message=moves.fixAudit(last.text)}
+ }
  if(implementFrom){
   const proposal=builder.loadMeta(id).messages.find(m=>m.at===implementFrom&&m.role==='assistant'&&m.proposal&&!m.question);
   if(!proposal)throw Object.assign(Error('This plan is no longer available. Please describe the change you want.'),{status:409});
@@ -533,6 +541,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
       const meta0=builder.loadMeta(id),facts=[...meta0.messages.filter(m=>m.role==='user').map(m=>m.text),meta0.knowledge||''].join('\n');
       let last=null;
       const craft=await require('./craft-check').run({url:()=>builder.previewUrl(builder.loadMeta(id)),request:message,facts,type:meta0.design.norms||require('./craft-norms').typeOf(meta0.name+' '+message),designShots,reviewLook,signal,avoid:(require('./design-presets').byType(meta0.design?.playbook||'')||{}).avoid,
+       detect:u=>{const m=builder.loadMeta(id);return require('./impeccable').check({files:builder.loadFiles(id,m.current_version),url:u})},
        onProgress:p=>update({status:'reviewing',progress:p,stream:null}),
        edit:async(msg,shown)=>{const r=await builder.edit(id,msg,{onVersion,designShots,browse,onBrowser:b=>update({browser:b}),displayText:shown,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});if(r&&!r.unchanged&&!r.rolled_back)last=r;return r}});
       if(last)job.result={...last,first_version:first.version,design:first.design};
@@ -1512,7 +1521,21 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   }
   if(action==='/records'&&method==='GET')return send(res,200,{items:backend.ownerRecords(id,new URL(req.url,'http://x').searchParams.get('collection')||'')}),true;
   if(action==='/records'&&method==='DELETE'){const b=await readJson(req,2000);return send(res,200,backend.ownerDelete(id,b.id)),true}
-  if(action==='/chat'&&method==='POST'){const b=await readJson(req,60000000);const context=await parseFiles(b.files);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',model:typeof b.model==='string'?b.model:null,images:parseImages(b.images),context,fix:b.fix===true,implementFrom:typeof b.implementFrom==='string'?b.implementFrom:null},deps))}),true}
+  if(action==='/chat'&&method==='POST'){const b=await readJson(req,60000000);const context=await parseFiles(b.files);return send(res,202,{job:publicJob(startJob(v,id,{message:b.message,mode:b.mode||'build',tier:b.tier||'standard',model:typeof b.model==='string'?b.model:null,images:parseImages(b.images),context,fix:b.fix===true,implementFrom:typeof b.implementFrom==='string'?b.implementFrom:null,move:typeof b.move==='string'?b.move:null},deps))}),true}
+  // The design audit (design-moves.js): Impeccable's detector and Kairoq's measured giveaways on
+  // the current version, no model, reported in the chat.
+  if(action==='/moves'&&method==='GET')return send(res,200,{moves:require('./design-moves').list(),impeccable:require('./impeccable').enabled()}),true;
+  if(action==='/audit'&&method==='POST'){
+   const b=await readJson(req,20000),meta=builder.loadMeta(id);
+   if(!meta.current_version)throw Object.assign(Error('Build the app first, then audit it.'),{status:409});
+   const note=String(b.message||'').trim().slice(0,400),url=builder.previewUrl(meta);
+   const [detected,pictures]=await Promise.all([require('./impeccable').check({files:builder.loadFiles(id,meta.current_version),url}).catch(()=>[]),deps.designShots?deps.designShots(url).catch(()=>[]):[]]);
+   const facts=[...meta.messages.filter(m=>m.role==='user').map(m=>m.text),meta.knowledge||''].join('\n');
+   const measured=pictures&&pictures.length?require('./craft-check').found(pictures,facts,meta.design?.norms||require('./craft-norms').typeOf(meta.name)).filter(i=>i.severity==='major'):[];
+   const report=require('./design-moves').auditReport({detected,measured,url});
+   builder.addMessages(id,[{role:'user',text:require('./design-moves').shown('audit',note),mode:'audit'},{role:'assistant',text:report.text,mode:'audit',audit:{count:report.count,detected:detected.length,measured:measured.length},credits:0,support:true}]);
+   return send(res,200,{report:report.text,count:report.count,detected:detected.length,measured:measured.length,impeccable:require('./impeccable').enabled()}),true;
+  }
   if(action==='/assets'&&method==='GET')return send(res,200,{assets:require('./react-assets').list(id)}),true;
   if(action==='/assets'&&method==='POST'){const b=await readJson(req,16000000);return send(res,201,{saved:require('./react-assets').save(id,parseImages(b.images)),assets:require('./react-assets').list(id)}),true}
   if(action==='/assets'&&method==='DELETE'){const b=await readJson(req,2000);require('./react-assets').remove(id,b.name);return send(res,200,{assets:require('./react-assets').list(id)}),true}

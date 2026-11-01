@@ -579,7 +579,7 @@ async function selfCheck(id,meta,files,checkRuntime,designShots=null){
    // Eyes for the agent: on a designed site, the page is also measured for the "made by AI"
    // giveaways (design-tells.js, the same list the craft check uses), so the agent fixes the look
    // while it works instead of after.
-   if(!r.errors.length&&designShots){const look=await designProblems(meta,previewUrl(meta,n),designShots).catch(()=>'');if(look)return'The app builds and opens, but the page looks generated. Measured on the real page (desktop and phone):\n'+look+'\nFix these, then call kairoq_check again.'}
+   if(!r.errors.length&&designShots){const look=await designProblems(meta,previewUrl(meta,n),designShots,files).catch(()=>'');if(look)return'The app builds and opens, but the page looks generated. Measured on the real page (desktop and phone):\n'+look+'\nFix these, then call kairoq_check again.'}
    return r.errors.length?'The app built, but opening it in a browser showed these problems:\n- '+r.errors.join('\n- '):'All checks passed: the app builds and opens on desktop and phone'+(r.verified&&r.verified.saves?', and a record added like a customer was saved':'')+'.';
   }finally{clearTesting(id,n)}
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
@@ -633,14 +633,16 @@ function browseReport(goal,viewport,r,pageErrors=[]){
 }
 // The design giveaways measured on a test build (craft-check.js), as a numbered list; '' when the
 // page is clean or is not a designed site.
-async function designProblems(meta,url,designShots){
+async function designProblems(meta,url,designShots,files=null){
  const d=loadMeta(meta.id).design;
  if(!d||!d.signature||process.env.KAIROQ_CRAFT_CHECK==='off')return'';
  const pictures=await designShots(url);
  if(!pictures||!pictures.length)return'';
  const facts=[...(loadMeta(meta.id).messages||[]).filter(m=>m.role==='user').map(m=>m.text),meta.knowledge||''].join('\n');
  const craft=require('./craft-check'),list=craft.found(pictures,facts,d.norms||require('./craft-norms').typeOf(meta.name)).filter(i=>i.severity==='major');
- return list.slice(0,8).map((i,n)=>(n+1)+'. '+i.issue+'. Fix: '+i.fix).join('\n');
+ if(!files)try{files=loadFiles(meta.id,loadMeta(meta.id).current_version)}catch{files={}}
+ const detected=await require('./impeccable').check({files,url}).catch(()=>[]);
+ return list.concat(detected).slice(0,10).map((i,n)=>(n+1)+'. '+i.issue+'. Fix: '+i.fix).join('\n');
 }
 // Errors that mean the app does not show at all.
 // High-severity findings in the new code that the old code did not have.
