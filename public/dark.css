@@ -264,7 +264,7 @@ body.app dialog .link-btn,body.app dialog .icon-btn{border:0;background:transpar
 body.app dialog h2,body.app dialog h3,body.app dialog label,body.app dialog summary{color:#ECEEF1}
 body.app dialog .small,body.app dialog .muted,body.app dialog p.small{color:#9AA0AA}
 body.app dialog ul,body.app dialog .list,body.app dialog .notice{color:#C4C8CF}
-body.app .messages .assistant .ghost,body.app .messages .assistant button:not(.primary):not(.link-btn),body.app .messages .assistant .small-btn{background:#1C1F24!important;border:1px solid rgba(255,255,255,.12)!important;color:#ECEEF1!important;border-radius:999px!important}
+body.app .messages .assistant .ghost,body.app .messages .assistant .retry,body.app .messages .assistant .small-btn{background:#1C1F24!important;border:1px solid rgba(255,255,255,.12)!important;color:#ECEEF1!important;border-radius:999px!important}
 body.app .messages .assistant .primary{background:#35E0CF!important;color:#0E0F11!important}
 body.app .messages .assistant .link-btn{color:#35E0CF}
 body.app #home .home{overflow-x:hidden}
@@ -276,3 +276,47 @@ body.app #home #examples .example,body.app #home #examples button{white-space:no
   body.app #home .prompt-note{display:none}
 }
 @media (prefers-reduced-motion:reduce){body.app .seg-thumb{transition:none}}
+
+/* ---------- the agent's replies: header, work line, the questions card ---------- */
+body.app .agent-head{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#ECEEF1;margin:0 0 10px}
+body.app .agent-head::before{content:"";width:17px;height:17px;border-radius:5px;background:#35E0CF;flex:0 0 17px;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='7' width='18' height='13' rx='2'/><path d='M8 7V5a4 4 0 0 1 8 0v2M8 13h.01M16 13h.01M10 17h4'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='7' width='18' height='13' rx='2'/><path d='M8 7V5a4 4 0 0 1 8 0v2M8 13h.01M16 13h.01M10 17h4'/></svg>") center/contain no-repeat}
+body.app .agent-head .agent-name{font-weight:500}
+body.app .agent-head .agent-work{color:#666C77}
+body.app .work-line{display:flex;align-items:center;gap:8px;font-size:13px;color:#9AA0AA;padding:10px 0 2px;margin:8px 0 10px;border-top:1px solid rgba(255,255,255,.08)}
+body.app .work-line::before{content:"";width:14px;height:14px;border-radius:999px;border:1.6px solid #9AA0AA;flex:0 0 14px;box-sizing:border-box}
+body.app .ask-intro{font-size:14.5px;line-height:1.6;color:#D9DCE1;margin:0}
+body.app.in-editor #editor .messages li.ask-card{background:transparent!important;border:0!important;padding:0!important;max-width:none!important;box-shadow:none!important}
+body.app.in-editor #editor .messages li.ask-card::before{display:none!important}
+body.app .ask-card .ask-head{color:#9AA0AA;font-size:13.5px}
+body.app .qs{border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:6px 18px;display:flex;flex-direction:column;background:#15171B}
+body.app .q{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:3px}
+body.app .q:last-child{border-bottom:0}
+body.app .q-label{border:0;background:transparent;padding:0;text-align:left;font:400 13px/1.4 Geist,ui-sans-serif,sans-serif;color:#8A919E;cursor:pointer}
+body.app .q-answer{font-size:15px;line-height:1.45;color:#ECEEF1;cursor:pointer;border-radius:6px}
+body.app .q-answer:hover{color:#35E0CF}
+body.app .q-answer.q-empty{color:#35E0CF}
+body.app .q[data-open=true] .q-answer{color:#35E0CF}
+body.app .q .ask-opts{margin-top:10px;display:grid;gap:6px}
+body.app .q .ask-opts.hidden{display:none}
+body.app .ask-card .ask-opt{display:flex;align-items:flex-start;gap:10px;min-height:40px;padding:9px 12px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:#0E0F11;color:#ECEEF1;cursor:pointer}
+body.app .ask-card .ask-opt:hover{border-color:rgba(255,255,255,.22)}
+body.app .ask-card .ask-opt.on{border-color:#35E0CF;box-shadow:0 0 0 2px rgba(53,224,207,.2)}
+body.app .ask-card .ask-opt input{accent-color:#35E0CF;margin-top:3px}
+body.app .ask-card .ask-words{display:flex;flex-direction:column;gap:2px}
+body.app .ask-card .ask-label{font-size:13.5px;font-weight:500}
+body.app .ask-card .ask-detail{font-size:12.5px;color:#9AA0AA;line-height:1.4}
+body.app .ask-card .ask-other{height:36px;padding:0 12px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:#0E0F11;color:#ECEEF1;font:400 13.5px/1 Geist,ui-sans-serif,sans-serif}
+body.app .ask-card .ask-foot{display:flex;align-items:center;gap:8px;margin-top:14px}
+body.app .ask-card .ask-gap{flex:1}
+body.app .ask-card .ask-link{border:0;background:transparent;color:#9AA0AA;font:500 13px/1 Geist,ui-sans-serif,sans-serif;padding:8px 10px;border-radius:999px;cursor:pointer}
+body.app .ask-card .ask-link:hover{color:#ECEEF1;background:rgba(255,255,255,.06)}
+body.app .ask-card .ask-next,body.app .ask-card .plan-approve{height:34px;padding:0 14px;border:0;border-radius:999px;background:#35E0CF;color:#0E0F11;font:500 13px/1 Geist,ui-sans-serif,sans-serif;cursor:pointer}
+body.app .ask-card .ask-next:hover{background:#5BEADB}
+body.app .ask-card .ask-ghost{height:34px;padding:0 14px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:#1C1F24;color:#ECEEF1;font:500 13px/1 Geist,ui-sans-serif,sans-serif}
+body.app .plan-card .plan-kicker{color:#666C77;font:400 11px/1 "Geist Mono",ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em}
+body.app .plan-card .plan-title{font-size:16px;font-weight:600;color:#ECEEF1;margin:4px 0 6px}
+body.app .plan-card .plan-summary,body.app .plan-card .plan-sub{color:#C4C8CF;font-size:14px;line-height:1.55}
+body.app .plan-card .plan-research{color:#3DDC84;font:400 12.5px/1.5 "Geist Mono",ui-monospace,monospace}
+body.app .plan-card .plan-more{color:#C4C8CF;font-size:13.5px}
+body.app .plan-card .plan-part{color:#9AA0AA;font-size:12.5px;font-weight:500;margin:10px 0 4px}
+body.app .plan-card .plan-review{border:0;background:transparent;color:#35E0CF;font:500 13px/1 Geist,ui-sans-serif,sans-serif;cursor:pointer;padding:8px 0}
