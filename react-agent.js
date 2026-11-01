@@ -573,6 +573,21 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  if(unchanged())return noChange(steps.at(-1)?.thought||'Stopped without changes.');
  if(dirty||!built)await buildAndTest({});
  if(!built)throw Object.assign(Error('The agent stopped after '+steps.length+' steps and the project does not build.'),{status:422});
+ // Out of rounds with a build that works: Kairoq runs the checks the agent did not get to (the
+ // review and the visual gate), so the verdict rests on evidence, not on "was not evaluated".
+ if(!dirty){
+  signal?.throwIfAborted();
+  try{
+   const engReview=require('./engineering-review');
+   if(engReview.required(base,work,text)&&!lastReview){report({status:'reviewing'});lastReview=await engReview.run({callModel,base,current:work,request:text,ownerRequirements,knowledge:require('./project-knowledge').note(id),tier,signal});
+    tl.add({t:'test',ok:lastReview.ok,text:lastReview.ok?'Standards + Spec review passed':'Engineering review found blocking issues',detail:lastReview.blocking.map(x=>x.file+': '+x.message)})}
+  }catch(e){if(e.name==='AbortError'||signal?.aborted)throw e}
+  try{
+   const visualGate=require('./visual-quality-gate');
+   if(visualGate.required({base,current:work,request:text})&&(!lastVisualQuality||lastVisualQuality.version!==built.n)){report({status:'reviewing'});lastVisualQuality=await visualGate.evaluate({url:built.url,request:text,meta:builder.loadMeta(id),designShots,reviewLook,signal});lastVisualQuality.version=built.n;
+    tl.add({t:'test',ok:lastVisualQuality.passed,text:lastVisualQuality.passed?'Visual quality passed':'Visual quality needs repair',detail:lastVisualQuality.passed?[]:[visualGate.failureText(lastVisualQuality)]})}
+  }catch(e){if(e.name==='AbortError'||signal?.aborted)throw e}
+ }
  if(dirty)return save('Stopped after '+steps.length+' steps. The last changes did not build, so the last working build was saved. '+(steps.at(-1)?.thought||''),{stopped:true});
  return save('Stopped after '+steps.length+' steps. '+(steps.at(-1)?.thought||''),{stopped:true});
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}

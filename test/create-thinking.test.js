@@ -77,6 +77,26 @@ test('Agent mode records reads, edits, builds and its thoughts',async()=>{
  assert.equal(builder.loadMeta(meta.id).messages.at(-1).timeline.length,tl.length);
 });
 
+test('out of rounds with a working build: Kairoq runs the review itself and the verdict says so',async()=>{
+ const agent=require('../react-agent');
+ const meta=builder.create({name:'Out of rounds'});await builder.initialize(meta);
+ const files=builder.loadFiles(meta.id,1);
+ const app=files['src/App.jsx'].replace(/<\/main>|<\/div>\s*\);\s*}\s*$/,m=>'<h1>Members</h1>'+m);
+ // Two files change (the review is required); the model keeps reading and never calls finish.
+ const steps=[{thought:'Write the page.',actions:[{tool:'write_files',files:{'src/App.jsx':app,'src/Members.jsx':'export default function Members(){return <p>Two members</p>}\n'}},{tool:'build_and_test'}]},{thought:'One more look.',actions:[{tool:'read_files',paths:['src/App.jsx']}]}];
+ const reviews=[];
+ const callModel=async(opts,parse)=>{
+  const sys=String(opts.messages[0].content||'');
+  if(/independent senior code reviewer|independent product\/spec reviewer/.test(sys)){reviews.push(sys.slice(0,40));return parse(JSON.stringify({verdict:'pass',findings:[]}))}
+  return parse(JSON.stringify(steps.shift()||{thought:'Still looking.',actions:[{tool:'read_files',paths:['src/App.jsx']}]}));
+ };
+ const r=await agent.run(meta.id,'Add a members page with a list',{callModel,maxSteps:2});
+ assert.match(r.message,/Stopped after \d+ steps/);
+ assert.equal(reviews.length,2,'both reviewers ran after the rounds were used up');
+ assert.ok(r.timeline.some(e=>e.t==='test'&&e.text==='Standards + Spec review passed'),JSON.stringify(r.timeline.map(e=>e.text||e.t)));
+ assert.equal(r.verification.evidence.engineering_review,'passed');
+});
+
 test('the Changes API returns each changed file before and after',async()=>{
  const http=require('http'),createApi=require('../create-api');
  const server=http.createServer(async(req,res)=>{if(await createApi.handle(req,res,{isOwner:()=>false,callModel:async()=>{throw Error('no model')},secure:false}))return;res.writeHead(404);res.end()});
