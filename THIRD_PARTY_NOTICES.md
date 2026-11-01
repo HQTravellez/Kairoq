@@ -260,3 +260,18 @@ frontmatter tool declarations, runs Kairoq's prompt-injection scan, caps prompt 
 installation, shell, network, plugin, hook, and package-manager examples as reference text rather
 than authorization. Kairoq does not copy the upstream demo branding or visual identity; the guidance
 is applied to the user's own brief and brand.
+
+
+## GreenSock GSAP agent skills
+
+Kairoq can load task-matched animation guidance from GreenSock's official
+`greensock/gsap-skills` repository (MIT License), pinned to revision
+`aed9cfd3277740755f6bfc1155c7aa645403b760`.
+
+`gsap-skill-packs.js` exposes focused skills for GSAP core, React integration,
+ScrollTrigger, timelines, performance, plugins, frameworks, and utilities. The skills are
+loaded only when the user's request calls for animation/motion work, are stripped of
+frontmatter tool declarations, passed through Kairoq's prompt-injection scanner, and
+treated strictly as implementation guidance. They do not grant shell, network, or tool
+permissions. Kairoq already includes GSAP as a runtime dependency, so no package install
+is performed by this integration.
