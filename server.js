@@ -7168,7 +7168,10 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       let lastData=null;
       const ask=async(msgs,onTok)=>{
         if(viaAnthropic){
-          const r=await anthropic.ask(model,msgs,{maxTokens:maxOutput,onToken:stream?(onTok||(()=>{})):undefined,signal:require("./builder-response-policy").requestSignal(opts,{premium,stream})});
+          // Claude straight from Anthropic always streams: a whole-app reply takes longer than the
+          // 110 s a single non-streamed request gets, and every Sonnet build was cut off there and
+          // fell through to the free models. A streamed reply gets the long budget instead.
+          const r=await anthropic.ask(model,msgs,{maxTokens:maxOutput,onToken:onTok||(()=>{}),signal:require("./builder-response-policy").requestSignal(opts,{premium:true,stream:true})});
           await recordUsage({...r.usage,cost:(r.usage.prompt_tokens*rates[0]+r.usage.completion_tokens*rates[1])/1000000},{purpose:checkTier?"site-check":"developer-build",model,provider:"anthropic",tier:opts.tier||"standard",...(designModel?{design:true}:{})});
           lastData={choices:[{message:{content:r.content},finish_reason:r.finish}],usage:r.usage};
           return{content:r.content,finish:r.finish};

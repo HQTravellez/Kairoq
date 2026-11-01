@@ -35,6 +35,8 @@ async function claudeCall(env){
  for(const k of Object.keys(env))if(env[k]===undefined)delete process.env[k];
  global.fetch=async(url,o)=>{calls.push({url:String(url),body:JSON.parse(o&&o.body||'{}')});
   const anthropic=String(url).includes('api.anthropic.com');
+  // Direct Claude calls stream (a whole-app reply outlasts a single request's time limit).
+  if(anthropic&&JSON.parse(o.body).stream){const sse=['event: message_start','data: {"type":"message_start","message":{"usage":{"input_tokens":10,"output_tokens":0}}}','','data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"{\\"ok\\":true}"}}','','data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}','',''].join('\n');return new Response(sse,{status:200,headers:{'Content-Type':'text/event-stream'}})}
   return new Response(JSON.stringify(anthropic?{content:[{type:'text',text:'{"ok":true}'}],stop_reason:'end_turn',usage:{input_tokens:10,output_tokens:3}}:{choices:[{message:{content:'{"ok":true}'}}],usage:{cost:0}}),{status:200,headers:{'Content-Type':'application/json'}})};
  let fellBack=null;
  try{await callBuilderModel({model:'anthropic/claude-opus-5.5',onFallback:e=>{fellBack=e},messages:[{role:'system',content:'Rules'},{role:'user',content:'x'}]},c=>JSON.parse(c))}finally{global.fetch=original;process.env=saved}
@@ -46,6 +48,7 @@ test('a chosen Claude model goes straight to Anthropic when its key is set',asyn
   assert.equal(fellBack,null);
   assert.equal(calls.length,1);assert.match(calls[0].url,/api\.anthropic\.com\/v1\/messages/);
   assert.equal(calls[0].body.model,'claude-opus-5-5');assert.equal(calls[0].body.system[0].text,'Rules');
+  assert.equal(calls[0].body.stream,true,'direct Claude calls always stream');
  }
  // Without the Anthropic key the same choice goes through OpenRouter, as before.
  const {calls}=await claudeCall({ANTHROPIC_API_KEY:undefined,OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:undefined});
