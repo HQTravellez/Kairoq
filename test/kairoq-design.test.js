@@ -45,7 +45,8 @@ test("the approved palette and the builder page restyle are loaded", () => {
   assert.match(css, /--k-wine:#8a2d3b/);
   assert.match(css, /\.kh-composer-slot::before/);
   assert.match(css, /\.main \.messages\{max-width:none!important/, "full width like Hermes");
-  assert.match(read("public/create.html"), /create-kairoq\.css/);
+  assert.match(read("public/create.html"), /dark\.css/, "the builder loads the dark workspace theme");
+  assert.doesNotMatch(read("public/create.html"), /create-kairoq\.css|studio\.css|fresh\.css|redesign-builder\.css/, "the old stacked looks are gone");
 });
 
 test("the builder's check report doesn't mention another project's features", () => {

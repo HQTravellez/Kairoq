@@ -18,6 +18,8 @@ function show(screen){
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
  const app=screen==='home'||screen==='editor'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
+ // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
+ document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
  $('side').classList.toggle('hidden',!app);
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.toggle('side-open',window.innerWidth>=1600)}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
@@ -93,7 +95,7 @@ async function loadHome(){
  renderSetup(state.me.setup);
  // The first build's price, before typing (the questions before it are free).
  const firstNote=document.querySelector('#new-form .prompt-note'),std=(state.me.tiers||[]).find(t=>t.id==='standard'&&t.enabled);
- if(firstNote)firstNote.textContent='Every change is tested in a real browser before you pay for it.'+(acct&&std?' First build: '+std.credits+' credit'+(std.credits===1?'':'s')+'; the questions before it are free.':'');
+ if(firstNote)firstNote.textContent='Tested in a real browser'+(acct&&std?' · first build '+std.credits+' credit'+(std.credits===1?'':'s')+', the questions are free':'');
  renderTemplates($('home-templates'),id=>startFromTemplate(id),id=>startFromSponsored(id));
  homeTab(state.homeTab||'projects');
  const {projects}=await api('/projects');
