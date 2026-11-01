@@ -93,9 +93,13 @@ function briefFor(lookId){
  return out;
 }
 // The themes whose keywords match a request, best first (for the three looks shown first).
+// Words that describe the kind of thing, not the business ("a mobile app for a running club"),
+// count a little, so a pharmacy theme tagged "app, mobile" does not beat the sport theme.
+const GENERIC=new Set(['app','apps','mobile','web','website','site','page','pages','online','platform','tool','system','software','digital','service','business','small','small business','new','simple','modern','clean','nice','good','best','custom','date','schedule','tracking','booking','bookings']);
 function match(request,n=3){
  const words=new Set(String(request||'').toLowerCase().match(/[a-z][a-z0-9-]+/g)||[]);
- return themes().map(t=>({t,score:t.keywords.filter(k=>k.split(/\s+/).every(w=>words.has(w))).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,n).map(x=>'hallmark-'+x.t.slug);
+ const score=t=>t.keywords.reduce((n,k)=>{const parts=k.split(/\s+/);if(!parts.every(w=>words.has(w)))return n;return n+(GENERIC.has(k)?0.2:parts.length>1?1.5:1)},0);
+ return themes().map(t=>({t,score:score(t)})).filter(x=>x.score>=1).sort((a,b)=>b.score-a.score).slice(0,n).map(x=>'hallmark-'+x.t.slug);
 }
 
 // ---------- photos ----------

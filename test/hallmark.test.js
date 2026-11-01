@@ -46,6 +46,11 @@ test('themes are matched to a request by their keywords',()=>{
  const m=hallmark.match('A field guide and reference handbook with tables of data');
  assert.ok(m.includes('hallmark-almanac'),m.join());
  assert.deepEqual(hallmark.match('zzz nothing here'),[]);
+ // Kind-of-thing words count little: "a mobile app for a running club" is Sport, not the
+ // pharmacy theme tagged "app, mobile"; "a mobile app" alone suggests nothing.
+ assert.equal(hallmark.match('Build a mobile app: A phone app for a running club: members see this week\'s group runs')[0],'hallmark-sport');
+ assert.deepEqual(hallmark.match('A mobile app'),[]);
+ assert.deepEqual(hallmark.match('A medication reminder app for my mum'),['hallmark-dose']);
 });
 
 test('the builder rules carry the Hallmark floor',()=>{
