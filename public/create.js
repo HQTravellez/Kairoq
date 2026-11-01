@@ -296,10 +296,86 @@ function morph(card,fill,dir=1){
  },150);
 }
 // Start immediately. The build agent can ask for genuinely blocking information in chat.
+// The agent's header above a reply, like Emergent's: "Kairoq Agent · Worked for 41s".
+function agentHead(label){
+ const h=el('div','agent-head');
+ h.append(el('span','agent-name','Kairoq Agent'),el('span','agent-work',label||''));
+ return h;
+}
+// A short line under a reply: what the agent did to get there ("Thought it through, used 3 tools").
+function workLine(text){return el('p','work-line',text)}
 async function askThenBuild(prompt){
- const {project}=await api('/projects',{method:'POST',body:{name:shortName(prompt)}});
+ const name=shortName(prompt);
+ const {project}=await api('/projects',{method:'POST',body:{name}});
  await openProject(project.id);
- await send(prompt,'build');
+ const list=$('messages');list.replaceChildren();
+ let mine=messageItem({role:'user',text:prompt});list.append(mine);
+ const card=document.createElement('li');card.className='assistant ask-card';
+ card.classList.add('enter');card.dataset.dir='0';
+ const started=Date.now(),worked=()=>'Worked for '+Math.max(1,Math.round((Date.now()-started)/1000))+'s';
+ card.append(agentHead('Reading your request…'),el('p','ask-head k-shimmer','Thinking it through…'));list.append(card);
+ const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt,tier:state.tier}}).catch(()=>({questions:[]}));
+ // The answers go with the request; the picked look becomes the project's colours and fonts; then
+ // the plan (build-plan.js) is shown with Review, Skip and Approve, and the build starts on Approve.
+ const request=answers=>answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
+ const go=(answers,plan)=>{mine.remove();card.remove();planWaiting(false);send(plan?withPlan(request(answers),plan):request(answers),'build')};
+ const build=async(answers,look)=>{
+  if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
+  if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
+  morph(card,()=>card.append(agentHead(worked()),el('p','ask-head k-shimmer','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
+  planWaiting(true);
+  const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
+  if(!plan)return go(answers,null);
+  // A character the owner picked in the plan is added to the project's 3D files first.
+  const approve=async()=>{
+   if(plan.pick){try{const d=await api('/projects/'+project.id+'/models?op=polypizza',{method:'POST',body:{id:plan.pick.id}});plan.picked=d.added.title}catch(err){card.querySelector('.char-pick')?.append(el('p','char-note char-err',err.message));return false}}
+   go(answers,plan);
+  };
+  showBuildPlan(card,plan,{onApprove:approve,onSkip:()=>go(answers,null),projectId:project.id,head:agentHead(worked())});
+  list.scrollTop=list.scrollHeight;
+ };
+ // Every question in one card, the recommended answer already filled in (like Emergent): the owner
+ // reads them, changes any, and confirms once. A question's answers open when its row is clicked.
+ const picked=questions.map(q=>new Set(Number.isInteger(q.recommended)?[q.options[q.recommended]]:[])),other=questions.map(()=>'');
+ const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
+ const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:'One more thing',onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>draw(-1):null});
+ const next=()=>{if(window.KairoqLook){morph(card,()=>card.append(agentHead(worked()),el('p','ask-head k-shimmer','Finding looks that fit…')),1);setTimeout(lookStep,STILL?0:170)}else build(answers())};
+ if(!questions.length)return next();
+ const draw=(dir=1)=>morph(card,()=>{
+  card.append(agentHead(worked()));
+  card.append(el('p','ask-intro','A few quick choices before I plan the build. I\'ve filled in what I\'d suggest; change anything, then confirm.'));
+  card.append(workLine('Thought it through · '+questions.length+' question'+(questions.length===1?'':'s')+' · the answers are free'));
+  const box=el('div','qs');
+  questions.forEach((q,at)=>{
+   const row=el('div','q');row.dataset.open='false';
+   const lab=el('button','q-label',q.q);lab.type='button';lab.setAttribute('aria-expanded','false');
+   const shown=()=>{const a=[...picked[at],...(other[at].trim()?[other[at].trim()]:[])];return a.length?a.join(', '):'Choose…'};
+   const val=el('div','q-answer',shown());
+   const opts=el('div','ask-opts hidden');
+   const mark=()=>{for(const r of opts.querySelectorAll('.ask-opt'))r.classList.toggle('on',r.querySelector('input').checked);val.textContent=shown();val.classList.toggle('q-empty',!picked[at].size&&!other[at].trim())};
+   (q.options||[]).forEach((o,i)=>{
+    const r=el('label','ask-opt');const input=document.createElement('input');
+    input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
+    input.onchange=()=>{if(!q.multi){picked[at].clear();other[at]='';own.value=''}input.checked?picked[at].add(o):picked[at].delete(o);mark();if(!q.multi)toggle(false)};
+    const words=el('span','ask-words');words.append(el('span','ask-label',o+(i===q.recommended?' (Recommended)':'')));
+    if(q.details&&q.details[i])words.append(el('span','ask-detail',q.details[i]));
+    r.append(input,words);opts.append(r);
+   });
+   const own=document.createElement('input');own.className='ask-other';own.placeholder='Other…';own.value=other[at];own.setAttribute('aria-label','Another answer');
+   own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false}mark()};
+   opts.append(own);
+   const toggle=open=>{const o=open??opts.classList.contains('hidden');opts.classList.toggle('hidden',!o);row.dataset.open=String(o);lab.setAttribute('aria-expanded',String(o))};
+   lab.onclick=()=>toggle();val.onclick=()=>toggle();
+   mark();row.append(lab,val,opts);box.append(row);
+  });
+  const foot=el('div','ask-foot');
+  const skip=el('button','ask-link','Not now');skip.type='button';skip.onclick=()=>{for(const s of picked)s.clear();for(let i=0;i<other.length;i++)other[i]='';next()};
+  const ok=el('button','ask-next','Looks right, continue');ok.type='button';ok.onclick=next;
+  foot.append(el('span','ask-gap'),skip,ok);
+  card.append(box,foot);
+  list.scrollTop=list.scrollHeight;
+ },dir);
+ draw(0);
 }
 // A first request with the owner's answers and the approved plan, shown like superapp: the request,
 // each question small with its answer under it, then the plan's title.
@@ -318,8 +394,8 @@ function requestCard(t){
 }
 // The plan before the first build: a title, a short summary, Review (the screens, features, what
 // waits, what was looked up), Skip and Approve.
-function showBuildPlan(card,plan,{onApprove,onSkip,projectId}){
- morph(card,()=>fillPlan(card,plan,{onApprove,onSkip,projectId}),0);
+function showBuildPlan(card,plan,{onApprove,onSkip,projectId,head}){
+ morph(card,()=>{fillPlan(card,plan,{onApprove,onSkip,projectId});if(head)card.prepend(head)},0);
 }
 // The character in the plan (build-plan.js characterChoices): real ready-made 3D models to pick
 // from, each with its picture, creator, licence and one honest note. Nothing is built until one

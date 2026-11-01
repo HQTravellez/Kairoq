@@ -64,11 +64,15 @@ test('in the editor: questions, the plan, Approve, and the build gets the answer
   await page.click('#new-kind [data-kind="site"]');
   await page.fill('#new-prompt','An iPhone app like Quiver: kids color a page and a 3D animal comes alive');
   await page.click('#new-submit');
-  await page.waitForSelector('.ask-opt',{timeout:20000});
-  assert.match(await page.locator('.ask-opt').first().innerText(),/Coloring comes alive \(Recommended\)\s+Scan a coloring page/);
-  await page.locator('.ask-opt').first().click();await page.click('.ask-next');
-  await page.waitForSelector('text=Who is the first version');
-  await page.fill('.ask-other','Kids and parents together');
+  // Every question in one card, the recommended answer filled in; a row opens its options.
+  await page.waitForSelector('.ask-card .q',{timeout:20000});
+  assert.match(await page.locator('.ask-card .agent-name').innerText(),/Kairoq Agent/);
+  assert.equal(await page.locator('.q').count(),2);
+  assert.equal(await page.locator('.q-answer').first().innerText(),'Coloring comes alive','the recommended answer is pre-filled');
+  await page.locator('.q-answer').nth(1).click();
+  assert.match(await page.locator('.q').nth(1).locator('.ask-opt').first().innerText(),/Kids: watch and play \(Recommended\)\s+A child scans a page/);
+  await page.locator('.q').nth(1).locator('.ask-other').fill('Kids and parents together');
+  assert.equal(await page.locator('.q-answer').nth(1).innerText(),'Kids and parents together');
   await page.click('.ask-next');
   await page.locator('.ask-card button:has-text("Skip")').first().click();
   await page.waitForSelector('.plan-card .plan-title',{timeout:20000});
