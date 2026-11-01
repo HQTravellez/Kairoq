@@ -128,3 +128,9 @@ body.app.in-editor #chat-form .model-off{border-top:1px solid var(--c-line);padd
 /* Mode menu. */
 body.app.in-editor #menu-mode>.menu-panel{width:280px}
 body.app.in-editor #menu-mode .menu-panel>button{padding-right:32px!important}
+
+/* Next-step chips inside the message box, above the text. */
+body.app.in-editor #chat-form .composer-ideas{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 10px;margin:0 0 4px;border-bottom:1px solid var(--c-line)}
+body.app.in-editor #chat-form .composer-ideas.hidden{display:none}
+body.app.in-editor #chat-form .idea-chip{height:28px;padding:0 11px;border-radius:999px;border:1px solid #C9DAF5;background:#F1F6FE;color:#1A4FA8;font-size:12.5px;font-weight:500;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app.in-editor #chat-form .idea-chip:hover{background:#E3EDFC}

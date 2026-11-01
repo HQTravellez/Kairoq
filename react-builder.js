@@ -543,7 +543,15 @@ function historyMessages(meta){
  return anchor?[anchor,...tail]:tail;
 }
 function conversationNote(meta){return '\nPROJECT CONVERSATION (owner requests and prior replies, not implementation evidence):\n'+JSON.stringify(historyMessages(meta))+'\nContinue the latest agreed direction. A greeting does not cancel it. Resolve "it", "that" and "the plan" from this conversation; never silently restart the project. The current owner request wins when it changes an earlier decision.';}
-function addMessages(id,entries){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));saveMeta(fresh);return fresh}
+function addMessages(id,entries,{startedAt}={}){const fresh=loadMeta(id);fresh.messages.push(...entries.map(e=>({...e,at:new Date().toISOString()})));placeTurn(fresh.messages,startedAt);saveMeta(fresh);return fresh}
+// A build's request is saved when the build ends, after anything said in the chat meanwhile. Put the
+// request back where it was sent (by its start time) so the conversation reads in order on reload.
+function placeTurn(messages,startedAt){
+ if(!startedAt||messages.length<2)return messages;
+ const u=messages[messages.length-2];if(!u||u.role!=='user')return messages;
+ const i=messages.slice(0,-2).findIndex(m=>m.at&&m.at>startedAt);if(i<0)return messages;
+ messages.splice(messages.length-2,1);u.at=startedAt;messages.splice(i,0,u);return messages;
+}
 
 // mode "build" edits code; checkRuntime(url) opens the build and returns runtime errors.
 // The checks the AI sent with a change: each is run on the new version (test copy of the data)
@@ -673,6 +681,7 @@ async function runtimeProblems(id,url,checkRuntime){
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
 async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null,designShots=null,browse=null,onBrowser=null}={}){
+ const startedAt=new Date().toISOString();
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -761,7 +770,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
    const Q=require('./builder-question'),now=new Date().toISOString(),text=Q.display(reply.message==='Updated the app.'?'':reply.message,reply.question);
    const fresh=loadMeta(id);
    fresh.messages.push({role:'user',text:displayText||String(instruction).trim().slice(0,12000),at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text,question:reply.question,mode:'question',at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),timeline:tl.stored(),thought_ms:thoughtMs});
-   saveMeta(fresh);
+   placeTurn(fresh.messages,startedAt);saveMeta(fresh);
    return{unchanged:true,question:reply.question,message:text,plan:firstPlan||[],version:fresh.current_version,preview_url:previewUrl(fresh),timeline:tl.stored(),duration_ms:tl.elapsed()};
   }
   if(reply.images.length){onProgress('images');imageNotes=await materializeImages(id,reply,{imageGen,cache:imageCache,design:loadMeta(id).design});tl.add({t:'note',icon:'image',text:'Generated '+reply.images.length+' image'+(reply.images.length===1?'':'s')})}
@@ -875,7 +884,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
   if(!rollback)fresh.current_version=n;
   const now=new Date().toISOString();
   fresh.messages.push({role:'user',text:displayText||text,at:now,...(images.length&&!extra.polish?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,version:rollback?working.n:n,changed:rollback?[]:changed,...(builtBy&&!rollback?{built_by:builtBy}:{}),...(rollback?{rolled_back:{tried:n,kept:working.n}}:{}),at:now,...(firstPlan&&firstPlan.length?{plan:firstPlan}:{}),...(thoughtMs!==null?{thought_ms:thoughtMs}:{}),...(thinking?{thinking:thinking.slice(0,4000)}:{}),...(attempt>1?{attempts:attempt}:{}),timeline:tl.stored(),duration_ms:tl.elapsed(),...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(generated.length?{generated}:{}),...(extra.polish?{polish:true}:{}),...(checks?{checks}:{}),...(runtimeErrors.length?{runtime_errors:runtimeErrors}:{}),...(verified&&!rollback?{verified}:{}),feature_verification:featureVerification});
-  saveMeta(fresh);
+  placeTurn(fresh.messages,startedAt);saveMeta(fresh);
   // The new version works: show it now. The checks below (new checks, feature journeys) and the
   // screenshot review run while the owner already looks at it.
   if(!rollback&&onVersion)try{onVersion({version:n,preview_url:previewUrl(fresh,n),changed})}catch{}
@@ -1156,4 +1165,4 @@ function handlePreview(req,res){
  return true;
 }
 
-module.exports={selfBrowse,browseReport,APP_PACKAGES,extraPackages,allowedImport,designProblems,usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,conversationNote,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};
+module.exports={placeTurn,selfBrowse,browseReport,APP_PACKAGES,extraPackages,allowedImport,designProblems,usesStory,copyStoryProps,lastChangedVersions,absoluteAssets,servedPrefix,splitIdeas,sendText,encodingFor,checkProject,undeclaredCollections,ensureBuilt,polish,prepareDesign,materializeImages,imageRequests,contentPolicy,initializeFrom,applyMigrations,addMessages,markTesting,clearTesting,testingVersion,contextFiles,knowledgeNote,userContent,historyMessages,conversationNote,writeJson,runBuild,buildStats,INDEX_HTML,saveSource,create,initialize,list,detail,readFile,edit,discuss,visualEdit,inspectElement,restore,rename,remove,loadMeta,saveMeta,loadFiles,versionDir,projectDir,previewUrl,serveDist,handlePreview,validateFiles,parseEdit,template,build,ROOT,ALLOWED_PACKAGES,SYSTEM_PROMPT};

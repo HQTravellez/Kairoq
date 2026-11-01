@@ -106,6 +106,7 @@ function describe(a){
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
 async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
+ const startedAt=new Date().toISOString();
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
  let meta=builder.loadMeta(id);
@@ -440,7 +441,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   fresh.current_version=built.n;
   fresh.owner_requirements=ownerRequirements;
   fresh.messages.push({role:'user',text,mode:'agent',at:now,...(images.length?{images:images.map(i=>i.name)}:{})},{role:'assistant',text:message,mode:'agent',version:built.n,changed,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),at:now,...(brief?{design:{name:brief.name,palette:brief.palette,fonts:brief.fonts}}:{}),...(errors.length?{runtime_errors:errors}:{})});
-  builder.saveMeta(fresh);
+  builder.placeTurn(fresh.messages,startedAt);builder.saveMeta(fresh);
   executionLedger.complete(id,text,{verified:completion.verified&&!stopped,version:built.n,message});
   try{
    const run=executionLedger.read(id).runs[executionLedger.key(text)];
@@ -463,7 +464,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   message=responseContract.guard(text,message,{technical:responseContract.technicalRequest(text)});
   if(!researchOnly)message='No changes were made. '+message;
   const storedMode=researchOnly?'discuss':'agent';
-  builder.addMessages(id,[{role:'user',text,mode:storedMode},{role:'assistant',text:message,mode:storedMode,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),...(researchOnly?{research:true}:{})}]);
+  builder.addMessages(id,[{role:'user',text,mode:storedMode},{role:'assistant',text:message,mode:storedMode,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed(),...(researchOnly?{research:true}:{})}],{startedAt});
   const fresh=builder.loadMeta(id);
   executionLedger.complete(id,text,{verified:true,version:fresh.current_version,message});
   return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],...(researchOnly?{research:true}:{}),preview_url:builder.previewUrl(fresh)};
