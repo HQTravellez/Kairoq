@@ -880,7 +880,7 @@ function modelFlags(modelOrId){
   const flags=[];
   if(m.local||String(m.id||"").startsWith("local/"))flags.push("LOCAL");
   if(m.isFree||String(m.id||"").endsWith(":free")||m.id==="openrouter/free"||m.id==="freellm/auto")flags.push("FREE");
-  else if(m.allowedPaid)flags.push("PAID");
+  else if(m.allowedPaid||(m.isFree===false&&!m.local))flags.push("PAID"); // every paid model says so, like the builder's picker
   return flags;
 }
 function compactModelLabel(m){
