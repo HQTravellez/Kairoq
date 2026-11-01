@@ -582,7 +582,7 @@ async function selfCheck(id,meta,files,checkRuntime,designShots=null){
 // then the browser agent (browser-agent.js, task mode) uses the app on a test copy of its data
 // to reach the builder's goal. The report says whether it got there, the steps, what did not
 // work, and the page's errors, so the builder fixes the app by using it, not only by reading it.
-async function selfBrowse(id,meta,files,{goal,device}={},{browse,callModel,tier='standard'}){
+async function selfBrowse(id,meta,files,{goal,device}={},{browse,callModel,tier='standard',onBrowser}){
  goal=String(goal||'').replace(/\s+/g,' ').trim().slice(0,600);
  if(!goal)return'Say what a visitor should be able to do, for example "add a task and mark it done".';
  const errors=checkProject(files);
@@ -597,7 +597,16 @@ async function selfBrowse(id,meta,files,{goal,device}={},{browse,callModel,tier=
     const s=await browse(previewUrl(meta,n),{sandbox:box.token,viewport});
     if(!s)return'There is no browser on this server.';
     try{
-     const r=await require('./browser-agent').run({session:s,goal,mode:'task',callModel,tier,maxSteps:Number(process.env.KAIROQ_BROWSE_STEPS||10),signal:AbortSignal.timeout(200000)});
+     // The owner watches in Kairoq's browser pane: a frame per step (at most one every 700 ms).
+     const log=[];let lastFrame=0;
+     const frame=async(step,force)=>{if(typeof onBrowser!=='function'||!s.screenshot)return;if(!force&&Date.now()-lastFrame<700)return;lastFrame=Date.now();
+      const shot=await s.screenshot().catch(()=>null);if(!shot)return;
+      onBrowser({url:typeof s.url==='function'?s.url():previewUrl(meta,n),title:'Testing: '+goal,screenshot:Buffer.isBuffer(shot)?shot.toString('base64'):String(shot),steps:log.slice(-8),at:new Date().toISOString()})};
+     await frame(null,true);
+     const pending=[];
+     const r=await require('./browser-agent').run({session:s,goal,mode:'task',callModel,tier,maxSteps:Number(process.env.KAIROQ_BROWSE_STEPS||10),signal:AbortSignal.timeout(200000),
+      onStep:step=>{log.push((step.path||'/')+': '+step.action+(step.label?' "'+String(step.label).slice(0,50)+'"':'')+(step.error?' (did not work)':step.no_change?' (nothing changed)':''));pending.push(frame(step))}});
+     await Promise.all(pending);await frame(null,true);
      return browseReport(goal,viewport,r,s.errors?s.errors():[]);
     }finally{await s.close()}
    });
@@ -655,7 +664,7 @@ async function runtimeProblems(id,url,checkRuntime){
 }
 // Said with every build, migration or browser error: the try stays applied and the fix goes on top.
 const KEPT='Your previous change is kept as it is; return only the files or edits that fix this (a file in "files" replaces that file whole).';
-async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null,designShots=null,browse=null}={}){
+async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThinking,onEvent,signal,tier='standard',images=[],checkRuntime,assetNote='',imageGen=null,imageNote='',displayText,extra={},design=false,inspect=null,engine,onVersion,makeModel=null,designShots=null,browse=null,onBrowser=null}={}){
  let meta=loadMeta(id);
  const text=String(instruction||'').trim().slice(0,12000);
  if(!text)throw Object.assign(Error('Describe the change you want'),{status:400});
@@ -710,7 +719,7 @@ async function edit(id,instruction,{callModel,onProgress=()=>{},onStream,onThink
  // The builder's research and fetch tools (builder-tools.js), shown in the timeline as it works.
  const builderTools=oc&&process.env.KAIROQ_BUILDER_TOOLS!=='off'?require('./builder-tools').forProject(id):null;let toolsShown=0;
  const TOOL_NOTES={kairoq_browse:['test','Tried the app in a browser'],kairoq_integration:['plug','Looked up an integration'],task:['users','Sent a helper'],kairoq_skill:['book','Opened a skill'],kairoq_tutorials:['book','Looked in the reference library'],kairoq_search:['search','Searched the web'],kairoq_read:['globe','Read a page'],kairoq_download:['download','Downloaded a file into the app'],kairoq_package:['package','Added a package']};
- let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./app-concept').note(meta)+conversationNote(meta)+require('./builder-playbooks').note(text)+require('./builder-references').note(text)+require('./builder-skills').menu(text)),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),browse:browse&&process.env.KAIROQ_BUILDER_BROWSE!=='off'?(files,a)=>selfBrowse(id,meta,files,a,{browse,callModel,tier}):null,onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
+ let ocSession=oc?oc.session({rules:oc.rules(SYSTEM_PROMPT,knowledgeNote(meta)+require('./app-concept').note(meta)+conversationNote(meta)+require('./builder-playbooks').note(text)+require('./builder-references').note(text)+require('./builder-skills').menu(text)),tools:builderTools,check:files=>selfCheck(id,meta,files,checkRuntime,designShots),browse:browse&&process.env.KAIROQ_BUILDER_BROWSE!=='off'?(files,a)=>selfBrowse(id,meta,files,a,{browse,callModel,tier,onBrowser}):null,onEvent:e=>{if(e.tool==='edit'||e.tool==='write')tl.add({t:'note',icon:'code',text:(e.tool==='write'?'Wrote ':'Edited ')+(e.file||'a file')});else if(TOOL_NOTES[e.tool])tl.add({t:'note',icon:TOOL_NOTES[e.tool][0],text:TOOL_NOTES[e.tool][1]})}}):null;
  let usedOpenCode=false,usedFallback=false,usedModel=null;
  const ocRequest=(firstBuild?(nativeApp.enabled(meta)?nativeApp.FIRST_BUILD:FIRST_BUILD)+'\n\n':'')+(assetNote?assetNote+'\n\n':'')+(imageNote?imageNote+'\n\n':'')+'Request: '+text;
  try{

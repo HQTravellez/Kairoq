@@ -320,3 +320,47 @@ body.app .plan-card .plan-research{color:#3DDC84;font:400 12.5px/1.5 "Geist Mono
 body.app .plan-card .plan-more{color:#C4C8CF;font-size:13.5px}
 body.app .plan-card .plan-part{color:#9AA0AA;font-size:12.5px;font-weight:500;margin:10px 0 4px}
 body.app .plan-card .plan-review{border:0;background:transparent;color:#35E0CF;font:500 13px/1 Geist,ui-sans-serif,sans-serif;cursor:pointer;padding:8px 0}
+
+/* ---------- Kairoq's browser as the third pane ---------- */
+body.app.in-editor #view-browser{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:999px;border:1px solid transparent;color:#9AA0AA;font:500 12.5px/1 Geist,ui-sans-serif,sans-serif}
+body.app.in-editor #view-browser .ico{width:14px;height:14px}
+body.app.in-editor #view-browser[aria-pressed=true]{color:#35E0CF;background:rgba(53,224,207,.1);border-color:rgba(53,224,207,.3)}
+body.app.in-editor .web-browser-log{list-style:none;margin:0;padding:10px 12px 12px;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px;max-height:190px;overflow:auto;font:400 12px/1.5 "Geist Mono",ui-monospace,monospace;color:#9AA0AA}
+body.app.in-editor .web-browser-log li{display:flex;gap:8px;align-items:flex-start}
+body.app.in-editor .web-browser-log li::before{content:"✓";color:#3DDC84;flex:0 0 12px}
+body.app.in-editor .web-browser-log li.now::before{content:"›";color:#35E0CF}
+body.app.in-editor .web-browser-log li.now{color:#ECEEF1}
+body.app.in-editor .web-browser-log.hidden{display:none}
+body.app.in-editor .web-browser-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+body.app.in-editor .web-browser-actions .small-btn{height:26px;padding:0 9px;font-size:12px}
+@media (max-width:900px){
+}
+body.app.in-editor #view-browser[aria-pressed=true]{color:#35E0CF!important;background:rgba(53,224,207,.1)!important;border-color:rgba(53,224,207,.3)!important}
+/* three panes: the stage bar keeps icons only, so Share and Publish stay in view */
+body.app.in-editor #editor.kq-browser-three .tabs-seg .lbl,body.app.in-editor #editor.kq-browser-three #view-browser .lbl{display:none}
+body.app.in-editor #editor.kq-browser-three .tabs-seg button{padding:0 9px!important}
+body.app.in-editor #editor.kq-browser-three #view-settings{display:none}
+body.app.in-editor #editor.kq-browser-three #visual-toggle .lbl{display:none}
+body.app.in-editor .stage-bar{flex-wrap:nowrap;overflow:hidden;min-width:0}
+body.app.in-editor .stage-bar .bar-spacer{min-width:4px}
+/* phone: one pane at a time, Chat | Preview | Browser */
+.phone-panes{display:none}
+@media (max-width:900px){
+  body.app.in-editor #editor{display:flex!important;flex-direction:column!important;height:100%;min-height:0;overflow:hidden!important}
+  body.app.in-editor .phone-panes{display:flex;gap:2px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.08);background:#0E0F11;flex:none;order:0}
+  body.app.in-editor .phone-panes button{flex:1;height:34px;border:0;border-radius:999px;background:transparent;color:#9AA0AA;font:500 13px/1 Geist,ui-sans-serif,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;position:relative}
+  body.app.in-editor .phone-panes button .ico{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  body.app.in-editor .phone-panes button[aria-selected=true]{background:#262A31;color:#ECEEF1}
+  body.app.in-editor .phone-panes .live-dot{display:none;width:7px;height:7px;border-radius:999px;background:#3DDC84;box-shadow:0 0 0 3px rgba(61,220,132,.18)}
+  body.app.in-editor .phone-panes button.live .live-dot{display:inline-block}
+  body.app.in-editor #editor>.chat,body.app.in-editor #editor>.stage,body.app.in-editor #editor>.web-browser-pane{display:none!important;order:1;flex:1 1 auto;min-height:0;max-height:none!important;width:100%;border:0!important}
+  body.app.in-editor #editor[data-pane=chat]>.chat{display:flex!important}
+  body.app.in-editor #editor[data-pane=preview]>.stage{display:flex!important;flex-direction:column}
+  body.app.in-editor #editor[data-pane=preview]>.stage .canvas{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  body.app.in-editor #editor[data-pane=preview]>.stage .device,body.app.in-editor #editor[data-pane=preview]>.stage #frame{flex:1 1 auto;min-height:0;height:auto;width:100%}
+  body.app.in-editor #editor[data-pane=preview]>.stage .device.mobile{padding:0;border-radius:0;box-shadow:none;background:transparent}
+  body.app.in-editor #editor[data-pane=preview]>.stage .device.mobile #frame{border-radius:10px!important}
+  body.app.in-editor #editor[data-pane=browser]>.web-browser-pane{display:flex!important}
+  body.app.in-editor #editor[data-pane=browser]>.web-browser-pane .web-browser-viewport{min-height:0;flex:1}
+  body.app.in-editor #kq-split-handle{display:none}
+}

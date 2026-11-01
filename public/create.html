@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="/create-look.css?v=2">
 <link rel="stylesheet" href="/builder-split-preview.css?v=4">
 <link rel="stylesheet" href="/landing-mono.css?v=1">
-<link rel="stylesheet" href="/dark.css?v=1">
+<link rel="stylesheet" href="/dark.css?v=2">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -376,7 +376,12 @@
 </section>
 
 <!-- Editor: chat + preview -->
-<section class="screen hidden" id="editor">
+<section class="screen hidden" id="editor" data-pane="chat">
+  <div class="phone-panes" id="phone-panes" role="tablist" aria-label="Editor panes">
+    <button type="button" role="tab" data-pane="chat" aria-selected="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Chat</button>
+    <button type="button" role="tab" data-pane="preview" aria-selected="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+    <button type="button" role="tab" data-pane="browser" aria-selected="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Browser<i class="live-dot" aria-hidden="true"></i></button>
+  </div>
   <aside class="chat">
     <div class="chat-head">
       <button class="ghost icon-btn" id="side-toggle" type="button" aria-label="Show or hide the sidebar" title="Sidebar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg></button>
@@ -451,6 +456,7 @@
         <button type="button" id="view-code" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg><span class="lbl">Code</span></button>
         <button type="button" id="view-data" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span class="lbl">Data</span></button>
       </div>
+      <button type="button" class="ghost view-browser" id="view-browser" aria-pressed="false" title="Kairoq's browser: where it searches, reads sites and tests your app"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span class="lbl">Browser</span></button>
       <button type="button" class="ghost" id="view-settings">Settings</button>
       <span class="bar-spacer"></span>
       <button class="ghost" id="visual-toggle" type="button" aria-pressed="false" title="Click elements in the preview to change text, styles or images without using credits" aria-label="Edit text and images in the preview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span class="lbl">Edit</span></button>
@@ -595,8 +601,8 @@
     <div class="web-browser-head">
       <div class="web-browser-heading">
         <span class="web-browser-live" aria-hidden="true"></span>
-        <strong>Browser</strong>
-        <span class="web-browser-title" id="web-browser-title">Public website</span>
+        <strong>Kairoq's browser</strong>
+        <span class="web-browser-title" id="web-browser-title"></span>
       </div>
       <div class="web-browser-actions">
         <a class="ghost small-btn hidden" id="web-browser-external" target="_blank" rel="noopener noreferrer" aria-label="Open website in a new tab">Open ↗</a>
@@ -610,11 +616,12 @@
     <div class="web-browser-viewport" id="web-browser-viewport">
       <img class="hidden" id="web-browser-shot" alt="Live view of the website Kairoq is browsing">
       <div class="web-browser-empty" id="web-browser-empty">
-        <strong>Live browser</strong>
-        <span>When Kairoq opens a public website, the same browser session it is using will appear here.</span>
+        <strong>Nothing open yet</strong>
+        <span>When Kairoq searches the web, reads a site or tests your app, you watch it here, step by step.</span>
       </div>
       <div class="web-browser-status hidden" id="web-browser-status" role="status"></div>
     </div>
+    <ol class="web-browser-log hidden" id="web-browser-log" aria-label="What Kairoq did in the browser"></ol>
   </aside>
 </section>
 </div><!-- /shell-main -->
@@ -1388,7 +1395,7 @@
 
 <script src="/voice-builder.js" defer></script>
 <script src="/create-look.js?v=6"></script>
-<script src="/builder-browser-pane.js?v=1"></script>
+<script src="/builder-browser-pane.js?v=2"></script>
 <script src="/create.js?v=20261141"></script>
 <script src="/builder-split-preview.js?v=4"></script>
 </body>
