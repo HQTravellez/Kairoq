@@ -250,3 +250,18 @@ in `licenses/scientific-agent-skills-LICENSE.txt`.
 ## Impeccable
 
 Impeccable 4.8.0 (Apache License 2.0, © Paul Bakaus, https://github.com/pbakaus/impeccable) is the design detector the app builder runs on every app it makes (`impeccable.js`): 62 deterministic rules for the "made by AI" tells and design quality problems, on the app's source and on the rendered page. It is an npm dependency of the server; its findings reach the builder as fixes to make. Generated apps do not include it.
+
+
+## GreenSock GSAP agent skills
+
+Kairoq can load task-matched animation guidance from GreenSock's official
+`greensock/gsap-skills` repository (MIT License), pinned to revision
+`aed9cfd3277740755f6bfc1155c7aa645403b760`.
+
+`gsap-skill-packs.js` exposes focused skills for GSAP core, React integration,
+ScrollTrigger, timelines, performance, plugins, frameworks, and utilities. The skills are
+loaded only when the user's request calls for animation/motion work, are stripped of
+frontmatter tool declarations, passed through Kairoq's prompt-injection scanner, and
+treated strictly as implementation guidance. They do not grant shell, network, or tool
+permissions. Kairoq already includes GSAP as a runtime dependency, so no package install
+is performed by this integration.
