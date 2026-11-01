@@ -96,6 +96,16 @@ test('email goes only to the app owner or the signed-in user, with limits',async
   assert.equal(kept.status,200,'email not set up does not fail the customer');assert.equal(kept.json.sent,false);assert.equal(kept.json.saved,true);
   assert.equal(sent.length,5,'nothing is sent without the key');
   const outbox=require('../react-backend').overview(id).outbox;assert.equal(outbox[0].subject,'Your booking');assert.equal(outbox[0].user_email,'cy@x.co');
+  // The agent's test run (sandbox): nothing is sent, but a bad request fails the same way it
+  // would for a customer (a live build once passed its test and then showed "Could not save
+  // your booking" because the app emailed a raw address).
+  const box=require('../react-sandbox').create(id),sbh={'x-kairoq-sandbox':box.token};
+  const ok=await request(server,'POST',base+'/email',{body:{to:'owner',subject:'New walk',text:'Biscuit, Friday 09:00'},headers:sbh});
+  assert.equal(ok.status,200);assert.deepEqual(ok.json,{sent:true,test:true});
+  assert.equal((await request(server,'POST',base+'/email',{body:{to:'client@example.com',subject:'x',text:'y'},headers:sbh})).status,400);
+  assert.equal((await request(server,'POST',base+'/email',{body:{to:'owner',subject:'',text:'y'},headers:sbh})).status,400);
+  assert.equal((await request(server,'POST',base+'/email',{body:{to:'me',subject:'x',text:'y'},headers:sbh})).status,401);
+  assert.equal(sent.length,5,'the sandbox sends nothing');
  }finally{global.fetch=original;delete process.env.KAIROQ_EMAIL_FROM}
 });
 

@@ -488,6 +488,17 @@ body.app .fold{display:grid;grid-template-rows:0fr;transition:grid-template-rows
 body.app .fold.open{grid-template-rows:1fr}
 body.app .fold>.rail{min-height:0;overflow:hidden;opacity:0;transition:opacity var(--k-base) var(--k-ease)}
 body.app .fold.open>.rail{opacity:1}
+/* the finished message: one plain sentence, the notes, then the checks as a short list */
+body.app.in-editor #editor .messages .verdict-head{display:flex;align-items:flex-start;gap:8px;margin:10px 0 6px;font:500 14px/1.5 Geist,ui-sans-serif,sans-serif;color:#ECEEF1}
+body.app.in-editor #editor .messages .verdict-head .vmark{flex:none;width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font:700 11px/1 Geist,ui-sans-serif,sans-serif;margin-top:2px}
+body.app.in-editor #editor .messages .verdict-head.ok .vmark{background:rgba(53,224,207,.18);color:#35E0CF}
+body.app.in-editor #editor .messages .verdict-head.draft .vmark{background:rgba(245,179,66,.18);color:#F5B342}
+body.app.in-editor #editor .messages .verdict-rows{list-style:none;margin:8px 0 2px;padding:10px 12px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.025);display:grid;gap:5px}
+body.app.in-editor #editor .messages .verdict-rows li{display:flex;align-items:flex-start;gap:8px;font:400 12.5px/1.5 Geist,ui-sans-serif,sans-serif;color:#C4C8CF}
+body.app.in-editor #editor .messages .verdict-rows .vmark{flex:none;width:14px;font-weight:700;color:#9AA0AA}
+body.app.in-editor #editor .messages .verdict-rows li.ok .vmark{color:#35E0CF}
+body.app.in-editor #editor .messages .verdict-rows li.bad .vmark{color:#F5B342}
+body.app.in-editor #editor .messages .verdict-why{margin:6px 0 0;font:400 12.5px/1.5 Geist,ui-sans-serif,sans-serif;color:#9AA0AA}
 /* home: the hero settles in; the prompt box glows when focused */
 body.app #home .home-hero h1{animation:k-rise var(--k-slow) var(--k-ease) both}
 body.app #home .home-sub{animation:k-rise var(--k-slow) var(--k-ease) .06s both}

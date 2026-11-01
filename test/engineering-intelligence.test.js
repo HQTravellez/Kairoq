@@ -84,7 +84,9 @@ test("engineering intelligence requires task graph only for substantial work",()
 test("Build exposes knowledge, task graph and two-axis review and gates substantial writes",()=>{
  const src=fs.readFileSync(path.join(__dirname,"..","react-agent.js"),"utf8");
  for(const tool of ["project_knowledge","task_graph","engineering_review"])assert.match(src,new RegExp(tool));
- assert.match(src,/substantial work needs a tracer-bullet task graph first/);
+ // Substantial work without a task graph: Kairoq writes the task list from the plan and lets the
+ // write through (a refused write cost a whole round on a slow model, in two live builds).
+ assert.match(src,/autoGraph\(\)/);assert.ok(!/substantial work needs a tracer-bullet task graph first/.test(src));
  assert.match(src,/reviewRequired/);
  assert.match(src,/build-retro/);
 });
@@ -105,4 +107,18 @@ test("Capability OS recommends engineering intelligence for architecture work",(
  const ids=rows.map(x=>x.id);
  assert.ok(ids.includes("engineering_intelligence"));
  assert.ok(ids.includes("execution_discipline"));
+});
+
+test("the task list Kairoq writes from an approved plan: one task per screen, else per feature, else one",()=>{
+ const plan="A phone app for a running club\n\nApproved plan (build exactly this first version):\nShow and join runs. Members join with a code.\nScreens: Join (enter the club code); This week (the runs, tap to join); Run (who is coming)\nFeatures: Push reminders\nLeft out for now: Payments";
+ const t=tasks.fromPlan(plan);
+ assert.deepEqual(t.map(x=>x.id+"|"+x.title+"|"+x.delivers),["S1|Screen: Join|enter the club code","S2|Screen: This week|the runs, tap to join","S3|Screen: Run|who is coming"]);
+ assert.deepEqual(tasks.fromPlan("x\n\nApproved plan (build exactly this first version):\nT. S.\nFeatures: Sign up; Book a walk").map(x=>x.title),["Sign up","Book a walk"]);
+ assert.deepEqual(tasks.fromPlan("A CRM for leads").map(x=>x.id+"|"+x.delivers),["T1|A CRM for leads"]);
+ const root=fs.mkdtempSync(path.join(require("os").tmpdir(),"kq-auto-"));
+ tasks.define("p1",{instruction:plan,tasks:t,auto:true,root});
+ assert.equal(tasks.autoDefined("p1",plan,{root}),true);
+ assert.equal(tasks.autoDefined("p1","other",{root}),false);
+ tasks.define("p1",{instruction:"other",tasks:t,root});
+ assert.equal(tasks.autoDefined("p1","other",{root}),false);
 });

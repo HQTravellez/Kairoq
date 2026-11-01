@@ -109,6 +109,17 @@ async function deliver(to,subject,text,replyTo,opts={}){
  const r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,...(replyTo?{reply_to:replyTo}:{})}),signal:AbortSignal.timeout(15000)});
  if(!r.ok){const d=await r.json().catch(()=>({}));throw fail(502,'Email could not be sent: '+(d.message||r.status))}
 }
+// The checks a real send makes, without sending: the agent's test run (the sandbox) answers
+// /email with these too, so an app that posts a raw address or forgets the subject fails in the
+// test the way it fails for a customer, instead of passing the test and breaking live.
+function checkEmail(body,{cfg,user}){
+ if(!cfg.email)throw fail(404,'Email is not enabled. Add "email": true to src/backend.json.');
+ if(body.to!=='owner'&&body.to!=='me')throw fail(400,'Send to "owner" (the app owner) or "me" (the signed-in user)');
+ if(body.to==='me'&&!(user&&user.email))throw fail(401,'Sign in to email yourself');
+ const subject=String(body.subject||'').trim().slice(0,200),text=String(body.text||'').trim().slice(0,10000);
+ if(!subject||!text)throw fail(400,'Email needs a subject and text');
+ return{subject,text};
+}
 async function sendEmail(body,{meta,db,cfg,user}){
  if(!cfg.email)throw fail(404,'Email is not enabled. Add "email": true to src/backend.json.');
  const to=body.to==='owner'?ownerEmail(meta):body.to==='me'?(user&&user.email):null;
@@ -228,4 +239,4 @@ async function runSchedules(id,cfg,db,meta,{now=Date.now(),send=deliver}={}){
  return results;
 }
 
-module.exports={deliver,allowedReturn,normalizeExtras,migrate,upload,serveFile,removeFile,sendEmail,checkout,paymentWebhook,myPurchases,runSchedules,ownerEmail,FILE_TYPES};
+module.exports={deliver,checkEmail,allowedReturn,normalizeExtras,migrate,upload,serveFile,removeFile,sendEmail,checkout,paymentWebhook,myPurchases,runSchedules,ownerEmail,FILE_TYPES};

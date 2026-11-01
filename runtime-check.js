@@ -513,7 +513,19 @@ async function inspect(url,{steps=[],screenshot=true,timeoutMs=15000,sandbox,vie
     else throw Error('Unknown action (use click, fill, select, press, expect, goto, wait)');
     await page.waitForTimeout(250);
     results.push({step:label,ok:true});
-   }catch(e){results.push({step:label,ok:false,error:String(e.message||e).split('\n')[0].slice(0,300)})}
+   }catch(e){
+    // What is on the page, so the next attempt is right first time (a slow model once spent four
+    // rounds guessing why "fill by label" missed): visible fields and buttons, in one line.
+    let hint='';
+    if(/fill|click|select|expect/.test(String(s.action||'')))hint=await page.evaluate(()=>{
+     const seen=el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);return r.width>0&&r.height>0&&st.visibility!=='hidden'&&st.display!=='none'};
+     const name=el=>{const id=el.id,lab=(id&&document.querySelector('label[for="'+CSS.escape(id)+'"]'))||el.closest('label');return(el.getAttribute('aria-label')||(lab&&lab.textContent)||el.placeholder||el.name||id||'').replace(/\s+/g,' ').trim().slice(0,40)};
+     const fields=[...document.querySelectorAll('input:not([type=hidden]),select,textarea')].filter(seen).slice(0,12).map(el=>name(el)+(el.id?' (#'+el.id+')':el.placeholder?' (placeholder "'+el.placeholder.slice(0,30)+'")':''));
+     const buttons=[...document.querySelectorAll('button,a[href],[role="button"]')].filter(seen).map(el=>(el.getAttribute('aria-label')||el.textContent||'').replace(/\s+/g,' ').trim().slice(0,30)).filter(Boolean).slice(0,14);
+     return(fields.length?' On the page now, fields: '+fields.join('; ')+'.':'')+(buttons.length?' Buttons and links: '+buttons.join(' | ')+'.':'');
+    }).catch(()=>'');
+    results.push({step:label,ok:false,error:String(e.message||e).split('\n')[0].slice(0,300)+hint.slice(0,900)});
+   }
   }
   await page.waitForLoadState('networkidle',{timeout:3000}).catch(()=>{});
   if(!page.url().startsWith(origin+root))add('The page left the app: '+page.url());
