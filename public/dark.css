@@ -364,3 +364,17 @@ body.app.in-editor .stage-bar .bar-spacer{min-width:4px}
   body.app.in-editor #editor[data-pane=browser]>.web-browser-pane .web-browser-viewport{min-height:0;flex:1}
   body.app.in-editor #kq-split-handle{display:none}
 }
+
+/* The look picker (create-look.css) on dark: its white chips, cards, buttons and dialogs. */
+body.app .lk-chip,body.app .lk-btn,body.app .lk-icon,body.app .lk-fix,body.app .lk-font,body.app .lk-card,body.app .lk-card:hover{background:#15171B;color:#ECEEF1;border-color:rgba(255,255,255,.14)}
+body.app .lk-chip:hover,body.app .lk-btn:hover,body.app .lk-card:hover{background:#1C1F24}
+body.app .lk-chip.on{background:#35E0CF;border-color:#35E0CF;color:#0E0F11}
+body.app .lk-card.on{border-color:#35E0CF}
+body.app .lk-card-meta b{color:#ECEEF1}
+body.app .lk-primary,body.app .ask-card .ask-next{color:#0E0F11!important}
+body.app .lk-dark{background:#ECEEF1;color:#0E0F11}
+body.app .lk-dialog,body.app .lk-side-foot{background:#15171B;color:#ECEEF1}
+body.app .lk-seg button.on{background:#242830;color:#ECEEF1;box-shadow:none}
+body.app .lk-swatch.on{box-shadow:0 0 0 2px #15171B,0 0 0 4px #35E0CF}
+body.app .lk-switch i{background:#ECEEF1}
+body.app .lk-preview{background:#0E0F11}

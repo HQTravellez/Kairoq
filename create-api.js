@@ -1310,7 +1310,9 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
    const looks=require('./looks'),recent=[];
    // Palettes of the owner's three newest apps go last, so new apps do not repeat them.
    for(const p of listFor(v).filter(p=>p.role==='owner').slice(0,3)){try{const id=builder.loadMeta(p.id).design?.look_id;if(id)recent.push(String(id).split('--')[0])}catch{}}
-   return send(res,200,{feels:looks.FEELS.map(([id,label])=>({id,label})),looks:looks.catalog(),brand:looks.brand(v.owner),recent}),true;
+   // Hallmark themes whose keywords fit the request come first (hallmark.js match).
+   const suggested=require('./hallmark').match(String(new URL(req.url,'http://x').searchParams.get('prompt')||'').slice(0,2000));
+   return send(res,200,{feels:looks.FEELS.map(([id,label])=>({id,label})),looks:looks.all(),brand:looks.brand(v.owner),recent,suggested}),true;
   }
   if(route==='/looks/brand'&&method==='POST'){const b=await readJson(req,8000);return send(res,200,{brand:require('./looks').saveBrand(v.owner,b.look===null?null:b.look)}),true}
   if(route==='/looks/from-site'&&method==='POST'){
