@@ -242,3 +242,21 @@ task-matched scientific skills, fetches the pinned `SKILL.md` on demand, removes
 declarations, runs Kairoq's prompt-injection scan, caps prompt size, and treats installation/shell/API
 examples as reference guidance rather than tool authorization. The upstream license text is retained
 in `licenses/scientific-agent-skills-LICENSE.txt`.
+
+
+## Hallmark and Impeccable external design skills
+
+Kairoq can load task-matched design guidance from two pinned public skill repositories:
+
+- **Hallmark** — https://github.com/Nutlope/hallmark — MIT License, pinned revision
+  `4f6a46c6dc325d40ab268c93e25c7b96676ebccd`. Kairoq uses Hallmark for new-interface,
+  anti-generic design audits, and redesign guidance.
+- **Impeccable** — https://github.com/pbakaus/impeccable — Apache License 2.0, pinned revision
+  `4f956490f0056ae1ff5ea80372cf56e83c001d3c`. Kairoq uses Impeccable for polish,
+  bolder visual direction, critique, and release-oriented design audits.
+
+`external-design-skill-packs.js` loads only the skill needed for the current request, strips
+frontmatter tool declarations, runs Kairoq's prompt-injection scan, caps prompt size, and treats
+installation, shell, network, plugin, hook, and package-manager examples as reference text rather
+than authorization. Kairoq does not copy the upstream demo branding or visual identity; the guidance
+is applied to the user's own brief and brand.
