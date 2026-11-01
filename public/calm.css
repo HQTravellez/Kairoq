@@ -1,14 +1,14 @@
-/* Calm editor: an off-white page with a faint dot grid, white cards, Kairoq's soft rainbow glow
-   (public/glow.webp, drawn for Kairoq) behind home and along the editor's top bar, and deep navy
-   for actions. One quiet top bar, a 40/60 split, a plain composer and small next-step chips.
+/* Calm editor: an off-white page with a faint dot grid, white cards, a sky with a rainbow
+   (public/sky.webp, 3840x1600, drawn for Kairoq) behind home and along the editor's top bar, and
+   deep navy for actions. One quiet top bar, a 40/60 split, a plain composer and small next-step chips.
    Loaded last, so it wins over the older layers without touching them. */
-body.app{--c-bg:#FAFBFC;--c-panel:#FFFFFF;--c-raise:#F4F6F8;--c-ink:#2A2D32;--c-ink-2:#5C6168;--c-ink-3:#737980;--c-line:#EDEFF2;--c-line-2:#D8DBE0;--c-hover:rgba(10,42,82,.05);--c-accent:#0A2A52;--c-accent-2:#123A6E;--c-glow:0 1px 1px rgba(0,0,0,.1),0 0 18px rgba(10,42,82,.32),inset 0 -1.5px 0 rgba(0,0,0,.2);--c-dots:radial-gradient(circle,rgba(0,0,0,.07) 1px,transparent 1.2px);--c-sky:url("/glow.webp")}
-/* Home: the rainbow glow behind the prompt, fading into the page. */
+body.app{--c-bg:#FAFBFC;--c-panel:#FFFFFF;--c-raise:#F4F6F8;--c-ink:#2A2D32;--c-ink-2:#5C6168;--c-ink-3:#737980;--c-line:#EDEFF2;--c-line-2:#D8DBE0;--c-hover:rgba(10,42,82,.05);--c-accent:#0A2A52;--c-accent-2:#123A6E;--c-glow:0 1px 1px rgba(0,0,0,.1),0 0 18px rgba(10,42,82,.32),inset 0 -1.5px 0 rgba(0,0,0,.2);--c-dots:radial-gradient(circle,rgba(0,0,0,.07) 1px,transparent 1.2px);--c-sky:url("/sky.webp")}
+/* Home: the sky and rainbow behind the prompt, fading into the page. */
 body.app #home,body.app.day #home{background:var(--c-bg)!important}
-body.app #home .home,body.app.day #home .home{background-color:var(--c-bg)!important;background-image:linear-gradient(180deg,rgba(250,251,252,0) 0,rgba(250,251,252,0) 430px,var(--c-bg) 640px),var(--c-sky),var(--c-dots)!important;background-size:100% 100%,100% 660px,20px 20px!important;background-repeat:no-repeat,no-repeat,repeat!important;background-position:0 0,center top,0 0!important}
+body.app #home .home,body.app.day #home .home{background-color:var(--c-bg)!important;background-image:linear-gradient(180deg,rgba(250,251,252,0) 0,rgba(250,251,252,0) 430px,var(--c-bg) 640px),var(--c-sky),var(--c-dots)!important;background-size:100% 100%,max(100%,1680px) auto,20px 20px!important;background-repeat:no-repeat,no-repeat,repeat!important;background-position:0 0,center top,0 0!important}
 body.app #home .home::after{display:none!important}
-body.app.day #home .home-hero h1,body.app #home .home-hero h1{color:var(--c-accent)!important;text-shadow:none}
-body.app.day #home .home-sub,body.app #home .home-sub{color:#3E4A5C!important;text-shadow:none}
+body.app.day #home .home-hero h1,body.app #home .home-hero h1{color:#fff!important;text-shadow:0 2px 20px rgba(10,42,82,.45)}
+body.app.day #home .home-sub,body.app #home .home-sub{color:#fff!important;text-shadow:0 1px 12px rgba(10,42,82,.5)}
 body.app #home #new-kind{background:rgba(255,255,255,.5)!important;border-color:rgba(255,255,255,.7)!important;backdrop-filter:blur(6px)}
 body.app #home #new-kind button{color:#3E4A5C!important}
 body.app #home #new-kind button[aria-pressed=true]{color:var(--c-accent)!important}
@@ -98,15 +98,15 @@ body.app #editor .share-pop .ghost{border:1px solid var(--c-line-2)!important;ba
 /* Same items twice in More: Settings opens the same panel, and Share has its own button now. */
 body.app.in-editor #menu-project #settings-open,body.app.in-editor #menu-project #team-open{display:none!important}
 
-/* The glow band: the same rainbow glow, one continuous strip behind the chat title and the top bar. */
-body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:var(--c-sky) center top/max(1600px,100vw) auto fixed!important;border-bottom:0!important}
-body.app.in-editor #editor .chat-head #project-name,body.app.in-editor #editor .chat-head .ghost,body.app.in-editor #editor .chat-head button{color:var(--c-accent)!important;text-shadow:none}
-body.app.in-editor #editor .stage-bar .tabs-seg{background:rgba(255,255,255,.45)!important;border:1px solid rgba(255,255,255,.65)!important;backdrop-filter:blur(6px)}
-body.app.in-editor #editor .stage-bar .tabs-seg button{color:#3E4A5C!important}
+/* The sky band: the same sky, one continuous strip behind the chat title and the top bar. */
+body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:linear-gradient(rgba(10,42,82,.22),rgba(10,42,82,.22)) fixed,var(--c-sky) center top/max(1600px,100vw) auto fixed!important;border-bottom:0!important}
+body.app.in-editor #editor .chat-head #project-name,body.app.in-editor #editor .chat-head .ghost,body.app.in-editor #editor .chat-head button{color:#fff!important;text-shadow:0 1px 8px rgba(10,42,82,.4)}
+body.app.in-editor #editor .stage-bar .tabs-seg{background:rgba(255,255,255,.22)!important;border:1px solid rgba(255,255,255,.4)!important;backdrop-filter:blur(6px)}
+body.app.in-editor #editor .stage-bar .tabs-seg button{color:#fff!important}
 body.app.in-editor #editor .stage-bar .tabs-seg button[aria-pressed=true]{color:var(--c-accent)!important}
-body.app.in-editor #editor .stage-bar .ghost.icon-btn,body.app.in-editor #editor .stage-bar a.icon-btn,body.app.in-editor #editor .stage-bar .menu>summary,body.app.in-editor #editor .stage-bar .seg.icons button{color:#2F3A4D!important}
-body.app.in-editor #editor .stage-bar .ghost.icon-btn:hover,body.app.in-editor #editor .stage-bar a.icon-btn:hover,body.app.in-editor #editor .stage-bar .menu>summary:hover,body.app.in-editor #editor .stage-bar .menu[open]>summary,body.app.in-editor #editor .stage-bar .seg.icons button[aria-pressed=true]{background:rgba(255,255,255,.5)!important;color:var(--c-accent)!important}
-body.app.in-editor #editor #versions{background-color:rgba(255,255,255,.5)!important;border-color:rgba(255,255,255,.75)!important;color:#2F3A4D!important}
+body.app.in-editor #editor .stage-bar .ghost.icon-btn,body.app.in-editor #editor .stage-bar a.icon-btn,body.app.in-editor #editor .stage-bar .menu>summary,body.app.in-editor #editor .stage-bar .seg.icons button{color:#fff!important}
+body.app.in-editor #editor .stage-bar .ghost.icon-btn:hover,body.app.in-editor #editor .stage-bar a.icon-btn:hover,body.app.in-editor #editor .stage-bar .menu>summary:hover,body.app.in-editor #editor .stage-bar .menu[open]>summary,body.app.in-editor #editor .stage-bar .seg.icons button[aria-pressed=true]{background:rgba(255,255,255,.24)!important;color:#fff!important}
+body.app.in-editor #editor #versions{background-color:rgba(255,255,255,.22)!important;border-color:rgba(255,255,255,.45)!important;color:#fff!important}
 body.app.in-editor #editor #versions option{color:var(--c-ink)}
 body.app.in-editor #editor #share-open{background:#fff!important;border-color:#fff!important;color:var(--c-accent)!important}
 /* Ground and cards: the dotted page behind the chat, the preview as a white card. */
@@ -144,6 +144,6 @@ body.app.in-editor #chat-form .composer-ideas{display:flex;flex-wrap:wrap;gap:6p
 body.app.in-editor #chat-form .composer-ideas.hidden{display:none}
 body.app.in-editor #chat-form .idea-chip{height:28px;padding:0 11px;border-radius:20px;border:1px solid var(--c-line);background:#fff;color:var(--c-ink-3);font-size:13px;font-weight:400;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.app.in-editor #chat-form .idea-chip:hover{background:var(--c-raise);color:var(--c-ink)}
-body.app.in-editor #editor .stage-bar #desktop,body.app.in-editor #editor .stage-bar #mobile{background:transparent!important;color:#2F3A4D!important;box-shadow:none!important}
-body.app.in-editor #editor .stage-bar #desktop[aria-pressed=true],body.app.in-editor #editor .stage-bar #mobile[aria-pressed=true]{background:rgba(255,255,255,.55)!important}
-body.app.in-editor #editor .stage-bar .seg.icons .seg-thumb{background:rgba(255,255,255,.55)!important;box-shadow:none!important}
+body.app.in-editor #editor .stage-bar #desktop,body.app.in-editor #editor .stage-bar #mobile{background:transparent!important;color:#fff!important;box-shadow:none!important}
+body.app.in-editor #editor .stage-bar #desktop[aria-pressed=true],body.app.in-editor #editor .stage-bar #mobile[aria-pressed=true]{background:rgba(255,255,255,.26)!important}
+body.app.in-editor #editor .stage-bar .seg.icons .seg-thumb{background:rgba(255,255,255,.26)!important;box-shadow:none!important}

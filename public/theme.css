@@ -1,6 +1,6 @@
 /* Kairoq, the light workspace (for the signed-in app: body.app). Was the dark theme; same rules,
-   light colours: an off-white ground, white cards, deep navy for actions; calm.css adds the rainbow
-   glow (public/glow.webp) behind home and along the editor's top bar, a collapsible left panel, and the
+   light colours: an off-white ground, white cards, deep navy for actions; calm.css adds the sky and
+   rainbow (public/sky.webp) behind home and along the editor's top bar, a collapsible left panel, and the
    editor as Chat | Preview | Kairoq's browser. Replaces the stacked "looks" that used to fight each
    other (studio, fresh, premium, unified, redesign). The older layers (create, workspace, chat-box,
    builder, create-look, split-preview) keep the layout and read their colours from the tokens below.
