@@ -27,7 +27,7 @@ Kairoq can invoke a separately installed OpenEnrich CLI and can call the Postiz 
 
 ## Hallmark
 
-`design-library/hallmark/` holds the 50 themes (`themes/*.md`) and the photo index (`photos.json`) of Hallmark by Together AI (MIT, https://github.com/Nutlope/hallmark, revision 4f6a46c, licence in `design-library/hallmark/LICENSE`). The themes are offered as Looks before an app's first build and their words go into the design brief (`hallmark.js`); the photo index points at openly licensed photographs on Wikimedia Commons, each credited to its author and licence where it is used. Hallmark's scripts and image generation are not included.
+`design-library/hallmark/` holds the 50 themes (`themes/*.md`) and the photo index (`photos.json`) of Hallmark by Together AI (MIT, https://github.com/Nutlope/hallmark, revision 4f6a46c, licence in `design-library/hallmark/LICENSE`). The themes are offered as Looks before an app's first build and their words go into the design brief (`hallmark.js`); the photo index points at openly licensed photographs on Wikimedia Commons, each credited to its author and licence where it is used. Hallmark's scripts and image generation are not included. Its skill (SKILL.md, references and agents, MIT) ships read-only to Kairoq Agent in `hermes/skills/design/hallmark/`.
 
 ## Prettier
 
@@ -249,4 +249,4 @@ in `licenses/scientific-agent-skills-LICENSE.txt`.
 
 ## Impeccable
 
-Impeccable 4.8.0 (Apache License 2.0, © Paul Bakaus, https://github.com/pbakaus/impeccable) is the design detector the app builder runs on every app it makes (`impeccable.js`): 62 deterministic rules for the "made by AI" tells and design quality problems, on the app's source and on the rendered page. It is an npm dependency of the server; its findings reach the builder as fixes to make. Generated apps do not include it.
+Impeccable 4.8.0 (Apache License 2.0, © Paul Bakaus, https://github.com/pbakaus/impeccable) is the design detector the app builder runs on every app it makes (`impeccable.js`): 62 deterministic rules for the "made by AI" tells and design quality problems, on the app's source and on the rendered page. It is an npm dependency of the server; its findings reach the builder as fixes to make. Generated apps do not include it. Its Hermes skill (SKILL.md and references, Apache-2.0) ships read-only to Kairoq Agent in `hermes/skills/design/impeccable/`.
