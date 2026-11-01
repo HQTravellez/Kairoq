@@ -246,3 +246,7 @@ task-matched scientific skills, fetches the pinned `SKILL.md` on demand, removes
 declarations, runs Kairoq's prompt-injection scan, caps prompt size, and treats installation/shell/API
 examples as reference guidance rather than tool authorization. The upstream license text is retained
 in `licenses/scientific-agent-skills-LICENSE.txt`.
+
+## Impeccable
+
+Impeccable 4.8.0 (Apache License 2.0, © Paul Bakaus, https://github.com/pbakaus/impeccable) is the design detector the app builder runs on every app it makes (`impeccable.js`): 62 deterministic rules for the "made by AI" tells and design quality problems, on the app's source and on the rendered page. It is an npm dependency of the server; its findings reach the builder as fixes to make. Generated apps do not include it.

@@ -191,6 +191,19 @@ agents. Kairoq keeps three parts of it in `design-library/hallmark/` (`hallmark.
 - The photo index (755 openly licensed photographs on Wikimedia Commons) gives a new site real
   pictures with their credit instead of placeholders. Nothing to set; no key.
 
+## Impeccable (design detector, server)
+
+[Impeccable](https://github.com/pbakaus/impeccable) (Apache-2.0) is a design detector for AI-made
+UI: 62 rules, no model, no key. Kairoq runs it in the builder's loop (`impeccable.js`,
+`craft-check.js`): after a build, the app's files and the rendered test page are scanned, the
+findings join the measured giveaways (`design-tells.js`), the builder fixes them, and the page is
+measured again. The agent's `kairoq_check` reports them the same way.
+
+- Comes with `npm install` (`impeccable` plus the `@impeccable/cli-linux-x64` binary). Nothing to set.
+- URL scans use the server's Chromium (`CHROMIUM_PATH`); without one only the files are scanned.
+- `KAIROQ_IMPECCABLE=off` turns it off; `KAIROQ_IMPECCABLE_TIMEOUT` (ms, default 90000) caps a scan.
+- Fail-open: a missing binary, a crash or a timeout means no findings, never a failed build.
+
 ## Site notes for the web agent
 
 `site-notes.js`: after a web task (chat "go to this site and…", or Web tasks and watches), Kairoq
