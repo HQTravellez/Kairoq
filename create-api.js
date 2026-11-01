@@ -533,6 +533,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
       const meta0=builder.loadMeta(id),facts=[...meta0.messages.filter(m=>m.role==='user').map(m=>m.text),meta0.knowledge||''].join('\n');
       let last=null;
       const craft=await require('./craft-check').run({url:()=>builder.previewUrl(builder.loadMeta(id)),request:message,facts,type:meta0.design.norms||require('./craft-norms').typeOf(meta0.name+' '+message),designShots,reviewLook,signal,avoid:(require('./design-presets').byType(meta0.design?.playbook||'')||{}).avoid,
+       detect:u=>{const m=builder.loadMeta(id);return require('./impeccable').check({files:builder.loadFiles(id,m.current_version),url:u})},
        onProgress:p=>update({status:'reviewing',progress:p,stream:null}),
        edit:async(msg,shown)=>{const r=await builder.edit(id,msg,{onVersion,designShots,browse,displayText:shown,callModel,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,onProgress:s=>update({status:s,stream:null})});if(r&&!r.unchanged&&!r.rolled_back)last=r;return r}});
       if(last)job.result={...last,first_version:first.version,design:first.design};
