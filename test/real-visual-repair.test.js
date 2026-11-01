@@ -39,3 +39,18 @@ test('real Chromium dashboard defect is repaired and rescreened at mobile, table
   }
  }finally{await browser.close();}
 });
+
+test('a huge headline cut off at the edge of a clipped page is reported, a fitting one is not',{skip:!fs.existsSync(browserPath),timeout:60000},async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:browserPath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const page=await browser.newPage();await page.setViewportSize({width:1280,height:800});
+  const html=size=>`<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{overflow-x:clip;margin:0;font:16px Arial;color:#111;background:#fff}h1{font-size:${size};margin:0;white-space:nowrap;line-height:1}</style></head><body><main><h1>MARIGOLD</h1><p>Bread baked each morning in Leslieville.</p></main></body></html>`;
+  await page.setContent(html('320px'));
+  const cut=await inspect(page,'desktop');
+  assert.ok(cut.some(i=>/^Heading runs off the screen: MARIGOLD/.test(i.issue)),JSON.stringify(cut));
+  assert.match(cut.find(i=>/Heading runs off/.test(i.issue)).fix,/clamp\(\)/);
+  await page.setContent(html('clamp(48px, 10vw, 160px)'));
+  const fits=await inspect(page,'desktop');
+  assert.ok(!fits.some(i=>/Heading runs off/.test(i.issue)),JSON.stringify(fits));
+ }finally{await browser.close()}
+});

@@ -592,7 +592,8 @@ function messageItem(m,last,index){
    b.onclick=()=>{if(!rail.childElementCount)for(const e of tl)rail.append(eventRow(e,{expand:false,version:m.version}));const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
    li.append(b,fold);
   }
-  li.append(renderMarkdown(readable(m.text)));
+  const verdict=verdictCard(m.text);
+  if(verdict)li.append(...verdict);else li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
    const q=el('div','question-options');
@@ -671,10 +672,47 @@ function messageItem(m,last,index){
    b.disabled=true;setChatMode('build');send('Implement this plan.','build','/chat',{implementFrom:m.at});
   };li.append(b)}
  if(m.role==='assistant'){
-  const extra=[...li.children].filter(n=>n.matches('.status-line.done,.acts,.design-chip,.memory-chip,.file-chips.done,.msg-meta,.look-note:not(.warn),.check-chip:not(.bad),.agent-steps,.verified.ok,.verified-quiet'));
+  const extra=[...li.children].filter(n=>n.matches('.acts,.design-chip,.memory-chip,.file-chips.done,.msg-meta,.look-note:not(.warn),.check-chip:not(.bad),.agent-steps,.verified.ok,.verified-quiet'));
   if(extra.length){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...extra);li.append(details);}
  }
  return li;
+}
+// The agent's finished message (engineering-completion-gate.js resultMessage) is stored as
+// "VERIFIED BUILD / UNVERIFIED DRAFT · … \n\nPROOF\n- Build: passed …\n\nBuilder notes: …".
+// In the chat it reads as one plain sentence, the notes, and the checks as a short list.
+function verdictCard(raw){
+ const m=/^(VERIFIED BUILD|UNVERIFIED DRAFT)[^\n]*\n+PROOF\n([\s\S]*?)(?:\n\n(?:Builder notes:\s*)?([\s\S]*))?$/.exec(String(raw||'').trim());
+ if(!m)return null;
+ const ok=m[1]==='VERIFIED BUILD';
+ const rows=m[2].split('\n').map(l=>/^- ([^:]+): (.*)$/.exec(l)).filter(Boolean).map(r=>({label:r[1],value:r[2]}));
+ const unresolved=(rows.find(r=>r.label==='Unresolved')||{}).value;
+ const NAMES={Build:'Builds','Browser':'Opens and works in a browser','Visual quality':'Looks right','Verification tests':'Tests','Regression checks':'Saved checks','Engineering review':'Code review'};
+ const shown=rows.filter(r=>r.label!=='Unresolved'&&!(r.label==='Repair attempts'&&r.value==='0')&&!/^not-required|^skipped/.test(r.value));
+ let notes=String(m[3]||'').trim();
+ notes=notes.replace(/^Stopped after (\d+) steps?\.\s*(The last changes did not build, so the last working build was saved\.)?\s*/,(_,n,kept)=>'I used all '+n+' rounds before every check passed'+(kept?', so the last working build is what you see':'')+'. ');
+ const out=[];
+ const head=el('p','verdict-head '+(ok?'ok':'draft'));
+ head.append(el('span','vmark',ok?'✓':'!'),el('span',null,ok?'Built and checked.':'Draft ready. Some checks did not pass yet, so try it in the preview.'));
+ out.push(head);
+ if(notes)out.push(renderMarkdown(notes));
+ if(ok&&shown.length){
+  // All passed: one quiet line, like "Build ✓ · Browser ✓ · Looks right ✓".
+  const p=el('p','verdict-why');
+  p.textContent=shown.filter(r=>r.label!=='Repair attempts').map(r=>(NAMES[r.label]||r.label)+' ✓').join(' · ');
+  out.push(p);
+ }else if(shown.length){
+  const ul=el('ul','verdict-rows');
+  for(const r of shown){
+   const pass=/^passed/.test(r.value),repairs=r.label==='Repair attempts';
+   const li=el('li',repairs?'':pass?'ok':'bad');
+   const detail=r.value.replace(/^(passed|failed)\s*(·\s*)?/,'').replace(/interaction step\(s\)/,'actions tried');
+   li.append(el('span','vmark',repairs?'↻':pass?'✓':'✗'),el('span',null,repairs?r.value+' repair'+(r.value==='1'?'':'s')+' along the way':(NAMES[r.label]||r.label)+(pass?'':': '+(detail.replace(/^failed/,'').trim()||'did not pass'))+(pass&&detail?' · '+detail:'')));
+   ul.append(li);
+  }
+  out.push(ul);
+ }
+ if(unresolved&&unresolved!=='none')out.push(el('p','verdict-why',unresolved));
+ return out;
 }
 // "Verified by Kairoq": what its browser tested on this build, like a customer would.
 function verifiedCard(v,checks,added){
@@ -1385,7 +1423,7 @@ function renderBuildOverlay(j){
  const card=overlay.querySelector('.bo-card');
  const shown=j.preview&&j.preview.version;
  const files=work.files.length;
- const label=shown?'v'+j.preview.version+' is showing · '+(PHASES[phaseOf(j)]&&phaseOf(j)!=='verifying'?PHASES[phaseOf(j)]:'still checking it')+'…':liveStatus(j)+(phaseOf(j)==='writing'&&files>1?' · '+files+' files':'')+'…';
+ const label=shown?(j.preview.draft?'A first build is showing':'v'+j.preview.version+' is showing')+' · '+(PHASES[phaseOf(j)]&&phaseOf(j)!=='verifying'?PHASES[phaseOf(j)]:'still checking it')+'…':liveStatus(j)+(phaseOf(j)==='writing'&&files>1?' · '+files+' files':'')+'…';
  const spin=card.querySelector('.bo-spin')||el('span','bo-spin');spin.setAttribute('aria-hidden','true');
  const line=card.querySelector('.bo-line')||el('span','bo-line');
  if(line.textContent!==label)line.textContent=label;
@@ -1395,7 +1433,19 @@ function renderBuildOverlay(j){
 function liveStatus(j){
  const p=phaseOf(j);
  if(j.mode==='discuss')return j.stream&&j.stream.text?'Writing the answer':/\b(suggest|ideas?|recommend|what else|what next)\b/i.test(work.asked||'')?'Thinking about ideas for your app':'Thinking about your question';
- if(j.mode==='agent'&&j.agent&&j.agent.step){const last=(j.events||[]).at(-1);return'Step '+j.agent.step+' · '+(p==='thinking'?'Thinking':last&&last.t==='edit'?'Editing '+last.file.replace(/^src\//,''):PHASES[p]||'Working')}
+ // The agent (react-agent.js) works in rounds: the label follows what it is doing right now, not
+ // the round's first phase ("Understanding your idea" stayed on screen for a whole build once).
+ if(j.agent&&j.agent.step){
+  const ev=j.events||[],last=ev.at(-1),did=ev.some(e=>e.t==='edit'||e.t==='build'||e.t==='test');
+  if(p==='thinking')return did?'Thinking about the next step':'Understanding your idea';
+  if(p==='repairing')return'Repairing what the checks found';
+  if(p==='checking'||p==='reviewing')return PHASES[p];
+  if(last&&last.t==='edit')return'Editing '+String(last.file||'').replace(/^src\//,'');
+  if(last&&last.t==='build')return'Building the preview';
+  if(last&&last.t==='test')return'Testing in a browser';
+  if(last&&last.t==='note'&&last.icon==='web')return'Reading the web';
+  return did?'Working on it':'Understanding your idea';
+ }
  if(p==='writing'&&work.current)return'Writing '+work.current.replace(/^src\//,'');
  return PHASES[p]||'Working';
 }
@@ -1438,7 +1488,7 @@ function renderWork(j){
  if(detailState.source==='live')renderDetail();
  if(stick)list.scrollTop=list.scrollHeight;
 }
-function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');const waited=Date.now()-work.started;if(r)text(r,waited>45000?'Planning the app… (a slow free model can take a few minutes; the fast model streams at once)':waited>15000?'Planning the app…':'Thinking…')}if(detailState.source==='live')renderDetail()}
+function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');const ev=work.job.events||[],n=ev.length;if(n!==work.roundEvents){work.roundEvents=n;work.roundAt=Date.now()}const waited=Date.now()-(work.roundAt||work.started),did=ev.some(e=>e.t==='edit'||e.t==='build'||e.t==='test');if(r)text(r,did?(waited>30000?'Still thinking… (this model is slow today)':'Thinking about the next step…'):waited>45000?'Planning the app… (a slow free model can take a few minutes; the fast model streams at once)':waited>15000?'Planning the app…':'Thinking…')}if(detailState.source==='live')renderDetail()}
 // ---------- the Details panel (over the preview) ----------
 const detailState={source:null,tab:'timeline'};
 function openDetail(source,tab){detailState.source=source;if(tab)detailState.tab=tab;$('detail').classList.remove('hidden');document.querySelector('.stage').classList.add('show-detail');renderDetail()}
@@ -1511,7 +1561,7 @@ function renderDetail(){
 async function watch(job){
  state.job=job;const watchToken=state.watchToken=(state.watchToken||0)+1;busy(true,LABELS[job.status]);refreshCredits();
  const id=state.project.id;
- Object.assign(work,{started:Date.now(),files:[],current:null,message:'',tail:'',thinking:'',thought:'',thoughtAt:0,asked:state.lastSent||'',plan:[],seen:new Set()});if(detailState.source!==null)closeDetail();
+ Object.assign(work,{started:Date.now(),roundAt:0,roundEvents:-1,files:[],current:null,message:'',tail:'',thinking:'',thought:'',thoughtAt:0,asked:state.lastSent||'',plan:[],seen:new Set()});if(detailState.source!==null)closeDetail();
  clearInterval(work.timer);work.timer=setInterval(tickWork,1000);
  const done=await new Promise(resolve=>{
   let finished=false;

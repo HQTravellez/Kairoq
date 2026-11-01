@@ -30,7 +30,10 @@ test('options can carry one sentence each and a recommended one',()=>{
 test('ask() returns the opening line with the questions; a bad line is dropped',async()=>{
  const raw={opening:'A field guide for Ontario birds with sighting tables — lovely. Two things so I get the data right:',questions:[{q:'Who adds sightings?',options:[{label:'Just you',detail:'You sign in; visitors read.'},{label:'Any birder',detail:'Anyone can sign up.'}],recommended:0}]};
  const r=await clarify.ask('A field guide for Ontario birds',{callModel:async(o,parse)=>{assert.match(o.messages[0].content,/warm, quick and specific/);return parse(JSON.stringify(raw))}});
- assert.equal(r.opening,raw.opening);assert.equal(r.questions.length,1);
+ // The model said "Two things" and asked one question: the line says "One thing".
+ assert.equal(r.opening,'A field guide for Ontario birds with sighting tables — lovely. One things so I get the data right:'.replace('One things','One thing'));assert.equal(r.questions.length,1);
+ assert.equal(clarify.opening({opening:'Two quick details so I get it right:'},3),'Three quick details so I get it right:');
+ assert.equal(clarify.opening({opening:'Two of your pages need photos; one question:'},1),'Two of your pages need photos; one question:');
  assert.equal(clarify.opening({opening:'{'}),'');assert.equal(clarify.opening({}),'');
  assert.deepEqual(await clarify.ask('x'.repeat(700),{callModel:async()=>{throw Error('no')}}),{opening:'',questions:[]});
 });

@@ -210,7 +210,9 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   built={n,dir,url:builder.previewUrl(meta,n),files:{...work}};dirty=false;
   tl.add({t:'build',ok:true});
   builder.markTesting(id,n,built.files);
-  report({status:'testing'});
+  // The owner sees each build as soon as it exists (the preview route serves any built version),
+  // not only the saved one at the end: a first build is on screen while the agent keeps testing.
+  report({status:'testing',preview:{url:built.url,version:n,draft:true}});
   return testBuild(a,'build_and_test: built OK.');
  }
  async function tool(a){

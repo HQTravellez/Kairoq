@@ -478,7 +478,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra,continuity].filter(Boolean).join('\n\n');
     const researchOnly=browserResearchOnly&&!hooks;
     job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,designShots,reviewLook,fetchUrl:url=>require('./public-web-fetch').fetchPublic(url,{maxRedirects:5,maxBytes:2000000,accept:"application/json, text/html, text/markdown, text/plain"}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
-     onStep:p=>update({status:p.status,stream:null,...(p.browser?{browser:p.browser}:{}),agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
+     onStep:p=>update({status:p.status,stream:null,...(p.browser?{browser:p.browser}:{}),...(p.preview?{preview:p.preview}:{}),agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
    else if(mode==='discuss'){
@@ -2006,6 +2006,18 @@ function nameFromPrompt(prompt){
  const t=String(prompt||'').replace(/\s+/g,' ').trim();if(!t)return'';
  const named=/\b(?:called|named)\s+["“']?([A-Z0-9][\w'&.-]*(?:\s+[A-Z0-9&][\w'&.-]*){0,4})/.exec(t);
  if(named)return named[1].replace(/[.,:;!?'"”]+$/,'').slice(0,60);
+ // "A website for Marigold Bakery in Leslieville" → Marigold Bakery; "A web app for a small
+ // dog-walking business: …" → Small dog-walking business (the name is used as the brand on the
+ // look preview, so "A web app for a small dog-walking" will not do).
+ const KIND='(?:web\\s+)?(?:app|application|website|web\\s*site|site|page|landing\\s+page|store|shop|dashboard|portal|tool|crm|booking\\s+(?:page|site|app)|iphone\\s+app|android\\s+app|phone\\s+app|mobile\\s+app)';
+ const forWho=new RegExp('^(?:build\\s+|make\\s+|create\\s+)?(?:an?|the|one-page|simple)?\\s*(?:[\\w-]+\\s+)?'+KIND+'\\s+for\\s+(?:(?:a|an|the|my|our)\\s+)?([^.:\\n!?,]+)','i').exec(t);
+ if(forWho){
+  const who=forWho[1].trim();
+  const proper=/^([A-Z][\w'&.-]*(?:\s+(?:[A-Z][\w'&.-]*|&|of|de|the|and))*)/.exec(who);
+  if(proper&&proper[1].length>=3&&!/^(A|An|The|My|Our)$/.test(proper[1]))return proper[1].replace(/\s+(of|de|the|and)$/,'').slice(0,60);
+  const plain=who.split(/\s+(?:in|at|near|with|so|to)\s+/)[0].trim();
+  if(plain.length>=3&&plain.length<=48)return plain[0].toUpperCase()+plain.slice(1);
+ }
  const first=t.split(/[.\n:!?]/)[0].trim();
  if(first.length<=48)return first;
  const cut=first.slice(0,48),sp=cut.lastIndexOf(' ');
