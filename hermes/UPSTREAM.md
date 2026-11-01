@@ -26,6 +26,18 @@ Shipped read-only at `/opt/kairoq/skills/superpowers` and listed in `skills.exte
 To update: replace `skills/superpowers/` with the `skills/` folder of a newer revision, keep
 `LICENSE`, and update the revision above.
 
+## Impeccable and Hallmark (design skills)
+
+| | |
+|---|---|
+| Impeccable | https://github.com/pbakaus/impeccable, Apache-2.0, © Paul Bakaus; 4.8.0, the prebuilt Hermes skill (`.hermes/skills/impeccable/`) without `scripts/` (the launcher, binary and hooks need a terminal the agent does not have) |
+| Hallmark | https://github.com/Nutlope/hallmark, MIT, © Hallmark contributors (Together AI); revision 4f6a46c, `skills/hallmark/` without `scripts/` and the theme pictures |
+| Contents | `skills/design/impeccable/` (SKILL.md, reference/, LICENSE, NOTICE.md) and `skills/design/hallmark/` (SKILL.md, references/, agents/, LICENSE) |
+| Change | One "Kairoq note" block at the top of each SKILL.md saying the script steps do not apply here |
+
+Shipped read-only at `/opt/kairoq/skills/design`. The same two projects power the app builder's
+design loop (`impeccable.js`, `hallmark.js`, `design-moves.js`).
+
 ## Upgrading
 
 1. Pick a newer stable tag from the upstream releases and set `HERMES_TAG` in `Dockerfile`.
