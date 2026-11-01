@@ -1,14 +1,19 @@
-/* Calm editor, like Emergent: soft grey ground, white cards, a light blue band along the top, one
-   blue accent; one quiet top bar, a 40/60 split, a plain composer and small next-step chips.
+/* Calm editor in daylight: an off-white page with a faint dot grid, white cards, a daytime sky
+   (public/sky.webp, drawn for Kairoq) behind home and along the editor's top bar, and deep navy
+   for actions. One quiet top bar, a 40/60 split, a plain composer and small next-step chips.
    Loaded last, so it wins over the older layers without touching them. */
-body.app{--c-bg:#F4F6F9;--c-panel:#FFFFFF;--c-raise:#F4F6F9;--c-ink:#17181C;--c-ink-2:#5F6570;--c-ink-3:#8A9099;--c-line:rgba(17,18,22,.08);--c-line-2:rgba(17,18,22,.13);--c-hover:rgba(17,18,22,.05);--c-accent:#1F6FEB;--c-accent-2:#1A5FD0;--c-band:linear-gradient(90deg,#A9C7F3 0%,#C6DAF7 45%,#DCE8FA 100%)}
-/* Home: the soft grey ground, no night sky; the same blue band across the top. */
-body.app #home .home,body.app.day #home .home{background-image:linear-gradient(180deg,#DCE8FA 0,#EEF3FB 220px,#F4F6F9 420px)!important;background-color:#F4F6F9!important}
-body.app #home #new-form,body.app #home .prompt-box{background:#FFFFFF!important;border-color:#C9DAF5!important;box-shadow:0 10px 30px -18px rgba(31,111,235,.35)!important}
+body.app{--c-bg:#FAFBFC;--c-panel:#FFFFFF;--c-raise:#F4F6F8;--c-ink:#2A2D32;--c-ink-2:#5C6168;--c-ink-3:#737980;--c-line:#EDEFF2;--c-line-2:#D8DBE0;--c-hover:rgba(10,42,82,.05);--c-accent:#0A2A52;--c-accent-2:#123A6E;--c-glow:0 1px 1px rgba(0,0,0,.1),0 0 18px rgba(10,42,82,.32),inset 0 -1.5px 0 rgba(0,0,0,.2);--c-dots:radial-gradient(circle,rgba(0,0,0,.07) 1px,transparent 1.2px);--c-sky:url("/sky.webp")}
+/* Home: the daytime sky behind the prompt, fading into the page. */
+body.app #home,body.app.day #home{background:var(--c-bg)!important}
+body.app #home .home,body.app.day #home .home{background-color:var(--c-bg)!important;background-image:linear-gradient(180deg,rgba(250,251,252,0) 0,rgba(250,251,252,0) 430px,var(--c-bg) 640px),var(--c-sky),var(--c-dots)!important;background-size:100% 100%,100% 660px,20px 20px!important;background-repeat:no-repeat,no-repeat,repeat!important;background-position:0 0,center top,0 0!important}
 body.app #home .home::after{display:none!important}
-body.app.day #home .home-hero h1,body.app #home .home-hero h1{color:var(--c-ink)!important}
-body.app.day #home .home-sub{color:var(--c-ink-2)!important}
-
+body.app.day #home .home-hero h1,body.app #home .home-hero h1{color:#fff!important;text-shadow:0 1px 18px rgba(10,42,82,.35)}
+body.app.day #home .home-sub,body.app #home .home-sub{color:rgba(255,255,255,.92)!important;text-shadow:0 1px 10px rgba(10,42,82,.35)}
+body.app #home #new-kind{background:rgba(255,255,255,.28)!important;border-color:rgba(255,255,255,.45)!important;backdrop-filter:blur(6px)}
+body.app #home #new-kind button{color:#fff!important}
+body.app #home #new-kind button[aria-pressed=true]{color:var(--c-accent)!important}
+body.app #home #new-form,body.app #home .prompt-box{background:#fff!important;border:1px solid #fff!important;border-radius:20px!important;box-shadow:0 0 0 4px rgba(255,255,255,.55),0 18px 40px -20px rgba(10,42,82,.45)!important}
+body.app #home .prompt-box .primary,body.app #home #new-form .primary,body.app #home #new-form button[type=submit]{background:var(--c-accent)!important;color:#EAF2FB!important;box-shadow:var(--c-glow)!important}
 /* Split: no coloured rule between chat and preview; a faint line shows only while you drag. */
 @media(min-width:901px){
  body.app.in-editor #kq-split-handle::before{background:transparent!important;width:1px!important;left:8px!important}
@@ -27,20 +32,20 @@ body.app.in-editor #editor .stage-bar .seg.icons button{width:32px;height:32px;p
 body.app.in-editor #editor #versions{height:30px;width:auto;min-width:0!important;max-width:118px!important;padding:0 24px 0 10px!important;font-size:12.5px!important;color:var(--c-ink-2)!important;background-color:transparent!important;border:1px solid var(--c-line)!important;border-radius:8px!important;text-overflow:ellipsis;margin:0 4px}
 body.app.in-editor #editor #versions:hover{border-color:var(--c-line-2)!important;color:var(--c-ink)!important}
 /* Share is quiet, Publish is the one solid button. */
-body.app.in-editor #editor #share-open{height:32px;padding:0 14px!important;margin-left:0;border-radius:9px!important;border:1px solid var(--c-line-2)!important;background:transparent!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important}
+body.app.in-editor #editor #share-open{height:32px;padding:0 14px!important;margin-left:0;border-radius:999px!important;border:1px solid var(--c-line-2)!important;background:transparent!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important}
 body.app.in-editor #editor #share-open:hover{background:var(--c-hover)!important}
-body.app.in-editor #editor #publish-open{height:32px;padding:0 16px!important;border-radius:9px!important;border:0!important;background:var(--c-accent)!important;color:#fff!important;font-size:13px!important;font-weight:600!important;box-shadow:none!important;opacity:1!important}
+body.app.in-editor #editor #publish-open{height:32px;padding:0 16px!important;border-radius:9px!important;border:0!important;background:var(--c-accent)!important;color:#EAF2FB!important;font-size:13px!important;font-weight:600!important;box-shadow:var(--c-glow)!important;opacity:1!important;border-radius:999px!important}
 body.app.in-editor #editor #publish-open:hover{background:var(--c-accent-2)!important}
-body.app.in-editor #editor #publish-open .live-dot{background:#fff!important;box-shadow:none!important}
+body.app.in-editor #editor #publish-open .live-dot{background:#5EE0A0!important;box-shadow:none!important}
 
 /* Composer: a plain box; the send button lights up only when there is something to send. */
-body.app.in-editor #chat-form.composer{padding:12px 10px 10px 14px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;border-radius:16px!important;box-shadow:0 8px 24px -16px rgba(16,24,40,.25)!important}
-body.app.in-editor #chat-form.composer:focus-within{border-color:#9DBEF3!important;box-shadow:0 0 0 3px rgba(31,111,235,.12)!important}
+body.app.in-editor #chat-form.composer{padding:12px 10px 10px 14px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;border-radius:20px!important;box-shadow:0 2px 16px rgba(0,0,0,.06)!important}
+body.app.in-editor #chat-form.composer:focus-within{border-color:#B9CCE6!important;box-shadow:0 0 0 4px rgba(198,218,243,.45),0 2px 16px rgba(0,0,0,.06)!important}
 body.app.in-editor #chat-form #chat-input{min-height:44px}
 body.app.in-editor #chat-form #menu-plus>summary{width:30px!important;height:30px!important;padding:0!important;justify-content:center;border-radius:999px!important;border:1px solid var(--c-line-2)!important;font-size:18px!important;line-height:1;color:var(--c-ink-2)!important}
 body.app.in-editor #chat-form #menu-plus>summary:hover{color:var(--c-ink)!important;background:var(--c-hover)!important}
-body.app.in-editor #chat-form #send{width:32px!important;height:32px!important;background:var(--c-accent)!important;color:#fff!important}
-body.app.in-editor #chat-form #send.is-empty,body.app.in-editor #chat-form #send:disabled{background:#E4E5E8!important;color:var(--c-ink-3)!important}
+body.app.in-editor #chat-form #send{width:32px!important;height:32px!important;background:var(--c-accent)!important;color:#EAF2FB!important;box-shadow:var(--c-glow)!important}
+body.app.in-editor #chat-form #send.is-empty,body.app.in-editor #chat-form #send:disabled{background:#EDEFF2!important;color:#A6ABB2!important;box-shadow:none!important}
 
 /* Next-step ideas: small chips, not big white cards. */
 body.app.in-editor .messages .idea-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
@@ -74,7 +79,7 @@ body.app .share-pop .link-btn:hover{color:var(--c-ink)}
 body.app .share-pop-live{font-size:12.5px;word-break:break-all}
 body.app .share-pop-live:empty{display:none}
 body.app .share-pop-live a{color:var(--c-ink)}
-body.app .share-pop .primary{height:36px;border:0;border-radius:9px;background:var(--c-accent);color:#fff;font-weight:600;margin-top:4px;border-top:1px solid var(--c-line)}
+body.app .share-pop .primary{height:36px;border:0;border-radius:999px;box-shadow:var(--c-glow);background:var(--c-accent);color:#fff;font-weight:600;margin-top:4px;border-top:1px solid var(--c-line)}
 body.app .share-pop .primary:hover{background:var(--c-accent-2)}
 body.app .share-pop .error:empty{display:none}
 body.app .share-pop .share-pop-row .ghost,body.app .share-pop .share-pop-off .ghost{border:1px solid var(--c-line-2)!important;background:#fff!important;color:var(--c-ink)!important;border-radius:9px!important}
@@ -93,18 +98,23 @@ body.app #editor .share-pop .ghost{border:1px solid var(--c-line-2)!important;ba
 /* Same items twice in More: Settings opens the same panel, and Share has its own button now. */
 body.app.in-editor #menu-project #settings-open,body.app.in-editor #menu-project #team-open{display:none!important}
 
-/* The blue band: one continuous gradient behind the chat title and the top bar. */
-body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:var(--c-band)!important;background-attachment:fixed!important;border-bottom:0!important}
-body.app.in-editor #editor .stage-bar .tabs-seg{background:rgba(255,255,255,.45)!important}
-body.app.in-editor #editor .stage-bar .ghost.icon-btn,body.app.in-editor #editor .stage-bar a.icon-btn,body.app.in-editor #editor .stage-bar .menu>summary{color:#2F3A4D!important}
-body.app.in-editor #editor .stage-bar .ghost.icon-btn:hover,body.app.in-editor #editor .stage-bar a.icon-btn:hover,body.app.in-editor #editor .stage-bar .menu>summary:hover,body.app.in-editor #editor .stage-bar .menu[open]>summary,body.app.in-editor #editor .stage-bar .seg.icons button[aria-pressed=true]{background:rgba(255,255,255,.6)!important}
-body.app.in-editor #editor #versions{background-color:rgba(255,255,255,.55)!important;border-color:rgba(255,255,255,.7)!important;color:#2F3A4D!important}
-body.app.in-editor #editor #share-open{background:#fff!important;border-color:rgba(255,255,255,.9)!important}
-/* Ground and cards: grey behind the chat, the preview as a white card. */
-body.app.in-editor #editor,body.app.in-editor #editor .chat,body.app.in-editor #editor .stage{background:var(--c-bg)!important}
-body.app.in-editor #editor .chat{border-right:0!important}
-body.app.in-editor #editor .canvas>iframe,body.app.in-editor #editor #frame{box-shadow:0 0 0 1px var(--c-line),0 12px 30px -20px rgba(16,24,40,.3)!important}
-body.app.in-editor #editor .messages li.user{background:#E6EEFB!important;color:var(--c-ink)!important}
+/* The sky band: the same daytime sky, one continuous strip behind the chat title and the top bar. */
+body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:var(--c-sky) center -40px/max(1600px,100vw) auto fixed!important;border-bottom:0!important}
+body.app.in-editor #editor .chat-head #project-name,body.app.in-editor #editor .chat-head .ghost,body.app.in-editor #editor .chat-head button{color:#fff!important;text-shadow:0 1px 8px rgba(10,42,82,.35)}
+body.app.in-editor #editor .stage-bar .tabs-seg{background:rgba(255,255,255,.22)!important;border:1px solid rgba(255,255,255,.35)!important;backdrop-filter:blur(6px)}
+body.app.in-editor #editor .stage-bar .tabs-seg button{color:#fff!important}
+body.app.in-editor #editor .stage-bar .tabs-seg button[aria-pressed=true]{color:var(--c-accent)!important}
+body.app.in-editor #editor .stage-bar .ghost.icon-btn,body.app.in-editor #editor .stage-bar a.icon-btn,body.app.in-editor #editor .stage-bar .menu>summary,body.app.in-editor #editor .stage-bar .seg.icons button{color:#fff!important}
+body.app.in-editor #editor .stage-bar .ghost.icon-btn:hover,body.app.in-editor #editor .stage-bar a.icon-btn:hover,body.app.in-editor #editor .stage-bar .menu>summary:hover,body.app.in-editor #editor .stage-bar .menu[open]>summary,body.app.in-editor #editor .stage-bar .seg.icons button[aria-pressed=true]{background:rgba(255,255,255,.22)!important;color:#fff!important}
+body.app.in-editor #editor #versions{background-color:rgba(255,255,255,.22)!important;border-color:rgba(255,255,255,.4)!important;color:#fff!important}
+body.app.in-editor #editor #versions option{color:var(--c-ink)}
+body.app.in-editor #editor #share-open{background:#fff!important;border-color:#fff!important;color:var(--c-accent)!important}
+/* Ground and cards: the dotted page behind the chat, the preview as a white card. */
+body.app.in-editor #editor,body.app.in-editor #editor .stage{background:var(--c-bg)!important}
+body.app.in-editor #editor .chat{background:var(--c-bg) var(--c-dots)!important;background-size:20px 20px!important;border-right:0!important}
+body.app.in-editor #editor .canvas>iframe,body.app.in-editor #editor #frame{box-shadow:0 0 0 1px var(--c-line),0 2px 16px rgba(0,0,0,.06)!important}
+body.app.in-editor #editor .messages li.user{background:#E7F0FB!important;color:var(--c-accent)!important;border:1px solid var(--c-line)!important;border-radius:16px 16px 2px 16px!important}
+body.app.in-editor #editor .messages li.assistant{font-size:15px;font-weight:450;color:#2E3133;line-height:1.7}
 body.app .messages .q-opt.idea{background:#fff!important}
 
 /* Composer menus (+, mode, model): compact white popovers, one line per choice. */
@@ -122,7 +132,7 @@ body.app.in-editor #menu-tier>.menu-panel{width:300px;max-height:min(440px,calc(
 body.app.in-editor #chat-form .model-search{width:calc(100% - 8px);margin:4px 4px 6px;height:32px;padding:0 10px;border:1px solid var(--c-line-2);border-radius:8px;font-size:13px;background:var(--c-raise)}
 body.app.in-editor #chat-form .model-list>button{padding-right:30px!important}
 body.app.in-editor #chat-form .menu.pick .menu-panel button[aria-pressed=true]::after{content:"";position:absolute;right:14px;top:50%;width:5px;height:10px;margin-top:-7px;border:0;border-right:2px solid var(--c-accent);border-bottom:2px solid var(--c-accent);border-left:0;transform:rotate(45deg)}
-body.app.in-editor #chat-form .model-tag{font-style:normal;font-size:10.5px;font-weight:500;padding:1px 6px;border-radius:999px;background:#E6EEFB;color:var(--c-accent-2)}
+body.app.in-editor #chat-form .model-tag{font-style:normal;font-size:10.5px;font-weight:500;padding:1px 6px;border-radius:999px;background:#E7F0FB;color:var(--c-accent)}
 body.app.in-editor #chat-form .model-tag.free{background:#E7F6EC;color:#15803D}
 body.app.in-editor #chat-form .model-off{border-top:1px solid var(--c-line);padding-top:8px;margin-top:6px!important}
 /* Mode menu. */
@@ -132,5 +142,8 @@ body.app.in-editor #menu-mode .menu-panel>button{padding-right:32px!important}
 /* Next-step chips inside the message box, above the text. */
 body.app.in-editor #chat-form .composer-ideas{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 10px;margin:0 0 4px;border-bottom:1px solid var(--c-line)}
 body.app.in-editor #chat-form .composer-ideas.hidden{display:none}
-body.app.in-editor #chat-form .idea-chip{height:28px;padding:0 11px;border-radius:999px;border:1px solid #C9DAF5;background:#F1F6FE;color:#1A4FA8;font-size:12.5px;font-weight:500;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-body.app.in-editor #chat-form .idea-chip:hover{background:#E3EDFC}
+body.app.in-editor #chat-form .idea-chip{height:28px;padding:0 11px;border-radius:20px;border:1px solid var(--c-line);background:#fff;color:var(--c-ink-3);font-size:13px;font-weight:400;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app.in-editor #chat-form .idea-chip:hover{background:var(--c-raise);color:var(--c-ink)}
+body.app.in-editor #editor .stage-bar #desktop,body.app.in-editor #editor .stage-bar #mobile{background:transparent!important;color:#fff!important;box-shadow:none!important}
+body.app.in-editor #editor .stage-bar #desktop[aria-pressed=true],body.app.in-editor #editor .stage-bar #mobile[aria-pressed=true]{background:rgba(255,255,255,.26)!important}
+body.app.in-editor #editor .stage-bar .seg.icons .seg-thumb{background:rgba(255,255,255,.26)!important;box-shadow:none!important}
