@@ -494,7 +494,20 @@
           <button type="button" id="settings-open"><b>Settings</b><span>Knowledge, secrets, GitHub, API keys</span></button>
         </div>
       </details>
-      <button class="ghost" id="share-open" type="button">Share</button>
+      <div class="share-pop-wrap">
+      <button class="ghost" id="share-open" type="button" aria-expanded="false" aria-controls="share-pop">Share</button>
+      <div class="share-pop hidden" id="share-pop" role="dialog" aria-label="Share">
+        <p class="share-pop-title">Share a preview</p>
+        <div class="share-pop-off" id="share-pop-off"><p>Anyone with the link sees a live preview. They can't change anything.</p><button type="button" class="ghost" id="share-pop-on">Create link</button></div>
+        <div class="share-pop-on hidden" id="share-pop-link"><div class="share-pop-row"><input id="share-pop-url" readonly aria-label="Preview link"><button type="button" class="ghost" id="share-pop-copy">Copy link</button></div>
+          <label class="check"><input type="checkbox" id="share-pop-remix"> Let them copy the app into their account</label>
+          <button type="button" class="link-btn" id="share-pop-stop">Stop sharing</button></div>
+        <div class="share-pop-live" id="share-pop-live"></div>
+        <button type="button" class="primary" id="share-pop-publish">Publish your site</button>
+        <button type="button" class="link-btn" id="share-pop-team">Invite teammates</button>
+        <p class="error" id="share-pop-error" role="alert"></p>
+      </div>
+      </div>
       <button class="primary" id="publish-open" type="button"><i class="live-dot" aria-hidden="true"></i>Publish</button>
     </div>
     <div class="preview-bar hidden" id="preview-bar" aria-hidden="true"></div>

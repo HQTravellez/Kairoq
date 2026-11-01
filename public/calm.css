@@ -14,7 +14,7 @@ body.app.day #home .home-sub{color:var(--c-ink-2)!important}
 }
 
 /* The one top bar. */
-body.app.in-editor #editor .stage-bar{height:52px!important;gap:4px!important;padding:0 12px 0 8px!important;align-items:center}
+body.app.in-editor #editor .stage-bar{height:52px!important;gap:4px!important;padding:0 12px 0 8px!important;align-items:center;overflow:visible!important;position:relative;z-index:30}
 body.app.in-editor #editor .stage-bar .bar-tools{display:flex;align-items:center;gap:2px}
 body.app.in-editor #editor .stage-bar .ghost.icon-btn,body.app.in-editor #editor .stage-bar a.icon-btn,body.app.in-editor #editor .stage-bar .menu>summary{width:32px;height:32px;min-width:32px;padding:0!important;display:inline-flex;align-items:center;justify-content:center;border-radius:8px!important;color:var(--c-ink-2)!important;background:transparent!important;border:0!important}
 body.app.in-editor #editor .stage-bar .ghost.icon-btn:hover,body.app.in-editor #editor .stage-bar a.icon-btn:hover,body.app.in-editor #editor .stage-bar .menu>summary:hover,body.app.in-editor #editor .stage-bar .menu[open]>summary{background:var(--c-hover)!important;color:var(--c-ink)!important}
@@ -25,7 +25,7 @@ body.app.in-editor #editor .stage-bar .seg.icons button{width:32px;height:32px;p
 body.app.in-editor #editor #versions{height:30px;width:auto;min-width:0!important;max-width:118px!important;padding:0 24px 0 10px!important;font-size:12.5px!important;color:var(--c-ink-2)!important;background-color:transparent!important;border:1px solid var(--c-line)!important;border-radius:8px!important;text-overflow:ellipsis;margin:0 4px}
 body.app.in-editor #editor #versions:hover{border-color:var(--c-line-2)!important;color:var(--c-ink)!important}
 /* Share is quiet, Publish is the one solid button. */
-body.app.in-editor #editor #share-open{height:32px;padding:0 14px!important;margin-left:6px;border-radius:9px!important;border:1px solid var(--c-line-2)!important;background:transparent!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important}
+body.app.in-editor #editor #share-open{height:32px;padding:0 14px!important;margin-left:0;border-radius:9px!important;border:1px solid var(--c-line-2)!important;background:transparent!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important}
 body.app.in-editor #editor #share-open:hover{background:var(--c-hover)!important}
 body.app.in-editor #editor #publish-open{height:32px;padding:0 16px!important;border-radius:9px!important;border:0!important;background:var(--c-ink)!important;color:#fff!important;font-size:13px!important;font-weight:600!important;box-shadow:none!important;opacity:1!important}
 body.app.in-editor #editor #publish-open:hover{background:#000!important}
@@ -53,3 +53,40 @@ body.app.in-editor .messages details.message-details>summary::-webkit-details-ma
 body.app.in-editor .messages details.message-details>summary::after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);margin-left:2px}
 body.app.in-editor .messages details.message-details[open]>summary::after{transform:rotate(45deg)}
 body.app.in-editor .messages details.message-details>summary:hover{color:var(--c-ink)}
+
+/* Share popover. */
+body.app .share-pop-wrap{position:relative;display:inline-flex;margin-left:6px}
+body.app .share-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:60;width:340px;padding:16px;display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid var(--c-line-2);border-radius:14px;box-shadow:0 18px 40px -16px rgba(16,18,24,.22);color:var(--c-ink);font-size:13px}
+body.app .share-pop.hidden{display:none}
+body.app .share-pop-title{margin:0;font-size:14px;font-weight:600}
+body.app .share-pop p{margin:0;color:var(--c-ink-2);line-height:1.45}
+body.app .share-pop-off{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+body.app .share-pop-on{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+body.app .share-pop-row{display:flex;gap:6px;width:100%}
+body.app .share-pop-row input{flex:1;min-width:0;height:34px;padding:0 10px;font-size:12.5px;border:1px solid var(--c-line-2);border-radius:9px;background:var(--c-raise);color:var(--c-ink)}
+body.app .share-pop .ghost{height:34px;padding:0 12px;border:1px solid var(--c-line-2);border-radius:9px;background:#fff;color:var(--c-ink);font-weight:500;white-space:nowrap}
+body.app .share-pop .ghost:hover{background:var(--c-hover)}
+body.app .share-pop .check{display:flex;gap:8px;align-items:center;color:var(--c-ink-2);font-size:12.5px}
+body.app .share-pop .link-btn{background:none;border:0;padding:0;color:var(--c-ink-2);font-size:12.5px;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+body.app .share-pop .link-btn:hover{color:var(--c-ink)}
+body.app .share-pop-live{font-size:12.5px;word-break:break-all}
+body.app .share-pop-live:empty{display:none}
+body.app .share-pop-live a{color:var(--c-ink)}
+body.app .share-pop .primary{height:36px;border:0;border-radius:9px;background:var(--c-ink);color:#fff;font-weight:600;margin-top:4px;border-top:1px solid var(--c-line)}
+body.app .share-pop .primary:hover{background:#000}
+body.app .share-pop .error:empty{display:none}
+body.app .share-pop .share-pop-row .ghost,body.app .share-pop .share-pop-off .ghost{border:1px solid var(--c-line-2)!important;background:#fff!important;color:var(--c-ink)!important;border-radius:9px!important}
+body.app .share-pop .link-btn{border:0!important;background:none!important;height:auto!important;box-shadow:none!important;align-self:flex-start}
+body.app .share-pop #share-pop-team{align-self:center}
+/* More menu: a tidy list that opens to the left of the button. */
+body.app.in-editor #menu-project{position:relative}
+body.app.in-editor #menu-project>.menu-panel{position:absolute;top:calc(100% + 8px);right:0;left:auto!important;width:300px;max-height:calc(100vh - 80px);overflow:auto;padding:6px;background:#fff!important;border:1px solid var(--c-line-2)!important;border-radius:14px!important;box-shadow:0 18px 40px -16px rgba(16,18,24,.22)!important;z-index:60}
+body.app.in-editor #menu-project>.menu-panel>button{display:flex!important;flex-direction:column;align-items:flex-start;gap:2px;width:100%;height:auto!important;padding:8px 10px!important;border:0!important;border-radius:8px!important;background:transparent!important;text-align:left;color:var(--c-ink)!important}
+body.app.in-editor #menu-project>.menu-panel>button:hover{background:var(--c-hover)!important}
+body.app.in-editor #menu-project>.menu-panel>button>b{font-size:13px;font-weight:500}
+body.app.in-editor #menu-project>.menu-panel>button>span{font-size:12px;color:var(--c-ink-3);font-weight:400}
+body.app.in-editor #menu-project>.menu-panel>button>svg{display:none}
+body.app.in-editor #menu-project>.menu-panel>.menu-note{margin:8px 10px 4px;font-size:11.5px;color:var(--c-ink-3);text-transform:none;letter-spacing:0}
+body.app #editor .share-pop .ghost{border:1px solid var(--c-line-2)!important;background:#fff!important;color:var(--c-ink)!important;border-radius:9px!important;height:34px!important;padding:0 12px!important}
+/* Same items twice in More: Settings opens the same panel, and Share has its own button now. */
+body.app.in-editor #menu-project #settings-open,body.app.in-editor #menu-project #team-open{display:none!important}

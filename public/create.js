@@ -855,7 +855,29 @@ $('safari-shot').onclick=async()=>{
 $('dev-shot-close').onclick=()=>$('dev-shot').classList.add('hidden');
 // Reload; when the preview had not loaded, rebuild it first.
 $('refresh').onclick=()=>{if(!$('preview-notice').classList.contains('hidden'))return rebuildPreview();const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
-$('share-open').onclick=()=>$('team-open').click();
+// Share: a small popover like Emergent's: the preview link and Copy, then Publish.
+function renderSharePop(){
+ const p=state.project,on=Boolean(p.share);text($('share-pop-error'),'');
+ $('share-pop-off').classList.toggle('hidden',on);$('share-pop-link').classList.toggle('hidden',!on);
+ if(on){$('share-pop-url').value=location.origin+p.share.url;$('share-pop-remix').checked=Boolean(p.share.remix)}
+ text($('share-pop-copy'),'Copy link');
+ const live=$('share-pop-live');live.replaceChildren();
+ if(p.published){const a=el('a',null,location.origin+'/sites/'+p.published.slug+'/');a.href=a.textContent;a.target='_blank';a.rel='noopener';live.append(el('span','muted small','Live at '),a)}
+ text($('share-pop-publish'),p.published?'Publish changes':'Publish your site');
+ $('share-pop-team').classList.toggle('hidden',state.project.role!=='owner');
+}
+function toggleSharePop(open){const pop=$('share-pop');open=open==null?pop.classList.contains('hidden'):open;pop.classList.toggle('hidden',!open);$('share-open').setAttribute('aria-expanded',String(open));if(open)renderSharePop()}
+async function sharePopCall(body){try{const r=await api('/projects/'+state.project.id+'/share',{method:'POST',body});if(r.project)state.project=r.project;renderSharePop()}catch(err){text($('share-pop-error'),err.message)}}
+$('share-open').onclick=e=>{e.stopPropagation();toggleSharePop()};
+$('share-pop').addEventListener('click',e=>e.stopPropagation());
+document.addEventListener('click',()=>{if(!$('share-pop').classList.contains('hidden'))toggleSharePop(false)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('share-pop').classList.contains('hidden'))toggleSharePop(false)});
+$('share-pop-on').onclick=()=>sharePopCall({enabled:true,remix:false});
+$('share-pop-stop').onclick=()=>sharePopCall({enabled:false,remix:false});
+$('share-pop-remix').onchange=()=>sharePopCall({enabled:true,remix:$('share-pop-remix').checked});
+$('share-pop-copy').onclick=()=>{navigator.clipboard?.writeText($('share-pop-url').value).then(()=>text($('share-pop-copy'),'Copied')).catch(()=>$('share-pop-url').select())};
+$('share-pop-publish').onclick=()=>{toggleSharePop(false);$('publish-open').click()};
+$('share-pop-team').onclick=()=>{toggleSharePop(false);$('team-open').click()};
 function view(mode){
  state.code=mode==='code';state.data=mode==='data';
  for(const m of ['preview','code','data'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
