@@ -95,10 +95,10 @@ body.app #home .home::before,body.app #home .home-hero::before,body.app #home .h
 body.app #home .prompt-box::before,body.app #home .prompt-box::after,body.app #home #new-form::before,body.app #home #new-form::after{display:none!important}
 /* the morning sky, 6:00 to 18:00 (create.js adds body.day) */
 body.app.day #home .home{background-image:
-  radial-gradient(160px 160px at 84% 14%,rgba(255,236,170,.95) 0%,rgba(255,236,170,.35) 35%,rgba(255,236,170,0) 70%),
-  radial-gradient(55% 32% at 14% 44%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 70%),
-  radial-gradient(45% 26% at 62% 58%,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 70%),
-  linear-gradient(180deg,#8FB9E3 0%,#B9D6F0 26%,#D9E8F5 46%,#0E0F11 100%),
+  radial-gradient(70% 40% at 50% 0%,rgba(255,255,255,.22) 0%,rgba(255,255,255,0) 70%),
+  radial-gradient(55% 30% at 12% 46%,rgba(255,255,255,.12) 0%,rgba(255,255,255,0) 70%),
+  radial-gradient(45% 24% at 70% 56%,rgba(255,255,255,.10) 0%,rgba(255,255,255,0) 70%),
+  linear-gradient(180deg,#9DBFDF 0%,#BDD3E6 24%,#D6E1EA 44%,#0E0F11 100%),
   linear-gradient(rgba(0,0,0,.035) 1px,transparent 1px),
   linear-gradient(90deg,rgba(0,0,0,.035) 1px,transparent 1px);
   background-size:100% 100%,100% 100%,100% 100%,100% 760px,48px 48px,48px 48px;background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,repeat,repeat}
@@ -165,7 +165,7 @@ body.app.in-editor #editor #project-name:focus{background:#15171B!important;bord
 body.app.in-editor #editor #messages{background:#0E0F11!important;padding:18px 16px 8px!important}
 body.app.in-editor #editor .messages .user,body.app.in-editor #editor .messages li.user{background:#1C2A2A!important;border:0!important;color:#ECEEF1!important;border-radius:14px 14px 4px 14px!important;box-shadow:none!important;font-size:14px;line-height:21px}
 body.app.in-editor #editor .messages li.assistant{color:#D9DCE1;font-size:14px;line-height:1.65}
-body.app.in-editor #editor .messages .assistant::before{background:#35E0CF!important;color:#0E0F11!important;box-shadow:none!important}
+body.app.in-editor #editor .messages .assistant::before{display:none!important}
 body.app.in-editor #editor .messages .status-line,body.app.in-editor #editor .messages .step{color:#9AA0AA!important;font:400 12.5px/1.5 "Geist Mono",ui-monospace,monospace}
 body.app.in-editor #editor .messages .error,body.app.in-editor #editor .messages li.error,body.app.in-editor #editor .messages .assistant.failed{border-color:rgba(240,97,109,.4)!important;background:rgba(240,97,109,.06)!important;color:#ECEEF1!important}
 body.app.in-editor #editor .chat #progress:not(.hidden){display:flex!important;align-items:center;gap:8px;margin:0 12px;padding:8px 12px 0;color:#3DDC84;font-size:13px}
@@ -388,3 +388,65 @@ body.app.in-editor #editor .messages li .audit-fix{display:inline-block;width:au
 body.app.in-editor #editor .messages li .audit-fix:hover{background:#5BEADB!important}
 body.app.in-editor #editor .messages li .audit-fix:disabled{opacity:.5;cursor:default}
 @media (max-width:720px){body.app #editor .design-moves{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:4px 10px 0}body.app #editor .design-moves .move{flex:0 0 auto}}
+
+/* The brand step ("Do you have a brand?") and its page preview. */
+body.app .brand-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 10px}
+body.app .brand-opt{display:flex;flex-direction:column;gap:3px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:#15171B;color:#ECEEF1;cursor:pointer;box-shadow:none;font:inherit}
+body.app .brand-opt b{font-size:13.5px;font-weight:600}
+body.app .brand-opt span{font-size:12px;color:#9AA0AA;line-height:1.4}
+body.app .brand-opt:hover{background:#1C1F24}
+body.app .brand-opt.on{border-color:#35E0CF;background:rgba(53,224,207,.08)}
+body.app .brand-opt:focus-visible{outline:2px solid #35E0CF;outline-offset:1px}
+body.app .brand-body{display:flex;flex-direction:column;gap:10px}
+body.app .brand-note,body.app .brand-why,body.app .brand-got{margin:0;font-size:13.5px;line-height:1.55;color:#C4C8CF}
+body.app .brand-why{color:#ECEEF1}
+body.app .brand-got{color:#3DDC84}
+body.app .brand-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+body.app .brand-url{flex:1 1 220px;height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0E0F11;color:#ECEEF1;font:14px/1 Geist,ui-sans-serif,sans-serif}
+body.app .brand-url::placeholder{color:#666C77}
+body.app .brand-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+body.app .lk-page{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.08);font-size:13px;line-height:1.45}
+body.app .lk-p-nav{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid;font-size:12.5px;white-space:nowrap}
+body.app .lk-p-nav b{font-size:14px;margin-right:auto;overflow:hidden;text-overflow:ellipsis;min-width:0}
+body.app .lk-p-cta{padding:5px 10px;font-size:12px;font-weight:600}
+body.app .lk-p-hero{padding:26px 16px 18px;display:flex;flex-direction:column;gap:10px}
+body.app .lk-p-h1{font-size:30px;line-height:1.05;letter-spacing:-.02em;max-width:18ch}
+body.app .lk-p-sub{margin:0;max-width:44ch;font-size:13.5px}
+body.app .lk-p-actions{display:flex;gap:12px;align-items:center;margin-top:4px}
+body.app .lk-p-btn{padding:8px 14px;font-weight:600;font-size:13px}
+body.app .lk-p-link{font-size:13px;text-decoration:underline;text-underline-offset:3px}
+body.app .lk-p-list{margin:0 16px 16px;padding:12px 14px}
+body.app .lk-p-listhead{font-size:14px;margin-bottom:6px}
+body.app .lk-p-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid;font-size:12.5px}
+@media (max-width:720px){body.app .brand-opts{grid-template-columns:1fr}body.app .lk-p-h1{font-size:24px}body.app .lk-p-nav span:not(.lk-p-cta){display:none}}
+
+/* The work log in the chat: the step rail (live and folded), the breathing dots, the status line. */
+body.app.in-editor #editor .messages .status-line{display:inline-flex;align-items:center;gap:8px;font:500 13px/1.5 Geist,ui-sans-serif,sans-serif!important;color:#C4C8CF!important;background:transparent!important;border:0!important;padding:2px 0!important;cursor:pointer}
+body.app.in-editor #editor .messages .status-line .ico{width:14px;height:14px;transition:transform .15s}
+body.app.in-editor #editor .messages .status-line[aria-expanded="true"] .ico{transform:rotate(90deg)}
+body.app.in-editor #editor .messages .status-line:hover{color:#ECEEF1!important}
+body.app .rail::before{background:rgba(255,255,255,.1)}
+body.app .ev>.ico{background:#15171B;color:#9AA0AA}
+body.app .ev-head{color:#D9DCE1;font-size:13.5px}
+body.app .ev-label{font-weight:500}
+body.app .ev-think .ev-label{color:#9AA0AA}
+body.app .ev-thought,body.app .ev-detail{color:#9AA0AA}
+body.app .ev-detail{background:#0E0F11;border-color:rgba(255,255,255,.08)}
+body.app .ev-test:not(.bad)>.ico,body.app .ev-check:not(.bad)>.ico{color:#3DDC84}
+body.app .ev.bad>.ico{color:#F0616D}
+body.app .rail.done{margin:6px 0 10px}
+body.app .rail.live .ev-think.live .ev-label{color:#ECEEF1}
+body.app .ev-more{display:block;grid-template-columns:none;padding:2px 0 6px 30px!important}
+body.app .ev-more .link-btn{white-space:nowrap;color:#9AA0AA;font-size:12.5px;background:none;border:0;padding:0;cursor:pointer}
+body.app .ev-more .link-btn:hover{color:#ECEEF1;text-decoration:underline}
+body.app .k-dots{display:inline-flex;gap:3px;align-items:center;margin-left:2px}
+body.app .k-dots i{width:5px;height:5px;border-radius:50%;background:#35E0CF;opacity:.3;animation:k-dot 1.2s ease-in-out infinite}
+body.app .k-dots i:nth-child(2){animation-delay:.2s}
+body.app .k-dots i:nth-child(3){animation-delay:.4s}
+@keyframes k-dot{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){body.app .k-dots i{animation:none;opacity:.7}}
+body.app.in-editor #editor .work .stages.hidden{display:none}
+body.app .think-line{display:flex;align-items:center;gap:8px;color:#ECEEF1;font-size:14px;margin:0}
+body.app.in-editor #editor .messages .status-line .agent-name{color:#ECEEF1;font-weight:600}
+body.app.in-editor #editor .messages .status-line .agent-name::before{content:"";display:inline-block;width:14px;height:14px;border-radius:4px;background:#35E0CF;margin-right:7px;vertical-align:-2px}
+body.app.in-editor #editor .messages .status-line .status-text{color:#9AA0AA;font-weight:400}

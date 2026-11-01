@@ -304,6 +304,7 @@ function agentHead(label){
 }
 // A short line under a reply: what the agent did to get there ("Thought it through, used 3 tools").
 function workLine(text){return el('p','work-line',text)}
+function thinkLine(text){const p=el('p','ask-head think-line');p.append(el('span',null,text),dots());return p}
 async function askThenBuild(prompt){
  const name=shortName(prompt);
  const {project}=await api('/projects',{method:'POST',body:{name}});
@@ -313,8 +314,8 @@ async function askThenBuild(prompt){
  const card=document.createElement('li');card.className='assistant ask-card';
  card.classList.add('enter');card.dataset.dir='0';
  const started=Date.now(),worked=()=>'Worked for '+Math.max(1,Math.round((Date.now()-started)/1000))+'s';
- card.append(agentHead('Reading your request…'),el('p','ask-head k-shimmer','Thinking it through…'));list.append(card);
- const {questions=[]}=await api('/clarify',{method:'POST',body:{prompt,tier:state.tier}}).catch(()=>({questions:[]}));
+ card.append(agentHead('Reading your request…'),thinkLine('Thinking it through'));list.append(card);
+ const {opening='',questions=[]}=await api('/clarify',{method:'POST',body:{prompt,tier:state.tier}}).catch(()=>({opening:'',questions:[]}));
  // The answers go with the request; the picked look becomes the project's colours and fonts; then
  // the plan (build-plan.js) is shown with Review, Skip and Approve, and the build starts on Approve.
  const request=answers=>answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
@@ -322,7 +323,7 @@ async function askThenBuild(prompt){
  const build=async(answers,look)=>{
   if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
   if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
-  morph(card,()=>card.append(agentHead(worked()),el('p','ask-head k-shimmer','Planning the first version…'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
+  morph(card,()=>card.append(agentHead(worked()),thinkLine('Planning the first version'),el('p','plan-sub','Looking up anything your request names, then writing the plan.')),0);
   planWaiting(true);
   const {plan}=await api('/projects/'+project.id+'/plan',{method:'POST',body:{prompt:request(answers),tier:state.tier}}).catch(()=>({plan:null}));
   if(!plan)return go(answers,null);
@@ -339,12 +340,13 @@ async function askThenBuild(prompt){
  const picked=questions.map(q=>new Set(Number.isInteger(q.recommended)?[q.options[q.recommended]]:[])),other=questions.map(()=>'');
  const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
  const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:'One more thing',onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>draw(-1):null});
- const next=()=>{if(window.KairoqLook){morph(card,()=>card.append(agentHead(worked()),el('p','ask-head k-shimmer','Finding looks that fit…')),1);setTimeout(lookStep,STILL?0:170)}else build(answers())};
- if(!questions.length)return next();
+ const next=()=>{if(window.KairoqLook){morph(card,()=>card.append(agentHead(worked()),thinkLine('Thinking about the look')),1);setTimeout(lookStep,STILL?0:170)}else build(answers())};
+ // No questions: the opening line says what gets built, then straight on to the brand.
+ if(!questions.length){if(opening){morph(card,()=>card.append(agentHead(worked()),el('p','ask-intro',opening)),1);setTimeout(next,STILL?0:900)}else next();return}
  const draw=(dir=1)=>morph(card,()=>{
   card.append(agentHead(worked()));
-  card.append(el('p','ask-intro','A few quick choices before I plan the build. I\'ve filled in what I\'d suggest; change anything, then confirm.'));
-  card.append(workLine('Thought it through · '+questions.length+' question'+(questions.length===1?'':'s')+' · the answers are free'));
+  card.append(el('p','ask-intro',opening||'A few quick things before I plan the build. I\'ve filled in what I\'d suggest; change anything, then confirm.'));
+  card.append(workLine('Read your request · '+questions.length+' question'+(questions.length===1?'':'s')+', my suggestion filled in · free'));
   const box=el('div','qs');
   questions.forEach((q,at)=>{
    const row=el('div','q');row.dataset.open='false';
@@ -581,7 +583,15 @@ function messageItem(m,last,index){
   // Like Lovable: "Thought for Ns", the answer (formatted), then what was done, folded.
   const think=tl.find(e=>e.t==='think');
   const thoughtMs=m.thought_ms!=null?m.thought_ms:think?think.ms:null;
-  if(thoughtMs!=null&&index>=0){const b=el('button','status-line done');b.type='button';b.append(el('span','status-text','Thought for '+secsShort(thoughtMs)),icon('chev'));b.onclick=()=>openDetail(index,'timeline');li.append(b)}
+  // "Worked for 41s · 9 steps": the steps fold out under it (like a coding agent's log); Details has the rest.
+  if((thoughtMs!=null||tl.length)&&index>=0){
+   const steps=tl.filter(e=>e.t!=='note'||e.icon).length;
+   const label=m.duration_ms!=null&&steps?'Worked for '+secsShort(m.duration_ms)+' · '+steps+' step'+(steps===1?'':'s'):thoughtMs!=null?'Thought for '+secsShort(thoughtMs):'Worked for '+secsShort(m.duration_ms||0);
+   const b=el('button','status-line done');b.type='button';b.setAttribute('aria-expanded','false');b.append(el('span','agent-name','Kairoq Agent'),el('span','status-text',label),icon('chev'));
+   const rail=el('ol','rail done hidden');
+   b.onclick=()=>{if(!rail.childElementCount)for(const e of tl)rail.append(eventRow(e,{expand:false,version:m.version}));const open=rail.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!open))};
+   li.append(b,rail);
+  }
   li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
@@ -1320,11 +1330,15 @@ function summarize(events){
  return[reads&&'read '+reads+' file'+(reads===1?'':'s'),edits&&'edited '+edits+' file'+(edits===1?'':'s'),tests.length&&(tests.at(-1).ok?'tested in a browser':'browser test found problems'),fixes&&'fixed '+fixes+' problem'+(fixes===1?'':'s')].filter(Boolean).join(' · ').replace(/^./,c=>c.toUpperCase());
 }
 // ---------- live: the chat shows a status line and the latest activity ----------
+// Three breathing dots: shown wherever Kairoq is thinking.
+function dots(){const d=el('span','k-dots');d.setAttribute('aria-hidden','true');d.append(el('i'),el('i'),el('i'));return d}
+// For the kairoq-design tests: render a saved message the way the chat does.
+window.kairoqRenderMessage=(m,last,index)=>messageItem(m,last,index);
 function workCard(){
  let li=$('stream');
  if(!li){
   li=el('li','assistant work');li.id='stream';
-  const status=el('button','status-line');status.type='button';status.append(el('span','status-text','Thinking'),icon('chev'));status.onclick=()=>openDetail('live');
+  const status=el('button','status-line');status.type='button';status.append(el('span','agent-name','Kairoq Agent'),el('span','status-text','Thinking'),dots(),icon('chev'));status.onclick=()=>openDetail('live');
   const head=el('div','work-head');head.append(status,el('span','work-time'));const stop=el('button','ghost work-stop','Stop');stop.type='button';stop.onclick=()=>$('stop-job').click();head.append(stop);
   // Like Lovable: one status line, then what Kairoq says and plans; the step checklist stays in Details.
   li.append(head,el('div','work-msg hidden'),el('ol','stages'),el('p','work-think hidden'),el('ol','rail live'));
@@ -1406,10 +1420,14 @@ function renderWork(j){
  li.querySelector('.stages').replaceWith(ask?el('ol','stages hidden'):stageList(j));
  const th=li.querySelector('.work-think'),thought='';th.classList.toggle('hidden',!thought);text(th,thought);
  renderBuildOverlay(j);
+ // The steps so far, in the chat, like a coding agent's log: the last eight, the rest folded
+ // behind "earlier steps"; a live "Thinking…" row with breathing dots while the model works.
  const r=li.querySelector('.rail.live');r.replaceChildren();
- // Only the files it is changing and the problems it is fixing show here; notes (the design pick,
- // engine switches) and the rest stay in Details.
- // Detailed file activity is available in Details.
+ const events=liveEvents(j),cut=Math.max(0,events.length-8);
+ if(cut){const more=el('li','ev ev-more');const b=el('button','link-btn',cut+' earlier step'+(cut===1?'':'s'));b.type='button';b.onclick=()=>openDetail('live');more.append(b);r.append(more)}
+ for(const e of events.slice(cut))r.append(eventRow(e,{live:true}));
+ if(phaseOf(j)==='thinking'||(j.status==='writing'&&!(st&&st.chars))){const row=el('li','ev ev-think live');row.append(icon('think'));const main=el('div','ev-main'),head=el('div','ev-head');head.append(el('span','ev-label','Thinking'),dots());main.append(head);row.append(main);r.append(row)}
+ li.querySelector('.stages').classList.add('hidden');
  const msg=li.querySelector('.work-msg');
  const said=j.mode==='discuss'&&st?.text?st.text:'';
  const planText='';
