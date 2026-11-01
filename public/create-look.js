@@ -75,19 +75,21 @@ function lookCard(look,{on,onPick}){
   h('span',{class:'lk-card-meta'},
    h('b',null,look.name),
    h('span',{class:'lk-dots','aria-hidden':'true'},...['bg','surface','ink','muted','accent'].map(k=>h('i',{style:{background:c[k]}}))),
-   h('small',null,fonts)));
+   h('small',null,look.material?look.material:fonts)));
 }
 
 // ---------- data ----------
 let data=null;
-async function loadData(){if(!data)data=await call('/looks');return data}
+async function loadData(prompt){if(!data)data=await call('/looks'+(prompt?'?prompt='+encodeURIComponent(String(prompt).slice(0,2000)):''));return data}
 // Apps for children start on Playful and are offered only light, soft looks (no dark screens).
 function forKids(prompt){return /\b(kids?|children|child|toddlers?|preschool(ers)?|little ones|nursery|kindergarten)\b/i.test(String(prompt||''))}
 function light(l){const n=parseInt(String(l.colors&&l.colors.bg||'#ffffff').slice(1),16);return(0.2126*((n>>16)&255)+0.7152*((n>>8)&255)+0.0722*(n&255))/255>0.72}
 function forFeel(feel,kids){
  const recent=new Set(data.recent||[]),every=data.looks.filter(l=>l.feel===feel),soft=kids?every.filter(light):every,all=soft.length>=3?soft:every;
- // Looks used for the owner's newest apps go to the end so new apps do not repeat them.
- return all.filter(l=>!recent.has(l.id.split('--')[0])).concat(all.filter(l=>recent.has(l.id.split('--')[0])));
+ // Hallmark themes that fit the request come first; looks used for the owner's newest apps go
+ // to the end so new apps do not repeat them.
+ const sug=data.suggested||[],rank=l=>sug.includes(l.id)?0:recent.has(l.id.split('--')[0])?2:1;
+ return all.map((l,i)=>[rank(l),sug.indexOf(l.id)>=0?sug.indexOf(l.id):i,l]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(x=>x[2]);
 }
 
 // ---------- dialogs ----------
@@ -234,52 +236,99 @@ const THREE_D=[
  {id:'walkthrough',label:'Room walkthrough',tip:'Move around a space with labelled spots, for a property, venue or showroom.'},
  {id:'scroll',label:'Scroll story',tip:'The camera moves around your model as visitors scroll.'},
  {id:'background',label:'3D background',tip:'A slow-turning model behind the top of the page.'}];
-// ---------- the step inside the chat ----------
-// card: the chat list item to draw into. count: "Question 3 of 3" or "One quick question".
-// onBuild(look|null): null means "Decide for me" without a pick (Kairoq's own design brief).
+// ---------- the brand step inside the chat ----------
+// One question after the clarifying ones: "Do you have a brand?" Three ways in: the owner's own
+// site or colours, Kairoq's pick for this business (recommended, shown as a real page preview),
+// or a few words the owner writes. No gallery of palettes: Kairoq chooses from its looks and
+// Hallmark's themes underneath, and the owner can still open the gallery or fine-tune.
+const FEEL_WORDS=[[/\b(warm|cosy|cozy|friendly|soft|gentle|calm|quiet|natural|organic)\b/i,'calm'],[/\b(bold|loud|strong|punchy|energetic|sport|street|urban)\b/i,'bold'],[/\b(fun|playful|kids?|children|bright|colou?rful|cheerful|candy)\b/i,'playful'],[/\b(premium|luxury|luxurious|elegant|dark|moody|high.end|boutique|classy|refined)\b/i,'premium'],[/\b(minimal|clean|simple|plain|modern|tech|saas|startup)\b/i,'minimal']];
+function feelFromWords(t){for(const [re,f] of FEEL_WORDS)if(re.test(String(t||'')))return f;return''}
+// A short name for the preview: the project name when it is short, else the first few words of
+// the request without the "a website for" part ("A field guide website for Ontario birds" → "Ontario birds").
+function headline(name,prompt){
+ let n=String(name||prompt||'').replace(/^(an?|the|my)\s+/i,'').replace(/\b(website|web app|app|site|landing page|page|platform)\b\s*(for|about|of)?\s*/i,'').replace(/\s+with\b.*$/i,'').trim();
+ n=n.split(/[.,:;\n]/)[0].trim();
+ if(n.length>28)n=n.split(/\s+/).slice(0,3).join(' ');
+ return n?n.charAt(0).toUpperCase()+n.slice(1):'Your business';
+}
+// A real page in this look: menu, headline, one sentence, the action, a short list. Not a sample screen.
+function pagePreview(look,name,prompt){
+ const c=look.colors,r=RADIUS[look.corners]||RADIUS.soft;loadFonts([look.head,look.body]);
+ const head={fontFamily:"'"+look.head+"',serif",fontWeight:String(look.headW||600)},body="'"+look.body+"',sans-serif";
+ const row=(a,b,i)=>h('div',{class:'lk-p-row',style:{borderColor:i?c.surface:'transparent'}},h('span',null,a),h('span',{style:{color:c.muted}},b));
+ return h('div',{class:'lk-page',style:{background:c.bg,color:c.ink,fontFamily:body,'--lk-r':r}},
+  h('div',{class:'lk-p-nav',style:{borderColor:c.surface}},h('b',{style:head},headline(name,prompt)),h('span',{style:{color:c.muted}},'Home'),h('span',{style:{color:c.muted}},'About'),h('span',{class:'lk-p-cta',style:{background:c.accent,color:c.accentInk,borderRadius:r}},'Get in touch')),
+  h('div',{class:'lk-p-hero'},
+   h('div',{class:'lk-p-h1',style:head},headline(name,prompt)),
+   h('p',{class:'lk-p-sub',style:{color:c.muted}},'One clear sentence about what you offer and who it is for.'),
+   h('div',{class:'lk-p-actions'},h('span',{class:'lk-p-btn',style:{background:c.accent,color:c.accentInk,borderRadius:r}},'Get started'),h('span',{class:'lk-p-link',style:{color:c.ink}},'See how it works'))),
+  h('div',{class:'lk-p-list',style:{background:c.surface,borderRadius:r}},h('div',{class:'lk-p-listhead',style:head},'What you get'),row('Made for your customers','Clear and quick',0),row('Works on every phone','Tested before you see it',1),row('Yours to change','Any colour, any word',2)));
+}
+function whyThis(look,name){
+ if(look.material)return'For '+headline(name)+' I would go with '+look.name+': '+look.material+'.';
+ const feel=({calm:'calm and clear',bold:'bold',playful:'playful',premium:'premium and quiet',minimal:'minimal'})[look.feel]||'clear';
+ return'For '+headline(name)+' I would go with '+look.name+': a '+feel+' look, '+(look.head===look.body?look.head+' throughout':look.head+' for headings and '+look.body+' for reading')+'.';
+}
 async function step({card,count,name,prompt,onBuild,onBack,onSkip}){
- card.replaceChildren(h('p',{class:'ask-head'},'Loading looks…'));
- try{await loadData()}catch(e){return onBuild(null)}
+ card.replaceChildren(h('p',{class:'ask-head'},'One more thing…'));
+ try{await loadData(prompt)}catch(e){return onBuild(null)}
  const kids=forKids(prompt);
- const st={feel:kids?'playful':'calm',page:0,picked:null,three:'none'};
- const preview=previewPane();document.body.classList.add('picking-look');
- const done=()=>{document.body.classList.remove('picking-look');preview.remove()};
- // A look from the gallery, a website or Fine-tune joins the cards and is selected.
- const use=look=>{st.picked=look;if(!shown().some(l=>l.id===look.id)&&!(data.brand&&look.id===data.brand.id))st.extra=look;draw()};
- function shown(){const list=forFeel(st.feel,kids);const n=list.length;const a=(st.page*3)%n;return[0,1,2].map(i=>list[(a+i)%n])}
+ // Kairoq's picks for this request: suggested themes first, then the looks of the fitting feel.
+ const feel=feelFromWords(prompt)||(kids?'playful':'calm');
+ const picks=()=>{const sug=(data.suggested||[]).map(id=>data.looks.find(l=>l.id===id)).filter(l=>l&&(!kids||light(l)));const rest=forFeel(feel,kids).filter(l=>!sug.includes(l));return[...sug,...rest]};
+ const st={mode:data.brand?'mine':'kairoq',at:0,list:picks(),picked:null,words:'',site:null,busy:false,error:''};
+ st.picked=data.brand||st.list[0];
+ const use=look=>{st.picked=look;draw()};
+ const describe=async()=>{
+  const words=st.words.trim();if(!words||st.busy)return;
+  st.busy=true;st.error='';draw();
+  try{const d=await call('/looks?prompt='+encodeURIComponent(words.slice(0,300)));const f=feelFromWords(words);const sug=(d.suggested||[]).map(id=>data.looks.find(l=>l.id===id)).filter(Boolean);st.list=[...sug,...(f?data.looks.filter(l=>l.feel===f&&!sug.includes(l)):[])];if(!st.list.length)st.list=picks();st.at=0;st.picked=st.list[0]}
+  catch(e){st.error=e.message}
+  st.busy=false;draw();
+ };
+ const readSite=async(input)=>{
+  const v=input.value.trim();if(!v||st.busy)return;
+  st.busy=true;st.error='';draw();
+  try{const r=await call('/looks/from-site',{url:/^https?:\/\//i.test(v)?v:'https://'+v,own:true});st.site=r;st.picked=r.look}
+  catch(e){st.error=e.message}
+  st.busy=false;draw();
+ };
  function draw(){
-  const three=shown();if(!st.picked)st.picked=three[0];
-  const cards=[...(data.brand?[data.brand]:[]),...(st.extra?[st.extra]:[]),...three];
-  preview.replaceChildren(h('div',{class:'lk-preview-head'},h('b',null,'Live preview'),h('span',null,st.picked.name+', changes as you pick')),sample(st.picked,name));
+  const look=st.picked;
+  const opt=(id,title,sub)=>h('button',{type:'button',class:'brand-opt'+(st.mode===id?' on':''),'aria-pressed':String(st.mode===id),onclick:()=>{st.mode=id;if(id==='kairoq'){st.list=picks();st.at=0;st.picked=st.list[0]}if(id==='mine'&&data.brand)st.picked=data.brand;draw()}},h('b',null,title),h('span',null,sub));
+  const body=h('div',{class:'brand-body'});
+  if(st.mode==='mine'){
+   const input=h('input',{type:'url',class:'brand-url',placeholder:'yourbusiness.com','aria-label':'Your website',value:'',onkeydown:e=>{if(e.key==='Enter'){e.preventDefault();readSite(input)}}});
+   body.append(h('p',{class:'brand-note'},data.brand?'Your saved brand is ready; Kairoq matches it exactly.':'Paste your website and Kairoq reads your colours and fonts, or set them by hand.'),
+    h('div',{class:'brand-row'},input,h('button',{type:'button',class:'lk-btn',disabled:st.busy,onclick:()=>readSite(input)},st.busy?'Reading…':'Read it'),h('button',{type:'button',class:'lk-link',onclick:()=>openTune(copy(look||st.list[0]),use,{name})},'Set colours and fonts by hand')));
+   if(st.site&&st.site.understood){const u=st.site.understood;body.append(h('p',{class:'brand-got'},'Got it: '+u.colors.map(x=>x.label.toLowerCase()+' '+x.hex).join(', ')+'; '+u.fonts+'. We will match it exactly.'))}
+  }else if(st.mode==='words'){
+   const input=h('input',{type:'text',class:'brand-url',placeholder:'warm, like a Scandinavian bakery',value:st.words,'aria-label':'Describe the look',oninput:e=>{st.words=e.target.value},onkeydown:e=>{if(e.key==='Enter'){e.preventDefault();describe()}}});
+   body.append(h('p',{class:'brand-note'},'A few words are enough: a mood, a material, a place.'),h('div',{class:'brand-row'},input,h('button',{type:'button',class:'lk-btn',disabled:st.busy,onclick:describe},st.busy?'Finding…':'Show me')));
+  }else{
+   body.append(h('p',{class:'brand-why'},look?whyThis(look,name):''));
+  }
+  if(st.error)body.append(h('p',{class:'lk-error'},st.error));
+  if(look&&(st.mode!=='mine'||st.site||data.brand)){
+   body.append(pagePreview(look,name,prompt),
+    h('div',{class:'brand-tools'},
+     st.mode!=='mine'&&st.list.length>1?h('button',{type:'button',class:'lk-btn',onclick:()=>{st.at=(st.at+1)%st.list.length;st.picked=st.list[st.at];draw()}},'Try another'):null,
+     h('button',{type:'button',class:'lk-link',onclick:()=>openTune(copy(look),use,{name})},'Fine-tune'),
+     h('button',{type:'button',class:'lk-link',onclick:()=>openGallery(look,use,{name})},'All looks')));
+  }
   const foot=h('div',{class:'ask-foot'});
-  if(onBack)foot.append(h('button',{type:'button',class:'ask-link',onclick:()=>{done();onBack()}},'Back'));
-  foot.append(h('button',{type:'button',class:'ask-ghost',onclick:()=>{const l=three[Math.floor(Math.random()*3)];st.picked=l;draw();}},'Decide for me'),
-   h('button',{type:'button',class:'ask-next',onclick:()=>{done();onBuild({...copy(st.picked),three_d:st.three})}},'Build with '+st.picked.name));
-  const t3=THREE_D.find(x=>x.id===st.three)||THREE_D[0];
+  if(onBack)foot.append(h('button',{type:'button',class:'ask-link',onclick:onBack},'Back'));
+  foot.append(h('span',{class:'ask-gap'}),h('button',{type:'button',class:'ask-link',onclick:()=>(onSkip||onBuild)(null)},'Not now'),
+   h('button',{type:'button',class:'ask-next',disabled:!look,onclick:()=>onBuild({...copy(look),three_d:'none'})},look?'Build with '+look.name:'Build'));
   card.replaceChildren(
-   h('div',{class:'ask-top'},h('span',{class:'ask-count'},count),h('button',{type:'button',class:'ask-link',onclick:()=>{done();(onSkip||onBuild)(null)}},'Skip')),
-   h('p',{class:'ask-q'},'How should it feel?'),
-   h('p',{class:'lk-sub lk-lead'},'Pick a feeling, then a look. You can change any colour or font afterwards.'),
-   h('div',{class:'lk-feels',role:'group','aria-label':'Feeling'},...data.feels.map(f=>h('button',{type:'button',class:'lk-chip'+(st.feel===f.id?' on':''),'aria-pressed':String(st.feel===f.id),onclick:()=>{st.feel=f.id;st.page=0;st.picked=null;draw()}},f.label))),
-   h('div',{class:'lk-cards'},...cards.map(l=>lookCard(l,{on:l===st.picked||l.id===st.picked.id,onPick:()=>{st.picked=l;draw()}}))),
-   h('div',{class:'lk-tools'},
-    h('button',{type:'button',class:'lk-btn',onclick:()=>{st.page++;st.picked=null;draw()}},'Show 3 more'),
-    h('button',{type:'button',class:'lk-btn',onclick:()=>openGallery(st.picked,use,{name})},'Browse all '+data.looks.length),
-    h('button',{type:'button',class:'lk-btn',onclick:()=>openSite(use,{name})},'From a website'),
-    h('button',{type:'button',class:'lk-link',onclick:()=>openTune(copy(st.picked),use,{name})},'Fine-tune colours and fonts')),
-   h('p',{class:'lk-sub lk-3d-q'},'Add 3D?'),
-   h('div',{class:'lk-feels lk-3d',role:'group','aria-label':'3D'},...THREE_D.map(x=>h('button',{type:'button',class:'lk-chip'+(st.three===x.id?' on':''),'aria-pressed':String(st.three===x.id),title:x.tip,onclick:()=>{st.three=x.id;draw()}},x.label))),
-   h('p',{class:'lk-sub lk-3d-tip'},t3.tip),
-   foot);
+   h('p',{class:'ask-intro'},'One more thing: do you have a brand?'),
+   h('div',{class:'brand-opts',role:'group','aria-label':'Brand'},
+    opt('mine','Use my brand','Your website, or your logo and colours'),
+    opt('kairoq','Design it for me'+(st.mode==='kairoq'||!data.brand?' (Recommended)':''),'Kairoq picks a direction for this business and shows it'),
+    opt('words','I\'ll describe it','"warm, like a Scandinavian bakery"')),
+   body,foot);
  }
  draw();
 }
-function previewPane(){
- const old=document.getElementById('look-preview');if(old)old.remove();
- const p=h('div',{id:'look-preview',class:'lk-preview',role:'region','aria-label':'Look preview'});
- (document.getElementById('canvas')||document.body).append(p);
- return p;
-}
-
-window.KairoqLook={step,openGallery,openTune,openSite,sample,forKids};
+window.KairoqLook={step,openGallery,openTune,openSite,sample,pagePreview,forKids};
 })();

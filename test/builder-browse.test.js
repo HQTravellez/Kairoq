@@ -35,7 +35,14 @@ const browse=(u,o)=>runtime.session('http://127.0.0.1:'+server.address().port+u,
 
 test('the builder uses its own app: a working button reaches the goal',{skip:!runtime.available()&&'no Chromium',timeout:120000},async()=>{
  const meta=builder.create({name:'Tally',owner:'owner'});presses=0;
- const r=await builder.selfBrowse(meta.id,meta,app(true),{goal:'Press Add one until the count shows 2'},{browse,callModel});
+ // The owner watches in Kairoq's browser pane: frames with a screenshot, the address and the steps.
+ const frames=[];
+ const r=await builder.selfBrowse(meta.id,meta,app(true),{goal:'Press Add one until the count shows 2'},{browse,callModel,onBrowser:f=>frames.push(f)});
+ assert.ok(frames.length>=2,'frames streamed: '+frames.length);
+ assert.match(frames[0].title,/^Testing: Press Add one/);
+ assert.match(frames[0].url,/127\.0\.0\.1/);
+ assert.ok(/^[A-Za-z0-9+/=]{200,}$/.test(frames[0].screenshot),'a JPEG as base64');
+ assert.ok(frames.at(-1).steps.some(x=>/click "Add one"/.test(x)),'the steps are listed: '+JSON.stringify(frames.at(-1).steps));
  assert.match(r,/^Reached the goal \(desktop\)/);
  assert.match(r,/click "Add one"/);
  assert.match(r,/It works for this goal\./);

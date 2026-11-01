@@ -25,6 +25,10 @@ Kairoq can invoke a separately installed OpenEnrich CLI and can call the Postiz 
 
 `design-skills/frontend-design/SKILL.md` is the "frontend-design" skill from https://github.com/anthropics/skills, licensed under the Apache License 2.0 (full text in `design-skills/frontend-design/LICENSE.txt`). Kairoq changed only its front matter (display name, `default: on`).
 
+## Hallmark
+
+`design-library/hallmark/` holds the 50 themes (`themes/*.md`) and the photo index (`photos.json`) of Hallmark by Together AI (MIT, https://github.com/Nutlope/hallmark, revision 4f6a46c, licence in `design-library/hallmark/LICENSE`). The themes are offered as Looks before an app's first build and their words go into the design brief (`hallmark.js`); the photo index points at openly licensed photographs on Wikimedia Commons, each credited to its author and licence where it is used. Hallmark's scripts and image generation are not included. Its skill (SKILL.md, references and agents, MIT) ships read-only to Kairoq Agent in `hermes/skills/design/hallmark/`. Impeccable's Hermes skill (SKILL.md and references, Apache-2.0, © Paul Bakaus, https://github.com/pbakaus/impeccable) ships the same way in `hermes/skills/design/impeccable/`.
+
 ## Prettier
 
 Prettier 3.9 (MIT, https://github.com/prettier/prettier) formats the code the app builder writes (`code-format.js`). It runs on the server only; generated apps do not include it.
