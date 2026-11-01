@@ -276,3 +276,7 @@ frontmatter tool declarations, passed through Kairoq's prompt-injection scanner,
 treated strictly as implementation guidance. They do not grant shell, network, or tool
 permissions. Kairoq already includes GSAP as a runtime dependency, so no package install
 is performed by this integration.
+
+## Editor backdrop photo
+
+The image behind the Create home prompt and the editor's top bar is the Carina Nebula, taken by the Hubble Space Telescope. Credit: NASA. Kairoq loads it from Unsplash (https://unsplash.com/photos/nebula--hI5dX2ObAs) under the Unsplash License, which allows free commercial use without attribution. NASA images are generally not copyrighted. `public/space.webp` is a fallback drawn for Kairoq and is shown only if the photo fails to load.

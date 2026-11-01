@@ -1,11 +1,12 @@
-/* Calm editor: an off-white page with a faint dot grid, white cards, a bright space scene
-   (public/space.webp, 3840x1600, drawn for Kairoq: nebula, stars, a planet's glowing rim) behind home and along the editor's top bar, and
+/* Calm editor: an off-white page with a faint dot grid, white cards, a real NASA Hubble
+   photo of the Carina Nebula (Unsplash, free licence; public/space.webp is the fallback if it
+   cannot load) behind home and along the editor's top bar, and
    deep navy for actions. One quiet top bar, a 40/60 split, a plain composer and small next-step chips.
    Loaded last, so it wins over the older layers without touching them. */
-body.app{--c-bg:#FAFBFC;--c-panel:#FFFFFF;--c-raise:#F4F6F8;--c-ink:#2A2D32;--c-ink-2:#5C6168;--c-ink-3:#737980;--c-line:#EDEFF2;--c-line-2:#D8DBE0;--c-hover:rgba(10,42,82,.05);--c-accent:#0A2A52;--c-accent-2:#123A6E;--c-glow:0 1px 1px rgba(0,0,0,.1),0 0 18px rgba(10,42,82,.32),inset 0 -1.5px 0 rgba(0,0,0,.2);--c-dots:radial-gradient(circle,rgba(0,0,0,.07) 1px,transparent 1.2px);--c-sky:url("/space.webp")}
-/* Home: the space scene behind the prompt, fading into the page. */
+body.app{--c-bg:#FAFBFC;--c-panel:#FFFFFF;--c-raise:#F4F6F8;--c-ink:#2A2D32;--c-ink-2:#5C6168;--c-ink-3:#737980;--c-line:#EDEFF2;--c-line-2:#D8DBE0;--c-hover:rgba(10,42,82,.05);--c-accent:#0A2A52;--c-accent-2:#123A6E;--c-glow:0 1px 1px rgba(0,0,0,.1),0 0 18px rgba(10,42,82,.32),inset 0 -1.5px 0 rgba(0,0,0,.2);--c-dots:radial-gradient(circle,rgba(0,0,0,.07) 1px,transparent 1.2px);--c-photo:url("https://images.unsplash.com/photo-1462332420958-a05d1e002413?w=3840&q=85&fm=webp&fit=crop");--c-sky:url("/space.webp")}
+/* Home: the nebula photo behind the prompt, fading into the page. */
 body.app #home,body.app.day #home{background:var(--c-bg)!important}
-body.app #home .home,body.app.day #home .home{background-color:var(--c-bg)!important;background-image:linear-gradient(180deg,rgba(250,251,252,0) 0,rgba(250,251,252,0) 430px,var(--c-bg) 640px),var(--c-sky),var(--c-dots)!important;background-size:100% 100%,max(100%,1680px) auto,20px 20px!important;background-repeat:no-repeat,no-repeat,repeat!important;background-position:0 0,center top,0 0!important}
+body.app #home .home,body.app.day #home .home{background-color:var(--c-bg)!important;background-image:linear-gradient(180deg,rgba(10,12,30,.3) 0,rgba(10,12,30,.06) 300px,rgba(250,251,252,0) 420px,var(--c-bg) 640px),var(--c-photo),var(--c-sky),var(--c-dots)!important;background-size:100% 100%,max(100%,1600px) auto,max(100%,1680px) auto,20px 20px!important;background-repeat:no-repeat,no-repeat,no-repeat,repeat!important;background-position:0 0,center top,center top,0 0!important}
 body.app #home .home::after{display:none!important}
 body.app.day #home .home-hero h1,body.app #home .home-hero h1{color:#fff!important;text-shadow:0 2px 20px rgba(10,42,82,.45)}
 body.app.day #home .home-sub,body.app #home .home-sub{color:#fff!important;text-shadow:0 1px 12px rgba(10,42,82,.5)}
@@ -99,7 +100,7 @@ body.app #editor .share-pop .ghost{border:1px solid var(--c-line-2)!important;ba
 body.app.in-editor #menu-project #settings-open,body.app.in-editor #menu-project #team-open{display:none!important}
 
 /* The space band: the same scene, one continuous strip behind the chat title and the top bar. */
-body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:linear-gradient(rgba(20,16,70,.12),rgba(20,16,70,.12)) fixed,var(--c-sky) center top/max(1600px,100vw) auto fixed!important;border-bottom:0!important}
+body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:linear-gradient(rgba(10,12,30,.32),rgba(10,12,30,.32)) fixed,var(--c-photo) center 22%/max(1600px,100vw) auto fixed,var(--c-sky) center top/max(1600px,100vw) auto fixed!important;border-bottom:0!important}
 body.app.in-editor #editor .chat-head #project-name,body.app.in-editor #editor .chat-head .ghost,body.app.in-editor #editor .chat-head button{color:#fff!important;text-shadow:0 1px 8px rgba(10,42,82,.4)}
 body.app.in-editor #editor .stage-bar .tabs-seg{background:rgba(255,255,255,.22)!important;border:1px solid rgba(255,255,255,.4)!important;backdrop-filter:blur(6px)}
 body.app.in-editor #editor .stage-bar .tabs-seg button{color:#fff!important}
