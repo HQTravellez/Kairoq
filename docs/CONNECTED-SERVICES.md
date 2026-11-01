@@ -179,6 +179,18 @@ with a laptop, through Kairoq (`builder-tools.js`), never with a shell:
   the button again continues where it stopped.
 
 
+## Hallmark (themes, rules and photos)
+
+[Hallmark](https://github.com/Nutlope/hallmark) (MIT) is Together AI's design skill for coding
+agents. Kairoq keeps three parts of it in `design-library/hallmark/` (`hallmark.js`):
+
+- The 50 themes are Looks: "How should it feel?" offers them with Kairoq's own 100, the ones
+  whose keywords fit the request first. A picked theme's material (type, surfaces, controls,
+  motion, voice, do-nots) goes into the project's design brief.
+- The floor (rules every page keeps) is part of the builder's design rules.
+- The photo index (755 openly licensed photographs on Wikimedia Commons) gives a new site real
+  pictures with their credit instead of placeholders. Nothing to set; no key.
+
 ## Site notes for the web agent
 
 `site-notes.js`: after a web task (chat "go to this site and…", or Web tasks and watches), Kairoq

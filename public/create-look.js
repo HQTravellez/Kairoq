@@ -75,19 +75,21 @@ function lookCard(look,{on,onPick}){
   h('span',{class:'lk-card-meta'},
    h('b',null,look.name),
    h('span',{class:'lk-dots','aria-hidden':'true'},...['bg','surface','ink','muted','accent'].map(k=>h('i',{style:{background:c[k]}}))),
-   h('small',null,fonts)));
+   h('small',null,look.material?look.material:fonts)));
 }
 
 // ---------- data ----------
 let data=null;
-async function loadData(){if(!data)data=await call('/looks');return data}
+async function loadData(prompt){if(!data)data=await call('/looks'+(prompt?'?prompt='+encodeURIComponent(String(prompt).slice(0,2000)):''));return data}
 // Apps for children start on Playful and are offered only light, soft looks (no dark screens).
 function forKids(prompt){return /\b(kids?|children|child|toddlers?|preschool(ers)?|little ones|nursery|kindergarten)\b/i.test(String(prompt||''))}
 function light(l){const n=parseInt(String(l.colors&&l.colors.bg||'#ffffff').slice(1),16);return(0.2126*((n>>16)&255)+0.7152*((n>>8)&255)+0.0722*(n&255))/255>0.72}
 function forFeel(feel,kids){
  const recent=new Set(data.recent||[]),every=data.looks.filter(l=>l.feel===feel),soft=kids?every.filter(light):every,all=soft.length>=3?soft:every;
- // Looks used for the owner's newest apps go to the end so new apps do not repeat them.
- return all.filter(l=>!recent.has(l.id.split('--')[0])).concat(all.filter(l=>recent.has(l.id.split('--')[0])));
+ // Hallmark themes that fit the request come first; looks used for the owner's newest apps go
+ // to the end so new apps do not repeat them.
+ const sug=data.suggested||[],rank=l=>sug.includes(l.id)?0:recent.has(l.id.split('--')[0])?2:1;
+ return all.map((l,i)=>[rank(l),sug.indexOf(l.id)>=0?sug.indexOf(l.id):i,l]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(x=>x[2]);
 }
 
 // ---------- dialogs ----------
@@ -239,9 +241,10 @@ const THREE_D=[
 // onBuild(look|null): null means "Decide for me" without a pick (Kairoq's own design brief).
 async function step({card,count,name,prompt,onBuild,onBack,onSkip}){
  card.replaceChildren(h('p',{class:'ask-head'},'Loading looks…'));
- try{await loadData()}catch(e){return onBuild(null)}
+ try{await loadData(prompt)}catch(e){return onBuild(null)}
  const kids=forKids(prompt);
- const st={feel:kids?'playful':'calm',page:0,picked:null,three:'none'};
+ const first=(data.suggested||[]).map(id=>data.looks.find(l=>l.id===id)).find(l=>l&&(!kids||light(l)));
+ const st={feel:kids?'playful':first?first.feel:'calm',page:0,picked:null,three:'none'};
  const preview=previewPane();document.body.classList.add('picking-look');
  const done=()=>{document.body.classList.remove('picking-look');preview.remove()};
  // A look from the gallery, a website or Fine-tune joins the cards and is selected.

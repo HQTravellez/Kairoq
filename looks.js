@@ -52,6 +52,8 @@ function catalog(){
  }
  return cache=out;
 }
+// Every look the owner can pick: the 100 above plus Hallmark's 50 themes (hallmark.js).
+function all(){return catalog().concat(require('./hallmark').looks())}
 function fonts(){return[...new Set(TYPE.flatMap(t=>[t.head,t.body]))]}
 
 // ---------- colour helpers ----------
@@ -83,6 +85,8 @@ function toDesign(look,{request='',projectName=''}={}){
   {sharp:'Nearly square corners on cards, buttons and inputs.',soft:'Softly rounded corners on cards, buttons and inputs.',round:'Generously rounded corners; buttons may be pill-shaped.'}[l.corners],
   l.spacing==='compact'?'Compact spacing: tighter padding and gaps, more on each screen.':'Comfortable spacing: generous padding and room between sections.'
  ];
+ // A Hallmark theme brings its own material: type, surfaces, controls, motion, voice, do-nots.
+ for(const line of require('./hallmark').briefFor(l.id))details.push(line);
  let notes='';
  if(l.source&&l.source.own)notes='This is the owner\'s own brand (from '+l.source.url+'). Match these colours and fonts exactly.';
  else if(l.source)notes='The look is inspired by '+l.source.url+'. Use only the colour mood, font style and layout feel; never use that company\'s name, logo, trademarks, text or photos.';
@@ -161,4 +165,4 @@ function saveBrand(owner,look){
  return l;
 }
 
-module.exports={FEELS,TYPE,CORNERS,catalog,fonts,normalizeLook,toDesign,fromTokens,fromSite,closestFont,contrast,brand,saveBrand};
+module.exports={FEELS,TYPE,CORNERS,catalog,all,fonts,normalizeLook,toDesign,fromTokens,fromSite,closestFont,contrast,brand,saveBrand};
