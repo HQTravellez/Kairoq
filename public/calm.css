@@ -1,8 +1,10 @@
-/* Calm, light editor (like Emergent): one quiet top bar, a 40/60 split, a plain composer and
-   small next-step chips. Loaded last, so it wins over the older layers without touching them. */
-body.app{--c-bg:#FFFFFF;--c-panel:#FFFFFF;--c-raise:#F7F7F8;--c-ink:#17181C;--c-ink-2:#5F6570;--c-ink-3:#8A9099;--c-line:rgba(17,18,22,.08);--c-line-2:rgba(17,18,22,.14);--c-hover:rgba(17,18,22,.05);--c-accent:#17181C}
-/* Home: plain white, no sky. */
-body.app #home .home,body.app.day #home .home{background-image:none!important;background-color:#FFFFFF!important}
+/* Calm editor, like Emergent: soft grey ground, white cards, a light blue band along the top, one
+   blue accent; one quiet top bar, a 40/60 split, a plain composer and small next-step chips.
+   Loaded last, so it wins over the older layers without touching them. */
+body.app{--c-bg:#F4F6F9;--c-panel:#FFFFFF;--c-raise:#F4F6F9;--c-ink:#17181C;--c-ink-2:#5F6570;--c-ink-3:#8A9099;--c-line:rgba(17,18,22,.08);--c-line-2:rgba(17,18,22,.13);--c-hover:rgba(17,18,22,.05);--c-accent:#1F6FEB;--c-accent-2:#1A5FD0;--c-band:linear-gradient(90deg,#A9C7F3 0%,#C6DAF7 45%,#DCE8FA 100%)}
+/* Home: the soft grey ground, no night sky; the same blue band across the top. */
+body.app #home .home,body.app.day #home .home{background-image:linear-gradient(180deg,#DCE8FA 0,#EEF3FB 220px,#F4F6F9 420px)!important;background-color:#F4F6F9!important}
+body.app #home #new-form,body.app #home .prompt-box{background:#FFFFFF!important;border-color:#C9DAF5!important;box-shadow:0 10px 30px -18px rgba(31,111,235,.35)!important}
 body.app #home .home::after{display:none!important}
 body.app.day #home .home-hero h1,body.app #home .home-hero h1{color:var(--c-ink)!important}
 body.app.day #home .home-sub{color:var(--c-ink-2)!important}
@@ -27,17 +29,17 @@ body.app.in-editor #editor #versions:hover{border-color:var(--c-line-2)!importan
 /* Share is quiet, Publish is the one solid button. */
 body.app.in-editor #editor #share-open{height:32px;padding:0 14px!important;margin-left:0;border-radius:9px!important;border:1px solid var(--c-line-2)!important;background:transparent!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important}
 body.app.in-editor #editor #share-open:hover{background:var(--c-hover)!important}
-body.app.in-editor #editor #publish-open{height:32px;padding:0 16px!important;border-radius:9px!important;border:0!important;background:var(--c-ink)!important;color:#fff!important;font-size:13px!important;font-weight:600!important;box-shadow:none!important;opacity:1!important}
-body.app.in-editor #editor #publish-open:hover{background:#000!important}
-body.app.in-editor #editor #publish-open .live-dot{background:#3DDC84!important;box-shadow:none!important}
+body.app.in-editor #editor #publish-open{height:32px;padding:0 16px!important;border-radius:9px!important;border:0!important;background:var(--c-accent)!important;color:#fff!important;font-size:13px!important;font-weight:600!important;box-shadow:none!important;opacity:1!important}
+body.app.in-editor #editor #publish-open:hover{background:var(--c-accent-2)!important}
+body.app.in-editor #editor #publish-open .live-dot{background:#fff!important;box-shadow:none!important}
 
 /* Composer: a plain box; the send button lights up only when there is something to send. */
-body.app.in-editor #chat-form.composer{padding:12px 10px 10px 14px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;border-radius:16px!important}
-body.app.in-editor #chat-form.composer:focus-within{border-color:rgba(17,18,22,.24)!important;box-shadow:none!important}
+body.app.in-editor #chat-form.composer{padding:12px 10px 10px 14px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;border-radius:16px!important;box-shadow:0 8px 24px -16px rgba(16,24,40,.25)!important}
+body.app.in-editor #chat-form.composer:focus-within{border-color:#9DBEF3!important;box-shadow:0 0 0 3px rgba(31,111,235,.12)!important}
 body.app.in-editor #chat-form #chat-input{min-height:44px}
 body.app.in-editor #chat-form #menu-plus>summary{width:30px!important;height:30px!important;padding:0!important;justify-content:center;border-radius:999px!important;border:1px solid var(--c-line-2)!important;font-size:18px!important;line-height:1;color:var(--c-ink-2)!important}
 body.app.in-editor #chat-form #menu-plus>summary:hover{color:var(--c-ink)!important;background:var(--c-hover)!important}
-body.app.in-editor #chat-form #send{width:32px!important;height:32px!important;background:var(--c-ink)!important;color:#fff!important}
+body.app.in-editor #chat-form #send{width:32px!important;height:32px!important;background:var(--c-accent)!important;color:#fff!important}
 body.app.in-editor #chat-form #send.is-empty,body.app.in-editor #chat-form #send:disabled{background:#E4E5E8!important;color:var(--c-ink-3)!important}
 
 /* Next-step ideas: small chips, not big white cards. */
@@ -72,8 +74,8 @@ body.app .share-pop .link-btn:hover{color:var(--c-ink)}
 body.app .share-pop-live{font-size:12.5px;word-break:break-all}
 body.app .share-pop-live:empty{display:none}
 body.app .share-pop-live a{color:var(--c-ink)}
-body.app .share-pop .primary{height:36px;border:0;border-radius:9px;background:var(--c-ink);color:#fff;font-weight:600;margin-top:4px;border-top:1px solid var(--c-line)}
-body.app .share-pop .primary:hover{background:#000}
+body.app .share-pop .primary{height:36px;border:0;border-radius:9px;background:var(--c-accent);color:#fff;font-weight:600;margin-top:4px;border-top:1px solid var(--c-line)}
+body.app .share-pop .primary:hover{background:var(--c-accent-2)}
 body.app .share-pop .error:empty{display:none}
 body.app .share-pop .share-pop-row .ghost,body.app .share-pop .share-pop-off .ghost{border:1px solid var(--c-line-2)!important;background:#fff!important;color:var(--c-ink)!important;border-radius:9px!important}
 body.app .share-pop .link-btn{border:0!important;background:none!important;height:auto!important;box-shadow:none!important;align-self:flex-start}
@@ -90,3 +92,17 @@ body.app.in-editor #menu-project>.menu-panel>.menu-note{margin:8px 10px 4px;font
 body.app #editor .share-pop .ghost{border:1px solid var(--c-line-2)!important;background:#fff!important;color:var(--c-ink)!important;border-radius:9px!important;height:34px!important;padding:0 12px!important}
 /* Same items twice in More: Settings opens the same panel, and Share has its own button now. */
 body.app.in-editor #menu-project #settings-open,body.app.in-editor #menu-project #team-open{display:none!important}
+
+/* The blue band: one continuous gradient behind the chat title and the top bar. */
+body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:var(--c-band)!important;background-attachment:fixed!important;border-bottom:0!important}
+body.app.in-editor #editor .stage-bar .tabs-seg{background:rgba(255,255,255,.45)!important}
+body.app.in-editor #editor .stage-bar .ghost.icon-btn,body.app.in-editor #editor .stage-bar a.icon-btn,body.app.in-editor #editor .stage-bar .menu>summary{color:#2F3A4D!important}
+body.app.in-editor #editor .stage-bar .ghost.icon-btn:hover,body.app.in-editor #editor .stage-bar a.icon-btn:hover,body.app.in-editor #editor .stage-bar .menu>summary:hover,body.app.in-editor #editor .stage-bar .menu[open]>summary,body.app.in-editor #editor .stage-bar .seg.icons button[aria-pressed=true]{background:rgba(255,255,255,.6)!important}
+body.app.in-editor #editor #versions{background-color:rgba(255,255,255,.55)!important;border-color:rgba(255,255,255,.7)!important;color:#2F3A4D!important}
+body.app.in-editor #editor #share-open{background:#fff!important;border-color:rgba(255,255,255,.9)!important}
+/* Ground and cards: grey behind the chat, the preview as a white card. */
+body.app.in-editor #editor,body.app.in-editor #editor .chat,body.app.in-editor #editor .stage{background:var(--c-bg)!important}
+body.app.in-editor #editor .chat{border-right:0!important}
+body.app.in-editor #editor .canvas>iframe,body.app.in-editor #editor #frame{box-shadow:0 0 0 1px var(--c-line),0 12px 30px -20px rgba(16,24,40,.3)!important}
+body.app.in-editor #editor .messages li.user{background:#E6EEFB!important;color:var(--c-ink)!important}
+body.app .messages .q-opt.idea{background:#fff!important}
