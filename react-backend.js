@@ -779,7 +779,10 @@ export const basename=(()=>{try{return new URL('..',import.meta.url).pathname.re
 // (from before real addresses) are moved to "/services" before the first page shows.
 export function Router({children}){
  try{const h=location.hash;if(/^#\\/./.test(h))history.replaceState(history.state,'',basename+h.slice(1))}catch{}
- return React.createElement(BrowserRouter,{basename},children);
+ // The router's basename keeps its trailing slash: the home route is then ".../v/2/" and not
+ // ".../v/2", so the app's relative images ("./uploads/hero.png") resolve inside the app (a
+ // live build's hero was a 404 at ".../v/uploads/hero.png" after navigating home).
+ return React.createElement(BrowserRouter,{basename:basename+'/'},children);
 }
 // Each page sets its own title and description for search results and link previews.
 export function usePageMeta({title,description}={}){
