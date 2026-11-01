@@ -98,6 +98,11 @@ test('a published app: every page loads at its own address, is pre-built with it
    await tab.click('text=Beard trim');await tab.waitForURL(/\/services\/beard$/);
    assert.equal(await tab.textContent('h1'),'Beard trim');
    assert.equal(await tab.title(),"Beard trim – Joe's Barbers");
+   // Home keeps its trailing slash (".../joe-test/", never ".../joe-test"), so the app's relative
+   // images ("./uploads/hero.png") still resolve inside the app after navigating home.
+   await tab.click('text=Home');await tab.waitForURL(/\/sites\/joe-test\/$/);
+   assert.equal(await tab.textContent('h1'),"Joe's Barbers");
+   assert.equal(await tab.evaluate(()=>new URL('./uploads/hero.png',location.href).pathname),'/sites/joe-test/uploads/hero.png');
   }finally{await ctx.close()}
  }finally{server.close();await runtime.close()}
 });

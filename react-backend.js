@@ -486,7 +486,7 @@ async function handle(req,res,{onlyProject}={}){
   if(fm&&req.method==='GET'){extras.serveFile(res,{id,db,fid:fm[1]});return true}
   if(fm&&req.method==='DELETE')return send(res,200,extras.removeFile({id,db,user,fid:fm[1]})),true;
   // In a test run, emails and payments are not real.
-  if(route==='/email'&&req.method==='POST')return send(res,200,sb?{sent:true,test:true}:await extras.sendEmail(await readJson(req,20000),{meta,db,cfg,user})),true;
+  if(route==='/email'&&req.method==='POST'){const body=await readJson(req,20000);if(sb)extras.checkEmail(body,{cfg,user});return send(res,200,sb?{sent:true,test:true}:await extras.sendEmail(body,{meta,db,cfg,user})),true}
   if(route==='/payments/checkout'&&req.method==='POST')return send(res,200,sb?{url:'#kairoq-test-checkout',test:true}:await extras.checkout(await readJson(req),{id,meta,cfg,user,req})),true;
   if(route==='/payments/mine'&&req.method==='GET')return send(res,200,{purchases:extras.myPurchases(db,user)}),true;
   const rt=/^\/realtime\/([a-z][a-z0-9_]{0,39})(\/ticket)?$/.exec(route);
@@ -779,7 +779,10 @@ export const basename=(()=>{try{return new URL('..',import.meta.url).pathname.re
 // (from before real addresses) are moved to "/services" before the first page shows.
 export function Router({children}){
  try{const h=location.hash;if(/^#\\/./.test(h))history.replaceState(history.state,'',basename+h.slice(1))}catch{}
- return React.createElement(BrowserRouter,{basename},children);
+ // The router's basename keeps its trailing slash: the home route is then ".../v/2/" and not
+ // ".../v/2", so the app's relative images ("./uploads/hero.png") resolve inside the app (a
+ // live build's hero was a 404 at ".../v/uploads/hero.png" after navigating home).
+ return React.createElement(BrowserRouter,{basename:basename+'/'},children);
 }
 // Each page sets its own title and description for search results and link previews.
 export function usePageMeta({title,description}={}){

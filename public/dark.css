@@ -488,6 +488,17 @@ body.app .fold{display:grid;grid-template-rows:0fr;transition:grid-template-rows
 body.app .fold.open{grid-template-rows:1fr}
 body.app .fold>.rail{min-height:0;overflow:hidden;opacity:0;transition:opacity var(--k-base) var(--k-ease)}
 body.app .fold.open>.rail{opacity:1}
+/* the finished message: one plain sentence, the notes, then the checks as a short list */
+body.app.in-editor #editor .messages .verdict-head{display:flex;align-items:flex-start;gap:8px;margin:10px 0 6px;font:500 14px/1.5 Geist,ui-sans-serif,sans-serif;color:#ECEEF1}
+body.app.in-editor #editor .messages .verdict-head .vmark{flex:none;width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font:700 11px/1 Geist,ui-sans-serif,sans-serif;margin-top:2px}
+body.app.in-editor #editor .messages .verdict-head.ok .vmark{background:rgba(53,224,207,.18);color:#35E0CF}
+body.app.in-editor #editor .messages .verdict-head.draft .vmark{background:rgba(245,179,66,.18);color:#F5B342}
+body.app.in-editor #editor .messages .verdict-rows{list-style:none;margin:8px 0 2px;padding:10px 12px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.025);display:grid;gap:5px}
+body.app.in-editor #editor .messages .verdict-rows li{display:flex;align-items:flex-start;gap:8px;font:400 12.5px/1.5 Geist,ui-sans-serif,sans-serif;color:#C4C8CF}
+body.app.in-editor #editor .messages .verdict-rows .vmark{flex:none;width:14px;font-weight:700;color:#9AA0AA}
+body.app.in-editor #editor .messages .verdict-rows li.ok .vmark{color:#35E0CF}
+body.app.in-editor #editor .messages .verdict-rows li.bad .vmark{color:#F5B342}
+body.app.in-editor #editor .messages .verdict-why{margin:6px 0 0;font:400 12.5px/1.5 Geist,ui-sans-serif,sans-serif;color:#9AA0AA}
 /* home: the hero settles in; the prompt box glows when focused */
 body.app #home .home-hero h1{animation:k-rise var(--k-slow) var(--k-ease) both}
 body.app #home .home-sub{animation:k-rise var(--k-slow) var(--k-ease) .06s both}
@@ -500,3 +511,15 @@ body.app #editor .view-in{animation:k-fade var(--k-base) var(--k-ease) both}
 body.app #editor .stage,body.app #editor .side,body.app #editor .sidebar,body.app .kn,body.app #side{transition:transform var(--k-slow) var(--k-ease),width var(--k-slow) var(--k-ease),opacity var(--k-base) var(--k-ease)}
 body.app .menu-panel{animation:k-rise var(--k-fast) var(--k-ease) both}
 @media (prefers-reduced-motion:reduce){body.app *,body.app *::before,body.app *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* The working mark: a 4x4 grid of dots breathing in a diagonal wave, beside "Kairoq Agent". */
+body.app .k-grid{display:inline-grid;grid-template-columns:repeat(4,4px);gap:2px;width:22px;height:22px;align-content:center;justify-content:center;margin-right:2px}
+body.app .k-grid i{width:4px;height:4px;border-radius:50%;background:#35E0CF;opacity:.25;animation:k-grid 1.6s ease-in-out infinite}
+body.app .k-grid i:nth-child(1){animation-delay:0s}body.app .k-grid i:nth-child(2),body.app .k-grid i:nth-child(5){animation-delay:.1s}
+body.app .k-grid i:nth-child(3),body.app .k-grid i:nth-child(6),body.app .k-grid i:nth-child(9){animation-delay:.2s}
+body.app .k-grid i:nth-child(4),body.app .k-grid i:nth-child(7),body.app .k-grid i:nth-child(10),body.app .k-grid i:nth-child(13){animation-delay:.3s}
+body.app .k-grid i:nth-child(8),body.app .k-grid i:nth-child(11),body.app .k-grid i:nth-child(14){animation-delay:.4s}
+body.app .k-grid i:nth-child(12),body.app .k-grid i:nth-child(15){animation-delay:.5s}body.app .k-grid i:nth-child(16){animation-delay:.6s}
+@keyframes k-grid{0%,70%,100%{opacity:.22;transform:scale(.9)}25%{opacity:1;transform:scale(1.15)}}
+body.app.in-editor #editor .messages .status-line:not(.done) .agent-name::before{display:none}
+@media (prefers-reduced-motion:reduce){body.app .k-grid i{animation:none;opacity:.7}}

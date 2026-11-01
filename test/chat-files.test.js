@@ -31,6 +31,11 @@ test('a new project is named after the business, or after the first words withou
  assert.equal(nameFromPrompt('A one-page website for a small bakery called Rosa Bakery: hero, three breads with prices.'),'Rosa Bakery');
  assert.equal(nameFromPrompt('Website for my hotel named Casa Azul in Lisbon'),'Casa Azul');
  assert.equal(nameFromPrompt('A CRM to track leads, deals and follow-ups'),'A CRM to track leads, deals and follow-ups');
+ // "for <business>": the business is the name (it is the brand on the look preview).
+ assert.equal(nameFromPrompt('A website for Marigold Bakery in Leslieville, Toronto: the menu, pre-orders for custom cakes'),'Marigold Bakery');
+ assert.equal(nameFromPrompt('A web app for a small dog-walking business: clients sign up, book a walk'),'Small dog-walking business');
+ assert.equal(nameFromPrompt('A landing page for Northline Build Co'),'Northline Build Co');
+ assert.equal(nameFromPrompt('An iPhone app for kids who love dinosaurs'),'Kids who love dinosaurs');
  const long=nameFromPrompt('Build a booking page for my yoga studio with class times, prices and a sign-up form');
  assert.ok(long.length<=48&&/studio$/.test(long),long);
 });

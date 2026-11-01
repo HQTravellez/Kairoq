@@ -33,12 +33,18 @@ function clean(raw){
 // Long requirements already give the builder enough context; do not slow these down with generic questions.
 // Keep this bounded below the model's 1500-character context cap to avoid re-asking documented details.
 function worthAsking(prompt){const t=clip(prompt,4000);return t.length>=3&&t.length<=600}
-function opening(raw){const t=clip(raw&&raw.opening,220);return /^[A-Za-z0-9"'“(]/.test(t)&&t.length>=8?t:''}
+function opening(raw,count=null){
+ let t=clip(raw&&raw.opening,220);
+ if(!(/^[A-Za-z0-9"'“(]/.test(t)&&t.length>=8))return'';
+ // "Two things…" must match the questions actually asked (the model wrote "two" and asked three).
+ if(Number.isInteger(count)&&count>0){const W=['zero','one','two','three','four','five'];t=t.replace(/\b(one|two|three|four|five|1|2|3|4|5)\b(\s+(?:quick\s+|short\s+|small\s+)?)(things?|questions?|details?|checks?|choices?)\b/i,(_,n,gap,noun)=>{const w=W[count],cap=/^[A-Z]/.test(n)?w[0].toUpperCase()+w.slice(1):w;return cap+gap+noun.replace(/s$/,'')+(count===1?'':'s')})}
+ return t;
+}
 // The opening line and the questions together ({opening, questions}); questions() keeps the old shape.
 async function ask(prompt,{callModel,tier='standard'}={}){
  if(!callModel||!worthAsking(prompt))return{opening:'',questions:[]};
  const call=callModel({messages:[{role:'system',content:SYSTEM},{role:'user',content:clip(prompt,1500)}],tier,temperature:0.2,maxOutputTokens:1000,purpose:'clarify'},c=>{const t=String(c).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');return JSON.parse(a>=0&&b>a?t.slice(a,b+1):t)});
- try{const raw=await Promise.race([call,new Promise((_,rej)=>setTimeout(()=>rej(Error('timeout')),TIMEOUT_MS))]);return{opening:opening(raw),questions:clean(raw)}}
+ try{const raw=await Promise.race([call,new Promise((_,rej)=>setTimeout(()=>rej(Error('timeout')),TIMEOUT_MS))]);const questions=clean(raw);return{opening:opening(raw,questions.length),questions}}
  catch{return{opening:'',questions:[]}}
 }
 async function questions(prompt,{callModel,tier='standard'}={}){

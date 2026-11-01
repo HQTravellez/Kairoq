@@ -4,6 +4,7 @@
 // helps. The builder reads the menu in its rules and opens the skills it decides it needs with
 // the kairoq_skill tool, instead of Kairoq guessing from words in the request.
 const P=require('./builder-playbooks'),R=require('./builder-references'),S=require('./specialist-skill-packs'),T=require('./teardown-skill-pack');
+const P=require('./builder-playbooks'),R=require('./builder-references'),S=require('./specialist-skill-packs'),G=require('./gsap-skill-packs');
 const ABOUT={'3d-character':'a 3D character or animal that moves, is tapped or coloured in','ar-coloring':'AR from a printed page or placing a model in the room','camera-colours':'reading colours from a photo or camera frame of a drawing','printable':'printable pages and worksheets','game-design':'designing a small game: the core loop, controls, tuning values, game states','game-feel':'making a game feel good: feedback, impact, easing, sound','game-qa':'testing a game: first-time play, automatic checks, balance','game-accessibility':'games everyone can play: text, controls, pause, sound'};
 function list(){
  return[
@@ -13,6 +14,7 @@ function list(){
 }
 function menu(request=''){
  const rows=[...list(),...S.list(request),...T.list(request)];
+ const rows=[...list(),...S.list(request),...G.list(request)];
  return'\n\nSKILLS (open the ones this request needs with kairoq_skill before building; each gives tested know-how):\n'+rows.map(s=>'- '+s.name+': '+s.about).join('\n');
 }
 function open(name){
@@ -27,6 +29,7 @@ async function openAsync(name,options={}){
  if(!/^No skill called /.test(local))return local;
  const specialist=await S.open(name,options);if(specialist)return specialist;
  const teardown=await T.open(name,options);if(teardown)return teardown;
+ const motion=await G.open(name,options);if(motion)return motion;
  return local;
 }
 module.exports={list,menu,open,openAsync};

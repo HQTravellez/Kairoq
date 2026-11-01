@@ -263,3 +263,16 @@ requests involving machine explainers, exploded views, cutaways, interactive 3D 
 engines, gearboxes, pumps, linkages and similar mechanisms. Kairoq uses its own
 Three.js/React/browser runtime and QA pipeline; upstream npm/Playwright/ffmpeg/Python/shell
 instructions are treated as reference text and do not grant execution permission.
+## GreenSock GSAP agent skills
+
+Kairoq can load task-matched animation guidance from GreenSock's official
+`greensock/gsap-skills` repository (MIT License), pinned to revision
+`aed9cfd3277740755f6bfc1155c7aa645403b760`.
+
+`gsap-skill-packs.js` exposes focused skills for GSAP core, React integration,
+ScrollTrigger, timelines, performance, plugins, frameworks, and utilities. The skills are
+loaded only when the user's request calls for animation/motion work, are stripped of
+frontmatter tool declarations, passed through Kairoq's prompt-injection scanner, and
+treated strictly as implementation guidance. They do not grant shell, network, or tool
+permissions. Kairoq already includes GSAP as a runtime dependency, so no package install
+is performed by this integration.
