@@ -120,6 +120,37 @@ test('substantial work without a task graph: Kairoq writes the task list from th
  assert.ok(!results.some(x=>/task graph is incomplete/.test(x)),results.join('\n').slice(0,800));
 });
 
+test('a review that keeps blocking a working build stops after two rounds and saves a draft',async()=>{
+ const agent=require('../react-agent');
+ const meta=builder.create({name:'Review cap'});await builder.initialize(meta);
+ const files=builder.loadFiles(meta.id,1);
+ let reviews=0,step=0;
+ const callModel=async(opts,parse)=>{
+  const sys=String(opts.messages[0].content||'');
+  if(/independent senior code reviewer/.test(sys)){reviews++;return parse(JSON.stringify({verdict:'block',findings:[{id:'S1',severity:'critical',confidence:0.95,file:'src/App.jsx',message:'The menu crashes when empty',evidence:'x'}]}))}
+  if(/independent product\/spec reviewer/.test(sys))return parse(JSON.stringify({verdict:'pass',findings:[]}));
+  step++;
+  // Write, build and test, then finish; after a refusal, change a file and finish again.
+  // Two plain modules (no UI files, so the screenshot check is not needed in this test).
+  return parse(JSON.stringify(step%2?{thought:'Write and test.',actions:[{tool:'write_files',files:{'src/menuData.js':'export const items=['+step+']\n','src/prices.js':'export const prices={}\n'}},{tool:'build_and_test'}]}:{thought:'Done.',actions:[{tool:'finish',message:'Built the menu.'}]}));
+ };
+ const inspect=async()=>({errors:[],steps:[{step:'open',ok:true}],text:'Menu',external:[]});
+ const r=await agent.run(meta.id,'Add the menu data and prices modules',{callModel,inspect,maxSteps:10});
+ assert.equal(reviews,2,'two review rounds, then no more');
+ assert.ok(!/^Stopped after/.test(r.message.split('\n').pop()),'it finished, it did not run out of rounds');
+ assert.match(r.message,/UNVERIFIED DRAFT/);
+ assert.match(r.message,/open finding\(s\) after 2 rounds: src\/App\.jsx: The menu crashes when empty/);
+ assert.equal(r.verification.evidence.engineering_review,'failed','the verdict stays honest');
+});
+
+test('style-level Standards findings do not block; critical ones and confident Spec gaps do',()=>{
+ const {blocking}=require('../engineering-review');
+ assert.equal(blocking({standards:{findings:[{severity:'important',confidence:0.95,message:'duplicated logic'}]},spec:{findings:[]}}).length,0);
+ assert.equal(blocking({standards:{findings:[{severity:'critical',confidence:0.6,message:'crash'}]},spec:{findings:[]}}).length,1);
+ assert.equal(blocking({standards:{findings:[]},spec:{findings:[{severity:'important',confidence:0.9,message:'no cake form'}]}}).length,1);
+ assert.equal(blocking({standards:{findings:[]},spec:{findings:[{severity:'important',confidence:0.5,message:'maybe'}]}}).length,0);
+});
+
 test('the Changes API returns each changed file before and after',async()=>{
  const http=require('http'),createApi=require('../create-api');
  const server=http.createServer(async(req,res)=>{if(await createApi.handle(req,res,{isOwner:()=>false,callModel:async()=>{throw Error('no model')},secure:false}))return;res.writeHead(404);res.end()});

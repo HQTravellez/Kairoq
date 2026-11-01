@@ -122,7 +122,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const generated=[],pendingChecks=[];
  // The agent's browser tests and SQL reads use a test copy of the data, never the real one.
  const box=require('./react-sandbox').create(id);
- let checksWarned=false,lastSavedChecks=null,lastVisualQuality=null,repairAttempts=0,needsRepair=false;
+ let checksWarned=false,lastSavedChecks=null,lastVisualQuality=null,repairAttempts=0,needsRepair=false,reviewBlocks=0,lastBlockingReview=null;
+ const reviewRounds=intEnv('KAIROQ_REVIEW_ROUNDS',2,1,6);
  const normalLimit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
  const recoverySteps=researchOnly?0:recoveryStepsDefault();
  const limit=normalLimit+recoverySteps;
@@ -524,6 +525,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     if(taskState&&!taskState.complete&&require('./task-graph').autoDefined(id,text)){const tg=require('./task-graph');for(let guard=0;guard<30&&taskState&&!taskState.complete;guard++){const next=taskState.ready[0];if(!next)break;tg.complete(id,text,next,{evidence:'built and tested in the browser ('+(lastTest?.steps||0)+' steps, no errors)'});taskState=tg.status(id,text)}}
     if(taskState&&!taskState.complete){results.push('finish: task graph is incomplete. Complete the ready tracer-bullet tasks first: '+(taskState.ready.join(', ')||'no ready task; inspect blockers')+'.');continue}
     const engReview=require('./engineering-review'),reviewRequired=engReview.required(base,work,text);
+    // Past the review rounds, no new review: the last one's open findings stand in the verdict.
+    if(reviewRequired&&!lastReview&&reviewBlocks>=reviewRounds&&lastBlockingReview)lastReview=lastBlockingReview;
     if(reviewRequired&&!lastReview){
      try{
       lastReview=await engReview.run({callModel,base,current:work,request:text,ownerRequirements,knowledge:require('./project-knowledge').note(id),tier,signal});
@@ -531,7 +534,12 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
       tl.add({t:'test',ok:lastReview.ok,text:lastReview.ok?'Standards + Spec review passed':'Engineering review found blocking issues',detail:lastReview.blocking.map(x=>x.file+': '+x.message)});
      }catch(e){results.push('finish: engineering review could not run: '+String(e.message||e).slice(0,400));continue}
     }
-    if(lastReview?.blocking?.length){needsRepair=true;results.push('finish: independent review has '+lastReview.blocking.length+' blocking finding(s). Repair them and run engineering_review again.');continue}
+    // The review blocks finish at most reviewRounds times: after that a build that builds and
+    // passes its browser test is saved as a draft, and the open findings stay in the verdict.
+    if(lastReview?.blocking?.length&&!lastReview.counted){lastReview.counted=true;reviewBlocks++;lastBlockingReview=lastReview}
+    if(lastReview?.blocking?.length&&reviewBlocks<reviewRounds){needsRepair=true;results.push('finish: independent review has '+lastReview.blocking.length+' blocking finding(s). Repair them and run engineering_review again.');continue}
+    if(lastReview?.blocking?.length&&!(lastTest&&!lastTest.errors.length&&lastTest.failed===0&&lastTest.steps>0)){needsRepair=true;results.push('finish: the review still has blocking findings and the browser test has not passed. Repair, build and test again.');continue}
+    const reviewCapped=Boolean(lastReview?.blocking?.length);
     const gate=require('./engineering-completion-gate');
     if(gate.requiresUnitTests(ownerRequirements,work)&&!lastUnitTests){
      lastUnitTests=require('./project-test-runner').run(work);
@@ -558,8 +566,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     }
     const verdict=gate.evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files:work,review:lastReview,reviewRequired,
       visualQuality:lastVisualQuality,visualRequired,repairs:repairAttempts});
-    if(!verdict.verified){finishWarned=true;needsRepair=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
-    finished=save(message);break;
+    // Out of review rounds: when the review is the only thing still open, the draft is saved and
+    // the verdict says so (it stays unverified); any other failure still has to be repaired.
+    const onlyReview=reviewCapped&&verdict.issues.every(i=>/engineering review/i.test(i));
+    if(!verdict.verified&&!onlyReview){finishWarned=true;needsRepair=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
+    finished=save(onlyReview?message+' The independent review still had '+lastReview.blocking.length+' open finding(s) after '+reviewBlocks+' rounds: '+lastReview.blocking.map(x=>(x.file?x.file+': ':'')+x.message).join(' ').slice(0,600):message);break;
    }
    try{
     const r=await tool(a),resultText=clip(r.text,20000);results.push(resultText);if(r.image)image=r.image;

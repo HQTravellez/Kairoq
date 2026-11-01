@@ -37,9 +37,14 @@ function normalize(v){
  })).filter(f=>f.message);
  return{verdict,findings};
 }
+// What holds a build back: a critical finding on either axis, or a confident "important" gap
+// against the owner's request (Spec). Standards findings below critical (duplicated logic,
+// shallow modules, seams) are notes for later: in live builds they kept the agent reviewing and
+// repairing working apps until it ran out of rounds.
 function blocking(review){
- const all=[...(review?.standards?.findings||[]),...(review?.spec?.findings||[])];
- return all.filter(f=>f.severity==="critical"||(f.severity==="important"&&f.confidence>=0.85));
+ const std=(review?.standards?.findings||[]).filter(f=>f.severity==="critical");
+ const spec=(review?.spec?.findings||[]).filter(f=>f.severity==="critical"||(f.severity==="important"&&f.confidence>=0.85));
+ return[...std,...spec];
 }
 async function one(callModel,{system,user,tier,signal}){
  return callModel({messages:[{role:"system",content:system},{role:"user",content:user}],temperature:0,maxOutputTokens:2200,tier,signal},parse);
@@ -54,6 +59,7 @@ async function run({callModel,base,current,request,ownerRequirements=[],knowledg
   "Review only the supplied changed code, not imagined files. Axis: STANDARDS. "+
   "Look for correctness/security problems, duplicated logic, shotgun surgery, speculative generality, shallow pass-through modules, poor public seams, implementation-coupled tests, tautological tests, and violations visible in the diff. "+
   "Do not complain about style tooling would enforce. Do not invent a problem without citing supplied code. "+
+  "Severity critical means a bug a user will hit, data loss or a security hole; structure and style concerns are important or minor. "+
   "Return ONLY JSON: {\"verdict\":\"pass|block\",\"findings\":[{\"id\":\"S1\",\"severity\":\"critical|important|minor\",\"confidence\":0.0,\"file\":\"path\",\"message\":\"specific problem\",\"evidence\":\"specific supplied evidence\"}]}.";
  const specSystem="You are an independent product/spec reviewer with no access to the implementation conversation. "+
   "Axis: SPEC. Compare the supplied request/requirements to the changed code. "+
