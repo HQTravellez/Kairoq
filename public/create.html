@@ -13,15 +13,10 @@
 <link rel="stylesheet" href="/workspace.css?v=20261112">
 <link rel="stylesheet" href="/chat-box.css?v=4">
 <link rel="stylesheet" href="/builder.css?v=8">
-<link rel="stylesheet" href="/create-kairoq.css?v=4">
 <link rel="stylesheet" href="/create-look.css?v=2">
-<link rel="stylesheet" href="/studio.css?v=11">
-<link rel="stylesheet" href="/fresh.css?v=6">
-<link rel="stylesheet" href="/premium-workspace.css?v=1">
-<link rel="stylesheet" href="/workspace-unified.css?v=1">
-<link rel="stylesheet" href="/free-chat-clean-workspace.css?v=1">
 <link rel="stylesheet" href="/builder-split-preview.css?v=4">
-<link rel="stylesheet" href="/redesign-builder.css?v=3">
+<link rel="stylesheet" href="/landing-mono.css?v=1">
+<link rel="stylesheet" href="/dark.css?v=1">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -350,15 +345,15 @@
       <h1 id="home-title">What should we build?</h1>
       <p class="home-sub">Describe it in your own words. Kairoq asks a few questions, shows you a plan, then builds and tests it.</p>
       <form id="new-form" class="prompt-box">
+        <div class="seg kind-seg" role="group" aria-label="What to build" id="new-kind">
+          <button type="button" data-kind="app" aria-pressed="false">Web app</button>
+          <button type="button" data-kind="phone" aria-pressed="false">Phone app</button>
+          <button type="button" data-kind="site" aria-pressed="true">Website</button>
+        </div>
         <textarea id="new-prompt" rows="2" placeholder="Ask Kairoq to build a booking page for my yoga studio with class times, prices and a sign-up form" required></textarea>
         <div class="prompt-bar">
           <button type="button" class="round" id="new-template" aria-label="Start from a template" title="Start from a template">+</button>
-          <div class="seg kind-seg" role="group" aria-label="What to build" id="new-kind">
-            <button type="button" data-kind="site" aria-pressed="true">Website</button>
-            <button type="button" data-kind="app" aria-pressed="false">Web app</button>
-            <button type="button" data-kind="phone" aria-pressed="false">Phone app</button>
-          </div>
-          <span class="prompt-note">Every change is tested in a real browser before you pay for it.</span>
+          <span class="prompt-note">Tested in a real browser</span>
           <button class="primary send" type="submit" id="new-submit" aria-label="Build it" title="Build it"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
         </div>
       </form>
