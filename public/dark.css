@@ -93,43 +93,67 @@ body.app #home .home>*{position:relative;z-index:1}
 body.app #home .home-hero{background:none!important;box-shadow:none!important;overflow:visible;padding-bottom:0;flex:none}
 body.app #home .home::before,body.app #home .home-hero::before,body.app #home .home-hero::after{display:none!important}
 body.app #home .prompt-box::before,body.app #home .prompt-box::after,body.app #home #new-form::before,body.app #home #new-form::after{display:none!important}
-/* the morning sky, 6:00 to 18:00 (create.js adds body.day) */
+/* the morning sky, 6:00 to 18:00 (create.js adds body.day): sunrise seen from orbit. The last
+   stars in deep indigo at the top, a pale band, a warm rim of light at the horizon, then the dark
+   page. Night keeps the moon and clouds. */
 body.app.day #home .home{background-image:
-  radial-gradient(160px 160px at 84% 14%,rgba(255,236,170,.95) 0%,rgba(255,236,170,.35) 35%,rgba(255,236,170,0) 70%),
-  radial-gradient(55% 32% at 14% 44%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 70%),
-  radial-gradient(45% 26% at 62% 58%,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 70%),
-  linear-gradient(180deg,#8FB9E3 0%,#B9D6F0 26%,#D9E8F5 46%,#0E0F11 100%),
-  linear-gradient(rgba(0,0,0,.035) 1px,transparent 1px),
-  linear-gradient(90deg,rgba(0,0,0,.035) 1px,transparent 1px);
-  background-size:100% 100%,100% 100%,100% 100%,100% 760px,48px 48px,48px 48px;background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,repeat,repeat}
-body.app.day #home .home::after{background:linear-gradient(180deg,rgba(14,15,17,0) 0%,rgba(14,15,17,0) 50%,#0E0F11 100%)}
-body.app.day #home .home-hero h1,body.app.day #home .home-sub{color:#15171B}
+  radial-gradient(1.5px 1.5px at 12% 9%,rgba(255,255,255,.9) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(1px 1px at 31% 16%,rgba(255,255,255,.7) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(1.5px 1.5px at 48% 6%,rgba(255,255,255,.8) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(1px 1px at 63% 13%,rgba(255,255,255,.6) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(1.5px 1.5px at 79% 8%,rgba(255,255,255,.85) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(1px 1px at 90% 18%,rgba(255,255,255,.6) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(1px 1px at 22% 24%,rgba(255,255,255,.5) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(1px 1px at 70% 27%,rgba(255,255,255,.45) 0,rgba(255,255,255,0) 100%),
+  radial-gradient(140% 40% at 50% 84%,rgba(255,196,140,.95) 0%,rgba(255,170,110,.5) 22%,rgba(255,140,90,0) 60%),
+  radial-gradient(90% 16% at 50% 79%,rgba(255,244,214,.9) 0%,rgba(255,244,214,0) 70%),
+  linear-gradient(180deg,#0B1030 0%,#1B2452 30%,#3E4A86 50%,#7E82B4 64%,#C9AEB4 75%,#2A1E24 86%,#0E0F11 100%),
+  linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+  background-size:100% 760px,100% 760px,100% 760px,100% 760px,100% 760px,100% 760px,100% 760px,100% 760px,100% 760px,100% 760px,100% 760px,48px 48px,48px 48px;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,repeat,repeat;background-color:#0E0F11}
+body.app.day #home .home::after{background:linear-gradient(180deg,rgba(14,15,17,0) 0%,rgba(14,15,17,0) 58%,rgba(14,15,17,.85) 86%,#0E0F11 100%)}
+body.app.day #home .home-hero h1{color:#F4F1FF}
+body.app.day #home .home-sub{color:#C9C6E0}
 body.app #home .home-hero{max-width:780px;margin-inline:auto;padding:84px 24px 0;display:flex;flex-direction:column;align-items:center;gap:16px}
 body.app #home .home-hero h1,body.app #home #home-title{font-size:38px;font-weight:500;letter-spacing:-.025em;line-height:1.1;text-align:center;margin:0}
 body.app #home .home-sub{display:block;color:#9AA0AA;font-size:16px;text-align:center;max-width:560px;margin:0}
-body.app #home #new-kind{order:-1;margin:8px 0 0;display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(21,23,27,.9);border:1px solid rgba(255,255,255,.08)}
-body.app #home #new-kind button{height:28px;padding:0 12px;border-radius:999px;border:0;background:transparent;color:#9AA0AA;font:500 12.5px/1 Geist,ui-sans-serif,sans-serif}
+body.app #home #new-kind{margin:10px auto 0;display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:rgba(21,23,27,.85);border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.04);backdrop-filter:blur(8px)}
+body.app #home #new-kind button{height:30px;padding:0 14px;border-radius:999px;border:0;background:transparent;color:#9AA0AA;font:500 13px/1 Geist,ui-sans-serif,sans-serif;transition:color .18s var(--k-ease,ease)}
+body.app #home #new-kind button:hover{color:#D9DCE1}
 body.app #home #new-kind button[aria-pressed=true]{background:transparent;color:#ECEEF1;box-shadow:none;position:relative;z-index:1}
 body.app #home #new-kind button{position:relative;z-index:1}
 /* the sliding thumb (create.js slideSegs) is the active pill */
 body.app .seg.sliding{position:relative}
-body.app .seg-thumb{position:absolute;top:3px;bottom:3px;left:0;border-radius:999px;background:#262A31;box-shadow:none;transition:transform .2s,width .2s;z-index:0}
+body.app .seg-thumb{position:absolute;top:4px;bottom:4px;left:0;border-radius:999px;background:#2A2F38;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.4);transition:transform .32s cubic-bezier(.3,1.2,.3,1),width .32s cubic-bezier(.3,1.2,.3,1);z-index:0}
 body.app #editor .seg.sliding button[aria-pressed=true],body.app.in-editor .tabs-seg button[aria-pressed=true]{background:transparent!important;position:relative;z-index:1}
 body.app #editor .seg.sliding button{position:relative;z-index:1}
-body.app #home .prompt-box,body.app #home #new-form{width:100%;max-width:720px;display:flex;flex-direction:column;align-items:center;gap:0;background:transparent;border:0;box-shadow:none;padding:0}
-body.app #home #new-form textarea{width:100%;background:rgba(21,23,27,.92);border:1px solid rgba(255,255,255,.12);border-bottom:0;border-radius:16px 16px 0 0;padding:16px 16px 6px;font:400 14.5px/22px Geist,ui-sans-serif,sans-serif;color:#ECEEF1;min-height:84px;resize:none;outline:0;box-shadow:0 30px 60px -30px rgba(0,0,0,.9)}
-body.app #home #new-form textarea:focus{border-color:rgba(53,224,207,.5)}
-body.app #home #new-form:focus-within .prompt-bar{border-color:rgba(53,224,207,.5)}
-body.app #home .prompt-bar{width:100%;display:flex;align-items:center;gap:4px;background:rgba(21,23,27,.92);border:1px solid rgba(255,255,255,.12);border-top:0;border-radius:0 0 16px 16px;padding:6px 10px 10px 10px;margin:0}
-body.app #home .prompt-bar .round,body.app #home #new-template{width:30px;height:30px;border-radius:999px;border:0;background:transparent;color:#9AA0AA;font-size:18px}
-body.app #home .prompt-note{display:inline-flex;align-items:center;gap:6px;margin-left:4px;color:#9AA0AA;font-size:12.5px;font-weight:500}
-body.app #home .prompt-note::before{content:"";width:14px;height:14px;border-radius:999px;border:1.6px solid #9AA0AA;box-sizing:border-box}
-body.app #home #new-submit{margin-left:auto;width:34px;height:34px;border-radius:999px;background:#35E0CF!important;color:#0E0F11!important}
+/* The prompt box, after looking at Lovable and Bolt: one spare surface, 20px corners, a hairline
+   with a faint top highlight, a deep soft shadow and a light behind it; inside only the words,
+   a "+" and a Build pill. The kind tabs sit above the box, outside it. */
+body.app #home .prompt-box,body.app #home #new-form{width:100%;max-width:760px;display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;position:relative;margin-top:14px;
+  background:#1A1C21;border:1px solid rgba(255,255,255,.09);border-radius:20px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 2px 4px rgba(0,0,0,.4),0 40px 90px -30px rgba(0,0,0,.9),0 0 120px -20px rgba(53,224,207,.12)}
+body.app #home #new-form textarea{width:100%;background:transparent;border:0;border-radius:20px 20px 0 0;padding:20px 22px 10px;font:400 15.5px/24px Geist,ui-sans-serif,sans-serif;color:#ECEEF1;min-height:96px;resize:none;outline:0;box-shadow:none}
+body.app #home #new-form textarea::placeholder{color:#6E7480}
+body.app #home #new-form textarea:focus{border-color:transparent}
+body.app #home .prompt-bar{width:100%;display:flex;align-items:center;gap:6px;background:transparent;border:0;border-radius:0 0 20px 20px;padding:4px 12px 12px 14px;margin:0}
+body.app #home .prompt-bar .round,body.app #home #new-template{width:32px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#C4C8CF;display:inline-flex;align-items:center;justify-content:center;padding:0}
+body.app #home #new-template .ico{width:15px;height:15px}
+body.app #home .prompt-bar .round:hover,body.app #home #new-template:hover{background:rgba(255,255,255,.08);color:#fff}
+body.app #home .prompt-note{display:none}
+body.app #home #new-submit{margin-left:auto;width:auto;height:36px;padding:0 8px 0 16px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;background:#35E0CF!important;color:#0E0F11!important;font:600 13.5px/1 Geist,ui-sans-serif,sans-serif;box-shadow:0 8px 20px -8px rgba(53,224,207,.8)}
+body.app #home #new-submit .ico{width:16px;height:16px;transform:rotate(90deg)}
+body.app #home #new-submit:hover{background:#5BEADB!important;transform:translateY(-1px);box-shadow:0 12px 26px -8px rgba(53,224,207,.9)}
+body.app #home #new-submit:active{transform:scale(.97)}
 /* the three example lines under the box are gone (Ka, 1 Nov); the placeholder cycles instead */
 body.app #home #examples{display:none!important}
 body.app #home #examples .example,body.app #home #examples button{height:30px;padding:0 11px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(21,23,27,.85);color:#C4C8CF;font:500 12.5px/1 Geist,ui-sans-serif,sans-serif}
 body.app #home #examples .example:hover,body.app #home #examples button:hover{background:#242830;color:#fff}
-body.app #home .setup-card,body.app #home .storage-warn{background:rgba(21,23,27,.9);border:1px solid rgba(255,255,255,.1);border-radius:12px;color:#C4C8CF;max-width:720px;width:100%}
+body.app #home .setup-card,body.app #home .storage-warn{background:transparent;border:0;border-radius:12px;color:#8C929C;max-width:760px;width:100%;font-size:12.5px}
+body.app #home .setup-card summary,body.app #home .storage-warn summary{color:#8C929C;font-weight:500}
+body.app #home .setup-card summary:hover{color:#ECEEF1}
+body.app #home .setup-card[open],body.app #home .storage-warn[open]{background:rgba(21,23,27,.9);border:1px solid rgba(255,255,255,.1);color:#C4C8CF}
 body.app #home .browser{width:100%;max-width:860px;margin:64px auto 40px;padding:0 24px;background:transparent;border:0;box-shadow:none}
 body.app #home .browser-tabs{display:flex;justify-content:center;gap:2px;padding:3px;border-radius:999px;background:#15171B;border:1px solid rgba(255,255,255,.08);width:max-content;margin:0 auto 14px}
 body.app #home .browser-tabs button{height:28px;padding:0 12px;border-radius:999px;border:0;background:transparent;color:#9AA0AA;font:500 12.5px/1 Geist,ui-sans-serif,sans-serif}
@@ -165,7 +189,7 @@ body.app.in-editor #editor #project-name:focus{background:#15171B!important;bord
 body.app.in-editor #editor #messages{background:#0E0F11!important;padding:18px 16px 8px!important}
 body.app.in-editor #editor .messages .user,body.app.in-editor #editor .messages li.user{background:#1C2A2A!important;border:0!important;color:#ECEEF1!important;border-radius:14px 14px 4px 14px!important;box-shadow:none!important;font-size:14px;line-height:21px}
 body.app.in-editor #editor .messages li.assistant{color:#D9DCE1;font-size:14px;line-height:1.65}
-body.app.in-editor #editor .messages .assistant::before{background:#35E0CF!important;color:#0E0F11!important;box-shadow:none!important}
+body.app.in-editor #editor .messages .assistant::before{display:none!important}
 body.app.in-editor #editor .messages .status-line,body.app.in-editor #editor .messages .step{color:#9AA0AA!important;font:400 12.5px/1.5 "Geist Mono",ui-monospace,monospace}
 body.app.in-editor #editor .messages .error,body.app.in-editor #editor .messages li.error,body.app.in-editor #editor .messages .assistant.failed{border-color:rgba(240,97,109,.4)!important;background:rgba(240,97,109,.06)!important;color:#ECEEF1!important}
 body.app.in-editor #editor .chat #progress:not(.hidden){display:flex!important;align-items:center;gap:8px;margin:0 12px;padding:8px 12px 0;color:#3DDC84;font-size:13px}
@@ -378,3 +402,101 @@ body.app .lk-seg button.on{background:#242830;color:#ECEEF1;box-shadow:none}
 body.app .lk-swatch.on{box-shadow:0 0 0 2px #15171B,0 0 0 4px #35E0CF}
 body.app .lk-switch i{background:#ECEEF1}
 body.app .lk-preview{background:#0E0F11}
+
+
+/* The brand step ("Do you have a brand?") and its page preview. */
+body.app .brand-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 10px}
+body.app .brand-opt{display:flex;flex-direction:column;gap:3px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:#15171B;color:#ECEEF1;cursor:pointer;box-shadow:none;font:inherit}
+body.app .brand-opt b{font-size:13.5px;font-weight:600}
+body.app .brand-opt span{font-size:12px;color:#9AA0AA;line-height:1.4}
+body.app .brand-opt:hover{background:#1C1F24}
+body.app .brand-opt.on{border-color:#35E0CF;background:rgba(53,224,207,.08)}
+body.app .brand-opt:focus-visible{outline:2px solid #35E0CF;outline-offset:1px}
+body.app .brand-body{display:flex;flex-direction:column;gap:10px}
+body.app .brand-note,body.app .brand-why,body.app .brand-got{margin:0;font-size:13.5px;line-height:1.55;color:#C4C8CF}
+body.app .brand-why{color:#ECEEF1}
+body.app .brand-got{color:#3DDC84}
+body.app .brand-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+body.app .brand-url{flex:1 1 220px;height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0E0F11;color:#ECEEF1;font:14px/1 Geist,ui-sans-serif,sans-serif}
+body.app .brand-url::placeholder{color:#666C77}
+body.app .brand-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+body.app .lk-page{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.08);font-size:13px;line-height:1.45}
+body.app .lk-p-nav{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid;font-size:12.5px;white-space:nowrap}
+body.app .lk-p-nav b{font-size:14px;margin-right:auto;overflow:hidden;text-overflow:ellipsis;min-width:0}
+body.app .lk-p-cta{padding:5px 10px;font-size:12px;font-weight:600}
+body.app .lk-p-hero{padding:26px 16px 18px;display:flex;flex-direction:column;gap:10px}
+body.app .lk-p-h1{font-size:30px;line-height:1.05;letter-spacing:-.02em;max-width:18ch}
+body.app .lk-p-sub{margin:0;max-width:44ch;font-size:13.5px}
+body.app .lk-p-actions{display:flex;gap:12px;align-items:center;margin-top:4px}
+body.app .lk-p-btn{padding:8px 14px;font-weight:600;font-size:13px}
+body.app .lk-p-link{font-size:13px;text-decoration:underline;text-underline-offset:3px}
+body.app .lk-p-list{margin:0 16px 16px;padding:12px 14px}
+body.app .lk-p-listhead{font-size:14px;margin-bottom:6px}
+body.app .lk-p-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid;font-size:12.5px}
+@media (max-width:720px){body.app .brand-opts{grid-template-columns:1fr}body.app .lk-p-h1{font-size:24px}body.app .lk-p-nav span:not(.lk-p-cta){display:none}}
+
+/* The work log in the chat: the step rail (live and folded), the breathing dots, the status line. */
+body.app.in-editor #editor .messages .status-line{display:inline-flex;align-items:center;gap:8px;font:500 13px/1.5 Geist,ui-sans-serif,sans-serif!important;color:#C4C8CF!important;background:transparent!important;border:0!important;padding:2px 0!important;cursor:pointer}
+body.app.in-editor #editor .messages .status-line .ico{width:14px;height:14px;transition:transform .15s}
+body.app.in-editor #editor .messages .status-line[aria-expanded="true"] .ico{transform:rotate(90deg)}
+body.app.in-editor #editor .messages .status-line:hover{color:#ECEEF1!important}
+body.app .rail::before{background:rgba(255,255,255,.1)}
+body.app .ev>.ico{background:#15171B;color:#9AA0AA}
+body.app .ev-head{color:#D9DCE1;font-size:13.5px}
+body.app .ev-label{font-weight:500}
+body.app .ev-think .ev-label{color:#9AA0AA}
+body.app .ev-thought,body.app .ev-detail{color:#9AA0AA}
+body.app .ev-detail{background:#0E0F11;border-color:rgba(255,255,255,.08)}
+body.app .ev-test:not(.bad)>.ico,body.app .ev-check:not(.bad)>.ico{color:#3DDC84}
+body.app .ev.bad>.ico{color:#F0616D}
+body.app .rail.done{margin:6px 0 10px}
+body.app .rail.live .ev-think.live .ev-label{color:#ECEEF1}
+body.app .ev-more{display:block;grid-template-columns:none;padding:2px 0 6px 30px!important}
+body.app .ev-more .link-btn{white-space:nowrap;color:#9AA0AA;font-size:12.5px;background:none;border:0;padding:0;cursor:pointer}
+body.app .ev-more .link-btn:hover{color:#ECEEF1;text-decoration:underline}
+body.app .k-dots{display:inline-flex;gap:3px;align-items:center;margin-left:2px}
+body.app .k-dots i{width:5px;height:5px;border-radius:50%;background:#35E0CF;opacity:.3;animation:k-dot 1.2s ease-in-out infinite}
+body.app .k-dots i:nth-child(2){animation-delay:.2s}
+body.app .k-dots i:nth-child(3){animation-delay:.4s}
+@keyframes k-dot{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){body.app .k-dots i{animation:none;opacity:.7}}
+body.app.in-editor #editor .work .stages.hidden{display:none}
+body.app .think-line{display:flex;align-items:center;gap:8px;color:#ECEEF1;font-size:14px;margin:0}
+body.app.in-editor #editor .messages .status-line .agent-name{color:#ECEEF1;font-weight:600}
+body.app.in-editor #editor .messages .status-line .agent-name::before{content:"";display:inline-block;width:14px;height:14px;border-radius:4px;background:#35E0CF;margin-right:7px;vertical-align:-2px}
+body.app.in-editor #editor .messages .status-line .status-text{color:#9AA0AA;font-weight:400}
+
+/* Motion: one easing, three speeds, so the whole product moves the same way. */
+:root{--k-ease:cubic-bezier(.2,.8,.2,1);--k-fast:.16s;--k-base:.24s;--k-slow:.36s}
+body.app button,body.app .btn,body.app a.btn,body.app .kn-item,body.app .seg button,body.app .lk-btn,body.app .lk-link,body.app .ask-next,body.app .ask-link,body.app .ask-ghost,body.app .brand-opt,body.app .ask-opt,body.app .q-label,body.app .projects.cards li,body.app .menu-panel button,body.app .status-line{transition:background-color var(--k-fast) var(--k-ease),color var(--k-fast) var(--k-ease),border-color var(--k-fast) var(--k-ease),box-shadow var(--k-fast) var(--k-ease),transform var(--k-fast) var(--k-ease),opacity var(--k-fast) var(--k-ease)}
+body.app button:active:not(:disabled),body.app .ask-next:active,body.app .brand-opt:active,body.app .lk-btn:active{transform:scale(.98)}
+body.app button:focus-visible,body.app .ask-next:focus-visible,body.app .lk-btn:focus-visible,body.app .brand-opt:focus-visible,body.app .q-label:focus-visible{outline:2px solid rgba(53,224,207,.9);outline-offset:2px;transition:outline-offset var(--k-fast) var(--k-ease)}
+@keyframes k-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes k-card-in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes k-fade{from{opacity:0}to{opacity:1}}
+/* chat: messages and cards arrive; log rows appear one after another */
+body.app.in-editor #editor .messages>li{animation:k-rise var(--k-base) var(--k-ease) both}
+body.app.in-editor #editor .messages li.ask-card.enter{animation:k-card-in var(--k-slow) var(--k-ease) both}
+body.app.in-editor #editor .messages li.ask-card>.step-out{transition:opacity .14s ease,transform .14s ease;opacity:0!important;transform:translateX(-12px)}
+body.app.in-editor #editor .messages li.ask-card[data-dir="-1"]>.step-out{transform:translateX(12px)}
+body.app.in-editor #editor .messages li.ask-card[data-dir="0"]>.step-out{transform:translateY(-4px)}
+body.app.in-editor #editor .messages li.ask-card.morphing{transition:height var(--k-slow) var(--k-ease);overflow:hidden}
+body.app .rail .ev{animation:k-rise var(--k-base) var(--k-ease) both}
+body.app .ask-opts:not(.hidden){animation:k-rise var(--k-fast) var(--k-ease) both}
+/* the folded work log opens with a height ease */
+body.app .fold{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--k-slow) var(--k-ease)}
+body.app .fold.open{grid-template-rows:1fr}
+body.app .fold>.rail{min-height:0;overflow:hidden;opacity:0;transition:opacity var(--k-base) var(--k-ease)}
+body.app .fold.open>.rail{opacity:1}
+/* home: the hero settles in; the prompt box glows when focused */
+body.app #home .home-hero h1{animation:k-rise var(--k-slow) var(--k-ease) both}
+body.app #home .home-sub{animation:k-rise var(--k-slow) var(--k-ease) .06s both}
+body.app #home #new-kind{animation:k-rise var(--k-slow) var(--k-ease) .12s both}
+body.app #home #new-form{animation:k-rise var(--k-slow) var(--k-ease) .18s both;transition:box-shadow var(--k-base) var(--k-ease),border-color var(--k-base) var(--k-ease)}
+body.app #home #new-form:focus-within{border-color:rgba(53,224,207,.45)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 4px rgba(53,224,207,.10),0 40px 90px -30px rgba(0,0,0,.9),0 0 140px -20px rgba(53,224,207,.22)!important}
+body.app #home .projects.cards li{animation:k-rise var(--k-base) var(--k-ease) both}
+/* editor: views crossfade; the preview frame too */
+body.app #editor .view-in{animation:k-fade var(--k-base) var(--k-ease) both}
+body.app #editor .stage,body.app #editor .side,body.app #editor .sidebar,body.app .kn,body.app #side{transition:transform var(--k-slow) var(--k-ease),width var(--k-slow) var(--k-ease),opacity var(--k-base) var(--k-ease)}
+body.app .menu-panel{animation:k-rise var(--k-fast) var(--k-ease) both}
+@media (prefers-reduced-motion:reduce){body.app *,body.app *::before,body.app *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

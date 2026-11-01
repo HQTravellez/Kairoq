@@ -344,17 +344,17 @@
     <div class="home-hero">
       <h1 id="home-title">What should we build?</h1>
       <p class="home-sub">Describe it in your own words. Kairoq asks a few questions, shows you a plan, then builds and tests it.</p>
+      <div class="seg kind-seg" role="group" aria-label="What to build" id="new-kind">
+        <button type="button" data-kind="app" aria-pressed="false">Web app</button>
+        <button type="button" data-kind="phone" aria-pressed="false">Phone app</button>
+        <button type="button" data-kind="site" aria-pressed="true">Website</button>
+      </div>
       <form id="new-form" class="prompt-box">
-        <div class="seg kind-seg" role="group" aria-label="What to build" id="new-kind">
-          <button type="button" data-kind="app" aria-pressed="false">Web app</button>
-          <button type="button" data-kind="phone" aria-pressed="false">Phone app</button>
-          <button type="button" data-kind="site" aria-pressed="true">Website</button>
-        </div>
         <textarea id="new-prompt" rows="2" placeholder="Ask Kairoq to build a booking page for my yoga studio with class times, prices and a sign-up form" required></textarea>
         <div class="prompt-bar">
-          <button type="button" class="round" id="new-template" aria-label="Start from a template" title="Start from a template">+</button>
+          <button type="button" class="round" id="new-template" aria-label="Start from a template" title="Start from a template"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
           <span class="prompt-note">Tested in a real browser</span>
-          <button class="primary send" type="submit" id="new-submit" aria-label="Build it" title="Build it"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="primary send" type="submit" id="new-submit" aria-label="Build it" title="Build it"><span>Build</span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
         </div>
       </form>
       <div class="examples" id="examples"></div>
