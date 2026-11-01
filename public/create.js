@@ -1201,21 +1201,24 @@ function renderTiers(){
  // good at and what a message costs. A named model that cannot run falls back to Auto.
  const models=state.me.models||[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true}];
  if(!models.some(m=>m.id===state.model&&m.enabled))state.model='auto';
- const panel=$('tier-panel');panel.replaceChildren(el('p','menu-note','Which AI model works on your next message'));
- for(const m of models){
-  const b=document.createElement('button');b.type='button';b.disabled=!m.enabled;b.setAttribute('aria-pressed',String(m.id===state.model));
+ // Like Emergent: a short list of the models that can run here, one grey line each, a tick on the
+ // chosen one, the cost on hover, and a search box when the list is long.
+ const panel=$('tier-panel');panel.replaceChildren();
+ const usable=models.filter(m=>m.enabled),off=models.length-usable.length;
+ const list=el('div','model-list');
+ if(usable.length>6){const q=el('input','model-search');q.type='search';q.placeholder='Search models';q.setAttribute('aria-label','Search models');q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const b of list.children)b.hidden=Boolean(t)&&!b.dataset.name.includes(t)};panel.append(q)}
+ for(const m of usable){
+  const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+(m.note||'')).toLowerCase();
   const name=el('b',null,m.label);
   if(m.id==='auto')name.append(el('i','model-tag top','Recommended'));
   if(m.free===true||m.isFree===true||m.credits===0)name.append(el('i','model-tag free','Free'));
-  if(m.top)name.append(el('i','model-tag top','Top pick'));
-  const credits=m.credits?m.credits+' credit'+(m.credits===1?'':'s')+' a message':'';
-  const bits=[m.note,credits].filter(Boolean).join(' · ');
-  const line=el('span',null,bits+(m.enabled?'':' · unavailable on this account'));
-  if(m.costlier&&m.enabled)line.append(el('i','model-tag cost','costlier'));
-  b.append(name,line);
+  b.append(name,el('span',null,m.note||''));
+  if(m.credits)b.title=m.credits+' credit'+(m.credits===1?'':'s')+' a message'+(m.costlier?' (costlier)':'');
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
-  panel.append(b);
+  list.append(b);
  }
+ panel.append(list);
+ if(off)panel.append(el('p','menu-note model-off',off+' more model'+(off===1?' is':'s are')+' not available on this account'));
  const cur=models.find(m=>m.id===state.model);text($('tier-label'),cur?cur.label:'Auto');
  costHint();
 }
