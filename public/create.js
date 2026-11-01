@@ -21,7 +21,7 @@ function show(screen){
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
  $('side').classList.toggle('hidden',!app);
- if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.toggle('side-open',window.innerWidth>=1600)}
+ if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
  for(const b of ['side-new','side-projects','side-templates','side-check'])$(b).removeAttribute('aria-current');
