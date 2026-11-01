@@ -486,7 +486,7 @@ async function handle(req,res,{onlyProject}={}){
   if(fm&&req.method==='GET'){extras.serveFile(res,{id,db,fid:fm[1]});return true}
   if(fm&&req.method==='DELETE')return send(res,200,extras.removeFile({id,db,user,fid:fm[1]})),true;
   // In a test run, emails and payments are not real.
-  if(route==='/email'&&req.method==='POST')return send(res,200,sb?{sent:true,test:true}:await extras.sendEmail(await readJson(req,20000),{meta,db,cfg,user})),true;
+  if(route==='/email'&&req.method==='POST'){const body=await readJson(req,20000);if(sb)extras.checkEmail(body,{cfg,user});return send(res,200,sb?{sent:true,test:true}:await extras.sendEmail(body,{meta,db,cfg,user})),true}
   if(route==='/payments/checkout'&&req.method==='POST')return send(res,200,sb?{url:'#kairoq-test-checkout',test:true}:await extras.checkout(await readJson(req),{id,meta,cfg,user,req})),true;
   if(route==='/payments/mine'&&req.method==='GET')return send(res,200,{purchases:extras.myPurchases(db,user)}),true;
   const rt=/^\/realtime\/([a-z][a-z0-9_]{0,39})(\/ticket)?$/.exec(route);
