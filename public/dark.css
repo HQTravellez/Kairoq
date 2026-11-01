@@ -500,3 +500,15 @@ body.app #editor .view-in{animation:k-fade var(--k-base) var(--k-ease) both}
 body.app #editor .stage,body.app #editor .side,body.app #editor .sidebar,body.app .kn,body.app #side{transition:transform var(--k-slow) var(--k-ease),width var(--k-slow) var(--k-ease),opacity var(--k-base) var(--k-ease)}
 body.app .menu-panel{animation:k-rise var(--k-fast) var(--k-ease) both}
 @media (prefers-reduced-motion:reduce){body.app *,body.app *::before,body.app *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* The working mark: a 4x4 grid of dots breathing in a diagonal wave, beside "Kairoq Agent". */
+body.app .k-grid{display:inline-grid;grid-template-columns:repeat(4,4px);gap:2px;width:22px;height:22px;align-content:center;justify-content:center;margin-right:2px}
+body.app .k-grid i{width:4px;height:4px;border-radius:50%;background:#35E0CF;opacity:.25;animation:k-grid 1.6s ease-in-out infinite}
+body.app .k-grid i:nth-child(1){animation-delay:0s}body.app .k-grid i:nth-child(2),body.app .k-grid i:nth-child(5){animation-delay:.1s}
+body.app .k-grid i:nth-child(3),body.app .k-grid i:nth-child(6),body.app .k-grid i:nth-child(9){animation-delay:.2s}
+body.app .k-grid i:nth-child(4),body.app .k-grid i:nth-child(7),body.app .k-grid i:nth-child(10),body.app .k-grid i:nth-child(13){animation-delay:.3s}
+body.app .k-grid i:nth-child(8),body.app .k-grid i:nth-child(11),body.app .k-grid i:nth-child(14){animation-delay:.4s}
+body.app .k-grid i:nth-child(12),body.app .k-grid i:nth-child(15){animation-delay:.5s}body.app .k-grid i:nth-child(16){animation-delay:.6s}
+@keyframes k-grid{0%,70%,100%{opacity:.22;transform:scale(.9)}25%{opacity:1;transform:scale(1.15)}}
+body.app.in-editor #editor .messages .status-line:not(.done) .agent-name::before{display:none}
+@media (prefers-reduced-motion:reduce){body.app .k-grid i{animation:none;opacity:.7}}

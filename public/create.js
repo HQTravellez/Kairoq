@@ -1334,13 +1334,15 @@ function summarize(events){
 // ---------- live: the chat shows a status line and the latest activity ----------
 // Three breathing dots: shown wherever Kairoq is thinking.
 function dots(){const d=el('span','k-dots');d.setAttribute('aria-hidden','true');d.append(el('i'),el('i'),el('i'));return d}
+// The working mark beside the agent's name: a 4×4 grid of dots that breathes in a wave.
+function workingMark(){const g=el('span','k-grid');g.setAttribute('aria-hidden','true');for(let i=0;i<16;i++)g.append(el('i'));return g}
 // For the kairoq-design tests: render a saved message the way the chat does.
 window.kairoqRenderMessage=(m,last,index)=>messageItem(m,last,index);
 function workCard(){
  let li=$('stream');
  if(!li){
   li=el('li','assistant work');li.id='stream';
-  const status=el('button','status-line');status.type='button';status.append(el('span','agent-name','Kairoq Agent'),el('span','status-text','Thinking'),dots(),icon('chev'));status.onclick=()=>openDetail('live');
+  const status=el('button','status-line');status.type='button';status.append(workingMark(),el('span','agent-name','Kairoq Agent'),el('span','status-text','is thinking…'),icon('chev'));status.onclick=()=>openDetail('live');
   const head=el('div','work-head');head.append(status,el('span','work-time'));const stop=el('button','ghost work-stop','Stop');stop.type='button';stop.onclick=()=>$('stop-job').click();head.append(stop);
   // Like Lovable: one status line, then what Kairoq says and plans; the step checklist stays in Details.
   li.append(head,el('div','work-msg hidden'),el('ol','stages'),el('p','work-think hidden'),el('ol','rail live'));
@@ -1417,7 +1419,8 @@ function renderWork(j){
  if(st&&st.message)work.message=st.message;
  if(st&&st.tail)work.tail=st.tail;
  if(j.thinking)work.thinking=j.thinking;
- text(li.querySelector('.status-text'),liveStatus(j));
+ // "Kairoq Agent is building the application…", like a person at work.
+ const st0=liveStatus(j);text(li.querySelector('.status-text'),'is '+st0.charAt(0).toLowerCase()+st0.slice(1).replace(/\u2026?$/,'')+'\u2026');
  const ask=j.mode==='discuss';
  li.querySelector('.stages').replaceWith(ask?el('ol','stages hidden'):stageList(j));
  const th=li.querySelector('.work-think'),thought='';th.classList.toggle('hidden',!thought);text(th,thought);
