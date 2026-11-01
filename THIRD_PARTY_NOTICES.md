@@ -250,3 +250,16 @@ in `licenses/scientific-agent-skills-LICENSE.txt`.
 ## Impeccable
 
 Impeccable 4.8.0 (Apache License 2.0, © Paul Bakaus, https://github.com/pbakaus/impeccable) is the design detector the app builder runs on every app it makes (`impeccable.js`): 62 deterministic rules for the "made by AI" tells and design quality problems, on the app's source and on the rendered page. It is an npm dependency of the server; its findings reach the builder as fixes to make. Generated apps do not include it.
+
+
+## Teardown 3D simulator skill
+
+Kairoq can load task-matched 3D mechanism/simulator guidance from
+`elvarofficial/teardown` (MIT License), pinned to revision
+`a91262ac1109051e014662d42ecb0b7bc1f113b1`.
+
+`teardown-skill-pack.js` exposes the `3d:teardown-simulator` specialist skill for
+requests involving machine explainers, exploded views, cutaways, interactive 3D lessons,
+engines, gearboxes, pumps, linkages and similar mechanisms. Kairoq uses its own
+Three.js/React/browser runtime and QA pipeline; upstream npm/Playwright/ffmpeg/Python/shell
+instructions are treated as reference text and do not grant execution permission.
