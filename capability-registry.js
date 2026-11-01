@@ -25,6 +25,7 @@ const CAPABILITIES=Object.freeze([
   {id:"understand",label:"Static code dependency graph export",group:"Engineering",status:"graph-export",entry:"integrations/agent-stack/understand.js",tools:[]},
   {id:"ecc",label:"Project context recall",group:"Knowledge",status:"concept-adaptation",entry:"ecc-context-recall.js",tools:[]},
   {id:"media",label:"AI media, 3D and Remotion workflows",group:"Creative",status:"feature-specific",entry:"hyperframes-video.js",tools:[]},
+  {id:"interactive_3d_explainer",label:"Create Interactive 3D Explainer",group:"Creative",status:"builder-specialist-pack",entry:"teardown-skill-pack.js",tools:["kairoq_skill","build_and_test","test_ui"]},
   {id:"sales",label:"Sales lead research and outreach drafting",group:"Business",status:"feature-specific",entry:"agent-brain.js",tools:[]},
   {id:"marketing",label:"Marketing content and approved publishing",group:"Business",status:"feature-specific",entry:"server.js",tools:[]}
 ]);
@@ -66,6 +67,8 @@ const RULES=Object.freeze({
   requires:[],evidence:["project-owned context source"],fallback:"Use project-memory and current code."},
  media:{risk:"medium",auto:true,when:[/\b(image|video|3d|voice|audio|remotion|animation render|model viewer)\b/i],
   requires:[],evidence:["generated/loaded asset or renderer result"],fallback:"Use supported static assets and mark unavailable media generation explicitly."},
+ interactive_3d_explainer:{risk:"medium",auto:true,when:[/\b(teardown|exploded view|cutaway|machine simulator|mechanism simulator|interactive 3d lesson|3d explainer|engine simulator|gearbox|pump|landing gear|mechanical watch|excavator|show (me )?how .* works?|how .* works? visually)\b/i],
+  requires:["app_builder","design_skills","test_repair"],evidence:["3d:teardown-simulator skill selected","rendered interactive mechanism","working subsystem/cutaway controls","browser QA on primary interaction","readouts and motion share one state model when quantitative"],fallback:"Build an illustrative 3D explainer with Kairoq's native 3D stack, clearly mark unverified engineering values, and never claim physical accuracy without a verified reference."},
  sales:{risk:"medium",auto:false,when:[/\b(leads?|prospects?|outreach|sales research)\b/i],
   requires:["browser"],evidence:["public source evidence","approval before sending"],fallback:"Draft only; do not send."},
  marketing:{risk:"medium",auto:false,when:[/\b(marketing|campaign|social post|publish content|content calendar)\b/i],
