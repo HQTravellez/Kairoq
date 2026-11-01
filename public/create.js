@@ -588,9 +588,9 @@ function messageItem(m,last,index){
    const steps=tl.filter(e=>e.t!=='note'||e.icon).length;
    const label=m.duration_ms!=null&&steps?'Worked for '+secsShort(m.duration_ms)+' · '+steps+' step'+(steps===1?'':'s'):thoughtMs!=null?'Thought for '+secsShort(thoughtMs):'Worked for '+secsShort(m.duration_ms||0);
    const b=el('button','status-line done');b.type='button';b.setAttribute('aria-expanded','false');b.append(el('span','agent-name','Kairoq Agent'),el('span','status-text',label),icon('chev'));
-   const rail=el('ol','rail done hidden');
-   b.onclick=()=>{if(!rail.childElementCount)for(const e of tl)rail.append(eventRow(e,{expand:false,version:m.version}));const open=rail.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!open))};
-   li.append(b,rail);
+   const rail=el('ol','rail done'),fold=el('div','fold');fold.append(rail);
+   b.onclick=()=>{if(!rail.childElementCount)for(const e of tl)rail.append(eventRow(e,{expand:false,version:m.version}));const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
+   li.append(b,fold);
   }
   li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
@@ -822,6 +822,8 @@ function view(mode){
  state.code=mode==='code';state.data=mode==='data';
  for(const m of ['preview','code','data'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
  $('device').classList.toggle('hidden',mode!=='preview');$('frame').classList.toggle('hidden',mode!=='preview');$('code').classList.toggle('hidden',mode!=='code');$('data').classList.toggle('hidden',mode!=='data');
+ // The shown view fades in (dark.css .view-in) instead of snapping.
+ const shown=$(mode==='preview'?'frame':mode);if(shown&&!STILL){shown.classList.remove('view-in');void shown.offsetWidth;shown.classList.add('view-in')}
  if(mode==='code')renderFiles();
  if(mode==='data')renderData();
 }
