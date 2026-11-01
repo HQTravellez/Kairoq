@@ -35,7 +35,7 @@ test('the editor is light, calm and keeps its ids',()=>{
  assert.doesNotMatch(html,/dark\.css/);
  assert.match(theme,/color-scheme:light/);assert.doesNotMatch(theme,/#0E0F11|#35E0CF/i);
  for(const id of ['share-open','publish-open','share-pop','composer-ideas','menu-plus','menu-tier','menu-mode','versions','view-browser'])assert.match(html,new RegExp('id="'+id+'"'));
- assert.match(css,/--c-accent:#0A2A52/);assert.match(css,/sky\.webp/);assert.match(css,/#send\.is-empty/);
+ assert.match(css,/--c-accent:#0A2A52/);assert.match(css,/glow\.webp/);assert.match(css,/#send\.is-empty/);
  assert.match(js,/function renderIdeas\(/);assert.match(js,/model-search/);
  assert.doesNotMatch(js,/this model is slow today/);
 });
