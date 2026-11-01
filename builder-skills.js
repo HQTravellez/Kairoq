@@ -26,6 +26,7 @@ async function openAsync(name,options={}){
  const local=open(name);
  if(!/^No skill called /.test(local))return local;
  const specialist=await S.open(name,options);if(specialist)return specialist;
+ const design=await D.open(name,options);if(design)return design;
  return local;
 }
 module.exports={list,menu,open,openAsync};
