@@ -97,6 +97,29 @@ test('out of rounds with a working build: Kairoq runs the review itself and the 
  assert.equal(r.verification.evidence.engineering_review,'passed');
 });
 
+test('substantial work without a task graph: Kairoq writes the task list from the plan and the write goes through',async()=>{
+ const agent=require('../react-agent'),tg=require('../task-graph');
+ const meta=builder.create({name:'Auto task list'});await builder.initialize(meta);
+ const request='Build a platform: an app with auth, a database and an api for a running club\n\nApproved plan (build exactly this first version):\nShow runs. Members join with a code.\nScreens: Join (enter the club code); This week (the runs)';
+ const results=[];
+ const steps=[{thought:'Write the function.',actions:[{tool:'write_files',files:{'functions/hello.js':'export default async function hello(){return {ok:true}}\n'}}]},
+  {thought:'Done.',actions:[{tool:'finish',message:'Added the function.'}]}];
+ const callModel=async(opts,parse)=>{
+  const sys=String(opts.messages[0].content||'');
+  if(/independent senior code reviewer|independent product\/spec reviewer/.test(sys))return parse(JSON.stringify({verdict:'pass',findings:[]}));
+  const last=opts.messages.at(-1);if(typeof last.content==='string'&&/^Results of step/.test(last.content))results.push(last.content);
+  return parse(JSON.stringify(steps.shift()||{thought:'Looking.',actions:[{tool:'read_files',paths:['src/App.jsx']}]}));
+ };
+ const r=await agent.run(meta.id,request,{callModel,maxSteps:4});
+ assert.ok(!results.some(x=>/needs a tracer-bullet task graph first/.test(x)),'the write is not refused');
+ assert.ok(results.some(x=>/write_files: functions\/hello\.js/.test(x)),results.join('\n').slice(0,500));
+ assert.ok(r.timeline.some(e=>e.t==='note'&&e.text==='Set up the task list from the plan'));
+ const st=tg.status(meta.id,request);
+ assert.deepEqual(st.tasks.map(t=>t.id+':'+t.status),['S1:done','S2:done'],'the auto list is ticked off at finish');
+ // (No browser in this test, so the completion gate holds finish back; the task list is not the reason.)
+ assert.ok(!results.some(x=>/task graph is incomplete/.test(x)),results.join('\n').slice(0,800));
+});
+
 test('the Changes API returns each changed file before and after',async()=>{
  const http=require('http'),createApi=require('../create-api');
  const server=http.createServer(async(req,res)=>{if(await createApi.handle(req,res,{isOwner:()=>false,callModel:async()=>{throw Error('no model')},secure:false}))return;res.writeHead(404);res.end()});

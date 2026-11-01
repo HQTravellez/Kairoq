@@ -22,15 +22,30 @@ function validate(tasks){
  function visit(id){if(done.has(id))return;if(temp.has(id))throw Error("task graph contains a cycle at "+id);temp.add(id);for(const b of by.get(id).blockedBy)visit(b);temp.delete(id);done.add(id)}
  for(const id of ids)visit(id);return true;
 }
-function define(id,{instruction,tasks,root}={}){
+function define(id,{instruction,tasks,root,auto=false}={}){
  if(!Array.isArray(tasks)||!tasks.length||tasks.length>24)throw Error("task graph needs 1-24 tasks");
  const normalized=tasks.map(normalizeTask);validate(normalized);
  const opts=root?{root}:{},data=readAll(id,opts),k=key(instruction),now=new Date().toISOString();
- data.graphs[k]={instruction:clean(instruction,4000),createdAt:now,updatedAt:now,tasks:normalized};writeAll(id,data,opts);
+ data.graphs[k]={instruction:clean(instruction,4000),createdAt:now,updatedAt:now,tasks:normalized,...(auto?{auto:true}:{})};writeAll(id,data,opts);
  return status(id,instruction,{root});
+}
+// The task list Kairoq writes itself from the approved plan (build-plan.js withPlan) when the
+// model starts writing files without defining one: one task per screen, or per feature, or
+// one for the whole first version. A refused write cost a whole round on a slow model.
+function fromPlan(instruction){
+ const t=String(instruction||""),plan=/\n\nApproved plan \(build exactly this first version\):\n([\s\S]*)$/.exec(t);
+ const body=plan?plan[1]:"";
+ const line=name=>{const m=new RegExp("\\n"+name+": ([^\\n]+)").exec(body);return m?m[1].split(";").map(x=>x.trim()).filter(Boolean):[]};
+ const screens=line("Screens"),features=line("Features");
+ let tasks=[];
+ if(screens.length)tasks=screens.map((s,i)=>{const m=/^(.*?)\s*\((.*)\)$/.exec(s);return{id:"S"+(i+1),title:"Screen: "+(m?m[1]:s),delivers:m&&m[2]?m[2]:s,acceptance:["Opens in the browser and does what it says"]}});
+ else if(features.length)tasks=features.map((f,i)=>({id:"F"+(i+1),title:f,delivers:f,acceptance:["Works in the browser"]}));
+ else tasks=[{id:"T1",title:"The first version",delivers:clean(t.split("\n")[0],300)||"The app as requested",acceptance:["Builds, opens and the main flow works in the browser"]}];
+ return tasks.slice(0,24);
 }
 function get(id,instruction,{root}={}){return readAll(id,root?{root}:{}).graphs[key(instruction)]||null}
 function ready(g){return g.tasks.filter(t=>t.status==="pending"&&t.blockedBy.every(b=>g.tasks.find(x=>x.id===b)?.status==="done"))}
+function autoDefined(id,instruction,{root}={}){return Boolean(get(id,instruction,{root})?.auto)}
 function status(id,instruction,{root}={}){
  const g=get(id,instruction,{root});if(!g)return null;
  return{tasks:g.tasks,ready:ready(g).map(x=>x.id),done:g.tasks.filter(x=>x.status==="done").map(x=>x.id),complete:g.tasks.every(x=>x.status==="done")};
@@ -51,4 +66,4 @@ function prompt(id,instruction,{root}={}){
  return"\n\nENGINEERING TASK GRAPH: "+s.done.length+"/"+s.tasks.length+" tracer-bullet tasks complete. Ready frontier: "+(s.ready.join(", ")||"none")+
   "\n"+s.tasks.map(t=>"- "+t.id+" ["+t.status+"] "+t.title+" — "+t.delivers+(t.blockedBy.length?"; blocked by "+t.blockedBy.join(", "):"")).join("\n");
 }
-module.exports={key,file,define,get,status,start,complete,prompt,validate,ready};
+module.exports={key,file,define,fromPlan,autoDefined,get,status,start,complete,prompt,validate,ready};
