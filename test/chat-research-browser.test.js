@@ -10,33 +10,50 @@ const root=path.join(__dirname,"..");
 function fakeBrowse(pages){
  return async url=>{let here=url;return{observe:async()=>({title:pages[here]?.title||"Untitled",text:pages[here]?.text||"",elements:[]}),url:()=>here,screenshot:async()=>"data:image/jpeg;base64,AAAA",close:async()=>{}}};
 }
-const PAGES={"http://127.0.0.1:9/wave":{title:"Wave pricing",text:"Wave: free accounting, paid payroll."},"http://127.0.0.1:9/xero":{title:"Xero plans",text:"Xero: Starter, Standard, Premium plans."},"http://127.0.0.1:9/site":{title:"Acme",text:"Acme sells bikes."}};
+const LONG=" Plans, features and prices for small firms, with invoicing, bank feeds, reports and payroll options explained.";
+const PAGES={"http://127.0.0.1:9/wave":{title:"Wave pricing",text:"Wave: free accounting, paid payroll."+LONG},"http://127.0.0.1:9/xero":{title:"Xero plans",text:"Xero: Starter, Standard, Premium plans."+LONG},"http://127.0.0.1:9/site":{title:"Acme",text:"Acme sells bikes."+LONG},
+ "http://127.0.0.1:9/xero-block":{title:"Just a moment...",text:"Checking your browser before accessing the site. Enable JavaScript and cookies to continue."+LONG}};
 
-test("plain plan: links are opened, research requests are searched (typos and filler removed)",()=>{
+test("plain plan: the topic only; a comparison becomes focused searches",()=>{
  assert.deepEqual(web.plainPlan("check https://xero.com/pricing and wave.com"),[{open:"https://xero.com/pricing"},{open:"https://wave.com"}]);
- assert.deepEqual(web.plainPlan("I WANT YOU RESEARCHA ND CHECK ND THEN TELL ME\n\ncompare wave and xero"),[{search:"compare wave and xero",openTop:2}]);
+ assert.deepEqual(web.plainPlan("hi compare xero and wave"),[{search:"xero vs wave",openTop:1},{search:"xero pricing features",openTop:1},{search:"wave pricing features",openTop:1}]);
+ assert.equal(web.topicOf("Compare Wave and Xero for a small accounting firm. Research it and show it as a table."),"Compare Wave and Xero for a small accounting firm");
+ assert.equal(web.topicOf("i want you search actual xero and wave"),"xero and wave");
+ assert.equal(web.topicOf("I WANT YOU RESEARCHA ND CHECK ND THEN TELL ME\n\nwhat is the latest notion pricing"),"what is the latest notion pricing");
  assert.deepEqual(web.plainPlan("hi"),[]);
 });
 
-test("with every model down, a research request still searches, reads the top pages and reports each step",async()=>{
+test("only pages about the question are read: no dictionaries, no text-diff tools, no bot-check pages",()=>{
+ const urls=["https://dictionary.cambridge.org/dictionary/english/hi","https://www.merriam-webster.com/dictionary/hi","https://www.diffchecker.com/","https://text-compare.com/","https://www.xero.com/ca/pricing/","https://www.waveapps.com/pricing"];
+ assert.deepEqual(web.relevant(urls,"xero vs wave"),["https://www.xero.com/ca/pricing/","https://www.waveapps.com/pricing"]);
+ assert.equal(web.blockedPage("Just a moment...",""),true);
+ assert.equal(web.blockedPage("Acme docs","GET /v1/rooms returns the rooms as JSON."),false,"a short real page is read");
+ assert.equal(web.blockedPage("Access denied","x".repeat(400)),true);
+ assert.equal(web.blockedPage("Xero pricing","Plans for every business. "+"x".repeat(200)),false);
+});
+
+test("a follow-up that names its own topic is not glued to the previous message",()=>{
+ assert.deepEqual(web.keyWords(web.topicOf("research it and tell me")),[]);
+ assert.deepEqual(web.keyWords(web.topicOf("i want you search actual xero and wave")),["xero","wave"]);
+ const api=fs.readFileSync(path.join(root,"create-api.js"),"utf8");
+ assert.match(api,/!web\.keyWords\(web\.topicOf\(askText\)\)\.length/);
+});
+
+test("with every model down, a comparison still searches each side, skips blocked pages and reads real ones",async()=>{
  const frames=[],searched=[];
- const out=await web.gather("compare wave and xero for an accounting firm",{
+ const results={"wave vs xero":["https://dictionary.cambridge.org/dictionary/english/hi","http://127.0.0.1:9/xero-block","http://127.0.0.1:9/wave"],
+  "wave pricing features":["http://127.0.0.1:9/wave"],"xero pricing features":["http://127.0.0.1:9/xero"]};
+ const out=await web.gather("hi compare wave and xero for an accounting firm, research it and show it as a table",{
   callModel:async()=>{throw Error("OpenRouter: no credits")},
-  webSearch:async q=>{searched.push(q);return["http://127.0.0.1:9/wave","http://127.0.0.1:9/xero","http://127.0.0.1:9/site"]},
+  webSearch:async q=>{searched.push(q);return results[q.toLowerCase()]||[]},
   browseSite:fakeBrowse(PAGES),onBrowser:f=>frames.push(f)
  });
- assert.deepEqual(searched,["compare wave and xero for an accounting firm"]);
- assert.deepEqual(out.sources.map(s=>s.title),["Wave pricing","Xero plans"],"top two results read");
- assert.match(out.context,/^Web research done for this request/);
- assert.match(out.context,/Xero: Starter, Standard, Premium/);
+ assert.deepEqual(searched,["wave vs xero","wave pricing features","xero pricing features"]);
+ assert.deepEqual(out.sources.map(s=>s.title),["Wave pricing","Xero plans"],"the bot-check page and the dictionary are not sources");
  const last=frames.at(-1);
- assert.ok(last.steps.length>=5);
- assert.match(last.steps[0],/^Step 1 · Deciding what to look up$/);
- assert.ok(last.steps.some(s=>/^Step \d+ · Searching the web for "compare wave and xero/.test(s)));
- assert.ok(last.steps.some(s=>/^Step \d+ · Reading 127\.0\.0\.1/.test(s)));
+ assert.ok(last.steps.some(s=>/Skipped 127\.0\.0\.1 \(the site would not let us read it\)/.test(s)));
+ assert.ok(!last.steps.some(s=>/cambridge/.test(s)),"the dictionary is never opened");
  assert.match(last.steps.at(-1),/Done: read 2 pages/);
- assert.ok(frames.some(f=>f.screenshot==="data:image/jpeg;base64,AAAA"),"screenshots reach the pane");
- assert.deepEqual(out.steps,last.steps.map(s=>s.replace(/^Step \d+ · /,"")));
 });
 
 test("a pasted link is always opened, even when the model plans only a search",async()=>{
@@ -51,20 +68,24 @@ test("a pasted link is always opened, even when the model plans only a search",a
  assert.deepEqual(out.sources.map(s=>s.title),["Acme"]);
 });
 
-test("the builder plans research on the free route, keeps the steps on the answer, and shows Show browsing",()=>{
+test("the builder researches on the free route, streams each page live, and shows a quiet sources line",()=>{
  const api=fs.readFileSync(path.join(root,"create-api.js"),"utf8");
  assert.match(api,/gather\([^\n]*\{callModel:\(o,p\)=>callModel\(\{\.\.\.o,tier:'chat',freeOnly:true\},p\),tier:'chat'/);
- assert.match(api,/lastMsg\.browsing=\{steps:research\.steps\.slice\(0,30\)/);
+ assert.match(api,/live\.watch\(v\.owner,p,'kairoq'\)/);
+ assert.match(api,/route==='\/live-browser\/stream'/);
  const ui=fs.readFileSync(path.join(root,"public/create.js"),"utf8");
- assert.match(ui,/'Show browsing \('\+m\.browsing\.steps\.length\+' steps\)'/);
- assert.match(ui,/window\.kairoqBrowserPane\.show\(\{url:m\.browsing\.url,title:m\.browsing\.title,steps:m\.browsing\.steps\}\)/);
+ assert.doesNotMatch(ui,/Show browsing/);
+ assert.match(ui,/'Read '\+list\.length\+' page'/);
  const html=fs.readFileSync(path.join(root,"public/create.html"),"utf8");
+ assert.match(html,/id="web-browser-url" type="text"/);
+ assert.doesNotMatch(html,/web-browser-log/);
  assert.doesNotMatch(html,/calm\.css\?v=1"/);assert.doesNotMatch(html,/create\.js\?v=20261141"/);
 });
 
 test("Discuss answers like a consultant: direct answer first, tables for comparisons, honest sources",()=>{
  const src=fs.readFileSync(path.join(root,"react-builder.js"),"utf8");
  const prompt=/const DISCUSS_PROMPT=`[\s\S]*?`;/.exec(src)[0];
+ assert.match(prompt,/no plan to change this app/);
  assert.match(prompt,/Open with the direct answer/);
  assert.match(prompt,/give a Markdown table/);
  assert.match(prompt,/cite the pages as \[1\], \[2\]/);

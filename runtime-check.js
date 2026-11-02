@@ -711,11 +711,13 @@ function SCAN({max}){
 // site: true for another website (see guardSite); observe() then counts the forms a visitor sent.
 // record: keep the page's own GET responses (pages and data requests, up to 40) so a web watch
 // can learn which request holds its answer (see web-replay.js).
-async function session(url,{sandbox,viewport,timeoutMs=15000,site=false,record=false}={}){
+async function session(url,{sandbox,viewport,timeoutMs=15000,site=false,record=false,onPage}={}){
  if(!available())return null;
  const phone=viewport==='phone';
  const context=await (await (site?externalBrowser():browser())).newContext(phone?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:800}});
  const page=await context.newPage(),errors=[];
+ // The live browser pane watches this page (its screen streams to the owner while it loads).
+ if(typeof onPage==='function')await Promise.resolve(onPage(page)).catch(()=>{});
  page.on('pageerror',e=>{if(errors.length<10)errors.push('Uncaught error: '+String(e.message||e).slice(0,300))});
  // Sends right after a visitor's click or typing count as the visitor sending a form (not
  // analytics pings, which happen on their own).
