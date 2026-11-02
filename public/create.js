@@ -2876,6 +2876,8 @@ function renderMemory(mem){
  const sh=$('mem-shared');sh.replaceChildren();for(const r of mem.shared){const li=el('li');li.append(el('b',null,r.title),el('span','muted small',' · '+r.when));sh.append(li)}
 }
 $('side-memory').onclick=openMemory;
+// The older chat page (Sales Agent, Studio and the rest) lives at /chat; / now opens this page.
+$('side-chat').onclick=()=>{location.href='/chat'};
 // Web agent: tasks on other websites, and watches that repeat them and email changes.
 const webState={poll:null};
 function webRunItem(r){
