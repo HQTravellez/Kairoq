@@ -1,1 +1,423 @@
-/* Kairoq UI: chat. Follows docs/DESIGN-SYSTEM.md. Loaded after calm.css. */
+/* Kairoq UI: chat. Follows docs/DESIGN-SYSTEM.md. Loaded after calm.css.
+   The editor (#editor, not its dialogs): the chat column, the composer and its menus, the stage
+   (top bar, preview, Code, Data), the visual-edit form and Kairoq's browser pane. Lovable-calm:
+   one ground colour, white cards with one hairline, radius 10/12/14, one navy accent, nothing boxy.
+   Every rule is scoped to body.app.in-editor #editor (or an id inside it). Tokens only. */
+
+/* ---------- ground: the chat column is plain, like Lovable (no dot grid) ---------- */
+body.app.in-editor #editor .chat{background:var(--c-bg)!important;background-image:none!important}
+body.app.in-editor #editor .chat-head{height:52px;padding:0 12px!important;gap:4px!important}
+body.app.in-editor #editor .chat-head #project-name{font-size:14.5px!important;font-weight:600!important;color:#1B1D22!important;letter-spacing:-.005em;border-radius:8px!important;padding:4px 8px!important;border:1px solid transparent!important;background:transparent!important}
+body.app.in-editor #editor .chat-head #project-name:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor .chat-head #project-name:focus{outline:none;background:var(--c-panel)!important;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body.app.in-editor #editor .chat-head .icon-btn{width:32px;height:32px;border-radius:8px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor .chat-head .icon-btn:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+
+/* ---------- the message list: one 16px gutter, 20px between turns ---------- */
+body.app.in-editor #editor #messages{padding:20px 16px 12px!important;gap:20px!important;scrollbar-width:thin;scrollbar-color:var(--c-line-2) transparent}
+body.app.in-editor #editor #messages>li.assistant{padding:0!important;font-size:14.5px;line-height:1.65;color:var(--c-ink)}
+/* User turns: a quiet raised bubble on the right, never wider than 85%. */
+body.app.in-editor #editor #messages>li.user{max-width:85%!important;padding:10px 14px!important;background:var(--c-raise)!important;color:var(--c-ink)!important;border:1px solid var(--c-line)!important;border-radius:16px 16px 4px 16px!important;font-size:14.5px!important;line-height:1.55!important;box-shadow:none!important}
+body.app.in-editor #editor #messages>li.user .msg-text{white-space:pre-wrap;word-break:break-word}
+body.app.in-editor #editor #messages>li.user .changed{display:block;margin-top:6px;font-size:12px;color:var(--c-ink-3)}
+/* A first request with the owner's answers: the answers sit on white inside the bubble. */
+body.app.in-editor #editor #messages .req-card{display:flex;flex-direction:column;gap:10px}
+body.app.in-editor #editor #messages .req-answers{display:grid;gap:2px;padding:10px 12px!important;margin:0!important;background:var(--c-panel)!important;border:1px solid var(--c-line)!important;border-radius:10px!important}
+body.app.in-editor #editor #messages .req-q{margin:6px 0 0!important;font-size:12px!important;color:var(--c-ink-3)!important;font-weight:400!important}
+body.app.in-editor #editor #messages .req-q:first-child{margin-top:0!important}
+body.app.in-editor #editor #messages .req-a{margin:0!important;font-size:13.5px!important;font-weight:500!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .req-plan{margin:0!important;font-size:12.5px!important;color:var(--c-ink-2)!important}
+/* The first empty-state line. */
+body.app.in-editor #editor #messages>li.assistant:only-child:not([class*=" "]){color:var(--c-ink-2);font-size:14px}
+
+/* "Kairoq Agent · Worked for 41s" never wraps onto two lines. */
+body.app.in-editor #editor #messages .status-line{display:inline-flex!important;align-items:center;gap:8px;max-width:100%;min-width:0;height:28px;padding:0 8px!important;margin:0 0 8px -8px!important;border:0!important;border-radius:8px!important;background:transparent!important;font-size:13px!important;color:var(--c-ink-2)!important;white-space:nowrap}
+body.app.in-editor #editor #messages .status-line:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #messages .status-line .agent-name{font-weight:500;color:var(--c-ink);white-space:nowrap;flex:none}
+body.app.in-editor #editor #messages .status-line .status-text{color:var(--c-ink-3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app.in-editor #editor #messages .status-line .ico{width:14px;height:14px;flex:none;color:var(--c-ink-3)}
+body.app.in-editor #editor #messages .status-line[aria-expanded=true] .ico{transform:rotate(90deg)}
+body.app.in-editor #editor #messages .fold>.rail{margin:2px 0 12px}
+
+/* ---------- the finished write-up ---------- */
+body.app.in-editor #editor #messages .verdict-head{display:flex;align-items:center;gap:8px;margin:0 0 6px!important;font-size:14.5px!important;font-weight:600!important;color:#1B1D22!important}
+body.app.in-editor #editor #messages .verdict-head .vmark{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:999px;font-size:11px;font-weight:700;background:rgba(31,138,91,.1)!important;color:#1F8A5B!important;border:0!important}
+body.app.in-editor #editor #messages .verdict-head.draft .vmark{background:rgba(183,121,31,.1)!important;color:#B7791F!important}
+body.app.in-editor #editor #messages .writeup{margin:16px 0 0!important}
+body.app.in-editor #editor #messages .writeup-title{margin:0 0 6px!important;font:600 13.5px/1.4 Geist,ui-sans-serif,system-ui,sans-serif!important;color:#1B1D22!important}
+body.app.in-editor #editor #messages .writeup .verdict-rows{list-style:none!important;display:grid;gap:4px}
+body.app.in-editor #editor #messages .writeup .verdict-rows li{display:flex;gap:10px;align-items:baseline;padding:0!important;font-size:14px!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .writeup .vmark{flex:none;width:14px;text-align:center;font-size:12px}
+body.app.in-editor #editor #messages .writeup.todo .vmark{color:#C2412D!important}
+body.app.in-editor #editor #messages .writeup.tested .vmark{color:#1F8A5B!important}
+body.app.in-editor #editor #messages .agent-finished{margin:18px 0 0!important;padding-top:12px!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .agent-finished::before{background:#1F8A5B!important}
+/* Notes under a reply (screenshot review, scope, memory, problems): one quiet line each. */
+body.app.in-editor #editor #messages .look-note{display:flex;gap:8px;align-items:baseline;margin:10px 0 0!important;padding:0!important;border:0!important;background:none!important;font-size:13px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .look-note .vmark{color:#1F8A5B;flex:none}
+body.app.in-editor #editor #messages .look-note.warn{padding:10px 12px!important;border-radius:10px!important;background:rgba(183,121,31,.08)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .look-note.warn .vmark{color:#B7791F}
+body.app.in-editor #editor #messages :is(.scope-chip,.memory-chip){display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:10px 0 0!important;padding:8px 12px!important;border:1px solid var(--c-line)!important;border-radius:10px!important;background:var(--c-panel)!important;font-size:13px!important;color:var(--c-ink-2)!important;box-shadow:none!important}
+body.app.in-editor #editor #messages :is(.scope-chip,.memory-chip) .ico{width:14px;height:14px;color:var(--c-ink-3)}
+body.app.in-editor #editor #messages .sources{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 0!important}
+body.app.in-editor #editor #messages .sources-label{font-size:12px;color:var(--c-ink-3);margin-right:2px}
+body.app.in-editor #editor #messages .source{display:inline-flex;align-items:center;height:24px;max-width:220px;padding:0 10px;border-radius:999px;border:1px solid var(--c-line);background:var(--c-panel);font-size:12px;color:var(--c-ink-2)!important;text-decoration:none!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app.in-editor #editor #messages .source:hover{background:var(--c-raise);color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .browse-replay{margin-top:8px;font-size:12.5px;color:var(--c-ink-2)}
+/* Browser checks that found problems: one bordered list, danger as text. */
+body.app.in-editor #editor #messages .verified{margin:14px 0 0!important;padding:12px 14px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body.app.in-editor #editor #messages .verified-head{font-size:13.5px!important;font-weight:600!important;color:#1B1D22!important;margin:0 0 6px!important}
+body.app.in-editor #editor #messages .verified ul{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13.5px}
+body.app.in-editor #editor #messages .verified li{display:flex;gap:8px}
+body.app.in-editor #editor #messages .verified li.ok .vmark{color:#1F8A5B}
+body.app.in-editor #editor #messages .verified li.bad .vmark{color:#C2412D}
+body.app.in-editor #editor #messages .verification-scope{margin:8px 0 0!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .check-chip{display:inline-flex;align-items:center;min-height:24px;margin:10px 0 0!important;padding:2px 10px!important;border:0!important;border-radius:999px!important;font-size:12px!important;background:rgba(31,138,91,.08)!important;color:#1F8A5B!important}
+body.app.in-editor #editor #messages .check-chip.bad{background:rgba(194,65,45,.08)!important;color:#C2412D!important}
+/* Build details fold: the cost line reads as small muted text, not boxes. */
+body.app.in-editor #editor #messages .msg-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:10px 0 0!important;padding:0!important;border:0!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .msg-meta>span{display:inline-flex;align-items:center;gap:5px}
+body.app.in-editor #editor #messages .msg-meta .ico{width:13px;height:13px}
+body.app.in-editor #editor #messages .msg-meta .ver{height:20px;padding:0 7px;border-radius:999px;background:var(--c-raise);color:var(--c-ink-2);font-weight:500}
+body.app.in-editor #editor #messages .msg-meta .details-link{font-size:12.5px;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages details.message-details[open]{padding-bottom:2px}
+body.app.in-editor #editor #messages .design-chip{display:inline-flex;align-items:center;gap:4px;margin:10px 0 0!important;padding:4px 10px 4px 6px!important;border:1px solid var(--c-line)!important;border-radius:999px!important;background:var(--c-panel)!important;font-size:12px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .design-chip i{width:12px;height:12px;border-radius:999px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+body.app.in-editor #editor #messages .generated{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+body.app.in-editor #editor #messages .generated img{width:88px;height:66px;object-fit:cover;border-radius:10px;border:1px solid var(--c-line)}
+body.app.in-editor #editor #messages li.preview-ready{display:inline-flex!important;align-self:flex-start;align-items:center;gap:8px;padding:0!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages li.preview-ready::before{content:"";width:7px;height:7px;border-radius:999px;background:#1F8A5B}
+
+/* ---------- the builder's open question: one list, one row per answer ---------- */
+body.app.in-editor #editor #messages .question-options{display:flex!important;flex-direction:column;gap:0!important;margin:14px 0 6px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+body.app.in-editor #editor #messages .question-options .q-opt{display:flex!important;align-items:center;justify-content:flex-start;gap:10px;width:100%!important;min-height:44px!important;margin:0!important;padding:10px 14px!important;border:0!important;border-top:1px solid var(--c-line)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;font-size:14px!important;font-weight:450!important;color:var(--c-ink)!important;text-align:left;cursor:pointer}
+body.app.in-editor #editor #messages .question-options .q-opt:first-child{border-top:0!important}
+body.app.in-editor #editor #messages .question-options .q-opt:hover:not(:disabled){background:var(--c-raise)!important}
+body.app.in-editor #editor #messages .question-options .q-opt::after{content:""!important;margin-left:auto;width:6px;height:6px;border:0!important;border-right:1.5px solid var(--c-ink-3)!important;border-bottom:1.5px solid var(--c-ink-3)!important;transform:rotate(-45deg);background:none!important;position:static!important}
+body.app.in-editor #editor #messages .question-options .q-opt:disabled{opacity:.55;cursor:default}
+body.app.in-editor #editor #messages .question-options .q-tag{order:2;margin-left:4px;display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;background:rgba(10,42,82,.08)!important;color:var(--c-accent)!important;font-size:11.5px!important;font-weight:500!important;border:0!important}
+body.app.in-editor #editor #messages .question-options .q-opt::after{order:3}
+body.app.in-editor #editor #messages .q-hint{margin:6px 0 0!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+/* Inline idea chips (an old reply shown on its own). */
+body.app.in-editor #editor #messages .idea-list{gap:8px!important;margin-top:12px!important}
+body.app.in-editor #editor #messages .q-opt.idea{height:32px;padding:0 14px!important;border-radius:999px!important;border:1px solid var(--c-line-2)!important;background:var(--c-panel)!important;font-size:13px!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .q-opt.idea:hover{background:var(--c-raise)!important}
+
+/* ---------- failed and stopped: a calm note, not a red box ---------- */
+body.app.in-editor #editor #messages>li.assistant.failed{display:flex!important;flex-direction:column;align-items:flex-start;gap:10px;padding:12px 14px 12px 40px!important;position:relative;border:1px solid rgba(194,65,45,.18)!important;border-radius:12px!important;background:rgba(194,65,45,.05)!important;color:var(--c-ink)!important;font-size:14px!important;line-height:1.55!important;box-shadow:none!important}
+body.app.in-editor #editor #messages>li.assistant.failed::before{content:"!"!important;display:grid!important;place-items:center;position:absolute;left:14px;top:14px;width:18px;height:18px;border-radius:999px;background:rgba(194,65,45,.12)!important;color:#C2412D!important;font:700 11px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important}
+body.app.in-editor #editor #messages>li.assistant.failed .md{font-size:14px!important;line-height:1.55!important}
+body.app.in-editor #editor #messages>li.assistant.failed .md p{margin:0 0 4px!important}
+body.app.in-editor #editor #messages>li.assistant.failed .md p:last-child{margin:0!important}
+body.app.in-editor #editor #messages .retry{width:auto!important;height:32px!important;padding:0 14px!important;margin:2px 0 0!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body.app.in-editor #editor #messages .retry:hover{background:var(--c-raise)!important}
+/* "Review & build" under a Discuss plan. */
+body.app.in-editor #editor #messages>li.assistant>.ghost.small-btn{align-self:flex-start;height:32px!important;padding:0 14px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important}
+
+/* ---------- "Reading your request…": the clarifying questions ---------- */
+body.app.in-editor #editor #messages .agent-head{margin:0 0 10px!important;font-size:13px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .agent-head .agent-name{color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .agent-head .agent-work{color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .ask-card .ask-intro{font-size:14.5px!important;line-height:1.65!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .ask-card .think-line{font-size:14px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .ask-card .plan-sub{margin:6px 0 0!important;font-size:13px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .work-line{margin:8px 0 12px!important;padding:0!important;border:0!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .work-line::before{content:none!important}
+body.app.in-editor #editor #messages .qs{padding:4px 16px!important;border:1px solid var(--c-line)!important;border-radius:14px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+body.app.in-editor #editor #messages .qs .q{padding:12px 0!important;border-bottom:1px solid var(--c-line)!important;gap:2px!important}
+body.app.in-editor #editor #messages .qs .q:last-child{border-bottom:0!important}
+body.app.in-editor #editor #messages .qs .q-label{font-size:12.5px!important;color:var(--c-ink-3)!important;border:0!important;box-shadow:none!important}
+body.app.in-editor #editor #messages .qs .q-answer{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14.5px!important;font-weight:500;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .qs .q-answer::after{content:"";flex:none;width:6px;height:6px;margin-right:4px;border-right:1.5px solid var(--c-ink-3);border-bottom:1.5px solid var(--c-ink-3);transform:rotate(45deg);transition:transform .15s}
+body.app.in-editor #editor #messages .qs .q[data-open=true] .q-answer::after{transform:rotate(-135deg)}
+body.app.in-editor #editor #messages .qs .q-answer:hover,body.app.in-editor #editor #messages .qs .q[data-open=true] .q-answer{color:var(--c-accent)!important}
+body.app.in-editor #editor #messages .qs .q-answer.q-empty{color:var(--c-ink-3)!important;font-weight:400}
+/* The answers: rows in one bordered list, the picked one tinted, with the accent radio. */
+body.app.in-editor #editor #messages .qs .ask-opts{display:flex!important;flex-direction:column;gap:0!important;margin-top:10px!important;border:1px solid var(--c-line)!important;border-radius:10px!important;overflow:hidden}
+body.app.in-editor #editor #messages .qs .ask-opts.hidden{display:none!important}
+body.app.in-editor #editor #messages .qs .ask-opt{min-height:44px!important;margin:0!important;padding:10px 12px!important;align-items:center!important;border:0!important;border-top:1px solid var(--c-line)!important;border-radius:0!important;background:var(--c-panel)!important;box-shadow:none!important}
+body.app.in-editor #editor #messages .qs .ask-opt:first-child{border-top:0!important}
+body.app.in-editor #editor #messages .qs .ask-opt:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #messages .qs .ask-opt.on{background:rgba(10,42,82,.05)!important;box-shadow:none!important}
+body.app.in-editor #editor #messages .qs .ask-label{font-size:14px!important;font-weight:500!important;color:var(--c-ink)}
+body.app.in-editor #editor #messages .qs .ask-detail{font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .qs .ask-other{height:40px!important;margin:0!important;padding:0 12px!important;border:0!important;border-top:1px solid var(--c-line)!important;border-radius:0!important;background:var(--c-panel)!important;font-size:13.5px!important;color:var(--c-ink)!important;box-shadow:none!important}
+body.app.in-editor #editor #messages .qs .ask-other:focus{outline:none;background:var(--c-raise)!important}
+/* Footer of every in-chat card: quiet links on the left, one primary on the right. */
+body.app.in-editor #editor #messages .ask-foot{display:flex;align-items:center;gap:6px!important;margin-top:16px!important}
+body.app.in-editor #editor #messages :is(.ask-link,.plan-review){height:36px!important;padding:0 12px!important;border:0!important;border-radius:10px!important;background:transparent!important;color:var(--c-ink-2)!important;font:500 13px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important;cursor:pointer}
+body.app.in-editor #editor #messages :is(.ask-link,.plan-review):hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .ask-next{height:36px!important;padding:0 16px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font:500 13.5px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body.app.in-editor #editor #messages .ask-next:hover:not(:disabled){background:var(--c-accent-2)!important}
+body.app.in-editor #editor #messages .ask-next:disabled{background:var(--c-raise)!important;color:var(--c-ink-3)!important;box-shadow:none!important;cursor:default}
+
+/* ---------- the design look before the first build ---------- */
+body.app.in-editor #editor #messages .brand-opts{gap:8px!important;margin:12px 0 14px!important}
+body.app.in-editor #editor #messages .brand-opt{gap:4px!important;padding:12px 14px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .brand-opt:hover{border-color:var(--c-line-2)!important;background:var(--c-panel)!important}
+body.app.in-editor #editor #messages .brand-opt.on{border-color:var(--c-accent)!important;background:var(--c-panel)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body.app.in-editor #editor #messages .brand-opt b{font-size:13.5px!important;font-weight:600!important;line-height:1.35}
+body.app.in-editor #editor #messages .brand-opt span{font-size:12.5px!important;color:var(--c-ink-3)!important;line-height:1.45!important}
+body.app.in-editor #editor #messages .brand-body{gap:12px!important}
+body.app.in-editor #editor #messages :is(.brand-why,.brand-note){font-size:14px!important;line-height:1.6!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .brand-got{font-size:13.5px!important;color:#1F8A5B!important}
+body.app.in-editor #editor #messages .brand-url{height:38px!important;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;font-size:14px!important}
+body.app.in-editor #editor #messages .brand-url:focus{outline:none;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body.app.in-editor #editor #messages .lk-page{border-radius:12px!important;box-shadow:0 0 0 1px var(--c-line),0 8px 24px -12px rgba(16,24,40,.25)!important;overflow:hidden}
+body.app.in-editor #editor #messages .brand-tools{gap:4px!important}
+body.app.in-editor #editor #messages .brand-tools .lk-btn,body.app.in-editor #editor #messages .brand-row .lk-btn{height:32px!important;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:13px!important;font-weight:500!important;box-shadow:none!important}
+body.app.in-editor #editor #messages .brand-tools .lk-btn:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #messages :is(.brand-tools,.brand-row) .lk-link{height:32px;padding:0 10px!important;border:0!important;border-radius:10px!important;background:transparent!important;color:var(--c-ink-2)!important;font-size:13px!important;font-weight:500!important;text-decoration:none!important}
+body.app.in-editor #editor #messages :is(.brand-tools,.brand-row) .lk-link:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .lk-error{font-size:13px;color:#C2412D}
+
+/* ---------- the plan: a white card with Review / Skip / Approve ---------- */
+body.app.in-editor #editor #messages>li.plan-card{padding:16px 18px!important;border:1px solid var(--c-line)!important;border-radius:14px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body.app.in-editor #editor #messages>li.plan-card .agent-head{padding-bottom:12px;margin:0 0 12px!important;border-bottom:1px solid var(--c-line)}
+body.app.in-editor #editor #messages .plan-card .plan-research{display:inline-flex;align-items:center;height:24px;margin:0 0 12px!important;padding:0 10px;border-radius:999px;background:rgba(31,138,91,.08);font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;color:#1F8A5B!important}
+body.app.in-editor #editor #messages .plan-card .plan-kicker{margin:0!important;font:500 12px/1.4 Geist,ui-sans-serif,system-ui,sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .plan-card .plan-title{margin:2px 0 6px!important;font-size:18px!important;font-weight:600!important;letter-spacing:-.01em;color:#1B1D22!important}
+body.app.in-editor #editor #messages .plan-card .plan-summary{margin:0!important;font-size:14.5px!important;line-height:1.6!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .plan-card .plan-more{margin-top:12px;padding-top:4px;border:0!important}
+body.app.in-editor #editor #messages .plan-card .plan-more.hidden{display:none}
+body.app.in-editor #editor #messages .plan-card .plan-part{margin:14px 0 6px!important;font-size:13px!important;font-weight:600!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #messages .plan-card .plan-more ul{margin:0!important;padding:0 0 0 18px!important;display:grid;gap:4px;list-style:disc}
+body.app.in-editor #editor #messages .plan-card .plan-more li{font-size:13.5px!important;line-height:1.5;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .plan-card .plan-more li::marker{color:var(--c-ink-3)}
+body.app.in-editor #editor #messages .plan-card .plan-more a{color:var(--c-accent);text-underline-offset:2px}
+body.app.in-editor #editor #messages .plan-card .ask-foot{margin:16px -18px -16px!important;padding:12px 18px;border-top:1px solid var(--c-line);background:var(--c-bg);border-radius:0 0 14px 14px}
+body.app.in-editor #editor #messages .plan-card .plan-review{margin-left:-12px}
+/* Character pick in a plan. */
+body.app.in-editor #editor #messages .char-pick{margin-top:14px}
+body.app.in-editor #editor #messages .char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:6px}
+body.app.in-editor #editor #messages .char-opt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:8px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;text-align:left;font-size:12.5px;color:var(--c-ink)}
+body.app.in-editor #editor #messages .char-opt[aria-pressed=true]{border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body.app.in-editor #editor #messages .char-pic{width:100%;aspect-ratio:4/3;border-radius:8px;background:var(--c-raise);overflow:hidden}
+body.app.in-editor #editor #messages .char-pic img{width:100%;height:100%;object-fit:cover}
+body.app.in-editor #editor #messages .char-name{font-weight:500}
+body.app.in-editor #editor #messages :is(.char-meta,.char-note){font-size:12px;color:var(--c-ink-3)}
+body.app.in-editor #editor #messages .char-err{color:#C2412D}
+
+/* ---------- the live work card ---------- */
+body.app.in-editor #editor #messages>li.work{padding:0!important}
+body.app.in-editor #editor #messages .work-head{display:flex!important;align-items:center;gap:8px;min-width:0;margin:0 0 8px!important;flex-wrap:nowrap!important}
+body.app.in-editor #editor #messages .work-head .status-line{flex:1 1 auto;margin:0 0 0 -8px!important}
+body.app.in-editor #editor #messages .work-head .status-line .status-text{color:var(--c-ink-2)}
+body.app.in-editor #editor #messages .work-head .k-grid{flex:none}
+body.app.in-editor #editor #messages .work-time{flex:none;font-size:12px;color:var(--c-ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+body.app.in-editor #editor #messages .work-stop{flex:none;height:28px!important;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:8px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:12.5px!important;font-weight:500!important;box-shadow:none!important}
+body.app.in-editor #editor #messages .work-stop:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #messages .work-msg{margin:0 0 8px}
+/* The activity rail: a hairline down the left, rows 28px apart. */
+body.app.in-editor #editor #messages .rail{margin:0!important;padding:0!important;list-style:none}
+body.app.in-editor #editor #messages .rail .ev{min-height:26px}
+body.app.in-editor #editor #messages .rail .chip{height:22px;display:inline-flex;align-items:center;padding:0 8px!important;border:1px solid var(--c-line)!important;border-radius:6px!important;background:var(--c-panel)!important;font:500 12px/1 "Geist Mono",ui-monospace,monospace!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #messages .rail .chip.active{border-color:var(--c-line-2)!important;color:var(--c-ink)!important;background:var(--c-raise)!important}
+body.app.in-editor #editor #messages .rail .ev-more .link-btn{font-size:12.5px;color:var(--c-ink-2)}
+body.app.in-editor #editor #messages .ev.bad :is(.ev-label,.ev-head){color:#C2412D!important}
+
+/* The progress line above the composer (shown while a job runs). */
+body.app.in-editor #editor #progress:not(.hidden){align-items:center;gap:8px;margin:0 16px 6px!important;padding:0!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #chat-error:not(:empty){margin:4px 16px 10px!important;padding:8px 12px!important;border-radius:10px;background:rgba(194,65,45,.06);color:#C2412D!important;font-size:13px}
+
+/* ---------- composer ---------- */
+body.app.in-editor #editor #chat-form.composer{margin:4px 16px 16px!important;padding:12px 10px 10px 14px!important;border-radius:16px!important;border-color:var(--c-line-2)!important;box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px -12px rgba(16,24,40,.12)!important}
+body.app.in-editor #editor #chat-form.composer:focus-within{border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12),0 8px 24px -12px rgba(16,24,40,.12)!important}
+body.app.in-editor #editor #chat-form #chat-input{font-size:14.5px!important;line-height:1.55!important;color:var(--c-ink)!important;padding:2px 2px 0!important}
+body.app.in-editor #editor #chat-form #chat-input::placeholder{color:var(--c-ink-3)!important}
+body.app.in-editor #editor #chat-form .composer-bar{gap:2px!important}
+body.app.in-editor #editor #chat-form :is(#menu-mode,#menu-tier)>summary{height:30px;padding:0 8px!important;border-radius:8px!important;gap:5px;font-size:13px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #chat-form :is(#menu-mode,#menu-tier)>summary:hover,body.app.in-editor #editor #chat-form .menu[open]>summary{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #chat-form #send{border-radius:10px!important}
+body.app.in-editor #editor #chat-form .composer-ideas{gap:6px!important;padding:0 0 10px!important;margin:0 0 8px!important}
+body.app.in-editor #editor #chat-form .idea-chip{height:28px!important;padding:0 12px!important;border-radius:999px!important;border:1px solid var(--c-line-2)!important;background:var(--c-panel)!important;color:var(--c-ink-2)!important;font-size:12.5px!important}
+body.app.in-editor #editor #chat-form .idea-chip:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #chat-form .attachments:not(.hidden){display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+body.app.in-editor #editor #chat-form .cost-line{font-size:12px!important;color:var(--c-ink-3)!important}
+/* Menus: radius 12, floating shadow, 34px rows, section labels 11.5px muted. */
+body.app.in-editor #editor #chat-form .menu>.menu-panel{border-color:var(--c-line)!important;border-radius:12px!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.25),0 0 0 1px rgba(16,24,40,.02)!important;padding:6px!important}
+body.app.in-editor #editor #chat-form .menu-panel>:is(button,a){min-height:34px!important;border-radius:8px!important}
+body.app.in-editor #editor #chat-form .menu-panel>:is(button,a):hover,body.app.in-editor #editor #chat-form .model-list>button:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #menu-plus .menu-panel>.menu-note:not(:first-child){margin-top:6px!important}
+body.app.in-editor #editor #menu-mode .menu-panel>.menu-note{margin:6px 10px 6px!important;line-height:1.4}
+body.app.in-editor #editor #chat-form .menu.pick .menu-panel button[aria-pressed=true]{background:rgba(10,42,82,.05)!important}
+body.app.in-editor #editor #chat-form .model-search{height:36px!important;border-radius:10px!important;margin:2px 2px 6px!important;width:calc(100% - 4px)!important}
+body.app.in-editor #editor #chat-form .model-search:focus{border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body.app.in-editor #editor #chat-form .model-list>button{border-radius:8px!important}
+body.app.in-editor #editor #chat-form .model-tag{background:rgba(10,42,82,.08)!important;color:var(--c-accent)!important}
+body.app.in-editor #editor #chat-form .model-tag.free{background:rgba(31,138,91,.08)!important;color:#1F8A5B!important}
+body.app.in-editor #editor #chat-form .model-off{margin:6px 4px 2px!important;padding:8px 6px 2px!important;font-size:12px!important;color:var(--c-ink-3)!important}
+
+/* ---------- visual edit: the same card as the composer, labelled fields ---------- */
+body.app.in-editor #editor #visual-panel:not(.hidden){display:flex!important;flex-direction:column;gap:12px;margin:4px 16px 16px!important;padding:14px 16px 16px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;border-radius:16px!important;box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px -12px rgba(16,24,40,.12)!important}
+body.app.in-editor #editor #visual-panel #visual-hint{margin:0!important;font-size:13px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #visual-panel #visual-fields:not(.hidden){display:flex;flex-direction:column;gap:12px}
+body.app.in-editor #editor #visual-panel #visual-tag{align-self:flex-start;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:var(--c-raise);font:500 12px/1 "Geist Mono",ui-monospace,monospace;color:var(--c-ink-2)}
+body.app.in-editor #editor #visual-panel label{display:flex;flex-direction:column;gap:6px;margin:0!important;font-size:13px!important;font-weight:500!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #visual-panel :is(input,select,textarea){width:100%;min-height:38px;padding:8px 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font:400 14px/1.45 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important}
+body.app.in-editor #editor #visual-panel #visual-class,body.app.in-editor #editor #visual-panel #visual-src{font:400 12.5px/1.45 "Geist Mono",ui-monospace,monospace!important}
+body.app.in-editor #editor #visual-panel textarea{resize:vertical;min-height:64px}
+body.app.in-editor #editor #visual-panel :is(input,select,textarea):focus{outline:none;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body.app.in-editor #editor #visual-panel .swatches{display:flex;flex-wrap:wrap;gap:6px}
+body.app.in-editor #editor #visual-panel .row.end{display:flex;justify-content:flex-end;gap:8px;margin:0!important}
+body.app.in-editor #editor #visual-panel>.row.end{padding-top:12px;border-top:1px solid var(--c-line)}
+body.app.in-editor #editor #visual-panel #visual-fields.hidden+.error+.row.end,body.app.in-editor #editor #visual-panel #visual-fields.hidden~.row.end{padding-top:0;border-top:0}
+body.app.in-editor #editor #visual-panel .primary{height:36px!important;padding:0 16px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font-size:13.5px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body.app.in-editor #editor #visual-panel .ghost{height:36px!important;padding:0 14px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:13.5px!important;font-weight:500!important}
+body.app.in-editor #editor #visual-panel .ghost:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #visual-panel .error:empty{display:none}
+
+/* ---------- the top bar over the stage ---------- */
+body.app.in-editor #editor .stage{container:kq-stage/inline-size}
+body.app.in-editor #editor .stage-bar{min-width:0}
+body.app.in-editor #editor .stage-bar .tabs-seg{height:34px;padding:3px!important;gap:2px;border-radius:10px!important;flex:none}
+body.app.in-editor #editor .stage-bar .tabs-seg button{height:28px!important;padding:0 10px!important;border-radius:8px!important;font-size:13px!important;font-weight:500!important;gap:6px}
+body.app.in-editor #editor .stage-bar .tabs-seg button:hover:not([aria-pressed=true]){color:var(--c-ink)!important;background:rgba(255,255,255,.6)!important}
+body.app.in-editor #editor .stage-bar .tabs-seg .ico{width:15px;height:15px}
+body.app.in-editor #editor #versions{max-width:150px!important;border-color:var(--c-line-2)!important;border-radius:8px!important;background-color:var(--c-panel)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #share-open{border-radius:10px!important;border:1px solid var(--c-line-2)!important;background:var(--c-panel)!important;color:var(--c-ink)!important;height:34px!important}
+body.app.in-editor #editor #share-open:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #publish-open{border-radius:10px!important;height:34px!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important;margin-left:4px}
+body.app.in-editor #editor .stage-bar :is(#safari-shot,.run-phone){height:30px;padding:0 10px!important;border:1px solid var(--c-line-2)!important;border-radius:8px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:12.5px!important;gap:6px}
+body.app.in-editor #editor .stage-bar #device-model{height:30px;padding:0 24px 0 10px;border:1px solid var(--c-line-2);border-radius:8px;background-color:var(--c-panel);font-size:12.5px;color:var(--c-ink)}
+body.app.in-editor #editor .stage-bar #visual-toggle[aria-pressed=true]{background:rgba(10,42,82,.08)!important;color:var(--c-accent)!important}
+/* A narrow stage (the browser pane is open, or a phone) keeps one row: the extras step aside. */
+@container kq-stage (max-width:760px){
+ body.app.in-editor #editor .stage-bar .tabs-seg .lbl{display:none}
+ body.app.in-editor #editor .stage-bar :is(#refresh,#open,.seg.icons,#device-model,#safari-shot){display:none!important}
+ body.app.in-editor #editor #versions{max-width:96px!important}
+}
+@container kq-stage (max-width:560px){
+ body.app.in-editor #editor .stage-bar{padding:0 12px 0 8px!important}
+ body.app.in-editor #editor .stage-bar #kq-tests-tab,body.app.in-editor #editor .stage-bar #visual-toggle{display:none!important}
+ body.app.in-editor #editor #versions{display:none!important}
+ body.app.in-editor #editor #share-open{padding:0 10px!important}
+ body.app.in-editor #editor #publish-open{padding:0 12px!important}
+}
+
+/* ---------- the preview ---------- */
+body.app.in-editor #editor #canvas{padding:12px 16px 16px 4px!important}
+body.app.in-editor #editor #frame{border-radius:12px!important;box-shadow:0 0 0 1px var(--c-line),0 1px 2px rgba(16,24,40,.05),0 12px 32px -16px rgba(16,24,40,.12)!important}
+/* "The preview has not loaded yet": a small card floating over the preview, not a banner. */
+body.app.in-editor #editor #preview-notice:not(.hidden){position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:5;width:min(560px,calc(100% - 48px));margin:0!important;padding:12px 16px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.25)!important;font-size:13px!important;line-height:1.6!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #preview-notice a,body.app.in-editor #editor #preview-notice .link-btn{color:var(--c-accent)!important;font-weight:500;text-decoration:none!important;background:none!important;border:0!important;padding:0!important;height:auto!important;font-size:13px!important}
+body.app.in-editor #editor #preview-notice a:hover,body.app.in-editor #editor #preview-notice .link-btn:hover{text-decoration:underline!important;text-underline-offset:2px}
+body.app.in-editor #editor #preview-notice .preview-diagnosis:not(:empty){display:block;margin-top:6px;color:var(--c-ink-3);font-size:12.5px}
+body.app.in-editor #editor .plan-wait{text-align:center}
+body.app.in-editor #editor .plan-wait-title{margin:0 0 4px;font-size:15px;font-weight:600;color:#1B1D22}
+body.app.in-editor #editor .plan-wait-sub{margin:0;font-size:13px;color:var(--c-ink-3)}
+/* Problems in the preview: one quiet bar with Explain and Fix it. */
+body.app.in-editor #editor #errors:not(.hidden){display:flex;align-items:center;gap:8px;margin:8px 16px 0 4px!important;padding:8px 8px 8px 14px!important;border:1px solid rgba(194,65,45,.18)!important;border-radius:12px!important;background:rgba(194,65,45,.05)!important;font-size:13px;color:var(--c-ink)}
+body.app.in-editor #editor #errors details{flex:1;min-width:0}
+body.app.in-editor #editor #errors summary{color:#C2412D;font-weight:500;cursor:pointer}
+body.app.in-editor #editor #errors .ghost{height:32px;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:13px}
+body.app.in-editor #editor #errors .primary{height:32px;padding:0 14px!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font-size:13px}
+body.app.in-editor #editor .sample-pill:not(.hidden){border-radius:999px;font-size:12px}
+
+/* ---------- Code view ---------- */
+body.app.in-editor #editor #code:not(.hidden){gap:0!important;margin:0!important;padding:0!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+body.app.in-editor #editor #code .file-list{background:var(--c-bg)!important;border-right:1px solid var(--c-line)!important;padding:8px 6px!important}
+body.app.in-editor #editor #code .file-list button{border-radius:6px!important;padding:5px 8px!important;font-size:12.5px!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #code .file-list button:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #code .file-list button[aria-current=true]{background:rgba(10,42,82,.07)!important;color:var(--c-accent)!important;font-weight:500!important}
+body.app.in-editor #editor #code .file-pane{gap:0!important;padding:0!important;background:var(--c-panel)}
+body.app.in-editor #editor #code .file-bar{display:flex;align-items:center;gap:6px;min-height:48px;margin:0!important;padding:8px 12px 8px 16px!important;border-bottom:1px solid var(--c-line)!important;background:var(--c-panel)!important}
+body.app.in-editor #editor #code .file-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 12.5px/1 "Geist Mono",ui-monospace,monospace!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #code #file-status{font-size:12px;color:var(--c-ink-3)}
+body.app.in-editor #editor #code .file-bar .small-btn{height:30px!important;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:8px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:12.5px!important;font-weight:500!important;box-shadow:none!important}
+body.app.in-editor #editor #code .file-bar .small-btn:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #code .file-bar .primary.small-btn{border:0!important;background:var(--c-accent)!important;color:#fff!important}
+body.app.in-editor #editor #code #file-view,body.app.in-editor #editor #code #file-editor{margin:0!important;border:0!important;border-radius:0!important;padding:16px 18px!important;background:var(--c-panel)!important;font-size:12.5px!important;line-height:1.7!important}
+
+/* ---------- Data view: sections as white cards, real buttons ---------- */
+body.app.in-editor #editor #data:not(.hidden){display:flex!important;flex-direction:column;gap:16px;padding:4px 4px 24px!important;overflow:auto;font-size:14px;color:var(--c-ink)}
+body.app.in-editor #editor #data>p.muted.small:first-child{margin:4px 2px 0!important;font-size:13px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #data>#data-features:empty{display:none}
+body.app.in-editor #editor #data :is(.ask-data,.assistant-section,.sql-section,.auto-section,.logs-section,.data-grid){margin:0!important;padding:16px 18px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body.app.in-editor #editor #data h3{display:flex;align-items:center;gap:8px;margin:0 0 6px!important;font-size:15px!important;font-weight:600!important;color:#1B1D22!important}
+body.app.in-editor #editor #data h4{margin:0 0 4px!important;font-size:14px!important;font-weight:600!important}
+body.app.in-editor #editor #data h3 .link-btn{margin-left:auto;height:28px;padding:0 10px!important;border:1px solid var(--c-line-2)!important;border-radius:8px!important;background:var(--c-panel)!important;color:var(--c-ink-2)!important;font-size:12.5px!important;font-weight:500!important;text-decoration:none!important}
+body.app.in-editor #editor #data h3 .link-btn:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #data :is(p.muted.small,.muted.small){font-size:13px!important;line-height:1.55!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #data label{display:flex;flex-direction:column;gap:4px;font-size:15px;font-weight:600;color:#1B1D22}
+body.app.in-editor #editor #data label>.muted.small{font-weight:400}
+body.app.in-editor #editor #data .row{display:flex;align-items:center;gap:8px;margin-top:8px}
+body.app.in-editor #editor #data :is(input:not([type=file]):not([type=checkbox]),textarea){width:100%;min-height:38px;padding:8px 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font:400 14px/1.45 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important}
+body.app.in-editor #editor #data textarea{resize:vertical}
+body.app.in-editor #editor #data #sql-query{font:400 12.5px/1.5 "Geist Mono",ui-monospace,monospace!important}
+body.app.in-editor #editor #data :is(input,textarea):focus{outline:none;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body.app.in-editor #editor #data .row input{flex:1}
+body.app.in-editor #editor #data button.ghost:not(.link-btn){flex:none;height:38px!important;padding:0 14px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:13.5px!important;font-weight:500!important;box-shadow:none!important;white-space:nowrap}
+body.app.in-editor #editor #data button.ghost:not(.link-btn):hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #data .assistant-section{display:flex;flex-direction:column;gap:12px}
+body.app.in-editor #editor #data .assistant-section>*{margin:0!important}
+body.app.in-editor #editor #data .assistant-form{display:flex;flex-direction:column;gap:8px}
+body.app.in-editor #editor #data .assistant-form>div:not(.hidden):not(.row){display:flex;flex-direction:column;gap:8px}
+body.app.in-editor #editor #data .assistant-form .row{margin-top:0}
+body.app.in-editor #editor #data :is(.assistant-change,.assistant-test){padding-top:14px;border-top:1px solid var(--c-line)}
+body.app.in-editor #editor #data .assistant-tabs{align-self:flex-start;height:34px;padding:3px!important;border-radius:10px!important;background:var(--c-raise)!important;border:1px solid var(--c-line)!important}
+body.app.in-editor #editor #data .assistant-tabs button{height:26px!important;padding:0 12px!important;border-radius:8px!important;font-size:13px!important;color:var(--c-ink-2)!important;background:transparent!important}
+body.app.in-editor #editor #data .assistant-tabs button[aria-pressed=true]{background:var(--c-panel)!important;color:var(--c-ink)!important;box-shadow:0 1px 2px rgba(16,24,40,.08)!important}
+body.app.in-editor #editor #data .data-grid{display:grid!important;grid-template-columns:220px minmax(0,1fr);gap:20px}
+body.app.in-editor #editor #data .data-grid>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+body.app.in-editor #editor #data .data-grid h3{margin:0!important}
+body.app.in-editor #editor #data .data-grid h3+ul{margin-bottom:10px}
+body.app.in-editor #editor #data #collections{background:transparent!important;border:0!important}
+body.app.in-editor #editor #data #collections li,body.app.in-editor #editor #data .users li{font:400 13px/1.5 Geist,ui-sans-serif,system-ui,sans-serif!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #data #collections button{border-radius:8px!important;font:500 13px/1.3 Geist,ui-sans-serif,system-ui,sans-serif!important;color:var(--c-ink)!important;padding:6px 8px!important}
+body.app.in-editor #editor #data #collections button:hover{background:var(--c-raise)!important}
+body.app.in-editor #editor #data #collections button[aria-current=true]{background:rgba(10,42,82,.07)!important;color:var(--c-accent)!important}
+body.app.in-editor #editor #data .records{background:transparent!important}
+body.app.in-editor #editor #data .records li{border:1px solid var(--c-line)!important;border-radius:10px!important;padding:10px 12px!important;background:var(--c-panel)!important}
+body.app.in-editor #editor #data .logs{max-height:260px;margin-top:4px!important;border:1px solid var(--c-line);border-radius:10px;background:var(--c-bg);padding:4px 12px!important}
+body.app.in-editor #editor #data .logs li{padding:6px 0!important;border-bottom:1px solid var(--c-line)!important;font-size:12px;color:var(--c-ink-2)}
+body.app.in-editor #editor #data .logs li:last-child{border-bottom:0!important}
+body.app.in-editor #editor #data .logs:empty{display:none}
+body.app.in-editor #editor #data .logs li.error{color:#C2412D}
+body.app.in-editor #editor #data .logs li.warn{color:#B7791F}
+body.app.in-editor #editor #data :is(.ask-data-result,.assistant-answer,.assistant-findings):not(.hidden){margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--c-bg);border:1px solid var(--c-line)}
+body.app.in-editor #editor #data .error.small:empty{display:none}
+@container kq-stage (max-width:700px){body.app.in-editor #editor #data .data-grid{grid-template-columns:1fr}}
+
+/* ---------- Kairoq's browser pane: its head lines up with the 52px top bar ---------- */
+body.app.in-editor #editor #web-browser-pane{background:var(--c-bg)!important;border-left:1px solid var(--c-line)!important;position:relative;z-index:31}
+body.app.in-editor #editor #web-browser-pane .web-browser-head{height:52px;min-height:52px;padding:0 10px 0 16px!important;border-bottom:1px solid var(--c-line)!important;background:var(--c-bg)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-heading{gap:8px}
+body.app.in-editor #editor #web-browser-pane .web-browser-heading strong{font-size:13.5px!important;font-weight:600;color:#1B1D22!important;white-space:nowrap}
+body.app.in-editor #editor #web-browser-pane .web-browser-live{background:#1F8A5B!important;box-shadow:0 0 0 3px rgba(31,138,91,.12)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-title{font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-title:not(:empty)::before{content:"·";margin-right:8px;color:var(--c-line-2)}
+body.app.in-editor #editor #web-browser-pane .web-browser-actions .small-btn{height:30px!important;padding:0 10px!important;border:1px solid var(--c-line-2)!important;border-radius:8px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:12.5px!important;font-weight:500;display:inline-flex;align-items:center}
+body.app.in-editor #editor #web-browser-pane .web-browser-actions .small-btn.hidden{display:none!important}
+body.app.in-editor #editor #web-browser-pane #web-browser-close{width:32px;height:32px;padding:0!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2)!important;font-size:18px!important;line-height:1}
+body.app.in-editor #editor #web-browser-pane #web-browser-close:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-address{height:36px!important;margin:12px 16px 0!important;padding:0 12px!important;border:1px solid var(--c-line)!important;border-radius:10px!important;background:var(--c-panel)!important;font:400 12.5px/1 "Geist Mono",ui-monospace,monospace!important;color:var(--c-ink-2)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-address>span:first-child{color:var(--c-ink-3)}
+body.app.in-editor #editor #web-browser-pane .web-browser-viewport{margin:12px 16px!important;border-radius:12px!important;background:var(--c-panel)!important;box-shadow:0 0 0 1px var(--c-line),0 1px 2px rgba(16,24,40,.05)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-empty{gap:6px!important;font-size:13px!important;line-height:1.55;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-empty strong{font-size:15px!important;font-weight:600;color:#1B1D22!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-status{border-radius:10px!important;font:400 12.5px/1.5 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.25)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-log{gap:2px!important;margin:0 16px 16px!important;padding:6px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;font:400 13px/1.45 Geist,ui-sans-serif,system-ui,sans-serif!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-log.hidden{display:none!important}
+body.app.in-editor #editor #web-browser-pane .web-browser-log li{align-items:center!important;gap:10px!important;min-height:30px;padding:4px 8px;border-radius:8px}
+body.app.in-editor #editor #web-browser-pane .web-browser-log li::before{content:""!important;flex:0 0 7px!important;width:7px;height:7px;border-radius:999px;background:#1F8A5B}
+body.app.in-editor #editor #web-browser-pane .web-browser-log li.now{background:var(--c-raise);color:var(--c-ink)!important;font-weight:500}
+body.app.in-editor #editor #web-browser-pane .web-browser-log li.now::before{background:var(--c-accent);box-shadow:0 0 0 3px rgba(10,42,82,.12)}
+
+/* ---------- phone (one pane at a time) ---------- */
+@media (max-width:900px){
+ body.app.in-editor #editor .phone-panes{gap:4px!important;padding:6px 16px!important;border-bottom:1px solid var(--c-line)!important;background:var(--c-bg)!important}
+ body.app.in-editor #editor .phone-panes button{height:34px!important;border:0!important;border-radius:10px!important;background:transparent!important;color:var(--c-ink-2)!important;font-size:13px!important;font-weight:500!important;box-shadow:none!important}
+ body.app.in-editor #editor .phone-panes button[aria-selected=true]{background:var(--c-raise)!important;color:var(--c-ink)!important}
+ body.app.in-editor #editor #messages{padding:16px 16px 8px!important}
+ body.app.in-editor #editor #chat-form.composer,body.app.in-editor #editor #visual-panel:not(.hidden){margin:4px 12px 12px!important}
+ body.app.in-editor #editor #canvas{padding:12px!important}
+ body.app.in-editor #editor .stage-bar{gap:2px!important}
+ body.app.in-editor #editor #messages .brand-opts{grid-template-columns:1fr!important}
+ body.app.in-editor #editor #web-browser-pane .web-browser-head{padding:0 8px 0 16px!important}
+}
+@media (prefers-reduced-motion:reduce){body.app.in-editor #editor #messages .qs .q-answer::after{transition:none}}
+/* Data has no outer frame: its sections are the cards (no box around boxes). */
+body.app.in-editor #editor #data:not(.hidden){background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0 0 16px!important}
+body.app.in-editor #editor #messages .plan-card .plan-research{align-self:flex-start;width:auto}
+body.app.in-editor #editor #messages .qs .ask-opt input{margin:0!important;flex:none}
