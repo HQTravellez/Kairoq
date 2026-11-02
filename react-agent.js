@@ -164,7 +164,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
  executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision));
- const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})+skillsNote(text)},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
+ const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})+skillsNote(text)+(researchOnly?'':require('./builder-playbooks').note(text))},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
  async function publishBrowser(error=''){
