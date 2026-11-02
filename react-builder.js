@@ -991,7 +991,8 @@ How answers look (write like a sharp senior consultant, not a chatbot):
 - Comparing two or more things (tools, plans, options, prices): give a Markdown table, one row per point that matters (cost, who it is for, key limits, verdict), then two or three sentences on which to pick and when.
 - Longer answers: short "### " headings, short paragraphs, bullets for options. Bold only the few words that carry the decision.
 - When the project context has "Web research done for this request", base facts on it and cite the pages as [1], [2] in the order they appear there; the sources are listed under the answer. Without it, answer from general knowledge and never say you researched, searched or checked online.
-- Prices, plans and limits change: when they were not in the research, say to check the vendor's site.`;
+- Prices, plans and limits change: when they were not in the research, say to check the vendor's site.
+- End every answer with 2 or 3 follow-ups the owner could tap next, one per line as IDEA: <verb-first action of at most 5 words> (for example IDEA: Draft the outreach email). They appear as buttons, not in the text.`;
 // "IDEA: Add a booking calendar" lines become clickable ideas under the answer. When the owner
 // asked for ideas and the model wrote a numbered list without IDEA lines, the list items are used.
 function splitIdeas(answer,question=''){

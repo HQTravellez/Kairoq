@@ -17,7 +17,8 @@ function prompt(){
   "- While work is running, updates should say only the meaningful stage and observed progress; do not narrate private reasoning.",
   "- For completed execution, lead with the user-visible result. The executor-owned PROOF/UNVERIFIED block is authoritative and must not be contradicted or replaced by model prose.",
   "- For a concrete blocker, say exactly what failed, what evidence exists, and the smallest next action. Do not fall back to generic 'I cannot' language.",
-  "- Be concise. Do not dump filenames, tools, agents, logs, or architecture unless they are useful to the request or the owner asks for them."
+  "- Be concise. Do not dump filenames, tools, agents, logs, or architecture unless they are useful to the request or the owner asks for them.",
+  "- After work ran, use this shape (skip a part when it would be empty): one sentence with the outcome; **Done:** what is finished, with what was checked; **Not done:** short bullets, each with the honest reason; **What I'd do next, in this order:** a numbered list, each item a bold short lead (\"**Publish.**\") then one plain sentence on why. Plain words, short paragraphs, no filler."
  ].join("\n");
 }
 

@@ -198,3 +198,21 @@ body.app .ev:not(.bad)>svg,body.app .ev:not(.bad) .ico{opacity:.5}
 .md th,.md td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--c-line,#EDEFF2)}
 .md th{font-weight:600;background:var(--c-raise,#F4F6F8)}
 .md tr:last-child td{border-bottom:0}
+/* Replies read like Lovable's: roomy text, bold lead-ins, numbered next steps, quiet dividers,
+   and a small Copy / thumbs row under each answer. */
+body.app #editor .messages li.assistant .md{font-size:15.5px;line-height:1.7;color:#2A2D32}
+body.app #editor .messages li.assistant .md p{margin:0 0 14px}
+body.app #editor .messages li.assistant .md :is(ul,ol){margin:0 0 14px;padding-left:22px}
+body.app #editor .messages li.assistant .md li{margin:0 0 8px;padding-left:2px}
+body.app #editor .messages li.assistant .md strong{font-weight:600;color:#1B1D22}
+body.app #editor .messages li.assistant .md h3{font-size:17px;font-weight:600;margin:22px 0 8px;color:#1B1D22}
+body.app #editor .messages li.assistant .md hr{border:0;border-top:1px solid var(--c-line,#EDEFF2);margin:18px 0}
+body.app #editor .messages li.assistant .md code.inline{font-size:.88em;padding:2px 6px;border-radius:6px;background:#EEF0F3;color:#2A2D32}
+.reply-actions{display:flex;gap:2px;margin:6px 0 2px -6px}
+.reply-act{display:inline-grid;place-items:center;width:30px;height:30px;border:0!important;border-radius:8px;background:none;box-shadow:none!important;padding:0;color:#8A9099;cursor:pointer}
+.reply-act .ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.reply-act:hover{background:rgba(10,42,82,.06);color:#2A2D32}
+.reply-act[aria-pressed="true"]{color:#0A2A52;background:rgba(10,42,82,.08)}
+.reply-act[aria-pressed="true"] .ico{fill:rgba(10,42,82,.12)}
+.reply-act.done{color:#1F8A5B}
+.reply-act:focus-visible{outline:2px solid #0A2A52;outline-offset:1px}

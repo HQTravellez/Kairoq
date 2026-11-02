@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/figmaexport':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'POST:/rating':'editor','GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/figmaexport':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
@@ -1502,6 +1502,15 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
    const b=await readJson(req,12000);
    const plan=process.env.KAIROQ_PLAN==='off'?null:await require('./build-plan').make(String(b.prompt||''),{callModel:deps.callModel,tier:b.tier==='pro'||b.tier==='max'?b.tier:'standard',webSearch:deps.webSearch,browseSite:deps.browseSite});
    return send(res,200,{plan}),true;
+  }
+  // Thumbs up / down on an answer (the row under each reply): kept on the message, so what
+  // the owner liked or disliked can be read back later (no credits, no model call).
+  if(action==='/rating'&&method==='POST'){
+   const b=await readJson(req,2000),meta=builder.loadMeta(id),m=b.at?meta.messages.find(x=>x.role==='assistant'&&x.at===String(b.at)):null;
+   if(!m)throw Object.assign(Error('That answer was not found'),{status:404});
+   if(b.rating==='up'||b.rating==='down')m.rating=b.rating;else delete m.rating;
+   builder.saveMeta(meta);
+   return send(res,200,{rating:m.rating||null}),true;
   }
   // The look picked before the first build becomes the project's design (react-builder prepareDesign).
   if(action==='/look'&&method==='POST'){
