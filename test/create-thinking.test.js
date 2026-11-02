@@ -191,3 +191,38 @@ test('the Changes API returns each changed file before and after',async()=>{
   assert.equal((await call('GET','/api/create/projects/'+id+'/changes?version=2')).status,401,'sign-in needed');
  }finally{server.close()}
 });
+
+test('the agent sees the matching specialist skills and can open one',async()=>{
+ const agent=require('../react-agent');
+ const G=require('../gsap-skill-packs');G.clear();
+ const meta=builder.create({name:'Motion skill'});await builder.initialize(meta);
+ let step=0,system='',opened='';
+ const realFetch=global.fetch;
+ global.fetch=async(url,o)=>{if(String(url).includes('raw.githubusercontent.com/greensock'))return new Response('---\nname: gsap-core\n---\nUse gsap.to with an ease.',{status:200});return realFetch(url,o)};
+ const callModel=async(opts,parse)=>{
+  const sys=String(opts.messages[0].content||'');
+  if(/independent senior code reviewer|independent product\/spec reviewer/.test(sys))return parse(JSON.stringify({verdict:'pass',findings:[]}));
+  if(!system)system=sys;
+  step++;
+  const last=String(opts.messages.at(-1).content||'');
+  if(step===2)opened=last;
+  return parse(JSON.stringify(step===1?{thought:'Read the motion skill first.',actions:[{tool:'open_skill',name:'gsap:core'}]}:step===2?{thought:'Write and test.',actions:[{tool:'write_files',files:{'src/motion.js':'export const ease="power2.out"\n'}},{tool:'build_and_test'}]}:{thought:'Done.',actions:[{tool:'finish',message:'Added the motion helper.'}]}));
+ };
+ const inspect=async()=>({errors:[],steps:[{step:'open',ok:true}],text:'ok',external:[]});
+ try{
+  const r=await agent.run(meta.id,'Add a motion helper module for the animated hero',{callModel,inspect,maxSteps:6});
+  assert.match(system,/SPECIALIST SKILLS for this request[\s\S]*gsap:core/);
+  assert.match(system,/"tool":"open_skill"/);
+  assert.match(opened,/OFFICIAL GSAP SKILL[\s\S]*Use gsap\.to with an ease\./);
+  const tl=builder.loadMeta(meta.id).messages.at(-1).timeline||[];
+  assert.ok(tl.some(e=>e.t==='note'&&e.icon==='book'&&/gsap:core/.test(e.text)),'the step log shows the skill');
+  assert.ok(r.message);
+ }finally{global.fetch=realFetch;G.clear()}
+});
+
+test('a plain request lists no specialist skills',()=>{
+ const src=require('fs').readFileSync(require('path').join(__dirname,'..','react-agent.js'),'utf8');
+ assert.match(src,/function skillsNote\(request\)/);
+ const T=require('../teardown-skill-pack'),G=require('../gsap-skill-packs');
+ assert.equal([...T.list('Add a contact page'),...G.list('Add a contact page')].length,0);
+});
