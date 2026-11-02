@@ -24,3 +24,9 @@ test("GSAP skill loader strips frontmatter and safety scans",async()=>{
  assert.match(out,/Use transforms and opacity/);
  assert.doesNotMatch(out,/tools: shell/);
 });
+
+test("everyday wording reaches the GSAP skills, plain sites do not",()=>{
+ assert.deepEqual(G.list("an animated landing page for a coffee shop").map(x=>x.name),["gsap:core"]);
+ assert.ok(G.list("a landing page with scroll effects and parallax").some(x=>x.name==="gsap:core"));
+ assert.equal(G.list("a website for a bakery").length,0);
+});

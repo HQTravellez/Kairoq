@@ -7,7 +7,7 @@ const LICENSE="MIT";
 const MAX_BODY=22000;
 const cache=new Map();
 const CATALOG=Object.freeze([
- {id:"gsap:core",path:"skills/gsap-core/SKILL.md",about:"core GSAP animation patterns, tweens, eases and animation composition",when:/\b(gsap|animation|animate|motion|transition|tween|easing|microinteraction)\b/i},
+ {id:"gsap:core",path:"skills/gsap-core/SKILL.md",about:"core GSAP animation patterns, tweens, eases and animation composition",when:/\b(gsap|animations?|animated?|animating|motion|transitions?|tween|easing|micro-?interactions?|scroll effects?|parallax)\b/i},
  {id:"gsap:react",path:"skills/gsap-react/SKILL.md",about:"use GSAP safely and idiomatically in React components",when:/\b(react|component|jsx|tsx)\b.*\b(gsap|animation|motion|transition)\b|\b(gsap|animation|motion)\b.*\b(react|component|jsx|tsx)\b/i},
  {id:"gsap:scrolltrigger",path:"skills/gsap-scrolltrigger/SKILL.md",about:"scroll-driven animation and ScrollTrigger choreography",when:/\b(scrolltrigger|scroll animation|scroll-driven|parallax|pinning|scrub|scroll choreography)\b/i},
  {id:"gsap:timeline",path:"skills/gsap-timeline/SKILL.md",about:"coordinate multi-step motion with GSAP timelines and sequencing",when:/\b(timeline|sequence|stagger|choreograph|multi-step animation|intro animation)\b/i},

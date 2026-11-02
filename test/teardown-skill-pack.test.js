@@ -22,3 +22,9 @@ test("teardown loader strips frontmatter and retains safe guidance",async()=>{
  assert.doesNotMatch(out,/tools: shell/);
  assert.match(out,/Do not run npm/);
 });
+
+test("'how a … works' requests reach the teardown skill; unrelated 'works' does not",()=>{
+ assert.equal(T.list("show how a jet engine works in 3D").length,1);
+ assert.equal(T.list("how does a turbine work").length,1);
+ assert.equal(T.list("a booking app that works offline").length,0);
+});

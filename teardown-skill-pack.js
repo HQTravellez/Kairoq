@@ -8,7 +8,7 @@ const PATH="SKILL.md";
 const MAX_BODY=20000;
 const cache=new Map();
 const CATALOG=Object.freeze([
- {id:"3d:teardown-simulator",about:"build an interactive 3D machine/mechanism explainer with cutaways, exploded views, live readouts, guided camera states and a verification loop",when:/\b(teardown|exploded view|cutaway|how (does|do).*work|machine simulator|mechanism simulator|interactive 3d lesson|3d explainer|engine simulator|gearbox|pump|landing gear|linkage|mechanical watch|excavator|machine works)\b/i}
+ {id:"3d:teardown-simulator",about:"build an interactive 3D machine/mechanism explainer with cutaways, exploded views, live readouts, guided camera states and a verification loop",when:/\b(teardown|exploded view|cutaway|how (does|do|an?|the)\b[^.]{0,40}\bworks?\b|machine simulator|mechanism simulator|interactive 3d lesson|3d explainer|engine simulator|gearbox|pump|landing gear|linkage|mechanical watch|excavator|machine works)\b/i}
 ]);
 function list(request=""){
  const t=String(request||"");
