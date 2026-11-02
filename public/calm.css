@@ -178,3 +178,13 @@ body.app.in-editor #editor .messages .writeup.todo .vmark{color:#B45309!importan
 body.app.in-editor #editor .messages .agent-finished{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--c-line);font-size:12.5px;color:var(--c-ink-3)}
 body.app.in-editor #editor .messages .agent-finished::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#22A06B;margin-right:7px;vertical-align:1px}
 body.app.in-editor #chat-form .model-list>[hidden]{display:none!important}
+
+/* Build status while the agent works: a small chip at the foot of the preview. The preview stays
+   sharp and usable underneath (no white veil, no blur), like Lovable and Emergent. */
+body.app.in-editor #build-overlay,body.app.in-editor #build-overlay.first{inset:auto 0 18px 0!important;display:flex!important;justify-content:center;padding:0!important;background:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;pointer-events:none!important}
+body.app.in-editor #build-overlay.hidden{display:none!important}
+body.app.in-editor #build-overlay .bo-card,body.app.in-editor #build-overlay.first .bo-card{display:inline-flex!important;align-items:center;gap:8px;width:auto!important;max-width:min(360px,86%);padding:7px 14px 7px 11px!important;border-radius:999px!important;background:rgba(255,255,255,.94)!important;border:1px solid rgba(15,23,42,.08)!important;box-shadow:0 6px 20px rgba(15,23,42,.10)!important;font-size:12.5px!important;line-height:1.3!important;color:#2A2D32!important;animation:bo-in .25s ease both}
+body.app.in-editor #build-overlay .bo-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.app.in-editor #build-overlay .bo-spin{width:12px;height:12px;border-width:2px}
+@keyframes bo-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){body.app.in-editor #build-overlay .bo-card{animation:none}}
