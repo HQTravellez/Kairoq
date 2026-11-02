@@ -1054,7 +1054,7 @@ function streamJob(req,res,job){
  tick();
 }
 
-async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture}){
+async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,screenshot,inspect,browse,browseSite,webSearch,figmaFetch,designShots,generateImage,usageRows,referenceFetch,renderSite,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture}){
  const deps={callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook,storeShots,snackFetch,appleFetch,figmaCapture};
  const url=String(req.url||'').split('?')[0];
  if(!url.startsWith('/api/create/'))return false;
@@ -1077,7 +1077,11 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   // ----- accounts -----
   if(route==='/me'&&method==='GET'){
    const v=viewer(req,isOwner);
-   return send(res,200,{viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},explode_generation:{enabled:require('./explode-video').configured(process.env,{images:Boolean(generateImage)}),credits:require('./explode-video').prices()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   // The free models the chat box can list (650+ when the free pool is on): the server's catalogue,
+   // remembered here so a pick by id can be checked (model-choices.pick).
+   let catalog=[];
+   if(typeof listModels==='function'){try{catalog=require('./model-choices').remember(await listModels())}catch(e){console.warn('[create] model catalogue: '+String(e.message||e).slice(0,160))}}
+   return send(res,200,{free_models:catalog.map(m=>({id:m.id,label:m.label,note:m.note,provider:m.provider})),viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},explode_generation:{enabled:require('./explode-video').configured(process.env,{images:Boolean(generateImage)}),credits:require('./explode-video').prices()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));

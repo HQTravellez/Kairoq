@@ -280,3 +280,7 @@ is performed by this integration.
 ## Editor backdrop photo
 
 The image behind the Create home prompt and the editor's top bar is the Carina Nebula, taken by the Hubble Space Telescope. Credit: NASA. Kairoq loads it from Unsplash (https://unsplash.com/photos/nebula--hI5dX2ObAs) under the Unsplash License, which allows free commercial use without attribution. NASA images are generally not copyrighted. `public/space.webp` is a fallback drawn for Kairoq and is shown only if the photo fails to load.
+
+## Model maker logos in the chat box
+
+The coloured logos beside the models in the Create chat box come from LobeHub's icon set, `@lobehub/icons-static-svg` (MIT License, https://github.com/lobehub/lobe-icons), loaded by the browser from unpkg at a pinned version. The logos themselves belong to their companies and are shown only to identify the model's maker.

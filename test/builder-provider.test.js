@@ -66,3 +66,14 @@ test('freeOnly chat stays on free models in premium mode',async()=>{
  assert.ok(models.length,'a model was asked');
  assert.ok(models.every(m=>/:free$/.test(m)||/^(openrouter\/free|kairoq|local)/.test(m)),'only free models: '+models.join(', '));
 });
+
+// A free model picked by name runs through OpenRouter without paid builds being switched on.
+test('a free model picked by name runs without paid approval',async()=>{
+ const saved={...process.env},original=global.fetch,models=[];
+ Object.assign(process.env,{KAIROQ_BUILDER_PROVIDER:'openrouter',OPENROUTER_API_KEY:'test-only'});
+ delete process.env.KAIROQ_BUILDER_PAID_APPROVED;delete process.env.EXPLABS_API_KEY;delete process.env.ANTHROPIC_API_KEY;
+ global.fetch=async(url,o)=>{const b=JSON.parse(o&&o.body||'{}');if(b.model)models.push(b.model);return new Response(JSON.stringify({choices:[{message:{content:'{"ok":true}'}}],usage:{cost:0}}),{status:200,headers:{'Content-Type':'application/json'}})};
+ try{const r=await callBuilderModel({messages:[{role:'user',content:'x'}],model:'qwen/qwen3-coder:free'},c=>JSON.parse(c));assert.deepEqual(r,{ok:true})}
+ finally{global.fetch=original;process.env=saved}
+ assert.deepEqual(models,['qwen/qwen3-coder:free']);
+});

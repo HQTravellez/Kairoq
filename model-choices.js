@@ -45,12 +45,40 @@ function named(env=process.env){
 function list(env=process.env){
  const max=Math.max(0,...named(env).map(m=>m.credits));
  return[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true},
-  ...named(env).map(m=>({...m,enabled:modelReady(m,env),costlier:m.credits>=max&&max>=10}))];
+  ...named(env).map(m=>({...m,enabled:modelReady(m,env),costlier:m.credits>=max&&max>=10,provider:m.provider||providerOf(m.id)}))];
+}
+// The free models (the free pool and OpenRouter's ":free" models), as the server's catalogue lists
+// them (server.js getModels). Kept here so a pick can be checked without another fetch.
+const PROVIDERS={anthropic:'Anthropic',openai:'OpenAI',google:'Google',meta:'Meta','meta-llama':'Meta',deepseek:'DeepSeek',mistralai:'Mistral',mistral:'Mistral',qwen:'Qwen',nvidia:'NVIDIA',microsoft:'Microsoft','x-ai':'xAI',xai:'xAI',cohere:'Cohere',perplexity:'Perplexity',amazon:'Amazon',moonshotai:'Moonshot',moonshot:'Moonshot','z-ai':'Z.ai',zai:'Z.ai',minimax:'MiniMax',baidu:'Baidu',tencent:'Tencent',bytedance:'ByteDance',ai21:'AI21',inception:'Inception',liquid:'Liquid',nousresearch:'Nous',arcee:'Arcee',openrouter:'OpenRouter',freellm:'Free pool',local:'Local'};
+function providerOf(id){
+ const head=String(id||'').split('/')[0].toLowerCase();
+ if(head==='freellm'||head==='local'){const rest=String(id||'').split('/').slice(1).join('/');const inner=rest.includes('/')?rest.split('/')[0].toLowerCase():'';return{key:inner||head,name:PROVIDERS[inner]||(inner?inner.charAt(0).toUpperCase()+inner.slice(1):PROVIDERS[head])}}
+ return{key:head,name:PROVIDERS[head]||(head?head.charAt(0).toUpperCase()+head.slice(1):'')};
+}
+let freeCatalog=[];
+function remember(models){
+ const seen=new Set();
+ freeCatalog=(Array.isArray(models)?models:[]).filter(m=>m&&m.id&&m.isFree&&!seen.has(m.id)&&seen.add(m.id)).map(m=>{
+  const id=String(m.id),p=providerOf(id),ctx=Number(m.context_length)||0;
+  const label=String(m.name||id).replace(/\s*·.*$/,'').replace(/\s*\((free)\)\s*$/i,'').replace(/:free$/,'').trim()||id;
+  return{id,label,credits:0,free:true,enabled:true,provider:p,note:[p.name,ctx?Math.round(ctx/1000)+'k context':'',m.supportsVision?'reads images':''].filter(Boolean).join(' · '),source:m.source||''};
+ });
+ return freeCatalog;
+}
+function free(){return freeCatalog.slice()}
+// A free catalogue id runs at no credits: ":free" OpenRouter models need the OpenRouter key; the
+// free pool's models need the pool; a local model needs the local server.
+function freeReady(m,env=process.env){
+ if(/^freellm\//.test(m.id))return require('./freellmapi').enabled(env);
+ if(/^local\//.test(m.id))return true;
+ return Boolean(env.OPENROUTER_API_KEY);
 }
 // The named model for a request, or null for Auto (unknown or unavailable ids mean Auto).
 function pick(id,env=process.env){
  if(!id||id==='auto')return null;
  const m=named(env).find(x=>x.id===id);
- return m&&modelReady(m,env)?m:null;
+ if(m)return modelReady(m,env)?m:null;
+ const f=freeCatalog.find(x=>x.id===id);
+ return f&&freeReady(f,env)?f:null;
 }
-module.exports={list,pick,named,ready,modelReady,DEFAULTS};
+module.exports={list,pick,named,ready,modelReady,DEFAULTS,providerOf,remember,free,freeReady};

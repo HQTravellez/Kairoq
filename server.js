@@ -645,6 +645,8 @@ async function getModels(force = false) {
       supportsTools:true,supportsReasoning:true,source:"local",local:true,preferred:true
     }]:[]),
     ...localModels,
+    // Each model in the free pool, selectable by name (freellm/<id>); the pool runs it at no cost.
+    ...freePoolModels.map(id=>({id:"freellm/"+id,name:String(id).split("/").pop()+" · Free pool",context_length:null,isFree:true,inputPrice:"0",outputPrice:"0",inputModalities:["text"],supportsVision:false,supportsTools:false,supportsReasoning:false,source:"freellmapi",local:false,preferred:false})),
     ...(openRouterConfigured()?[{
       id:"openrouter/free",name:"OpenRouter Free Auto",context_length:200000,isFree:true,
       inputPrice:"0",outputPrice:"0",inputModalities:["text","image"],supportsVision:true,
@@ -4470,11 +4472,11 @@ async function handleChat(req, res) {
     }
     // FreeLLMAPI is a real selectable free route, not an OpenRouter model ID.
     // Keep the UI label and the executor honest: selecting the free pool always runs that pool.
-    if(requestedModel==="freellm/auto"){
-      const pool=require("./freellmapi");
+    if(requestedModel==="freellm/auto"||requestedModel.startsWith("freellm/")){
+      const pool=require("./freellmapi"),pinned=requestedModel==="freellm/auto"?"":requestedModel.slice("freellm/".length);
       if(!pool.enabled())throw Object.assign(new Error("Kairoq Free Pool is not connected right now. Pick another FREE model or Auto (free)."),{status:503});
-      writeSSE(res,"status",{message:"FREE · Kairoq Free Pool"});
-      const reply=await pool.complete(finalMessages,{temperature,maxTokens:12000,reasoningEffort:effort});
+      writeSSE(res,"status",{message:"FREE · Kairoq Free Pool"+(pinned?" · "+pinned:"")});
+      const reply=await pool.complete(finalMessages,{model:pinned,temperature,maxTokens:12000,reasoningEffort:effort});
       writeSSE(res,"token",{text:reply.text});
       writeSSE(res,"meta",{model:reply.model,usage:{...(reply.usage||{}),cost:0}});
       writeSSE(res,"done",{ok:true,provider:"freellmapi",model:reply.model,zeroCost:true});
@@ -6939,6 +6941,8 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
     const {model,onFallback,...rest}=opts;
     try{
       if(model==="meta/muse-spark"){const r=await callMuse(rest);return parse(r.text,r.model)}
+      // A model from the free pool, picked by name: the pool runs it (no credits, no OpenRouter).
+      if(/^freellm\//.test(model)){const pool=require("./freellmapi");const r=await pool.json(rest.messages,{model:model.replace(/^freellm\//,""),temperature:rest.temperature??0.1,maxTokens:16000,coding:true,signal:rest.signal});return parse===parseDeveloperResponse?r.value:parse(r.value,r.model)}
       // Claude models go straight to Anthropic when ANTHROPIC_API_KEY is set (anthropic.js).
       if(!process.env.OPENROUTER_API_KEY&&!(require("./anthropic").isClaude(model)&&require("./anthropic").configured()))throw Error("OpenRouter is not set up");
       return await callOpenRouterBuilder({...rest,only:model},parse);
@@ -7119,7 +7123,8 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   // freeOnly (builder chat, learning notes): never a paid model, whatever the build mode.
   let allowPaid=!opts.freeOnly&&(mode==="premium"||mode==="paid-first"||Boolean(opts.only)) && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
-  if(opts.only&&!allowPaid)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
+  const onlyFree=Boolean(opts.only)&&(/:free$/.test(opts.only)||opts.only==="openrouter/free");
+  if(opts.only&&!allowPaid&&!onlyFree)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
   // Website checks and AI customers (tier "check"): a cheap, reliable paid model first (a few cents a
   // check), with its own monthly cap and the free models behind it; builds are not affected.
@@ -7309,7 +7314,7 @@ const server = http.createServer(async (req, res) => {
   if(await require("./voice-routes").handle(req,res,{authenticated:isAuthenticated}))return;
   if(url.startsWith("/sites/")&&reactHosting.handlePath(req,res))return;
   if(url==="/api/whatsapp/webhook"&&await require("./whatsapp").handle(req,res,{callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null}).catch(e=>{console.warn("[whatsapp]",e.message);if(!res.headersSent){res.writeHead(500);res.end()}}))return;
-  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),reviewLook,storeShots:(u,o)=>require("./runtime-check").storeShots("http://127.0.0.1:"+PORT+u,o),figmaCapture:(u,o)=>require("./runtime-check").captureLayout("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
+  if(url.startsWith("/api/create/")&&await createApi.handle(req,res,{isOwner:r=>isAuthenticated(r),callModel:callBuilderModel,listModels:()=>getModels(),checkRuntime:(u,o)=>require("./runtime-check").check("http://127.0.0.1:"+PORT+u,o),screenshot:(u,f)=>require("./runtime-check").screenshot("http://127.0.0.1:"+PORT+u,f),inspect:(u,o)=>require("./runtime-check").inspect("http://127.0.0.1:"+PORT+u,o),browse:(u,o)=>require("./runtime-check").session("http://127.0.0.1:"+PORT+u,o),webSearch:searchPublicWeb,designShots:u=>require("./runtime-check").designShots("http://127.0.0.1:"+PORT+u),renderSite:(u,o)=>require("./runtime-check").renderSite("http://127.0.0.1:"+PORT+u,o),reviewLook,storeShots:(u,o)=>require("./runtime-check").storeShots("http://127.0.0.1:"+PORT+u,o),figmaCapture:(u,o)=>require("./runtime-check").captureLayout("http://127.0.0.1:"+PORT+u,o),generateImage:builderImagesEnabled()?generateBuilderImage:null,usageRows:()=>readLocalJsonLines(USAGE_FILE,20000),secure:(process.env.SITE_URL||process.env.KAIROQ_PUBLIC_URL||"").startsWith("https://")}))return;
   if(req.method==="GET"&&/^\/create(\/share\/[a-f0-9]{24}|\/check\/[a-f0-9]{24})?\/?(\?.*)?$/.test(url)){req.url="/create.html";return serveStatic(req,res);}
   if(url.startsWith("/builder-assets/"))return require("./builder-assets").handle(req,res);
   if(await require("./website-forms").handle(req,res,{authenticated:isAuthenticated,readBody:getBody}))return;
