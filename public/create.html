@@ -671,6 +671,7 @@
 <dialog id="publish-dialog">
   <form method="dialog" class="dialog">
     <h2>Publish</h2>
+    <p class="muted small">Put this app on the web and choose how it looks when shared.</p><!-- dialog subtitle (design system) -->
     <label>Site name<input id="slug" pattern="[a-z0-9-]{3,40}" placeholder="my-app"></label>
     <p class="muted small">Your app will be live at <code id="slug-preview"></code></p>
     <p class="hosting-note small hidden" id="hosting-note"></p>
@@ -998,16 +999,17 @@
 <dialog id="settings-dialog">
   <form method="dialog" class="dialog">
     <h2>Project settings</h2>
+    <p class="muted small">Instructions, keys and connections for this app.</p><!-- dialog subtitle (design system) -->
     <h3>Project knowledge</h3>
     <p class="muted small">Standing instructions the AI follows on every change: brand, tone, audience, rules.</p>
     <textarea id="knowledge" rows="4" maxlength="8000" placeholder="Brand colours are teal and sand. Write in a warm, plain tone. Prices are in EUR. Never use stock photos of people."></textarea>
     <div class="row"><button class="ghost" id="knowledge-save" type="button">Save knowledge</button><span class="muted small" id="knowledge-status"></span></div>
     <details class="memory" id="memory-box"><summary>What Kairoq remembers about this project</summary><p class="muted small">Sent with every request, so nothing is forgotten in long projects. Kept from your app's code and everything you asked for.</p><pre id="memory-text"></pre></details>
-    <h3>Server secrets</h3>
-    <p class="muted small">API keys your server functions read with secrets.get("NAME"). Values are encrypted and never shown again.</p>
+    <h3>API keys for your app</h3><!-- plain wording; was "Server secrets" with secrets.get("NAME") -->
+    <p class="muted small">Keys for services your app calls, like maps, SMS or AI. They are encrypted and never shown again.</p>
     <ul class="domains" id="secrets-list"></ul>
-    <div class="row"><input id="secret-name" placeholder="NAME" spellcheck="false" style="max-width:160px"><input id="secret-value" type="password" autocomplete="off" placeholder="value"><button class="ghost" id="secret-add" type="button">Save</button></div>
-    <h3>Outside APIs</h3>
+    <div class="row"><input id="secret-name" placeholder="Name, e.g. MAPS_KEY" spellcheck="false" style="max-width:200px" aria-label="Key name"><input id="secret-value" type="password" autocomplete="off" placeholder="Value" aria-label="Key value"><!-- clearer placeholders --><button class="ghost" id="secret-add" type="button">Save</button></div>
+    <h3>Other services</h3><!-- plain wording; was "Outside APIs" -->
     <p class="muted small">Services your app calls, like a hotel supplier. Type its name or website: Kairoq finds how it works and the AI uses it. Until you add its key, the preview gets sample answers shaped like the real ones; the live site always calls the real service.</p>
     <div class="row"><input id="api-name" maxlength="200" placeholder="Service name or website, e.g. Hotelbeds" spellcheck="false"><button class="ghost" id="api-add" type="button">Add</button></div>
     <p class="muted small" id="api-status" role="status"></p>
@@ -1274,6 +1276,7 @@
 <dialog id="mobile-dialog">
   <form method="dialog" class="dialog" id="mobile-form">
     <h2>Mobile app</h2>
+    <p class="muted small">Make this a phone app, then install it or send it to the stores.</p><!-- dialog subtitle (design system) -->
     <label class="check"><input type="checkbox" id="mobile-enabled"> This is a mobile app <span class="muted small">(the AI designs phone-first; downloads include an iOS and Android project)</span></label>
     <div class="row wrap">
       <label>App name<input id="mobile-name" maxlength="45"></label>
@@ -1379,6 +1382,7 @@
 <dialog id="team-dialog">
   <form method="dialog" class="dialog">
     <h2>Share and collaborate</h2>
+    <p class="muted small">Invite people to work on this app, or share a preview link.</p><!-- dialog subtitle (design system) -->
     <h3>Collaborators</h3>
     <p class="muted small">Editors can chat, edit and publish. Viewers can look. Each person uses their own credits.</p>
     <div class="row"><input id="member-email" type="email" placeholder="teammate@example.com"><select id="member-role" style="width:auto"><option value="editor">Editor</option><option value="viewer">Viewer</option></select><button class="primary" id="member-add" type="button">Invite</button></div>
