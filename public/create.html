@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="/ui/screens.css?v=1">
 <link rel="stylesheet" href="/ui/chat.css?v=1">
 <link rel="stylesheet" href="/ui/dialogs.css?v=1">
-<link rel="stylesheet" href="/ui/tools.css?v=1">
+<link rel="stylesheet" href="/ui/tools.css?v=2">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -1310,13 +1310,13 @@
 <dialog id="ref-dialog" class="wide">
   <form method="dialog" class="dialog">
     <h2>Build from a reference</h2>
-    <p class="muted small">Kairoq studies a product (its public pages, its code or screenshots), writes a plan for you to approve, then builds <b>its own version</b>: comparable features and design, with an original name, text and images. It follows robots.txt and never signs in or submits forms on the reference site.</p>
+    <p class="muted small">Kairoq studies a product (its public pages, its code or screenshots), writes a plan for you to approve, then builds <b>its own version</b>: comparable features and design, with an original name, text and images. It respects the site's rules for automated visitors and never signs in or submits forms there.</p><!-- tools pass: plain words for "robots.txt" -->
     <div id="ref-step1">
       <label>Website<input id="ref-url" type="url" placeholder="https://example.com"></label>
       <label>or a GitHub repository<input id="ref-repo" placeholder="github.com/owner/name"></label>
       <label>Screenshots <span class="muted small">(optional, up to 4)</span><input id="ref-images" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
       <div id="ref-app-box" class="hidden">
-        <label>or app files <span class="muted small">(zip of a JavaScript or Electron app, analyzed with REA)</span><input id="ref-app" type="file" accept=".zip,application/zip"></label>
+        <label>or app files <span class="muted small">(a zip of a JavaScript or Electron app)</span><!-- tools pass: dropped the tool name "REA" --><input id="ref-app" type="file" accept=".zip,application/zip"></label>
         <label class="check"><input type="checkbox" id="ref-rights"> I own this app or have the right to analyze it</label>
       </div>
       <label>What you want <span class="muted small">(optional)</span><textarea id="ref-note" rows="2" placeholder="A booking site for my 12-room hotel in Lisbon, with the same easy date search"></textarea></label>
@@ -1342,7 +1342,7 @@
       <h3>Journeys tested on desktop and phone</h3><ul id="ref-journeys" class="ref-list"></ul>
       <div id="ref-skip-box" class="hidden"><h3>Can't be copied</h3><ul id="ref-skip" class="ref-list"></ul></div>
       <h3>Design</h3><div id="ref-design" class="ref-design"></div>
-      <details><summary class="small">Edit the full plan (JSON)</summary><textarea id="ref-plan" rows="12" spellcheck="false"></textarea></details>
+      <details><summary class="small">Edit the full plan (advanced)</summary><!-- tools pass: "JSON" is jargon --><textarea id="ref-plan" rows="12" spellcheck="false"></textarea></details>
       <div id="ref-owner-box">
         <label class="check"><input type="checkbox" id="ref-publish"> Publish when every journey passes, then check the live site</label>
         <label class="check"><input type="checkbox" id="ref-github"> Push the code to GitHub</label>

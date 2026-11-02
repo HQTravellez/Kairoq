@@ -1,1 +1,437 @@
-/* Kairoq UI: tools. Follows docs/DESIGN-SYSTEM.md. Loaded after calm.css. */
+/* Kairoq UI: tools. Follows docs/DESIGN-SYSTEM.md. Loaded after calm.css.
+   Scope: the tool panels (Checks, Synthetic customers, Customers before code, Security, Web agent,
+   Find customers, WhatsApp, Figma send/import, Reference), the Website check and Shared app
+   screens, and the Templates gallery on home. Every selector starts at one of those ids, so nothing
+   here reaches another area. Tokens only (body.app in calm.css); status tints are the token
+   colours at 8-10% alpha. */
+
+/* ================================================================== */
+/* 1. Tool dialogs: the shell                                          */
+/* ================================================================== */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog){width:min(560px,calc(100vw - 32px))!important;max-width:none!important;max-height:calc(100dvh - 48px)!important;padding:0!important;margin:auto!important;border:1px solid var(--c-line)!important;border-radius:16px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.25)!important;overflow:hidden!important;font-family:Geist,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body.app :is(#customers-dialog,#launch-dialog,#web-dialog,#leads-dialog,#ref-dialog).wide{width:min(860px,calc(100vw - 32px))!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog)[open]{display:flex!important;flex-direction:column}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog)::backdrop{background:rgba(17,24,39,.35)!important;backdrop-filter:blur(2px)!important;-webkit-backdrop-filter:blur(2px)!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog)>form.dialog{flex:1 1 auto;min-height:0;overflow:auto;margin:0;padding:24px 24px 0!important;display:block;font-size:14.5px;line-height:1.6;color:var(--c-ink);background:transparent!important;border:0!important;box-shadow:none!important;max-width:none!important}
+
+/* Title and the one-line subtitle under it. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog>h2{margin:0 0 4px!important;font:600 20px/1.3 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:-.01em!important;color:#1B1D22!important;text-transform:none!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog>h2+p{margin:0 0 20px!important;font-size:13.5px!important;line-height:1.55!important;color:var(--c-ink-3)!important;max-width:none}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog>h2+p b{color:var(--c-ink-2);font-weight:600}
+
+/* Section titles: sentence case, 15px/600. Sub-sections 13.5px. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog h3{margin:28px 0 10px!important;font:600 15px/1.4 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:-.005em!important;text-transform:none!important;color:var(--c-ink)!important;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog h3 .muted{font-size:12.5px!important;font-weight:400!important;color:var(--c-ink-3)!important;letter-spacing:0}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog h4{margin:22px 0 8px!important;font:600 13.5px/1.4 Geist,ui-sans-serif,system-ui,sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:var(--c-ink)!important}
+
+/* Text. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog p{margin:8px 0 0}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(.small,p.small,.muted.small){font-size:13px!important;line-height:1.5!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .muted{color:var(--c-ink-3)!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog p:empty{display:none}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog a:not(.primary):not(.ghost){color:var(--c-accent);text-decoration:underline;text-underline-offset:2px}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .error{margin:10px 0 0!important;font-size:13px!important;color:#C2412D!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .error:empty{display:none!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .hidden.hidden{display:none!important}
+
+/* Fields: label above (13px/500), 38px controls, accent focus ring. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog label:not(.check){display:block!important;margin:14px 0 0!important;font-size:13px!important;font-weight:500!important;line-height:1.4;color:var(--c-ink-2)!important;text-transform:none!important;letter-spacing:0!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog label:not(.check)>.muted{display:inline;font-weight:400}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea){box-sizing:border-box;width:100%;height:38px;margin:0;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:#fff!important;color:var(--c-ink)!important;font:400 14px/1.4 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important;outline:0}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog label:not(.check)>:is(input:not([type=checkbox]):not([type=radio]),select,textarea){display:block;margin-top:6px!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog textarea{height:auto!important;min-height:76px;padding:9px 12px!important;line-height:1.5!important;resize:vertical}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog select:not(#_){-webkit-appearance:none;appearance:none;padding-right:32px!important;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235C6168' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 12px center!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(input,select,textarea)::placeholder{color:var(--c-ink-3);opacity:.75}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(input,select,textarea):focus{border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important;outline:0!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(input,select,textarea):disabled{background:var(--c-raise)!important;color:var(--c-ink-3)!important;cursor:not-allowed}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog input[type=file]{box-sizing:border-box;width:100%;padding:10px 12px;border:1px dashed var(--c-line-2);border-radius:10px;background:var(--c-raise);color:var(--c-ink-2);font-size:13px;cursor:pointer}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog input[type=file]::file-selector-button{height:30px;margin-right:12px;padding:0 12px;border:1px solid var(--c-line-2);border-radius:8px;background:#fff;color:var(--c-ink);font:500 13px Geist,ui-sans-serif,system-ui,sans-serif;cursor:pointer}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog label.check{display:flex!important;align-items:flex-start;gap:10px;margin:14px 0 0!important;font-size:13.5px!important;font-weight:400!important;line-height:1.45;color:var(--c-ink)!important;cursor:pointer}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog input:is([type=checkbox],[type=radio]){flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--c-accent);cursor:pointer}
+
+/* Rows of fields and buttons. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row{display:flex!important;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:16px 0 0!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row>label:not(.check){flex:1 1 160px;margin:0!important;min-width:0}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row>label.check{margin:0 0 9px!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row>input:not([type=checkbox]){flex:1 1 220px;width:auto}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row>.small,body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row>.muted{align-self:center;margin:0!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row.end{justify-content:flex-end}
+
+/* The footer: Close (and the dialog's main action when it lives there) stays in view at the bottom. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog) form.dialog>.row.end:last-child,body.app #ref-dialog :is(#ref-step1,#ref-step2)>.row.end{position:sticky;bottom:0;z-index:3;margin:24px -24px 0!important;padding:14px 24px!important;background:var(--c-panel);border-top:1px solid var(--c-line);justify-content:flex-end;align-items:center}
+body.app #ref-dialog form.dialog{padding-bottom:0!important}
+body.app #ref-dialog #ref-error:not(:empty){margin:0 0 16px!important}
+/* Secondary first, primary last (the order the design system asks for). */
+body.app #security-dialog form.dialog>.row.end #security-fix,body.app #figma-dialog form.dialog>.row.end .primary,body.app #ref-dialog .row.end .primary{order:2}
+
+/* Buttons: one primary per view; secondary is white with a line; links are quiet. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(button,a).primary{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;height:36px!important;min-height:36px;padding:0 14px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font:500 13.5px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;text-decoration:none!important;white-space:nowrap;cursor:pointer;transform:none!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(button,a).primary:hover{background:var(--c-accent-2)!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(button,a).ghost:not(.link-btn){display:inline-flex!important;align-items:center;justify-content:center;gap:6px;height:36px!important;min-height:36px;padding:0 14px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:#fff!important;color:var(--c-ink)!important;font:500 13.5px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;box-shadow:none!important;text-decoration:none!important;white-space:nowrap;cursor:pointer;transform:none!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(button,a).ghost:not(.link-btn):hover{background:var(--c-raise)!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(button.link-btn,.ghost.link-btn,.small-btn){display:inline-flex!important;align-items:center;height:28px!important;min-height:0;padding:0 8px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2)!important;font:500 13px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important;text-decoration:none!important;white-space:nowrap;cursor:pointer}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(button.link-btn,.ghost.link-btn,.small-btn):hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog button:disabled{opacity:.45!important;cursor:not-allowed!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(button,a):focus-visible{outline:0!important;box-shadow:0 0 0 3px rgba(10,42,82,.18)!important}
+
+/* Lists: one bordered container with dividers, never a box per row. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(ul.skills,ul.mem-list,ul.findings,ul.ref-list){display:block!important;list-style:none!important;margin:0!important;padding:0!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(ul.skills,ul.mem-list,ul.findings,ul.ref-list)>li{display:flex!important;align-items:center;flex-wrap:wrap;gap:12px;margin:0!important;padding:12px 14px!important;border:0!important;border-top:1px solid var(--c-line)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;font-size:14px;line-height:1.5;color:var(--c-ink)}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(ul.skills,ul.mem-list,ul.findings,ul.ref-list)>li:first-child{border-top:0!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(ul.skills,ul.mem-list,ul.findings,ul.ref-list):empty{display:none!important}
+/* Empty state: one short sentence, centred, on the raised fill. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(ul.skills,ul.mem-list,ul.findings,ul.ref-list):has(>li.muted:only-child){border-style:dashed!important;border-color:var(--c-line-2)!important;background:var(--c-bg)!important;box-shadow:none}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog :is(ul.skills,ul.mem-list,ul.findings,ul.ref-list)>li.muted:only-child{display:block!important;padding:20px 16px!important;text-align:center;font-size:13px!important;line-height:1.5;color:var(--c-ink-3)!important}
+/* Row anatomy: a title and a muted line, actions on the right. */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .skill-text{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .skill-text>b{font-size:14px;font-weight:500;color:var(--c-ink);overflow-wrap:anywhere}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .skill-text>span{font-size:12.5px;line-height:1.45;color:var(--c-ink-3);overflow-wrap:anywhere}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .skill-actions{margin-left:auto;display:flex;align-items:center;gap:4px;flex:none}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .skill-actions>label{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;margin:0 6px 0 0!important;font-size:13px!important;font-weight:400!important;color:var(--c-ink-2)!important}
+/* Plain bullet lists inside reports: same container with dividers. */
+body.app :is(#customers-dialog,#launch-dialog) form.dialog ul.small:not(.recall){list-style:none!important;margin:0!important;padding:0!important;border:1px solid var(--c-line);border-radius:12px;background:var(--c-panel);overflow:hidden}
+body.app :is(#customers-dialog,#launch-dialog) form.dialog ul.small:not(.recall)>li{margin:0;padding:10px 14px;border-top:1px solid var(--c-line);font-size:13.5px;line-height:1.5;color:var(--c-ink)}
+body.app :is(#customers-dialog,#launch-dialog) form.dialog ul.small:not(.recall)>li:first-child{border-top:0}
+body.app :is(#customers-dialog,#launch-dialog) form.dialog ul.small:not(.recall)>li.muted{color:var(--c-ink-3)}
+body.app :is(#customers-dialog,#launch-dialog) form.dialog ul.small:not(.recall)>li.error{color:#C2412D!important;margin:0!important}
+body.app :is(#customers-dialog,#launch-dialog) form.dialog ul.small:empty{display:none}
+
+/* Status chips: 24px, pill, status colour as text on an 8% tint. */
+body.app :is(#checks-dialog,#security-dialog,#web-dialog,#leads-dialog) form.dialog :is(.check-state,.dev-badge,.sev){display:inline-flex;align-items:center;justify-content:center;gap:4px;height:24px;padding:0 9px;border-radius:999px;font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif;letter-spacing:0;text-transform:none;background:var(--c-raise);color:var(--c-ink-2);white-space:nowrap;margin:0}
+body.app :is(#checks-dialog,#security-dialog,#web-dialog,#leads-dialog) form.dialog :is(.check-state,.dev-badge).ok{background:rgba(31,138,91,.08);color:#1F8A5B}
+body.app :is(#checks-dialog,#security-dialog,#web-dialog,#leads-dialog) form.dialog :is(.check-state,.dev-badge).bad,body.app #security-dialog form.dialog .sev.high{background:rgba(194,65,45,.08);color:#C2412D}
+body.app #security-dialog form.dialog .sev.medium{background:rgba(183,121,31,.10);color:#B7791F}
+body.app #security-dialog form.dialog .sev::first-letter{text-transform:uppercase}
+
+/* Notices (a raised panel inside a dialog). */
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .notice{margin:16px 0 0!important;padding:16px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-bg)!important;color:var(--c-ink)!important;box-shadow:none!important}
+body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .notice>:first-child{margin-top:0!important}
+
+/* Disclosures: a quiet bordered fold with a chevron. */
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details{margin:16px 0 0;border:1px solid var(--c-line);border-radius:12px;background:var(--c-panel)}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details>summary{list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 14px!important;margin:0;border:0!important;outline:0;font-size:13.5px!important;font-weight:500;line-height:1.45;color:var(--c-ink)!important;cursor:pointer;border-radius:12px}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details>summary::-webkit-details-marker{display:none}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details>summary::before{content:"";flex:none;width:6px;height:6px;margin:0 4px 0 2px;border-right:1.5px solid var(--c-ink-3);border-bottom:1.5px solid var(--c-ink-3);transform:rotate(-45deg);transition:transform .15s}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details[open]>summary::before{transform:rotate(45deg)}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details>summary:hover{background:var(--c-raise)}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details>summary:focus-visible{box-shadow:inset 0 0 0 2px rgba(10,42,82,.14)}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details[open]>summary{border-bottom:1px solid var(--c-line)!important;border-radius:12px 12px 0 0}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details[open]{padding:0 16px 16px}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details[open]>summary{margin:0 -16px!important}
+body.app :is(#customers-dialog,#web-dialog,#leads-dialog,#ref-dialog) form.dialog details>summary+*{margin-top:14px!important}
+
+/* Numbered steps (WhatsApp, Figma plugin). */
+body.app :is(#wa-dialog,#figma-dialog) form.dialog ol:is(.wa-steps,.store-steps){counter-reset:step;list-style:none;margin:14px 0 0;padding:0;display:grid;gap:10px}
+body.app :is(#wa-dialog,#figma-dialog) form.dialog ol:is(.wa-steps,.store-steps)>li{counter-increment:step;position:relative;padding-left:34px;font-size:13.5px;line-height:1.5;color:var(--c-ink);min-height:24px}
+body.app :is(#wa-dialog,#figma-dialog) form.dialog ol:is(.wa-steps,.store-steps)>li::before{content:counter(step);position:absolute;left:0;top:-1px;width:24px;height:24px;border-radius:999px;background:var(--c-raise);border:1px solid var(--c-line);display:grid;place-items:center;font:600 12px/1 Geist,ui-sans-serif,system-ui,sans-serif;color:var(--c-ink-2)}
+
+/* ================================================================== */
+/* 2. Each tool                                                        */
+/* ================================================================== */
+
+/* Checks */
+body.app #checks-dialog form.dialog #checks-monitor{display:flex;align-items:flex-start;gap:10px;margin:0 0 16px!important;padding:10px 12px;border-radius:10px;background:var(--c-raise);font-size:13px!important;line-height:1.5;color:var(--c-ink-2)!important}
+body.app #checks-dialog form.dialog #checks-monitor::before{content:"";flex:none;width:7px;height:7px;margin-top:6px;border-radius:50%;background:var(--c-ink-3)}
+body.app #checks-dialog form.dialog #checks-list>li .check-state{width:24px;padding:0;flex:none}
+body.app #checks-dialog form.dialog .check-devices{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+body.app #checks-dialog form.dialog .check-repair{flex:1 1 100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:rgba(183,121,31,.08);font-size:13px;color:var(--c-ink)}
+body.app #checks-dialog form.dialog #checks-run{margin-top:0}
+body.app #checks-dialog form.dialog>.row:has(#checks-run){margin-top:12px!important}
+body.app #checks-dialog form.dialog>.row:has(#checks-save-anyway.hidden){display:none!important}
+body.app #checks-dialog form.dialog #checks-add{background:var(--c-accent)!important;border-color:var(--c-accent)!important;color:#fff!important}
+body.app #checks-dialog form.dialog #checks-add:hover{background:var(--c-accent-2)!important}
+body.app #checks-dialog form.dialog #checks-status:empty{display:none}
+
+/* Synthetic customers */
+body.app #customers-dialog form.dialog #cust-sites>p:first-of-type{margin-top:14px!important}
+body.app #customers-dialog form.dialog #cust-cost:empty,body.app #customers-dialog form.dialog #cust-repair-cost:empty{display:none}
+body.app #customers-dialog form.dialog #cust-report{margin-top:24px;padding-top:4px}
+body.app #customers-dialog form.dialog #cust-target{margin:0!important}
+body.app #customers-dialog form.dialog #cust-headline{margin-top:10px!important;font-size:17px!important}
+body.app #customers-dialog form.dialog .cust-stats,body.app #launch-dialog form.dialog .cust-stats{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:4px 0 0!important}
+body.app #customers-dialog form.dialog .cust-stats>b,body.app #launch-dialog form.dialog .cust-stats>b{font:600 24px/1.2 Geist,ui-sans-serif,system-ui,sans-serif;letter-spacing:-.01em;color:#1B1D22}
+body.app #customers-dialog form.dialog #cust-comparison .cust-stats>b{font-size:18px}
+body.app #customers-dialog form.dialog #cust-comparison h4{margin-top:0!important}
+body.app #customers-dialog form.dialog #cust-reports>li:not(.muted){padding:0!important}
+body.app #customers-dialog form.dialog #cust-reports>li>button.ghost{display:block!important;width:100%;height:auto!important;min-height:44px;padding:12px 14px!important;border:0!important;border-radius:0!important;background:transparent!important;text-align:left;font-weight:400!important;font-size:13.5px!important;line-height:1.45!important;white-space:normal}
+body.app #customers-dialog form.dialog #cust-reports>li>button.ghost:hover{background:var(--c-raise)!important}
+body.app #customers-dialog form.dialog #cust-repair-box .row label:not(.check){flex:0 1 180px}
+body.app #customers-dialog form.dialog .cust-visit{padding:10px 0;border-top:1px solid var(--c-line)}
+body.app #customers-dialog form.dialog .cust-visit:first-child{border-top:0}
+body.app #customers-dialog form.dialog .cust-visit ol{margin:6px 0 0;padding-left:20px}
+body.app #customers-dialog form.dialog .cust-visit li.error{margin:0!important}
+body.app :is(#customers-dialog,#launch-dialog) .explain-card{margin:10px 0 0;padding:14px 16px;border:1px solid var(--c-line);border-radius:12px;background:var(--c-panel);box-shadow:0 1px 2px rgba(16,24,40,.05)}
+body.app :is(#customers-dialog,#launch-dialog) .explain-card dl{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin:10px 0 0;font-size:13.5px}
+body.app :is(#customers-dialog,#launch-dialog) .explain-card dt{color:var(--c-ink-3);font-weight:500}
+body.app :is(#customers-dialog,#launch-dialog) .explain-card dd{margin:0;color:var(--c-ink)}
+/* What visitors remembered: a chip per question. */
+body :is(#customers-dialog,#check-screen) ul.recall{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:12px 0 0!important;padding:0!important;border:0}
+body :is(#customers-dialog,#check-screen) ul.recall.hidden{display:none!important}
+body :is(#customers-dialog,#check-screen) ul.recall>li{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:999px;background:var(--c-raise);font-size:12px;color:var(--c-ink-2)}
+body :is(#customers-dialog,#check-screen) ul.recall>li.recall-head{background:none;padding:0 4px 0 0;color:var(--c-ink-3)}
+body :is(#customers-dialog,#check-screen) ul.recall>li.ok{background:rgba(31,138,91,.08);color:#1F8A5B}
+body :is(#customers-dialog,#check-screen) ul.recall>li.bad{background:rgba(194,65,45,.08);color:#C2412D}
+
+/* Customers before code */
+body.app #launch-dialog form.dialog #launch-cost:empty,body.app #launch-dialog form.dialog #watch-cost:empty{display:none}
+body.app #launch-dialog form.dialog #launch-new .row:has(#launch-start){margin-top:18px!important}
+body.app #launch-dialog form.dialog .launch-bar{height:8px;margin:12px 0 0;border-radius:999px;background:var(--c-line);overflow:hidden}
+body.app #launch-dialog form.dialog .launch-bar>span{display:block;height:100%;border-radius:999px;background:var(--c-accent)}
+body.app #launch-dialog form.dialog #launch-headline{font-size:17px!important;margin-top:24px!important}
+body.app #launch-dialog form.dialog #launch-posts>*{margin:10px 0 0;padding:14px 16px;border:1px solid var(--c-line);border-radius:12px;background:var(--c-panel)}
+body.app #launch-dialog form.dialog>h3:has(+#watch-intro){margin-top:32px!important}
+body.app #launch-dialog form.dialog #watch-intro{margin-top:0!important}
+body.app #launch-dialog form.dialog .watch-entry{margin:12px 0 0;padding:14px 16px;border:1px solid var(--c-line);border-radius:12px;background:var(--c-panel)}
+body.app #launch-dialog form.dialog .watch-entry>p:first-child{margin-top:0}
+body.app #launch-dialog form.dialog .watch-entry .primary{margin-top:12px}
+body.app #launch-dialog form.dialog #watch-status:empty{display:none}
+/* One primary per view: in the watch section, Save and Run now are secondary. */
+body.app #launch-dialog form.dialog #watch-save{background:#fff!important}
+
+/* Security check: the summary is a status line, each finding a row with its severity chip. */
+body.app #security-dialog form.dialog #security-summary{display:flex;align-items:center;gap:10px;margin:4px 0 16px!important;padding:12px 14px;border:1px solid var(--c-line);border-radius:12px;background:var(--c-bg);font-size:14px!important;color:var(--c-ink)!important;max-width:none}
+body.app #security-dialog form.dialog #security-summary::before{content:"";flex:none;width:18px;height:18px;background:var(--c-ink-2);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center/contain no-repeat}
+body.app #security-dialog form.dialog:has(#findings:empty) #security-summary::before{background:#1F8A5B}
+body.app #security-dialog form.dialog #findings>li{display:grid!important;grid-template-columns:auto 1fr;align-items:center;gap:4px 10px}
+body.app #security-dialog form.dialog #findings>li>strong{font-size:14px;font-weight:500;color:var(--c-ink)}
+body.app #security-dialog form.dialog #findings>li>p{grid-column:2;margin:0!important;font-size:13px;line-height:1.5;color:var(--c-ink-2)}
+body.app #security-dialog form.dialog #findings>li>p+p{color:var(--c-ink-3)}
+
+/* Web agent */
+body.app #web-dialog form.dialog #web-price:empty{display:none}
+body.app #web-dialog form.dialog>.row:has(#web-run){align-items:center}
+body.app #web-dialog form.dialog #web-every{order:-1;width:auto!important;min-width:150px;flex:none}
+body.app #web-dialog form.dialog #web-run{order:0}
+body.app #web-dialog form.dialog #web-error{flex:1 1 100%;margin:0!important}
+body.app #web-dialog form.dialog>.row:has(#web-run)+p{margin-top:10px!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app #web-dialog form.dialog .web-live,body.app #web-dialog form.dialog .web-result{margin:20px 0 0;padding:16px;border:1px solid var(--c-line);border-radius:12px;background:var(--c-panel);box-shadow:0 1px 2px rgba(16,24,40,.05)}
+body.app #web-dialog form.dialog .web-live.hidden,body.app #web-dialog form.dialog .web-result.hidden{display:none!important}
+body.app #web-dialog form.dialog .web-live.yours{border-color:var(--c-accent);box-shadow:0 0 0 3px rgba(10,42,82,.12)}
+body.app #web-dialog form.dialog .web-live-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 0 10px!important;font-size:14px}
+body.app #web-dialog form.dialog #web-live-img{display:block;width:100%;border:1px solid var(--c-line);border-radius:10px;background:var(--c-raise);min-height:120px}
+body.app #web-dialog form.dialog .web-live-controls>.ghost{min-width:36px;padding:0 10px!important}
+body.app #web-dialog form.dialog .web-result>h4:first-child{margin-top:0!important}
+body.app #web-dialog form.dialog .web-answer{margin:0!important;font-size:14.5px;line-height:1.6;color:var(--c-ink);white-space:pre-wrap}
+body.app #web-dialog form.dialog #web-runs>li{cursor:pointer}
+body.app #web-dialog form.dialog #web-runs>li:not(.muted):hover{background:var(--c-raise)!important}
+
+/* Find customers */
+body.app #leads-dialog form.dialog #leads-settings-box>summary>b{font-weight:500}
+body.app #leads-dialog form.dialog #leads-missing{font-size:12.5px!important;font-weight:400;color:#B7791F!important}
+body.app #leads-dialog form.dialog #leads-missing:empty{display:none}
+body.app #leads-dialog form.dialog #leads-settings-box>p.small{margin-top:18px!important;color:var(--c-ink-2)!important}
+body.app #leads-dialog form.dialog .leads-signals{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-top:10px!important}
+body.app #leads-dialog form.dialog .leads-signals>label.check{display:grid!important;grid-template-columns:16px 1fr;align-items:start;align-content:start;gap:2px 10px;margin:0!important;padding:10px 12px;border:1px solid var(--c-line);border-radius:10px;background:var(--c-panel);font-size:13px!important;font-weight:500!important;line-height:1.4}
+body.app #leads-dialog form.dialog .leads-signals>label.check>input{grid-row:1/span 2;margin-top:1px}
+body.app #leads-dialog form.dialog .leads-signals>label.check>.muted{grid-column:2;margin:0!important;padding:0!important;font-size:12px;font-weight:400;line-height:1.4}
+body.app #leads-dialog form.dialog .leads-signals>label.check:hover{background:var(--c-raise)}
+body.app #leads-dialog form.dialog .leads-signals>label.check:has(input:checked){border-color:var(--c-accent);background:rgba(10,42,82,.04)}
+body.app #leads-dialog form.dialog #leads-save{background:#fff!important;color:var(--c-ink)!important;border:1px solid var(--c-line-2)!important}
+body.app #leads-dialog form.dialog #leads-save:hover{background:var(--c-raise)!important}
+body.app #leads-dialog form.dialog>.row:has(#leads-search){margin-top:20px!important}
+body.app #leads-dialog form.dialog>.row:has(#leads-search)>label{flex:1 1 200px}
+body.app #leads-dialog form.dialog :is(#leads-status,#leads-sending,#leads-attribution):empty{display:none}
+body.app #leads-dialog form.dialog #leads-attribution{margin-top:12px!important;font-size:12px!important}
+body.app #leads-dialog form.dialog :is(#leads-outbox,#leads-list)>li:not(.muted){display:block!important}
+body.app #leads-dialog form.dialog :is(#leads-outbox,#leads-list)>li>p{margin:0!important}
+body.app #leads-dialog form.dialog :is(#leads-outbox,#leads-list)>li>p+p{margin-top:2px!important}
+body.app #leads-dialog form.dialog :is(#leads-outbox,#leads-list)>li .row{margin-top:8px!important;gap:4px}
+body.app #leads-dialog form.dialog #leads-outbox>li>:is(input,textarea){margin-top:8px!important}
+body.app #leads-dialog form.dialog #leads-outbox .row .primary{height:32px!important;min-height:32px}
+
+/* WhatsApp */
+body.app #wa-dialog form.dialog .wa-status{display:inline-flex;align-items:center;gap:8px;height:28px;margin:0!important;padding:0 12px;border-radius:999px;background:var(--c-raise);font-size:13px;font-weight:500;color:var(--c-ink-2)}
+body.app #wa-dialog form.dialog .wa-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c-ink-3)}
+body.app #wa-dialog form.dialog .wa-status:empty{display:none}
+body.app #wa-dialog form.dialog #wa-connect{margin-top:16px;padding:16px;border:1px solid var(--c-line);border-radius:12px;background:var(--c-bg)}
+body.app #wa-dialog form.dialog #wa-connect>ol{margin-top:0!important}
+body.app #wa-dialog form.dialog #wa-connect>.row{margin-top:16px!important}
+body.app #wa-dialog form.dialog #wa-code-line{margin-top:12px!important}
+body.app #wa-dialog form.dialog #wa-code-line b{font-family:"Geist Mono",ui-monospace,monospace;font-weight:500;padding:1px 6px;border-radius:6px;background:#fff;border:1px solid var(--c-line)}
+body.app #wa-dialog form.dialog>p.muted.small:not(:first-of-type){margin-top:16px!important}
+
+/* Figma: send (code for the plugin) and import (frame link) */
+body.app #figma-dialog form.dialog #figma-status{margin-bottom:0!important}
+body.app #figma-dialog form.dialog .figma-code{margin-top:16px;padding:16px;border:1px solid var(--c-line);border-radius:12px;background:var(--c-bg)}
+body.app #figma-dialog form.dialog .figma-code.hidden{display:none!important}
+body.app #figma-dialog form.dialog .figma-code-value{margin:0!important;padding:12px;border:1px solid var(--c-line);border-radius:10px;background:#fff;text-align:center;font:500 22px/1.2 "Geist Mono",ui-monospace,monospace;letter-spacing:.08em;color:#1B1D22;user-select:all}
+body.app #figma-dialog form.dialog .figma-code>p.muted:last-child{margin-top:12px!important}
+body.app #figma-dialog form.dialog #figma-cost:empty,body.app #figma-dialog form.dialog #figma-token-status:empty{display:none}
+
+/* Build from a reference */
+body.app #ref-dialog form.dialog #ref-cost:empty,body.app #ref-dialog form.dialog #ref-build-cost:empty{display:none}
+body.app #ref-dialog form.dialog #ref-step1>.row.end,body.app #ref-dialog form.dialog #ref-step2>.row.end{flex-direction:row}
+body.app #ref-dialog form.dialog #ref-step2>.row.end #ref-back{margin-right:auto;order:0}
+body.app #ref-dialog form.dialog #ref-summary{margin:0!important;padding:12px 14px;border-radius:12px;background:var(--c-bg);border:1px solid var(--c-line);font-size:13.5px;color:var(--c-ink)}
+body.app #ref-dialog form.dialog .ref-shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:12px}
+body.app #ref-dialog form.dialog .ref-shots:empty{display:none}
+body.app #ref-dialog form.dialog .ref-shots img{display:block;width:100%;border:1px solid var(--c-line);border-radius:10px}
+body.app #ref-dialog form.dialog .ref-list>li{display:block!important;font-size:13.5px}
+body.app #ref-dialog form.dialog .ref-list>li>label.check{margin:0!important}
+body.app #ref-dialog form.dialog .ref-list>li>span.muted{display:block;margin:2px 0 0 26px;font-size:12.5px}
+body.app #ref-dialog form.dialog .ref-theme-head{display:block;font-weight:500;color:var(--c-ink)}
+body.app #ref-dialog form.dialog .ref-quotes blockquote{margin:8px 0 0;padding:2px 0 2px 12px;border-left:2px solid var(--c-line-2);font-size:13px;color:var(--c-ink-2)}
+body.app #ref-dialog form.dialog .ref-angle:empty{display:none}
+body.app #ref-dialog form.dialog .ref-design{margin-top:4px;padding:14px;border:1px solid var(--c-line);border-radius:12px;font-size:13.5px}
+body.app #ref-dialog form.dialog .ref-design:empty{display:none}
+body.app #ref-dialog form.dialog #ref-plan{min-height:220px;font:12.5px/1.55 "Geist Mono",ui-monospace,monospace!important}
+body.app #ref-dialog form.dialog #ref-owner-box{margin-top:16px}
+
+/* ================================================================== */
+/* 3. Website check (/create/check)                                    */
+/* ================================================================== */
+/* These two screens also show to signed-out visitors (no body.app), so they carry the same tokens. */
+#check-screen,#share-screen{--c-bg:#FAFBFC;--c-panel:#FFFFFF;--c-raise:#F4F6F8;--c-ink:#2A2D32;--c-ink-2:#5C6168;--c-ink-3:#737980;--c-line:#EDEFF2;--c-line-2:#D8DBE0;--c-accent:#0A2A52;--c-accent-2:#123A6E;font-family:Geist,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body #check-screen{background:var(--c-bg)}
+body #check-screen .check-page{box-sizing:border-box;max-width:880px;margin:0 auto;padding:56px 24px 72px}
+/* The start form, the running state and the failed state: one centred card each. */
+body #check-screen :is(.sc-form,.check-running,.check-failed){box-sizing:border-box;max-width:560px;margin:0 auto;padding:24px!important;border:1px solid var(--c-line)!important;border-radius:16px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;display:flex;flex-direction:column;align-items:stretch;gap:0;text-align:left}
+body #check-screen :is(.sc-form,.check-running,.check-failed).hidden{display:none!important}
+body #check-screen .sc-form .kicker{align-self:flex-start;display:inline-flex;align-items:center;height:24px;margin:0 0 12px!important;padding:0 10px;border-radius:999px;background:var(--c-raise);font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink-2)!important}
+body #check-screen .sc-form .kicker::before{display:none!important}
+body #check-screen :is(.sc-form,.check-failed,.check-running) :is(h1,h2){margin:0 0 4px!important;font:600 20px/1.3 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:-.01em!important;color:#1B1D22!important}
+body #check-screen .sc-form>h1+p.muted{margin:0 0 20px!important;font-size:13.5px!important;line-height:1.55!important;color:var(--c-ink-3)!important}
+body #check-screen .sc-form>input{box-sizing:border-box;width:100%;height:38px!important;margin:0 0 10px!important;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:#fff!important;color:var(--c-ink)!important;font:400 14px/1.4 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important}
+body #check-screen .sc-form>input::placeholder{color:var(--c-ink-3);opacity:.75}
+body #check-screen .sc-form>input:focus{border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important;outline:0}
+body #check-screen :is(.sc-form,.check-failed,.cr-actions,.cr-cta) .primary{display:inline-flex!important;align-items:center;justify-content:center;height:36px!important;padding:0 14px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font:500 13.5px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;cursor:pointer;white-space:nowrap}
+body #check-screen :is(.sc-form,.check-failed,.cr-actions,.cr-cta) .primary:hover{background:var(--c-accent-2)!important}
+body #check-screen :is(.sc-form,.check-failed,.cr-actions,.cr-cta) .primary:disabled{opacity:.45}
+body #check-screen .sc-form>.primary{margin-top:6px}
+body #check-screen :is(.cr-actions,.cr-cta) .ghost{display:inline-flex!important;align-items:center;justify-content:center;height:36px!important;padding:0 14px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:#fff!important;color:var(--c-ink)!important;font:500 13.5px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important;cursor:pointer;white-space:nowrap}
+body #check-screen :is(.cr-actions,.cr-cta) .ghost:hover{background:var(--c-raise)!important}
+body #check-screen .sc-form>p.muted.small{margin:12px 0 0!important;font-size:12.5px!important;color:var(--c-ink-3)!important;text-align:left}
+body #check-screen .sc-form>.error{margin:8px 0 0!important;font-size:13px;color:#C2412D}
+body #check-screen .sc-form>.error:empty{display:none}
+body #check-screen .check-running{align-items:center;text-align:center;padding:40px 24px!important}
+body #check-screen .check-running .spinner{width:28px;height:28px;margin:0 0 16px;border:2.5px solid var(--c-line);border-top-color:var(--c-accent);border-radius:50%}
+body #check-screen .check-running>p{margin:4px 0 0!important;font-size:13.5px;color:var(--c-ink-3)}
+body #check-screen .check-running>p.small{margin-top:14px!important;font-size:12.5px!important}
+body #check-screen .check-failed>p{margin:0 0 20px!important;font-size:13.5px;color:var(--c-ink-3)}
+body #check-screen .check-failed>.primary{align-self:flex-start}
+/* The report. */
+body #check-screen .check-report{display:flex;flex-direction:column;gap:16px}
+body #check-screen .check-report.hidden{display:none!important}
+body #check-screen .check-report>section,body #check-screen .cr-head{margin:0!important;padding:20px 24px!important;border:1px solid var(--c-line)!important;border-radius:16px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body #check-screen .cr-head{display:grid!important;grid-template-columns:auto 1fr auto;align-items:center;gap:20px}
+body #check-screen .cr-score{position:relative;width:96px;height:96px;display:grid;place-items:center;flex:none}
+body #check-screen .cr-score svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+body #check-screen .cr-score .track{fill:none;stroke:var(--c-line);stroke-width:9}
+body #check-screen .cr-score .bar{fill:none;stroke:var(--c-accent);stroke-width:9;stroke-linecap:round}
+body #check-screen .cr-score.good .bar{stroke:#1F8A5B}
+body #check-screen .cr-score.fair .bar{stroke:#B7791F}
+body #check-screen .cr-score.poor .bar{stroke:#C2412D}
+body #check-screen .cr-score>b{position:relative;font:600 26px/1 Geist,ui-sans-serif,system-ui,sans-serif;color:#1B1D22}
+body #check-screen .cr-score>span{position:absolute;bottom:22px;font-size:11.5px;color:var(--c-ink-3)}
+body #check-screen .cr-title .kicker{display:inline-flex;height:22px;align-items:center;padding:0 9px;border-radius:999px;background:var(--c-raise);font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink-2)!important}
+body #check-screen .cr-title .kicker::before{display:none!important}
+body #check-screen .cr-title h1{margin:8px 0 2px!important;font:600 20px/1.3 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:-.01em!important;color:#1B1D22!important;overflow-wrap:anywhere}
+body #check-screen .cr-title p{margin:2px 0 0!important;font-size:13.5px;color:var(--c-ink-3)}
+body #check-screen .cr-title p:empty{display:none}
+body #check-screen .cr-goal b{color:var(--c-ink);font-weight:500}
+body #check-screen .cr-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+body #check-screen .cr-headline>p:first-child{margin:0!important;font:600 15px/1.45 Geist,ui-sans-serif,system-ui,sans-serif;color:var(--c-ink)}
+body #check-screen .cr-numbers{margin:6px 0 0!important;font-size:13.5px;color:var(--c-ink-2)}
+body #check-screen .cr-shots{display:grid!important;grid-template-columns:3fr 1fr;gap:16px;align-items:start}
+body #check-screen .cr-shots:empty{display:none!important}
+body #check-screen .cr-shot{margin:0}
+body #check-screen .cr-shot img{display:block;width:100%;border:1px solid var(--c-line);border-radius:10px;background:var(--c-raise)}
+body #check-screen .cr-shot figcaption{margin-top:6px;font-size:12px;color:var(--c-ink-3)}
+body #check-screen .cr-block>h2,body #check-screen .cr-cta h2{margin:0 0 12px!important;font:600 15px/1.4 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:-.005em!important;text-transform:none!important;color:var(--c-ink)!important}
+body #check-screen .cr-block :is(ol,ul){list-style:none;margin:0;padding:0;border:1px solid var(--c-line);border-radius:12px;overflow:hidden}
+body #check-screen .cr-block :is(ol,ul)>li{margin:0;padding:12px 14px;border-top:1px solid var(--c-line);font-size:13.5px;line-height:1.55;color:var(--c-ink)}
+body #check-screen .cr-block :is(ol,ul)>li:first-child{border-top:0}
+body #check-screen .cr-block :is(ol,ul)>li.muted{color:var(--c-ink-3);text-align:center}
+body #check-screen .cr-issues>li>b{display:block;font-weight:500}
+body #check-screen .cr-issues>li>p{margin:2px 0 0;color:var(--c-ink-2)}
+body #check-screen .cr-issues blockquote{margin:6px 0 0;padding-left:10px;border-left:2px solid var(--c-line-2);color:var(--c-ink-2);font-size:13px}
+body #check-screen .cr-fixes{counter-reset:fix}
+body #check-screen .cr-fixes>li:not(.muted){counter-increment:fix;position:relative;padding-left:46px!important}
+body #check-screen .cr-fixes>li:not(.muted)::before{content:counter(fix);position:absolute;left:14px;top:12px;width:22px;height:22px;border-radius:999px;background:var(--c-raise);display:grid;place-items:center;font:600 12px/1 Geist,ui-sans-serif,system-ui,sans-serif;color:var(--c-ink-2)}
+body #check-screen .cr-tech>li{display:grid!important;grid-template-columns:20px 1fr;gap:2px 10px;align-items:start}
+body #check-screen .cr-tech>li>svg,body #check-screen .cr-tech>li>.ico{grid-row:1/span 2;width:16px;height:16px;margin-top:3px}
+body #check-screen .cr-tech>li.ok>:first-child{color:#1F8A5B}
+body #check-screen .cr-tech>li.bad>:first-child{color:#C2412D}
+body #check-screen .cr-tech>li>b{font-weight:500}
+body #check-screen .cr-tech>li>span{grid-column:2;font-size:13px;color:var(--c-ink-3)}
+body #check-screen .cr-visits{border:1px solid var(--c-line);border-radius:12px;overflow:hidden}
+body #check-screen .cr-visits:empty{display:none}
+body #check-screen .cr-visit{border-top:1px solid var(--c-line)}
+body #check-screen .cr-visit:first-child{border-top:0}
+body #check-screen .cr-visit>summary{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:12px 14px;list-style:none;cursor:pointer;font-size:13.5px}
+body #check-screen .cr-visit>summary::-webkit-details-marker{display:none}
+body #check-screen .cr-visit>summary:hover{background:var(--c-raise)}
+body #check-screen .cr-outcome{margin-left:auto;display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:500}
+body #check-screen .cr-outcome.ok{background:rgba(31,138,91,.08);color:#1F8A5B}
+body #check-screen .cr-outcome.bad{background:rgba(194,65,45,.08);color:#C2412D}
+body #check-screen .cr-visit>ol{margin:0;padding:4px 14px 14px 34px;font-size:13px;line-height:1.55;color:var(--c-ink-2);border:0;border-radius:0}
+body #check-screen .cr-visit>ol>li{padding:3px 0;border:0}
+body #check-screen .cr-cta{display:flex!important;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;background:var(--c-bg)!important}
+body #check-screen .cr-cta p{margin:0!important;max-width:60ch;font-size:13.5px;line-height:1.55;color:var(--c-ink-3)}
+body #check-screen .cr-cta-actions{display:flex;gap:8px;flex-wrap:wrap}
+body #check-screen .cr-cta-actions .ghost{order:-1}
+
+/* ================================================================== */
+/* 4. Shared app (/create/share/…)                                     */
+/* ================================================================== */
+body #share-screen{background:var(--c-bg)}
+body #share-screen .share-page{box-sizing:border-box;max-width:1240px;margin:0 auto;padding:24px 24px 32px;display:flex;flex-direction:column;gap:16px;min-height:calc(100dvh - 56px)}
+body #share-screen .share-head{display:flex!important;align-items:center;justify-content:space-between;gap:16px;margin:0!important;padding:0!important;background:none!important;border:0!important}
+body #share-screen .share-head .eyebrow{display:inline-flex!important;align-items:center;gap:6px;height:24px;margin:0 0 6px!important;padding:0 10px!important;border:0!important;border-radius:999px;background:var(--c-raise)!important;font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink-2)!important;box-shadow:none!important}
+body #share-screen .share-head .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:#1F8A5B}
+body #share-screen #share-name{margin:0!important;font:600 20px/1.3 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:-.01em!important;color:#1B1D22!important}
+body #share-screen #share-name:empty{display:none}
+body #share-screen #remix{display:inline-flex!important;align-items:center;height:36px!important;padding:0 14px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font:500 13.5px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;cursor:pointer}
+body #share-screen #remix:hover{background:var(--c-accent-2)!important}
+body #share-screen #remix.hidden{display:none!important}
+body #share-screen #share-error{margin:0!important;padding:12px 14px;border:1px solid rgba(194,65,45,.2);border-radius:12px;background:rgba(194,65,45,.06);font-size:13.5px;color:#C2412D}
+body #share-screen #share-error:empty{display:none}
+body #share-screen #share-frame{flex:1;width:100%;min-height:560px;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel);box-shadow:0 1px 2px rgba(16,24,40,.05),0 12px 32px -16px rgba(16,24,40,.18)!important}
+/* When the link is dead there is nothing to frame: an empty state instead of a blank box. */
+body #share-screen .share-page:has(#share-error:not(:empty)) #share-frame{display:none}
+
+/* ================================================================== */
+/* 5. Templates gallery on home                                        */
+/* ================================================================== */
+body.app #home #home-templates{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px;max-width:1080px;margin:8px auto 40px;padding:0 24px;box-sizing:border-box}
+body.app #home #home-templates.hidden{display:none!important}
+body.app #home #home-templates .tpl{--stage:var(--c-raise);--stage-2:var(--c-raise);--glow:transparent;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;text-align:left;transition:box-shadow .18s ease,transform .18s ease,border-color .18s ease}
+body.app #home #home-templates .tpl:hover{transform:translateY(-2px);border-color:var(--c-line-2)!important;box-shadow:0 10px 28px -12px rgba(16,24,40,.28)!important}
+body.app #home #home-templates .tpl:focus-visible{outline:0;box-shadow:0 0 0 3px rgba(10,42,82,.18)!important}
+body.app #home #home-templates .tpl-shot{height:172px;padding:18px 18px 0;background:var(--c-raise)!important;border-bottom:1px solid var(--c-line)}
+body.app #home #home-templates .tpl-window{box-shadow:0 0 0 1px var(--c-line),0 12px 28px -16px rgba(16,24,40,.3)}
+body.app #home #home-templates .tpl-body{gap:4px;padding:14px 16px 16px}
+body.app #home #home-templates .tpl-body .cat{align-self:flex-start;display:inline-flex;align-items:center;height:22px;margin:0 0 6px;padding:0 9px;border-radius:999px;background:var(--c-raise);font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink-2)!important}
+body.app #home #home-templates .tpl-body .cat::first-letter{text-transform:uppercase}
+body.app #home #home-templates .tpl-body .cat::before{display:none!important;content:none!important}
+body.app #home #home-templates .tpl-body strong{font:600 15px/1.35 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:-.005em!important;color:var(--c-ink)!important}
+body.app #home #home-templates .tpl-body .desc{font-size:13px!important;line-height:1.5!important;color:var(--c-ink-3)!important}
+body.app #home #home-templates .tpl-use{margin-top:auto;padding-top:12px;font-size:13px;font-weight:500;color:var(--c-ink-2);opacity:1}
+body.app #home #home-templates .tpl:hover .tpl-use{color:var(--c-accent)}
+body.app #home #home-templates .sponsored{display:flex;flex-direction:column;gap:6px;padding:16px!important;border:1px solid var(--c-line)!important;border-radius:12px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;text-align:left;cursor:pointer}
+body.app #home #home-templates .sponsored:hover{background:var(--c-raise)!important}
+body.app #home #home-templates .sponsored .cat{align-self:flex-start;display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;background:var(--c-raise);font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink-2)!important}
+body.app #home #home-templates .sponsored strong{font-size:15px;font-weight:600;color:var(--c-ink)}
+body.app #home #home-templates .sponsored .desc{font-size:13px;color:var(--c-ink-3)}
+@media (prefers-reduced-motion:reduce){body.app #home #home-templates .tpl{transition:none}body.app #home #home-templates .tpl:hover{transform:none}}
+
+/* ================================================================== */
+/* 6. Phones                                                           */
+/* ================================================================== */
+@media (max-width:640px){
+ body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog),body.app :is(#customers-dialog,#launch-dialog,#web-dialog,#leads-dialog,#ref-dialog).wide{width:100vw!important;max-height:92dvh!important;margin:auto 0 0!important;border-radius:16px 16px 0 0!important;border-bottom:0!important}
+ body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog)>form.dialog{padding:20px 16px 0!important}
+ body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog) form.dialog>.row.end:last-child,body.app #ref-dialog :is(#ref-step1,#ref-step2)>.row.end{margin:20px -16px 0!important;padding:12px 16px calc(12px + env(safe-area-inset-bottom))!important}
+ body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog .row>:is(.primary,.ghost:not(.link-btn)){flex:1 1 auto}
+ body.app :is(#checks-dialog,#customers-dialog,#launch-dialog,#security-dialog,#web-dialog,#leads-dialog,#wa-dialog,#figma-dialog,#ref-dialog) form.dialog>.row.end:last-child>*{flex:0 0 auto}
+ body.app #leads-dialog .leads-signals{grid-template-columns:1fr}
+ body #check-screen .check-page{padding:24px 16px 48px}
+ body #check-screen .cr-head{grid-template-columns:auto 1fr;padding:16px!important}
+ body #check-screen .cr-actions{grid-column:1/-1;justify-content:stretch}
+ body #check-screen .cr-actions>*{flex:1}
+ body #check-screen .check-report>section{padding:16px!important}
+ body #check-screen .cr-shots{grid-template-columns:1fr}
+ body #share-screen .share-page{padding:16px}
+ body #share-screen .share-head{flex-wrap:wrap}
+ body.app #home #home-templates{grid-template-columns:1fr;padding:0 16px;gap:16px}
+}
