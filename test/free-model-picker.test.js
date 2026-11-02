@@ -34,7 +34,7 @@ test("compact selector labels local and explicit free choices clearly",()=>{
 });
 test("FreeLLM pool selection is executed by FreeLLMAPI rather than sent to OpenRouter",()=>{
  const server=fs.readFileSync(path.join(__dirname,"../server.js"),"utf8");
- const freeAt=server.indexOf('if(requestedModel==="freellm/auto")');
+ const freeAt=server.indexOf('if(requestedModel==="freellm/auto"||requestedModel.startsWith("freellm/"))');
  const genericAt=server.indexOf('// A model picked by name in the picker',freeAt);
  assert.ok(freeAt>=0&&genericAt>freeAt);
  const block=server.slice(freeAt,genericAt);
