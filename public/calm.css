@@ -229,3 +229,23 @@ body.app.in-editor #menu-project>.menu-panel>.menu-note.g-test{order:10}
 body.app.in-editor #checks-open{order:11!important}body.app.in-editor #autopilot-run{order:12!important}body.app.in-editor #customers-open{order:13!important}body.app.in-editor #security-open{order:14!important}
 body.app.in-editor #menu-project>.menu-panel>.menu-note.g-launch{order:20}
 body.app.in-editor #launch-open{order:21!important}body.app.in-editor #figma-send{order:22!important}body.app.in-editor #restore{order:23!important}
+
+/* Home, Lovable-style: projects as a grid of large cards (picture on top, name and date below),
+   and the owner's setup checklist lives in Admin, not on the home page. */
+body.app #home #setup-card{display:none!important}
+body.app #admin-dialog #setup-card{display:block!important;margin:0 0 18px}
+body.app #home .projects.cards{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:22px 20px;max-width:1080px;margin:8px auto 40px;padding:0 24px}
+body.app #home .projects.cards>li{position:relative;display:flex!important;flex-direction:column;align-items:stretch;gap:0;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;cursor:pointer}
+body.app #home .projects.cards>li .thumb{width:100%!important;height:auto!important;aspect-ratio:16/10;border-radius:12px!important;border:1px solid var(--c-line)!important;background:var(--c-raise)!important;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.05);transition:box-shadow .18s ease,transform .18s ease;display:grid;place-items:center;font-size:22px;color:var(--c-ink-3)}
+body.app #home .projects.cards>li .thumb .thumb-img{width:100%;height:100%;object-fit:cover;object-position:top}
+body.app #home .projects.cards>li:hover .thumb{box-shadow:0 10px 28px -12px rgba(16,24,40,.28);transform:translateY(-2px)}
+body.app #home .projects.cards>li .open{margin:10px 0 0!important;padding:0!important;border:0!important;background:none!important;text-align:left;font-size:14.5px!important;font-weight:500!important;color:var(--c-ink)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.app #home .projects.cards>li .meta{margin:2px 0 0!important;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app #home .projects.cards>li .badge.live{position:absolute;top:10px;left:10px;padding:2px 8px;border-radius:999px;background:#fff;color:#1F8A5B;font-size:11.5px;font-weight:600;box-shadow:0 1px 3px rgba(16,24,40,.12)}
+body.app #home .projects.cards>li .role-badge{position:absolute;top:10px;right:10px;padding:2px 8px;border-radius:999px;background:#fff;font-size:11.5px;color:var(--c-ink-2);box-shadow:0 1px 3px rgba(16,24,40,.12)}
+body.app #home .projects.cards>li>.link-btn{position:absolute;top:8px;right:8px;opacity:0;padding:3px 9px!important;border-radius:8px!important;background:#fff!important;font-size:12px!important;box-shadow:0 1px 3px rgba(16,24,40,.15);transition:opacity .15s}
+body.app #home .projects.cards>li:hover>.link-btn,body.app #home .projects.cards>li>.link-btn:focus-visible{opacity:1}
+@media (max-width:640px){body.app #home .projects.cards{grid-template-columns:1fr 1fr;gap:16px 12px;padding:0 16px}}
+body.app #home .browser{max-width:1120px!important;width:100%}
+body.app #home .projects.cards{grid-template-columns:repeat(auto-fill,minmax(230px,250px))!important;justify-content:center}
+body.app #home .projects.cards>li .meta,body.app #home .projects.cards>li .open{padding-left:0!important;margin-left:0!important}
