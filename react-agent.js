@@ -121,7 +121,15 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
+// How much of the app the agent reads up front. Models with a 1M-token window (Claude Sonnet, Opus
+// and Fable) read the whole app up to KAIROQ_AGENT_CONTEXT_CHARS (default 800k characters, about
+// 200k tokens), which prompt caching keeps cheap; other models keep the 60k-character view and read
+// the rest with read_files.
+function contextBudget(modelId){
+ const big=/^anthropic\/claude-(sonnet|opus|fable)/i.test(String(modelId||''));
+ return big?intEnv('KAIROQ_AGENT_CONTEXT_CHARS',800000,60000,3200000):60000;
+}
+async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
  const startedAt=new Date().toISOString();
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
@@ -160,7 +168,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=researchOnly?null:await require('./decision-router').suggest(text);
  const researchRule=researchOnly?'\n\nRESEARCH-ONLY TASK: Do not write, edit, build, test, query the app database, run automations, or generate assets. Use web_search/web_open/web_act/fetch_url as needed, answer from observed evidence, then finish. If a browser action fails, report that failure; never replace it with a claim that Kairoq cannot browse.':'';
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:contextChars)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
  require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
  executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision));
@@ -657,4 +665,4 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token);await wb.close().catch(()=>{})}
 }
-module.exports={run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
+module.exports={contextBudget,run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
