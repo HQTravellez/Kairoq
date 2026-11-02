@@ -512,6 +512,17 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
 
+ // A first build is written by parallel writers (parallel-writers.js): one plan, one writer per
+ // section at the same time. The agent then builds, tests and fixes as usual.
+ if(!researchOnly&&!checkpoint&&require('./parallel-writers').enabled()&&require('./react-design').isUntouchedStarter(work)){
+  report({status:'writing',step:0});
+  const pw=await require('./parallel-writers').write({system:messages[0].content,intro:introMsg.content,callModel,tier,signal,onNote:t=>tl.add({t:'note',icon:'code',text:t})});
+  if(pw){
+   const r=await tool({tool:'write_files',files:pw.files});
+   messages.push({role:'assistant',content:JSON.stringify({thought:'Kairoq wrote the first version in parallel from one plan.',actions:[{tool:'write_files',files:Object.fromEntries(Object.keys(pw.files).map(n=>[n,'(written)']))}]})},
+    {role:'user',content:r.text+(pw.failed.length?'\nThese planned sections were not written yet; write them first: '+pw.failed.join(', '):'')+'\nNext: build_and_test with steps that try the main interactions, fix what breaks, then finish.'});
+  }
+ }
  try{
  for(let step=Math.max(1,(checkpoint?.step||0)+1);step<=limit;step++){
   activeStep=step;
