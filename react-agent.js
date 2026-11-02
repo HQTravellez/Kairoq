@@ -169,9 +169,14 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
  const decision=researchOnly?null:await require('./decision-router').suggest(text);
  const researchRule=researchOnly?'\n\nRESEARCH-ONLY TASK: Do not write, edit, build, test, query the app database, run automations, or generate assets. Use web_search/web_open/web_act/fetch_url as needed, answer from observed evidence, then finish. If a browser action fails, report that failure; never replace it with a claim that Kairoq cannot browse.':'';
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:contextChars)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
+ // The matching specialist skills are opened before the first step and put in the request, so the
+ // agent writes with them from the start: no step spent opening them and no first draft thrown away.
+ const preSkills=researchOnly?[]:skillRows(text).slice(0,2),skillsOpened=new Set();let skillText='';
+ for(const r of preSkills){try{const body=await require('./builder-skills').openAsync(r.name,{fetchImpl:fetch});if(body&&!/^No skill called /.test(body)){skillsOpened.add(r.name);skillText+='\n\n'+clip(body,7000);tl.add({t:'note',icon:'book',text:'Opened the skill '+r.name})}}catch(e){if(e.name==='AbortError'||signal?.aborted)throw e}}
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
  require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
- executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision));
+ executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision))+(skillText?'\n\nSPECIALIST SKILLS ALREADY OPENED FOR THIS REQUEST (follow them; open others from the list only if needed):'+skillText:'');
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})+skillsNote(text)+(researchOnly?'':require('./builder-playbooks').note(text))},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
@@ -246,7 +251,6 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   report({status:'testing',preview:{url:built.url,version:n,draft:true}});
   return testBuild(a,'build_and_test: built OK.');
  }
- const skillsListed=researchOnly?[]:skillRows(text).map(r=>r.name),skillsOpened=new Set();let skillsNudged=false;
  async function tool(a){
   const t=a.tool;
   if(researchOnly&&['write_files','edit_files','build_and_test','test_ui','run_tests','query_db','run_automation','generate_images'].includes(t))
@@ -349,12 +353,6 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
    const tg=require('./task-graph');
    try{tg.define(id,{instruction:text,tasks:tg.fromPlan(text),auto:true});tl.add({t:'note',icon:'code',text:'Set up the task list from the plan'})}catch{}
   }
-  // Listed skills are read before the first file is written: the agent once wrote a GSAP page
-  // with framer-motion without opening the GSAP skill. One reminder, then it carries on.
-  if((t==='write_files'||t==='edit_files')&&skillsListed.length&&!skillsOpened.size&&!skillsNudged){
-   skillsNudged=true;
-   return{text:t+': nothing written yet. This request has specialist skills: '+skillsListed.join(', ')+'. Open the ones that cover this code with open_skill first, follow them, then write the files.'};
-  }
   if(t==='write_files'){
    const eng=require('./engineering-intelligence'),tg=require('./task-graph');
    if(eng.substantial(text)&&!tg.get(id,text))autoGraph();
@@ -379,6 +377,8 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
+  // A build of the untouched starter page is not the app: say so instead of testing and passing it.
+  if(t==='build_and_test'&&!researchOnly&&require('./react-design').isUntouchedStarter(work))return{text:'build_and_test: nothing to build yet. src/App.jsx is still Kairoq\'s starter page ("Describe your app in the chat"). Write the app with write_files first, then build_and_test.'};
   if(t==='build_and_test')return buildAndTest(a);
   if(t==='test_ui')return testBuild(a,'test_ui on version '+(built?built.n:'?')+':');
   if(t==='run_tests'){
