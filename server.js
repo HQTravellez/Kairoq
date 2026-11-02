@@ -4472,19 +4472,6 @@ async function handleChat(req, res) {
         return res.end();
       }
     }
-    // FreeLLMAPI is a real selectable free route, not an OpenRouter model ID.
-    // Keep the UI label and the executor honest: selecting the free pool always runs that pool.
-    if(requestedModel==="freellm/auto"||requestedModel.startsWith("freellm/")){
-      const pool=require("./freellmapi"),pinned=requestedModel==="freellm/auto"?"":requestedModel.slice("freellm/".length);
-      if(!pool.enabled())throw Object.assign(new Error("Kairoq Free Pool is not connected right now. Pick another FREE model or Auto (free)."),{status:503});
-      writeSSE(res,"status",{message:"FREE · Kairoq Free Pool"+(pinned?" · "+pinned:"")});
-      const reply=await pool.complete(finalMessages,{model:pinned,temperature,maxTokens:12000,reasoningEffort:effort});
-      writeSSE(res,"token",{text:reply.text});
-      writeSSE(res,"meta",{model:reply.model,usage:{...(reply.usage||{}),cost:0}});
-      writeSSE(res,"done",{ok:true,provider:"freellmapi",model:reply.model,zeroCost:true});
-      return res.end();
-    }
-
     // Auto: one order for every "Auto" chat (Kairoq Agent, when connected, already ran above):
     // free pool → Ollama Cloud / local model → free-tier keys → Claude on the Anthropic key
     // (own monthly cap) → OpenCode Zen → OpenRouter free last (skipped for an hour after "no credits").
@@ -4522,6 +4509,19 @@ async function handleChat(req, res) {
         onFail:(s,e)=>audit("chat.auto_step_failed",{step:s.id,error:String(e.message||e).slice(0,300)})
       });
       writeSSE(res,"done",{ok:true,provider:done.provider,model:done.model,zeroCost:Boolean(done.zeroCost)});
+      return res.end();
+    }
+
+    // FreeLLMAPI is a real selectable free route, not an OpenRouter model ID.
+    // Keep the UI label and the executor honest: selecting the free pool always runs that pool.
+    if(requestedModel==="freellm/auto"||requestedModel.startsWith("freellm/")){
+      const pool=require("./freellmapi"),pinned=requestedModel==="freellm/auto"?"":requestedModel.slice("freellm/".length);
+      if(!pool.enabled())throw Object.assign(new Error("Kairoq Free Pool is not connected right now. Pick another FREE model or Auto (free)."),{status:503});
+      writeSSE(res,"status",{message:"FREE · Kairoq Free Pool"+(pinned?" · "+pinned:"")});
+      const reply=await pool.complete(finalMessages,{model:pinned,temperature,maxTokens:12000,reasoningEffort:effort});
+      writeSSE(res,"token",{text:reply.text});
+      writeSSE(res,"meta",{model:reply.model,usage:{...(reply.usage||{}),cost:0}});
+      writeSSE(res,"done",{ok:true,provider:"freellmapi",model:reply.model,zeroCost:true});
       return res.end();
     }
 
