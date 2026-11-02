@@ -43,7 +43,9 @@ body.app.in-editor #editor #publish-open .live-dot{background:#5EE0A0!important;
 body.app.in-editor #chat-form.composer{padding:12px 10px 10px 14px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;border-radius:20px!important;box-shadow:0 2px 16px rgba(0,0,0,.06)!important}
 body.app.in-editor #chat-form.composer:focus-within{border-color:#B9CCE6!important;box-shadow:0 0 0 4px rgba(198,218,243,.45),0 2px 16px rgba(0,0,0,.06)!important}
 body.app.in-editor #chat-form #chat-input{min-height:44px}
-body.app.in-editor #chat-form #menu-plus>summary{width:30px!important;height:30px!important;padding:0!important;justify-content:center;border-radius:999px!important;border:1px solid var(--c-line-2)!important;font-size:18px!important;line-height:1;color:var(--c-ink-2)!important}
+body.app.in-editor #chat-form #menu-plus>summary{width:30px!important;height:30px!important;padding:0!important;justify-content:center;border-radius:8px!important;border:0!important;font-size:22px!important;font-weight:300;line-height:1;color:var(--c-ink-2)!important}
+body.app.in-editor #chat-form #menu-mode>summary,body.app.in-editor #chat-form #menu-tier>summary{color:var(--c-ink)!important;font-weight:500!important;font-size:13px!important}
+body.app.in-editor #chat-form #menu-mode>summary:hover,body.app.in-editor #chat-form #menu-tier>summary:hover{background:var(--c-hover)!important}
 body.app.in-editor #chat-form #menu-plus>summary:hover{color:var(--c-ink)!important;background:var(--c-hover)!important}
 body.app.in-editor #chat-form #send{width:32px!important;height:32px!important;background:var(--c-accent)!important;color:#EAF2FB!important;box-shadow:var(--c-glow)!important}
 body.app.in-editor #chat-form #send.is-empty,body.app.in-editor #chat-form #send:disabled{background:#EDEFF2!important;color:#A6ABB2!important;box-shadow:none!important}
@@ -131,10 +133,23 @@ body.app.in-editor #menu-plus .menu-note{margin:10px 10px 2px!important;font-siz
 body.app.in-editor #menu-plus .menu-note:first-child{margin-top:4px!important}
 body.app.in-editor #menu-plus .menu-note+button,body.app.in-editor #menu-plus .menu-note+a{margin-top:0}
 body.app.in-editor #menu-plus .menu-panel>.menu-note:not(:first-child){border-top:1px solid var(--c-line);padding-top:10px}
-/* Model list. */
-body.app.in-editor #menu-tier>.menu-panel{width:300px;max-height:min(440px,calc(100vh - 160px));overflow:auto}
-body.app.in-editor #chat-form .model-search{width:calc(100% - 8px);margin:4px 4px 6px;height:32px;padding:0 10px;border:1px solid var(--c-line-2);border-radius:8px;font-size:13px;background:var(--c-raise)}
-body.app.in-editor #chat-form .model-list>button{padding-right:30px!important}
+/* Model list: search on top, the maker's mark on each row. */
+body.app.in-editor #menu-tier>.menu-panel{width:320px;max-height:min(520px,calc(100vh - 160px));overflow:auto;display:flex;flex-direction:column}
+body.app.in-editor #chat-form .model-search{flex:none;width:calc(100% - 8px);margin:4px 4px 6px;height:34px;padding:0 10px;border:1px solid var(--c-line-2);border-radius:9px;font-size:13px;background:#fff;position:sticky;top:0;z-index:1}
+body.app.in-editor #chat-form .model-search:focus{outline:none;border-color:#B9CCE6;box-shadow:0 0 0 3px rgba(198,218,243,.45)}
+body.app.in-editor #chat-form .model-list>button{flex-direction:row!important;align-items:center!important;gap:10px;padding:7px 30px 7px 8px!important}
+body.app.in-editor #chat-form .model-list .m-body{display:flex;flex-direction:column;gap:1px;min-width:0}
+body.app.in-editor #chat-form .model-list .m-body>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.app.in-editor #chat-form .model-list .model-section{margin:8px 10px 4px!important;font-weight:500}
+body.app.in-editor #chat-form .model-list .model-section:not(:first-child){border-top:1px solid var(--c-line);padding-top:10px}
+body.app .m-mark{position:relative;flex:none;width:26px;height:26px;border-radius:8px;background:var(--c-raise);border:1px solid var(--c-line);display:inline-grid;place-items:center;overflow:hidden}
+body.app .m-mark.small{width:18px;height:18px;border-radius:5px;margin-right:6px}
+body.app .m-mark .m-letter{font:600 12px/1 Geist,ui-sans-serif,sans-serif;color:var(--c-ink-2)}
+body.app .m-mark.small .m-letter{font-size:10px}
+body.app .m-mark img{position:absolute;inset:0;margin:auto;width:16px;height:16px;background:var(--c-raise)}
+body.app .m-mark.small img{width:12px;height:12px}
+body.app.in-editor #menu-tier>summary>.ico{display:none}
+body.app.in-editor #menu-tier>summary #tier-label{display:inline-flex;align-items:center}
 body.app.in-editor #chat-form .menu.pick .menu-panel button[aria-pressed=true]::after{content:"";position:absolute;right:14px;top:50%;width:5px;height:10px;margin-top:-7px;border:0;border-right:2px solid var(--c-accent);border-bottom:2px solid var(--c-accent);border-left:0;transform:rotate(45deg)}
 body.app.in-editor #chat-form .model-tag{font-style:normal;font-size:10.5px;font-weight:500;padding:1px 6px;border-radius:999px;background:#E7F0FB;color:var(--c-accent)}
 body.app.in-editor #chat-form .model-tag.free{background:#E7F6EC;color:#15803D}
@@ -162,3 +177,4 @@ body.app.in-editor #editor .messages .writeup.tested .vmark{color:#15803D!import
 body.app.in-editor #editor .messages .writeup.todo .vmark{color:#B45309!important}
 body.app.in-editor #editor .messages .agent-finished{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--c-line);font-size:12.5px;color:var(--c-ink-3)}
 body.app.in-editor #editor .messages .agent-finished::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#22A06B;margin-right:7px;vertical-align:1px}
+body.app.in-editor #chat-form .model-list>[hidden]{display:none!important}
