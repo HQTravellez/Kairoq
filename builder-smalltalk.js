@@ -80,6 +80,8 @@ function reply(kind,meta){
   if(pending&&pending.options.length)return(kind==='thanks'?"You're welcome.":'Hi!')+' Your choice is still open: '+pending.options.join(' or ')+'.';
   const line=stateLine(name,status(meta));
   if(line)return(kind==='thanks'?"You're welcome! ":'Hi! ')+line;
+  // A chat opened from the home page ("New chat") has no app yet: greet like a person, not a form.
+  if(/^new chat$/i.test(String(meta&&meta.name||'')))return kind==='thanks'?"You're welcome. What's next?":"Hi! What would you like to build, or talk through first? Describe an app, paste a website, or ask me to research something.";
   return kind==='thanks'?"You're welcome. Tell me what you'd like "+name+' to do next.':'Hi! Tell me what '+name+" should do: who it's for, the pages you need, and what people can do on it. I'll ask a couple of questions, then build it.";
  }
  const fresh=!meta||!(meta.current_version>1);
