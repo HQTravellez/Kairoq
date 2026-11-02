@@ -145,9 +145,9 @@ test('payments use the owner Stripe key, check the return URL and record verifie
 test('scheduled jobs delete old records and email the owner a summary when due',async()=>{
  const id=await project({'src/App.jsx':APP,'src/backend.json':JSON.stringify({collections:{logs:{access:'public'},bookings:{access:'public'}},schedules:[{name:'cleanup',every:'day',action:'delete_older_than',collection:'logs',days:7},{name:'digest',every:'day',action:'email_owner_summary',collection:'bookings'}]})});
  const db=backend.database(id),old=new Date(Date.now()-10*86400000).toISOString(),now=new Date().toISOString();
- db.prepare('INSERT INTO records VALUES(?,?,?,?,?,?)').run('a','logs',null,'{}',old,old);
- db.prepare('INSERT INTO records VALUES(?,?,?,?,?,?)').run('b','logs',null,'{}',now,now);
- db.prepare('INSERT INTO records VALUES(?,?,?,?,?,?)').run('c','bookings',null,JSON.stringify({name:'Ana',guests:2}),now,now);
+ db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('a','logs',null,'{}',old,old);
+ db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('b','logs',null,'{}',now,now);
+ db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('c','bookings',null,JSON.stringify({name:'Ana',guests:2}),now,now);
  const mails=[],send=async(to,subject,text)=>mails.push({to,subject,text});
  const meta=builder.loadMeta(id),cfg=backend.parseConfig(builder.loadFiles(id,meta.current_version));
  const first=await extras.runSchedules(id,cfg,db,meta,{send});

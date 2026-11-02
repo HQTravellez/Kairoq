@@ -15,6 +15,8 @@ const crypto=require("crypto");
 
 const MAX_FREE=100000,MAX_COST=1000,MAX_PACK=1000000,HISTORY=20;
 function fail(status,message){return Object.assign(Error(message),{status})}
+// "credits_500" → "Credits 500" for the history customers read.
+function label(product){const t=String(product||"").replace(/_/g," ");return t.charAt(0).toUpperCase()+t.slice(1)}
 function whole(v,min,max){return Number.isInteger(v)&&v>=min&&v<=max}
 
 function normalize(raw){
@@ -85,7 +87,7 @@ function mine(db,cfg,user){
 function fromCheckout(db,cfg,session){
  const p=cfg.payments?.products?.[session.metadata?.product];
  if(!cfg.credits||!p?.credits||!session.metadata?.user_id)return false;
- return add(db,session.metadata.user_id,p.credits,"stripe:"+session.id,(session.metadata.product)+" purchase");
+ return add(db,session.metadata.user_id,p.credits,"stripe:"+session.id,label(session.metadata.product)+" purchase");
 }
 // Stripe: each renewal invoice of a subscription adds its credits again (ref = the invoice).
 // The first invoice is skipped: its checkout already added them.
@@ -96,7 +98,7 @@ function fromInvoice(db,cfg,invoice){
  const row=db.prepare("SELECT user_id,product FROM payments WHERE subscription_id=? AND status='active'").get(String(sub));
  const p=row&&cfg.payments?.products?.[row.product];
  if(!p?.credits)return false;
- return add(db,row.user_id,p.credits,"stripe:"+invoice.id,row.product+" renewal");
+ return add(db,row.user_id,p.credits,"stripe:"+invoice.id,label(row.product)+" renewal");
 }
 
 module.exports={normalize,productCredits,check,migrate,balance,grant,spend,refund,charged,mine,fromCheckout,fromInvoice};

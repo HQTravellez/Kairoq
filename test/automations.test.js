@@ -97,7 +97,7 @@ test('scheduled automations run the function when due, log the run, email the ow
  const cookie=await signup('auto@example.com');
  const id=await appWith(cookie,{'src/backend.json':JSON.stringify(CONFIG),'functions/remind.js':REMIND,'functions/welcome.js':WELCOME});
  const db=backend.database(id);
- db.prepare('INSERT INTO records VALUES(?,?,?,?,?,?)').run('b1','bookings',null,JSON.stringify({name:'Ana'}),'2026-10-01T00:00:00Z','2026-10-01T00:00:00Z');
+ db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('b1','bookings',null,JSON.stringify({name:'Ana'}),'2026-10-01T00:00:00Z','2026-10-01T00:00:00Z');
  const mails=[],send=async(to,subject,text)=>mails.push({to,subject,text});
  // 08:00: nothing due except the hourly one, which has never run.
  let r=await automations.tick({now:at('20','08:00'),send});

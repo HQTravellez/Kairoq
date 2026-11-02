@@ -7,7 +7,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {DatabaseSync}=require('node:sqlite');
 const builder=require('./react-builder');
 
-const ACCESS=['private','shared','public-read','public','submit-only','managed'];
+const ACCESS=['private','shared','public-read','public','submit-only','managed','team'];
 const MAX_RECORD_BYTES=20000,MAX_RECORDS=10000,MAX_USERS=10000,LIST_LIMIT=200,SESSION_DAYS=30;
 const dbs=new Map();
 
@@ -73,6 +73,7 @@ function openFile(file){
   CREATE TABLE IF NOT EXISTS app_tokens(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL);`);
  try{db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT')}catch{}
  require('./react-backend-extras').migrate(db);
+ require('./app-teams').migrate(db);
  if(schemaName&&schemaName.startsWith('app_')){require('./app-assistant').migrate(db);pg.copyFromSqlite(file,db,{key:'app-data'})}
  else if(ext&&owner.main)require('./app-assistant').migrate(db);
  dbs.set(file,db);
@@ -91,7 +92,7 @@ async function hashPassword(p,salt=crypto.randomBytes(16).toString('hex')){retur
 async function checkPassword(p,stored){const [,salt,hex]=String(stored).split('$');if(!salt||!hex)return false;const a=Buffer.from(hex,'hex'),b=await scrypt(String(p),salt,32);return a.length===b.length&&crypto.timingSafeEqual(a,b)}
 function fail(status,message){return Object.assign(Error(message),{status})}
 function publicUser(u){return u&&{id:u.id,email:u.email,name:u.name||null,created_at:u.created_at}}
-function record(r){return{id:r.id,...JSON.parse(r.data),_owner:r.owner_id,_created_at:r.created_at,_updated_at:r.updated_at}}
+function record(r){return{id:r.id,...JSON.parse(r.data),_owner:r.owner_id,...(r.team_id?{_team:r.team_id}:{}),_created_at:r.created_at,_updated_at:r.updated_at}}
 
 // ---------- auth ----------
 async function signUp(db,{email,password,name}){
@@ -163,7 +164,7 @@ function managerEmails(meta){
  return owner?[owner.toLowerCase()]:[];
 }
 function isManager(meta,user){return Boolean(user&&user.email&&managerEmails(meta).includes(String(user.email).toLowerCase()))}
-function visibleWhere(access,user){return access==='private'?{sql:' AND owner_id=?',args:[user.id]}:{sql:'',args:[]}}
+function visibleWhere(access,user,team){return access==='team'?{sql:' AND team_id=?',args:[team.team]}:access==='private'?{sql:' AND owner_id=?',args:[user.id]}:{sql:'',args:[]}}
 function cleanData(data){
  if(!data||typeof data!=='object'||Array.isArray(data))throw fail(400,'Record data must be an object');
  const out={};for(const [k,v] of Object.entries(data))if(!k.startsWith('_')&&k!=='id')out[k]=v;
@@ -171,10 +172,10 @@ function cleanData(data){
  if(Buffer.byteLength(text)>MAX_RECORD_BYTES)throw fail(413,'Record is larger than 20 KB');
  return text;
 }
-function list(db,access,collection,user,query){
+function list(db,access,collection,user,query,team=null){
  if(access==='submit-only')throw fail(403,'Entries in this collection are private to the app owner');
  if(!canRead(access,user))throw fail(401,'Sign in to view these records');
- const v=visibleWhere(access,user);
+ const v=visibleWhere(access,user,team);
  if(query.mine==='true'){if(!user)throw fail(401,'Sign in first');v.sql+=' AND owner_id=?';v.args.push(user.id)}
  const limit=Math.max(1,Math.min(LIST_LIMIT,Number(query.limit)||100));
  const order=query.order==='asc'?'ASC':'DESC';
@@ -189,26 +190,29 @@ function list(db,access,collection,user,query){
 function publicFields(db,collection,fields){
  return db.prepare('SELECT data FROM records WHERE collection=? ORDER BY created_at DESC LIMIT ?').all(collection,MAX_RECORDS).map(r=>{let d={};try{d=JSON.parse(r.data)}catch{}const o={};for(const f of fields)if(d[f]!==undefined&&(typeof d[f]!=='object'||d[f]===null))o[f]=d[f];return o}).filter(o=>Object.keys(o).length);
 }
-function getOne(db,access,collection,user,id){
+function getOne(db,access,collection,user,id,team=null){
  if(access==='submit-only')throw fail(403,'Entries in this collection are private to the app owner');
  if(!canRead(access,user))throw fail(401,'Sign in to view this record');
  const r=db.prepare('SELECT * FROM records WHERE id=? AND collection=?').get(id,collection);
- if(!r||(access==='private'&&r.owner_id!==user.id))throw fail(404,'Record not found');
+ if(!r||(access==='private'&&r.owner_id!==user.id)||(access==='team'&&r.team_id!==team.team))throw fail(404,'Record not found');
  return record(r);
 }
-function create(db,access,collection,user,data,manager=false){
+function create(db,access,collection,user,data,manager=false,team=null){
  if(!canCreate(access,user,manager))throw fail(access==='managed'?403:401,access==='managed'?'Only the app\'s managers can add these':'Sign in to add records');
+ if(access==='team')require('./app-teams').needWrite(team);
  if(db.prepare('SELECT COUNT(*) n FROM records WHERE collection=?').get(collection).n>=MAX_RECORDS)throw fail(403,'This collection is full');
  const id=crypto.randomUUID(),at=new Date().toISOString();
- db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id,collection,user?user.id:null,cleanData(data),at,at);
+ db.prepare('INSERT INTO records(id,collection,owner_id,data,created_at,updated_at,team_id) VALUES(?,?,?,?,?,?,?)').run(id,collection,user?user.id:null,cleanData(data),at,at,access==='team'?team.team:null);
  const created=record(db.prepare('SELECT * FROM records WHERE id=?').get(id));
  publish(db,collection,'created',created,user?user.id:null);
  return created;
 }
-function ownRecord(db,collection,user,id,{access,manager=false}={}){
+function ownRecord(db,collection,user,id,{access,manager=false,team=null}={}){
  if(!user)throw fail(401,'Sign in first');
  const r=db.prepare('SELECT * FROM records WHERE id=? AND collection=?').get(id,collection);
  if(!r)throw fail(404,'Record not found');
+ // Team records: anyone in the team who may write can change them, not only their author.
+ if(access==='team'){if(r.team_id!==team.team)throw fail(404,'Record not found');require('./app-teams').needWrite(team);return r}
  if(access==='managed'){if(!manager)throw fail(403,'Only the app\'s managers can change these');return r}
  if(r.owner_id!==user.id)throw fail(403,'You can only change your own records');
  return r;
@@ -221,7 +225,7 @@ function update(db,collection,user,id,data,opts={}){
  publish(db,collection,'updated',updated,r.owner_id);
  return updated;
 }
-function remove(db,collection,user,id,opts={}){const r=ownRecord(db,collection,user,id,opts);db.prepare('DELETE FROM records WHERE id=?').run(id);publish(db,collection,'deleted',{id},r.owner_id);return{deleted:id}}
+function remove(db,collection,user,id,opts={}){const r=ownRecord(db,collection,user,id,opts);db.prepare('DELETE FROM records WHERE id=?').run(id);publish(db,collection,'deleted',{id,...(r.team_id?{_team:r.team_id}:{})},r.owner_id);return{deleted:id}}
 
 // ---------- HTTP: /api/apps/<id>/... ----------
 const hits=new Map();
@@ -231,7 +235,7 @@ function limited(req,id){
  const list=(hits.get(key)||[]).filter(t=>now-t<60000);list.push(now);hits.set(key,list);
  if(list.length>240)throw fail(429,'Too many requests. Slow down and try again.');
 }
-const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Authorization, Content-Type, X-Kairoq-Version, X-Kairoq-Preview','Access-Control-Allow-Methods':'GET, POST, PUT, PATCH, DELETE, OPTIONS','Access-Control-Max-Age':'600'};
+const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Authorization, Content-Type, X-Kairoq-Version, X-Kairoq-Preview, X-Kairoq-Team','Access-Control-Allow-Methods':'GET, POST, PUT, PATCH, DELETE, OPTIONS','Access-Control-Max-Age':'600'};
 const aiHits=new Map();
 function limitedAi(req,id){
  if(aiHits.size>20000)aiHits.clear();
@@ -348,7 +352,8 @@ function functionDb(db,cfg,op,a,user){
 // Subscribers receive created/updated/deleted events for one collection over Server-Sent
 // Events, filtered by the collection's read access. Single-server, in-memory fan-out.
 const channels=new Map(),tickets=new Map();
-function visibleTo(sub,ownerId){
+function visibleTo(sub,ownerId,item){
+ if(sub.access==='team')return Boolean(sub.team)&&item&&item._team===sub.team;
  if(sub.access==='submit-only')return false;
  if(sub.access==='private')return Boolean(sub.userId)&&sub.userId===ownerId;
  if(sub.access==='shared')return Boolean(sub.userId);
@@ -361,14 +366,14 @@ function publish(db,collection,type,item,ownerId){
  try{require('./react-automations').onRecord(db,collection,type,item)}catch{}
  const subs=channels.get(projectId+':'+collection);if(!subs)return;
  const line='event: '+type+'\ndata: '+JSON.stringify({type,item})+'\n\n';
- for(const sub of subs)if(visibleTo(sub,ownerId))try{sub.res.write(line)}catch{}
+ for(const sub of subs)if(visibleTo(sub,ownerId,item))try{sub.res.write(line)}catch{}
 }
-function issueTicket(projectId,collection,access,user){
+function issueTicket(projectId,collection,access,user,team=null){
  if(!canRead(access,user)&&access!=='submit-only')throw fail(401,'Sign in to follow these records');
  if(access==='submit-only')throw fail(403,'Entries in this collection are private to the app owner');
  if(tickets.size>20000)tickets.clear();
  const t=crypto.randomBytes(18).toString('base64url');
- tickets.set(t,{projectId,collection,access,userId:user?user.id:null,expires:Date.now()+60000});
+ tickets.set(t,{projectId,collection,access,userId:user?user.id:null,team:team?team.team:null,expires:Date.now()+60000});
  return t;
 }
 function subscribe(req,res,projectId,collection,ticket){
@@ -379,7 +384,7 @@ function subscribe(req,res,projectId,collection,ticket){
  if(total>=Number(process.env.KAIROQ_REALTIME_MAX_PER_APP||500))throw fail(503,'Too many live connections for this app');
  res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no',...CORS});
  res.write(': connected\n\n');
- const sub={res,access:entry.access,userId:entry.userId};
+ const sub={res,access:entry.access,userId:entry.userId,team:entry.team};
  subs.add(sub);channels.set(key,subs);
  const ping=setInterval(()=>{try{res.write(': ping\n\n')}catch{}},25000);
  req.on('close',()=>{clearInterval(ping);subs.delete(sub);if(!subs.size)channels.delete(key)});
@@ -400,11 +405,13 @@ async function handle(req,res,{onlyProject}={}){
   const db=sb?openFile(path.join(sb.dir,'data.sqlite')):database(id),user=currentUser(db,req);
   db.__projectId=sb?id+'~test':id;if(sb){db.__filesDir=path.join(sb.dir,'files');db.__sandbox=true;db.__sandboxToken=req.headers['x-kairoq-sandbox']}
   const version=requestVersion(meta,req);
-  if(route==='/auth/signup'&&req.method==='POST'){const b=await readJson(req),out=await signUp(db,b);if(b.ref)try{require('./app-referrals').claim(db,out.user.id,b.ref)}catch{}return send(res,201,out),true}
+  // Signed-in users learn at once whether they manage the app (to show its admin page).
+  const asManager=out=>out&&out.user?{...out,user:{...out.user,manager:isManager(meta,out.user)}}:out;
+  if(route==='/auth/signup'&&req.method==='POST'){const b=await readJson(req),out=await signUp(db,b);if(b.ref)try{require('./app-referrals').claim(db,out.user.id,b.ref)}catch{}return send(res,201,asManager(out)),true}
   // Invite a friend (app-referrals.js): the user's own code and who joined through it.
   if(route==='/referrals/me'&&req.method==='GET'){if(!user)throw fail(401,'Sign in to see your invite link');return send(res,200,require('./app-referrals').mine(db,user.id)),true}
   if(route==='/referrals/claim'&&req.method==='POST'){if(!user)throw fail(401,'Sign in first');return send(res,200,{claimed:require('./app-referrals').claim(db,user.id,(await readJson(req,1000)).code)}),true}
-  if(route==='/auth/signin'&&req.method==='POST')return send(res,200,await signIn(db,await readJson(req))),true;
+  if(route==='/auth/signin'&&req.method==='POST')return send(res,200,asManager(await signIn(db,await readJson(req)))),true;
   if(route==='/auth/signout'&&req.method==='POST'){const t=/^Bearer (.+)$/.exec(String(req.headers.authorization||''));if(t)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(t[1]));return send(res,200,{ok:true}),true}
   if(route==='/auth/user'&&req.method==='GET')return send(res,200,{user:user?{...publicUser(user),manager:isManager(meta,user)}:null}),true;
   if(route==='/auth/google/start'&&req.method==='GET'){
@@ -412,7 +419,7 @@ async function handle(req,res,{onlyProject}={}){
    const url=require('./google-oauth').startUrl({kind:'app',appId:id,returnUrl:back.toString()},'http://'+String(req.headers.host||'localhost'));
    res.writeHead(302,{Location:url,'Cache-Control':'no-store'});res.end();return true;
   }
-  if(route==='/auth/google/exchange'&&req.method==='POST')return send(res,200,require('./google-oauth').redeemAppCode(id,(await readJson(req,2000)).code)),true;
+  if(route==='/auth/google/exchange'&&req.method==='POST')return send(res,200,asManager(require('./google-oauth').redeemAppCode(id,(await readJson(req,2000)).code))),true;
   if(route==='/auth/reset/request'&&req.method==='POST'){
    const b=await readJson(req,4000),back=require('./react-backend-extras').allowedReturn(b.return_url,req,meta);
    const e=String(b.email||'').trim().toLowerCase(),found=db.prepare('SELECT * FROM users WHERE email=?').get(e);
@@ -434,7 +441,7 @@ async function handle(req,res,{onlyProject}={}){
    db.prepare('DELETE FROM app_tokens WHERE token_hash=?').run(row.token_hash);
    db.prepare('UPDATE users SET password=? WHERE id=?').run(await hashPassword(b.password),row.user_id);
    db.prepare('DELETE FROM sessions WHERE user_id=?').run(row.user_id);
-   return send(res,200,session(db,row.user_id)),true;
+   return send(res,200,asManager(session(db,row.user_id))),true;
   }
   const extras=require('./react-backend-extras'),q0=Object.fromEntries(u.searchParams);
   if(route==='/payments/webhook'&&req.method==='POST'&&!sb)return send(res,200,await extras.paymentWebhook(req,{id,meta,db,cfg:liveConfig(meta)})),true;
@@ -492,13 +499,25 @@ async function handle(req,res,{onlyProject}={}){
   if(fm&&req.method==='DELETE')return send(res,200,extras.removeFile({id,db,user,fid:fm[1]})),true;
   // In a test run, emails and payments are not real.
   if(route==='/email'&&req.method==='POST'){const body=await readJson(req,20000);if(sb)extras.checkEmail(body,{cfg,user});return send(res,200,sb?{sent:true,test:true}:await extras.sendEmail(body,{meta,db,cfg,user})),true}
-  if(route==='/payments/checkout'&&req.method==='POST')return send(res,200,sb?{url:'#kairoq-test-checkout',test:true}:await extras.checkout(await readJson(req),{id,meta,cfg,user,req})),true;
+  if(route==='/payments/checkout'&&req.method==='POST')return send(res,200,sb?{url:'#kairoq-test-checkout',test:true}:await extras.checkout(await readJson(req),{id,meta,cfg,db,user,req})),true;
   if(route==='/payments/mine'&&req.method==='GET')return send(res,200,{purchases:extras.myPurchases(db,user)}),true;
+  // Stripe's billing page, where a customer changes card, plan or cancels, and sees invoices.
+  if(route==='/payments/portal'&&req.method==='POST')return send(res,200,sb?{url:'#kairoq-test-billing',test:true}:await extras.portal(await readJson(req,4000),{id,meta,cfg,db,user,req})),true;
+  // Teams (app-teams.js) and the owner's admin view (app-admin.js).
+  if(route.startsWith('/teams')){const body=['POST','PATCH'].includes(req.method)?await readJson(req,4000):{};return send(res,200,require('./app-teams').route(db,user,route,req.method,body)),true}
+  if(route.startsWith('/admin/')){
+   if(!user)throw fail(401,'Sign in first');
+   if(!isManager(meta,user))throw fail(403,'Only the app\'s managers can open the admin page');
+   const admin=require('./app-admin');
+   if(route==='/admin/overview'&&req.method==='GET')return send(res,200,admin.overview(db,cfg,{q:u.searchParams.get('q')})),true;
+   if(route==='/admin/credits'&&req.method==='POST')return send(res,200,admin.giveCredits(db,cfg,user,await readJson(req,4000))),true;
+   throw fail(404,'Unknown admin route');
+  }
   const rt=/^\/realtime\/([a-z][a-z0-9_]{0,39})(\/ticket)?$/.exec(route);
   if(rt){
    const def=Object.hasOwn(cfg.collections,rt[1])?cfg.collections[rt[1]]:undefined;
    if(!def)throw fail(404,'Collection "'+rt[1]+'" is not declared in src/backend.json');
-   if(rt[2]&&req.method==='POST')return send(res,200,{ticket:issueTicket(id,rt[1],def.access,user)}),true;
+   if(rt[2]&&req.method==='POST')return send(res,200,{ticket:issueTicket(id,rt[1],def.access,user,def.access==='team'?require('./app-teams').context(db,req,user):null)}),true;
    if(!rt[2]&&req.method==='GET'){subscribe(req,res,id,rt[1],u.searchParams.get('ticket'));return true}
    throw fail(405,'Method not allowed');
   }
@@ -507,12 +526,14 @@ async function handle(req,res,{onlyProject}={}){
   const collection=c[1],rid=c[2],def=Object.hasOwn(cfg.collections,collection)?cfg.collections[collection]:undefined;
   if(!def)throw fail(404,'Collection "'+collection+'" is not declared in src/backend.json');
   const q=Object.fromEntries(u.searchParams);
-  const manager=def.access==='managed'&&isManager(meta,user),opts={access:def.access,manager};
+  // A team collection works in the team the app sends (X-Kairoq-Team), checked against membership.
+  const team=def.access==='team'?require('./app-teams').context(db,req,user):null;
+  const manager=def.access==='managed'&&isManager(meta,user),opts={access:def.access,manager,team};
   // A submit-only form with public_fields: anyone lists only those fields (e.g. taken slots).
   if(!rid&&req.method==='GET'&&def.access==='submit-only'&&def.public_fields)return send(res,200,{items:publicFields(db,collection,def.public_fields)}),true;
-  if(!rid&&req.method==='GET')return send(res,200,{items:list(db,def.access,collection,user,q)}),true;
-  if(!rid&&req.method==='POST')return send(res,201,{item:create(db,def.access,collection,user,(await readJson(req)).data,manager)}),true;
-  if(rid&&req.method==='GET')return send(res,200,{item:getOne(db,def.access,collection,user,rid)}),true;
+  if(!rid&&req.method==='GET')return send(res,200,{items:list(db,def.access,collection,user,q,team)}),true;
+  if(!rid&&req.method==='POST')return send(res,201,{item:create(db,def.access,collection,user,(await readJson(req)).data,manager,team)}),true;
+  if(rid&&req.method==='GET')return send(res,200,{item:getOne(db,def.access,collection,user,rid,team)}),true;
   if(rid&&req.method==='PATCH')return send(res,200,{item:update(db,collection,user,rid,(await readJson(req)).data,opts)}),true;
   if(rid&&req.method==='DELETE')return send(res,200,remove(db,collection,user,rid,opts)),true;
   throw fail(405,'Method not allowed');
@@ -630,13 +651,15 @@ function returnUrl(){return NATIVE&&APP_URL?APP_URL:location.href.split('#')[0]}
 const VERSION=${JSON.stringify(String(version||''))};
 const PREVIEW=(()=>{try{const m=/\\/builder\\/p\\/[a-f0-9]{12}-([a-f0-9]{24})\\//.exec(location.pathname);return m?m[1]:''}catch{return''}})();
 function versionHeaders(){return VERSION?{'X-Kairoq-Version':VERSION,...(PREVIEW?{'X-Kairoq-Preview':PREVIEW}:{})}:{}}
-const KEY='kairoq-session-${projectId}';
-let token=null,currentUser=null;const listeners=new Set();
+const KEY='kairoq-session-${projectId}',TEAM_KEY='kairoq-team-${projectId}';
+let token=null,currentUser=null,currentTeam=null;const listeners=new Set();
+try{currentTeam=localStorage.getItem(TEAM_KEY)||null}catch{}
+function teamHeaders(){return currentTeam?{'X-Kairoq-Team':currentTeam}:{}}
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){token=s.token;currentUser=s.user}}catch{}
 function save(){try{token?localStorage.setItem(KEY,JSON.stringify({token,user:currentUser})):localStorage.removeItem(KEY)}catch{}listeners.forEach(fn=>{try{fn(currentUser)}catch{}})}
 async function call(path,{method='GET',body,query}={}){
   const qs=query?'?'+new URLSearchParams(Object.entries(query).filter(([,v])=>v!==undefined).map(([k,v])=>[k,typeof v==='object'?JSON.stringify(v):String(v)])).toString():'';
-  const r=await fetch(BASE+path+qs,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:body?JSON.stringify(body):undefined});
+  const r=await fetch(BASE+path+qs,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{}),...teamHeaders(),...versionHeaders()},body:body?JSON.stringify(body):undefined});
   const data=await r.json().catch(()=>({}));
   if(r.status===401&&token&&!path.startsWith('/auth/')){token=null;currentUser=null;save()}
   if(!r.ok)throw Object.assign(new Error(data.error||('Request failed ('+r.status+')')),{status:r.status});
@@ -654,7 +677,14 @@ const REF_KEY='kairoq-ref-${projectId}';
 try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[a-z0-9]{6,16}$/i.test(r))localStorage.setItem(REF_KEY,JSON.stringify({code:r.toLowerCase(),at:Date.now()}))}catch{}
 function pendingRef(){try{const r=JSON.parse(localStorage.getItem(REF_KEY)||'null');return r&&Date.now()-r.at<30*86400000?r.code:undefined}catch{return undefined}}
 function clearRef(){try{localStorage.removeItem(REF_KEY)}catch{}}
-const ready=pendingCode?call('/auth/google/exchange',{method:'POST',body:{code:pendingCode}}).then(async d=>{token=d.token;currentUser=d.user;save();const ref=pendingRef();if(ref){await call('/referrals/claim',{method:'POST',body:{code:ref}}).catch(()=>{});clearRef()}}).catch(()=>{}):Promise.resolve();
+const JOIN_KEY='kairoq-join-${projectId}';
+try{const j=new URLSearchParams(location.search).get('join');if(j&&/^[A-Za-z0-9_-]{16,40}$/.test(j)){localStorage.setItem(JOIN_KEY,j);const q=new URLSearchParams(location.search);q.delete('join');history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:'')+location.hash)}}catch{}
+function pendingJoin(){try{return localStorage.getItem(JOIN_KEY)||null}catch{return null}}
+// After any sign-in: a pending team invite is used, and its team becomes the current one.
+async function afterAuth(){const code=pendingJoin();if(!code)return;try{localStorage.removeItem(JOIN_KEY)}catch{};try{const d=await call('/teams/join',{method:'POST',body:{code}});setTeam(d.team.id)}catch{}}
+const teamListeners=new Set();
+function setTeam(id){currentTeam=id||null;try{currentTeam?localStorage.setItem(TEAM_KEY,currentTeam):localStorage.removeItem(TEAM_KEY)}catch{}teamListeners.forEach(fn=>{try{fn(currentTeam)}catch{}})}
+const ready=(pendingCode?call('/auth/google/exchange',{method:'POST',body:{code:pendingCode}}).then(async d=>{token=d.token;currentUser=d.user;save();const ref=pendingRef();if(ref){await call('/referrals/claim',{method:'POST',body:{code:ref}}).catch(()=>{});clearRef()}}).catch(()=>{}):Promise.resolve()).then(()=>token?afterAuth():undefined);
 export const auth={
   ready(){return ready},
   async signInWithGoogle(){
@@ -666,9 +696,9 @@ export const auth={
   resetToken(){return pendingReset},
   async resetPassword(password,tokenValue=pendingReset){const d=await call('/auth/reset/complete',{method:'POST',body:{token:tokenValue,password}});pendingReset=null;token=d.token;currentUser=d.user;save();return d.user},
   user(){return currentUser},
-  async signUp(email,password,name){const d=await call('/auth/signup',{method:'POST',body:{email,password,name,ref:pendingRef()}});clearRef();token=d.token;currentUser=d.user;save();return d.user},
-  async signIn(email,password){const d=await call('/auth/signin',{method:'POST',body:{email,password}});token=d.token;currentUser=d.user;save();return d.user},
-  async signOut(){try{await call('/auth/signout',{method:'POST'})}catch{}token=null;currentUser=null;save()},
+  async signUp(email,password,name){const d=await call('/auth/signup',{method:'POST',body:{email,password,name,ref:pendingRef()}});clearRef();token=d.token;currentUser=d.user;save();await afterAuth();return d.user},
+  async signIn(email,password){const d=await call('/auth/signin',{method:'POST',body:{email,password}});token=d.token;currentUser=d.user;save();await afterAuth();return d.user},
+  async signOut(){try{await call('/auth/signout',{method:'POST'})}catch{}token=null;currentUser=null;setTeam(null);save()},
   onChange(fn){listeners.add(fn);return()=>listeners.delete(fn)}
 };
 export function collection(name){
@@ -701,7 +731,7 @@ export function collection(name){
 }
 export const storage={
   async upload(file,{name}={}){
-    const r=await fetch(BASE+'/files?name='+encodeURIComponent(name||file.name||'file'),{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:file});
+    const r=await fetch(BASE+'/files?name='+encodeURIComponent(name||file.name||'file'),{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream',...(token?{Authorization:'Bearer '+token}:{}),...teamHeaders(),...versionHeaders()},body:file});
     const d=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(d.error||'Upload failed'),{status:r.status});
     return{...d.file,url:new URL(d.file.url,BASE.startsWith('http')?BASE:location.href).toString()};
   },
@@ -722,7 +752,35 @@ export const payments={
     window.open(url,'_blank','noopener');
   },
   async purchases(){return(await call('/payments/mine')).purchases},
+  // Stripe's billing page: change card or plan, cancel, download invoices.
+  async manage(){
+    const {url}=await call('/payments/portal',{method:'POST',body:{return_url:location.href}});
+    try{if(window.top===window){location.href=url;return}}catch{}
+    window.open(url,'_blank','noopener');
+  },
   async has(product){return(await this.purchases()).some(p=>p.product===product&&p.status==='active')}
+};
+// Teams (B2B workspaces): records of "team" collections belong to the current team.
+export const teams={
+  async list(){return(await call('/teams')).teams},
+  async create(name){const d=await call('/teams',{method:'POST',body:{name}});setTeam(d.team.id);return d.team},
+  current(){return currentTeam},
+  use(id){setTeam(id)},
+  onChange(fn){teamListeners.add(fn);return()=>teamListeners.delete(fn)},
+  async rename(id,name){return call('/teams/'+id,{method:'PATCH',body:{name}})},
+  async remove(id){const d=await call('/teams/'+id,{method:'DELETE'});if(currentTeam===id)setTeam(null);return d},
+  async members(id=currentTeam){return(await call('/teams/'+id+'/members')).members},
+  // An invite link to send to a colleague (single use, 7 days): role 'admin' | 'member' | 'viewer'.
+  async invite(role='member',id=currentTeam){const d=await call('/teams/'+id+'/invites',{method:'POST',body:{role}});return{...d,link:(NATIVE&&APP_URL?APP_URL:location.origin+location.pathname)+'?join='+d.code}},
+  async join(code){const d=await call('/teams/join',{method:'POST',body:{code}});setTeam(d.team.id);return d.team},
+  async setRole(userId,role,id=currentTeam){return call('/teams/'+id+'/members/'+userId,{method:'PATCH',body:{role}})},
+  async removeMember(userId,id=currentTeam){return call('/teams/'+id+'/members/'+userId,{method:'DELETE'})},
+  async leave(id=currentTeam){const d=await call('/teams/'+id+'/members/'+currentUser.id,{method:'DELETE'});if(currentTeam===id)setTeam(null);return d}
+};
+// The owner's admin view (for the app's managers): sign-ups, paying customers, credits.
+export const admin={
+  async overview({q}={}){return call('/admin/overview',{query:{q}})},
+  async giveCredits(userId,amount,note){return call('/admin/credits',{method:'POST',body:{user_id:userId,amount,note}})}
 };
 // Credits (when the app sells AI use): balance, what each AI request costs, packs to buy, history.
 export const credits={
@@ -734,7 +792,7 @@ export const credits={
 export const functions={
   // Calls functions/<name>.js on the server with a JSON body; returns its JSON (or text) response.
   async invoke(name,body){
-    const r=await fetch(BASE+'/functions/'+encodeURIComponent(name),{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:JSON.stringify(body===undefined?{}:body)});
+    const r=await fetch(BASE+'/functions/'+encodeURIComponent(name),{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...teamHeaders(),...versionHeaders()},body:JSON.stringify(body===undefined?{}:body)});
     const type=r.headers.get('content-type')||'',data=type.includes('json')?await r.json().catch(()=>null):await r.text();
     if(!r.ok)throw Object.assign(new Error((data&&data.error)||('Function failed ('+r.status+')')),{status:r.status,data});
     return data;
@@ -743,7 +801,7 @@ export const functions={
 };
 // Reads a streamed answer (server-sent events over POST), calling onToken with each piece.
 async function streamed(path,body,onToken){
-  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json',Accept:'text/event-stream',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:JSON.stringify({...body,stream:true})});
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json',Accept:'text/event-stream',...(token?{Authorization:'Bearer '+token}:{}),...teamHeaders(),...versionHeaders()},body:JSON.stringify({...body,stream:true})});
   if(!r.ok||!r.body){const d=await r.json().catch(()=>({}));throw Object.assign(new Error(d.error||('Request failed ('+r.status+')')),{status:r.status})}
   const reader=r.body.getReader(),dec=new TextDecoder();let buf='',result=null;
   for(;;){
@@ -779,7 +837,7 @@ export const ai={
   async extract({shape,schema,text,image,images,instructions}={}){
     const toUrl=f=>typeof f==='string'?Promise.resolve(f):new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('Could not read the image'));r.readAsDataURL(f)});
     const list=await Promise.all([...(images||[]),...(image?[image]:[])].map(toUrl));
-    const r=await fetch(BASE+'/ai/extract',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...versionHeaders()},body:JSON.stringify({shape:shape||schema,text,images:list,instructions})});
+    const r=await fetch(BASE+'/ai/extract',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...teamHeaders(),...versionHeaders()},body:JSON.stringify({shape:shape||schema,text,images:list,instructions})});
     const d=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(d.error||'Could not read it ('+r.status+')'),{status:r.status});
     return d;
   },
@@ -806,7 +864,7 @@ export function usePageMeta({title,description}={}){
   if(description){let m=document.querySelector('meta[name="description"]');if(!m){m=document.createElement('meta');m.setAttribute('name','description');document.head.appendChild(m)}m.setAttribute('content',description)}
  },[title,description]);
 }
-export default{auth,collection,storage,email,payments,credits,functions,ai,Router,usePageMeta,basename};
+export default{auth,collection,storage,email,payments,credits,teams,admin,functions,ai,Router,usePageMeta,basename};
 `;
 }
 
