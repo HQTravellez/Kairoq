@@ -469,3 +469,20 @@ function saasStarter(prompt){
 function list(){return TEMPLATES.map(({files,assistantDocs,...t})=>t)}
 function get(id){return TEMPLATES.find(t=>t.id===id)||null}
 module.exports={list,get,saasStarter,TEMPLATES};
+// Agentic CRM: the UI kit and design tokens plus templates/agentic-crm (a pipeline, contacts, tasks,
+// an in-app Copilot whose changes wait for Approve, and a daily agent run with a log).
+TEMPLATES.splice(1,0,{id:'agentic-crm',name:'Agentic CRM',category:'Business',description:'A team CRM with an agent built in: pipeline, contacts and tasks, a Copilot that looks things up and drafts follow-ups (you approve every change), and a morning run that adds follow-up tasks and logs why.',
+ get files(){
+  const design=require('./react-design'),base=design.starterFiles('Relay');
+  const css=base['src/index.css'].replace('--primary: 243 75% 59%;','--primary: 222 47% 18%;').replace('--ring: 243 75% 59%;','--ring: 222 47% 18%;').replace('--accent: 330 81% 60%;','--accent: 158 55% 36%;');
+  return{...base,'src/index.css':css,...folder('agentic-crm')};
+ }});
+// A first prompt that clearly asks for one of these starts from that template, and the agent then
+// shapes it to the request. Strict on purpose: only requests that are plainly this kind of app.
+const MATCH=[
+ ['agentic-crm',/\b(crm|sales pipeline|deal pipeline|pipeline of (leads|deals)|lead tracker|track(ing)? (my |our )?(leads|deals|clients))\b/i,/\b(website|landing page|portfolio|blog|game)\b/i]
+];
+function match(prompt){const t=String(prompt||'');for(const [id,yes,no] of MATCH)if(yes.test(t)&&!no.test(t))return id;return null}
+function list(){return TEMPLATES.map(({files,assistantDocs,...t})=>t)}
+function get(id){return TEMPLATES.find(t=>t.id===id)||null}
+module.exports={list,get,match,TEMPLATES};

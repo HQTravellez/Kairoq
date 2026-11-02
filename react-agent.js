@@ -121,7 +121,15 @@ function describe(a){
 
 // Options: callModel, inspect(url,{steps,screenshot}), webSearch(query), fetchUrl(url), browseSite(url,opts),
 // onStep(entry), signal, tier, images, assetNote, maxSteps.
-async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
+// How much of the app the agent reads up front. Models with a 1M-token window (Claude Sonnet, Opus
+// and Fable) read the whole app up to KAIROQ_AGENT_CONTEXT_CHARS (default 800k characters, about
+// 200k tokens), which prompt caching keeps cheap; other models keep the 60k-character view and read
+// the rest with read_files.
+function contextBudget(modelId){
+ const big=/^anthropic\/claude-(sonnet|opus|fable)/i.test(String(modelId||''));
+ return big?intEnv('KAIROQ_AGENT_CONTEXT_CHARS',800000,60000,3200000):60000;
+}
+async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearch,fetchUrl,browseSite,designShots,reviewLook,onStep=()=>{},onThinking,onEvent,signal,tier='standard',images=[],assetNote='',maxSteps,imageGen=null,imageNote='',researchOnly=false,initialBrowserUrl=''}={}){
  const startedAt=new Date().toISOString();
  const text=String(instruction||'').trim().slice(0,8000);
  if(!text)throw Object.assign(Error('Describe what you want the agent to do'),{status:400});
@@ -160,10 +168,15 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=researchOnly?null:await require('./decision-router').suggest(text);
  const researchRule=researchOnly?'\n\nRESEARCH-ONLY TASK: Do not write, edit, build, test, query the app database, run automations, or generate assets. Use web_search/web_open/web_act/fetch_url as needed, answer from observed evidence, then finish. If a browser action fails, report that failure; never replace it with a claim that Kairoq cannot browse.':'';
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:contextChars)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
+ // The matching specialist skills are opened before the first step and put in the request, so the
+ // agent writes with them from the start: no step spent opening them and no first draft thrown away.
+ const preSkills=researchOnly?[]:skillRows(text).slice(0,2),skillsOpened=new Set();let skillText='';
+ for(const r of preSkills){try{const body=await require('./builder-skills').openAsync(r.name,{fetchImpl:fetch});if(body&&!/^No skill called /.test(body)){skillsOpened.add(r.name);skillText+='\n\n'+clip(body,7000);tl.add({t:'note',icon:'book',text:'Opened the skill '+r.name})}}catch(e){if(e.name==='AbortError'||signal?.aborted)throw e}}
  const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
  require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
- executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision));
+ executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision))+(skillText?'\n\nSPECIALIST SKILLS ALREADY OPENED FOR THIS REQUEST (follow them; open others from the list only if needed):'+skillText:'');
  const messages=[{role:'system',content:codingRules()+builder.knowledgeNote(meta)+require('./app-concept').note(meta)+await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)+protocol({vision,web,maxSteps:limit,images:Boolean(imageGen)})+skillsNote(text)+(researchOnly?'':require('./builder-playbooks').note(text))},...builder.historyMessages(meta),{role:'user',content:builder.userContent(intro,images)}];
  const introMsg=messages.at(-1);
  const report=patch=>onStep({steps:steps.slice(-40),...patch});
@@ -238,7 +251,6 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   report({status:'testing',preview:{url:built.url,version:n,draft:true}});
   return testBuild(a,'build_and_test: built OK.');
  }
- const skillsListed=researchOnly?[]:skillRows(text).map(r=>r.name),skillsOpened=new Set();let skillsNudged=false;
  async function tool(a){
   const t=a.tool;
   if(researchOnly&&['write_files','edit_files','build_and_test','test_ui','run_tests','query_db','run_automation','generate_images'].includes(t))
@@ -341,12 +353,6 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const tg=require('./task-graph');
    try{tg.define(id,{instruction:text,tasks:tg.fromPlan(text),auto:true});tl.add({t:'note',icon:'code',text:'Set up the task list from the plan'})}catch{}
   }
-  // Listed skills are read before the first file is written: the agent once wrote a GSAP page
-  // with framer-motion without opening the GSAP skill. One reminder, then it carries on.
-  if((t==='write_files'||t==='edit_files')&&skillsListed.length&&!skillsOpened.size&&!skillsNudged){
-   skillsNudged=true;
-   return{text:t+': nothing written yet. This request has specialist skills: '+skillsListed.join(', ')+'. Open the ones that cover this code with open_skill first, follow them, then write the files.'};
-  }
   if(t==='write_files'){
    const eng=require('./engineering-intelligence'),tg=require('./task-graph');
    if(eng.substantial(text)&&!tg.get(id,text))autoGraph();
@@ -371,6 +377,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
    const problems=builder.checkProject(work);
    return{text:'edit_files: changed '+(r.changed.join(', ')||'nothing (the replacements matched the current text)')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
+  // A build of the untouched starter page is not the app: say so instead of testing and passing it.
+  if(t==='build_and_test'&&!researchOnly&&require('./react-design').isUntouchedStarter(work))return{text:'build_and_test: nothing to build yet. src/App.jsx is still Kairoq\'s starter page ("Describe your app in the chat"). Write the app with write_files first, then build_and_test.'};
   if(t==='build_and_test')return buildAndTest(a);
   if(t==='test_ui')return testBuild(a,'test_ui on version '+(built?built.n:'?')+':');
   if(t==='run_tests'){
@@ -504,6 +512,17 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
 
+ // A first build is written by parallel writers (parallel-writers.js): one plan, one writer per
+ // section at the same time. The agent then builds, tests and fixes as usual.
+ if(!researchOnly&&!checkpoint&&require('./parallel-writers').enabled()&&require('./react-design').isUntouchedStarter(work)){
+  report({status:'writing',step:0});
+  const pw=await require('./parallel-writers').write({system:messages[0].content,intro:introMsg.content,callModel,tier,signal,onNote:t=>tl.add({t:'note',icon:'code',text:t})});
+  if(pw){
+   const r=await tool({tool:'write_files',files:pw.files});
+   messages.push({role:'assistant',content:JSON.stringify({thought:'Kairoq wrote the first version in parallel from one plan.',actions:[{tool:'write_files',files:Object.fromEntries(Object.keys(pw.files).map(n=>[n,'(written)']))}]})},
+    {role:'user',content:r.text+(pw.failed.length?'\nThese planned sections were not written yet; write them first: '+pw.failed.join(', '):'')+'\nNext: build_and_test with steps that try the main interactions, fix what breaks, then finish.'});
+  }
+ }
  try{
  for(let step=Math.max(1,(checkpoint?.step||0)+1);step<=limit;step++){
   activeStep=step;
@@ -657,4 +676,4 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token);await wb.close().catch(()=>{})}
 }
-module.exports={run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
+module.exports={contextBudget,run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};

@@ -505,7 +505,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     const continuity=browserDecision.execute&&browserDecision.message!==message?browserDecision.message.slice(String(message||'').length).trim():'';
     const assetNote=[images.length||context||extra?require('./react-assets').note(id):'',require('./react-models').note(id,builder.loadMeta(id)),context,extra,continuity].filter(Boolean).join('\n\n');
     const researchOnly=browserResearchOnly&&!hooks;
-    job.result=await require('./react-agent').run(id,message,{callModel,onThinking,onEvent,inspect,webSearch,browseSite,designShots,reviewLook,fetchUrl:url=>require('./public-web-fetch').fetchPublic(url,{maxRedirects:5,maxBytes:2000000,accept:"application/json, text/html, text/markdown, text/plain"}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
+    job.result=await require('./react-agent').run(id,message,{contextChars:require('./react-agent').contextBudget(chosen&&chosen.id),callModel,onThinking,onEvent,inspect,webSearch,browseSite,designShots,reviewLook,fetchUrl:url=>require('./public-web-fetch').fetchPublic(url,{maxRedirects:5,maxBytes:2000000,accept:"application/json, text/html, text/markdown, text/plain"}),tier:modelTier,images,assetNote,signal,imageGen,imageNote,researchOnly,initialBrowserUrl:researchOnly?browserDecision.reference:'',maxSteps:researchOnly?10:executionMode==='agent'&&mode==='build'?24:undefined,
      onStep:p=>update({status:p.status,stream:null,...(p.browser?{browser:p.browser}:{}),...(p.preview?{preview:p.preview}:{}),agent:{step:p.step||job.agent?.step||0,steps:p.steps.map(s=>({n:s.n,thought:s.thought,actions:s.actions}))}})});
     if(hooks&&hooks.after)job.result=await hooks.after(job.result,{update,signal,onStream,imageGen,imageNote});
    }
@@ -2071,6 +2071,9 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[],e
  // A SaaS asked for in words starts from the SaaS starter, so the build only writes the product part.
  const auto=!template&&prompt?T.saasStarter(prompt):null;
  const tpl=template||auto?T.get(String(template||auto)):null;
+ // No template chosen: a prompt that plainly asks for an app Kairoq has a template for starts from it.
+ const matched=!template&&prompt?require('./create-templates').match(prompt):null;
+ const tpl=template?require('./create-templates').get(String(template)):matched?require('./create-templates').get(matched):null;
  if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
  const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:nameFromPrompt(prompt))||'Untitled app',owner:v.owner});
  if(tpl)await builder.initializeFrom(meta,tpl.files,auto?'Started from the SaaS starter (sign-in, teams, credits, billing and admin are ready)':'Started from the '+tpl.name+' template');
