@@ -168,12 +168,11 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
  const listing=Object.keys(base).sort().map(n=>n+' ('+Buffer.byteLength(base[n])+' bytes)').join('\n');
  const decision=researchOnly?null:await require('./decision-router').suggest(text);
  const researchRule=researchOnly?'\n\nRESEARCH-ONLY TASK: Do not write, edit, build, test, query the app database, run automations, or generate assets. Use web_search/web_open/web_act/fetch_url as needed, answer from observed evidence, then finish. If a browser action fails, report that failure; never replace it with a claim that Kairoq cannot browse.':'';
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:contextChars)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
  // The matching specialist skills are opened before the first step and put in the request, so the
  // agent writes with them from the start: no step spent opening them and no first draft thrown away.
  const preSkills=researchOnly?[]:skillRows(text).slice(0,2),skillsOpened=new Set();let skillText='';
  for(const r of preSkills){try{const body=await require('./builder-skills').openAsync(r.name,{fetchImpl:fetch});if(body&&!/^No skill called /.test(body)){skillsOpened.add(r.name);skillText+='\n\n'+clip(body,7000);tl.add({t:'note',icon:'book',text:'Opened the skill '+r.name})}}catch(e){if(e.name==='AbortError'||signal?.aborted)throw e}}
- const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:60000)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
+ const intro='Project files:\n'+listing+'\n\n'+builder.contextFiles(work,researchOnly?12000:contextChars)+(assetNote?'\n\n'+assetNote:'')+(imageNote?'\n\n'+imageNote:'')+'\n\nRequest: '+text+researchRule+
  require('./capability-registry').taskContext(text)+(researchOnly?'':discipline.prompt(text)+require('./engineering-intelligence').prompt(text))+
  require('./project-knowledge').note(id)+(researchOnly?'':require('./task-graph').prompt(id,text)+require('./build-retro').note(id)+
  executionLedger.summary(ledgerRun)+ownerContract.prompt(ownerRequirements)+require('./engineering-workflows').prompt(text)+require('./decision-router').note(decision))+(skillText?'\n\nSPECIALIST SKILLS ALREADY OPENED FOR THIS REQUEST (follow them; open others from the list only if needed):'+skillText:'');
