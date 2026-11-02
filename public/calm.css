@@ -125,9 +125,12 @@ body.app.in-editor #chat-form .menu-panel>button:hover,body.app.in-editor #chat-
 body.app.in-editor #chat-form .menu-panel b{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px}
 body.app.in-editor #chat-form .menu-panel span{font-size:12px;color:var(--c-ink-3);font-weight:400;line-height:1.35}
 body.app.in-editor #chat-form .menu-panel .menu-note{margin:6px 10px 4px;font-size:11.5px;color:var(--c-ink-3)}
-/* +: only what you add to a message. Model and settings live in their own places. */
-body.app.in-editor #menu-plus #builder-model-open,body.app.in-editor #menu-plus #builder-advanced-open{display:none!important}
-body.app.in-editor #menu-plus>.menu-panel{width:290px}
+/* +: grouped into Add, Tools and Settings. */
+body.app.in-editor #menu-plus>.menu-panel{width:290px;max-height:min(560px,calc(100vh - 140px));overflow:auto}
+body.app.in-editor #menu-plus .menu-note{margin:10px 10px 2px!important;font-size:11.5px;font-weight:500;color:var(--c-ink-3)}
+body.app.in-editor #menu-plus .menu-note:first-child{margin-top:4px!important}
+body.app.in-editor #menu-plus .menu-note+button,body.app.in-editor #menu-plus .menu-note+a{margin-top:0}
+body.app.in-editor #menu-plus .menu-panel>.menu-note:not(:first-child){border-top:1px solid var(--c-line);padding-top:10px}
 /* Model list. */
 body.app.in-editor #menu-tier>.menu-panel{width:300px;max-height:min(440px,calc(100vh - 160px));overflow:auto}
 body.app.in-editor #chat-form .model-search{width:calc(100% - 8px);margin:4px 4px 6px;height:32px;padding:0 10px;border:1px solid var(--c-line-2);border-radius:8px;font-size:13px;background:var(--c-raise)}
@@ -148,3 +151,14 @@ body.app.in-editor #chat-form .idea-chip:hover{background:var(--c-raise);color:v
 body.app.in-editor #editor .stage-bar #desktop,body.app.in-editor #editor .stage-bar #mobile{background:transparent!important;color:#fff!important;box-shadow:none!important}
 body.app.in-editor #editor .stage-bar #desktop[aria-pressed=true],body.app.in-editor #editor .stage-bar #mobile[aria-pressed=true]{background:rgba(255,255,255,.26)!important}
 body.app.in-editor #editor .stage-bar .seg.icons .seg-thumb{background:rgba(255,255,255,.26)!important;box-shadow:none!important}
+
+/* The finished write-up: plain headed sections, no boxes; "Agent finished" closes it. */
+body.app.in-editor #editor .messages .writeup{margin:14px 0 0}
+body.app.in-editor #editor .messages .writeup-title{margin:0 0 4px;font:600 13.5px/1.4 Geist,ui-sans-serif,sans-serif;color:var(--c-ink)}
+body.app.in-editor #editor .messages .writeup .verdict-rows{margin:0!important;padding:0!important;border:0!important;background:none!important;gap:3px}
+body.app.in-editor #editor .messages .writeup .verdict-rows li{font-size:13.5px!important;color:#3D4149!important;line-height:1.55}
+body.app.in-editor #editor .messages .writeup.pages .vmark{color:var(--c-ink-3)!important}
+body.app.in-editor #editor .messages .writeup.tested .vmark{color:#15803D!important}
+body.app.in-editor #editor .messages .writeup.todo .vmark{color:#B45309!important}
+body.app.in-editor #editor .messages .agent-finished{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--c-line);font-size:12.5px;color:var(--c-ink-3)}
+body.app.in-editor #editor .messages .agent-finished::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#22A06B;margin-right:7px;vertical-align:1px}
