@@ -1229,14 +1229,16 @@ $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){
 const PLACEHOLDERS={build:'Message Kairoq…',discuss:'Ask about this project…',agent:'Describe what you want to build…'};
 function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));text($('mode-label'),{build:'Build',discuss:'Discuss',agent:'Agent'}[mode]);$('menu-mode').open=false;$('chat-input').placeholder=PLACEHOLDERS[mode];$('send').setAttribute('aria-label',mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');$('send').title=$('send').getAttribute('aria-label');costHint()}
 $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');$('mode-agent').onclick=()=>setChatMode('agent');
-// The maker's mark beside a model: the brand icon (simpleicons.org, loaded by the browser) with a
-// lettered circle behind it in case the icon is not there.
-const MARK_SLUGS={anthropic:'anthropic',google:'google',meta:'meta','meta-llama':'meta',deepseek:'deepseek',mistralai:'mistralai',mistral:'mistralai',qwen:'alibabacloud',nvidia:'nvidia',perplexity:'perplexity',minimax:'minimax',baidu:'baidu',tencent:'tencentqq',bytedance:'bytedance',huggingface:'huggingface',openrouter:'openrouter'};
+// The maker's mark beside a model: the real coloured logo from LobeHub's icon set
+// (@lobehub/icons-static-svg, MIT, pinned version; THIRD_PARTY_NOTICES), with a lettered square
+// behind it until it loads or when there is none.
+const MARK_BASE='https://unpkg.com/@lobehub/icons-static-svg@1.101.0/icons/';
+const MARK_FILES={anthropic:'claude-color',openai:'openai',google:'gemini-color',meta:'meta-color','meta-llama':'meta-color',deepseek:'deepseek-color',mistralai:'mistral-color',mistral:'mistral-color',qwen:'qwen-color',nvidia:'nvidia-color',microsoft:'microsoft-color','x-ai':'xai',xai:'xai',cohere:'cohere-color',perplexity:'perplexity-color',amazon:'aws-color',moonshotai:'moonshot',moonshot:'moonshot',minimax:'minimax-color','z-ai':'zhipu-color',zai:'zhipu-color',baidu:'baidu-color',bytedance:'bytedance-color',tencent:'tencent-color',ai21:'ai21',nousresearch:'nousresearch',liquid:'liquid',huggingface:'huggingface-color',openrouter:'openrouter'};
 function modelMark(m,small){
  const p=(m&&m.provider)||{},key=String(p.key||'').toLowerCase(),box=el('span','m-mark'+(small?' small':''));
  const letter=el('span','m-letter',m&&m.id==='auto'?'✦':(p.name||m&&m.label||'?').charAt(0).toUpperCase());box.append(letter);
- const slug=MARK_SLUGS[key];
- if(slug&&m.id!=='auto'){const img=document.createElement('img');img.alt='';img.loading='lazy';img.src='https://cdn.simpleicons.org/'+slug;img.onerror=()=>img.remove();box.append(img)}
+ const file=MARK_FILES[key];
+ if(file&&m.id!=='auto'){const img=document.createElement('img');img.alt='';img.loading='lazy';img.src=MARK_BASE+file+'.svg';img.onerror=()=>img.remove();box.append(img)}
  return box;
 }
 function renderTiers(){
