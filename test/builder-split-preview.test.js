@@ -79,7 +79,7 @@ test("editor contains a separate live browser surface, not an external-site ifra
 // frames while the builder tests its own app, and one pane at a time on a phone.
 test('the browser pane has a toggle, a step log and phone tabs',()=>{
  const fs=require('fs'),path=require('path');
- const html=fs.readFileSync(path.join(__dirname,'..','public','create.html'),'utf8'),js=fs.readFileSync(path.join(__dirname,'..','public','builder-browser-pane.js'),'utf8'),css=fs.readFileSync(path.join(__dirname,'..','public','dark.css'),'utf8');
+ const html=fs.readFileSync(path.join(__dirname,'..','public','create.html'),'utf8'),js=fs.readFileSync(path.join(__dirname,'..','public','builder-browser-pane.js'),'utf8'),css=fs.readFileSync(path.join(__dirname,'..','public','theme.css'),'utf8');
  assert.match(html,/id="view-browser"[^>]*aria-pressed="false"/,'a Browser toggle in the stage bar');
  assert.match(html,/<ol class="web-browser-log hidden" id="web-browser-log"/,'the step log under the live view');
  assert.match(html,/id="phone-panes" role="tablist"[\s\S]*data-pane="chat"[\s\S]*data-pane="preview"[\s\S]*data-pane="browser"/,'Chat | Preview | Browser on a phone');

@@ -21,7 +21,7 @@ function show(screen){
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
  $('side').classList.toggle('hidden',!app);
- if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.toggle('side-open',window.innerWidth>=1600)}
+ if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
  for(const b of ['side-new','side-projects','side-templates','side-check'])$(b).removeAttribute('aria-current');
@@ -555,6 +555,17 @@ async function openProject(id,{pendingText,job}={}){
  if(state.data)await renderData();
  if(job||active_job)watch(job||active_job);
 }
+// Next-step chips above the message box: one click builds that idea. Cleared once you send.
+function renderIdeas(m){
+ const box=$('composer-ideas');if(!box)return;box.replaceChildren();
+ const ideas=m&&m.role==='assistant'&&Array.isArray(m.ideas)&&!state.job&&state.project?.role!=='viewer'?m.ideas.slice(0,3):[];
+ box.classList.toggle('hidden',!ideas.length);
+ for(const idea of ideas){
+  const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
+  const b=el('button','idea-chip',idea);b.type='button';b.title='Build this: '+ask;
+  b.onclick=()=>{box.classList.add('hidden');send(ask,'build')};box.append(b);
+ }
+}
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
  const msgs=state.project.messages;
@@ -562,6 +573,7 @@ function renderMessages(pendingText){
  const questionIndex=msgs.findLastIndex(m=>m.role==='assistant'&&m.question&&m.question.text===state.project.pending_question?.text);
  msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1||i===questionIndex,i)));
  if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
+ renderIdeas(pendingText?null:msgs[msgs.length-1]);
  list.scrollTop=list.scrollHeight;
  renderErrors();
 }
@@ -605,8 +617,9 @@ function messageItem(m,last,index){
    });
    li.append(q,el('p','q-hint','Pick one, or type your own answer. "ok" goes with the recommended option.'));
   }
-  // Suggested next steps: one click builds that idea.
-  if(last&&Array.isArray(m.ideas)&&m.ideas.length){
+  // Suggested next steps sit in the message box (renderIdeas), like Emergent; only an old reply
+  // shown on its own (index==null) still carries them inline.
+  if(last&&index==null&&Array.isArray(m.ideas)&&m.ideas.length){
    const q=el('div','idea-list');
    for(const idea of m.ideas){
     const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
@@ -616,8 +629,9 @@ function messageItem(m,last,index){
    }
    li.append(q,el('p','q-hint','Pick an idea to build it, or tell me what you want.'));
   }
+  // The same steps already fold out under "Worked for …"; list them here only when that line is absent.
   const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan');
-  if(acts.length){
+  if(acts.length&&!((thoughtMs!=null||tl.length)&&index>=0)){
    const d=el('details','acts'),s=el('summary');s.append(icon('down','toggle'),el('span',null,summarize(tl)||acts.length+' steps'));
    d.append(s,rail(acts.slice(0,30),{}));li.append(d);
   }
@@ -673,7 +687,10 @@ function messageItem(m,last,index){
   };li.append(b)}
  if(m.role==='assistant'){
   const extra=[...li.children].filter(n=>n.matches('.acts,.design-chip,.memory-chip,.file-chips.done,.msg-meta,.look-note:not(.warn),.check-chip:not(.bad),.agent-steps,.verified.ok,.verified-quiet'));
-  if(extra.length){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...extra);li.append(details);}
+  // A build folds its extras under "Build details". A chat reply drops its cost line (credits still
+  // show in Usage), so most replies have no fold at all; other notes stay folded under "Details".
+  const kept=m.version?extra:extra.filter(n=>{if(n.matches('.msg-meta')){n.remove();return false}return true});
+  if(kept.length){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...kept);li.append(details);}
  }
  return li;
 }
@@ -855,7 +872,29 @@ $('safari-shot').onclick=async()=>{
 $('dev-shot-close').onclick=()=>$('dev-shot').classList.add('hidden');
 // Reload; when the preview had not loaded, rebuild it first.
 $('refresh').onclick=()=>{if(!$('preview-notice').classList.contains('hidden'))return rebuildPreview();const f=$('frame');if(f.src){const u=f.src;f.src='about:blank';setTimeout(()=>setPreview(u),30)}};
-$('share-open').onclick=()=>$('team-open').click();
+// Share: a small popover like Emergent's: the preview link and Copy, then Publish.
+function renderSharePop(){
+ const p=state.project,on=Boolean(p.share);text($('share-pop-error'),'');
+ $('share-pop-off').classList.toggle('hidden',on);$('share-pop-link').classList.toggle('hidden',!on);
+ if(on){$('share-pop-url').value=location.origin+p.share.url;$('share-pop-remix').checked=Boolean(p.share.remix)}
+ text($('share-pop-copy'),'Copy link');
+ const live=$('share-pop-live');live.replaceChildren();
+ if(p.published){const a=el('a',null,location.origin+'/sites/'+p.published.slug+'/');a.href=a.textContent;a.target='_blank';a.rel='noopener';live.append(el('span','muted small','Live at '),a)}
+ text($('share-pop-publish'),p.published?'Publish changes':'Publish your site');
+ $('share-pop-team').classList.toggle('hidden',state.project.role!=='owner');
+}
+function toggleSharePop(open){const pop=$('share-pop');open=open==null?pop.classList.contains('hidden'):open;pop.classList.toggle('hidden',!open);$('share-open').setAttribute('aria-expanded',String(open));if(open)renderSharePop()}
+async function sharePopCall(body){try{const r=await api('/projects/'+state.project.id+'/share',{method:'POST',body});if(r.project)state.project=r.project;renderSharePop()}catch(err){text($('share-pop-error'),err.message)}}
+$('share-open').onclick=e=>{e.stopPropagation();toggleSharePop()};
+$('share-pop').addEventListener('click',e=>e.stopPropagation());
+document.addEventListener('click',()=>{if(!$('share-pop').classList.contains('hidden'))toggleSharePop(false)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('share-pop').classList.contains('hidden'))toggleSharePop(false)});
+$('share-pop-on').onclick=()=>sharePopCall({enabled:true,remix:false});
+$('share-pop-stop').onclick=()=>sharePopCall({enabled:false,remix:false});
+$('share-pop-remix').onchange=()=>sharePopCall({enabled:true,remix:$('share-pop-remix').checked});
+$('share-pop-copy').onclick=()=>{navigator.clipboard?.writeText($('share-pop-url').value).then(()=>text($('share-pop-copy'),'Copied')).catch(()=>$('share-pop-url').select())};
+$('share-pop-publish').onclick=()=>{toggleSharePop(false);$('publish-open').click()};
+$('share-pop-team').onclick=()=>{toggleSharePop(false);$('team-open').click()};
 function view(mode){
  state.code=mode==='code';state.data=mode==='data';
  for(const m of ['preview','code','data'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
@@ -1179,21 +1218,24 @@ function renderTiers(){
  // good at and what a message costs. A named model that cannot run falls back to Auto.
  const models=state.me.models||[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true}];
  if(!models.some(m=>m.id===state.model&&m.enabled))state.model='auto';
- const panel=$('tier-panel');panel.replaceChildren(el('p','menu-note','Which AI model works on your next message'));
- for(const m of models){
-  const b=document.createElement('button');b.type='button';b.disabled=!m.enabled;b.setAttribute('aria-pressed',String(m.id===state.model));
+ // Like Emergent: a short list of the models that can run here, one grey line each, a tick on the
+ // chosen one, the cost on hover, and a search box when the list is long.
+ const panel=$('tier-panel');panel.replaceChildren();
+ const usable=models.filter(m=>m.enabled),off=models.length-usable.length;
+ const list=el('div','model-list');
+ if(usable.length>6){const q=el('input','model-search');q.type='search';q.placeholder='Search models';q.setAttribute('aria-label','Search models');q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const b of list.children)b.hidden=Boolean(t)&&!b.dataset.name.includes(t)};panel.append(q)}
+ for(const m of usable){
+  const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+(m.note||'')).toLowerCase();
   const name=el('b',null,m.label);
   if(m.id==='auto')name.append(el('i','model-tag top','Recommended'));
   if(m.free===true||m.isFree===true||m.credits===0)name.append(el('i','model-tag free','Free'));
-  if(m.top)name.append(el('i','model-tag top','Top pick'));
-  const credits=m.credits?m.credits+' credit'+(m.credits===1?'':'s')+' a message':'';
-  const bits=[m.note,credits].filter(Boolean).join(' · ');
-  const line=el('span',null,bits+(m.enabled?'':' · unavailable on this account'));
-  if(m.costlier&&m.enabled)line.append(el('i','model-tag cost','costlier'));
-  b.append(name,line);
+  b.append(name,el('span',null,m.note||''));
+  if(m.credits)b.title=m.credits+' credit'+(m.credits===1?'':'s')+' a message'+(m.costlier?' (costlier)':'');
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
-  panel.append(b);
+  list.append(b);
  }
+ panel.append(list);
+ if(off)panel.append(el('p','menu-note model-off',off+' more model'+(off===1?' is':'s are')+' not available on this account'));
  const cur=models.find(m=>m.id===state.model);text($('tier-label'),cur?cur.label:'Auto');
  costHint();
 }
@@ -1289,7 +1331,7 @@ async function send(message,mode,path='/chat',extra={}){
  text($('chat-error'),'');
  const images=state.attachments.filter(a=>a.kind!=='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
  const files=state.attachments.filter(a=>a.kind==='file').map(a=>({name:a.name,dataUrl:a.dataUrl}));
- state.lastSent=message;
+ state.lastSent=message;$('composer-ideas')?.classList.add('hidden');
  $('messages').append(messageItem({role:'user',text:message,mode,images:[...images,...files].map(i=>i.name)}));$('messages').scrollTop=$('messages').scrollHeight;
  $('chat-input').value='';state.attachments=[];renderAttachments();
  try{const {job}=await api('/projects/'+projectId+path,{method:'POST',body:{message,mode,tier:state.tier,...(state.model&&state.model!=='auto'?{model:state.model}:{}),images:images.length?images:undefined,files:files.length?files:undefined,...extra}});if(state.project?.id===projectId)watch(job)}
@@ -1425,7 +1467,7 @@ function renderBuildOverlay(j){
  const card=overlay.querySelector('.bo-card');
  const shown=j.preview&&j.preview.version;
  const files=work.files.length;
- const label=shown?(j.preview.draft?'A first build is showing':'v'+j.preview.version+' is showing')+' · '+(PHASES[phaseOf(j)]&&phaseOf(j)!=='verifying'?PHASES[phaseOf(j)]:'still checking it')+'…':liveStatus(j)+(phaseOf(j)==='writing'&&files>1?' · '+files+' files':'')+'…';
+ const label=shown?(j.preview.draft?'A first build is showing':'v'+j.preview.version+' is showing')+' · '+(phaseOf(j)==='verifying'?'still checking it':liveStatus(j))+'…':liveStatus(j)+(phaseOf(j)==='writing'&&files>1?' · '+files+' files':'')+'…';
  const spin=card.querySelector('.bo-spin')||el('span','bo-spin');spin.setAttribute('aria-hidden','true');
  const line=card.querySelector('.bo-line')||el('span','bo-line');
  if(line.textContent!==label)line.textContent=label;
@@ -1491,7 +1533,7 @@ function renderWork(j){
  if(detailState.source==='live')renderDetail();
  if(stick)list.scrollTop=list.scrollHeight;
 }
-function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');const ev=work.job.events||[],n=ev.length;if(n!==work.roundEvents){work.roundEvents=n;work.roundAt=Date.now()}const waited=Date.now()-(work.roundAt||work.started),did=ev.some(e=>e.t==='edit'||e.t==='build'||e.t==='test');if(r)text(r,did?(waited>30000?'Still thinking… (this model is slow today)':'Thinking about the next step…'):waited>45000?'Planning the app… (a slow free model can take a few minutes; the fast model streams at once)':waited>15000?'Planning the app…':'Thinking…')}if(detailState.source==='live')renderDetail()}
+function tickWork(){const li=$('stream');if(!li)return;text(li.querySelector('.work-time'),secs(Date.now()-work.started));if(work.job&&phaseOf(work.job)==='thinking'){const r=li.querySelector('.rail.live .ev-think:last-child .ev-label');const ev=work.job.events||[],n=ev.length;if(n!==work.roundEvents){work.roundEvents=n;work.roundAt=Date.now()}const waited=Date.now()-(work.roundAt||work.started),did=ev.some(e=>e.t==='edit'||e.t==='build'||e.t==='test');if(r)text(r,did?(waited>60000?'Still thinking about the next step…':'Thinking about the next step…'):waited>45000?'Planning the app… (a full app plan can take a minute or two)':waited>15000?'Planning the app…':'Thinking…')}if(detailState.source==='live')renderDetail()}
 // ---------- the Details panel (over the preview) ----------
 const detailState={source:null,tab:'timeline'};
 function openDetail(source,tab){detailState.source=source;if(tab)detailState.tab=tab;$('detail').classList.remove('hidden');document.querySelector('.stage').classList.add('show-detail');renderDetail()}

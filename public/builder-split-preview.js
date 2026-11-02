@@ -27,7 +27,7 @@ if(typeof module!=="undefined"&&module.exports)module.exports={kqSplitBounds,kqW
  const CHAT_MIN_PX=320,PREVIEW_MIN_PX=720,BROWSER_PREVIEW_MIN_PX=560,BROWSER_MIN_PX=380;
  const handle=document.createElement("div");handle.id="kq-split-handle";handle.setAttribute("role","separator");handle.setAttribute("aria-label","Resize chat and live preview");handle.setAttribute("aria-orientation","vertical");handle.tabIndex=0;
  editor.insertBefore(handle,stage);
- const safeWidth=()=>{try{const v=Number(localStorage.getItem("kq-chat-width"));return Number.isFinite(v)&&v>=22&&v<=60?v:30}catch{return 30}};
+ const safeWidth=()=>{try{const v=Number(localStorage.getItem("kq-chat-width"));return Number.isFinite(v)&&v>=22&&v<=60?v:38}catch{return 38}};
  let preferredWidth=safeWidth(),appliedWidth=preferredWidth,dragging=false;
  function browserOpen(){return editor.classList.contains("kq-browser-open")&&!document.getElementById("web-browser-pane")?.classList.contains("hidden")}
  function layout(){return kqWorkspaceLayout(editor.getBoundingClientRect().width,browserOpen(),{chatMin:CHAT_MIN_PX,previewMin:PREVIEW_MIN_PX,browserPreviewMin:BROWSER_PREVIEW_MIN_PX,browserMin:BROWSER_MIN_PX})}

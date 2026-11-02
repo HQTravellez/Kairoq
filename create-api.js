@@ -244,6 +244,19 @@ function supportAnswer(meta){
   'If the preview is still blank, tell me exactly what you see (a screenshot helps) or paste any error from the browser console, and I will look without charging. If you wanted a change to the app instead, describe it and I will build it.'
  ].join('\n');
 }
+// What a running build is doing right now, in plain words, for a question asked meanwhile.
+function buildingNote(job){
+ if(!job)return'';
+ const ev=job.events||[],files=[...new Set(ev.filter(e=>e.t==='edit'&&e.file).map(e=>e.file))];
+ const mins=Math.max(0,Math.round((Date.now()-Date.parse(job.created_at||0))/60000));
+ const last=ev.filter(e=>e.t!=='think').at(-1);
+ return ['A build is running right now in this project (it keeps going while you answer).',
+  job.ask?'The owner asked it for: "'+job.ask+'"':'',
+  'Started '+(mins<1?'less than a minute':mins+' minute'+(mins===1?'':'s'))+' ago. Current stage: '+(job.status||'working')+'.',
+  files.length?'Files written so far: '+files.slice(-12).join(', ')+(files.length>12?' and '+(files.length-12)+' more':'')+'.':'No files written yet.',
+  last&&last.t==='build'?'Last step: built the preview'+(last.ok===false?' (it failed and is being fixed)':'')+'.':last&&last.t==='test'?'Last step: tested in a browser'+(last.ok===false?' (found problems, being fixed)':'')+'.':'',
+  'Answer from this. Do not say you have no record of the task. Do not promise a finish time.'].filter(Boolean).join('\n');
+}
 function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false,implementFrom=null},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
  const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
@@ -392,7 +405,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  const choices=require('./model-choices'),chosen=choices.pick(model);
  if(model&&model!=='auto'&&!chosen)throw Object.assign(Error('The selected model '+String(model).slice(0,100)+' is not available. Choose another model or explicitly select Auto; Kairoq will not silently switch models.'),{status:409});
  const credits=onUs?0:cost({mode,tier,images:images.length>0,model:chosen})+extraCredits;
- const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,execution_mode:executionMode,credits,status:'queued',seq:0,created_at:new Date().toISOString(),...(onUs?{on_us:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,execution_mode:executionMode,credits,status:'queued',seq:0,created_at:new Date().toISOString(),ask:String(message||'').trim().slice(0,400),...(onUs?{on_us:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
  const update=patch=>{Object.assign(job,patch);job.seq++};
  // Every model call for this message goes to the chosen model first; if it cannot run, the
  // usual builder (Auto) does the work and the chat says so.
@@ -483,6 +496,9 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    }
    else if(mode==='discuss'){
     update({status:'thinking'});
+    // Asked while a build runs: tell the model what that build is doing, so "how is it going?"
+    // gets a real answer instead of "I don't have a record of any task".
+    if(concurrentDiscuss)context=[context,buildingNote(active)].filter(Boolean).join('\n\n');
     job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context,
      browserRuntime});
    }
@@ -2056,4 +2072,4 @@ async function publishProject(id,{slug,version,force}={},{inspect,screenshot,ren
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;
 }
-module.exports={busy,exclusive,handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
+module.exports={buildingNote,busy,exclusive,handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};

@@ -1,0 +1,70 @@
+/* The public landing page (signed out) in the light workspace look: off-white ground, white
+   cards, deep navy for actions. Loaded after landing.css; replaces landing-mono.css. */
+body:not(.app){
+  --bg:#FAFBFC;--panel:#FFFFFF;--side:#FAFBFC;--border:rgba(17,18,22,.072);--line:rgba(17,18,22,.072);
+  --text:#2A2D32;--muted:#737980;--accent:#0A2A52;--accent-2:#123A6E;--accent-3:rgba(10,42,82,.18);--accent-ink:#FAFBFC;
+  --hover:rgba(17,18,22,.054);--error:#D92D3A;--ok:#15803D;--code:#FFFFFF;--ink:#2A2D32;--ink-text:#FAFBFC;--glass:rgba(255,255,255,.82);
+  --shadow-sm:0 1px 2px rgba(16,18,24,.06);--shadow:0 12px 30px -12px rgba(16,18,24,.105);--shadow-lg:0 30px 70px -25px rgba(16,18,24,.128);--grad:#0A2A52;
+  background:#FAFBFC;color:#2A2D32;color-scheme:light;
+}
+body:not(.app)::before{display:none}
+body:not(.app) .landing{--dark:#FFFFFF;--dark-2:#EDF0F4;--dark-text:#2A2D32;--dark-muted:#737980;--dark-line:rgba(17,18,22,.09);--stage:#FFFFFF;--stage-2:#EDF0F4;--glow:rgba(10,42,82,.18)}
+body:not(.app) .top-bar{background:rgba(255,255,255,.85);border-bottom:1px solid rgba(17,18,22,.054);backdrop-filter:blur(10px)}
+body:not(.app) .brand{color:#2A2D32}
+body:not(.app) .brand span,body:not(.app) .brand-foot b{background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;-webkit-text-fill-color:#0A2A52!important;color:#0A2A52!important}
+body:not(.app) .brand::before{content:"K";display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:#0A2A52;color:#FAFBFC;font:700 13px/1 Geist,ui-sans-serif,sans-serif;box-shadow:none}
+body:not(.app) .brand .mark,body:not(.app) .brand img{display:none}
+body:not(.app) .bar-nav a,body:not(.app) .bar-nav button{color:#737980}
+body:not(.app) .bar-nav a:hover{color:#2A2D32}
+body:not(.app) button.primary,body:not(.app) .primary,body:not(.app) #nav-start,body:not(.app) #landing-check-go{background:#0A2A52!important;border-color:#0A2A52!important;color:#FAFBFC!important;box-shadow:none!important}
+body:not(.app) button.primary:hover,body:not(.app) #nav-start:hover{background:#123A6E!important}
+body:not(.app) .ghost{color:#3D4149}
+/* the hero on the night sky */
+body:not(.app) .landing .hero{background-color:#FAFBFC;background-image:
+  radial-gradient(1.5px 1.5px at 12% 18%,rgba(17,18,22,.75) 50%,transparent 51%),
+  radial-gradient(1px 1px at 28% 42%,rgba(17,18,22,.6) 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 44% 12%,rgba(17,18,22,.7) 50%,transparent 51%),
+  radial-gradient(1px 1px at 61% 30%,rgba(17,18,22,.55) 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 73% 9%,rgba(17,18,22,.7) 50%,transparent 51%),
+  radial-gradient(1px 1px at 86% 36%,rgba(17,18,22,.6) 50%,transparent 51%),
+  radial-gradient(1px 1px at 93% 16%,rgba(17,18,22,.5) 50%,transparent 51%),
+  radial-gradient(1px 1px at 36% 58%,rgba(17,18,22,.45) 50%,transparent 51%),
+  radial-gradient(70px 70px at 11% 22%,rgba(255,255,240,.28) 0%,rgba(255,255,240,.05) 40%,rgba(255,255,240,0) 70%),
+  radial-gradient(52% 38% at 18% 70%,rgba(120,128,140,.22) 0%,rgba(120,128,140,0) 70%),
+  radial-gradient(60% 40% at 78% 24%,rgba(110,118,130,.26) 0%,rgba(110,118,130,0) 70%),
+  linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0) 60%,#FAFBFC 100%),
+  linear-gradient(rgba(17,18,22,.032) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(17,18,22,.032) 1px,transparent 1px);
+  background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,48px 48px,48px 48px;background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,repeat,repeat}
+body:not(.app) .landing .aurora{display:none!important}
+body:not(.app) .landing .eyebrow{background:rgba(10,42,82,.12);border:1px solid rgba(10,42,82,.3);color:#0A2A52;font:500 12px/1 "Geist Mono",ui-monospace,monospace}
+body:not(.app) .landing h1,body:not(.app) .landing h2{color:#2A2D32;font-weight:500;letter-spacing:-.035em}
+body:not(.app) .landing h1 em,body:not(.app) .landing h2 em{font-family:Geist,ui-sans-serif,sans-serif!important;font-style:normal!important;font-weight:500!important;color:#737980!important;background:none!important;-webkit-text-fill-color:#737980!important}
+body:not(.app) .landing .lede{color:#737980}
+body:not(.app) .landing .prompt-box,body:not(.app) .hero .prompt-box{background:rgba(255,255,255,.94)!important;border:1px solid rgba(17,18,22,.108)!important;box-shadow:0 30px 60px -30px rgba(16,18,24,.135)!important;border-radius:16px!important}
+body:not(.app) .landing .prompt-box textarea{background:transparent;color:#2A2D32}
+body:not(.app) .landing .ptool{background:#EDF0F4;color:#737980;border:1px solid rgba(17,18,22,.072)}
+body:not(.app) .landing .ptool.round{background:transparent;border:0;color:#737980}
+body:not(.app) .landing .hero-ideas button,body:not(.app) .landing .idea{background:#FFFFFF;border:1px solid rgba(17,18,22,.09);color:#3D4149}
+body:not(.app) .landing .hero-ideas button:hover{background:#EDF0F4;color:#000}
+body:not(.app) .landing .hero-facts,body:not(.app) .landing .facts{color:#737980}
+body:not(.app) .kicker{color:#0A2A52!important}body:not(.app) .kicker::before{background:#0A2A52!important}
+body:not(.app) .landing .card,body:not(.app) .landing .tile,body:not(.app) .landing .plan,body:not(.app) .landing .step,body:not(.app) .landing .feature,body:not(.app) .landing .show-card,body:not(.app) .landing .template-card{background:#FFFFFF;border-color:rgba(17,18,22,.072);color:#2A2D32;box-shadow:none}
+body:not(.app) .landing .muted,body:not(.app) .landing p{color:#737980}
+body:not(.app) .landing .card p,body:not(.app) .landing .tile p,body:not(.app) .landing li{color:#3D4149}
+body:not(.app) .landing .site-check-band,body:not(.app) .landing .cta,body:not(.app) .landing .compare,body:not(.app) .landing [class*=dark]{background:#FFFFFF!important;color:#2A2D32}
+body:not(.app) .landing .site-check-band input,body:not(.app) .landing .sc-form input{background:#FAFBFC;color:#2A2D32;border:1px solid rgba(17,18,22,.108)}
+body:not(.app) .landing .funnel-row i,body:not(.app) .landing .tile.wide .funnel-row i,body:not(.app) .landing .mock-bar>span{background:#0A2A52!important}
+body:not(.app) .landing .plan.hi,body:not(.app) .landing .plan.featured,body:not(.app) .landing .plan[data-popular]{border-color:rgba(10,42,82,.5)}
+body:not(.app) .landing .price,body:not(.app) .landing .plan b{color:#2A2D32}
+body:not(.app) .landing footer,body:not(.app) .landing .foot{color:#868C95;border-top:1px solid rgba(17,18,22,.072)}
+body:not(.app) .landing footer a{color:#737980}
+body:not(.app) .auth-dialog,body:not(.app) dialog{background:#FFFFFF;color:#2A2D32;border:1px solid rgba(17,18,22,.09)}
+body:not(.app) dialog::backdrop{background:rgba(16,18,24,.31)}
+body:not(.app) .auth-card input{background:#FAFBFC;color:#2A2D32;border:1px solid rgba(17,18,22,.108)}
+body:not(.app) .auth-card .google{background:#EDF0F4;color:#2A2D32;border:1px solid rgba(17,18,22,.108)}
+body:not(.app) .auth-card button[role=tab][aria-selected=true]{color:#2A2D32;border-color:#0A2A52}
+body:not(.app) .auth-card .link-btn{color:#0A2A52}
+body:not(.app) dialog.auth-dialog{background:transparent;border:0;box-shadow:none;padding:0}
+body:not(.app) .auth-card{background:#FFFFFF;border:1px solid rgba(17,18,22,.09);border-radius:18px;box-shadow:0 40px 80px -20px rgba(16,18,24,.12)}
+body:not(.app) .landing .eyebrow{line-height:1.3;text-align:center}
