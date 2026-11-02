@@ -29,7 +29,7 @@ test('"hi" in Build gets a free reply and starts no build',async()=>{
  assert.equal(job.credits,0);
  assert.equal(called,false);
  const last=builder.loadMeta(meta.id).messages.at(-1);
- assert.match(last.text,/We’re continuing Yoga Studio\./);
+ assert.match(last.text,/Hi! Tell me what Yoga Studio should do/);
  assert.equal(last.conversation_kind,'social');
  assert.equal(last.credits,0);
 });
@@ -50,4 +50,13 @@ test('"what can you do" with a topic gets a real answer, not the help menu',()=>
  }
  for(const m of ['what can you do 3d int his','what can you do with 3d?'])assert.equal(S.conversation(m),true,m);
  for(const m of ['what can you do','what can you do for me?','hi, what can you do','help please','help'])assert.equal(S.smallTalk(m),'help',m);
+});
+
+test('"hi" after a draft build says where the project stands',()=>{
+ const S=require('../builder-smalltalk');
+ const meta={name:'Marigold Bakery',current_version:2,messages:[{role:'user',text:'build it'},{role:'assistant',version:2,text:'UNVERIFIED DRAFT · NOT functionally verified.\n\nPROOF\n- Build: passed\n- Browser: passed · 9 interaction step(s)\n- Visual quality: failed\n- Engineering review: failed\n- Unresolved: x\n\nBuilt it.',timeline:[{t:'edit',file:'src/pages/Home.jsx'},{t:'edit',file:'src/pages/Menu.jsx'},{t:'edit',file:'src/pages/CakeRequest.jsx'}]}]};
+ const r=S.reply('hi',meta);
+ assert.match(r,/^Hi! Marigold Bakery is up as a draft \(v2\) with Home, Menu and Cake request\. Two things are still open: the look check and code review\. Want me to fix those/);
+ const ok={...meta,messages:[meta.messages[0],{...meta.messages[1],text:'VERIFIED BUILD\n\nPROOF\n- Build: passed\n- Browser: passed\n\nBuilt it.'}]};
+ assert.match(S.reply('thanks',ok),/^You're welcome! Marigold Bakery is built and checked \(v2\) with Home, Menu and Cake request\. What would you like to change next\?/);
 });

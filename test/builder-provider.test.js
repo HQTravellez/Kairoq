@@ -54,3 +54,15 @@ test('a chosen Claude model goes straight to Anthropic when its key is set',asyn
  const {calls}=await claudeCall({ANTHROPIC_API_KEY:undefined,OPENROUTER_API_KEY:'test-only',EXPLABS_API_KEY:undefined});
  assert.match(calls[0].url,/openrouter\.ai/);assert.equal(calls[0].body.model,'anthropic/claude-opus-5.5');
 });
+
+test('freeOnly chat stays on free models in premium mode',async()=>{
+ const saved={...process.env},original=global.fetch,models=[];
+ Object.assign(process.env,{KAIROQ_BUILDER_MODE:'premium',KAIROQ_BUILDER_PAID_APPROVED:'true',KAIROQ_BUILDER_PROVIDER:'openrouter',OPENROUTER_API_KEY:'test-only',KAIROQ_BUILDER_MODEL:'anthropic/claude-sonnet-4.5'});
+ delete process.env.EXPLABS_API_KEY;delete process.env.ANTHROPIC_API_KEY;
+ global.fetch=async(url,o)=>{const b=JSON.parse(o&&o.body||'{}');if(b.model)models.push(b.model);return new Response(JSON.stringify({choices:[{message:{content:'{"ok":true}'}}],usage:{cost:0}}),{status:200,headers:{'Content-Type':'application/json'}})};
+ try{await callBuilderModel({messages:[{role:'user',content:'hi'}],tier:'chat',freeOnly:true},c=>JSON.parse(c))}
+ catch(e){}
+ finally{global.fetch=original;process.env=saved}
+ assert.ok(models.length,'a model was asked');
+ assert.ok(models.every(m=>/:free$/.test(m)||/^(openrouter\/free|kairoq|local)/.test(m)),'only free models: '+models.join(', '));
+});

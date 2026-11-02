@@ -41,7 +41,7 @@ ${images?`- {"tool":"generate_images","images":[{"name":"hero-terrace.jpg","prom
 - {"tool":"web_act","steps":[{"action":"click","target":12},{"action":"click","target":"Pricing"},{"action":"fill","target":"Search","value":"..."},{"action":"select","target":9,"value":"..."},{"action":"scroll","value":"down"},{"action":"back"}]}: click around the page that is open (by number or by its text) and read the result. Reading only: nothing is sent to other sites.
 - {"tool":"fetch_url","url":"https://..."}: read a raw page or a JSON API response as text (no JavaScript).
 `:''}- {"tool":"finish","message":"for the user: what you built and how to use it"}: end when the request is done and the last build_and_test or test_ui passed.
-Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. For an initial app or a cohesive feature, put all needed files in ONE write_files action and then build_and_test; do not spend one model/tool round trip per file. Only split over two or three steps when the complete source cannot fit the response limit. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors, and keep the saved checks passing. Be economical: you have at most ${maxSteps} steps.`;
+Work this way: understand the request, read what you need, plan, write every needed file, then build_and_test. For an initial app or a cohesive feature, put all needed files in ONE write_files action and then build_and_test; do not spend one model/tool round trip per file. Only split over two or three steps when the complete source cannot fit the response limit. Exercise the main flows with test_ui (forms, buttons, navigation, sign-in when relevant) and check view_logs after using server functions. Fix every error you find and test again. Never finish with known errors, and keep the saved checks passing. Be economical: you have at most ${maxSteps} steps and a time budget. Ship, then iterate: once the app builds and its browser test passes, finish and say plainly what is still open rather than spending more rounds on polish; the owner can send it back.`;
 }
 
 // Never throws: a reply that is not valid JSON comes back as {invalid} so the loop can ask again.
@@ -125,6 +125,11 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  const box=require('./react-sandbox').create(id);
  let checksWarned=false,lastSavedChecks=null,lastVisualQuality=null,repairAttempts=0,needsRepair=false,reviewBlocks=0,lastBlockingReview=null;
  const reviewRounds=intEnv('KAIROQ_REVIEW_ROUNDS',2,1,6);
+ // Ship, then iterate (like Emergent): the look check gets this many repair rounds, and the whole
+ // run this many minutes. Past either, the next build that passes its browser test is saved as a
+ // draft and what is still open goes in the verdict ("Not done yet"), for the owner to send back.
+ const visualRounds=intEnv('KAIROQ_VISUAL_ROUNDS',1,0,6),maxMinutes=intEnv('KAIROQ_AGENT_MAX_MINUTES',12,2,60);
+ let visualBlocks=0;const overTime=()=>Date.now()-Date.parse(started)>maxMinutes*60000;
  const normalLimit=Number.isInteger(maxSteps)?maxSteps:maxStepsDefault();
  const recoverySteps=researchOnly?0:recoveryStepsDefault();
  const limit=normalLimit+recoverySteps;
@@ -528,7 +533,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     const engReview=require('./engineering-review'),reviewRequired=engReview.required(base,work,text);
     // Past the review rounds, no new review: the last one's open findings stand in the verdict.
     if(reviewRequired&&!lastReview&&reviewBlocks>=reviewRounds&&lastBlockingReview)lastReview=lastBlockingReview;
-    if(reviewRequired&&!lastReview){
+    if(reviewRequired&&!lastReview&&!overTime()){
      try{
       lastReview=await engReview.run({callModel,base,current:work,request:text,ownerRequirements,knowledge:require('./project-knowledge').note(id),tier,signal});
       results.push('Engineering review:\n'+engReview.summary(lastReview));
@@ -550,7 +555,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
     }
     const visualGate=require('./visual-quality-gate');
     const visualRequired=visualGate.required({base,current:work,request:text});
-    if(visualRequired&&(!lastVisualQuality||lastVisualQuality.version!==built.n)){
+    if(visualRequired&&!overTime()&&(!lastVisualQuality||lastVisualQuality.version!==built.n)){
       report({status:'reviewing'});
       lastVisualQuality=await visualGate.evaluate({
         url:built.url,request:text,meta:builder.loadMeta(id),designShots,reviewLook,signal
@@ -558,9 +563,10 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
       lastVisualQuality.version=built.n;
       tl.add({t:'test',ok:lastVisualQuality.passed,text:lastVisualQuality.passed?'Visual quality passed':'Visual quality needs repair',
         detail:lastVisualQuality.passed?[]:[visualGate.failureText(lastVisualQuality)]});
-      if(!lastVisualQuality.passed){
+      if(!lastVisualQuality.passed&&!lastVisualQuality.counted){lastVisualQuality.counted=true;visualBlocks++}
+      if(!lastVisualQuality.passed&&visualBlocks<=visualRounds){
         finishWarned=true;needsRepair=true;
-        results.push('finish: visual quality gate did not pass. Repair these visible problems and build/test again:\n'+visualGate.failureText(lastVisualQuality));
+        results.push('finish: visual quality gate did not pass. Repair these visible problems and build/test again ('+(visualRounds-visualBlocks+1)+' repair round'+(visualRounds-visualBlocks+1===1?'':'s')+' left for the look; after that the draft ships with these listed as not done):\n'+visualGate.failureText(lastVisualQuality));
         continue;
       }
       results.push('Visual quality: PASS on '+lastVisualQuality.screenshots+' captured view(s).');
@@ -569,9 +575,17 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
       visualQuality:lastVisualQuality,visualRequired,repairs:repairAttempts});
     // Out of review rounds: when the review is the only thing still open, the draft is saved and
     // the verdict says so (it stays unverified); any other failure still has to be repaired.
-    const onlyReview=reviewCapped&&verdict.issues.every(i=>/engineering review/i.test(i));
-    if(!verdict.verified&&!onlyReview){finishWarned=true;needsRepair=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
-    finished=save(onlyReview?message+' The independent review still had '+lastReview.blocking.length+' open finding(s) after '+reviewBlocks+' rounds: '+lastReview.blocking.map(x=>(x.file?x.file+': ':'')+x.message).join(' ').slice(0,600):message);break;
+    // Out of rounds or out of time: the review and the look check may stay open (they go in the
+    // verdict); anything else (the build, the browser test, saved checks, tests) still has to pass.
+    const visualCapped=Boolean(lastVisualQuality&&!lastVisualQuality.passed)&&visualBlocks>visualRounds,late=overTime();
+    const soft=i=>/engineering review|Standards \+ Spec review/i.test(i)?(reviewCapped||late):/visual quality/i.test(i)||i===(lastVisualQuality&&lastVisualQuality.reason)?(visualCapped||late):false;
+    const onlyCapped=!verdict.verified&&verdict.issues.every(soft);
+    if(!verdict.verified&&!onlyCapped){finishWarned=true;needsRepair=true;results.push('finish: Verification is incomplete: '+verdict.issues.join(' ')+' Repair the failure and retest. Calling finish again cannot bypass this gate.');continue}
+    const open=[];
+    if(onlyCapped&&lastReview?.blocking?.length)open.push('The independent review still had '+lastReview.blocking.length+' open finding(s) after '+reviewBlocks+' round'+(reviewBlocks===1?'':'s')+': '+lastReview.blocking.map(x=>(x.file?x.file+': ':'')+x.message).join(' ').slice(0,600));
+    if(onlyCapped&&lastVisualQuality&&!lastVisualQuality.passed)open.push('The look check still found: '+require('./visual-quality-gate').failureText(lastVisualQuality).slice(0,600));
+    if(onlyCapped&&late&&verdict.issues.some(i=>/not (executed|evaluated)/i.test(i)))open.push('I stopped at the '+maxMinutes+'-minute budget, so '+verdict.issues.filter(i=>/not (executed|evaluated)/i.test(i)).map(i=>i.replace(/\.$/,'').toLowerCase()).join(' and ')+'.');
+    finished=save(open.length?message+' '+open.join(' '):message);break;
    }
    try{
     const r=await tool(a),resultText=clip(r.text,20000);results.push(resultText);if(r.image)image=r.image;
@@ -587,7 +601,8 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   const recoveryNote=step===normalLimit&&recoverySteps
    ?'\n\nNORMAL EXECUTION BUDGET ENDED. Enter bounded recovery mode now: do not add scope. Repair only the remaining build/test/visual/review blockers, rerun evidence, and finish when the gate passes.'
    :'';
-  const body='Results of step '+step+' of '+limit+':\n\n'+clip(results.join('\n\n'),60000)+recoveryNote+(step===limit-1?'\n\nYou have one recovery step left: repair the remaining blocker and call finish only if evidence passes.':'');
+  const timeNote=overTime()&&built&&!dirty?'\n\nTIME: the '+maxMinutes+'-minute budget for this build is used up. Do not start new repairs. If the current build passed its browser test, call finish now and say plainly what is still open.':'';
+  const body='Results of step '+step+' of '+limit+':\n\n'+clip(results.join('\n\n'),60000)+recoveryNote+timeNote+(step===limit-1?'\n\nYou have one recovery step left: repair the remaining blocker and call finish only if evidence passes.':'');
   messages.push({role:'user',content:image?[{type:'text',text:body},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+image}}]:body});
  }
  // Out of steps: keep the work if it builds.
@@ -596,7 +611,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
  if(!built)throw Object.assign(Error('The agent stopped after '+steps.length+' steps and the project does not build.'),{status:422});
  // Out of rounds with a build that works: Kairoq runs the checks the agent did not get to (the
  // review and the visual gate), so the verdict rests on evidence, not on "was not evaluated".
- if(!dirty){
+ if(!dirty&&!overTime()){
   signal?.throwIfAborted();
   try{
    const engReview=require('./engineering-review');

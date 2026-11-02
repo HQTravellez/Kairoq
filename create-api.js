@@ -257,11 +257,20 @@ function buildingNote(job){
   last&&last.t==='build'?'Last step: built the preview'+(last.ok===false?' (it failed and is being fixed)':'')+'.':last&&last.t==='test'?'Last step: tested in a browser'+(last.ok===false?' (found problems, being fixed)':'')+'.':'',
   'Answer from this. Do not say you have no record of the task. Do not promise a finish time.'].filter(Boolean).join('\n');
 }
+// A one-line answer from a running build's live state, e.g. "Still building, 9 min in: 14 files
+// written, testing in the browser now. I'll post the result here when it's done."
+function liveLine(job){
+ const ev=(job&&job.events)||[],files=new Set(ev.filter(e=>e.t==='edit'&&e.file).map(e=>e.file)).size;
+ const mins=Math.max(0,Math.round((Date.now()-Date.parse(job&&job.created_at||0))/60000));
+ const last=ev.filter(e=>e.t!=='think'&&e.t!=='plan').at(-1),st=String(job&&job.status||'');
+ const now=/check|review|verif/.test(st)?'checking the result now':st==='testing'||(last&&last.t==='test')?'testing in the browser now':st==='building'||(last&&last.t==='build')?'building the preview now':/repair|fix/.test(st)?'fixing what the test found':files?'writing the code':'planning the app';
+ return'Hi! Still building'+(mins?', '+mins+' min in':'')+': '+(files?files+' file'+(files===1?'':'s')+' written, ':'')+now+". I'll post the result here when it's done.";
+}
 function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[],context='',referenceOnly=false,extraCredits=0,label='',hooks=null,fix=false,implementFrom=null},{callModel,checkRuntime,inspect,webSearch,browseSite,browse,designShots,generateImage,reviewLook}){
  const active=[...jobs.values()].find(job=>job.projectId===id&&ACTIVE.has(job.status));
  const concurrentDiscuss=Boolean(active)&&mode==='discuss'&&!hooks;
  if(active&&!model&&!hooks&&!images.length&&!context&&require('./builder-smalltalk').smallTalk(message)){
-  const answer='I’m here. The current change is still running, and your earlier messages and plan are kept. You can keep chatting or stop the build.';
+  const answer=liveLine(active);
   builder.addMessages(id,[{role:'user',text:String(message).trim(),conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',support:true,credits:0,conversation_kind:'status'}]);
   const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode:'discuss',tier,credits:0,status:'complete',seq:1,support:true,created_at:new Date().toISOString(),finished_at:new Date().toISOString(),result:{message:answer,unchanged:true,support:true}};
   jobs.set(job.id,job);setTimeout(()=>jobs.delete(job.id),3600000).unref?.();return job;
@@ -282,7 +291,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  const pinnedModel=Boolean(model);
  // The composer is conversational: an explicit action request must execute even if the UI
  // is currently in Discuss, while questions can still be answered by the selected paid model.
- const routing=require('./conversation-routing'),ownerText=String(message||'').trim();
+ const routing=require('./conversation-routing');let ownerText=String(message||'').trim();
  if(!implementFrom&&routing.proposalApproval(ownerText)){
   const latest=[...(builder.loadMeta(id).messages||[])].reverse().find(m=>m&&m.role==='assistant');
   if(latest&&latest.proposal&&!latest.question&&latest.at)implementFrom=latest.at;
@@ -363,7 +372,13 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   const S=require('./builder-smalltalk'),kind=S.smallTalk(message);
   // Intent is independent of model choice. Social acknowledgements such as "great work",
   // "thanks", "perfect" or "looks good" are conversation even when the composer says Build.
-  if(kind){
+  // "yes" / "sure" right after Kairoq offered to fix the open items is a go-ahead, not small talk.
+  const lastSaid=kind==='thanks'?(builder.loadMeta(id).messages||[]).at(-1):null;
+  if(lastSaid&&lastSaid.role==='assistant'&&/Want me to fix (it|those)/.test(String(lastSaid.text||''))&&/^(yes|yep|yeah|sure|ok|okay|alright|do it|go ahead|please do)\b/i.test(String(message).trim())){
+   const st=S.status(builder.loadMeta(id));
+   if(st&&st.open.length){message='Fix what is not done yet: '+st.open.join(', ')+'. Keep everything else as it is.';ownerText=message;mode=mode==='discuss'?'build':mode}
+  }
+  else if(kind){
    if(!pinnedModel){
     const meta=builder.loadMeta(id),answer=S.reply(kind,meta);
     builder.addMessages(id,[{role:'user',text:String(message).trim(),mode,conversation_kind:'social'},{role:'assistant',text:answer,mode:'support',credits:0,support:true,conversation_kind:'social'}]);
@@ -499,7 +514,10 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     // Asked while a build runs: tell the model what that build is doing, so "how is it going?"
     // gets a real answer instead of "I don't have a record of any task".
     if(concurrentDiscuss)context=[context,buildingNote(active)].filter(Boolean).join('\n\n');
-    job.result=await builder.discuss(id,message,{callModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context,
+    // Chat runs on the free route (Kairoq Agent, FreeLLMAPI, free providers); builds stay premium.
+    // A picture still needs a vision model, and a model the owner picked by name is kept.
+    const chatModel=images.length||model||process.env.KAIROQ_CHAT_FREE==='off'?callModel:(o,p)=>callModel({...o,tier:'chat',freeOnly:true},p);
+    job.result=await builder.discuss(id,message,{callModel:chatModel,onStream,onThinking,onEvent,tier:modelTier,images,signal,context,
      browserRuntime});
    }
    else if(mode==='polish'){job.result=await builder.polish(id,{shots:designShots,note:message,callModel,onVersion,onStream,onThinking,onEvent,tier:modelTier,checkRuntime,inspect,signal,imageGen,imageNote,onProgress:s=>update({status:s,stream:null})})}
@@ -2072,4 +2090,4 @@ async function publishProject(id,{slug,version,force}={},{inspect,screenshot,ren
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;
 }
-module.exports={buildingNote,busy,exclusive,handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
+module.exports={liveLine,buildingNote,busy,exclusive,handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};

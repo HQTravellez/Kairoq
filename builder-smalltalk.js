@@ -47,10 +47,40 @@ const ASKING=/\b(suggest(ions?)?|ideas?|recommend(ations?)?|advice|advise|explai
 // "suggest a gallery and add it" still asks for a change.
 const CHANGE_ASK=/\b(and|then) (add|build|make|create|change|put|implement)\b|\b(add|build|make|create|change|implement) (it|them|that|those|a|an|the)\b/i;
 
+// Where the project stands, from its last build: version, pages written and what is still open.
+const OPEN_NAMES={'Visual quality':'the look check','Engineering review':'code review','Browser':'the browser test','Regression checks':'saved checks','Verification tests':'tests','Build':'the build'};
+function pageName(file){
+ const m=/(?:^|\/)(?:pages|screens|routes)\/(?:.*\/)?([^/]+)\.(?:jsx?|tsx?)$/i.exec(String(file||''));
+ if(!m||/^(index|_app|_document|layout)$/i.test(m[1]))return null;
+ const w=m[1].replace(/(Page|Screen|View|Route)$/,'').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[-_]+/g,' ').trim().toLowerCase();
+ return w?w.charAt(0).toUpperCase()+w.slice(1):null;
+}
+function status(meta){
+ const msgs=(meta&&meta.messages)||[];
+ const last=[...msgs].reverse().find(m=>m.role==='assistant'&&(m.version||/^(VERIFIED BUILD|UNVERIFIED DRAFT)/.test(String(m.text||''))));
+ if(!last)return null;
+ const proof=/^(VERIFIED BUILD|UNVERIFIED DRAFT)[^\n]*\n+PROOF\n([\s\S]*?)(?:\n\n|$)/.exec(String(last.text||'').trim());
+ const open=[];
+ if(proof)for(const l of proof[2].split('\n')){const r=/^- ([^:]+): (.*)$/.exec(l);if(r&&/^failed/.test(r[2])&&OPEN_NAMES[r[1]])open.push(OPEN_NAMES[r[1]])}
+ const pages=[...new Set((last.timeline||[]).filter(e=>e.t==='edit').map(e=>pageName(e.file)).filter(Boolean))];
+ return{version:last.version||meta.current_version||null,verified:proof?proof[1]==='VERIFIED BUILD':null,open:[...new Set(open)],pages};
+}
+const list=a=>a.length<=1?a.join(''):a.slice(0,-1).join(', ')+' and '+a.at(-1);
+function stateLine(name,st){
+ if(!st)return null;
+ const v=st.version?' (v'+st.version+')':'',with_=st.pages.length?' with '+list(st.pages.slice(0,5)):'';
+ if(st.open.length)return name+' is up as a draft'+v+with_+'. '+(st.open.length===1?'One thing is':(['','One','Two','Three','Four','Five'][st.open.length]||st.open.length)+' things are')+' still open: '+list(st.open)+'. Want me to fix '+(st.open.length===1?'it':'those')+', or change something else?';
+ return name+' is built'+(st.verified?' and checked':'')+v+with_+'. What would you like to change next?';
+}
 function reply(kind,meta){
  const name=meta&&meta.name||'your app';
  const pending=require('./builder-question').pending(meta);
- if(kind!=='help')return(kind==='thanks'?"You're welcome.":"Hi — I'm here.")+' '+(pending&&pending.options.length?'Your choice is still open: '+pending.options.join(' or ')+'.':'We’re continuing '+name+'. Tell me what you’d like to do next.');
+ if(kind!=='help'){
+  if(pending&&pending.options.length)return(kind==='thanks'?"You're welcome.":'Hi!')+' Your choice is still open: '+pending.options.join(' or ')+'.';
+  const line=stateLine(name,status(meta));
+  if(line)return(kind==='thanks'?"You're welcome! ":'Hi! ')+line;
+  return kind==='thanks'?"You're welcome. Tell me what you'd like "+name+' to do next.':'Hi! Tell me what '+name+" should do: who it's for, the pages you need, and what people can do on it. I'll ask a couple of questions, then build it.";
+ }
  const fresh=!meta||!(meta.current_version>1);
  const examples=fresh
   ?['Who it is for and what it should do','The pages you need (for example home, rooms, booking, contact)','What people can do on it: book, sign up, send a request']
@@ -72,4 +102,4 @@ function conversation(message){
  return(CONVERSATION.test(t)||shortTalk)&&!CHANGE.test(t);
 }
 
-module.exports={smallTalk,questionOnly,conversation,reply};
+module.exports={smallTalk,questionOnly,conversation,reply,status,stateLine};
