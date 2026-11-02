@@ -2067,9 +2067,6 @@ function atProjectCap(n){const cap=Number(process.env.KAIROQ_BUILDER_MAX_PROJECT
 async function createProject(v,{name,prompt,template,tier='standard',images=[],engine}={},deps){
  if(atProjectCap(builder.list(v.owner).length))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
  prompt=String(prompt||'').trim();
- // No template chosen: a prompt that plainly asks for an app Kairoq has a template for starts from it.
- const matched=!template&&prompt?require('./create-templates').match(prompt):null;
- const tpl=template?require('./create-templates').get(String(template)):matched?require('./create-templates').get(matched):null;
  const T=require('./create-templates');
  // A SaaS asked for in words starts from the SaaS starter, so the build only writes the product part.
  // No template chosen: a prompt that plainly asks for an app Kairoq has a template for starts from
@@ -2079,7 +2076,7 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[],e
  const tpl=template||matched||auto?T.get(String(template||matched||auto)):null;
  if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
  const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:nameFromPrompt(prompt))||'Untitled app',owner:v.owner});
- if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
+ if(tpl)await builder.initializeFrom(meta,tpl.files,auto?'Started from the SaaS starter (sign-in, teams, credits, billing and admin are ready)':'Started from the '+tpl.name+' template');
  else await builder.initialize(meta);
  if(tpl&&tpl.assistantDocs){const A=require('./app-assistant'),db=backend.database(meta.id);for(const d of tpl.assistantDocs)A.addText(db,{title:d.title,text:d.text,source:'Sample from the template: replace it with your own',kind:'text'})}
  // Mobile templates start with the mobile app setting on (phone preview, installable app).
