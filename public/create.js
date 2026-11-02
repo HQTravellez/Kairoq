@@ -41,6 +41,8 @@ async function loadMe(){
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
  text($('home-title'),name?'What should we build, '+cap(name.split(' ')[0])+'?':'What should we build?');
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
+ // The older chat page (Plugins, Skills, Sales Agent) is for the owner only; clients never see it.
+ $('side-chat').classList.toggle('hidden',!(v&&v.kind==='owner'));
  const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
@@ -2917,6 +2919,8 @@ function renderMemory(mem){
  const sh=$('mem-shared');sh.replaceChildren();for(const r of mem.shared){const li=el('li');li.append(el('b',null,r.title),el('span','muted small',' · '+r.when));sh.append(li)}
 }
 $('side-memory').onclick=openMemory;
+// The older chat page (Sales Agent, Studio and the rest) lives at /chat; / now opens this page.
+$('side-chat').onclick=()=>{location.href='/chat'};
 // Web agent: tasks on other websites, and watches that repeat them and email changes.
 const webState={poll:null};
 function webRunItem(r){
