@@ -2,7 +2,8 @@
 // Optional backend features for Create apps, enabled in src/backend.json:
 //   "storage":  {"access":"signed-in"|"public"}   file uploads
 //   "email":    true                               send to the signed-in user or the app owner
-//   "payments": {"products":{"pro":{"price":"price_...","mode":"payment"|"subscription"}}}
+//   "payments": {"products":{"pro":{"price":"price_...","mode":"payment"|"subscription","credits":500?}}}
+//   "credits":  {"free":20,"ai_cost":1}             customers pay for AI with credits (app-credits.js)
 //   "schedules":[{"name":"cleanup","every":"day","action":"delete_older_than","collection":"logs","days":30},
 //               {"name":"digest","every":"day","action":"email_owner_summary","collection":"bookings"}]
 //   "automations": server functions on a schedule or on record changes (see react-automations.js)
@@ -32,11 +33,14 @@ function normalizeExtras(cfg,collections){
    if(!/^[a-z][a-z0-9_]{0,39}$/.test(name))throw Error('Payment product "'+name+'" must be lowercase letters, numbers or _.');
    if(!p||!/^price_[A-Za-z0-9]+$/.test(p.price||''))throw Error('Payment product "'+name+'" needs a Stripe "price" id like price_123.');
    const mode=p.mode||'payment';if(!['payment','subscription'].includes(mode))throw Error('Payment product "'+name+'" mode must be payment or subscription.');
-   products[name]={price:p.price,mode};
+   const credits=require('./app-credits').productCredits(p,name);
+   products[name]={price:p.price,mode,...(credits?{credits}:{})};
   }
   if(!Object.keys(products).length)throw Error('"payments" needs at least one product.');
   out.payments={products};
  }
+ if(cfg.credits!==undefined){if(cfg.ai!==true)throw Error('"credits" needs "ai": true in src/backend.json.');out.credits=require('./app-credits').normalize(cfg.credits)}
+ require('./app-credits').check(out);
  if(cfg.schedules!==undefined){
   if(!Array.isArray(cfg.schedules)||cfg.schedules.length>10)throw Error('"schedules" must be a list of up to 10 jobs.');
   out.schedules=cfg.schedules.map(s=>{
@@ -57,6 +61,7 @@ function migrate(db){
   CREATE TABLE IF NOT EXISTS email_log(id TEXT PRIMARY KEY,user_id TEXT,recipient TEXT NOT NULL,at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS payments(session_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,product TEXT NOT NULL,mode TEXT NOT NULL,status TEXT NOT NULL,subscription_id TEXT,amount INTEGER,currency TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS schedule_runs(name TEXT PRIMARY KEY,last_run INTEGER NOT NULL,last_result TEXT);`);
+ require('./app-credits').migrate(db);
 }
 
 // ---------- owner ----------
@@ -177,7 +182,7 @@ async function checkout(body,{id,meta,cfg,user,req,stripeCall=stripe}){
  const session=await stripeCall(projectStripeKey(id),'checkout/sessions',{method:'POST',form:{mode:product.mode,'line_items[0][price]':product.price,'line_items[0][quantity]':'1',client_reference_id:user.id,customer_email:user.email,'metadata[kairoq_app]':id,'metadata[product]':body.product,'metadata[user_id]':user.id,success_url:mark('success'),cancel_url:mark('cancelled')}});
  return{url:session.url};
 }
-async function paymentWebhook(req,{id,meta,db,stripeCall=stripe,now}){
+async function paymentWebhook(req,{id,meta,db,cfg={},stripeCall=stripe,now}){
  const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>65536)throw fail(413,'Webhook too large');chunks.push(c)}
  const raw=Buffer.concat(chunks);
  const secret=require('./project-secrets').get(id,'stripe_webhook_secret');
@@ -197,7 +202,13 @@ async function paymentWebhook(req,{id,meta,db,stripeCall=stripe,now}){
   if(s.mode==='subscription'&&s.subscription){const sub=await stripeCall(projectStripeKey(id),'subscriptions/'+encodeURIComponent(typeof s.subscription==='string'?s.subscription:s.subscription.id)).catch(()=>null);if(sub&&/^(canceled|incomplete_expired|unpaid)$/.test(sub.status))return{ignored:sub.status}}
   db.prepare('INSERT INTO payments(session_id,user_id,product,mode,status,subscription_id,amount,currency,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at')
    .run(s.id,s.metadata.user_id,s.metadata.product,s.mode,'active',s.subscription||null,s.amount_total??null,s.currency||null,at,at);
+  require('./app-credits').fromCheckout(db,cfg,s);
   return{recorded:s.id};
+ }
+ // A subscription renewal: its credits are added again (app-credits.js).
+ if(event.type==='invoice.paid'&&obj.id&&cfg.credits){
+  const inv=await stripeCall(projectStripeKey(id),'invoices/'+encodeURIComponent(obj.id));
+  return require('./app-credits').fromInvoice(db,cfg,inv)?{credited:inv.id}:{ignored:'invoice'};
  }
  if(event.type==='customer.subscription.deleted'&&obj.id){
   db.prepare("UPDATE payments SET status='cancelled',updated_at=? WHERE subscription_id=?").run(new Date().toISOString(),obj.id);

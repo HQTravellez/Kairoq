@@ -1951,7 +1951,7 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
   if(action==='/database'&&method==='DELETE')return send(res,200,{database:require('./app-database').disconnect(id)}),true;
   if(action==='/settings'&&method==='GET'){
    const secrets=require('./project-secrets');
-   return send(res,200,{settings:{app_managers:backend.managerEmails(builder.loadMeta(id)),secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;
+   return send(res,200,{settings:{app_managers:backend.managerEmails(builder.loadMeta(id)),secrets:secrets.status(id),encryption:(process.env.APP_ENCRYPTION_KEY||'').length>=16,stripe_webhook_url:origin(req)+'/api/apps/'+id+'/payments/webhook',stripe_events:['checkout.session.completed','checkout.session.async_payment_succeeded','customer.subscription.deleted','invoice.paid'],email:Boolean(process.env.KAIROQ_RESEND_API_KEY&&process.env.KAIROQ_EMAIL_FROM),engine:builder.loadMeta(id).engine||'kairoq',engines:require('./opencode-engine').available()?['kairoq','opencode']:['kairoq']}}),true;
   }
   if(action==='/settings'&&method==='POST'){
    const b=await readJson(req,8000),secrets=require('./project-secrets');
