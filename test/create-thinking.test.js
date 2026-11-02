@@ -143,6 +143,26 @@ test('a review that keeps blocking a working build stops after two rounds and sa
  assert.equal(r.verification.evidence.engineering_review,'failed','the verdict stays honest');
 });
 
+test('a look check that keeps failing stops after one repair round and ships the draft with it listed as open',async()=>{
+ const agent=require('../react-agent');
+ const meta=builder.create({name:'Look cap'});await builder.initialize(meta);
+ let step=0,shots=0;
+ const callModel=async(opts,parse)=>{
+  const sys=String(opts.messages[0].content||'');
+  if(/independent senior code reviewer|independent product\/spec reviewer/.test(sys))return parse(JSON.stringify({verdict:'pass',findings:[]}));
+  step++;
+  return parse(JSON.stringify(step%2?{thought:'Write and test.',actions:[{tool:'write_files',files:{'src/App.jsx':'export default function App(){return <h1>Menu '+step+'</h1>}\n'}},{tool:'build_and_test'}]}:{thought:'Done.',actions:[{tool:'finish',message:'Built the menu page.'}]}));
+ };
+ const inspect=async()=>({errors:[],steps:[{step:'open',ok:true}],text:'Menu',external:[]});
+ const designShots=async()=>{shots++;return[]};
+ const r=await agent.run(meta.id,'Add a menu page',{callModel,inspect,designShots,maxSteps:10});
+ assert.equal(shots,2,'one repair round for the look, then the draft ships');
+ assert.ok(!/^Stopped after/.test(r.message.split('\n').pop()),'it finished, it did not run out of rounds');
+ assert.match(r.message,/UNVERIFIED DRAFT/);
+ assert.match(r.message,/The look check still found: No visual screenshots were produced\./);
+ assert.equal(r.verification.evidence.visual_quality,'failed');
+});
+
 test('style-level Standards findings do not block; critical ones and confident Spec gaps do',()=>{
  const {blocking}=require('../engineering-review');
  assert.equal(blocking({standards:{findings:[{severity:'important',confidence:0.95,message:'duplicated logic'}]},spec:{findings:[]}}).length,0);

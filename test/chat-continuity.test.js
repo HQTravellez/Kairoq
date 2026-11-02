@@ -47,7 +47,7 @@ test('greetings during an active build are saved without launching another build
   assert.equal(active.status,'building');
   const saved=builder.loadMeta(m.id);
   assert.equal(saved.messages.at(-2).text,'hi');
-  assert.match(saved.messages.at(-1).text,/current change is still running/);
+  assert.match(saved.messages.at(-1).text,/Still building.*I'll post the result here/);
   assert.deepEqual(Q.pending(saved),question);
  }finally{api.jobs.delete(active.id);}
 });

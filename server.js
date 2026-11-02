@@ -7116,7 +7116,8 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
   const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
   // A model the owner picked by name (opts.only) is a paid choice in itself, whatever the mode.
-  let allowPaid=(mode==="premium"||mode==="paid-first"||Boolean(opts.only)) && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+  // freeOnly (builder chat, learning notes): never a paid model, whatever the build mode.
+  let allowPaid=!opts.freeOnly&&(mode==="premium"||mode==="paid-first"||Boolean(opts.only)) && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
   const errors=[];
   if(opts.only&&!allowPaid)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
   if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
