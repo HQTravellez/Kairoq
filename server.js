@@ -424,6 +424,7 @@ async function streamLocalLlm({messages,temperature=0.7,model="",effort=""},res)
   const reader=response.body.getReader();
   const decoder=new TextDecoder();
   let buffer="",emitted=false,usage=null,finalModel=resolved;
+  try{
   while(true){
     const {value,done}=await reader.read();
     if(done)break;
@@ -449,6 +450,7 @@ async function streamLocalLlm({messages,temperature=0.7,model="",effort=""},res)
       }
     }
   }
+  }catch(e){e.afterPartial=e.afterPartial||emitted;throw e}
   writeSSE(res,"meta",{model:`local/${finalModel}`,usage,provider:"local"});
   return {emitted,finalModel:`local/${finalModel}`,usage,provider:"local"};
 }
@@ -4470,6 +4472,46 @@ async function handleChat(req, res) {
         return res.end();
       }
     }
+    // Auto: one order for every "Auto" chat (Kairoq Agent, when connected, already ran above):
+    // free pool → Ollama Cloud / local model → free-tier keys → Claude on the Anthropic key
+    // (own monthly cap) → OpenCode Zen → OpenRouter free last (skipped for an hour after "no credits").
+    if(autoPick&&!isLocalModelId(requestedModel)){
+      const chain=require("./chat-auto-chain");
+      const text=reply=>{writeSSE(res,"token",{text:reply.text});return reply};
+      const claudeModel=String(process.env.KAIROQ_CHAT_CLAUDE_MODEL||"anthropic/claude-sonnet-5.5");
+      const claudeCap=()=>{const n=Number(process.env.KAIROQ_CLAUDE_CHAT_MONTHLY_USD??30);return Number.isFinite(n)&&n>=0?n:30};
+      const steps=[
+        {id:"freellmapi",label:"Kairoq Free Pool",ready:()=>require("./freellmapi").enabled(),
+         run:async()=>{const r=text(await require("./freellmapi").complete(finalMessages,{temperature,maxTokens:12000,reasoningEffort:effort}));writeSSE(res,"meta",{model:r.model,usage:{...(r.usage||{}),cost:0}});return{provider:"freellmapi",model:r.model,zeroCost:true}}},
+        {id:"local",label:"Ollama Cloud",ready:async()=>Boolean(await resolveLocalLlmModel()),
+         run:async()=>{const r=await streamLocalLlm({messages:finalMessages,temperature,model:await resolveLocalLlmModel(),effort},res);if(!r.emitted)throw Error("empty reply");return{provider:"local",model:r.finalModel,zeroCost:true}}},
+        {id:"free-keys",label:"Free-tier providers",ready:()=>require("./free-provider-router").candidates().length>0,
+         run:async()=>{const r=text(await require("./free-provider-router").complete(finalMessages,{temperature}));return{provider:r.provider,model:r.model,zeroCost:true}}},
+        {id:"claude",label:"Claude",ready:async()=>{if(!require("./anthropic").configured()||claudeCap()<=0)return false;return (await usageTotals({purpose:"chat-claude"})).monthly<claudeCap()},
+         run:async()=>{
+          let wrote=false;
+          try{
+           const r=await require("./anthropic").ask(claudeModel,finalMessages,{maxTokens:8000,onToken:t=>{wrote=true;writeSSE(res,"token",{text:t})}});
+           const [inRate,outRate]=require("./anthropic").rates(claudeModel,[3,15]);
+           const cost=(r.usage.prompt_tokens*inRate+r.usage.completion_tokens*outRate)/1e6;
+           await recordUsage({...r.usage,cost},{purpose:"chat-claude",model:claudeModel,kind:"chat_auto_claude"});
+           writeSSE(res,"meta",{model:claudeModel,usage:{...r.usage,cost}});
+           return{provider:"anthropic",model:claudeModel};
+          }catch(e){if(wrote)e.afterPartial=true;throw e}
+         }},
+        {id:"opencode",label:"OpenCode Zen",ready:()=>require("./opencode-free").configured(),
+         run:async()=>{const r=text(await require("./opencode-free").complete(finalMessages,{temperature}));writeSSE(res,"meta",{model:r.model,usage:{cost:0}});return{provider:r.provider,model:r.model,zeroCost:true}}},
+        {id:"openrouter",label:"OpenRouter free",ready:()=>openRouterConfigured()&&OPENROUTER_FREE_FALLBACK_ENABLED&&!chain.openRouterSkipped(),
+         run:async()=>{const r=await streamOpenRouter({messages:finalMessages,temperature,reasoning_effort:effort,stream:true,usage:{include:true},model:"openrouter/free"},res);if(r.usage)await recordUsage(r.usage,{model:r.finalModel,kind:"chat_free"});return{provider:"openrouter-free",model:r.finalModel,zeroCost:true}}}
+      ];
+      const done=await chain.run(steps,{
+        onTry:label=>writeSSE(res,"status",{message:label+"…"}),
+        onFail:(s,e)=>audit("chat.auto_step_failed",{step:s.id,error:String(e.message||e).slice(0,300)})
+      });
+      writeSSE(res,"done",{ok:true,provider:done.provider,model:done.model,zeroCost:Boolean(done.zeroCost)});
+      return res.end();
+    }
+
     // FreeLLMAPI is a real selectable free route, not an OpenRouter model ID.
     // Keep the UI label and the executor honest: selecting the free pool always runs that pool.
     if(requestedModel==="freellm/auto"||requestedModel.startsWith("freellm/")){
