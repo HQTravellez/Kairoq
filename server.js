@@ -701,7 +701,7 @@ function writeSSE(res, event, data) {
 function plainOpenRouterError(status, message = "") {
   const m = String(message);
   if (status === 402 || /insufficient credits|never purchased credits/i.test(m))
-    return "OpenRouter turned this down: your OpenRouter account has no credits, so even its free models are capped at a few requests a day. Add credits at openrouter.ai/settings/credits, or connect Kairoq Agent or Ollama Cloud (see docs/HERMES.md).";
+    return "OpenRouter turned this down: your OpenRouter account has no credits, so even its free models are capped at a few requests a day. Add credits at openrouter.ai/settings/credits, or pick Kairoq Agent or Ollama Cloud in the model menu.";
   if (status === 429 || /rate.?limit/i.test(m))
     return "The free models are busy or you've hit today's free limit. Try again in a minute, or pick another model.";
   if (status === 401 || /no auth|invalid api key|user not found/i.test(m))
@@ -4269,7 +4269,7 @@ async function handleChat(req, res) {
     // any other named model is used as picked and bypasses Hermes.
     const wantsHermes=body.model==="hermes/agent";
     const autoPick=!body.model||["openrouter/free","smart-auto","openrouter/auto"].includes(body.model);
-    if(wantsHermes&&!require("./hermes-chat").configured())return json(res,400,{error:"Kairoq Agent isn't connected yet. Set up the agent service on Railway (see docs/HERMES.md), or pick another model."});
+    if(wantsHermes&&!require("./hermes-chat").configured())return json(res,400,{error:"Kairoq Agent isn't connected yet. Pick another model for now."});
     let requestedModel=typeof body.model==="string"&&body.model&&!wantsHermes?body.model:"openrouter/free";
     requestedModel=resolveAutoModel(requestedModel,{freeOnly:body.freeOnly!==false});
     if(!require('./chat-model-eligibility').isConversationalModel({id:requestedModel,name:map.get(requestedModel)?.name}))requestedModel='openrouter/free';
