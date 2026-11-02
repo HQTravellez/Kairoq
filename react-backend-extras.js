@@ -62,6 +62,8 @@ function migrate(db){
   CREATE TABLE IF NOT EXISTS payments(session_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,product TEXT NOT NULL,mode TEXT NOT NULL,status TEXT NOT NULL,subscription_id TEXT,amount INTEGER,currency TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS schedule_runs(name TEXT PRIMARY KEY,last_run INTEGER NOT NULL,last_result TEXT);`);
  require('./app-credits').migrate(db);
+ // The Stripe customer of each purchase, for the billing page (portal()).
+ try{db.exec('ALTER TABLE payments ADD COLUMN customer_id TEXT')}catch{}
 }
 
 // ---------- owner ----------
@@ -172,14 +174,20 @@ function allowedReturn(url,req,meta){
  if(host===kairoq&&paths.some(p=>u.pathname.startsWith(p)))return u;
  throw fail(400,'return_url must point to this app');
 }
-async function checkout(body,{id,meta,cfg,user,req,stripeCall=stripe}){
+// The same Stripe customer for every purchase of a user, so one billing page shows them all.
+function who(db,user,mode){
+ const row=db&&db.prepare('SELECT customer_id FROM payments WHERE user_id=? AND customer_id IS NOT NULL ORDER BY created_at DESC').get(user.id);
+ if(row)return{customer:row.customer_id};
+ return{customer_email:user.email,...(mode==='payment'?{customer_creation:'always'}:{})};
+}
+async function checkout(body,{id,meta,cfg,db,user,req,stripeCall=stripe}){
  if(!cfg.payments)throw fail(404,'Payments are not enabled. Add "payments" to src/backend.json.');
  if(!user)throw fail(401,'Sign in to buy');
  const product=cfg.payments.products[body.product];
  if(!product)throw fail(404,'Unknown product');
  const back=allowedReturn(body.return_url,req,meta);
  const mark=(status)=>{const u=new URL(back);u.searchParams.set('kairoq_payment',status);return u.toString()};
- const session=await stripeCall(projectStripeKey(id),'checkout/sessions',{method:'POST',form:{mode:product.mode,'line_items[0][price]':product.price,'line_items[0][quantity]':'1',client_reference_id:user.id,customer_email:user.email,'metadata[kairoq_app]':id,'metadata[product]':body.product,'metadata[user_id]':user.id,success_url:mark('success'),cancel_url:mark('cancelled')}});
+ const session=await stripeCall(projectStripeKey(id),'checkout/sessions',{method:'POST',form:{mode:product.mode,'line_items[0][price]':product.price,'line_items[0][quantity]':'1',client_reference_id:user.id,...who(db,user,product.mode),'metadata[kairoq_app]':id,'metadata[product]':body.product,'metadata[user_id]':user.id,success_url:mark('success'),cancel_url:mark('cancelled')}});
  return{url:session.url};
 }
 async function paymentWebhook(req,{id,meta,db,cfg={},stripeCall=stripe,now}){
@@ -200,8 +208,9 @@ async function paymentWebhook(req,{id,meta,db,cfg={},stripeCall=stripe,now}){
   const existing=db.prepare('SELECT status FROM payments WHERE session_id=?').get(s.id);
   if(existing&&existing.status==='cancelled')return{ignored:'cancelled'};
   if(s.mode==='subscription'&&s.subscription){const sub=await stripeCall(projectStripeKey(id),'subscriptions/'+encodeURIComponent(typeof s.subscription==='string'?s.subscription:s.subscription.id)).catch(()=>null);if(sub&&/^(canceled|incomplete_expired|unpaid)$/.test(sub.status))return{ignored:sub.status}}
-  db.prepare('INSERT INTO payments(session_id,user_id,product,mode,status,subscription_id,amount,currency,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at')
-   .run(s.id,s.metadata.user_id,s.metadata.product,s.mode,'active',s.subscription||null,s.amount_total??null,s.currency||null,at,at);
+  const customer=typeof s.customer==='string'?s.customer:s.customer?.id||null;
+  db.prepare('INSERT INTO payments(session_id,user_id,product,mode,status,subscription_id,amount,currency,created_at,updated_at,customer_id) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at')
+   .run(s.id,s.metadata.user_id,s.metadata.product,s.mode,'active',s.subscription||null,s.amount_total??null,s.currency||null,at,at,customer);
   require('./app-credits').fromCheckout(db,cfg,s);
   return{recorded:s.id};
  }
@@ -215,6 +224,16 @@ async function paymentWebhook(req,{id,meta,db,cfg={},stripeCall=stripe,now}){
   return{cancelled:obj.id};
  }
  return{ignored:event.type};
+}
+// Stripe's own billing page for the signed-in customer: change card or plan, cancel, download invoices.
+// The owner turns it on once in Stripe (Settings → Billing → Customer portal).
+async function portal(body,{id,meta,db,user,req,stripeCall=stripe}){
+ if(!user)throw fail(401,'Sign in first');
+ const back=allowedReturn(body.return_url,req,meta);
+ const row=db.prepare('SELECT customer_id FROM payments WHERE user_id=? AND customer_id IS NOT NULL ORDER BY created_at DESC').get(user.id);
+ if(!row)throw fail(404,'There is no billing account yet. It appears after the first purchase.');
+ const session=await stripeCall(projectStripeKey(id),'billing_portal/sessions',{method:'POST',form:{customer:row.customer_id,return_url:back.toString()}});
+ return{url:session.url};
 }
 function myPurchases(db,user){
  if(!user)throw fail(401,'Sign in first');
@@ -250,4 +269,4 @@ async function runSchedules(id,cfg,db,meta,{now=Date.now(),send=deliver}={}){
  return results;
 }
 
-module.exports={deliver,checkEmail,allowedReturn,normalizeExtras,migrate,upload,serveFile,removeFile,sendEmail,checkout,paymentWebhook,myPurchases,runSchedules,ownerEmail,FILE_TYPES};
+module.exports={deliver,checkEmail,allowedReturn,normalizeExtras,migrate,upload,serveFile,removeFile,sendEmail,checkout,portal,paymentWebhook,myPurchases,runSchedules,ownerEmail,FILE_TYPES};
