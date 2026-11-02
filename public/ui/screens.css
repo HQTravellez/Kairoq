@@ -1,0 +1,353 @@
+/* Kairoq UI: screens. Follows docs/DESIGN-SYSTEM.md. Loaded after calm.css.
+   Covers: the signed-out landing (#auth .landing) and the sign-in / sign-up / reset dialog,
+   the home (#side sidebar, hero, prompt card, tabs, project cards, notices) and the phone
+   layout of home and the editor (top bar, drawer, #phone-panes).
+   Tokens only (calm.css); the landing is not body.app, so the same tokens are set on #auth. */
+
+/* =====================================================================
+   1. Sidebar (Lovable-quiet: small light items, soft active pill)
+   ===================================================================== */
+body.app #side{width:244px!important;padding:12px 10px 10px!important;background:var(--c-bg)!important;border-right:1px solid var(--c-line)!important;gap:0}
+body.app #side .side-brand{gap:9px!important;padding:4px 8px 14px!important;font-size:15px!important;font-weight:600!important;letter-spacing:-.01em;color:#1B1D22!important}
+body.app #side .side-brand .mark{width:24px!important;height:24px!important;border-radius:7px!important}
+body.app #side .side-brand .mark::after{font-size:12px!important}
+body.app #side .side-nav{gap:1px!important}
+body.app #side .side-nav button{height:32px!important;padding:0 10px!important;gap:10px!important;border-radius:8px!important;font-size:13.5px!important;font-weight:450!important;color:var(--c-ink-2)!important;background:transparent!important;border:0!important;box-shadow:none!important;transition:background .12s ease,color .12s ease}
+body.app #side .side-nav button .ico{width:16px!important;height:16px!important;padding:0!important;margin:0!important;background:none!important;border-radius:0!important;stroke-width:1.7;color:var(--c-ink-3)!important;flex:none}
+body.app #side .side-nav button:hover{background:var(--c-hover)!important;color:var(--c-ink)!important}
+body.app #side .side-nav button:hover .ico{color:var(--c-ink-2)!important}
+body.app #side .side-nav button[aria-current]:not([aria-current=false]){background:var(--c-line)!important;color:#1B1D22!important;font-weight:500!important;box-shadow:none!important}
+body.app #side .side-nav button[aria-current]:not([aria-current=false]) .ico{color:var(--c-accent)!important}
+body.app #side .side-nav button:focus-visible{outline:2px solid var(--c-accent);outline-offset:-2px}
+/* New: the one obvious action, a quiet outlined button. */
+body.app #side .side-nav #side-new{height:34px!important;margin:0 0 8px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;color:#1B1D22!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body.app #side .side-nav #side-new .ico{color:var(--c-ink)!important}
+body.app #side .side-nav #side-new:hover{background:var(--c-raise)!important}
+/* Group labels: small, muted, sentence case. */
+body.app #side .side-label{margin:16px 10px 4px!important;font-size:11.5px!important;font-weight:500!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink-3)!important}
+body.app #side .side-nav .side-label.side-group{margin-top:14px!important}
+/* Recents: plain one-line rows that scroll on their own; a green dot marks live apps. */
+body.app #side .recents{flex:1 1 auto;min-height:0;overflow-y:auto;margin:0!important;padding:0!important;display:grid;align-content:start;gap:1px;scrollbar-width:thin}
+body.app #side .recents li{height:30px;border-radius:8px!important;padding:0!important;background:transparent}
+body.app #side .recents li>button:first-child{height:30px;display:flex!important;align-items:center;gap:0;padding:0 10px!important;border:0!important;background:transparent!important;box-shadow:none!important;border-radius:8px;font-size:13px!important;font-weight:400!important;color:var(--c-ink-2)!important}
+body.app #side .recents li>button:first-child span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app #side .recents .diamond{display:none!important}
+body.app #side .recents li.live>button:first-child::after{content:"";flex:none;width:6px;height:6px;margin-left:8px;border-radius:999px;background:#1F8A5B}
+body.app #side .recents li:hover{background:var(--c-hover)}
+body.app #side .recents li:hover>button:first-child{color:var(--c-ink)!important}
+body.app #side .recents li.active{background:var(--c-hover)}
+body.app #side .recents li.active>button:first-child{color:#1B1D22!important;font-weight:500!important}
+body.app #side .recents .recent-delete{width:24px!important;height:24px!important;margin-right:3px;font-size:16px!important;color:var(--c-ink-3)!important}
+body.app #side .recents li.empty{height:auto;padding:4px 10px!important;font-size:12.5px;color:var(--c-ink-3)}
+/* Footer: credits (customers) and one account row. */
+body.app #side .side-foot{margin-top:8px!important;padding-top:8px!important;border-top:1px solid var(--c-line);gap:4px!important}
+body.app #side .side-card{border:0!important;border-radius:10px!important;background:var(--c-raise)!important;padding:10px 12px!important;gap:6px!important;box-shadow:none!important}
+body.app #side .side-card .credits{font-size:13px!important;font-weight:600!important;color:var(--c-ink)!important}
+body.app #side .side-actions{gap:4px!important}
+body.app #side .side-actions .ghost{height:26px;padding:0 10px!important;border-radius:8px!important;font-size:12px!important;font-weight:500;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;color:var(--c-ink)!important}
+body.app #side .side-user{display:flex!important;align-items:center;gap:8px;min-height:40px;padding:4px 6px 4px 8px!important;border:0!important;border-radius:10px!important;background:transparent!important;font-size:13px}
+body.app #side .side-user:hover{background:var(--c-hover)!important}
+body.app #side .side-user .who{flex:1;min-width:0;max-width:none!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--c-ink)!important;font-weight:500;display:flex;align-items:center;gap:9px}
+body.app #side .side-user .who::before{content:"";flex:none;width:26px;height:26px;border-radius:999px;background:var(--c-raise) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235C6168' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='12' cy='9' r='3.5'/%3E%3Cpath d='M5.5 19a6.5 6.5 0 0 1 13 0'/%3E%3C/svg%3E") center/16px no-repeat;box-shadow:inset 0 0 0 1px var(--c-line)}
+body.app #side .side-user .who:empty{display:none}
+body.app #side .side-user .ghost{height:28px;padding:0 10px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2)!important;font-size:12.5px!important;box-shadow:none!important}
+body.app #side .side-user .ghost:hover{background:var(--c-panel)!important;color:var(--c-ink)!important}
+
+/* =====================================================================
+   2. Home hero (keeps the space photo from calm.css)
+   ===================================================================== */
+body.app #home .home-hero{max-width:760px!important;margin:0 auto!important;padding-top:88px!important;padding-bottom:0!important;display:flex;flex-direction:column;align-items:center}
+body.app #home .home-hero h1,body.app #home #home-title{font-size:44px!important;line-height:1.08!important;font-weight:600!important;letter-spacing:-.032em!important;color:#fff!important;text-shadow:0 1px 24px rgba(10,12,30,.35)!important;text-wrap:balance}
+body.app #home .home-sub{max-width:540px;margin:14px auto 0!important;font-size:16px!important;line-height:1.55!important;color:rgba(255,255,255,.88)!important;text-shadow:0 1px 14px rgba(10,12,30,.4)!important;text-align:center;text-wrap:pretty}
+/* What to build: a glass segmented control on the photo. */
+body.app #home #new-kind{display:inline-flex!important;gap:2px!important;margin:26px auto 14px!important;padding:3px!important;border-radius:12px!important;background:rgba(255,255,255,.16)!important;border:1px solid rgba(255,255,255,.28)!important;box-shadow:none!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+body.app #home #new-kind button{height:30px!important;padding:0 14px!important;border-radius:9px!important;border:0!important;background:transparent!important;box-shadow:none!important;font-size:13px!important;font-weight:500!important;color:rgba(255,255,255,.9)!important;transition:background .12s ease,color .12s ease}
+body.app #home #new-kind button:hover{background:rgba(255,255,255,.14)!important;color:#fff!important}
+body.app #home #new-kind button[aria-pressed=true]{background:var(--c-panel)!important;color:#1B1D22!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+/* The prompt card. */
+body.app #home #new-form.prompt-box{width:100%;max-width:720px;margin:0 auto!important;padding:16px 14px 12px 18px!important;background:var(--c-panel)!important;border:1px solid rgba(255,255,255,.7)!important;border-radius:20px!important;box-shadow:0 0 0 5px rgba(255,255,255,.18),0 24px 48px -16px rgba(16,24,40,.35)!important;transition:box-shadow .15s ease}
+body.app #home #new-form.prompt-box:focus-within{box-shadow:0 0 0 5px rgba(255,255,255,.3),0 24px 48px -16px rgba(16,24,40,.35)!important}
+body.app #home #new-prompt{display:block;width:100%;min-height:64px;padding:0 4px 0 0!important;margin:0!important;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;resize:none;font-size:15.5px!important;line-height:1.55!important;color:var(--c-ink)!important}
+body.app #home #new-prompt::placeholder{color:var(--c-ink-3)!important;opacity:1}
+body.app #home #new-form .prompt-bar{display:flex!important;align-items:center;gap:10px;margin-top:10px!important;padding:0!important}
+body.app #home #new-form .round{width:32px!important;height:32px!important;min-width:32px;padding:0!important;display:inline-grid!important;place-items:center;border-radius:999px!important;border:1px solid var(--c-line-2)!important;background:var(--c-panel)!important;color:var(--c-ink-2)!important;box-shadow:none!important}
+body.app #home #new-form .round:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app #home #new-form .round .ico{width:16px;height:16px}
+body.app #home #new-form .prompt-note{flex:1;min-width:0;font-size:12.5px!important;color:var(--c-ink-3)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app #home #new-form #new-submit{height:36px!important;min-width:0!important;width:auto!important;padding:0 12px 0 14px!important;margin-left:auto;display:inline-flex!important;align-items:center;gap:6px;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font-size:13.5px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body.app #home #new-form #new-submit:hover{background:var(--c-accent-2)!important}
+body.app #home #new-form #new-submit .ico{width:15px;height:15px}
+body.app #home #new-form #new-submit:focus-visible{outline:2px solid var(--c-accent);outline-offset:2px}
+/* Errors and notices under the hero, then above the projects. */
+body.app #home #home-error:not(:empty){max-width:720px;width:100%;margin:12px auto 0;padding:10px 14px;border-radius:10px;background:rgba(194,65,45,.08);color:#C2412D;font-size:13.5px;text-align:left}
+body.app #home #storage-warn{max-width:720px;width:100%;margin:12px auto 0!important;padding:10px 14px!important;border:0!important;border-radius:10px!important;background:rgba(183,121,31,.1)!important;color:var(--c-ink)!important;font-size:13.5px!important;box-shadow:none!important;text-align:left}
+body.app #home #storage-warn summary{cursor:pointer;color:var(--c-ink)}
+body.app #home #storage-warn summary b{font-weight:600}
+body.app #home #storage-warn .setup-how{color:#B7791F;font-weight:500;margin-left:4px}
+body.app #home #storage-warn p{margin:8px 0 0;color:var(--c-ink-2);line-height:1.55}
+body.app #home #verify-notice{display:flex!important;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px!important;padding:10px 14px!important;border:0!important;border-radius:10px!important;background:rgba(10,42,82,.06)!important;color:var(--c-ink)!important;font-size:13.5px!important;line-height:1.45;box-shadow:none!important}
+body.app #home #verify-notice::before{content:"";flex:none;width:16px;height:16px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230A2A52' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2.5'/%3E%3Cpath d='m4 7 8 6 8-6'/%3E%3C/svg%3E") center/16px no-repeat}
+body.app #home #verify-notice.hidden{display:none!important}
+body.app #home #verify-notice .link-btn{margin-left:auto;padding:0!important;border:0!important;background:none!important;color:var(--c-accent)!important;font-weight:500;font-size:13.5px!important;text-decoration:none!important;box-shadow:none!important}
+body.app #home #verify-notice .link-btn:hover{text-decoration:underline!important}
+
+/* =====================================================================
+   3. My projects / Templates and the cards
+   ===================================================================== */
+body.app #home .browser{max-width:1120px!important;margin:56px auto 0!important;padding:0 32px 48px!important;background:transparent!important;border:0!important;box-shadow:none!important}
+body.app #home .browser-tabs{display:flex!important;align-items:center;gap:2px;margin:0 0 20px!important;padding:3px!important;width:max-content;max-width:100%;border:0!important;border-radius:10px;background:var(--c-raise)!important;box-shadow:inset 0 0 0 1px var(--c-line)}
+body.app #home .browser-tabs button[role=tab]{height:30px!important;padding:0 14px!important;border:0!important;border-radius:8px!important;background:transparent!important;box-shadow:none!important;font-size:13px!important;font-weight:500!important;color:var(--c-ink-2)!important}
+body.app #home .browser-tabs button[role=tab]:hover{color:var(--c-ink)!important}
+body.app #home .browser-tabs button[role=tab][aria-selected=true]{background:var(--c-panel)!important;color:#1B1D22!important;box-shadow:0 1px 2px rgba(16,24,40,.08),0 0 0 1px var(--c-line)!important}
+body.app #home .browser-tabs #project-count{margin:0 10px 0 8px;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app #home .projects.cards{grid-template-columns:repeat(auto-fill,minmax(232px,1fr))!important;justify-content:stretch!important;gap:28px 20px!important;max-width:none!important;margin:0!important;padding:0!important}
+body.app #home .projects.cards>li .thumb{text-shadow:none!important;border-radius:12px!important;font-size:20px!important;font-weight:600;letter-spacing:.02em;color:var(--c-ink-3)!important;background:var(--c-raise) var(--c-dots)!important;background-size:auto,14px 14px!important}
+body.app #home .projects.cards>li .thumb .thumb-img{background:var(--c-panel)}
+body.app #home .projects.cards>li .open{margin-top:12px!important;font-size:14px!important;font-weight:500!important;color:#1B1D22!important;cursor:pointer;box-shadow:none!important;height:auto!important}
+body.app #home .projects.cards>li .meta{font-size:12.5px!important;color:var(--c-ink-3)!important}
+body.app #home .projects.cards>li .badge.live{top:10px!important;left:10px!important;height:22px;padding:0 8px!important;display:inline-flex;align-items:center;gap:5px;border-radius:999px!important;background:var(--c-panel)!important;color:#1F8A5B!important;font-size:11.5px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body.app #home .projects.cards>li .badge.live::before{content:"";width:6px;height:6px;border-radius:999px;background:#1F8A5B}
+body.app #home .projects.cards>li .role-badge{height:22px;display:inline-flex;align-items:center;font-size:11.5px!important}
+body.app #home .projects.cards>li>.link-btn{top:8px!important;right:8px!important;height:26px;padding:0 10px!important;border:0!important;border-radius:8px!important;background:var(--c-panel)!important;color:#C2412D!important;font-size:12px!important;font-weight:500;text-decoration:none!important;box-shadow:0 1px 3px rgba(16,24,40,.15)!important}
+/* Empty state: one sentence in a quiet dashed card. */
+body.app #home .projects.cards>li.muted{grid-column:1/-1;display:block!important;cursor:default;padding:40px 24px!important;border:1px dashed var(--c-line-2)!important;border-radius:12px!important;background:var(--c-panel)!important;text-align:center;font-size:14px;color:var(--c-ink-2)!important}
+/* Templates tab uses the same grid rhythm. */
+body.app #home #home-templates{margin:0!important;padding:0!important}
+
+/* =====================================================================
+   4. Phone: home, the drawer, the editor shell
+   ===================================================================== */
+@media (max-width:900px){
+ body.app #top-bar{min-height:52px!important;padding:6px 12px!important;gap:8px;background:rgba(250,251,252,.9)!important;border-bottom:1px solid var(--c-line)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:none!important}
+ body.app #top-bar #side-open-btn{width:36px;height:36px;padding:0!important;display:inline-grid;place-items:center;border:0!important;border-radius:9px!important;background:transparent!important;color:var(--c-ink)!important;box-shadow:none!important}
+ body.app #top-bar #side-open-btn:hover{background:var(--c-hover)!important}
+ body.app #top-bar #side-open-btn .ico{width:18px;height:18px}
+ body.app #top-bar .brand{display:inline-flex!important;align-items:center;gap:8px;font-size:15px!important;font-weight:600!important;letter-spacing:-.01em;color:#1B1D22!important;text-decoration:none}
+ body.app #top-bar .brand::before{content:"K"!important;display:grid!important;place-items:center;flex:none;width:24px!important;height:24px!important;border-radius:7px!important;background:var(--c-accent)!important;color:#fff!important;font:700 12px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;box-shadow:none!important}
+ body.app #top-bar .brand span{color:var(--c-ink-3)!important;font-weight:500!important;background:none!important;-webkit-text-fill-color:currentColor!important}
+ /* The drawer: same quiet sidebar, over a dimmed page. */
+ body.app.side-open #side{width:min(288px,84vw)!important;box-shadow:0 0 0 100vmax rgba(17,24,39,.35),0 24px 48px -16px rgba(16,24,40,.25)!important;padding-top:14px!important}
+ /* Home. */
+ body.app #home .home-hero{padding:44px 16px 0!important}
+ body.app #home .home-hero h1,body.app #home #home-title{font-size:30px!important;letter-spacing:-.028em!important}
+ body.app #home .home-sub{font-size:14.5px!important;margin-top:10px!important}
+ body.app #home #new-kind{margin:20px auto 12px!important;max-width:100%}
+ body.app #home #new-kind button{padding:0 12px!important}
+ body.app #home #new-form.prompt-box{padding:14px 12px 10px 14px!important;border-radius:18px!important}
+ body.app #home #new-prompt{min-height:72px;font-size:16px!important}
+ body.app #home .browser{margin-top:40px!important;padding:0 16px 32px!important}
+ body.app #home .browser-tabs{margin-bottom:16px!important}
+ body.app #home .projects.cards{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:20px 12px!important}
+ body.app #home .projects.cards>li{display:flex!important;padding:0!important}
+ body.app #home .projects.cards>li .thumb{width:100%!important;height:auto!important;font-size:16px!important}
+ body.app #home .projects.cards>li .open{margin-top:8px!important;font-size:13.5px!important}
+ body.app #home .projects.cards>li .meta{font-size:12px!important}
+ /* Editor: the menu button opens the same drawer (it did nothing in the editor before). */
+ body.app.in-editor.side-open #side{display:flex!important;position:fixed!important;inset:0 auto 0 0!important;z-index:60!important}
+ /* Editor: the project name and the way back sit at the top of the chat pane. */
+ body.app.in-editor #editor .chat-head{display:flex!important;align-items:center;gap:4px;min-height:44px;padding:4px 8px!important;border-bottom:1px solid var(--c-line)!important;background:var(--c-panel)!important}
+ body.app.in-editor #editor .chat-head #side-toggle{display:none!important}
+ body.app.in-editor #editor .chat-head .bar-project{display:flex!important;align-items:center;gap:2px;flex:1;min-width:0}
+ body.app.in-editor #editor .chat-head .bar-project.hidden{display:none!important}
+ body.app.in-editor #editor .chat-head #back{width:32px;height:32px;padding:0!important;display:inline-grid;place-items:center;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2)!important;box-shadow:none!important}
+ body.app.in-editor #editor .chat-head #project-name{flex:1;min-width:0;height:32px;padding:0 8px!important;border:1px solid transparent!important;border-radius:8px!important;background:transparent!important;font-size:14.5px!important;font-weight:600!important;color:#1B1D22!important;box-shadow:none!important}
+ body.app.in-editor #editor .chat-head #project-name:focus{outline:0;border-color:var(--c-line-2)!important;background:var(--c-panel)!important}
+ /* Editor: Chat | Preview | Browser as one segmented control. */
+ body.app.in-editor #phone-panes{gap:2px!important;margin:8px 12px!important;padding:3px!important;border:0!important;border-radius:10px!important;background:var(--c-raise)!important;box-shadow:inset 0 0 0 1px var(--c-line)!important}
+ body.app.in-editor #phone-panes button{min-width:0;height:32px!important;padding:0 6px!important;border:0!important;border-radius:8px!important;background:transparent!important;box-shadow:none!important;font:500 13px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;color:var(--c-ink-2)!important;gap:6px!important}
+ body.app.in-editor #phone-panes button .ico{width:15px!important;height:15px!important;stroke-width:1.7!important}
+ body.app.in-editor #phone-panes button[aria-selected=true]{background:var(--c-panel)!important;color:#1B1D22!important;box-shadow:0 1px 2px rgba(16,24,40,.08),0 0 0 1px var(--c-line)!important}
+ body.app.in-editor #phone-panes .live-dot{background:#1F8A5B!important;box-shadow:none!important}
+}
+
+/* =====================================================================
+   5. Signed-out landing (#auth .landing). Same tokens as the app.
+   ===================================================================== */
+#auth{--c-bg:#FAFBFC;--c-panel:#FFFFFF;--c-raise:#F4F6F8;--c-ink:#2A2D32;--c-ink-2:#5C6168;--c-ink-3:#737980;--c-line:#EDEFF2;--c-line-2:#D8DBE0;--c-hover:rgba(10,42,82,.05);--c-accent:#0A2A52;--c-accent-2:#123A6E}
+body:not(.app) #top-bar{background:rgba(250,251,252,.86)!important;border-bottom:1px solid var(--c-line,#EDEFF2)!important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+body:not(.app) #top-bar #landing-nav a{font-size:14px;font-weight:450;color:#5C6168;text-decoration:none}
+body:not(.app) #top-bar #landing-nav a:hover{color:#1B1D22}
+body:not(.app) #top-bar #nav-signin{height:36px;padding:0 12px!important;border:0!important;border-radius:10px!important;background:transparent!important;color:#2A2D32!important;font-size:14px!important;font-weight:500!important;box-shadow:none!important}
+body:not(.app) #top-bar #nav-signin:hover{background:rgba(10,42,82,.05)!important}
+body:not(.app) #top-bar #nav-start{height:36px;padding:0 14px!important;border:0!important;border-radius:10px!important;background:#0A2A52!important;color:#fff!important;font-size:14px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body:not(.app) #top-bar #nav-start:hover{background:#123A6E!important}
+body:not(.app) #auth .landing{color:var(--c-ink)}
+/* Hero. */
+body:not(.app) #auth .hero .aurora{opacity:.55}
+body:not(.app) #auth .hero .eyebrow{display:inline-flex!important;align-items:center;gap:8px;height:30px;padding:0 12px 0 10px!important;border-radius:999px!important;background:var(--c-panel)!important;border:1px solid var(--c-line)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;color:var(--c-ink-2)!important;font:500 13px/1 Geist,ui-sans-serif,system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important}
+body:not(.app) #auth .hero .eyebrow::before{width:6px!important;height:6px!important;background:#1F8A5B!important}
+body:not(.app) #auth .hero h1{margin:22px auto 16px!important;font-size:clamp(38px,5.6vw,64px)!important;line-height:1.04!important;font-weight:600!important;letter-spacing:-.04em!important;color:#1B1D22!important;-webkit-text-fill-color:#1B1D22!important}
+body:not(.app) #auth .landing h2 em,body:not(.app) #auth .hero h1 em{font-family:inherit!important;font-style:normal!important;font-weight:inherit!important;letter-spacing:inherit!important;color:var(--c-ink-3)!important;-webkit-text-fill-color:var(--c-ink-3)!important}
+body:not(.app) #auth .hero .lede{max-width:580px;margin-left:auto;margin-right:auto;font-size:17px!important;line-height:1.6!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth #landing-form.prompt-box{max-width:720px;margin-left:auto;margin-right:auto;padding:18px 14px 12px 20px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;border-radius:20px!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.18),0 1px 2px rgba(16,24,40,.05)!important;transition:border-color .15s ease,box-shadow .15s ease}
+body:not(.app) #auth #landing-form.prompt-box:focus-within{border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12),0 24px 48px -16px rgba(16,24,40,.18)!important}
+body:not(.app) #auth #landing-prompt{min-height:68px;padding:0!important;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;font-size:16px!important;line-height:1.55!important;color:var(--c-ink)!important;resize:none}
+body:not(.app) #auth #landing-prompt::placeholder{color:var(--c-ink-3)!important;opacity:1}
+body:not(.app) #auth .prompt-tools{gap:6px!important;align-items:center}
+body:not(.app) #auth .prompt-tools .ptool{height:28px;padding:0 10px!important;display:inline-flex;align-items:center;border-radius:999px!important;border:1px solid var(--c-line)!important;background:transparent!important;color:var(--c-ink-3)!important;font-size:12px!important;font-weight:500!important;box-shadow:none!important}
+body:not(.app) #auth .prompt-tools .ptool.round{width:32px;padding:0!important;justify-content:center;border-color:var(--c-line-2)!important;color:var(--c-ink-2)!important;font-size:18px!important;font-weight:400!important}
+body:not(.app) #auth #landing-form .send{width:36px!important;height:36px!important;padding:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body:not(.app) #auth #landing-form .send:hover{background:var(--c-accent-2)!important}
+body:not(.app) #auth .hero-chips{gap:8px!important;max-width:760px;margin-left:auto;margin-right:auto}
+body:not(.app) #auth .hero-chip{height:34px;padding:0 14px 0 10px!important;gap:8px!important;border-radius:999px!important;background:var(--c-panel)!important;border:1px solid var(--c-line)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;color:var(--c-ink-2)!important;font-size:13px!important;font-weight:450!important;transform:none!important}
+body:not(.app) #auth .hero-chip:hover{background:var(--c-raise)!important;color:var(--c-ink)!important;border-color:var(--c-line-2)!important}
+body:not(.app) #auth .hero-chip .ci{transform:scale(.82);opacity:.85;filter:grayscale(1)}
+body:not(.app) #auth .hero-trust{font-size:13px!important;color:var(--c-ink-3)!important}
+body:not(.app) #auth .hero-trust span::before{background:#1F8A5B!important}
+body:not(.app) #auth .hero-wa{color:var(--c-ink-2)!important;font-size:13.5px}
+/* Section labels and titles: sentence case, one font. */
+body:not(.app) #auth .kicker{gap:0!important;font-size:13px!important;font-weight:500!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-accent)!important}
+body:not(.app) #auth .kicker::before{display:none!important}
+body:not(.app) #auth .section-head h2,body:not(.app) #auth .scb-text h2{font-size:clamp(28px,3.6vw,40px)!important;line-height:1.12!important;font-weight:600!important;letter-spacing:-.03em!important;color:#1B1D22!important;text-wrap:balance;max-width:760px}
+body:not(.app) #auth .section-head{margin-bottom:32px}
+body:not(.app) #auth .section-head h2{margin-top:10px!important}
+/* Free website check: a clean card; the action is secondary so the page keeps one primary. */
+body:not(.app) #auth .site-check-band{background:var(--c-panel)!important;border:1px solid var(--c-line)!important;border-radius:16px!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body:not(.app) #auth .scb-text p:not(.kicker){color:var(--c-ink-2)!important;font-size:14.5px!important;line-height:1.6!important}
+body:not(.app) #auth .sc-form{gap:10px!important}
+body:not(.app) #auth .sc-form input{height:40px!important;padding:0 12px!important;border-radius:10px!important;border:1px solid var(--c-line-2)!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:14px!important;box-shadow:none!important}
+body:not(.app) #auth .sc-form input:focus{outline:0;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body:not(.app) #auth #landing-check-go{height:40px!important;border-radius:10px!important;background:var(--c-panel)!important;border:1px solid var(--c-line-2)!important;color:#1B1D22!important;font-size:14px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body:not(.app) #auth #landing-check-go:hover{background:var(--c-raise)!important}
+body:not(.app) #auth .sc-form .muted.small{font-size:12.5px!important;color:var(--c-ink-3)!important}
+/* Templates: tidy segmented tabs. */
+body:not(.app) #auth .show-head h2{font-size:15px!important;font-weight:600!important;letter-spacing:-.01em!important;color:#1B1D22!important}
+body:not(.app) #auth .show-tabs{gap:2px!important;padding:3px!important;border-radius:10px!important;background:var(--c-raise)!important;box-shadow:inset 0 0 0 1px var(--c-line)}
+body:not(.app) #auth .show-tabs .tab{height:30px;padding:0 12px!important;border-radius:8px!important;font-size:13px!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth .show-tabs .tab[aria-pressed=true]{background:var(--c-panel)!important;color:#1B1D22!important;box-shadow:0 1px 2px rgba(16,24,40,.08),0 0 0 1px var(--c-line)!important}
+/* Proof strip: one bordered row with dividers, not four boxes. */
+body:not(.app) #auth .proof{gap:0!important;border:1px solid var(--c-line);border-radius:16px;background:var(--c-panel);overflow:hidden;padding-top:0!important;margin-top:56px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+body:not(.app) #auth .proof div{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:20px 22px!important}
+body:not(.app) #auth .proof div+div{border-left:1px solid var(--c-line)!important}
+body:not(.app) #auth .proof div::before{display:none!important}
+body:not(.app) #auth .proof b{font-size:14.5px!important;font-weight:600;color:#1B1D22}
+body:not(.app) #auth .proof span{font-size:13px!important;color:var(--c-ink-3)!important}
+/* How it works. */
+body:not(.app) #auth .steps li{border-radius:16px!important;border:1px solid var(--c-line)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;padding:24px!important}
+body:not(.app) #auth .steps li::after{display:none!important}
+body:not(.app) #auth .steps .num{width:28px!important;height:28px!important;border-radius:999px!important;background:rgba(10,42,82,.08)!important;color:var(--c-accent)!important;font-size:13px!important;font-weight:600!important;box-shadow:none!important}
+body:not(.app) #auth .steps h3{margin-top:8px!important;font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;color:#1B1D22}
+body:not(.app) #auth .steps p{font-size:14.5px!important;color:var(--c-ink-2)!important}
+/* Feature tiles. */
+body:not(.app) #auth .bento .tile{border-radius:16px!important;border:1px solid var(--c-line)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body:not(.app) #auth .bento .tile h3{font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;color:#1B1D22}
+body:not(.app) #auth .bento .tile p{font-size:14px!important;line-height:1.6!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth .bento .tile-ui{border:0!important;border-radius:12px!important;background:var(--c-raise)!important;box-shadow:none!important}
+body:not(.app) #auth .bento .tile-ui.chips span{background:var(--c-panel)!important;border:1px solid var(--c-line)!important;font-size:12px!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth .bento .explain b,body:not(.app) #auth .bento .before-after span{text-transform:none!important;letter-spacing:0!important;font-size:12px!important}
+/* Compare: a light, readable table (the dark-theme colours made the Kairoq column unreadable). */
+body:not(.app) #auth .compare::before,body:not(.app) #auth .compare::after{display:none!important}
+body:not(.app) #auth .cmp-table{border:1px solid var(--c-line)!important;border-radius:16px!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05);font-size:14px!important}
+body:not(.app) #auth .cmp-table th,body:not(.app) #auth .cmp-table td{padding:14px 20px!important;border-bottom:1px solid var(--c-line)!important}
+body:not(.app) #auth .cmp-table tr:last-child th,body:not(.app) #auth .cmp-table tr:last-child td{border-bottom:0!important}
+body:not(.app) #auth .cmp-table thead th{background:var(--c-raise)!important;font-size:13px!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth .cmp-table tbody th{font-weight:500!important;color:var(--c-ink)!important}
+body:not(.app) #auth .cmp-table td{color:var(--c-ink-3)!important}
+body:not(.app) #auth .cmp-table .us{background:rgba(10,42,82,.04)!important;color:#1B1D22!important;font-weight:500!important}
+body:not(.app) #auth .cmp-table thead .us{background:rgba(10,42,82,.07)!important;color:var(--c-accent)!important;font-weight:600!important}
+body:not(.app) #auth .cmp-table tbody .us::before{color:#1F8A5B!important;font-weight:700!important}
+/* Pricing. */
+body:not(.app) #auth .pricing-section .plan,body:not(.app) #auth .credits-how{border-radius:16px!important;border:1px solid var(--c-line)!important;background:var(--c-panel)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body:not(.app) #auth .pricing-section .plan h3{font-size:14px!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth .pricing-section .plan .price{font-size:36px!important;font-weight:600!important;letter-spacing:-.035em!important;color:#1B1D22!important}
+body:not(.app) #auth .pricing-section .plan li{font-size:14px;color:var(--c-ink-2)}
+body:not(.app) #auth .pricing-section .plan li::before{color:#1F8A5B!important}
+body:not(.app) #auth .credits-how h3{font-size:15px!important;font-weight:600!important;color:#1B1D22}
+body:not(.app) #auth .credits-how li{font-size:14px!important;line-height:1.6!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth .credits-how li b{color:var(--c-ink)!important;font-weight:600}
+/* Footer. */
+body:not(.app) #auth .foot{border-top:1px solid var(--c-line)!important;padding-top:28px!important;padding-bottom:36px!important;color:var(--c-ink-3)!important}
+body:not(.app) #auth .foot a{font-size:13.5px!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth .foot a:hover{color:#1B1D22!important}
+body:not(.app) #auth .foot .brand-foot{font-weight:600;color:#1B1D22}
+@media (max-width:900px){
+ body:not(.app) #auth .proof{grid-template-columns:1fr 1fr!important}
+ body:not(.app) #auth .proof div:nth-child(3){border-left:0!important}
+ body:not(.app) #auth .proof div:nth-child(n+3){border-top:1px solid var(--c-line)!important}
+}
+@media (max-width:640px){
+ body:not(.app) #top-bar{padding:8px 16px!important}
+ body:not(.app) #auth .hero h1{font-size:38px!important;letter-spacing:-.035em!important}
+ body:not(.app) #auth .hero .lede{font-size:15.5px!important}
+ body:not(.app) #auth .hero .eyebrow{height:auto;min-height:28px;padding:6px 12px!important;font-size:12.5px!important;line-height:1.35!important;white-space:normal;text-align:left}
+ body:not(.app) #auth #landing-form.prompt-box{padding:14px 12px 10px 16px!important;border-radius:18px!important}
+ body:not(.app) #auth .prompt-tools .ptool:not(.round){display:none!important}
+ body:not(.app) #auth .hero-chips{flex-wrap:nowrap!important;justify-content:flex-start!important;overflow-x:auto;margin-left:-16px!important;margin-right:-16px!important;padding:2px 16px 4px!important;scrollbar-width:none}
+ body:not(.app) #auth .hero-chips::-webkit-scrollbar{display:none}
+ body:not(.app) #auth .hero-chip{flex:none;white-space:nowrap}
+ body:not(.app) #auth .proof{grid-template-columns:1fr!important}
+ body:not(.app) #auth .proof div+div{border-left:0!important;border-top:1px solid var(--c-line)!important}
+ body:not(.app) #auth .cmp-table th,body:not(.app) #auth .cmp-table td{padding:10px 12px!important;font-size:13px!important}
+ body:not(.app) #auth .foot{flex-direction:column;align-items:flex-start}
+}
+
+/* =====================================================================
+   6. Sign in / Create account / Reset password (#auth-dialog)
+   ===================================================================== */
+body:not(.app) #auth #auth-dialog{width:min(420px,calc(100vw - 32px))!important;max-width:none!important;margin:auto!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;overflow:visible}
+body:not(.app) #auth #auth-dialog::backdrop{background:rgba(17,24,39,.35);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+body:not(.app) #auth #auth-dialog .auth-card{position:relative;display:flex!important;flex-direction:column;gap:0;width:auto!important;max-width:none!important;margin:0!important;padding:32px 28px 24px!important;background:var(--c-panel)!important;border:0!important;border-radius:16px!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.25),0 0 0 1px rgba(16,24,40,.04)!important;color:var(--c-ink)}
+/* The brand mark above the title. */
+body:not(.app) #auth #auth-dialog .auth-card::before{content:"K";display:grid;place-items:center;width:36px;height:36px;margin:0 auto 14px;border-radius:10px;background:var(--c-accent);color:#fff;font:700 16px/1 Geist,ui-sans-serif,system-ui,sans-serif}
+body:not(.app) #auth #auth-dialog #auth-title{margin:0 0 6px!important;padding:0 24px;font-size:20px!important;line-height:1.25!important;font-weight:600!important;letter-spacing:-.01em!important;text-align:center;color:#1B1D22!important}
+body:not(.app) #auth #auth-dialog #auth-title::after{content:"Build apps and websites by chatting.";display:block;margin-top:6px;font-size:14px;font-weight:400;letter-spacing:0;color:var(--c-ink-3)}
+body:not(.app) #auth #auth-dialog .auth-close{position:absolute!important;top:12px!important;right:12px!important;left:auto!important;width:32px!important;height:32px!important;padding:0!important;display:grid!important;place-items:center;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-3)!important;font-size:20px!important;line-height:1!important;box-shadow:none!important;outline:0}
+body:not(.app) #auth #auth-dialog .auth-close:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body:not(.app) #auth #auth-dialog .auth-close:focus-visible{outline:2px solid var(--c-accent)!important;outline-offset:1px}
+/* Create account | Sign in: one segmented control, full width. */
+body:not(.app) #auth #auth-dialog .tabs{display:grid!important;grid-template-columns:1fr 1fr;gap:2px;width:100%;margin:20px 0 18px!important;padding:3px!important;border:0!important;border-radius:10px!important;background:var(--c-raise)!important;box-shadow:inset 0 0 0 1px var(--c-line)!important}
+body:not(.app) #auth #auth-dialog .tabs:has(#tab-signup.hidden){grid-template-columns:1fr}
+body:not(.app) #auth #auth-dialog .tabs button{height:32px!important;padding:0 10px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2)!important;font-size:13.5px!important;font-weight:500!important;box-shadow:none!important}
+body:not(.app) #auth #auth-dialog .tabs button[aria-selected=true]{background:var(--c-panel)!important;color:#1B1D22!important;box-shadow:0 1px 2px rgba(16,24,40,.08),0 0 0 1px var(--c-line)!important}
+body:not(.app) #auth #auth-dialog form{display:flex!important;flex-direction:column;gap:14px!important;margin:0!important}
+body:not(.app) #auth #auth-dialog form.hidden{display:none!important}
+body:not(.app) #auth #auth-dialog label{display:flex!important;flex-direction:column;gap:6px!important;font-size:13px!important;font-weight:500!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth #auth-dialog input{height:40px!important;width:100%;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:14.5px!important;box-shadow:none!important;transition:border-color .12s ease,box-shadow .12s ease}
+body:not(.app) #auth #auth-dialog input:focus{outline:0!important;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body:not(.app) #auth #auth-dialog .primary{height:40px!important;width:100%;margin-top:4px!important;padding:0 14px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font-size:14px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body:not(.app) #auth #auth-dialog .primary:hover{background:var(--c-accent-2)!important}
+body:not(.app) #auth #auth-dialog .primary:disabled{opacity:.6}
+body:not(.app) #auth #auth-dialog .primary:focus-visible{outline:2px solid var(--c-accent);outline-offset:2px}
+body:not(.app) #auth #auth-dialog #free-note{margin:-4px 0 0!important;text-align:center;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body:not(.app) #auth #auth-dialog #free-note:empty,body:not(.app) #auth #auth-dialog .error:empty,body:not(.app) #auth #auth-dialog #forgot-status:empty{display:none}
+body:not(.app) #auth #auth-dialog .error{margin:0!important;padding:9px 12px;border-radius:10px;background:rgba(194,65,45,.08);color:#C2412D!important;font-size:13px!important}
+body:not(.app) #auth #auth-dialog #forgot-status{margin:0!important;font-size:13px;color:var(--c-ink-2)}
+body:not(.app) #auth #auth-dialog .link-btn{align-self:center;height:auto!important;padding:2px 4px!important;border:0!important;background:none!important;color:var(--c-ink-2)!important;font-size:13px!important;font-weight:500!important;text-decoration:none!important;box-shadow:none!important}
+body:not(.app) #auth #auth-dialog .link-btn:hover{color:var(--c-accent)!important;text-decoration:underline!important}
+body:not(.app) #auth #auth-dialog #forgot-form>p.muted,body:not(.app) #auth #auth-dialog #reset-form>p.muted{margin:0!important;font-size:13.5px!important;line-height:1.5;color:var(--c-ink-2)!important}
+/* Forgot password is only offered when signing in; while it is open, the sign-in form steps aside. */
+body:not(.app) #auth #auth-dialog:has(#tab-signup[aria-selected=true]) #forgot-open{display:none!important}
+body:not(.app) #auth #auth-dialog:has(#forgot-form:not(.hidden)) #auth-form,body:not(.app) #auth #auth-dialog:has(#reset-form:not(.hidden)) .tabs{display:none!important}
+body:not(.app) #auth #auth-dialog:has(#reset-form:not(.hidden)) #auth-title{margin-bottom:20px!important}
+/* Google: a secondary button with an "or" rule above it. */
+body:not(.app) #auth #auth-dialog .google{order:5;display:flex!important;align-items:center;justify-content:center;gap:8px;height:40px;margin-top:18px;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:#1B1D22!important;font-size:14px;font-weight:500;text-decoration:none;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body:not(.app) #auth #auth-dialog .google.hidden{display:none!important}
+body:not(.app) #auth #auth-dialog .google:hover{background:var(--c-raise)!important}
+@media (max-width:640px){
+ body:not(.app) #auth #auth-dialog .auth-card{padding:28px 20px 20px!important}
+}
+body:not(.app) #auth #auth-dialog:has(#forgot-form:not(.hidden)) #auth-title::after,body:not(.app) #auth #auth-dialog:has(#reset-form:not(.hidden)) #auth-title::after{content:none}
+body:not(.app) #auth #auth-dialog #reset-form>p.muted{display:none!important}
+body:not(.app) #auth #auth-dialog label{margin:0!important}
+@media (max-width:640px){
+ body:not(.app) #auth .hero .eyebrow{max-width:calc(100% - 16px);text-align:center;text-wrap:balance;justify-content:center}
+ body:not(.app) #auth .hero-trust{gap:6px 14px!important;font-size:12.5px!important}
+ body:not(.app) #auth .hero-trust span{margin:0!important}
+}
+/* Template cards (landing and the home Templates tab): sentence-case category, calmer type. */
+:is(body:not(.app) #auth,body.app #home) .tpl .tpl-body .cat{text-transform:none!important;letter-spacing:0!important;font-size:12px!important;font-weight:500!important;color:var(--c-ink-3)!important}
+:is(body:not(.app) #auth,body.app #home) .tpl .tpl-body .cat::before{display:none!important}
+:is(body:not(.app) #auth,body.app #home) .tpl .tpl-body strong{font-size:15px!important;font-weight:600!important;letter-spacing:-.01em;color:#1B1D22!important}
+:is(body:not(.app) #auth,body.app #home) .tpl .tpl-body .desc{font-size:13.5px!important;color:var(--c-ink-2)!important}
+:is(body:not(.app) #auth,body.app #home) .tpl .tpl-use{font-size:13px!important;font-weight:500!important;color:var(--c-accent)!important}
+:is(body:not(.app) #auth,body.app #home) .tpl{border-radius:16px!important;border:1px solid var(--c-line)!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+:is(body:not(.app) #auth,body.app #home) .tpl:hover{box-shadow:0 10px 28px -12px rgba(16,24,40,.28)!important}
+/* Templates tab: the projects grid really hides (calm.css forced display:grid over .hidden). */
+body.app #home .projects.cards.hidden{display:none!important}
+/* Footer never grows past the sidebar: a long email ends in an ellipsis, Sign out stays visible. */
+body.app #side .side-foot{display:grid!important;grid-template-columns:minmax(0,1fr)!important;min-width:0}
+body.app #side .side-foot>*{min-width:0}
+body.app #side .side-card .side-actions:not(:has(button:not(.hidden))){display:none!important}
+body.app #side .side-user .ghost{flex:none}
+body.app #side .side-card .credits{box-shadow:none!important;border:0!important;background:transparent!important;padding:0!important;border-radius:0!important}
+@media (max-width:640px){body:not(.app) #auth .hero .eyebrow::before{display:none!important}}
