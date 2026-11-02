@@ -1741,7 +1741,8 @@ async function renderMobile(){
  $('mobile-qr').classList.toggle('hidden',!d.url);
  if(d.url)$('mobile-qr').src='/api/create/projects/'+id+'/qr?t='+Date.now();
  text($('mobile-url'),d.url?d.url:'Publish the app first, then scan the code with your phone camera.');
- text($('mobile-install-note'),d.url&&!d.installable?'Installing works on the app\'s own subdomain or custom domain (set KAIROQ_SITES_DOMAIN or add a domain in Publish). The /sites/ link opens as a normal web page.':'');
+ // Owner-only setup detail (the KAIROQ_SITES_DOMAIN variable) is shown to the owner only.
+  text($('mobile-install-note'),d.url&&!d.installable?'Installing works on the app\'s own address or custom domain ('+(state.me?.viewer?.kind==='owner'?'set KAIROQ_SITES_DOMAIN or ':'')+'add a domain in Publish). This link opens as a normal web page.':'');
  const editor=state.project.role!=='viewer';for(const el of ['mobile-enabled','mobile-name','mobile-short','mobile-theme','mobile-icon','mobile-appid','mobile-save'])$(el).disabled=!editor;
 }
 $('mobile-open').onclick=async()=>{text($('mobile-error'),'');text($('mobile-status'),'');try{await renderMobile();$('mobile-dialog').showModal()}catch(err){text($('chat-error'),err.message)}};
@@ -1986,12 +1987,12 @@ function renderPublish(){
   const li=document.createElement('li'),head=document.createElement('div');
   head.className='row';head.style.marginTop='0';
   const name=document.createElement('strong');name.textContent=d.hostname;name.style.flex='1';
-  const badge=document.createElement('span');badge.className='badge'+(d.verified?' live':'');badge.textContent=d.verified?(d.https==='manual'?'Connected · add in Railway for HTTPS':d.https&&/VALID|ISSUED/i.test(d.https)?'Connected · HTTPS':'Connected'):'Waiting for DNS';
+  const badge=document.createElement('span');badge.className='badge'+(d.verified?' live':'');badge.textContent=d.verified?(d.https==='manual'?(state.me?.viewer?.kind==='owner'?'Connected · add in Railway for HTTPS':'Connected · HTTPS on the way')/* Railway is an owner-only detail */:d.https&&/VALID|ISSUED/i.test(d.https)?'Connected · HTTPS':'Connected'):'Waiting for DNS';
   head.append(name,badge);
   if(!d.verified){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent='Verify';b.onclick=()=>domainAction('/verify','POST',d.hostname);head.append(b)}
   const rm=document.createElement('button');rm.type='button';rm.className='ghost';rm.textContent='Remove';rm.onclick=()=>domainAction('/domains','DELETE',d.hostname);head.append(rm);
   li.append(head);
-  if(d.railway_error){const p=document.createElement('p');p.className='error small';p.textContent='Automatic HTTPS setup failed: '+d.railway_error;li.append(p)}
+  if(d.railway_error){const p=document.createElement('p');p.className='error small';p.textContent='Automatic HTTPS setup failed'+(state.me?.viewer?.kind==='owner'?': '+d.railway_error:'. Try removing the domain and adding it again.');/* the raw hosting error is for the owner only */li.append(p)}
   if(!d.verified){
    const dns=document.createElement('div');dns.className='dns';
    const intro=document.createElement('span');intro.className='muted';intro.textContent='Add these records at your domain provider:';dns.append(intro);
@@ -2066,14 +2067,15 @@ $('settings-open').onclick=async()=>{
   const st=settings.secrets;
   text($('stripe-key-status'),st.stripe_secret_key?'(saved '+st.stripe_secret_key.hint+')':'');
   text($('stripe-hook-status'),st.stripe_webhook_secret?'(saved '+st.stripe_webhook_secret.hint+')':'');
-  text($('gh-token-status'),gh.token?'(saved '+gh.token.hint+')':gh.owner_fallback?'(using the server GITHUB_TOKEN)':'');
+  text($('gh-token-status'),gh.token?'(saved '+gh.token.hint+')':gh.owner_fallback?(state.me?.viewer?.kind==='owner'?'(using the server GITHUB_TOKEN)':'(connected)'):''/* env var name: owner only */);
   text($('stripe-hook-url'),settings.stripe_webhook_url);text($('stripe-events'),settings.stripe_events.join(', '));
-  text($('email-status'),settings.email?'Email is set up. Apps can notify you with email.send({to:"owner", …}).':'Email is not set up on this server yet (KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM).');
+  // Plain wording for everyone; the env var names are shown to the owner only.
+   text($('email-status'),settings.email?'Email is on. Your app can send confirmations and notify you.':'Email is not set up yet.'+(state.me?.viewer?.kind==='owner'?' Add KAIROQ_RESEND_API_KEY and KAIROQ_EMAIL_FROM on the server.':''));
   const engines=settings.engines||['kairoq'];$('engine-row').classList.toggle('hidden',engines.length<2);$('engine-note').classList.toggle('hidden',engines.length<2);$('engine-select').value=settings.engine||'kairoq';
   $('app-managers').value=(settings.app_managers||[]).join(', ');text($('app-managers-status'),'');
   $('gh-repo').value=gh.github?.repo||'';
   if(gh.github?.last_push)text($('gh-status'),'Last push: version '+gh.github.last_push.version+' · '+when(gh.github.last_push.at));
-  if(!settings.encryption)text($('settings-error'),'Saving keys needs APP_ENCRYPTION_KEY on the server.');
+  if(!settings.encryption)text($('settings-error'),state.me?.viewer?.kind==='owner'?'Saving keys needs APP_ENCRYPTION_KEY on the server.':'Saving keys is not available yet.');/* env var name: owner only */
  }catch(err){text($('settings-error'),err.message)}
  $('settings-dialog').showModal();
 };
@@ -2553,7 +2555,7 @@ $('security-open').onclick=async()=>{
 async function renderSecrets(){
  const {secrets}=await api('/projects/'+state.project.id+'/secrets');
  const list=$('secrets-list');list.replaceChildren();
- if(!secrets.length)list.append(Object.assign(document.createElement('li'),{className:'muted small',textContent:'No secrets yet.'}));
+ if(!secrets.length)list.append(Object.assign(document.createElement('li'),{className:'muted small',textContent:'No keys yet.'/* matches the "API keys for your app" heading */}));
  for(const sec of secrets){
   const li=document.createElement('li'),row=document.createElement('div');row.className='row';row.style.marginTop='0';
   const name=Object.assign(document.createElement('code'),{textContent:sec.name});name.style.flex='1';
@@ -3278,6 +3280,14 @@ async function renderAdmin(given){
  }catch{}
 }
 $('side-admin').onclick=openAdmin;
+// Dialog shell (docs/DESIGN-SYSTEM.md, public/ui/dialogs.css): each settings-type dialog gets a
+// close (×) button in its top-right corner. It sits outside the form, so Enter in a field never hits it.
+for(const id of ['settings','connectors','apps','integrations','publish','team','design','mobile','phone','stores','key','plans','buy','explain','memory','admin']){
+ const d=$(id+'-dialog');if(!d||d.querySelector(':scope>.kq-dlg-x'))continue;
+ const x=document.createElement('button');x.type='button';x.className='kq-dlg-x';x.setAttribute('aria-label','Close');
+ x.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+ x.onclick=()=>d.close(d.id==='key-dialog'?'cancel':'close');d.append(x);// after the form, so opening still focuses the first field
+}
 $('learn-run').onclick=async()=>{const b=$('learn-run');b.disabled=true;text($('learn-status'),'Looking at recent builds…');try{const r=await api('/learning',{method:'POST',body:{action:'run'}});text($('learn-status'),r.result.proposed.length?'Proposed '+r.result.proposed.length+' new rule'+(r.result.proposed.length===1?'':'s')+'.':'No new repeated problems found.');renderAdmin(r.learning)}catch(err){text($('learn-status'),err.message)}finally{b.disabled=false}};
 
 async function start(){
@@ -3652,7 +3662,8 @@ state.designData=null;
 async function renderDesign(){
  const id=state.project.id,d=await api('/projects/'+id+'/design');state.designData=d;
  const ds=d.design||{},editor=state.project.role!=='viewer';
- text($('design-intro'),d.design?'The AI follows this design in every change. Colours and fonts live in src/index.css, so saving here restyles the whole app at once.':'No design brief yet. One is created automatically with the first build of a new app, or describe a direction below.');
+ // Plain wording (no file names) for the dialog subtitle.
+ text($('design-intro'),d.design?'The AI follows this design in every change. Saving here restyles the whole app at once.':'No design brief yet. One is created automatically with the first build of a new app, or describe a direction below.');
  $('design-missing').classList.toggle('hidden',d.has_tokens);
  $('design-name').value=ds.name||'';$('design-summary').value=ds.summary||'';$('design-notes').value=ds.notes||'';
  const pal=$('design-palette');pal.replaceChildren();
