@@ -79,6 +79,10 @@ test('the plan offers characters to pick; without a key it says so plainly',asyn
  assert.equal(q.characters.options.length,0);assert.match(q.characters.unavailable,/POLY_PIZZA_KEY/);assert.equal(q.characters.phone_note,undefined);
  const none=await plan.make('A booking site',{callModel:async(o,parse)=>parse(JSON.stringify({...PLAN,character:null}))});
  assert.equal(none.characters,undefined);
+ // A coffee landing page never gets a 3D model picker, even if the plan model names one.
+ const coffee=await plan.make('An animated landing page for Northwind Coffee Roasters with a parallax photo band',{callModel:async(o,parse)=>parse(JSON.stringify({...PLAN,character:{search:'coffee bag'}})),fetchImpl:fakeFetch});
+ assert.equal(coffee.characters,undefined);
+ assert.match(plan.SYSTEM,/an engine, a clock, a gearbox/);
  assert.match(plan.withPlan('x',{...PLAN,picked:'T-Rex'}),/picked the ready-made 3D model "T-Rex".*never draw the character from shapes or SVG/);
  assert.match(plan.SYSTEM,/never plan to draw the character from shapes/);
 });
