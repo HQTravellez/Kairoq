@@ -465,7 +465,9 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     // A short follow-up ("research it and tell me") is about the topic of the owner's last message.
     const askText=browserDecision.execute?browserDecision.message:message;
     const prevAsk=String(message).trim().split(/\s+/).length<10?[...(builder.loadMeta(id).messages||[])].reverse().find(m=>m.role==='user'&&String(m.text||'').trim()!==String(message).trim()):null;
-    research=await require('./web').gather(prevAsk&&!browserDecision.execute?String(prevAsk.text).slice(0,600)+'\n\n'+askText:askText,{callModel,tier:modelTier,signal,webSearch,browseSite,
+    // Deciding what to look up runs on the free chat route (Kairoq Agent, free pool, NVIDIA, Gemini),
+    // and research.js falls back to a plain search when no model answers.
+    research=await require('./web').gather(prevAsk&&!browserDecision.execute?String(prevAsk.text).slice(0,600)+'\n\n'+askText:askText,{callModel:(o,p)=>callModel({...o,tier:'chat',freeOnly:true},p),tier:'chat',signal,webSearch,browseSite,
      onProgress:p=>update({status:'researching',progress:p}),
      onBrowser:b=>update({status:'researching',browser:b})
     }).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
@@ -597,7 +599,7 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    // turn out as hoped. Customers who are unhappy contact support, who review the request and
    // can grant credits back (POST /api/create/admin/credits). The chat still says when a
    // change breaks a saved check or shows errors, so the customer can ask for a fix.
-   if(research.sources.length&&job.result){job.result.sources=research.sources;const m=builder.loadMeta(id),lastMsg=m.messages.at(-1);if(lastMsg&&lastMsg.role==='assistant'){lastMsg.sources=research.sources;builder.saveMeta(m)}}
+   if(research.sources.length&&job.result){job.result.sources=research.sources;const m=builder.loadMeta(id),lastMsg=m.messages.at(-1);if(lastMsg&&lastMsg.role==='assistant'){lastMsg.sources=research.sources;if(research.steps&&research.steps.length)lastMsg.browsing={steps:research.steps.slice(0,30),url:research.sources[0].url,title:research.sources[0].title};builder.saveMeta(m)}}
    // Asking before building is free: a reply that only asks the owner a question costs nothing.
    if(job.result&&job.result.question&&!job.refunded){job.free='A question before building is free.';if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: a question before building','refund:'+job.id)}catch{}job.refunded=true}
    // A change that still broke the app was not kept (the preview stays on the working version), so it is free.
