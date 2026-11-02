@@ -28,7 +28,7 @@ test('the template is listed, valid, and every change the AI can make needs a co
 test('a first prompt that plainly asks for a CRM starts from this template; other apps do not',()=>{
  for(const p of ['A CRM for my agency that follows up with leads','Build a sales pipeline for my team','I want to track our leads and deals','crm with email follow ups'])assert.equal(templates.match(p),'agentic-crm',p);
  for(const p of ['A website for my bakery','A CRM landing page for my startup','Booking app for a salon','A snake game',''])assert.equal(templates.match(p),null,p);
- assert.match(fs.readFileSync(path.join(__dirname,'..','create-api.js'),'utf8'),/const matched=!template&&prompt\?require\('\.\/create-templates'\)\.match\(prompt\):null;/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','create-api.js'),'utf8'),/const matched=!template&&prompt\?T\.match\(prompt\):null;[\s\S]*const auto=!template&&!matched&&prompt\?T\.saasStarter\(prompt\):null;/);
 });
 
 test('sign up, examples appear, the agent runs with reasons, Copilot moves a deal only after Approve',{skip:!runtime.available(),timeout:300000},async()=>{
