@@ -392,6 +392,10 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   // conversation remain chat; explicit execution requests were promoted above and stay Build.
   if(mode==='build'&&!routing.explicitExecution(ownerText)&&(S.questionOnly(message)||S.conversation(message))&&!supportQuestion(message))mode='discuss';
  }
+ // A chat started from the home page (a greeting or a question) is a conversation, not an app:
+ // "add a list of payroll add-ons" is asked of the chat, not the code. It becomes an app only
+ // when the owner asks for one ("build a CRM", "make a booking site"); from then on it builds.
+ {const cm=builder.loadMeta(id);if(cm.chat&&(mode==='build'||mode==='agent')&&!hooks){if(appRequest(ownerText)){cm.chat=false;builder.saveMeta(cm)}else mode='discuss'}}
  // Missing images are not a healthy-preview issue: never assert that a successful page load proves images are present.
  if((mode==='build'||mode==='agent'||mode==='discuss')&&!pinnedModel&&!hooks&&!images.length&&!context&&missingImageComplaint(message)){
   const meta=builder.loadMeta(id),answer=missingImageAnswer(meta);
@@ -1373,7 +1377,7 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
    // A greeting is not an app: "hi" never becomes a project named "hi".
    const asked=String(b.prompt||b.name||'').trim();
    if(!slot&&!b.template&&asked&&require('./builder-smalltalk').smallTalk(asked))return send(res,422,{error:'That reads like a greeting, not an app. Describe what to build, for example "a booking page for my yoga studio".'}),true;
-   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,prompt:b.answers?require('./clarify').withAnswers(b.prompt,b.answers):b.prompt,template:b.template,tier:b.tier,engine:b.engine==='opencode'?'opencode':undefined,images:parseImages(b.images)},deps);
+   const {meta,job}=await createProject(v,slot?{name:slot.name,prompt:slot.prompt,template:slot.template,tier:b.tier}:{name:b.name,chat:b.chat===true,prompt:b.answers?require('./clarify').withAnswers(b.prompt,b.answers):b.prompt,template:b.template,tier:b.tier,engine:b.engine==='opencode'?'opencode':undefined,images:parseImages(b.images)},deps);
    return send(res,201,{project:projectViewFor(meta.id),job}),true;
   }
   const jm=/^\/jobs\/([a-f0-9-]{36})(\/events)?$/.exec(route);
@@ -2080,7 +2084,9 @@ function nameFromPrompt(prompt){
 // No cap on how many projects an account keeps. KAIROQ_BUILDER_MAX_PROJECTS sets one if ever needed.
 function atProjectCap(n){const cap=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||0);return cap>0&&n>=cap}
 // A new project, started from a template and/or a first prompt (the editor and the MCP server).
-async function createProject(v,{name,prompt,template,tier='standard',images=[],engine}={},deps){
+// "Build a CRM", "make me a booking site", "create a landing page": a request for an app.
+function appRequest(text){return /\b(build|make|create|generate|design|launch|start)\b[^.?!\n]{0,60}\b(app|apps|site|website|web ?page|landing|page|tool|dashboard|crm|portal|store|shop|game|form|calculator|tracker|booking|saas|platform)\b/i.test(String(text||''))}
+async function createProject(v,{name,prompt,template,tier='standard',images=[],engine,chat=false}={},deps){
  if(atProjectCap(builder.list(v.owner).length))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
  prompt=String(prompt||'').trim();
  const T=require('./create-templates');
@@ -2092,6 +2098,8 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[],e
  const tpl=template||matched||auto?T.get(String(template||matched||auto)):null;
  if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
  const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:nameFromPrompt(prompt))||'Untitled app',owner:v.owner});
+ // Opened from the home page as a conversation: chat first, an app only when asked for (see appRequest).
+ if(chat&&!tpl&&!prompt){meta.chat=true;builder.saveMeta(meta)}
  if(tpl)await builder.initializeFrom(meta,tpl.files,auto?'Started from the SaaS starter (sign-in, teams, credits, billing and admin are ready)':'Started from the '+tpl.name+' template');
  else await builder.initialize(meta);
  if(tpl&&tpl.assistantDocs){const A=require('./app-assistant'),db=backend.database(meta.id);for(const d of tpl.assistantDocs)A.addText(db,{title:d.title,text:d.text,source:'Sample from the template: replace it with your own',kind:'text'})}

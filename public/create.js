@@ -237,7 +237,7 @@ $('new-form').onsubmit=async e=>{
   // Discuss mode (no design pick, no build) instead of starting a build or reopening the last project.
   const talk=homeTalk(typed);
   if(talk){
-   const {project}=await api('/projects',{method:'POST',body:{name:talk==='greeting'?'New chat':shortName(typed)}});
+   const {project}=await api('/projects',{method:'POST',body:{name:talk==='greeting'?'New chat':shortName(typed),chat:true}});
    await openProject(project.id);
    $('new-prompt').value='';
    setChatMode('discuss');
@@ -553,6 +553,8 @@ async function openProject(id,{pendingText,job}={}){
  show('editor');history.replaceState(null,'','/create?'+(EMBED?'embed=1&':'')+'project='+encodeURIComponent(id));
  if(window.parent!==window)window.parent.postMessage({kairoq:'project',id:project.id,name:project.name},location.origin);
  applyRole();
+ // A chat (no app yet) uses the whole width for the conversation; the preview comes back when it becomes an app.
+ $('editor').classList.toggle('chat-only',Boolean(project.chat));
  $('project-name').value=project.name;
  if(!state.projects)api('/projects').then(r=>renderRecents(r.projects)).catch(()=>{});else markRecent(id);
  renderTiers();setChatMode(state.mode);
@@ -803,7 +805,7 @@ function verifiedCard(v,checks,added){
  if(all)return document.createTextNode('');
  return box;
 }
-function renderVersions(){
+function renderVersions(){$('editor').classList.toggle('chat-only',Boolean(state.project&&state.project.chat));
  const sel=$('versions');sel.replaceChildren();
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.broken?'⚠ did not load · ':'')+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }

@@ -421,3 +421,8 @@ body.app.in-editor #editor #web-browser-pane .web-browser-log li.now::before{bac
 body.app.in-editor #editor #data:not(.hidden){background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0 0 16px!important}
 body.app.in-editor #editor #messages .plan-card .plan-research{align-self:flex-start;width:auto}
 body.app.in-editor #editor #messages .qs .ask-opt input{margin:0!important;flex:none}
+
+/* A chat that is not an app yet: the conversation takes the whole editor, centred like a chat app. */
+body.app.in-editor #editor.chat-only .stage,body.app.in-editor #editor.chat-only #view-browser{display:none!important}
+body.app.in-editor #editor.chat-only aside.chat{width:100%!important;max-width:none!important;flex:1 1 auto!important;border-right:0!important}
+body.app.in-editor #editor.chat-only aside.chat .messages,body.app.in-editor #editor.chat-only aside.chat #chat-form{max-width:780px;margin-left:auto!important;margin-right:auto!important;width:100%}

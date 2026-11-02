@@ -509,7 +509,7 @@ function list(owner){
  if(!fs.existsSync(ROOT()))return[];
  return fs.readdirSync(ROOT()).filter(d=>/^[a-f0-9]{12}$/.test(d)).map(d=>readJson(path.join(ROOT(),d,'project.json'),null)).filter(m=>m&&(owner===undefined||m.owner===owner)).map(summary).sort((a,b)=>b.updated_at.localeCompare(a.updated_at));
 }
-function summary(m){return{id:m.id,name:m.name,owner:m.owner,current_version:m.current_version,updated_at:m.updated_at,published:m.published,preview_url:previewUrl(m)}}
+function summary(m){return{id:m.id,name:m.name,owner:m.owner,current_version:m.current_version,updated_at:m.updated_at,published:m.published,preview_url:previewUrl(m),...(m.chat?{chat:true}:{})}}
 function previewUrl(m,n=m.current_version){return n?'/builder/p/'+m.id+'-'+m.preview_key+'/v/'+n+'/':null}
 // Messages for the editor. Long reasoning is kept in full only on the last few messages.
 function lightMessages(list){
@@ -992,7 +992,13 @@ How answers look (write like a sharp senior consultant, not a chatbot):
 - Longer answers: short "### " headings, short paragraphs, bullets for options. Bold only the few words that carry the decision.
 - When the project context has "Web research done for this request", base facts on it and cite the pages as [1], [2] in the order they appear there; the sources are listed under the answer. Without it, answer from general knowledge and never say you researched, searched or checked online.
 - Prices, plans and limits change: when they were not in the research, say to check the vendor's site.
+- Never promise work in the answer ("I will research…", "I'll look into…"): the answer is the result. Say what you found, or that it is from general knowledge.
 - End every answer with 2 or 3 follow-ups the owner could tap next, one per line as IDEA: <verb-first action of at most 5 words> (for example IDEA: Draft the outreach email). They appear as buttons, not in the text.`;
+// A chat opened from the home page has no app yet. It is a conversation with a sharp
+// consultant, not app planning: no sections, plans or "next steps for the app".
+const CHAT_NOTE=`
+
+THIS IS A CONVERSATION, NOT AN APP (yet). There is no app or page here. Answer the person's question itself, like a sharp consultant who knows the subject. Do not mention "this project", "the app", "the page", sections, designs, colours, plans or next steps for an app, and do not propose building anything unless they ask for an app. Follow-up IDEA lines are next questions or actions about the topic (for example IDEA: Compare their payroll add-ons), never app features. Never say you will do something later ("I will research…"): say what you found, or that you answered from general knowledge.`;
 // "IDEA: Add a booking calendar" lines become clickable ideas under the answer. When the owner
 // asked for ideas and the model wrote a numbered list without IDEA lines, the list items are used.
 function splitIdeas(answer,question=''){
@@ -1022,7 +1028,7 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  const codeContext=codeQuestion?contextFiles(files,24000):require('./project-memory').note(meta,files);
  // Stable instructions first and per-message notes last, so the start of the prompt can be cached.
  const perMessage=(await require('./verified-learning').note(meta,text)+require('./ecc-context-recall').note(meta,text)+await require('./integrations/agent-stack/memory-context').note(meta,text)).trim();
- const messages=[{role:'system',content:DISCUSS_PROMPT+require('./agent-response-contract').prompt()+knowledgeNote(meta)+require('./app-concept').note(meta)},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+(perMessage?'\n\n'+perMessage:'')+'\n\nMessage: '+text,images)}];
+ const messages=[{role:'system',content:DISCUSS_PROMPT+require('./agent-response-contract').prompt()+(meta.chat?CHAT_NOTE:knowledgeNote(meta)+require('./app-concept').note(meta))},...historyMessages(meta),{role:'user',content:userContent('Project context:\n\n'+codeContext+(context?'\n\n'+context:'')+(perMessage?'\n\n'+perMessage:'')+'\n\nMessage: '+text,images)}];
  // Save what the owner said before inference, so failed model calls cannot make it vanish.
  addMessages(id,[{role:'user',text,mode:'discuss'}]);
  let answer=(await callModel({messages,temperature:0.4,maxOutputTokens:2500,cacheKey:'kairoq-'+id,signal,tier:require('./builder-response-policy').discussionTier(images,tier),onToken:onStream?(_d,all)=>onStream(all,1):undefined,onReasoning:onThinking?(_d,all)=>onThinking(all):undefined},parseText)).slice(0,12000);
