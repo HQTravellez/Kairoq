@@ -1242,7 +1242,7 @@ async function handle(req,res,{isOwner,callModel,secure,checkRuntime,screenshot,
   if(route==='/remix'&&method==='POST'){
    const b=await readJson(req,2000),src=findShare(b.token);
    if(!src||!src.share.remix)throw Object.assign(Error('This app cannot be remixed'),{status:404});
-   if(listFor(v).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached'),{status:400});
+   if(atProjectCap(listFor(v).length))throw Object.assign(Error('Project limit reached'),{status:400});
    const meta=builder.create({name:('Remix of '+src.name).slice(0,80),owner:v.owner});
    const assets=require('./react-assets');
    for(const a of assets.list(src.id)){const f=assets.read(src.id,a.name);fs.mkdirSync(path.join(builder.projectDir(meta.id),'uploads'),{recursive:true});fs.writeFileSync(path.join(builder.projectDir(meta.id),'uploads',a.name),f.bytes)}
@@ -2057,9 +2057,11 @@ function nameFromPrompt(prompt){
  const cut=first.slice(0,48),sp=cut.lastIndexOf(' ');
  return (sp>20?cut.slice(0,sp):cut).replace(/[\s,;-]+(a|an|the|and|or|with|for|of|to|in)$/i,'').replace(/[,;\s-]+$/,'');
 }
+// No cap on how many projects an account keeps. KAIROQ_BUILDER_MAX_PROJECTS sets one if ever needed.
+function atProjectCap(n){const cap=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||0);return cap>0&&n>=cap}
 // A new project, started from a template and/or a first prompt (the editor and the MCP server).
 async function createProject(v,{name,prompt,template,tier='standard',images=[],engine}={},deps){
- if(builder.list(v.owner).length>=Number(process.env.KAIROQ_BUILDER_MAX_PROJECTS||50))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
+ if(atProjectCap(builder.list(v.owner).length))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
  prompt=String(prompt||'').trim();
  const tpl=template?require('./create-templates').get(String(template)):null;
  if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
@@ -2090,4 +2092,4 @@ async function publishProject(id,{slug,version,force}={},{inspect,screenshot,ren
  if(screenshot){const meta=builder.loadMeta(id);screenshot(builder.previewUrl(meta,meta.published.version),path.join(builder.projectDir(id),'og.png')).catch(()=>{})}
  return out;
 }
-module.exports={liveLine,buildingNote,busy,exclusive,handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
+module.exports={atProjectCap,liveLine,buildingNote,busy,exclusive,handle,parseFiles,nameFromPrompt,quickEdit,jobs,streamSnapshot,watchAll,runWatch,startJob,startLaunch,startSynthetic,startRepair,repairPrice,syntheticPrice,ownedProject,publicJob,listFor,createProject,publishProject,projectViewFor};
