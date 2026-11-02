@@ -18,7 +18,7 @@ Respond with ONLY JSON:
  "features":["one short line each, 3 to 6"],
  "left_out":["what waits for a later version, 1 to 3 short lines"],
  "character":null}
-Set "character" when the app shows a 3D character, animal, creature, vehicle or object as a main part (a dinosaur that comes to life, a mascot, a 3D product): {"search":"1 to 3 plain English words to find a ready-made 3D model, e.g. trex, dog, robot, car","animated":true when it should move (walk, jump, wave)}. Otherwise null. Ready-made models come from a free library; never plan to draw the character from shapes.`;
+Set "character" when the app shows a 3D character, animal, creature, vehicle or object as a main part (a dinosaur that comes to life, a mascot, a 3D product): {"search":"1 to 3 plain English words to find a ready-made 3D model, e.g. trex, dog, robot, car","animated":true when it should move (walk, jump, wave)}. Not for a machine or mechanism whose parts must move together (an engine, a clock, a gearbox): Kairoq builds those in code, so "character" stays null. Otherwise null. Ready-made models come from a free library; never plan to draw the character from shapes.`;
 
 function cleanPlan(raw){
  if(!raw||typeof raw!=='object')return null;
@@ -29,6 +29,9 @@ function cleanPlan(raw){
  const c=raw.character&&typeof raw.character==='object'?{search:clip(raw.character.search,40).replace(/[^\w ]+/g,''),animated:raw.character.animated===true}:null;
  return{title,summary,screens,features:list(raw.features,6,140),left_out:list(raw.left_out,3,140),...(c&&c.search?{character:c}:{})};
 }
+// Ready-made 3D characters are only offered when the owner asked for something 3D or AR; a
+// landing page for a coffee roaster never gets a model picker.
+function asks3d(prompt){return /\b(3d|3-d|three\.?js|webgl|ar|augmented reality|mascot|character|avatar|creature|dinosaur|3d model)\b/i.test(String(prompt||''))}
 // A request that names another product ("like Quiver", "similar to Calendly") is looked up.
 function namesProduct(prompt){return /\b(like|similar to|same as|inspired by|clone of|copy of|alternative to)\s+[A-Z0-9][\w.-]+/.test(String(prompt||''))}
 
@@ -55,7 +58,7 @@ async function make(prompt,{callModel,tier='standard',signal,webSearch,browseSit
  try{
   const plan=cleanPlan(await Promise.race([ask,new Promise((_,rej)=>{timer=setTimeout(()=>rej(Error('timeout')),TIMEOUT_MS)})]));
   if(!plan)return null;
-  const characters=await characterChoices(plan.character,{fetchImpl,prompt:request});
+  const characters=await characterChoices(asks3d(request)?plan.character:null,{fetchImpl,prompt:request});
   return{...plan,...(characters?{characters}:{}),sources:(research.sources||[]).slice(0,6).map(s=>({title:clip(s.title||s.url,120),url:String(s.url||'')})).filter(s=>/^https?:\/\//.test(s.url)),searches:(research.sources||[]).length};
  }catch(e){if(signal&&signal.aborted)throw e;return null}
  finally{clearTimeout(timer)}
@@ -69,4 +72,4 @@ function withPlan(prompt,plan){
   +(p.left_out.length?'\nLeft out for now: '+p.left_out.join('; '):'')
   +(plan&&plan.picked?'\nCharacter: the owner picked the ready-made 3D model "'+String(plan.picked).slice(0,80)+'" (in this project\'s 3D files). Show it with Model3D and use its own animations; never draw the character from shapes or SVG.':'');
 }
-module.exports={make,withPlan,cleanPlan,characterChoices,namesProduct,SYSTEM};
+module.exports={asks3d,make,withPlan,cleanPlan,characterChoices,namesProduct,SYSTEM};
