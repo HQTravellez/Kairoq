@@ -2067,7 +2067,9 @@ function atProjectCap(n){const cap=Number(process.env.KAIROQ_BUILDER_MAX_PROJECT
 async function createProject(v,{name,prompt,template,tier='standard',images=[],engine}={},deps){
  if(atProjectCap(builder.list(v.owner).length))throw Object.assign(Error('Project limit reached. Delete a project to create another.'),{status:400});
  prompt=String(prompt||'').trim();
- const tpl=template?require('./create-templates').get(String(template)):null;
+ // No template chosen: a prompt that plainly asks for an app Kairoq has a template for starts from it.
+ const matched=!template&&prompt?require('./create-templates').match(prompt):null;
+ const tpl=template?require('./create-templates').get(String(template)):matched?require('./create-templates').get(matched):null;
  if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
  const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:nameFromPrompt(prompt))||'Untitled app',owner:v.owner});
  if(tpl)await builder.initializeFrom(meta,tpl.files,'Started from the '+tpl.name+' template');
