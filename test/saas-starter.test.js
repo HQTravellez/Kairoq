@@ -29,9 +29,9 @@ test('the starter is listed, valid, and uses credits, teams, plans and the ready
 
 test('SaaS requests start from the starter; marketing pages and other apps do not',()=>{
  for(const p of ['Build me an AI SaaS that writes cover letters, $19 a month','An AI image generator people pay for with credits','B2B platform for clinics to manage staff rotas','A subscription app for meal plans'])
-  assert.equal(T.saasStarter(p),'ai-saas',p);
+  assert.equal(T.match(p),'ai-saas',p);
  for(const p of ['A landing page for my SaaS with a waitlist','A todo list app','Website for my bakery','Portfolio for a photographer',''])
-  assert.equal(T.saasStarter(p),null,p);
+  assert.equal(T.match(p),null,p);
 });
 
 test('a project started from it builds',async()=>{
