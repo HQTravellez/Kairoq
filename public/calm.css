@@ -101,15 +101,11 @@ body.app #editor .share-pop .ghost{border:1px solid var(--c-line-2)!important;ba
 /* Same items twice in More: Settings opens the same panel, and Share has its own button now. */
 body.app.in-editor #menu-project #settings-open,body.app.in-editor #menu-project #team-open{display:none!important}
 
-/* The space band: the same scene, one continuous strip behind the chat title and the top bar. */
-body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:linear-gradient(rgba(10,12,30,.32),rgba(10,12,30,.32)) fixed,var(--c-photo) center 22%/max(1600px,100vw) auto fixed,var(--c-sky) center top/max(1600px,100vw) auto fixed!important;border-bottom:0!important}
-body.app.in-editor #editor .chat-head #project-name,body.app.in-editor #editor .chat-head .ghost,body.app.in-editor #editor .chat-head button{color:#fff!important;text-shadow:0 1px 8px rgba(10,42,82,.4)}
-body.app.in-editor #editor .stage-bar .tabs-seg{background:rgba(255,255,255,.22)!important;border:1px solid rgba(255,255,255,.4)!important;backdrop-filter:blur(6px)}
-body.app.in-editor #editor .stage-bar .tabs-seg button{color:#fff!important}
-body.app.in-editor #editor .stage-bar .tabs-seg button[aria-pressed=true]{color:var(--c-accent)!important}
-body.app.in-editor #editor .stage-bar .ghost.icon-btn,body.app.in-editor #editor .stage-bar a.icon-btn,body.app.in-editor #editor .stage-bar .menu>summary,body.app.in-editor #editor .stage-bar .seg.icons button{color:#fff!important}
-body.app.in-editor #editor .stage-bar .ghost.icon-btn:hover,body.app.in-editor #editor .stage-bar a.icon-btn:hover,body.app.in-editor #editor .stage-bar .menu>summary:hover,body.app.in-editor #editor .stage-bar .menu[open]>summary,body.app.in-editor #editor .stage-bar .seg.icons button[aria-pressed=true]{background:rgba(255,255,255,.24)!important;color:#fff!important}
-body.app.in-editor #editor #versions{background-color:rgba(255,255,255,.22)!important;border-color:rgba(255,255,255,.45)!important;color:#fff!important}
+/* Editor bars: plain and quiet, like Lovable and Emergent. The space scene stays on the home page. */
+body.app.in-editor #editor .chat-head,body.app.in-editor #editor .stage-bar{background:var(--c-bg)!important;border-bottom:1px solid var(--c-line)!important}
+body.app.in-editor #editor .stage-bar .tabs-seg{background:var(--c-raise)!important;border:1px solid var(--c-line)!important}
+body.app.in-editor #editor .stage-bar .tabs-seg button{color:var(--c-ink-2)!important}
+body.app.in-editor #editor .stage-bar .tabs-seg button[aria-pressed=true]{background:#fff!important;color:var(--c-ink)!important;box-shadow:0 1px 2px rgba(16,24,40,.08)!important}
 body.app.in-editor #editor #versions option{color:var(--c-ink)}
 body.app.in-editor #editor #share-open{background:#fff!important;border-color:#fff!important;color:var(--c-accent)!important}
 /* Ground and cards: the dotted page behind the chat, the preview as a white card. */
@@ -163,9 +159,9 @@ body.app.in-editor #chat-form .composer-ideas{display:flex;flex-wrap:wrap;gap:6p
 body.app.in-editor #chat-form .composer-ideas.hidden{display:none}
 body.app.in-editor #chat-form .idea-chip{height:28px;padding:0 11px;border-radius:20px;border:1px solid var(--c-line);background:#fff;color:var(--c-ink-3);font-size:13px;font-weight:400;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.app.in-editor #chat-form .idea-chip:hover{background:var(--c-raise);color:var(--c-ink)}
-body.app.in-editor #editor .stage-bar #desktop,body.app.in-editor #editor .stage-bar #mobile{background:transparent!important;color:#fff!important;box-shadow:none!important}
-body.app.in-editor #editor .stage-bar #desktop[aria-pressed=true],body.app.in-editor #editor .stage-bar #mobile[aria-pressed=true]{background:rgba(255,255,255,.26)!important}
-body.app.in-editor #editor .stage-bar .seg.icons .seg-thumb{background:rgba(255,255,255,.26)!important;box-shadow:none!important}
+body.app.in-editor #editor .stage-bar #desktop,body.app.in-editor #editor .stage-bar #mobile{background:transparent!important;color:var(--c-ink-2)!important;box-shadow:none!important}
+body.app.in-editor #editor .stage-bar #desktop[aria-pressed=true],body.app.in-editor #editor .stage-bar #mobile[aria-pressed=true]{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body.app.in-editor #editor .stage-bar .seg.icons .seg-thumb{background:var(--c-raise)!important;box-shadow:none!important}
 
 /* The finished write-up: plain headed sections, no boxes; "Agent finished" closes it. */
 body.app.in-editor #editor .messages .writeup{margin:14px 0 0}
@@ -216,3 +212,20 @@ body.app #editor .messages li.assistant .md code.inline{font-size:.88em;padding:
 .reply-act[aria-pressed="true"] .ico{fill:rgba(10,42,82,.12)}
 .reply-act.done{color:#1F8A5B}
 .reply-act:focus-visible{outline:2px solid #0A2A52;outline-offset:1px}
+
+/* Menus, Lovable-style: one line per item, the explanation shows on hover; groups stay. */
+body.app #editor .menu-panel>:is(button,a)>span{display:none!important}
+body.app #editor .menu-panel>:is(button,a){min-height:34px!important;padding:7px 10px!important;border-radius:8px!important}
+body.app #editor .menu-panel>:is(button,a)>b{font-size:13.5px!important;font-weight:450!important;color:var(--c-ink)!important}
+body.app #editor .menu-panel>.menu-note{margin:10px 10px 4px!important;font-size:11.5px!important;color:var(--c-ink-3)!important}
+body.app.in-editor #menu-project>.menu-panel{width:240px!important}
+/* More menu order: the app first (Design, Settings, Connectors, Phone app), then testing, then
+   launch, then the rarely used ones. Group labels are rewritten in create.js. */
+body.app.in-editor #menu-project>.menu-panel{display:flex!important;flex-direction:column}
+body.app.in-editor #menu-project>.menu-panel>*{order:50}
+body.app.in-editor #menu-project>.menu-panel>.menu-note.g-app{order:0}
+body.app.in-editor #design-open{order:1!important}body.app.in-editor #view-settings{order:2!important}body.app.in-editor #connect-open{order:3!important;justify-content:flex-start!important;text-align:left!important;align-items:flex-start!important}body.app.in-editor #mobile-open{order:4!important}body.app.in-editor #view-browser{order:5!important}
+body.app.in-editor #menu-project>.menu-panel>.menu-note.g-test{order:10}
+body.app.in-editor #checks-open{order:11!important}body.app.in-editor #autopilot-run{order:12!important}body.app.in-editor #customers-open{order:13!important}body.app.in-editor #security-open{order:14!important}
+body.app.in-editor #menu-project>.menu-panel>.menu-note.g-launch{order:20}
+body.app.in-editor #launch-open{order:21!important}body.app.in-editor #figma-send{order:22!important}body.app.in-editor #restore{order:23!important}

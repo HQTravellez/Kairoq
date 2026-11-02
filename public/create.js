@@ -3817,3 +3817,10 @@ for(const d of document.querySelectorAll('#editor .stage-bar details.menu'))d.ad
  const r=d.querySelector('summary').getBoundingClientRect();
  p.style.position='fixed';p.style.top=Math.round(r.bottom+6)+'px';p.style.left='auto';p.style.right=Math.max(8,Math.round(innerWidth-r.right))+'px';
 });
+
+// Menus show one line per item; the longer explanation becomes the item's tooltip.
+for(const item of document.querySelectorAll('#editor .menu-panel>button,#editor .menu-panel>a')){const sp=item.querySelector(':scope>span');if(sp&&!item.title&&sp.textContent.trim())item.title=sp.textContent.trim()}
+// More menu groups: "Your app", "Test", "Launch" (the order is set in calm.css).
+(()=>{const panel=document.querySelector('#menu-project>.menu-panel');if(!panel)return;const notes=[...panel.querySelectorAll(':scope>.menu-note')];
+ const mk=(t,c)=>{const n=document.createElement('p');n.className='menu-note '+c;n.textContent=t;return n};
+ notes.forEach(n=>n.remove());panel.prepend(mk('Your app','g-app'),mk('Test','g-test'),mk('Launch','g-launch'))})();
