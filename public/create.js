@@ -796,9 +796,14 @@ function swapPreview(url){
  let shown=false;
  const show=()=>{
   if(shown||!next.isConnected)return;shown=true;clearTimeout(timer);
+  // Fade the new version in over the old one, then drop the old one.
+  const fade=matchMedia('(prefers-reduced-motion: reduce)').matches?0:260;
+  next.style.transition='opacity '+fade+'ms ease';next.style.opacity='1';
+  setTimeout(()=>{if(!next.isConnected)return;
   old.remove();for(const a of ['style','aria-hidden','tabindex'])next.removeAttribute(a);next.id='frame';
   state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();
   $('open').href=url;$('preview-open').href=url;state.previewReady=true;clearTimeout(state.previewTimer);$('preview-notice').classList.add('hidden');
+  },fade);
  };
  // "load" fires when the files are in; a short wait lets React draw the first screen.
  next.addEventListener('load',()=>setTimeout(show,350));
@@ -1492,8 +1497,8 @@ function thinkingLine(){
  if(next&&next!==work.thought){work.thought=next;work.thoughtAt=Date.now()}
  return work.thought||'';
 }
-// A slim pill over the preview says what is happening while the AI works; once the new version is
-// on screen, it says the remaining checks are still running.
+// A small chip at the foot of the preview says what is happening while the AI works. The preview
+// itself stays sharp and usable: no veil, no blur.
 // How long a step took, for the timeline (" in 3.4 s").
 function secs(ms){return typeof ms==='number'&&ms>=0?' in '+(ms<10000?(ms/1000).toFixed(1):Math.round(ms/1000))+' s':''}
 function renderBuildOverlay(j){
@@ -1503,7 +1508,8 @@ function renderBuildOverlay(j){
  const card=overlay.querySelector('.bo-card');
  const shown=j.preview&&j.preview.version;
  const files=work.files.length;
- const label=shown?(j.preview.draft?'A first build is showing':'v'+j.preview.version+' is showing')+' · '+(phaseOf(j)==='verifying'?'still checking it':liveStatus(j))+'…':liveStatus(j)+(phaseOf(j)==='writing'&&files>1?' · '+files+' files':'')+'…';
+ // Short, like Lovable and Emergent: what is happening now, nothing about versions.
+ const label=(shown&&phaseOf(j)==='verifying'?'Checking it':liveStatus(j))+(phaseOf(j)==='writing'&&files>1?' · '+files+' files':'')+'…';
  const spin=card.querySelector('.bo-spin')||el('span','bo-spin');spin.setAttribute('aria-hidden','true');
  const line=card.querySelector('.bo-line')||el('span','bo-line');
  if(line.textContent!==label)line.textContent=label;
