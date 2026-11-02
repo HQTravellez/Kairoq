@@ -41,6 +41,8 @@ async function loadMe(){
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
  text($('home-title'),name?'What should we build, '+cap(name.split(' ')[0])+'?':'What should we build?');
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
+ // The older chat page (Plugins, Skills, Sales Agent) is for the owner only; clients never see it.
+ $('side-chat').classList.toggle('hidden',!(v&&v.kind==='owner'));
  const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
