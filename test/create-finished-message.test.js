@@ -42,13 +42,17 @@ test('the finished message: status line on top, a plain verdict, the checks as a
   assert.match(out.draft.text,/Draft ready\. Some checks did not pass yet/);
   assert.match(out.draft.text,/I used all 28 rounds before every check passed\./);
   assert.ok(!/PROOF|UNVERIFIED|Builder notes|not-required|Repair attempts/.test(out.draft.text),out.draft.text);
-  assert.deepEqual(out.draft.rows,['ok|✓Builds','ok|✓Opens and works in a browser · 11 actions tried','bad|✗Looks right: did not pass','bad|✗Code review: did not pass']);
-  assert.match(out.draft.text,/Independent engineering review has blocking findings/);
-  // Verified: one sentence and one quiet line of ticks; the repair count stays out of it.
+  // Emergent-style write-up: what's there, what was tested, what is not done yet, then "Agent finished".
+  assert.deepEqual(out.draft.rows,['|•Menu','ok|✓Builds','ok|✓Opens and works in a browser · 11 actions tried','bad|✗Looks right: did not pass','bad|✗Code review: did not pass','bad|✗Independent engineering review has blocking findings. Visual quality was not evaluated.']);
+  assert.match(out.draft.text,/What's there\s*•\s*Menu/);
+  assert.match(out.draft.text,/What I tested/);assert.match(out.draft.text,/Not done yet/);
+  assert.match(out.draft.text,/Agent finished · 17m 14s/);
+  // Verified: the result, the tested list, no "Not done yet", and the repair count in the closing line.
   assert.match(out.ok.text,/Built and checked\./);
   assert.match(out.ok.text,/Added the menu page and the cake request form\./);
-  assert.match(out.ok.text,/Builds ✓ · Opens and works in a browser ✓ · Looks right ✓ · Saved checks ✓ · Code review ✓/);
-  assert.equal(out.ok.rows.length,0);
+  assert.deepEqual(out.ok.rows.map(r=>r.split('|')[1]),['•Menu','✓Builds','✓Opens and works in a browser · 9 actions tried','✓Looks right','✓Saved checks','✓Code review']);
+  assert.ok(!/Not done yet/.test(out.ok.text));
+  assert.match(out.ok.text,/Agent finished · 3m 04s · 1 repair/);
   // An ordinary reply is untouched.
   assert.match(out.plain.text,/Changed the button colour\./);assert.ok(!/✓/.test(out.plain.text));
  }finally{await ctx.close();server.close();await runtime.close()}

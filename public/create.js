@@ -558,10 +558,15 @@ async function openProject(id,{pendingText,job}={}){
 // Next-step chips above the message box: one click builds that idea. Cleared once you send.
 function renderIdeas(m){
  const box=$('composer-ideas');if(!box)return;box.replaceChildren();
- const ideas=m&&m.role==='assistant'&&Array.isArray(m.ideas)&&!state.job&&state.project?.role!=='viewer'?m.ideas.slice(0,3):[];
+ const can=m&&m.role==='assistant'&&!state.job&&state.project?.role!=='viewer';
+ // What is left to do comes first: one chip that fixes the "Not done yet" list.
+ const left=can?(verdictParts(m.text)||{todo:[]}).todo:[];
+ const chips=[];
+ if(left.length)chips.push({label:'Fix what is not done yet',ask:'Fix what is not done yet: '+left.join('; ')});
+ for(const idea of can&&Array.isArray(m.ideas)?m.ideas:[])chips.push({label:idea,ask:/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1)});
+ const ideas=chips.slice(0,3);
  box.classList.toggle('hidden',!ideas.length);
- for(const idea of ideas){
-  const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
+ for(const {label:idea,ask} of ideas){
   const b=el('button','idea-chip',idea);b.type='button';b.title='Build this: '+ask;
   b.onclick=()=>{box.classList.add('hidden');send(ask,'build')};box.append(b);
  }
@@ -604,7 +609,7 @@ function messageItem(m,last,index){
    b.onclick=()=>{if(!rail.childElementCount)for(const e of tl)rail.append(eventRow(e,{expand:false,version:m.version}));const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
    li.append(b,fold);
   }
-  const verdict=verdictCard(m.text);
+  const verdict=verdictCard(m.text,m);
   if(verdict)li.append(...verdict);else li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
   if(last&&m.question&&Array.isArray(m.question.options)&&m.question.options.length){
@@ -697,38 +702,51 @@ function messageItem(m,last,index){
 // The agent's finished message (engineering-completion-gate.js resultMessage) is stored as
 // "VERIFIED BUILD / UNVERIFIED DRAFT · … \n\nPROOF\n- Build: passed …\n\nBuilder notes: …".
 // In the chat it reads as one plain sentence, the notes, and the checks as a short list.
-function verdictCard(raw){
+// The finished build as a short write-up, like Emergent: the verdict and one-line result, then
+// "What's there" (the pages written), "What I tested" (the checks that passed), "Not done yet"
+// (what failed or is still open, in plain words) and "Agent finished · 12m 04s".
+function pageName(file){
+ const m=/(?:^|\/)(?:pages|screens|routes)\/(?:.*\/)?([^/]+)\.(?:jsx?|tsx?)$/i.exec(String(file||''));
+ if(!m||/^(index|_app|_document|layout)$/i.test(m[1]))return null;
+ const w=m[1].replace(/(Page|Screen|View|Route)$/,'').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[-_]+/g,' ').trim().toLowerCase();
+ return w?w.charAt(0).toUpperCase()+w.slice(1):null;
+}
+function verdictParts(raw){
  const m=/^(VERIFIED BUILD|UNVERIFIED DRAFT)[^\n]*\n+PROOF\n([\s\S]*?)(?:\n\n(?:Builder notes:\s*)?([\s\S]*))?$/.exec(String(raw||'').trim());
  if(!m)return null;
  const ok=m[1]==='VERIFIED BUILD';
  const rows=m[2].split('\n').map(l=>/^- ([^:]+): (.*)$/.exec(l)).filter(Boolean).map(r=>({label:r[1],value:r[2]}));
- const unresolved=(rows.find(r=>r.label==='Unresolved')||{}).value;
+ const unresolved=((rows.find(r=>r.label==='Unresolved')||{}).value||'').trim();
  const NAMES={Build:'Builds','Browser':'Opens and works in a browser','Visual quality':'Looks right','Verification tests':'Tests','Regression checks':'Saved checks','Engineering review':'Code review'};
- const shown=rows.filter(r=>r.label!=='Unresolved'&&!(r.label==='Repair attempts'&&r.value==='0')&&!/^not-required|^skipped/.test(r.value));
+ const shown=rows.filter(r=>NAMES[r.label]&&!/^not-required|^skipped/.test(r.value));
+ const tested=[],todo=[];
+ for(const r of shown){
+  const pass=/^passed/.test(r.value),detail=r.value.replace(/^(passed|failed)\s*(·\s*)?/,'').replace(/interaction step\(s\)/,'actions tried').trim();
+  if(pass)tested.push(NAMES[r.label]+(detail?' · '+detail:''));
+  else todo.push(NAMES[r.label]+': '+(detail.replace(/^failed/,'').trim()||'did not pass'));
+ }
+ if(unresolved&&unresolved!=='none')todo.push(unresolved);
  let notes=String(m[3]||'').trim();
  notes=notes.replace(/^Stopped after (\d+) steps?\.\s*(The last changes did not build, so the last working build was saved\.)?\s*/,(_,n,kept)=>'I used all '+n+' rounds before every check passed'+(kept?', so the last working build is what you see':'')+'. ');
+ const repairs=Number((rows.find(r=>r.label==='Repair attempts')||{}).value)||0;
+ return{ok,tested,todo,notes,repairs};
+}
+function verdictCard(raw,msg={}){
+ const v=verdictParts(raw);if(!v)return null;
  const out=[];
- const head=el('p','verdict-head '+(ok?'ok':'draft'));
- head.append(el('span','vmark',ok?'✓':'!'),el('span',null,ok?'Built and checked.':'Draft ready. Some checks did not pass yet, so try it in the preview.'));
+ const head=el('p','verdict-head '+(v.ok?'ok':'draft'));
+ head.append(el('span','vmark',v.ok?'✓':'!'),el('span',null,v.ok?'Built and checked.':'Draft ready. Some checks did not pass yet, so try it in the preview.'));
  out.push(head);
- if(notes)out.push(renderMarkdown(notes));
- if(ok&&shown.length){
-  // All passed: one quiet line, like "Build ✓ · Browser ✓ · Looks right ✓".
-  const p=el('p','verdict-why');
-  p.textContent=shown.filter(r=>r.label!=='Repair attempts').map(r=>(NAMES[r.label]||r.label)+' ✓').join(' · ');
-  out.push(p);
- }else if(shown.length){
-  const ul=el('ul','verdict-rows');
-  for(const r of shown){
-   const pass=/^passed/.test(r.value),repairs=r.label==='Repair attempts';
-   const li=el('li',repairs?'':pass?'ok':'bad');
-   const detail=r.value.replace(/^(passed|failed)\s*(·\s*)?/,'').replace(/interaction step\(s\)/,'actions tried');
-   li.append(el('span','vmark',repairs?'↻':pass?'✓':'✗'),el('span',null,repairs?r.value+' repair'+(r.value==='1'?'':'s')+' along the way':(NAMES[r.label]||r.label)+(pass?'':': '+(detail.replace(/^failed/,'').trim()||'did not pass'))+(pass&&detail?' · '+detail:'')));
-   ul.append(li);
-  }
-  out.push(ul);
+ if(v.notes)out.push(renderMarkdown(v.notes));
+ const section=(title,items,cls)=>{if(!items.length)return;const box=el('div','writeup '+cls);box.append(el('p','writeup-title',title));const ul=el('ul','verdict-rows '+cls);for(const t of items){const li=el('li',cls==='todo'?'bad':cls==='tested'?'ok':'');li.append(el('span','vmark',cls==='todo'?'✗':cls==='tested'?'✓':'•'),el('span',null,t));ul.append(li)}box.append(ul);out.push(box)};
+ const pages=[...new Set((msg.timeline||[]).filter(e=>e.t==='edit').map(e=>pageName(e.file)).filter(Boolean))];
+ section("What's there",pages,'pages');
+ section('What I tested',v.tested,'tested');
+ section('Not done yet',v.todo,'todo');
+ if(msg.duration_ms!=null){
+  const at=msg.at?new Date(msg.at):null,when=at&&!isNaN(at)?' · '+at.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
+  out.push(el('p','agent-finished','Agent finished · '+secsShort(msg.duration_ms)+(v.repairs?' · '+v.repairs+' repair'+(v.repairs===1?'':'s'):'')+when));
  }
- if(unresolved&&unresolved!=='none')out.push(el('p','verdict-why',unresolved));
  return out;
 }
 // "Verified by Kairoq": what its browser tested on this build, like a customer would.
