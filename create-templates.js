@@ -474,22 +474,12 @@ TEMPLATES.splice(1,0,{id:'agentic-crm',name:'Agentic CRM',category:'Business',de
   const css=base['src/index.css'].replace('--primary: 243 75% 59%;','--primary: 222 47% 18%;').replace('--ring: 243 75% 59%;','--ring: 222 47% 18%;').replace('--accent: 330 81% 60%;','--accent: 158 55% 36%;');
   return{...base,'src/index.css':css,...folder('agentic-crm')};
  }});
-// The SaaS starter: Kairoq's design system and UI kit, plus a working SaaS on top (landing page,
-// sign-in, a team workspace with an AI feature that uses credits, billing, team and admin pages
-// from kairoq/saas). A first prompt asking for a SaaS starts from it (match), so the AI only writes
-// the product part instead of sign-in, teams and billing every time.
-const SAAS_DESIGN={palette:{background:'#f7f6f3',foreground:'#1b1d22',primary:'#2347d6',secondary:'#eceae4',accent:'#1b1d22',muted:'#eceae4'},fonts:{display:'Fraunces',body:'Inter'}};
-TEMPLATES.splice(TEMPLATES.findIndex(t=>t.id==='help-center')+1,0,{id:'ai-saas',name:'AI SaaS starter',category:'AI',description:'A complete SaaS to make your own: landing page with pricing, sign-in, team workspaces with invite links, an AI feature customers pay for with credits, Stripe plans and credit packs, billing, team and admin pages.',
- get files(){const {'src/App.jsx':_,...kit}=require('./react-design').starterFiles('Draftwise',SAAS_DESIGN);return{...kit,...folder('ai-saas')}}});
 // A first prompt that clearly asks for one of these starts from that template, and the agent then
 // shapes it to the request. Strict on purpose: only requests that are plainly this kind of app.
 const MATCH=[
- ['agentic-crm',/\b(crm|sales pipeline|deal pipeline|pipeline of (leads|deals)|lead tracker|track(ing)? (my |our )?(leads|deals|clients))\b/i,/\b(website|landing page|portfolio|blog|game)\b/i],
- // A SaaS product (not a marketing page for one): plainly a SaaS, or an AI tool or app that charges.
- ['ai-saas',t=>/\b(saas|software as a service|subscription (app|product|platform|business)|b2b (app|platform|tool|software))\b/i.test(t)||/\b(charge|bill|sell|paid|pricing|plans?|subscriptions?|credits?|per[- ]seat|monthly)\b/i.test(t)&&/\b(ai|gpt|generator|writer|assistant|tool|platform|app)\b/i.test(t),/\b(landing page|marketing (site|page)|waitlist|one[- ]page|homepage|brochure|website|portfolio|blog|game)\b/i]
+ ['agentic-crm',/\b(crm|sales pipeline|deal pipeline|pipeline of (leads|deals)|lead tracker|track(ing)? (my |our )?(leads|deals|clients))\b/i,/\b(website|landing page|portfolio|blog|game)\b/i]
 ];
-const hits=(yes,t)=>typeof yes==='function'?yes(t):yes.test(t);
-function match(prompt){const t=String(prompt||'');for(const [id,yes,no] of MATCH)if(hits(yes,t)&&!no.test(t))return id;return null}
+function match(prompt){const t=String(prompt||'');for(const [id,yes,no] of MATCH)if(yes.test(t)&&!no.test(t))return id;return null}
 function list(){return TEMPLATES.map(({files,assistantDocs,...t})=>t)}
 function get(id){return TEMPLATES.find(t=>t.id===id)||null}
 module.exports={list,get,match,saasStarter,TEMPLATES};
