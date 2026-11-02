@@ -437,8 +437,11 @@ async function handle(req,res,{onlyProject}={}){
    return send(res,200,session(db,row.user_id)),true;
   }
   const extras=require('./react-backend-extras'),q0=Object.fromEntries(u.searchParams);
-  if(route==='/payments/webhook'&&req.method==='POST'&&!sb)return send(res,200,await extras.paymentWebhook(req,{id,meta,db})),true;
+  if(route==='/payments/webhook'&&req.method==='POST'&&!sb)return send(res,200,await extras.paymentWebhook(req,{id,meta,db,cfg:liveConfig(meta)})),true;
   const cfg=version?parseConfig(builder.loadFiles(id,version)):{collections:{}};
+  // Customer credits (app-credits.js): each AI request a customer makes costs credits.
+  const credits=require('./app-credits'),charged=(reason,work)=>credits.charged(db,cfg,user,reason,work);
+  if(route==='/credits/me'&&req.method==='GET')return send(res,200,credits.mine(db,cfg,user)),true;
   const fnm=/^\/functions\/([a-z][a-z0-9-]{0,39})$/.exec(route);
   if(fnm){
    const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>1024*1024)throw fail(413,'Request too large');chunks.push(c)}
@@ -458,7 +461,8 @@ async function handle(req,res,{onlyProject}={}){
   if(route==='/ai/extract'&&req.method==='POST'){
    if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
    limitedAi(req,id);
-   return send(res,200,await require('./app-extract').extract(await readJson(req,20000000),o=>appAi(meta,db,o))),true;
+   const body=await readJson(req,20000000);
+   return send(res,200,await charged('AI: read a document',()=>require('./app-extract').extract(body,o=>appAi(meta,db,o)))),true;
   }
   if((route==='/ai'||route==='/ai/ask')&&req.method==='POST'){
    if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');
@@ -476,7 +480,8 @@ async function handle(req,res,{onlyProject}={}){
     if(onToken&&out.text)onToken(out.text);
     return out;
    };
-   const run=onToken=>withTools?toolChat(onToken):route==='/ai'?appAi(meta,db,b,{onToken}):require('./app-assistant').ask(db,b,(a,o)=>appAi(meta,db,a,o),{onToken});
+   // One request costs its credits once, however many model calls (tool steps) it takes.
+   const run=onToken=>charged(route==='/ai/ask'?'AI: answer a question':'AI: chat',()=>withTools?toolChat(onToken):route==='/ai'?appAi(meta,db,b,{onToken}):require('./app-assistant').ask(db,b,(a,o)=>appAi(meta,db,a,o),{onToken}));
    if(b.stream!==true)return send(res,200,await run()),true;
    await streamAnswer(res,run);
    return true;
@@ -525,6 +530,9 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
  const files=version?builder.loadFiles(id,version):{},fnFile=require('./react-functions').functionFile(files,name),source=fnFile&&require('./react-functions').runnable(fnFile,files[fnFile]);
  if(!source)throw fail(404,'Function "'+name+'" does not exist');
  const extras=require('./react-backend-extras');
+ // With credits on, AI a signed-in customer starts through a function costs their credits;
+ // automations and anonymous calls are paid by the app owner as before.
+ const fnCharged=(reason,work)=>cfg.credits&&user&&!automation?require('./app-credits').charged(db,cfg,user,reason,work):work();
  let fdb=db;
  if(automation){fdb=Object.create(db);fdb.prepare=db.prepare.bind(db);fdb.exec=db.exec.bind(db);fdb.__automation=true}
  // Keys the function reads are hidden from its logs and errors (seen), so a console.log(key) never shows one.
@@ -537,9 +545,9 @@ async function runFunction(id,name,{meta,version,cfg,db,sb=null,user=null,req=nu
   // A service the owner connected with "Connect with …" (oauth-connect.js): a fresh access token.
   oauth:async s=>{const t=await require('./oauth-connect').token(id,s);seen.add(t.access_token);return t},
   db:async(op,a,u)=>functionDb(fdb,cfg,op,a,u),
-  ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return appAi(meta,db,a)},
-  extract:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-extract').extract(a,o=>appAi(meta,db,o))},
-  ask:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return require('./app-assistant').ask(db,a,o=>appAi(meta,db,o))},
+  ai:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return fnCharged('AI: chat',()=>appAi(meta,db,a))},
+  extract:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return fnCharged('AI: read a document',()=>require('./app-extract').extract(a,o=>appAi(meta,db,o)))},
+  ask:async a=>{if(!cfg.ai)throw fail(404,'AI is not enabled. Add "ai": true to src/backend.json.');if(req)limitedAi(req,id);return fnCharged('AI: answer a question',()=>require('./app-assistant').ask(db,a,o=>appAi(meta,db,o)))},
   sql:(q,p)=>require('./react-sql').run.query(sb?sb.dir:builder.projectDir(id),q,p),
   sqlBatch:steps=>require('./react-sql').run.batch(sb?sb.dir:builder.projectDir(id),steps),
   email:async(a,u)=>sb?{sent:true,test:true}:extras.sendEmail(a,{meta,db,cfg,user:u?db.prepare('SELECT * FROM users WHERE id=?').get(u.id):null})
@@ -716,6 +724,13 @@ export const payments={
   async purchases(){return(await call('/payments/mine')).purchases},
   async has(product){return(await this.purchases()).some(p=>p.product===product&&p.status==='active')}
 };
+// Credits (when the app sells AI use): balance, what each AI request costs, packs to buy, history.
+export const credits={
+  async mine(){return call('/credits/me')},
+  async balance(){return(await call('/credits/me')).balance},
+  // Opens Stripe Checkout for a payments product that adds credits.
+  async buy(product){return payments.checkout(product)}
+};
 export const functions={
   // Calls functions/<name>.js on the server with a JSON body; returns its JSON (or text) response.
   async invoke(name,body){
@@ -791,7 +806,7 @@ export function usePageMeta({title,description}={}){
   if(description){let m=document.querySelector('meta[name="description"]');if(!m){m=document.createElement('meta');m.setAttribute('name','description');document.head.appendChild(m)}m.setAttribute('content',description)}
  },[title,description]);
 }
-export default{auth,collection,storage,email,payments,functions,ai,Router,usePageMeta,basename};
+export default{auth,collection,storage,email,payments,credits,functions,ai,Router,usePageMeta,basename};
 `;
 }
 
