@@ -1,0 +1,14 @@
+{
+  "collections": {
+    "drafts": { "access": "team" }
+  },
+  "ai": true,
+  "credits": { "free": 25, "ai_cost": 1 },
+  "payments": {
+    "products": {
+      "pro": { "price": "price_ReplacePro", "mode": "subscription", "credits": 1000 },
+      "team": { "price": "price_ReplaceTeam", "mode": "subscription", "credits": 5000 },
+      "credits_500": { "price": "price_ReplaceCredits", "mode": "payment", "credits": 500 }
+    }
+  }
+}
