@@ -2069,11 +2069,11 @@ async function createProject(v,{name,prompt,template,tier='standard',images=[],e
  prompt=String(prompt||'').trim();
  const T=require('./create-templates');
  // A SaaS asked for in words starts from the SaaS starter, so the build only writes the product part.
- const auto=!template&&prompt?T.saasStarter(prompt):null;
- const tpl=template||auto?T.get(String(template||auto)):null;
- // No template chosen: a prompt that plainly asks for an app Kairoq has a template for starts from it.
- const matched=!template&&prompt?require('./create-templates').match(prompt):null;
- const tpl=template?require('./create-templates').get(String(template)):matched?require('./create-templates').get(matched):null;
+ // No template chosen: a prompt that plainly asks for an app Kairoq has a template for starts from
+ // it (the Agentic CRM); otherwise a SaaS asked for in words starts from the SaaS starter.
+ const matched=!template&&prompt?T.match(prompt):null;
+ const auto=!template&&!matched&&prompt?T.saasStarter(prompt):null;
+ const tpl=template||matched||auto?T.get(String(template||matched||auto)):null;
  if(template&&!tpl)throw Object.assign(Error('Unknown template'),{status:400});
  const meta=builder.create({name:String(name||'').trim()||(tpl&&!prompt?tpl.name:nameFromPrompt(prompt))||'Untitled app',owner:v.owner});
  if(tpl)await builder.initializeFrom(meta,tpl.files,auto?'Started from the SaaS starter (sign-in, teams, credits, billing and admin are ready)':'Started from the '+tpl.name+' template');

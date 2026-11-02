@@ -466,9 +466,6 @@ function saasStarter(prompt){
  const sells=/\b(charge|bill|sell|paid|pricing|plans?|subscriptions?|credits?|per[- ]seat|monthly)\b/.test(t)&&/\b(ai|gpt|generator|writer|assistant|tool|platform|app)\b/.test(t);
  return saas||sells?'ai-saas':null;
 }
-function list(){return TEMPLATES.map(({files,assistantDocs,...t})=>t)}
-function get(id){return TEMPLATES.find(t=>t.id===id)||null}
-module.exports={list,get,saasStarter,TEMPLATES};
 // Agentic CRM: the UI kit and design tokens plus templates/agentic-crm (a pipeline, contacts, tasks,
 // an in-app Copilot whose changes wait for Approve, and a daily agent run with a log).
 TEMPLATES.splice(1,0,{id:'agentic-crm',name:'Agentic CRM',category:'Business',description:'A team CRM with an agent built in: pipeline, contacts and tasks, a Copilot that looks things up and drafts follow-ups (you approve every change), and a morning run that adds follow-up tasks and logs why.',
@@ -485,4 +482,4 @@ const MATCH=[
 function match(prompt){const t=String(prompt||'');for(const [id,yes,no] of MATCH)if(yes.test(t)&&!no.test(t))return id;return null}
 function list(){return TEMPLATES.map(({files,assistantDocs,...t})=>t)}
 function get(id){return TEMPLATES.find(t=>t.id===id)||null}
-module.exports={list,get,match,TEMPLATES};
+module.exports={list,get,match,saasStarter,TEMPLATES};
