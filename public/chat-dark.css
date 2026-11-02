@@ -231,3 +231,9 @@ html body:not(#kq-never) :is(.listing-brand-strip,.listing-proposal-details,.lis
 html body:not(#kq-never) :is(.history-card,.project-card) :is(h3,h4,strong,b){color:#ECEEF1!important}
 html body:not(#kq-never) .arrival-status{background:rgba(61,220,132,.12)!important;color:#3DDC84!important}
 html body:not(#kq-never) .studio-divider{background:rgba(255,255,255,.08)!important}
+/* Home: the content column is see-through, so the night sky shows across the whole page
+   (a solid box behind the hero used to cover it and left the sky only at the edges). */
+html body:not(#kq-never) .command-center-view.kh :is(.cc-shell,.kh-shell){background:transparent!important}
+/* Opening a project: the "Setting up your app…" veil is dark like the rest of the page,
+   not the old light-grey one. */
+html body:not(#kq-never) .build-view .build-loading,html body:not(#kq-never) .main[data-view=build] .build-view .build-loading{background:rgba(14,15,17,.72)!important;border-color:rgba(255,255,255,.08)!important;color:#9AA0AA!important}
