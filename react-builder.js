@@ -995,6 +995,15 @@ function splitIdeas(answer,question=''){
   for(const l of keep){const m=/^\s*(?:\d+[.)]|[-*•])\s+(?:\*\*([^*]{4,80})\*\*|([^:—–-]{6,80}))/.exec(l);if(m)ideas.push((m[1]||m[2]).trim().replace(/[.:\s]+$/,''))}
  return{text:keep.join('\n').trim(),ideas:[...new Set(ideas)].filter(x=>x.length>=4).slice(0,5).map(x=>x.slice(0,140))};
 }
+// No web research ran for this message (web.js adds "Web research done…" when it does, and the
+// chat then lists the sources): an answer must not say it researched, searched or checked online.
+const CLAIMS_RESEARCH=/^\s*(?:I(?:'ve| have)?\s+(?:just\s+)?(?:researched|looked (?:it |this |that )?up|searched(?: the web| online)?|checked (?:online|the web|the latest)|done (?:some )?research)[^.\n]*[.\n]\s*)/i;
+function honestResearch(answer,context=''){
+ if(/Web research done for this request/.test(String(context||'')))return answer;
+ const a=String(answer||'');
+ if(!CLAIMS_RESEARCH.test(a))return a;
+ return 'This is from general knowledge, not a live web search, so check prices and plans on their sites.\n\n'+a.replace(CLAIMS_RESEARCH,'');
+}
 function parseText(content){return require('./model-output-guard').conversation(typeof content==='string'?content:String(content?.message||content?.answer||JSON.stringify(content)))}
 async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='standard',images=[],context='',browserRuntime={browser:false,search:false}}={}){
  const meta=loadMeta(id);
@@ -1015,6 +1024,7 @@ async function discuss(id,question,{callModel,onStream,onThinking,signal,tier='s
  answer=require('./browser-chat-routing').guardDiscussAnswer(text,answer,{...browserRuntime,context});
  const responseContract=require('./agent-response-contract');
  answer=responseContract.guard(text,answer,{technical:responseContract.technicalRequest(text)});
+ answer=honestResearch(answer,context);
  const {text:plain,ideas}=splitIdeas(answer,text);
  const Q=require('./builder-question'),{text:said,question:asked}=Q.fromText(plain);
  const shown=Q.display(said,asked);

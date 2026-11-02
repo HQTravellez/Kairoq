@@ -462,7 +462,10 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    const versionBefore=builder.loadMeta(id).current_version;
    if((mode==='build'||mode==='discuss')&&!referenceOnly&&executionMode!=='agent'&&process.env.KAIROQ_WEB_RESEARCH!=='off'){
     update({status:'researching'});
-    research=await require('./web').gather(browserDecision.execute?browserDecision.message:message,{callModel,tier:modelTier,signal,webSearch,browseSite,
+    // A short follow-up ("research it and tell me") is about the topic of the owner's last message.
+    const askText=browserDecision.execute?browserDecision.message:message;
+    const prevAsk=String(message).trim().split(/\s+/).length<10?[...(builder.loadMeta(id).messages||[])].reverse().find(m=>m.role==='user'&&String(m.text||'').trim()!==String(message).trim()):null;
+    research=await require('./web').gather(prevAsk&&!browserDecision.execute?String(prevAsk.text).slice(0,600)+'\n\n'+askText:askText,{callModel,tier:modelTier,signal,webSearch,browseSite,
      onProgress:p=>update({status:'researching',progress:p}),
      onBrowser:b=>update({status:'researching',browser:b})
     }).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
@@ -657,8 +660,10 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
   }catch(e){
    const said=require('./builder-errors').plain(e);
    if(said.busy)console.log('[builder] '+mode+' failed: '+said.raw.slice(0,300));
-   if(!controller.signal.aborted)require('./builder-errors').remember(builder,id,{message,mode,text:said.text});
-   update({status:'failed',error:controller.signal.aborted?'Stopped.':said.text,retry:!controller.signal.aborted,saved:!controller.signal.aborted});
+   // A stopped build keeps its place in the chat too: the owner's message stays where it was sent,
+   // followed by a short "Stopped" line, so later messages never look out of order.
+   require('./builder-errors').remember(builder,id,{message,mode,text:controller.signal.aborted?'Stopped before it finished. Nothing was changed.':said.text});
+   update({status:'failed',error:controller.signal.aborted?'Stopped.':said.text,retry:!controller.signal.aborted,saved:true});
    if(mode!=='discuss'&&!controller.signal.aborted&&e.status===422)try{require('./build-lessons').recordBuild(id,{mode,result:null,error:e.message})}catch{}
    if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Refund for failed '+(mode==='discuss'?'message':'edit'),'refund:'+job.id)}catch{}
   }

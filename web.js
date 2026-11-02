@@ -69,6 +69,7 @@ function needsWeb(text){
  const t=String(text||'');
  const bareDomain=/(?<![@\w])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|io|app|co|ai|net|org|ca|dev|tech|travel|co\.uk)(?:\/[^\s)\]}>]*)?/i;
  return /https?:\/\/[^\s)]+/i.test(t)||bareDomain.test(t)
+  ||/\bresearch|\bcheck (?:it |that |this )?(?:online|on the web)\b/i.test(t)
   ||/\b(search|look ?up|find out|research|latest|current|today'?s|news|online|on the web|internet|website|web ?site|site|docs|documentation|api reference|pricing of|prices? (?:of|for)|compare|competitors?|what does .* (?:do|cost))\b/i.test(t);
 }
 const RESEARCH_PROMPT=`You decide what to look up on the web before an app builder answers a user or changes their app. You can search the web and open public web pages in a real browser (reading only).

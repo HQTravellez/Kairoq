@@ -3,7 +3,8 @@
 // it gets a short, free reply instead of a build (no design pick, no credits). A question about
 // the app that asks for no change gets an answer (Discuss) instead of a build.
 
-const GREETING=/^(hi+|hello|hey+|hiya|yo|howdy|hola|namaste|good (morning|afternoon|evening|day)|hi there|hello there|hey there)\b/i;
+// Typos count too: "helo", "hii", "helloo", "hallo", "heyy" are greetings, not app names.
+const GREETING=/^(h+i+|h+e+l+o+w?|hel+o+|hal+o+|hey+a?|hiya|yo+|sup|howdy|hola|namaste|good (morning|afternoon|evening|day)|hi there|hello there|hey there)\b/i;
 const THANKS=/^(thanks|thank you|thx|ty|cheers|great|awesome|nice|cool|perfect|love it|looks good|wow|ok|okay|k|yes|yep|sure|alright|fine)\b/i;
 const HELP=/^(help|what can you do|what do you do|who are you|how does this work|how do i (start|use this)|what is this)\b/i;
 const HELP_FILLER=/^(please|pls|me|for|here|now|today|exactly|then|again|guys|mate|buddy|kairoq|agent)$/i;

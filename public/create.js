@@ -230,23 +230,15 @@ $('new-form').onsubmit=async e=>{
  try{
   const typed=$('new-prompt').value.trim();
   if(!typed)return;
-  // Greetings are conversation openers, not failed app specifications.
-  if(/^(hi|hello|hey|hey there|good morning|good afternoon|good evening)[!?.\s]*$/i.test(typed)){
-   // The home composer is an entry into the actual builder, never a dead-end greeting.
-   // Resume the latest project if one exists, avoiding an unnecessary quota-consuming project.
-   const recent=Array.isArray(state.projects)&&state.projects.length?state.projects[0]:null;
-   if(recent)await openProject(recent.id);
-   else{
-    const {project}=await api('/projects',{method:'POST',body:{name:'Untitled project'}});
-    await openProject(project.id);
-   }
+  // A greeting ("helo" too) or a question is a conversation, not an app: it opens a new chat in
+  // Discuss mode (no design pick, no build) instead of starting a build or reopening the last project.
+  const talk=homeTalk(typed);
+  if(talk){
+   const {project}=await api('/projects',{method:'POST',body:{name:talk==='greeting'?'New chat':shortName(typed)}});
+   await openProject(project.id);
    $('new-prompt').value='';
-   // Return to the normal composer. The backend decides whether each message is chat or a build.
-   setChatMode('build');
-   $('chat-input').value='';
-   $('chat-input').placeholder='Tell Kairoq what you want to build…';
-   $('chat-input').focus();
-   syncSend();
+   setChatMode('discuss');
+   await send(typed,'discuss');
    return;
   }
   $('home-error').classList.remove('welcome');
@@ -257,6 +249,20 @@ $('new-form').onsubmit=async e=>{
  }catch(err){text($('home-error'),err.message)}
  finally{$('new-submit').disabled=false}
 };
+
+// Home composer: 'greeting' | 'question' | null (a build request). Kept in step with builder-smalltalk.js.
+const HOME_GREET=/^(h+i+|h+e+l+o+w?|hel+o+|hal+o+|hey+a?|hiya|yo+|sup|howdy|hola|namaste|good (morning|afternoon|evening|day))\b/i;
+const HOME_BUILD=/\b(build|make|create|generate|design|clone|set up|launch|code|develop)\b/i;
+function homeTalk(t){
+ t=String(t||'').trim();if(!t)return null;
+ const words=t.split(/\s+/).length;
+ if(HOME_GREET.test(t)&&words<=6&&!HOME_BUILD.test(t))return'greeting';
+ if(HOME_BUILD.test(t))return null;
+ const lead=t.replace(/^(well|so|ok(ay)?|um+|actually|hey|hi|hello|please)[,\s]+/i,'');
+ if(/\b(discuss|talk (about|through)|compare|comparison|versus|vs\.?)\b/i.test(t))return'question';
+ if(/\?\s*$/.test(t)||/^(what|why|how|when|which|who|is|are|should|could|can you (tell|explain|compare)|tell me|explain|compare|discuss|i want to (discuss|talk|know|understand)|let'?s (talk|discuss)|help me (understand|decide|choose))\b/i.test(lead))return'question';
+ return null;
+}
 
 // A card-sized app name from the request: its first clause ("Digital menu for my café with today's
 // specials" → "Digital menu for my café"), at most 40 characters, never ending on "with", "for" etc.
@@ -1397,12 +1403,19 @@ function icon(name,cls){const s=document.createElementNS('http://www.w3.org/2000
 function fileChip(name,active){const c=el('code','chip'+(active?' active':''),name.replace(/^src\//,''));c.title=name;return c}
 // Tiny, safe Markdown: headings, lists, bold, inline code, paragraphs (text only, no HTML).
 function inlineMd(parent,textIn){const re=/(\*\*[^*]+\*\*|`[^`]+`)/g;let last=0,m;while((m=re.exec(textIn))){if(m.index>last)parent.append(textIn.slice(last,m.index));const t=m[0];parent.append(t.startsWith('**')?el('strong',null,t.slice(2,-2)):el('code','inline',t.slice(1,-1)));last=m.index+t.length}if(last<textIn.length)parent.append(textIn.slice(last))}
+// A table written on one line ("| A | B | | :--- | :--- | | 1 | 2 |") is split back into rows.
+function tableLines(src){return String(src||'').replace(/\r/g,'').split('\n').flatMap(l=>/\|\s*:?-{3,}:?\s*\|/.test(l)&&/\|\s+\|/.test(l)?l.trim().split(/\|\s+\|/).map((r,i,a)=>(i?'|':'')+r+(i<a.length-1?'|':'')):[l])}
+function tableCells(line){return line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim())}
 function renderMarkdown(src){
- const root=el('div','md'),lines=String(src||'').replace(/\r/g,'').split('\n');let para=[],stack=[];
+ const root=el('div','md'),lines=tableLines(src);let para=[],stack=[],rows=[];
  const flush=()=>{if(para.length){const p=el('p');inlineMd(p,para.join(' '));root.append(p);para=[]}};
  const closeLists=()=>{stack=[]};
+ // Markdown tables become real tables (header row, then body rows; the --- row is skipped).
+ const flushTable=()=>{if(!rows.length)return;const body=rows.filter(r=>!/^\|?\s*:?-{3,}/.test(r.trim()));if(body.length){const wrap=el('div','md-table'),t=el('table'),head=el('thead'),tb=el('tbody'),hr=el('tr');for(const c of tableCells(body[0])){const th=el('th');inlineMd(th,c);hr.append(th)}head.append(hr);for(const r of body.slice(1)){const tr=el('tr');for(const c of tableCells(r)){const td=el('td');inlineMd(td,c);tr.append(td)}tb.append(tr)}t.append(head,tb);wrap.append(t);root.append(wrap)}rows=[]};
  for(const raw of lines){
   const line=raw.replace(/\s+$/,'');
+  if(/^\s*\|.*\|\s*$/.test(line)){flush();closeLists();rows.push(line);continue}
+  flushTable();
   const h=/^(#{1,4})\s+(.*)$/.exec(line),li=/^(\s*)([-*•]|\d+[.)])\s+(.*)$/.exec(line);
   if(!line.trim()){flush();closeLists();continue}
   if(h){flush();closeLists();const x=el(h[1].length<=2?'h3':'h4');inlineMd(x,h[2]);root.append(x);continue}
@@ -1418,7 +1431,7 @@ function renderMarkdown(src){
   if(stack.length&&/^\s{2,}/.test(raw)){inlineMd(stack.at(-1).list.lastElementChild,' '+line.trim());continue}
   closeLists();para.push(line.trim());
  }
- flush();return root;
+ flushTable();flush();return root;
 }
 // One row of the activity rail. Rows with more detail expand in place.
 function editVerb(k){return k==='created'?'Created':k==='deleted'?'Deleted':'Edited'}
