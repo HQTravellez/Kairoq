@@ -3244,7 +3244,7 @@ $('ref-file').onchange=async()=>{const f=$('ref-file').files[0];$('ref-file').va
   text($('ref-status'),'Imported '+r.imported+' tutorial'+(r.imported===1?'':'s')+(r.skipped_marked?', '+r.skipped_marked+' marked as videos':'')+(r.already?', '+r.already+' already learned (kept)':'')+(r.not_in_list?', '+r.not_in_list+' not in the list':'')+(r.too_short?', '+r.too_short+' too short':'')+(r.bad_lines?', '+r.bad_lines+' unreadable lines':'')+'. Now '+r.status.learned+' of '+r.status.total+' learned.')}
  catch(err){text($('ref-status'),err.message)}};
 $('ref-stop').onclick=async()=>{try{await api('/admin/references',{method:'POST',body:{stop:true}})}catch{}renderRefs()};
-async function openAdmin(){text($('admin-error'),'');renderRefs();text($('learn-status'),'');$('admin-dialog').showModal();if(!state.templates)try{const r=await api('/templates');state.templates=r.templates;state.sponsored=r.sponsored||[]}catch{}try{renderPartnerAdmin((await api('/admin/partners')).partners)}catch(err){text($('admin-error'),err.message)}await renderAdmin()}
+async function openAdmin(){{const card=$('setup-card'),h=$('admin-dialog').querySelector('.dialog>h3');if(card&&h&&card.parentElement!==h.parentElement){h.before(card);card.open=true}}text($('admin-error'),'');renderRefs();text($('learn-status'),'');$('admin-dialog').showModal();if(!state.templates)try{const r=await api('/templates');state.templates=r.templates;state.sponsored=r.sponsored||[]}catch{}try{renderPartnerAdmin((await api('/admin/partners')).partners)}catch(err){text($('admin-error'),err.message)}await renderAdmin()}
 function pctText(r){return r==null?'–':Math.round(r*1000)/10+'%'}
 async function renderAdmin(given){
  try{
