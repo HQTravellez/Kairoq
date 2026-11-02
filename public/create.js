@@ -1756,25 +1756,29 @@ $('mobile-save').onclick=async()=>{
  }catch(err){text($('mobile-error'),err.message)}
 };
 // ---------- Figma import ----------
+// Two dialogs share the id "figma-dialog" (Send to Figma comes first in the page), so $('figma-dialog')
+// and $('figma-error') reach the Send one. The import form has its own id: use its dialog and error line.
+const figmaImportDialog=()=>$('figma-form').closest('dialog');
+const figmaImportError=()=>$('figma-form').querySelector('.error');
 $('figma-open').onclick=async()=>{
- text($('figma-error'),'');
+ text(figmaImportError(),'');
  const owner=state.project.role==='owner'||!state.project.role;
  $('figma-save').closest('label').classList.toggle('hidden',!owner);
  text($('figma-cost'),'Builds with the '+(state.mode==='agent'?'Agent':'Build')+' mode and the tier selected in the chat.');
  try{const {token_saved}=await api('/projects/'+state.project.id+'/figma');text($('figma-token-status'),token_saved?'(saved; leave empty to reuse)':'')}catch{}
- $('figma-dialog').showModal();
+ figmaImportDialog().showModal();
 };
 $('figma-import').onclick=async()=>{
  if(state.job)return;
- text($('figma-error'),'');
- const url=$('figma-url').value.trim();if(!url){text($('figma-error'),'Paste the frame link.');return}
+ text(figmaImportError(),'');
+ const url=$('figma-url').value.trim();if(!url){text(figmaImportError(),'Paste the frame link.');return}
  $('figma-import').disabled=true;
  try{
   const r=await api('/projects/'+state.project.id+'/figma',{method:'POST',body:{url,token:$('figma-token').value.trim()||undefined,save_token:$('figma-save').checked,message:$('figma-message').value.trim(),mode:state.mode==='agent'?'agent':'build',tier:state.tier}});
-  $('figma-dialog').close();$('figma-token').value='';
+  figmaImportDialog().close();$('figma-token').value='';
   $('messages').append(messageItem({role:'user',text:'Import from Figma: '+r.frame.name+(r.frame.images.length?' ('+r.frame.images.length+' images)':'')}));
   watch(r.job);
- }catch(err){text($('figma-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ }catch(err){text(figmaImportError(),err.message);if(err.status===402&&state.me.purchases)openBuy()}
  finally{$('figma-import').disabled=false}
 };
 // ---------- build from a reference ----------
@@ -1870,7 +1874,7 @@ $('ref-analyze').onclick=async()=>{
   $('messages').append(messageItem({role:'user',text:'Study the reference: '+(zip?zip.name:repo||url||files.length+' screenshots')}));
   const done=await watch(r.job);
   if(done&&done.status==='complete'&&done.result&&done.result.reference){refState.info=await api('/projects/'+state.project.id+'/reference');showPlan(refState.info.reference);refStep(2);$('ref-dialog').showModal()}
- }catch(err){text($('ref-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ }catch(err){text($('ref-error'),forViewer(err.message));if(err.status===402&&state.me.purchases)openBuy()}
  finally{$('ref-analyze').disabled=false}
 };
 $('ref-build').onclick=async()=>{
@@ -1884,7 +1888,7 @@ $('ref-build').onclick=async()=>{
   $('ref-dialog').close();
   $('messages').append(messageItem({role:'user',text:'Build "'+plan.name+'" from the approved plan'+($('ref-publish').checked?', then publish':'')}));
   watch(r.job);
- }catch(err){text($('ref-error'),err.message);if(err.status===402&&state.me.purchases)openBuy()}
+ }catch(err){text($('ref-error'),forViewer(err.message));if(err.status===402&&state.me.purchases)openBuy()}
  finally{$('ref-build').disabled=false}
 };
 $('stop-job').onclick=async()=>{if(!state.job)return;$('stop-job').disabled=true;try{await api('/jobs/'+state.job.id+'/cancel',{method:'POST'})}catch(err){text($('chat-error'),err.message)}finally{$('stop-job').disabled=false}};
@@ -3006,7 +3010,9 @@ $('web-run').onclick=async()=>{
 };
 // ----- Find customers (outreach.js): leads, drafts, an outbox the owner approves -----
 const LEAD_STATUS={new:'New',drafted:'Draft in outbox',contacted:'Emailed',replied:'Replied',not_interested:'Not interested',opted_out:'Asked not to be emailed',bounced:'Bounced',skipped:'Skipped'};
-async function leadsAction(fn){text($('leads-error'),'');try{const d=await fn();if(d&&d.leads)renderLeads(d);else await loadLeads()}catch(err){text($('leads-error'),err.message)}}
+// Server messages can name a setting (e.g. "(KAIROQ_OUTREACH_FROM)"); only the owner sees those names.
+function forViewer(msg){return state.me&&state.me.viewer&&state.me.viewer.kind==='owner'?msg:String(msg||'').replace(/\s*\((?:set )?KAIROQ_[A-Z0-9_]+\)/g,'')}
+async function leadsAction(fn){text($('leads-error'),'');try{const d=await fn();if(d&&d.leads)renderLeads(d);else await loadLeads()}catch(err){text($('leads-error'),forViewer(err.message))}}
 async function loadLeads(){renderLeads(await api('/outreach'))}
 function renderLeads(d){
  const s=d.settings||{};
