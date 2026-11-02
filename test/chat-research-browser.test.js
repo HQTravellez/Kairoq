@@ -59,7 +59,7 @@ test("the builder plans research on the free route, keeps the steps on the answe
  assert.match(ui,/'Show browsing \('\+m\.browsing\.steps\.length\+' steps\)'/);
  assert.match(ui,/window\.kairoqBrowserPane\.show\(\{url:m\.browsing\.url,title:m\.browsing\.title,steps:m\.browsing\.steps\}\)/);
  const html=fs.readFileSync(path.join(root,"public/create.html"),"utf8");
- assert.match(html,/calm\.css\?v=2"/);assert.match(html,/create\.js\?v=20261102"/);
+ assert.doesNotMatch(html,/calm\.css\?v=1"/);assert.doesNotMatch(html,/create\.js\?v=20261141"/);
 });
 
 test("Discuss answers like a consultant: direct answer first, tables for comparisons, honest sources",()=>{

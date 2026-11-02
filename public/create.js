@@ -599,6 +599,20 @@ function readable(t){
   return[v.message,plan,qt?'**'+qt+'**':''].filter(Boolean).join('\n\n')||s;
  }catch{return s}
 }
+// Under each answer, like Lovable: copy, thumbs up, thumbs down (kept on the message).
+function replyActions(m,index){
+ const bar=el('div','reply-actions');
+ const svg=d=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg');n.setAttribute('viewBox','0 0 24 24');n.setAttribute('aria-hidden','true');n.classList.add('ico');n.innerHTML=d;return n};
+ const ICON={up:'<path d="M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 3 2l-1 4h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7"/>',down:'<path d="M17 13V4h3v9zM17 13l-4 7a2 2 0 0 1-3-2l1-4H6a2 2 0 0 1-2-2.3l1.2-6A2 2 0 0 1 7.2 4H17"/>',copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>'};
+ const btn=(name,label)=>{const b=el('button','reply-act');b.type='button';b.title=label;b.setAttribute('aria-label',label);b.append(svg(ICON[name]));return b};
+ const copy=btn('copy','Copy');copy.onclick=async()=>{try{await navigator.clipboard.writeText(String(m.text||''));copy.title='Copied';copy.classList.add('done');setTimeout(()=>{copy.classList.remove('done');copy.title='Copy'},1400)}catch{}};
+ const up=btn('up','Good answer'),down=btn('down','Bad answer');
+ const paint=r=>{up.setAttribute('aria-pressed',String(r==='up'));down.setAttribute('aria-pressed',String(r==='down'))};paint(m.rating);
+ const rate=async want=>{const next=m.rating===want?null:want;paint(next);try{const r=await api('/projects/'+state.project.id+'/rating',{method:'POST',body:{at:m.at,rating:next}});m.rating=r.rating||undefined;paint(m.rating)}catch{paint(m.rating)}};
+ up.onclick=()=>rate('up');down.onclick=()=>rate('down');
+ bar.append(copy,up,down);
+ return bar;
+}
 function messageItem(m,last,index){
  const li=document.createElement('li');li.className=m.role+(m.mode==='discuss'?' discuss':'')+(m.failed?' failed':'');
  const tl=m.timeline||[];
@@ -659,6 +673,7 @@ function messageItem(m,last,index){
  if(m.role==='assistant'&&Array.isArray(m.sources)&&m.sources.length){const s=el('div','sources');s.append(el('span','sources-label','Sources'));for(const src of m.sources.slice(0,8)){const a=el('a','source',src.title&&src.title!==src.url?src.title.slice(0,60):src.url.replace(/^https?:\/\/(www\.)?/,'').slice(0,60));a.href=src.url;a.target='_blank';a.rel='noopener noreferrer';a.title=src.url;s.append(a)}li.append(s)}
  // Show browsing: the steps Kairoq took on the web for this answer, back in the browser pane.
  if(m.role==='assistant'&&m.browsing&&Array.isArray(m.browsing.steps)&&m.browsing.steps.length&&window.kairoqBrowserPane){const b=el('button','link-btn browse-replay','Show browsing ('+m.browsing.steps.length+' steps)');b.type='button';b.onclick=()=>window.kairoqBrowserPane.show({url:m.browsing.url,title:m.browsing.title,steps:m.browsing.steps});li.append(b)}
+ if(m.role==='assistant'&&!m.failed&&m.at&&String(m.text||'').trim()&&Number.isInteger(index)&&index>=0&&state.project&&state.project.role!=='viewer')li.append(replyActions(m,index));
  if(m.role==='assistant'&&!tl.length&&m.changed&&m.changed.length){const c=el('div','file-chips done');for(const f of m.changed.slice(0,12))c.append(fileChip(f));if(m.changed.length>12)c.append(el('span','chip more','+'+(m.changed.length-12)+' more'));li.append(c)}
  if(m.role==='assistant'&&(m.version||m.credits!=null)&&index!=null){
   const f=el('div','msg-meta');
@@ -1418,6 +1433,7 @@ function renderMarkdown(src){
   flushTable();
   const h=/^(#{1,4})\s+(.*)$/.exec(line),li=/^(\s*)([-*•]|\d+[.)])\s+(.*)$/.exec(line);
   if(!line.trim()){flush();closeLists();continue}
+  if(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)){flush();closeLists();root.append(el('hr'));continue}
   if(h){flush();closeLists();const x=el(h[1].length<=2?'h3':'h4');inlineMd(x,h[2]);root.append(x);continue}
   if(li){
    flush();const depth=Math.min(3,Math.floor(li[1].replace(/\t/g,'  ').length/2)),ordered=/\d/.test(li[2]);
