@@ -188,3 +188,13 @@ body.app.in-editor #build-overlay .bo-line{white-space:nowrap;overflow:hidden;te
 body.app.in-editor #build-overlay .bo-spin{width:12px;height:12px;border-width:2px}
 @keyframes bo-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){body.app.in-editor #build-overlay .bo-card{animation:none}}
+/* Build steps ("Chose the design direction…", "Planning the app…", "Edited App.jsx") are quiet:
+   small light-grey lines, so the conversation reads first. Problems stay in full colour. */
+body.app .ev:not(.bad),body.app .ev:not(.bad) :is(.ev-label,.ev-title,.ev-head,.ev-thought){color:#A0A5AD!important;font-size:12.5px!important;font-weight:400!important}
+body.app .ev:not(.bad)>svg,body.app .ev:not(.bad) .ico{opacity:.5}
+/* Tables in chat replies. */
+.md .md-table{overflow-x:auto;margin:8px 0;border:1px solid var(--c-line,#EDEFF2);border-radius:10px}
+.md table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.45}
+.md th,.md td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--c-line,#EDEFF2)}
+.md th{font-weight:600;background:var(--c-raise,#F4F6F8)}
+.md tr:last-child td{border-bottom:0}

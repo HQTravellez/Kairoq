@@ -21,11 +21,14 @@ test("short approvals can bind to the latest explicit proposal",()=>{
  assert.equal(routing.proposalApproval("build a CRM"),false);
 });
 
-test("home greeting returns to the normal build-capable composer",()=>{
+test("home greeting or question opens a new chat in Discuss, never a build or the last project",()=>{
+ // Changed on purpose (Nov 2): "helo" on the home page started a build, and "hi" reopened the last
+ // project. A greeting or a question now opens a new chat in Discuss; build requests still build.
  const ui=fs.readFileSync(path.join(__dirname,"..","public","create.js"),"utf8");
- const greeting=ui.slice(ui.indexOf("// Greetings are conversation openers"),ui.indexOf("// A card-sized app name"));
- assert.match(greeting,/setChatMode\('build'\)/);
- assert.doesNotMatch(greeting,/setChatMode\('discuss'\)/);
+ const greeting=ui.slice(ui.indexOf("const talk=homeTalk(typed);"),ui.indexOf("$('home-error').classList.remove('welcome');"));
+ assert.match(greeting,/setChatMode\('discuss'\)/);
+ assert.doesNotMatch(greeting,/state\.projects\[0\]/);
+ assert.match(ui,/await askThenBuild\(prompt\)/,"a build request still goes to the builder");
 });
 
 test("paid model pinning does not disable intent routing or pending-answer execution",()=>{
