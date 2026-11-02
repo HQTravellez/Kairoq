@@ -1229,33 +1229,48 @@ $('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){
 const PLACEHOLDERS={build:'Message Kairoq…',discuss:'Ask about this project…',agent:'Describe what you want to build…'};
 function setChatMode(mode){if(!PLACEHOLDERS[mode])mode='build';state.mode=mode;for(const m of ['build','discuss','agent'])$('mode-'+m).setAttribute('aria-pressed',String(mode===m));text($('mode-label'),{build:'Build',discuss:'Discuss',agent:'Agent'}[mode]);$('menu-mode').open=false;$('chat-input').placeholder=PLACEHOLDERS[mode];$('send').setAttribute('aria-label',mode==='discuss'?'Ask':mode==='agent'?'Start':'Send');$('send').title=$('send').getAttribute('aria-label');costHint()}
 $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>setChatMode('discuss');$('mode-agent').onclick=()=>setChatMode('agent');
+// The maker's mark beside a model: the brand icon (simpleicons.org, loaded by the browser) with a
+// lettered circle behind it in case the icon is not there.
+const MARK_SLUGS={anthropic:'anthropic',google:'google',meta:'meta','meta-llama':'meta',deepseek:'deepseek',mistralai:'mistralai',mistral:'mistralai',qwen:'alibabacloud',nvidia:'nvidia',perplexity:'perplexity',minimax:'minimax',baidu:'baidu',tencent:'tencentqq',bytedance:'bytedance',huggingface:'huggingface',openrouter:'openrouter'};
+function modelMark(m,small){
+ const p=(m&&m.provider)||{},key=String(p.key||'').toLowerCase(),box=el('span','m-mark'+(small?' small':''));
+ const letter=el('span','m-letter',m&&m.id==='auto'?'✦':(p.name||m&&m.label||'?').charAt(0).toUpperCase());box.append(letter);
+ const slug=MARK_SLUGS[key];
+ if(slug&&m.id!=='auto'){const img=document.createElement('img');img.alt='';img.loading='lazy';img.src='https://cdn.simpleicons.org/'+slug;img.onerror=()=>img.remove();box.append(img)}
+ return box;
+}
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
- // The model menu: Auto (the default builder) or a model picked by name, each with what it is
- // good at and what a message costs. A named model that cannot run falls back to Auto.
+ // The model menu, like Emergent's: a search box, "Recommended" (Auto and the named models that
+ // can run here) with the maker's mark, then every free model (the free pool and OpenRouter's
+ // free models, 650+), one grey line each, a tick on the chosen one and the cost on hover.
  const models=state.me.models||[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true}];
- if(!models.some(m=>m.id===state.model&&m.enabled))state.model='auto';
- // Like Emergent: a short list of the models that can run here, one grey line each, a tick on the
- // chosen one, the cost on hover, and a search box when the list is long.
+ const freeModels=(state.me.free_models||[]).filter(m=>!models.some(x=>x.id===m.id));
+ const usable=models.filter(m=>m.enabled),all=[...usable,...freeModels];
+ if(!all.some(m=>m.id===state.model))state.model='auto';
  const panel=$('tier-panel');panel.replaceChildren();
- const usable=models.filter(m=>m.enabled),off=models.length-usable.length;
- const list=el('div','model-list');
- if(usable.length>6){const q=el('input','model-search');q.type='search';q.placeholder='Search models';q.setAttribute('aria-label','Search models');q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const b of list.children)b.hidden=Boolean(t)&&!b.dataset.name.includes(t)};panel.append(q)}
- for(const m of usable){
-  const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+(m.note||'')).toLowerCase();
-  const name=el('b',null,m.label);
+ const q=el('input','model-search');q.type='search';q.placeholder='Search '+(all.length>8?all.length+' models':'models');q.setAttribute('aria-label','Search models');panel.append(q);
+ const list=el('div','model-list');panel.append(list);
+ const row=m=>{
+  const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+(m.note||'')+' '+m.id).toLowerCase();
+  const body=el('span','m-body'),name=el('b',null,m.label);
   if(m.id==='auto')name.append(el('i','model-tag top','Recommended'));
-  if(m.free===true||m.isFree===true||m.credits===0)name.append(el('i','model-tag free','Free'));
-  b.append(name,el('span',null,m.note||''));
+  if(m.free===true||m.credits===0)name.append(el('i','model-tag free','Free'));
+  body.append(name,el('span',null,m.note||''));b.append(modelMark(m),body);
   if(m.credits)b.title=m.credits+' credit'+(m.credits===1?'':'s')+' a message'+(m.costlier?' (costlier)':'');
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
-  list.append(b);
- }
- panel.append(list);
- if(off)panel.append(el('p','menu-note model-off',off+' more model'+(off===1?' is':'s are')+' not available on this account'));
- const cur=models.find(m=>m.id===state.model);text($('tier-label'),cur?cur.label:'Auto');
- costHint();
+  return b;
+ };
+ const section=(title,items)=>{if(!items.length)return;const h=el('p','menu-note model-section',title);list.append(h);for(const m of items)list.append(row(m))};
+ section('Recommended',usable);
+ section('Free models ('+freeModels.length+')',freeModels);
+ const off=models.length-usable.length;
+ if(off)panel.append(el('p','menu-note model-off',off+' paid model'+(off===1?' is':'s are')+' not available on this account'));
+ q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const n of list.children){if(n.tagName==='P'){n.hidden=Boolean(t);continue}n.hidden=Boolean(t)&&!n.dataset.name.includes(t)}};
+ const cur=all.find(m=>m.id===state.model)||usable[0];
+ const lbl=$('tier-label');lbl.replaceChildren(modelMark(cur,true),document.createTextNode(cur?cur.label:'Auto'));
+
 }
 $('tier').onchange=()=>{state.tier=$('tier').value;costHint()};
 function costHint(){
@@ -1436,6 +1451,7 @@ function dots(){const d=el('span','k-dots');d.setAttribute('aria-hidden','true')
 function workingMark(){const g=el('span','k-grid');g.setAttribute('aria-hidden','true');for(let i=0;i<16;i++)g.append(el('i'));return g}
 // For the kairoq-design tests: render a saved message the way the chat does.
 window.kairoqRenderMessage=(m,last,index)=>messageItem(m,last,index);
+window.kairoqSetMe=patch=>{Object.assign(state.me,patch);renderTiers()};
 function workCard(){
  let li=$('stream');
  if(!li){
