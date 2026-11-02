@@ -451,6 +451,14 @@ TEMPLATES.splice(2,0,
  withDocs({id:'ai-front-desk',name:'AI front desk',category:'AI',description:'A guesthouse site with a front desk that answers guests any time from your own house guide and prices, types its replies live, shows its sources and passes unanswered questions to you.'}),
  withDocs({id:'event-enquiry',name:'Event enquiry planner',category:'AI',description:'A venue site whose chat plans an event enquiry: it picks the date, guests and budget out of what people write, asks only for what is missing, and sends you a tidy summary. With a plain form for those who prefer it.'}),
  withDocs({id:'help-center',name:'AI help centre',category:'AI',description:'A help centre for any business: customers ask in their own words and get answers from your help articles with sources, plus popular topics and a contact form.'}));
+// Agentic CRM: the UI kit and design tokens plus templates/agentic-crm (a pipeline, contacts, tasks,
+// an in-app Copilot whose changes wait for Approve, and a daily agent run with a log).
+TEMPLATES.splice(1,0,{id:'agentic-crm',name:'Agentic CRM',category:'Business',description:'A team CRM with an agent built in: pipeline, contacts and tasks, a Copilot that looks things up and drafts follow-ups (you approve every change), and a morning run that adds follow-up tasks and logs why.',
+ get files(){
+  const design=require('./react-design'),base=design.starterFiles('Relay');
+  const css=base['src/index.css'].replace('--primary: 243 75% 59%;','--primary: 222 47% 18%;').replace('--ring: 243 75% 59%;','--ring: 222 47% 18%;').replace('--accent: 330 81% 60%;','--accent: 158 55% 36%;');
+  return{...base,'src/index.css':css,...folder('agentic-crm')};
+ }});
 function list(){return TEMPLATES.map(({files,assistantDocs,...t})=>t)}
 function get(id){return TEMPLATES.find(t=>t.id===id)||null}
 module.exports={list,get,TEMPLATES};

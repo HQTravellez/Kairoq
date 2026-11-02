@@ -1,0 +1,23 @@
+{
+  "collections": {
+    "contacts": { "access": "shared" },
+    "deals": { "access": "shared" },
+    "tasks": { "access": "shared" },
+    "activity": { "access": "shared" },
+    "drafts": { "access": "shared" },
+    "agent_runs": { "access": "shared" }
+  },
+  "ai": true,
+  "email": true,
+  "ai_tools": {
+    "find-contacts": { "description": "Find contacts by name, company or email, with their open deals and tasks", "parameters": { "query": "string" } },
+    "pipeline-summary": { "description": "Open pipeline value by stage and the deals with no activity for 7 days or more", "parameters": {} },
+    "list-tasks": { "description": "Open tasks, soonest first; due can be today, week or all", "parameters": { "due": "string" } },
+    "create-task": { "description": "Create a follow-up task for a contact", "parameters": { "title": "string", "contact": "string", "due": "string" }, "confirm": true },
+    "move-deal": { "description": "Move a deal to another stage (Lead, Qualified, Proposal, Negotiation, Won, Lost)", "parameters": { "deal": "string", "stage": "string" }, "confirm": true },
+    "draft-email": { "description": "Write a follow-up email draft to a contact for the team to review", "parameters": { "contact": "string", "purpose": "string" }, "confirm": true }
+  },
+  "automations": [
+    { "name": "morning-run", "run": "morning-run", "every": "day", "at": "08:00", "tz": "America/Toronto" }
+  ]
+}
