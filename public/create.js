@@ -57,6 +57,7 @@ function renderCredits(account){
 function planName(id){return(state.me?.plans||[]).find(p=>p.id===id)?.name||id}
 function setMode(mode){
  state.mode=mode;
+ $('forgot-form').classList.add('hidden'); // ui/screens: switching tabs leaves the reset-link form
  $('tab-signup').setAttribute('aria-selected',String(mode==='signup'));
  $('tab-login').setAttribute('aria-selected',String(mode==='login'));
  text($('auth-submit'),mode==='signup'?'Create account':'Sign in');
@@ -192,6 +193,8 @@ $('side-templates').onclick=async()=>{if($('home').classList.contains('hidden'))
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
+// ui/screens: on a phone the menu is a drawer; a tap outside it closes it.
+document.addEventListener('click',e=>{if(window.innerWidth<=900&&document.body.classList.contains('side-open')&&!e.target.closest('#side,#side-open-btn,#side-toggle')){document.body.classList.remove('side-open');e.preventDefault();e.stopPropagation()}},true);
 // What to build (like superapp's first question): a website, a web app or a phone app. Each has
 // its own examples, typed into the empty box one after another (they stop when you type or focus).
 const KINDS={
@@ -2523,7 +2526,8 @@ $('seo-save').onclick=async()=>{
 };
 
 // ---------- password reset, verification, Google ----------
-$('forgot-open').onclick=()=>{$('forgot-form').classList.toggle('hidden');$('forgot-email').value=$('email').value;$('forgot-email').focus()};
+// ui/screens: the dialog title says what this step is ("Sign in" again when a tab is picked).
+$('forgot-open').onclick=()=>{$('forgot-form').classList.toggle('hidden');text($('auth-title'),'Reset your password');$('forgot-email').value=$('email').value;$('forgot-email').focus()};
 $('forgot-form').onsubmit=async e=>{e.preventDefault();try{await api('/password/forgot',{method:'POST',body:{email:$('forgot-email').value}});text($('forgot-status'),state.me.email_ready?'If that email has an account, a reset link is on its way.':'Email is not set up on this server yet, so reset links cannot be sent.')}catch(err){text($('forgot-status'),err.message)}};
 $('reset-form').onsubmit=async e=>{e.preventDefault();text($('reset-error'),'');try{await api('/password/reset',{method:'POST',body:{token:state.resetToken,password:$('reset-password').value}});state.resetToken=null;history.replaceState(null,'','/create');await start()}catch(err){text($('reset-error'),err.message)}};
 $('verify-resend').onclick=async()=>{try{await api('/verify/resend',{method:'POST'});text($('verify-resend'),'Sent. Check your inbox.')}catch(err){text($('verify-resend'),err.message)}};
@@ -3302,7 +3306,7 @@ async function start(){
  await handleLinks();
  const v=await loadMe();
  $('google-login').classList.toggle('hidden',!state.me.google);
- if(state.resetToken){show('auth');renderLanding();$('auth-form').classList.add('hidden');$('reset-form').classList.remove('hidden');openAuth();return}
+ if(state.resetToken){show('auth');renderLanding();$('auth-form').classList.add('hidden');$('reset-form').classList.remove('hidden');text($('auth-title'),'Choose a new password');/* ui/screens: title for the reset step */openAuth();return}
  if(state.flash){text($('auth-error'),state.flash);text($('home-error'),state.flash);state.flash=null}
  const share=/^\/create\/share\/([a-f0-9]{24})\/?$/.exec(location.pathname);
  if(share)return openShare(share[1],v);
