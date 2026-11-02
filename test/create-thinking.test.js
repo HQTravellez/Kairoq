@@ -220,6 +220,28 @@ test('the agent sees the matching specialist skills and can open one',async()=>{
  }finally{global.fetch=realFetch;G.clear()}
 });
 
+test('writing before opening a listed skill gets one reminder to open it first',async()=>{
+ const agent=require('../react-agent');
+ const G=require('../gsap-skill-packs');G.clear();
+ const meta=builder.create({name:'Skip skill'});await builder.initialize(meta);
+ let step=0;const seen=[];
+ const realFetch=global.fetch;
+ global.fetch=async(url,o)=>{if(String(url).includes('raw.githubusercontent.com/greensock'))return new Response('---\nname: gsap-core\n---\nUse gsap.to with an ease.',{status:200});return realFetch(url,o)};
+ const write={tool:'write_files',files:{'src/motion.js':'export const ease="power2.out"\n'}};
+ const callModel=async(opts,parse)=>{
+  const sys=String(opts.messages[0].content||'');
+  if(/independent senior code reviewer|independent product\/spec reviewer/.test(sys))return parse(JSON.stringify({verdict:'pass',findings:[]}));
+  step++;seen.push(String(opts.messages.at(-1).content||''));
+  return parse(JSON.stringify(step===1?{thought:'Write straight away.',actions:[write]}:step===2?{thought:'Open it.',actions:[{tool:'open_skill',name:'gsap:core'}]}:step===3?{thought:'Write and test.',actions:[write,{tool:'build_and_test'}]}:{thought:'Done.',actions:[{tool:'finish',message:'Added the motion helper.'}]}));
+ };
+ const inspect=async()=>({errors:[],steps:[{step:'open',ok:true}],text:'ok',external:[]});
+ try{
+  await agent.run(meta.id,'Add a motion helper module for the animated hero',{callModel,inspect,maxSteps:8});
+  assert.match(seen[1],/nothing written yet[\s\S]*gsap:core[\s\S]*open_skill first/);
+  assert.match(seen[3]||'',/write_files: src\/motion\.js/,'after opening the skill the write goes through');
+ }finally{global.fetch=realFetch;G.clear()}
+});
+
 test('a plain request lists no specialist skills',()=>{
  const src=require('fs').readFileSync(require('path').join(__dirname,'..','react-agent.js'),'utf8');
  assert.match(src,/function skillsNote\(request\)/);

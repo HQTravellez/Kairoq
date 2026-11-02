@@ -13,10 +13,13 @@ function codingRules(){return builder.SYSTEM_PROMPT.replace(/\nRespond with ONLY
 // Specialist skills that match this request (GSAP motion, the 3D teardown simulator, the other
 // specialist packs): listed in the rules with the open_skill tool, so the agent reads the know-how
 // before it writes the code. Plain requests list none.
+function skillRows(request){
+ try{const S=require('./specialist-skill-packs'),T=require('./teardown-skill-pack'),G=require('./gsap-skill-packs');return[...S.list(request),...T.list(request),...G.list(request)].slice(0,8)}
+ catch{return[]}
+}
 function skillsNote(request){
  try{
-  const S=require('./specialist-skill-packs'),T=require('./teardown-skill-pack'),G=require('./gsap-skill-packs');
-  const rows=[...S.list(request),...T.list(request),...G.list(request)].slice(0,8);
+  const rows=skillRows(request);
   if(!rows.length)return'';
   return'\n\nSPECIALIST SKILLS for this request (tested know-how from the makers; open the ones you need with open_skill BEFORE writing the code they cover, and follow them):\n'+rows.map(r=>'- '+r.name+': '+r.about).join('\n');
  }catch{return''}
@@ -235,6 +238,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   report({status:'testing',preview:{url:built.url,version:n,draft:true}});
   return testBuild(a,'build_and_test: built OK.');
  }
+ const skillsListed=researchOnly?[]:skillRows(text).map(r=>r.name),skillsOpened=new Set();let skillsNudged=false;
  async function tool(a){
   const t=a.tool;
   if(researchOnly&&['write_files','edit_files','build_and_test','test_ui','run_tests','query_db','run_automation','generate_images'].includes(t))
@@ -273,7 +277,7 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   }
   if(t==='open_skill'){
    const name=String(a.name||'').trim().slice(0,80);
-   try{const body=await require('./builder-skills').openAsync(name,{fetchImpl:fetch});tl.add({t:'note',icon:'book',text:'Opened the skill '+name});return{text:clip(body,24000)}}
+   try{const body=await require('./builder-skills').openAsync(name,{fetchImpl:fetch});skillsOpened.add(name);tl.add({t:'note',icon:'book',text:'Opened the skill '+name});return{text:clip(body,24000)}}
    catch(e){if(e.name==='AbortError'||signal?.aborted)throw e;return{text:'open_skill '+name+': could not load ('+String(e.message||e).slice(0,200)+'). Carry on with what you know.'}}
   }
   if(t==='read_files'){
@@ -336,6 +340,12 @@ async function run(id,instruction,{callModel,inspect,webSearch,fetchUrl,browseSi
   function autoGraph(){
    const tg=require('./task-graph');
    try{tg.define(id,{instruction:text,tasks:tg.fromPlan(text),auto:true});tl.add({t:'note',icon:'code',text:'Set up the task list from the plan'})}catch{}
+  }
+  // Listed skills are read before the first file is written: the agent once wrote a GSAP page
+  // with framer-motion without opening the GSAP skill. One reminder, then it carries on.
+  if((t==='write_files'||t==='edit_files')&&skillsListed.length&&!skillsOpened.size&&!skillsNudged){
+   skillsNudged=true;
+   return{text:t+': nothing written yet. This request has specialist skills: '+skillsListed.join(', ')+'. Open the ones that cover this code with open_skill first, follow them, then write the files.'};
   }
   if(t==='write_files'){
    const eng=require('./engineering-intelligence'),tg=require('./task-graph');
