@@ -67,7 +67,7 @@ body.app #home #new-kind button[aria-pressed=true]{background:var(--c-panel)!imp
 /* The prompt card. */
 body.app #home #new-form.prompt-box{width:100%;max-width:720px;margin:0 auto!important;padding:16px 14px 12px 18px!important;background:var(--c-panel)!important;border:1px solid rgba(255,255,255,.7)!important;border-radius:20px!important;box-shadow:0 0 0 5px rgba(255,255,255,.18),0 24px 48px -16px rgba(16,24,40,.35)!important;transition:box-shadow .15s ease}
 body.app #home #new-form.prompt-box:focus-within{box-shadow:0 0 0 5px rgba(255,255,255,.3),0 24px 48px -16px rgba(16,24,40,.35)!important}
-body.app #home #new-prompt{display:block;width:100%;min-height:64px;padding:0 4px 0 0!important;margin:0!important;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;resize:none;font-size:15.5px!important;line-height:1.55!important;color:var(--c-ink)!important}
+body.app #home #new-prompt{display:block;width:100%;min-height:64px;padding:0 4px 0 3px!important;margin:0!important;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;resize:none;font-size:15.5px!important;line-height:1.55!important;color:var(--c-ink)!important}
 body.app #home #new-prompt::placeholder{color:var(--c-ink-3)!important;opacity:1}
 body.app #home #new-form .prompt-bar{display:flex!important;align-items:center;gap:10px;margin-top:10px!important;padding:0!important}
 body.app #home #new-form .round{width:32px!important;height:32px!important;min-width:32px;padding:0!important;display:inline-grid!important;place-items:center;border-radius:999px!important;border:1px solid var(--c-line-2)!important;background:var(--c-panel)!important;color:var(--c-ink-2)!important;box-shadow:none!important}
