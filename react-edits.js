@@ -12,12 +12,18 @@ const MAX_FILES=30,MAX_EDITS=40,MAX_TEXT=60000;
 function normalize(edits){
  if(edits===undefined||edits===null)return{};
  if(typeof edits==='string'){try{edits=JSON.parse(edits)}catch{throw Error('"edits" must be an object of file path → list of {"find","replace"}')}}
- if(typeof edits!=='object'||Array.isArray(edits))throw Error('"edits" must be an object of file path → list of {"find","replace"}');
+ // A list of edits that each name their file ([{"path","find","replace"}]) is grouped by file; free
+ // models often send this shape instead of the documented map.
+ if(Array.isArray(edits)){const g={};for(const e of edits){const f=e&&typeof e==='object'?(e.path||e.file||e.filename):null;if(typeof f==='string'&&f)(g[f]=g[f]||[]).push(e)}if(Object.keys(g).length)edits=g}
+ if(typeof edits!=='object'||Array.isArray(edits))throw Error('"edits" must be an object of file path → list of {"find","replace"}, for example {"src/App.jsx":[{"find":"old text","replace":"new text"}]}');
  const out={};let n=0;
  for(const [file,list] of Object.entries(edits).slice(0,MAX_FILES)){
   const parsed=typeof list==='string'?(()=>{try{return JSON.parse(list)}catch{return list}})():list;
   const arr=(Array.isArray(parsed)?parsed:[parsed]).map(e=>typeof e==='string'?(()=>{try{return JSON.parse(e)}catch{return e}})():e);
   out[file]=arr.filter(e=>e&&typeof e==='object').map(e=>{
+   // Other common names for the same thing: old/new, search/replace, old_str/new_str, before/after.
+   if(typeof e.find!=='string'){const f=[e.old,e.search,e.old_str,e.before,e.from].find(x=>typeof x==='string');if(f!==undefined)e={...e,find:f}}
+   if(typeof e.replace!=='string'){const r=[e.new,e.replacement,e.new_str,e.after,e.to].find(x=>typeof x==='string');if(r!==undefined)e={...e,replace:r}}
    if(typeof e.find!=='string'||!e.find.trim())throw Error(file+': every edit needs a non-empty "find"');
    if(typeof e.replace!=='string')throw Error(file+': every edit needs a "replace" string (use "" to delete)');
    if(++n>MAX_EDITS)throw Error('Too many edits in one reply (max '+MAX_EDITS+'); send the whole file instead');
