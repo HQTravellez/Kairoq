@@ -9,7 +9,7 @@ const fs=require('fs'),os=require('os'),path=require('path'),http=require('http'
 const DRAFT='UNVERIFIED DRAFT · NOT functionally verified.\n\nPROOF\n- Build: passed\n- Browser: passed · 11 interaction step(s)\n- Visual quality: failed\n- Verification tests: not-required\n- Regression checks: not-required\n- Engineering review: failed\n- Repair attempts: 0\n- Unresolved: Independent engineering review has blocking findings. Visual quality was not evaluated.\n\nBuilder notes: Stopped after 28 steps.';
 const OK='VERIFIED BUILD\n\nPROOF\n- Build: passed\n- Browser: passed · 9 interaction step(s)\n- Visual quality: passed\n- Verification tests: not-required\n- Regression checks: passed\n- Engineering review: passed\n- Repair attempts: 1\n- Unresolved: none\n\nAdded the menu page and the cake request form.';
 
-test('the finished message: status line on top, a plain verdict, the checks as a list',{timeout:120000},async(t)=>{
+test('the finished message: how long it worked, then only what was done',{timeout:120000},async(t)=>{
  const runtime=require('../runtime-check');
  if(!runtime.available()){t.diagnostic('no browser here');return}
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'kairoq-finished-'));
@@ -34,26 +34,18 @@ test('the finished message: status line on top, a plain verdict, the checks as a
    return{draft:render({role:'assistant',mode:'agent',text:draft,timeline:tl,duration_ms:1034000,version:2}),ok:render({role:'assistant',mode:'agent',text:ok,timeline:tl,duration_ms:184000,version:3}),plain:render({role:'assistant',text:'Changed the button colour.',timeline:tl,duration_ms:9000,version:4})};
   },[DRAFT,OK,tl]);
   assert.equal(errors.length,0,errors.join(' | '));
-  // The status line is the first thing, not inside "Build details".
+  // The status line is the first thing: just how long it worked; the steps stay folded.
   assert.match(out.draft.first,/status-line done/);
-  assert.match(out.draft.text,/Kairoq Agent\s*Worked for 17m 14s · 4 steps/);
-  assert.ok(!/Worked for/.test(out.draft.details),'the status line is not under Build details');
-  // The verdict in plain words; the raw PROOF block is gone.
-  assert.match(out.draft.text,/Draft · some checks still open/);
-  assert.ok(!/Draft ready\. Some checks/.test(out.draft.text),'no stock sentence');
+  assert.match(out.draft.text,/Kairoq Agent\s*Worked for 17m 14s/);
+  assert.ok(!/steps?\b/.test(out.draft.text.split('\n').slice(0,2).join(' ')),'no step count');
+  assert.ok(!/Read|Built the preview/.test(out.draft.text),'the step log is folded');
+  // Then only what was done, in the agent's words: no checklists, tags or Build details.
   assert.match(out.draft.text,/I used all 28 rounds before every check passed\./);
-  assert.ok(!/PROOF|UNVERIFIED|Builder notes|not-required|Repair attempts/.test(out.draft.text),out.draft.text);
-  // Emergent-style write-up: what's there, what was tested, what is not done yet, then "Agent finished".
-  assert.deepEqual(out.draft.rows,['|•Menu','ok|✓Builds','ok|✓Opens and works in a browser · 11 actions tried','bad|✗Independent engineering review has blocking findings. Visual quality was not evaluated.']);
-  assert.match(out.draft.text,/What's there\s*•\s*Menu/);
-  assert.match(out.draft.text,/What I tested/);assert.match(out.draft.text,/Not done yet/);
-  assert.match(out.draft.text,/Agent finished · 17m 14s/);
-  // Verified: the result, the tested list, no "Not done yet", and the repair count in the closing line.
-  assert.match(out.ok.text,/Added the menu page and the cake request form\.\s*✓\s*Checked/,'its own words first, then the small tag');
   assert.match(out.ok.text,/Added the menu page and the cake request form\./);
-  assert.deepEqual(out.ok.rows.map(r=>r.split('|')[1]),['•Menu','✓Builds','✓Opens and works in a browser · 9 actions tried','✓Looks right','✓Saved checks','✓Code review']);
-  assert.ok(!/Not done yet/.test(out.ok.text));
-  assert.match(out.ok.text,/Agent finished · 3m 04s · 1 repair/);
+  for(const o of [out.draft,out.ok]){
+   assert.ok(!/PROOF|UNVERIFIED|Builder notes|not-required|Repair attempts|What I tested|Not done yet|What's there|Checked|Draft ·|Agent finished/.test(o.text),o.text);
+   assert.equal(o.rows.length,0);assert.equal(o.details,'','no Build details fold');
+  }
   // An ordinary reply is untouched.
   assert.match(out.plain.text,/Changed the button colour\./);assert.ok(!/✓/.test(out.plain.text));
  }finally{await ctx.close();server.close();await runtime.close()}

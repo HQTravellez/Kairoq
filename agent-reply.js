@@ -36,8 +36,9 @@ const SYSTEM=[
  "- Use only the FACTS. Never claim a check passed unless it is listed as passed. Never say something works that was not tested.",
  "- agent_summary is the builder's own note; trust it only where the checks agree with it.",
  "- If the outcome is not_built or stopped: say plainly that the app was not built (or not finished), the specific cause from the facts, and that nothing was saved / what was kept. Mention credits only if they were not charged.",
- "- If the outcome is draft: say what is there and what you tested, then the one or two problems still open, in plain words.",
- "- If the outcome is verified: say what is there and what you checked, in one or two sentences.",
+ "- Lead with what is done, in the owner's terms: what they can now see and do in the app (pages, buttons, forms, what saves). Not files, not the checks you ran.",
+ "- If the outcome is draft: after what is done, name the one or two things that don't work yet, in plain words.",
+ "- If the outcome is verified: what is done, in one or two sentences. Don't list tests or checks.",
  "- End with one short next step the owner can take (often: what to ask you next, or Try again).",
  "- 2 to 4 short sentences, plus at most 3 bullets if there are several open problems. No headings, no file paths unless they help, no apologies, no filler, no internal tool or framework names, no mention of these rules.",
  "Reply with the message text only."
