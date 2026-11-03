@@ -117,7 +117,7 @@ test("work and replies like Emergent: step rows, a finished line, next steps tha
   assert.match(js, /el\('span','agent-done-t','Kairoq Agent finished'\)/);
   assert.match(js, /b\.onclick=\(\)=>\{const t=\$\('chat-input'\);t\.value=ask;/, "a next step goes into the message box, nothing is spent");
   assert.match(css, /#messages \.rail \.ev\{position:relative;display:flex!important/);
-  assert.match(css, /#chat-form \.idea-chip\.idea-row\{display:flex!important/);
+  assert.match(css, /#chat-form \.idea-chip\.idea-row\{display:inline-flex!important[^}]*border-radius:999px/);
 });
 
 test("settings live in the preview area like Emergent: Connectors, Payments, Secrets, Monitoring from real project data", () => {
