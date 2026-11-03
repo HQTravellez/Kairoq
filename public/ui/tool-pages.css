@@ -136,4 +136,51 @@ html body.app .ld-draft .link-btn:hover,html body.app .ld-actions .link-btn:hove
   html body.app .tp-tools.ld-find .primary,html body.app .tp-tools.ld-find .tp-btn{flex:none;width:100%;justify-content:center}
   html body.app .tp-two{grid-template-columns:1fr}
 }
+
+/* ---------- API checker ---------- */
+html body.app .ac-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;background:#fff;border:1px solid var(--c-line-2,#DEDBD5);border-radius:10px;padding:6px;box-shadow:0 8px 24px -18px rgba(36,35,41,.4)}
+html body.app .ac-bar:focus-within{border-color:var(--c-accent,#7552E8);box-shadow:0 0 0 3px rgba(117,82,232,.14)}
+html body.app .ac-bar select{flex:none!important;width:auto!important;min-width:0!important;height:36px;border:0!important;background:var(--c-raise,#F4F4F2)!important;border-radius:7px!important;padding:0 10px!important;font:600 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--c-ink,#1C1B1F);box-shadow:none!important}
+html body.app .ac-bar input{display:block!important;flex:1 1 auto!important;width:auto!important;min-width:0;height:36px;border:0!important;outline:none!important;box-shadow:none!important;background:none!important;padding:0 6px!important;font:13px "IBM Plex Mono",ui-monospace,monospace;color:var(--c-ink,#1C1B1F)}
+html body.app .ac-bar .primary{height:36px;padding:0 18px;border-radius:8px;font-size:13px;flex:none}
+html body.app .ac-bar .tp-btn{flex:none}
+html body.app .ac-n{min-width:18px;height:18px;border-radius:9px;background:var(--c-raise,#F4F4F2);font-size:12px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;box-sizing:border-box;color:var(--c-ink-3,#625F68)}
+html body.app .ac-hrows{display:flex;flex-direction:column;gap:8px}
+html body.app .ac-hrow{display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px;align-items:center}
+html body.app .ac-hrow input{font:12px "IBM Plex Mono",ui-monospace,monospace!important}
+html body.app .tp .link-btn{border:0!important;background:none!important;box-shadow:none!important;padding:0!important;height:auto!important;font-size:12px;color:var(--c-ink-3,#625F68);cursor:pointer;text-decoration:none!important}
+html body.app .tp .link-btn:hover{color:var(--c-accent,#7552E8)}
+html body.app #ac-body-wrap.hidden{display:none}
+html body.app #ac-body{font:12px "IBM Plex Mono",ui-monospace,monospace}
+html body.app .ac-view{display:flex;flex-direction:column;gap:14px}
+html body.app .ac-status{display:flex;align-items:center;gap:12px}
+html body.app .ac-code{display:inline-flex;align-items:center;border-radius:6px;padding:2px 8px;font:600 12px "IBM Plex Mono",ui-monospace,monospace;background:var(--f-green-bg,#E8F3ED);color:var(--f-green,#328368)}
+html body.app .ac-code.bad{background:#FCEBEA;color:#B3261E}
+html body.app .ac-code.big{font-size:14px;padding:4px 10px}
+html body.app .ac-meta{font:12px "IBM Plex Mono",ui-monospace,monospace;color:var(--c-ink-3,#625F68)}
+html body.app .tp-card.ac-plain,html body.app .tp-card.ac-fields,html body.app .tp-card.ac-raw{transform:none!important;box-shadow:none!important}
+html body.app .ac-label{margin:0;font:500 12px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--f-mut2,#716F77)}
+html body.app .ac-words{margin:0;font-size:16px;line-height:1.5;color:var(--c-ink,#1C1B1F)}
+html body.app .ac-plain .tp-row .primary{height:36px;padding:0 14px;border-radius:8px;font-size:13px}
+html body.app .ac-fields table{width:100%;border-collapse:collapse;font-size:13px}
+html body.app .ac-fields td{padding:9px 0;border-top:1px solid var(--c-line,#E6E4DF);vertical-align:top;word-break:break-word}
+html body.app .ac-fields td.ac-path{width:42%;padding-right:16px;font:12px "IBM Plex Mono",ui-monospace,monospace;color:var(--c-accent-2,#5B3DCC)}
+html body.app .ac-raw pre{margin:0;max-height:480px;overflow:auto;padding:14px;border-radius:8px;background:var(--f-chrome,#242329);color:#E9E7EE;font:12px/1.6 "IBM Plex Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word}
+html body.app .ac-history{list-style:none;margin:0;padding:0;background:#fff;border:1px solid var(--c-line,#E6E4DF);border-radius:10px;overflow:hidden}
+html body.app .ac-history li+li{border-top:1px solid var(--c-line,#E6E4DF)}
+html body.app .ac-history button{width:100%;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 16px;border:0!important;background:#fff!important;box-shadow:none!important;height:auto!important;text-align:left;cursor:pointer;border-radius:0!important}
+html body.app .ac-history button:hover{background:var(--c-raise,#F4F4F2)!important}
+html body.app .ac-m{font:600 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--c-ink-2,#3C3A42)}
+html body.app .ac-u{font:12px "IBM Plex Mono",ui-monospace,monospace;color:var(--c-ink,#1C1B1F);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body.app .ac-t{font-size:12px;color:var(--f-mut2,#716F77)}
+@media (max-width:900px){
+  html body.app .ac-bar{flex-wrap:wrap}
+  html body.app .ac-bar input{flex:1 1 100%!important;order:-1}
+  html body.app .ac-bar select{flex:1 1 100%!important;width:100%!important}
+  html body.app .ac-bar .primary{flex:1}
+  html body.app .ac-hrow{grid-template-columns:1fr}
+  html body.app .ac-history button{grid-template-columns:auto auto minmax(0,1fr)}
+  html body.app .ac-t{display:none}
+  html body.app .ac-fields td.ac-path{width:50%}
+}
 @media (prefers-reduced-motion:reduce){html body.app .ld-draft,html body.app .tp-card,html body.app .tp-sw::after,html body.app .tp-panel{transition:none!important;animation:none!important}}
