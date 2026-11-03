@@ -129,3 +129,14 @@ test("settings live in the preview area like Emergent: Connectors, Payments, Sec
   assert.match(js, /\$\('connect-open'\)\.onclick=\(\)=>openManage\('connectors'\);/);
   assert.match(read("ui/forma.css"), /#canvas\[data-view\]:not\(\[data-view=preview\]\)>#device\{display:none!important\}/);
 });
+
+test("composer and preview like Emergent: model note and cost, share picture and links, floating preview bar", () => {
+  const js = read("create.js"), css = read("ui/forma.css");
+  assert.match(js, /panel\.append\(el\('p','model-when','Model changes apply from your next message'\)\)/);
+  assert.match(js, /name\.append\(el\('i','model-tag cost',m\.credits\+' credit'/);
+  assert.match(js, /if\(p\.thumb\)\{const img=el\('img'\);img\.src=p\.thumb/, "the app's own picture, only when one exists");
+  assert.match(js, /\['LinkedIn','https:\/\/www\.linkedin\.com\/sharing\/share-offsite\/\?url='\]/);
+  assert.match(js, /function previewFloat\(\)\{/);
+  assert.match(css, /#canvas\[data-view\]:not\(\[data-view=preview\]\)>\.pv-float\{display:none!important\}/);
+  assert.match(fs.readFileSync(path.join(__dirname, "..", "create-api.js"), "utf8"), /thumb:\(\(\)=>\{try\{return require\('\.\/project-thumbs'\)\.url\(\{id,current_version:meta\.current_version\}\)\}/);
+});
