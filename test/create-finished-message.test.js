@@ -39,16 +39,17 @@ test('the finished message: status line on top, a plain verdict, the checks as a
   assert.match(out.draft.text,/Kairoq Agent\s*Worked for 17m 14s · 4 steps/);
   assert.ok(!/Worked for/.test(out.draft.details),'the status line is not under Build details');
   // The verdict in plain words; the raw PROOF block is gone.
-  assert.match(out.draft.text,/Draft ready\. Some checks did not pass yet/);
+  assert.match(out.draft.text,/Draft · some checks still open/);
+  assert.ok(!/Draft ready\. Some checks/.test(out.draft.text),'no stock sentence');
   assert.match(out.draft.text,/I used all 28 rounds before every check passed\./);
   assert.ok(!/PROOF|UNVERIFIED|Builder notes|not-required|Repair attempts/.test(out.draft.text),out.draft.text);
   // Emergent-style write-up: what's there, what was tested, what is not done yet, then "Agent finished".
-  assert.deepEqual(out.draft.rows,['|•Menu','ok|✓Builds','ok|✓Opens and works in a browser · 11 actions tried','bad|✗Looks right: did not pass','bad|✗Code review: did not pass','bad|✗Independent engineering review has blocking findings. Visual quality was not evaluated.']);
+  assert.deepEqual(out.draft.rows,['|•Menu','ok|✓Builds','ok|✓Opens and works in a browser · 11 actions tried','bad|✗Independent engineering review has blocking findings. Visual quality was not evaluated.']);
   assert.match(out.draft.text,/What's there\s*•\s*Menu/);
   assert.match(out.draft.text,/What I tested/);assert.match(out.draft.text,/Not done yet/);
   assert.match(out.draft.text,/Agent finished · 17m 14s/);
   // Verified: the result, the tested list, no "Not done yet", and the repair count in the closing line.
-  assert.match(out.ok.text,/Built and checked\./);
+  assert.match(out.ok.text,/Added the menu page and the cake request form\.\s*✓\s*Checked/,'its own words first, then the small tag');
   assert.match(out.ok.text,/Added the menu page and the cake request form\./);
   assert.deepEqual(out.ok.rows.map(r=>r.split('|')[1]),['•Menu','✓Builds','✓Opens and works in a browser · 9 actions tried','✓Looks right','✓Saved checks','✓Code review']);
   assert.ok(!/Not done yet/.test(out.ok.text));

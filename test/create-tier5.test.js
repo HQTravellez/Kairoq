@@ -137,7 +137,7 @@ test('agent mode: Stop cancels the task and refunds credits; a finish with error
  script=[{thought:'write',actions:[{tool:'write_files',files:{'src/App.jsx':'export default function App(){return <p>v2</p>}\n'}}]},{thought:'still going',actions:[{tool:'view_logs'}]}];
  const r=await agent.run(id,'Change the text',{callModel,maxSteps:2});
  script=null;
- assert.match(r.message,/^Stopped after 2 steps/);assert.equal(r.version,2);
+ assert.match(r.message,/ran out of rounds/);assert.equal(r.version,2);
 });
 
 test('Figma import reads the frame, saves its images, describes layout, colours and text, then builds it',async()=>{
