@@ -538,7 +538,17 @@ function previewFloat(){
  const canvas=$('canvas');if(!canvas||canvas.querySelector('.pv-float'))return;
  const bar=el('div','pv-float');bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Preview tools');
  const vis=$('visual-toggle');if(vis){if(!vis.querySelector('.pv-lbl'))vis.append(el('span','pv-lbl','Edit'));bar.append(vis)}
- const seg=$('preview-bar-tools')?.querySelector('.seg.icons');if(seg)bar.append(seg);
+ const seg=$('preview-bar-tools')?.querySelector('.seg.icons');
+ // Laptop, phone and tablet, like before: the phone has its own model menu (iPhone 16, Pro Max,
+ // SE, Pixel) and "Real Safari" next to it; both move here from the top toolbar.
+ if(seg){
+  if(!$('tablet')){const t=el('button');t.type='button';t.id='tablet';t.title='Tablet (iPad mini)';t.setAttribute('aria-label','Tablet');t.setAttribute('aria-pressed','false');
+   t.innerHTML='<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="2.5" width="15" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>';
+   t.onclick=()=>{state.deviceModel='ipad';try{localStorage.setItem('kq-device','ipad')}catch{}device(true)};seg.append(t)}
+  $('desktop').title='Laptop';$('desktop').setAttribute('aria-label','Laptop');
+  bar.append(seg);
+  for(const id of ['device-model','safari-shot'])if($(id))bar.append($(id));
+ }
  const full=el('button','pv-btn');full.type='button';full.title='Full screen';full.setAttribute('aria-label','Full screen');full.setAttribute('aria-pressed','false');
  full.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
  const stage=document.querySelector('#editor .stage');
@@ -547,8 +557,21 @@ function previewFloat(){
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&stage?.classList.contains('pv-full'))setFull(false)});
  const fold=el('button','pv-btn pv-fold');fold.type='button';fold.title='Hide the tools';fold.setAttribute('aria-label','Hide the preview tools');
  fold.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
- fold.onclick=()=>{const min=bar.classList.toggle('min');fold.title=min?'Show the tools':'Hide the tools';fold.setAttribute('aria-label',min?'Show the preview tools':'Hide the preview tools')};
- bar.append(full,fold);canvas.append(bar);
+ fold.onclick=()=>{const min=bar.classList.toggle('min');fitDevice();fold.title=min?'Show the tools':'Hide the tools';fold.setAttribute('aria-label',min?'Show the preview tools':'Hide the preview tools')};
+ // Open on your phone: a QR code for this preview (GET /previewqr), like Emergent and Lovable.
+ const qr=el('button','pv-btn pv-qr');qr.type='button';qr.title='Open on your phone';qr.setAttribute('aria-label','Open this preview on your phone');qr.setAttribute('aria-expanded','false');
+ qr.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 14h2M14 18v2M17 17h3v3"/></svg>';
+ const pop=el('div','pv-qr-pop hidden');pop.setAttribute('role','dialog');pop.setAttribute('aria-label','Open on your phone');
+ const img=el('img','pv-qr-img');img.alt='QR code that opens this preview on your phone';img.width=168;img.height=168;
+ const link=el('p','pv-qr-link'),copy=el('button','pv-qr-copy','Copy link');copy.type='button';
+ pop.append(el('p','pv-qr-title','Open on your phone'),img,el('p','pv-qr-hint',"Point your phone's camera at the code."),link,copy);
+ const close=()=>{pop.classList.add('hidden');qr.setAttribute('aria-expanded','false')};
+ qr.onclick=e=>{e.stopPropagation();if(!pop.classList.contains('hidden'))return close();const p=state.project;if(!p||!p.preview_url)return;
+  const url=location.origin+p.preview_url;img.src='/api/create/projects/'+p.id+'/previewqr?v='+(p.current_version||0);text(link,url.replace(/^https?:\/\//,''));
+  copy.onclick=()=>{navigator.clipboard?.writeText(url).then(()=>{text(copy,'Copied');setTimeout(()=>text(copy,'Copy link'),1500)}).catch(()=>{})};
+  pop.classList.remove('hidden');qr.setAttribute('aria-expanded','true')};
+ pop.onclick=e=>e.stopPropagation();document.addEventListener('click',close);document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+ bar.append(qr,full,fold,pop);canvas.append(bar);
 }
 function refreshWindow(){
  const p=state.project;if(!p||!$('fm-addr-text'))return;
@@ -770,6 +793,12 @@ $('ob-form').onsubmit=async e=>{
  try{await askThenBuild(what+'\n\nIt is for '+onboardFor()+'.',$('ob-name').value)}catch(err){text($('ob-error'),err.message)}finally{go.disabled=false}
 };
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
+$('ks-strip-stop').onclick=()=>$('stop-job').click();
+// The phone top bar (#ph-bar): its buttons are the editor's own, so they work exactly as before.
+$('ph-back').onclick=()=>$('back').click();
+$('ph-publish').onclick=()=>$('publish-open').click();
+$('ph-more').onclick=()=>document.body.classList.toggle('side-open');
+setInterval(()=>{const p=state.project;if(!p||!$('ph-name'))return;text($('ph-name'),p.name||'Untitled');text($('ph-saved'),state.job?'Kairoq is working…':'All changes saved');$('ph-publish').classList.toggle('hidden',p.role==='viewer')},800);
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
 // ui/screens: on a phone the menu is a drawer; a tap outside it closes it.
@@ -1300,16 +1329,21 @@ function messageItem(m,last,index){
   // "Worked for 41s · 9 steps": the steps fold out under it (like a coding agent's log); Details has the rest.
   if((thoughtMs!=null||tl.length)&&index>=0){
    const steps=tl.filter(e=>e.t!=='note'||e.icon).length;
-   const label=m.duration_ms!=null&&steps?'Worked for '+secsShort(m.duration_ms)+' · '+steps+' step'+(steps===1?'':'s'):thoughtMs!=null?'Thought for '+secsShort(thoughtMs):'Worked for '+secsShort(m.duration_ms||0);
+   // Just how long it worked; the steps stay folded behind it (like Lovable and Emergent, the
+   // owner sees the work, then what was done, not a log).
+   const label=m.duration_ms!=null?'Worked for '+secsShort(m.duration_ms):thoughtMs!=null?'Thought for '+secsShort(thoughtMs):'Worked for '+secsShort(0);
    const b=el('button','status-line done');b.type='button';b.setAttribute('aria-expanded','false');b.append(el('span','agent-name','Kairoq Agent'),el('span','status-text',label),icon('chev'));
    const rail=el('ol','rail done'),fold=el('div','fold');fold.append(rail);
    // Like Emergent: each step is a slim row (an icon, what was done, the file); an edit opens its diff.
    // The latest reply shows its steps; older replies keep them folded.
-   const fill=()=>{if(!rail.childElementCount)for(const e of tl.filter(e=>e.t!=='think'||e.text))rail.append(eventRow(e,{expand:true,version:m.version}))};
+   const fill=()=>{if(!rail.childElementCount)for(const e of tl.filter(e=>e.t!=='say'&&(e.t!=='think'||e.text||e.note)))rail.append(eventRow(e,{expand:true,version:m.version}))};
    b.onclick=()=>{fill();const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
-   if(last&&tl.length&&index>=0){fill();fold.classList.add('open');b.setAttribute('aria-expanded','true')}
    li.append(b,fold);
   }
+  // Like Lovable: what Kairoq said while it worked (a grey heading, its line under it, the
+  // thinking folded), then one card for the change (Details, Preview), then its message.
+  const story=storyRows(tl);if(story)li.append(story);
+  if(m.version&&index>=0)li.append(resultCard(m,index));
   const verdict=verdictCard(m.text,m);
   if(verdict)li.append(...verdict);else li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
@@ -1336,7 +1370,7 @@ function messageItem(m,last,index){
    li.append(q,el('p','q-hint','Pick an idea to build it, or tell me what you want.'));
   }
   // The same steps already fold out under "Worked for …"; list them here only when that line is absent.
-  const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan');
+  const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan'&&e.t!=='say');
   if(acts.length&&!((thoughtMs!=null||tl.length)&&index>=0)){
    const d=el('details','acts'),s=el('summary');s.append(icon('down','toggle'),el('span',null,summarize(tl)||acts.length+' steps'));
    d.append(s,rail(acts.slice(0,30),{}));li.append(d);
@@ -1397,7 +1431,9 @@ function messageItem(m,last,index){
   const extra=[...li.children].filter(n=>n.matches('.acts,.design-chip,.memory-chip,.file-chips.done,.msg-meta,.look-note:not(.warn),.check-chip:not(.bad),.agent-steps,.verified.ok,.verified-quiet'));
   // A build folds its extras under "Build details". A chat reply drops its cost line (credits still
   // show in Usage), so most replies have no fold at all; other notes stay folded under "Details".
-  const kept=m.version?extra:extra.filter(n=>{if(n.matches('.msg-meta')){n.remove();return false}return true});
+  // A finished agent build is just its message: no "Build details" fold under it.
+  const quiet=m.version&&verdictParts(m.text);if(quiet)for(const n of extra)n.remove();
+  const kept=quiet?[]:m.version?extra:extra.filter(n=>{if(n.matches('.msg-meta')){n.remove();return false}return true});
   if(kept.length){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...kept);li.append(details);}
  }
  return li;
@@ -1408,12 +1444,6 @@ function messageItem(m,last,index){
 // The finished build as a short write-up, like Emergent: the verdict and one-line result, then
 // "What's there" (the pages written), "What I tested" (the checks that passed), "Not done yet"
 // (what failed or is still open, in plain words) and "Agent finished · 12m 04s".
-function pageName(file){
- const m=/(?:^|\/)(?:pages|screens|routes)\/(?:.*\/)?([^/]+)\.(?:jsx?|tsx?)$/i.exec(String(file||''));
- if(!m||/^(index|_app|_document|layout)$/i.test(m[1]))return null;
- const w=m[1].replace(/(Page|Screen|View|Route)$/,'').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[-_]+/g,' ').trim().toLowerCase();
- return w?w.charAt(0).toUpperCase()+w.slice(1):null;
-}
 function verdictParts(raw){
  const m=/^(VERIFIED BUILD|UNVERIFIED DRAFT)[^\n]*\n+PROOF\n([\s\S]*?)(?:\n\n(?:Builder notes:\s*)?([\s\S]*))?$/.exec(String(raw||'').trim());
  if(!m)return null;
@@ -1428,29 +1458,52 @@ function verdictParts(raw){
   if(pass)tested.push(NAMES[r.label]+(detail?' · '+detail:''));
   else todo.push(NAMES[r.label]+': '+(detail.replace(/^failed/,'').trim()||'did not pass'));
  }
- if(unresolved&&unresolved!=='none')todo.push(unresolved);
+ // The open problem in its own words says more than "Looks right: did not pass"; show that instead.
+ if(unresolved&&unresolved!=='none'){for(let i=todo.length-1;i>=0;i--)if(/: did not pass$/.test(todo[i]))todo.splice(i,1);todo.push(unresolved)}
  let notes=String(m[3]||'').trim();
  notes=notes.replace(/^Stopped after (\d+) steps?\.\s*(The last changes did not build, so the last working build was saved\.)?\s*/,(_,n,kept)=>'I used all '+n+' rounds before every check passed'+(kept?', so the last working build is what you see':'')+'. ');
  const repairs=Number((rows.find(r=>r.label==='Repair attempts')||{}).value)||0;
  return{ok,tested,todo,notes,repairs};
 }
+function storyRow(e){
+ const row=el('div','ks-step');
+ if(e.title){
+  const h=el('button','ks-head',e.title);h.type='button';
+  if(e.note){h.append(icon('chev','ks-chev'));h.setAttribute('aria-expanded','false');
+   h.onclick=()=>{const open=h.getAttribute('aria-expanded')!=='true';h.setAttribute('aria-expanded',String(open));let n=row.querySelector('.ks-note');if(open&&!n){n=el('div','ks-note');n.append(icon('think'),el('p',null,e.note));h.after(n)}else if(!open&&n)n.remove()}}
+  else h.disabled=true;
+  row.append(h);
+ }
+ if(e.text){const p=el('p','ks-say');inlineMd(p,e.text);row.append(p)}
+ return row;
+}
+// The line above the message box while a job runs: the project, then what Kairoq is doing now
+// (its latest heading, or the stage in plain words). Stop is the editor's own Stop.
+function liveStrip(j){
+ const s=$('ks-strip');if(!s)return;
+ if(!j||j.status==='complete'||j.status==='failed'){s.classList.add('hidden');return}
+ // Present tense, what is happening now (the chat above already has the past-tense headings).
+ const line=liveStatus(j);
+ text($('ks-strip-name'),(state.project?.name||'Kairoq')+': ');
+ const t=$('ks-strip-line');if(t.textContent!==line){t.textContent=line;t.classList.remove('in');void t.offsetWidth;t.classList.add('in')}
+ s.classList.remove('hidden');
+}
+function storyRows(tl){const says=(tl||[]).filter(e=>e.t==='say'&&(e.text||e.title));if(!says.length)return null;const box=el('div','ks-story');for(const e of says)box.append(storyRow(e));return box}
+// The change as one card: its title, Details (the steps and files) and Preview (that version).
+function resultCard(m,index){
+ const title=m.title||String((state.project?.versions||[]).find(v=>v.n===m.version)?.title||'')||'Version '+m.version;
+ const card=el('div','ks-card'),head=el('div','ks-card-head');
+ head.append(el('span','ks-card-title',title),el('span','ks-card-v','v'+m.version));
+ const row=el('div','ks-card-btns'),det=el('button','ks-btn','Details'),pre=el('button','ks-btn','Preview');det.type=pre.type='button';
+ det.onclick=()=>openDetail(index,'timeline');
+ pre.onclick=()=>{if($('versions'))$('versions').value=String(m.version);setPreview(previewFor(m.version));const tab=document.querySelector('#phone-panes [data-pane=preview]');if(tab&&getComputedStyle($('phone-panes')).display!=='none')tab.click()};
+ row.append(det,pre);card.append(head,row);return card;
+}
 function verdictCard(raw,msg={}){
  const v=verdictParts(raw);if(!v)return null;
- const out=[];
- const head=el('p','verdict-head '+(v.ok?'ok':'draft'));
- head.append(el('span','vmark',v.ok?'✓':'!'),el('span',null,v.ok?'Built and checked.':'Draft ready. Some checks did not pass yet, so try it in the preview.'));
- out.push(head);
- if(v.notes)out.push(renderMarkdown(v.notes));
- const section=(title,items,cls)=>{if(!items.length)return;const box=el('div','writeup '+cls);box.append(el('p','writeup-title',title));const ul=el('ul','verdict-rows '+cls);for(const t of items){const li=el('li',cls==='todo'?'bad':cls==='tested'?'ok':'');li.append(el('span','vmark',cls==='todo'?'✗':cls==='tested'?'✓':'•'),el('span',null,t));ul.append(li)}box.append(ul);out.push(box)};
- const pages=[...new Set((msg.timeline||[]).filter(e=>e.t==='edit').map(e=>pageName(e.file)).filter(Boolean))];
- section("What's there",pages,'pages');
- section('What I tested',v.tested,'tested');
- section('Not done yet',v.todo,'todo');
- if(msg.duration_ms!=null){
-  const at=msg.at?new Date(msg.at):null,when=at&&!isNaN(at)?' · '+at.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
-  out.push(el('p','agent-finished','Agent finished · '+secsShort(msg.duration_ms)+(v.repairs?' · '+v.repairs+' repair'+(v.repairs===1?'':'s'):'')+when));
- }
- return out;
+ // Only what was done, in Kairoq Agent's own words (agent-reply.js). The checks it ran stay in
+ // the version's data; the chat doesn't list them.
+ return[renderMarkdown(v.notes||(v.ok?'Done.':"Done, but some checks didn't pass yet. Try it in the preview and tell me what to fix."))];
 }
 // "Verified by Kairoq": what its browser tested on this build, like a customer would.
 function verifiedCard(v,checks,added){
@@ -1560,19 +1613,23 @@ const MODELS={
  ipad:{label:'iPad mini',w:744,h:1133,top:24,urlTop:50,bottom:20,radius:22,island:false,os:'ipados'}};
 state.deviceModel=(()=>{try{return localStorage.getItem('kq-device')||'iphone16'}catch{return'iphone16'}})();
 if(!MODELS[state.deviceModel])state.deviceModel='iphone16';
+// The phone button goes back to the last phone picked (the tablet has its own button).
+state.lastPhone=state.deviceModel==='ipad'?'iphone16':state.deviceModel;
 function fitDevice(){
  const d=$('device'),m=MODELS[state.deviceModel];if(!d||d.classList.contains('desktop')||!m)return;
- const c=$('canvas'),pad=28,bez=m.home?72:24;
- const scale=Math.min(1,(c.clientHeight-pad)/(m.h+bez),(c.clientWidth-pad)/(m.w+24));
+ // Room for the floating preview bar under the device, so it never covers the home bar.
+ const c=$('canvas'),pad=28,bar=c.querySelector('.pv-float:not(.min)')?64:0,bez=m.home?72:24;
+ const scale=Math.min(1,(c.clientHeight-pad-bar)/(m.h+bez),(c.clientWidth-pad)/(m.w+24));
  d.style.setProperty('--dev-scale',String(Math.max(0.3,scale)));
 }
 function device(mobile){
  const m=MODELS[state.deviceModel],d=$('device');
- $('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile));
+ const tablet=mobile&&state.deviceModel==='ipad';
+ $('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile&&!tablet));$('tablet')?.setAttribute('aria-pressed',String(tablet));
  const hidden=d.classList.contains('hidden');
  d.className='device '+(hidden?'hidden ':'')+(mobile?'phone '+m.os+(m.island?' island':'')+(m.home?' homebutton':''):'desktop');
  for(const [k,v] of Object.entries({'--dev-w':m.w+'px','--dev-h':m.h+'px','--dev-top':m.top+'px','--dev-url':m.urlTop+'px','--dev-bottom':m.bottom+'px','--dev-radius':m.radius+'px'}))d.style.setProperty(k,v);
- $('device-model').classList.toggle('hidden',!mobile);$('device-model').value=state.deviceModel;
+ $('device-model').classList.toggle('hidden',!mobile||tablet);if(!tablet)$('device-model').value=state.deviceModel;
  $('safari-shot').classList.toggle('hidden',!mobile||m.os==='android'||Boolean(state.project&&state.project.native));
  // A native app is not a web page: no browser address bar in its phone frame.
  $('editor').classList.toggle('is-native',Boolean(state.project&&state.project.native));
@@ -1580,8 +1637,8 @@ function device(mobile){
  try{const host=new URL($('frame').src||location.href).host;for(const h of d.querySelectorAll('.dev-host'))h.textContent=state.project&&state.project.published&&state.project.published.slug?state.project.published.slug+'.kairoq.app':host}catch{}
  fitDevice();
 }
-$('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
-$('device-model').onchange=()=>{state.deviceModel=$('device-model').value;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
+$('desktop').onclick=()=>device(false);$('mobile').onclick=()=>{state.deviceModel=state.lastPhone;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
+$('device-model').onchange=()=>{state.deviceModel=state.lastPhone=$('device-model').value;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
 addEventListener('resize',fitDevice);
 // The preview column changes size when the sidebar, code panel, or browser chrome changes.
 // A window resize listener alone misses those transitions and leaves the iPhone clipped.
@@ -2262,7 +2319,12 @@ function eventRow(e,{expand=false,version=null,live=false}={}){
  const name=e.t==='note'?(e.icon||'note'):e.t;row.append(icon(name));
  const main=el('div','ev-main'),head=el('div','ev-head');main.append(head);row.append(main);
  let more=null;
- if(e.t==='think'){
+ // Kairoq Agent's one line to the owner between steps (react-agent.js "say"): plain text, no pill.
+ if(e.t==='say'){const p=el('li','ev ev-say');const t=el('p','ev-say-text');inlineMd(t,e.text||'');p.append(t);return p}
+ if(e.t==='think'&&e.note!==undefined){
+  head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secsShort(e.ms||0)));
+  if(e.note)more=()=>el('p','ev-thought',e.note);
+ }else if(e.t==='think'){
   if(e.title){const t=el('div','ev-title');inlineMd(t,e.title);main.insertBefore(t,head)}
   head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secsShort(e.ms||0)));
   if(e.text)more=()=>el('p','ev-thought',e.text);
@@ -2381,13 +2443,13 @@ function liveStatus(j){
   if(p==='thinking')return did?'Thinking about the next step':'Understanding your idea';
   if(p==='repairing')return'Repairing what the checks found';
   if(p==='checking'||p==='reviewing')return PHASES[p];
-  if(last&&last.t==='edit')return'Editing '+String(last.file||'').replace(/^src\//,'');
+  if(last&&last.t==='edit')return'Writing the code';
   if(last&&last.t==='build')return'Building the preview';
   if(last&&last.t==='test')return'Testing in a browser';
   if(last&&last.t==='note'&&last.icon==='web')return'Reading the web';
   return did?'Working on it':'Understanding your idea';
  }
- if(p==='writing'&&work.current)return'Writing '+work.current.replace(/^src\//,'');
+ if(p==='writing'&&work.current)return'Writing the code';
  return PHASES[p]||'Working';
 }
 function liveEvents(j){
@@ -2421,6 +2483,9 @@ function renderWork(j){
  const events=liveEvents(j),cut=Math.max(0,events.length-8);
  if(cut){const more=el('li','ev ev-more');const b=el('button','link-btn',cut+' earlier step'+(cut===1?'':'s'));b.type='button';b.onclick=()=>openDetail('live');more.append(b);r.append(more)}
  for(const e of events.slice(cut))r.append(eventRow(e,{live:true}));
+ // What Kairoq says while it works (its headings and lines), and one line above the message box.
+ {const old=li.querySelector('.ks-story');const st=storyRows(j.events||[]);if(st){st.classList.add('live');if(old)old.replaceWith(st);else li.querySelector('.rail.live').after(st)}else old?.remove()}
+ liveStrip(j);
  if(phaseOf(j)==='thinking'||(j.status==='writing'&&!(st&&st.chars))){const row=el('li','ev ev-think live');row.append(icon('think'));const main=el('div','ev-main'),head=el('div','ev-head');head.append(el('span','ev-label','Thinking'),dots());main.append(head);row.append(main);r.append(row)}
  li.querySelector('.stages').classList.add('hidden');
  const msg=li.querySelector('.work-msg');
@@ -2525,7 +2590,7 @@ async function watch(job){
   }
  });
  if(state.watchToken!==watchToken||state.project?.id!==id)return done;
- clearInterval(work.timer);renderBuildOverlay(null);
+ clearInterval(work.timer);renderBuildOverlay(null);liveStrip(null);
  const wasLive=detailState.source==='live';
  $('stream')?.remove();
  try{if(done&&state.project&&state.project.id===id){
