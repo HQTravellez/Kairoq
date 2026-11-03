@@ -1102,8 +1102,34 @@ function starterWaiting(on){
  previewWait('start-wait','Your app will appear here','Describe it in the chat. You will watch it come together here.',false);
 }
 function buildWaiting(label){
- if(!label){$('build-wait')?.remove();return}
+ if(!label){const b=$('build-wait');if(b&&!b.classList.contains('leaving')){if(STILL)b.remove();else{b.classList.add('leaving');setTimeout(()=>b.remove(),650)}}return}
  previewWait('build-wait','Building your app',label,true);
+ const box=$('build-wait');if(box&&!box.querySelector('.pw-matrix'))dotMatrix(box.querySelector('.pw-win'));
+}
+// A field of dots in Kairoq purple with a ripple running across it, drawn on a canvas over the
+// placeholder window. It stops when the window leaves the page and pauses while the tab is hidden;
+// with reduced motion it is a still grid.
+function dotMatrix(win){
+ if(!win)return;
+ const c=document.createElement('canvas');c.className='pw-matrix';c.setAttribute('aria-hidden','true');win.append(c);
+ const ctx=c.getContext('2d');if(!ctx)return;
+ const GAP=14,start=performance.now();
+ const size=()=>{const r=c.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);c.width=Math.max(1,r.width*d);c.height=Math.max(1,r.height*d);ctx.setTransform(d,0,0,d,0,0);return r};
+ let box=size();const ro=window.ResizeObserver?new ResizeObserver(()=>{box=size()}):null;ro?.observe(c);
+ const draw=now=>{
+  if(!c.isConnected){ro?.disconnect();return}
+  if(!document.hidden){
+   const t=(now-start)/1000,w=box.width,h=box.height;ctx.clearRect(0,0,w,h);
+   const cx=w*(0.5+0.32*Math.sin(t*0.35)),cy=h*(0.5+0.28*Math.cos(t*0.27));
+   for(let y=GAP/2;y<h;y+=GAP)for(let x=GAP/2;x<w;x+=GAP){
+    const d=Math.hypot(x-cx,y-cy)/GAP,wave=STILL?0.2:Math.max(0,Math.sin(d*0.55-t*3.2));
+    const a=0.1+0.75*Math.pow(wave,3);
+    ctx.fillStyle='rgba(117,82,232,'+a.toFixed(3)+')';ctx.beginPath();ctx.arc(x,y,1.2+1.1*Math.pow(wave,3),0,6.2832);ctx.fill();
+   }
+  }
+  if(!STILL)requestAnimationFrame(draw);
+ };
+ requestAnimationFrame(draw);
 }
 // Run on your phone (react-native-app.js): Expo Snack gives a QR code the Expo Go app opens.
 $('run-phone').onclick=async()=>{
@@ -1220,7 +1246,8 @@ function renderIdeas(m){
 function doneLine(m){
  const li=el('li','agent-done');li.setAttribute('role','presentation');
  const t=m.at?new Date(m.at):null,ok=t&&!isNaN(t);
- li.append(el('span','agent-done-t','Kairoq Agent finished'),el('span','agent-done-line'),el('time','agent-done-at',ok?t.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''));
+ const tick=el('span','agent-done-tick');tick.setAttribute('aria-hidden','true');tick.innerHTML='<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+ li.append(tick,el('span','agent-done-t','Kairoq Agent finished'),el('span','agent-done-line'),el('time','agent-done-at',ok?t.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''));
  if(ok)li.querySelector('time').dateTime=t.toISOString();
  return li;
 }
@@ -1230,7 +1257,7 @@ function renderMessages(pendingText){
  if(!msgs.length&&!pendingText){const li=document.createElement('li');li.className='assistant';li.textContent='Tell me what to build or change. Switch to Discuss to plan without changing code.';list.append(li)}
  const questionIndex=msgs.findLastIndex(m=>m.role==='assistant'&&m.question&&m.question.text===state.project.pending_question?.text);
  msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1||i===questionIndex,i)));
- if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
+ if(pendingText){const mine=messageItem({role:'user',text:pendingText});mine.classList.add('enter');list.append(mine)}
  // Like Emergent: a quiet "finished" line under the last piece of work.
  const end=msgs[msgs.length-1];
  if(!pendingText&&!state.job&&end&&end.role==='assistant'&&end.duration_ms!=null&&!end.failed)list.append(doneLine(end));
@@ -2265,7 +2292,16 @@ function summarize(events){
 // Three breathing dots: shown wherever Kairoq is thinking.
 function dots(){const d=el('span','k-dots');d.setAttribute('aria-hidden','true');d.append(el('i'),el('i'),el('i'));return d}
 // The working mark beside the agent's name: a 4×4 grid of dots that breathes in a wave.
-function workingMark(){const g=el('span','k-grid');g.setAttribute('aria-hidden','true');for(let i=0;i<16;i++)g.append(el('i'));return g}
+function workingMark(){const g=el('span','k-grid');g.setAttribute('aria-hidden','true');g.dataset.p='think';for(let i=0;i<16;i++){const d=el('i'),x=i%4,y=Math.floor(i/4);d.style.setProperty('--x',x);d.style.setProperty('--y',y);d.style.setProperty('--r',Math.round(Math.hypot(x-1.5,y-1.5)*10)/10);g.append(d)}return g}
+// The working grid's pattern says what Kairoq is doing (like Emergent's dot matrix): a pulse from
+// the centre while thinking, a wave while writing, rows filling while building, a scan while testing.
+function gridPattern(j){
+ const p=phaseOf(j);
+ if(/^(writing|fixing|repairing|designing|images|working)$/.test(p))return'write';
+ if(/^(building|assets|publishing)$/.test(p))return'build';
+ if(/^(testing|verifying|checking|reviewing|comparing|visiting|personas)$/.test(p))return'test';
+ return'think';
+}
 // For the kairoq-design tests: render a saved message the way the chat does.
 window.kairoqRenderMessage=(m,last,index)=>messageItem(m,last,index);
 window.kairoqSetMe=patch=>{Object.assign(state.me,patch);renderTiers()};
@@ -2366,6 +2402,7 @@ function renderWork(j){
  if(st&&st.tail)work.tail=st.tail;
  if(j.thinking)work.thinking=j.thinking;
  // "Kairoq Agent is building the application…", like a person at work.
+ const kg=li.querySelector('.k-grid'),pat=gridPattern(j);if(kg&&kg.dataset.p!==pat)kg.dataset.p=pat;
  const st0=liveStatus(j);text(li.querySelector('.status-text'),'is '+st0.charAt(0).toLowerCase()+st0.slice(1).replace(/\u2026?$/,'')+'\u2026');
  const ask=j.mode==='discuss';
  li.querySelector('.stages').replaceWith(ask?el('ol','stages hidden'):stageList(j));
