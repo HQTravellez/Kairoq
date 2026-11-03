@@ -863,3 +863,36 @@ html body.app .tw-in{animation:tw-in .45s var(--f-ease-out,ease-out) both}
 @keyframes tw-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 html body.app .status-text.tw-in,html body.app .think-line span.tw-in{display:inline-block}
 @media (prefers-reduced-motion:reduce){html body.app .tw-in{animation:none!important}}
+/* ---------- Phone home, like the Figma "Phone Home" frame ---------- */
+/* Desktop never hides a template; the "Explore all" button is phone-only. */
+html body #showcase .show-more{display:none}
+@media (max-width:600px){
+  /* Figma's order: hero, the editor demo, what it does, how it works, templates, then the rest. */
+  html body #auth .landing{display:flex;flex-direction:column}
+  html body #auth .landing>*{min-width:0;max-width:100%}
+  html body #showcase .show-tabs{overflow-x:auto;scrollbar-width:none}
+  html body #auth .landing>#top{order:1}
+  html body #auth .landing>.product{order:2}
+  html body #auth .landing>.marquee{order:3}
+  html body #auth .landing>.proof{order:4}
+  html body #auth .landing>#features{order:5}
+  html body #auth .landing>#how{order:6}
+  html body #auth .landing>#showcase{order:7}
+  html body #auth .landing>#website-check{order:8}
+  html body #auth .landing>.compare{order:9}
+  html body #auth .landing>#pricing{order:10}
+  html body #auth .landing>.foot{order:11}
+  /* Three templates as compact rows (picture left, name and line right), then "Explore all". */
+  html body #showcase:not(.show-all) #landing-templates>[data-more]{display:none!important}
+  html body #showcase #landing-templates{display:flex!important;flex-direction:column;gap:10px!important}
+  html body #showcase #landing-templates>.tpl{display:grid!important;grid-template-columns:112px minmax(0,1fr);min-width:0;max-width:100%;align-items:center;gap:14px;padding:8px!important;border-radius:14px!important;text-align:left}
+  html body #showcase #landing-templates>.tpl .tpl-shot{height:88px!important;min-height:0!important;aspect-ratio:auto!important;border-radius:10px!important;overflow:hidden;padding:8px 0 0 8px!important}
+  html body #showcase #landing-templates>.tpl .tpl-shot .tpl-window{transform:none;width:200%!important;border-radius:6px 0 0 0!important}
+  html body #showcase #landing-templates>.tpl .tpl-body{min-width:0;padding:0!important;gap:2px!important}
+  html body #showcase #landing-templates>.tpl .tpl-body .cat{display:none!important}
+  html body #showcase #landing-templates>.tpl .tpl-body strong{font-size:15px!important}
+  html body #showcase #landing-templates>.tpl .tpl-body .desc{font-size:12.5px!important;line-height:1.45!important;-webkit-line-clamp:2!important;display:-webkit-box!important;-webkit-box-orient:vertical;overflow:hidden}
+  html body #showcase #landing-templates>.tpl .tpl-use{font-size:12px!important;color:var(--c-accent,#7552E8)!important;margin-top:4px}
+  html body #showcase .show-more{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:44px;margin-top:12px;border:1px solid var(--c-line,#E6E4DF);border-radius:12px;background:#fff;font:500 14px Inter,system-ui,sans-serif;color:var(--c-ink,#1B1D22);cursor:pointer}
+  html body #showcase .show-more[hidden]{display:none}
+}
