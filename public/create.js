@@ -1277,14 +1277,13 @@ function renderIdeas(m){
  const left=can?(verdictParts(m.text)||{todo:[]}).todo:[];
  const chips=[];
  if(left.length)chips.push({label:'Fix what is not done yet',ask:'Fix what is not done yet: '+left.join('; ')});
- for(const idea of can&&Array.isArray(m.ideas)?m.ideas:[])chips.push({label:idea,ask:/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1)});
+ for(const idea of can&&Array.isArray(m.ideas)?m.ideas:[])chips.push({label:idea,ask:/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write|map|design|draft|plan|outline|list|sketch|define|test|verify|check|review|compare|set|track|send|fix|move|rename|remove|hide|split|link|import|export)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1)});
  const ideas=chips.slice(0,3);
  box.classList.toggle('hidden',!ideas.length);
- // Like Emergent: rows with a +; a click puts the step in the message box to send or change.
+ // Like Lovable: small pills above the message box; a click puts the step in the box to send or change.
  for(const {label:idea,ask} of ideas){
-  const b=el('button','idea-chip idea-row');b.type='button';b.title='Add to your message';
-  const plus=el('span','idea-plus');plus.setAttribute('aria-hidden','true');plus.innerHTML='<svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>';
-  b.append(plus,el('span','idea-text',idea));
+  const b=el('button','idea-chip');b.type='button';b.title=idea;
+  b.append(el('span','idea-text',idea));
   b.onclick=()=>{const t=$('chat-input');t.value=ask;t.dispatchEvent(new Event('input',{bubbles:true}));box.classList.add('hidden');t.focus();t.setSelectionRange(t.value.length,t.value.length)};
   box.append(b);
  }
@@ -1379,7 +1378,7 @@ function messageItem(m,last,index){
   if(last&&index==null&&Array.isArray(m.ideas)&&m.ideas.length){
    const q=el('div','idea-list');
    for(const idea of m.ideas){
-    const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
+    const ask=/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write|map|design|draft|plan|outline|list|sketch|define|test|verify|check|review|compare|set|track|send|fix|move|rename|remove|hide|split|link|import|export)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1);
     const b=el('button','q-opt idea',idea);b.type='button';b.title='Build this: '+ask;
     b.onclick=()=>{q.querySelectorAll('button').forEach(x=>{x.disabled=true});send(ask,'build')};
     q.append(b);
@@ -1724,6 +1723,10 @@ function openManage(tab){
 }
 for(const b of document.querySelectorAll('#manage [data-mg]'))b.onclick=()=>{mgUi.tab=b.dataset.mg;renderManage()};
 $('composer-connect').onclick=()=>openManage('connectors');
+$('plus-connectors').onclick=()=>{$('menu-plus').open=false;openManage('connectors')};
+// The + menu's search box filters its rows; it clears and takes focus each time the menu opens.
+$('plus-search').oninput=()=>{const t=$('plus-search').value.trim().toLowerCase();for(const r of document.querySelectorAll('#menu-plus .plus-panel>:is(button,a):not([hidden])'))r.classList.toggle('hidden',Boolean(t)&&!(r.textContent+' '+(r.title||'')).toLowerCase().includes(t))};
+$('menu-plus').addEventListener('toggle',()=>{if(!$('menu-plus').open)return;$('plus-search').value='';$('plus-search').oninput();setTimeout(()=>$('plus-search').focus(),0)});
 // The Connectors button in the message box shows one service after another, like Emergent's.
 (function(){
  const box=document.querySelector('#composer-connect .cn-spin-ico');if(!box)return;
