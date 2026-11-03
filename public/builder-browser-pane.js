@@ -46,9 +46,27 @@
 
  // The server's browser takes the pane's size, so pages lay out for it (like a real browser).
  const view=$("web-browser-viewport");let sentSize="",sizeTimer=null;
- function sendSize(){clearTimeout(sizeTimer);sizeTimer=setTimeout(()=>{const w=Math.round(view.clientWidth),h=Math.round(view.clientHeight);if(w<320||h<300)return;const k=w+"x"+h;if(k===sentSize)return;sentSize=k;send({type:"size",width:w,height:h})},250)}
+ function sendSize(){clearTimeout(sizeTimer);sizeTimer=setTimeout(()=>{const w=Math.round(view.clientWidth),h=Math.round(view.clientHeight);if(w<320||h<300)return;const k=w+"x"+h;if(k===sentSize)return;sentSize=k;const t=lastUserAt;send({type:"size",width:w,height:h}).finally(()=>{lastUserAt=t})},250)}
  if(window.ResizeObserver)new ResizeObserver(()=>{if(!pane.classList.contains("hidden"))sendSize()}).observe(view);
- function open(){pane.classList.remove("hidden");editor.classList.add("kq-browser-open");notify(true);connect();sendSize()}
+ // When Kairoq is done reading and you are not using the browser, it folds away so the preview
+ // gets the room back; a small tab on the preview brings it back.
+ let reopen=null,foldTimer=null,foldedKey="",lastUserAt=0;
+ function chip(){
+  if(reopen)return reopen;
+  reopen=document.createElement("button");reopen.type="button";reopen.className="kb-reopen hidden";
+  reopen.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg><span></span>';
+  reopen.onclick=()=>{byHand=true;open()};
+  (document.getElementById("canvas")||editor).append(reopen);
+  return reopen;
+ }
+ function fold(){
+  clearTimeout(foldTimer);
+  if(byHand||Date.now()-lastUserAt<15000||(live&&live.driver==="you"))return;
+  close();
+  const c=chip(),host=String((live&&live.url)||current?.url||"").replace(/^https?:\/\/(www\.)?/,"").split("/")[0];
+  c.querySelector("span").textContent="Browser"+(host?" · "+host:"");c.classList.remove("hidden");
+ }
+ function open(){clearTimeout(foldTimer);reopen?.classList.add("hidden");pane.classList.remove("hidden");editor.classList.add("kq-browser-open");notify(true);connect();sendSize()}
  function close(){pane.classList.add("hidden");editor.classList.remove("kq-browser-open","kq-browser-stacked");notify(false);disconnect()}
 
  // Kairoq's research reports here (job.browser): the pane opens and one quiet line says what
@@ -60,7 +78,11 @@
   const last=String(list[list.length-1]||"").replace(/^Step \d+ · /,"");
   const done=!last||/^Done\b/.test(last);
   current={...current,...data,url:href||current?.url||"",busy:!done};
+  // The same finished research keeps arriving with each job update: once folded, it stays folded.
+  const key=list.join("|");
+  if(done&&key&&key===foldedKey&&pane.classList.contains("hidden"))return;
   open();
+  if(done&&key&&key!==foldedKey){foldedKey=key;clearTimeout(foldTimer);foldTimer=setTimeout(fold,3500)}
   document.getElementById("phone-panes")?.querySelector('[data-pane="browser"]')?.classList.add("live");
   if(href&&(!live||!live.url))setPage(href,data.title);
   if(image&&Date.now()-lastFrameAt>3000)setFrame(image);
@@ -68,10 +90,11 @@
   if(data.error)setError(data.error);
  }
  function steps(){}  // the step log is gone; kept so older callers don't break
- function reset(){current=null;live=null;shot.removeAttribute("src");shot.classList.add("hidden");empty.classList.remove("hidden");setPage("","New tab");setDriving("");close()}
+ function reset(){clearTimeout(foldTimer);foldedKey="";reopen?.classList.add("hidden");current=null;live=null;shot.removeAttribute("src");shot.classList.add("hidden");empty.classList.remove("hidden");setPage("","New tab");setDriving("");close()}
 
  // The owner's own browsing.
  async function send(ev){
+  lastUserAt=Date.now();clearTimeout(foldTimer);
   try{
    const r=await fetch("/api/create/live-browser",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(ev)});
    const j=await r.json().catch(()=>({}));

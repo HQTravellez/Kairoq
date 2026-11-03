@@ -1,0 +1,223 @@
+/* Kairoq in Ka's Figma design (the "Forma" frames): dark sidebar and top band, purple actions,
+   lilac message bubbles, warm off-white panels, Inter with IBM Plex Mono for small labels.
+   Loaded last; every rule starts with "html body.app" so it wins over the older stylesheets
+   without touching them. Greys are a touch darker than the Figma file so small text passes
+   contrast (4.5:1), and nothing is smaller than 12px. One motion style for the whole app. */
+
+html body.app{
+  --c-bg:#F7F6F2;--c-panel:#FFFFFF;--c-raise:#F4F4F2;--c-ink:#1C1B1F;--c-ink-2:#3C3A42;--c-ink-3:#625F68;
+  --c-line:#E6E4DF;--c-line-2:#DEDBD5;--c-hover:rgba(117,82,232,.06);
+  --c-accent:#7552E8;--c-accent-2:#5B3DCC;--c-glow:0 1px 1px rgba(0,0,0,.08),0 8px 20px -8px rgba(117,82,232,.55);
+  --c-photo:none;--c-sky:none;--c-dots:none;
+  --f-chrome:#242329;--f-chrome-2:#2E2D33;--f-chrome-line:#3C3A42;--f-chrome-ink:#C9C7CE;--f-chrome-mut:#9A97A1;
+  --f-lilac:#ECE8F3;--f-lilac-2:#D8CEF3;--f-lilac-3:#BCAAFF;--f-peach:#F0D3BE;--f-sage:#DFE9E0;--f-green:#328368;--f-green-bg:#E8F3ED;
+  --f-mut2:#716F77;
+  --f-ease:cubic-bezier(.3,1.25,.5,1);--f-ease-out:cubic-bezier(.2,.8,.2,1);--f-fast:.18s;--f-mid:.32s;--f-slow:.5s;
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif!important;
+  background:var(--c-bg)!important;color:var(--c-ink);
+}
+html body.app :where(button,input,textarea,select,h1,h2,h3,h4,p,span,a,li,label,summary,strong,b){font-family:inherit}
+html body.app :where(.mono,.eyebrow,.side-label,.kind-hint,.home-date){font-family:"IBM Plex Mono",ui-monospace,monospace}
+html body.app :where(code,pre,kbd){font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+/* One motion style */
+html body.app :where(button,a,.card,.seg-thumb,.q-opt,.source,.kb-icon){transition-timing-function:var(--f-ease-out)}
+html body.app .seg.sliding .seg-thumb{transition:transform var(--f-mid) var(--f-ease),width var(--f-mid) var(--f-ease)!important}
+
+/* ---------- Sidebar: dark, like the Figma workspace navigation ---------- */
+html body.app #side{background:var(--f-chrome)!important;border-right:0!important;color:var(--f-chrome-ink)}
+html body.app #side .side-brand{color:#fff!important}
+html body.app #side .side-brand .mark{background:linear-gradient(135deg,var(--f-lilac-3),var(--c-accent))!important;box-shadow:none!important}
+html body.app #side .ws{border:1px solid var(--f-chrome-line)!important;background:transparent!important;border-radius:9px!important;color:#fff!important}
+html body.app #side .ws .avatar{background:var(--f-lilac-2)!important;color:#3C2A86!important}
+html body.app #side .ws .ws-name{color:#fff!important}
+html body.app #side .side-nav button{color:var(--f-chrome-ink)!important;background:transparent!important}
+html body.app #side .side-nav button:hover{background:var(--f-chrome-2)!important;color:#fff!important}
+html body.app #side .side-nav button .ico{color:currentColor!important}
+html body.app #side .side-nav button[aria-current]:not([aria-current=false]){background:var(--f-chrome-line)!important;color:#fff!important}
+html body.app #side .side-nav button[aria-current]:not([aria-current=false]) .ico{color:var(--f-lilac-3)!important}
+html body.app #side .side-label{color:var(--f-chrome-mut)!important;font-size:12px!important;letter-spacing:.12em!important;text-transform:uppercase}
+html body.app #side .recents li>button:first-child{color:var(--f-chrome-ink)!important}
+html body.app #side .recents li:hover,html body.app #side .recents li.active{background:var(--f-chrome-2)!important}
+html body.app #side .recents li.active>button:first-child{color:#fff!important}
+html body.app #side .side-card{background:var(--f-chrome-2)!important}
+html body.app #side .side-card .credits{color:#fff!important}
+html body.app #side .side-card .ghost{background:transparent!important;color:var(--f-chrome-ink)!important;border-color:var(--f-chrome-line)!important}
+html body.app #side .side-user,html body.app #side .side-user .who{color:var(--f-chrome-ink)!important;border-color:var(--f-chrome-line)!important}
+
+/* ---------- Buttons ---------- */
+html body.app button.primary,html body.app .primary{background:var(--c-accent)!important;color:#fff!important;border-color:transparent!important}
+html body.app button.primary:hover,html body.app .primary:hover{background:var(--c-accent-2)!important}
+html body.app :focus-visible{outline:2px solid var(--c-accent)!important;outline-offset:2px}
+
+/* ---------- Home ---------- */
+html body.app #home,html body.app #home .home{background:var(--c-bg)!important;background-image:none!important}
+html body.app #home .home-hero{max-width:880px!important;align-items:stretch!important;padding-top:44px!important;text-align:left!important}
+html body.app #home .home-date{margin:0 0 8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--c-accent)}
+html body.app #home .home-hero h1,html body.app #home #home-title{color:var(--c-ink)!important;text-shadow:none!important;font-size:40px!important;font-weight:500!important;letter-spacing:-.02em!important;text-align:left!important}
+html body.app #home .home-sub{color:var(--c-ink-3)!important;text-shadow:none!important;text-align:left!important;font-size:15px!important;margin-bottom:22px!important}
+
+/* The moving prompt box: drifting colour clouds, a glowing border that circles it, sparkles */
+html body.app #home .wow{position:relative;border-radius:20px;padding:32px;overflow:hidden;background:#F1EEF8;isolation:isolate}
+html body.app #home .wow-blob{position:absolute;z-index:-1;border-radius:50%;filter:blur(48px);opacity:.75;pointer-events:none}
+html body.app #home .wow-blob.b1{width:420px;height:300px;background:var(--f-lilac-2);left:-60px;top:-90px;animation:fm-drift1 14s ease-in-out infinite}
+html body.app #home .wow-blob.b2{width:380px;height:280px;background:var(--f-peach);right:-40px;bottom:-130px;animation:fm-drift2 16s ease-in-out infinite}
+html body.app #home .wow-blob.b3{width:300px;height:220px;background:var(--f-lilac-3);left:45%;top:5%;opacity:.4;animation:fm-drift1 18s ease-in-out infinite reverse}
+html body.app #home .wow-spark{position:absolute;z-index:-1;width:4px;height:4px;border-radius:2px;background:#fff;box-shadow:0 0 8px 2px var(--f-lilac-3);animation:fm-twinkle 2.4s ease-in-out infinite;pointer-events:none}
+html body.app #home .wow-ring{position:relative;border-radius:16px;padding:1.5px;overflow:hidden;box-shadow:0 18px 50px -20px rgba(117,82,232,.55)}
+html body.app #home .wow-ring::before{content:"";position:absolute;inset:-180%;background:conic-gradient(from 0deg,var(--f-lilac-3),var(--c-accent),var(--f-peach),var(--f-lilac-3) 40%,var(--f-lilac) 60%,var(--c-accent) 80%,var(--f-lilac-3));animation:fm-spin 7s linear infinite}
+html body.app #home .wow-ring #new-form.prompt-box{position:relative;margin:0!important;max-width:none!important;background:#fff!important;border:0!important;border-radius:14.5px!important;box-shadow:none!important;padding:16px 18px 12px!important}
+html body.app #home #new-prompt{font-size:18px!important;line-height:1.5!important;color:var(--c-ink)!important;min-height:60px;letter-spacing:-.01em;background:transparent!important}
+html body.app #home #new-prompt::placeholder{color:var(--c-ink-3)!important;opacity:1}
+html body.app #home .kind-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+html body.app #home .kind-hint{font-size:12px;color:var(--f-mut2)}
+html body.app #home #new-kind.kind-seg{margin:0!important;background:#F4F2FA!important;border:1px solid #EBE7F6!important;border-radius:10px!important;padding:3px!important;gap:0!important;backdrop-filter:none!important;box-shadow:none!important}
+html body.app #home #new-kind button{height:32px!important;padding:0 14px!important;border-radius:8px!important;font-size:13px!important;font-weight:500!important;color:var(--c-ink-2)!important;background:transparent!important;display:inline-flex;align-items:center;gap:7px;position:relative;z-index:1;transition:color var(--f-fast) var(--f-ease-out)}
+html body.app #home #new-kind button[aria-pressed=true]{color:#fff!important}
+html body.app #home #new-kind .seg-thumb{background:var(--f-chrome)!important;border-radius:8px!important;box-shadow:0 4px 12px -6px rgba(36,35,41,.6)!important;top:3px!important;bottom:3px!important;height:auto!important}
+html body.app #home #new-kind svg.cute{width:20px;height:20px;transition:transform var(--f-mid) var(--f-ease)}
+html body.app #home #new-kind button[aria-pressed=true] svg.cute{transform:scale(1.12) rotate(-6deg)}
+html body.app #home #new-kind button:hover svg.cute{transform:scale(1.08)}
+html body.app #home .prompt-bar{border-top:0!important;padding-top:6px!important}
+html body.app #home .prompt-note{color:var(--f-mut2)!important;font-size:12px!important}
+html body.app #home #new-submit.primary{position:relative;overflow:hidden;height:40px!important;padding:0 18px!important;border-radius:9px!important;font-size:14px!important;box-shadow:var(--c-glow)!important}
+html body.app #home #new-submit.primary::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:fm-shine 3.2s ease-in-out infinite}
+html body.app #home .examples{margin-top:14px!important;justify-content:flex-start!important;position:relative}
+html body.app #home .examples .example{border:1px solid var(--c-line-2)!important;background:rgba(255,255,255,.85)!important;color:var(--c-ink-2)!important;border-radius:999px!important;font-size:12px!important;padding:6px 12px!important;opacity:0;animation:fm-rise var(--f-slow) var(--f-ease-out) forwards}
+html body.app #home .examples .example:nth-child(2){animation-delay:.08s}
+html body.app #home .examples .example:nth-child(3){animation-delay:.16s}
+html body.app #home .examples .example:nth-child(4){animation-delay:.24s}
+
+/* Project cards: the app's real picture in a soft colour frame (set per project in create.js) */
+html body.app #home .browser-tabs [aria-selected=true]{color:var(--c-ink)!important}
+html body.app #home .projects.cards>li{background:#fff!important;border:1px solid var(--c-line)!important;border-radius:10px!important;overflow:hidden;padding:0 0 12px!important;transition:transform var(--f-mid) var(--f-ease),box-shadow var(--f-mid) var(--f-ease-out)}
+html body.app #home .projects.cards>li:hover{transform:translateY(-3px);box-shadow:0 14px 30px -18px rgba(36,35,41,.35)}
+html body.app #home .projects.cards>li .thumb{border-radius:0!important;background:var(--frame,var(--f-lilac))!important;background-image:none!important;padding:14px 18px 0!important;box-sizing:border-box;aspect-ratio:16/10;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;color:var(--c-ink-3)!important}
+html body.app #home .projects.cards>li .thumb .thumb-img{position:static!important;width:100%!important;height:100%!important;object-fit:cover;object-position:top;border-radius:6px 6px 0 0!important;box-shadow:0 6px 16px -10px rgba(36,35,41,.45)}
+html body.app #home .projects.cards>li .open,html body.app #home .projects.cards>li .meta{padding-left:14px!important;padding-right:14px!important}
+html body.app #home .projects.cards>li .meta{color:var(--f-mut2)!important;font-size:12px!important}
+html body.app #home .projects.cards>li .badge.live{background:var(--f-green-bg)!important;color:var(--f-green)!important;border:0!important}
+
+/* ---------- Editor: dark top band, lilac bubbles ---------- */
+html body.app.in-editor #editor .chat-head,html body.app.in-editor #editor .stage-bar{background:var(--f-chrome)!important;border-bottom:1px solid var(--f-chrome)!important;color:#fff}
+html body.app.in-editor #editor .chat-head #project-name{color:#fff!important;background:transparent!important}
+html body.app.in-editor #editor .chat-head #project-name:hover,html body.app.in-editor #editor .chat-head #project-name:focus{background:var(--f-chrome-2)!important;border-color:var(--f-chrome-line)!important}
+html body.app.in-editor #editor .chat-head .icon-btn,html body.app.in-editor #editor .stage-bar .icon-btn,html body.app.in-editor #editor .stage-bar .ghost{color:var(--f-chrome-ink)!important;background:transparent!important;border-color:transparent!important}
+html body.app.in-editor #editor .chat-head .icon-btn:hover,html body.app.in-editor #editor .stage-bar .icon-btn:hover,html body.app.in-editor #editor .stage-bar .ghost:hover{background:var(--f-chrome-2)!important;color:#fff!important}
+html body.app.in-editor #editor .stage-bar .seg{background:var(--f-chrome-2)!important;border-color:var(--f-chrome-line)!important}
+html body.app.in-editor #editor .stage-bar .seg button{color:var(--f-chrome-ink)!important;background:transparent!important}
+html body.app.in-editor #editor .stage-bar .seg button[aria-pressed=true]{color:#fff!important}
+html body.app.in-editor #editor .stage-bar .seg .seg-thumb{background:var(--f-chrome-line)!important;box-shadow:none!important}
+html body.app.in-editor #editor .stage-bar #versions{color:var(--f-chrome-ink)!important;border-color:var(--f-chrome-line)!important;background-color:transparent!important}
+html body.app.in-editor #editor #share-open{color:#fff!important;border-color:var(--f-chrome-line)!important;background:transparent!important}
+html body.app.in-editor #editor #publish-open{background:var(--c-accent)!important;color:#fff!important;box-shadow:var(--c-glow)!important}
+html body.app.in-editor #editor .chat{background:var(--c-bg)!important;border-right:1px solid var(--c-line)!important}
+html body.app.in-editor #editor .stage,html body.app.in-editor #editor .canvas{background:#EDECE8!important}
+html body.app.in-editor #editor #messages>li.user{background:var(--f-lilac)!important;border-color:transparent!important;border-radius:12px!important;color:var(--c-ink)!important}
+html body.app.in-editor #editor #messages .muted,html body.app.in-editor #editor #messages .small{color:var(--f-mut2)}
+html body.app.in-editor #editor #chat-form.composer{border-color:#D8D4E6!important;border-radius:12px!important}
+html body.app.in-editor #editor #chat-form.composer:focus-within{border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(117,82,232,.14)!important}
+html body.app.in-editor #editor #chat-form #send{background:var(--c-accent)!important;border-radius:8px!important;box-shadow:var(--c-glow)!important}
+/* While Kairoq works, the message box gets the same circling glow as the Home box */
+html body.app.in-editor #editor:has(#progress:not(.hidden)) #chat-form.composer{border-color:transparent!important;background:linear-gradient(#fff,#fff) padding-box,conic-gradient(from var(--fm-a,0deg),var(--f-lilac-3),var(--c-accent),var(--f-peach),var(--f-lilac-3)) border-box!important;animation:fm-angle 4s linear infinite}
+@property --fm-a{syntax:"<angle>";initial-value:0deg;inherits:false}
+html body.app.in-editor #editor .q-opt.on,html body.app.in-editor #editor .q-opt[aria-pressed=true]{border-color:var(--c-accent)!important;background:var(--f-lilac)!important;color:#3C2A86!important}
+html body.app.in-editor #editor #progress .dot{background:var(--c-accent)!important}
+
+/* Preview waiting: the app being put together, until the first version appears */
+html body.app .pw{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;background:#EDECE8;pointer-events:none}
+html body.app .pw-win{position:relative;width:min(560px,86%);aspect-ratio:16/10.5;background:#fff;border:1px solid var(--c-line);border-radius:12px;box-shadow:0 30px 60px -30px rgba(36,35,41,.35);overflow:hidden;padding:0 0 18px}
+html body.app .pw-top{height:28px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid var(--c-line);background:#FAF9F6}
+html body.app .pw-top i{width:8px;height:8px;border-radius:4px;background:#E3E1DC}
+html body.app .pw-top b{flex:1;height:12px;margin-left:10px;border-radius:6px;background:#F1F0EC}
+html body.app .pw-body{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding:16px 18px}
+html body.app .pw-b{position:relative;border-radius:8px;background:#F1EEF8;overflow:hidden;opacity:0;transform:translateY(8px) scale(.98);animation:fm-build 6s var(--f-ease) infinite}
+html body.app .pw-b::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:translateX(-100%);animation:fm-shimmer 1.6s ease-in-out infinite}
+html body.app .pw-b.nav{grid-column:span 6;height:14px;background:#F4F4F2;animation-delay:0s}
+html body.app .pw-b.hero{grid-column:span 4;height:64px;background:var(--f-lilac-2);animation-delay:.5s}
+html body.app .pw-b.pic{grid-column:span 2;height:64px;background:var(--f-peach);animation-delay:.9s}
+html body.app .pw-b.c1,html body.app .pw-b.c2,html body.app .pw-b.c3{grid-column:span 2;height:52px;background:var(--f-sage)}
+html body.app .pw-b.c1{animation-delay:1.3s}html body.app .pw-b.c2{animation-delay:1.5s}html body.app .pw-b.c3{animation-delay:1.7s}
+html body.app .pw-b.line{grid-column:span 4;height:10px;background:#F1F0EC;animation-delay:2.1s}
+html body.app .pw-b.btn{grid-column:span 2;height:10px;background:var(--c-accent);opacity:0;animation-delay:2.3s}
+html body.app .pw-cursor{position:absolute;width:16px;height:16px;left:30%;top:40%;animation:fm-cursor 6s var(--f-ease-out) infinite}
+html body.app .pw-cursor svg{width:16px;height:16px;fill:var(--c-accent);filter:drop-shadow(0 2px 4px rgba(117,82,232,.4))}
+html body.app .pw-text{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+html body.app .pw-title{margin:0;font-size:16px;font-weight:600;color:var(--c-ink)}
+html body.app .pw-sub{margin:0;font-size:13px;color:var(--c-ink-3);display:flex;align-items:center;gap:8px}
+html body.app .pw-sub .pw-spin{width:12px;height:12px;border-radius:6px;border:2px solid var(--f-lilac-2);border-top-color:var(--c-accent);animation:fm-spin .8s linear infinite}
+html body.app #plan-wait.pw .pw-sub .pw-spin{display:none}
+
+/* ---------- Browser pane (PR #363) in the same style ---------- */
+html body.app.in-editor #editor #web-browser-pane.kb .kb-tabs{background:var(--f-chrome)!important;border-bottom-color:var(--f-chrome)!important}
+html body.app.in-editor #editor #web-browser-pane.kb .kb-tab{background:var(--f-chrome-2)!important;color:#fff!important}
+html body.app.in-editor #editor #web-browser-pane.kb .kb-tabs .kb-icon{color:var(--f-chrome-ink)}
+html body.app.in-editor #editor #web-browser-pane.kb .kb-tabs .kb-icon:hover{background:var(--f-chrome-2);color:#fff}
+html body.app.in-editor #editor #web-browser-pane.kb .kb-driving{background:rgba(36,35,41,.92)}
+/* Folded: a slim tab on the stage brings the browser back */
+html body.app .kb-reopen{position:absolute;top:12px;right:12px;z-index:6;display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 10px;border:1px solid var(--c-line);border-radius:999px;background:#fff;color:var(--c-ink-2);font:500 12px Inter,sans-serif;box-shadow:0 8px 20px -12px rgba(36,35,41,.35);cursor:pointer;animation:fm-rise var(--f-mid) var(--f-ease-out)}
+html body.app .kb-reopen.hidden{display:none}
+html body.app .kb-reopen svg{width:14px;height:14px;fill:none;stroke:var(--c-accent);stroke-width:1.8}
+html body.app .kb-reopen:hover{border-color:var(--c-accent);color:var(--c-ink)}
+
+/* ---------- Readable small text everywhere ---------- */
+html body.app :where(.muted,.small,.hint,.meta,.caption){color:var(--c-ink-3)}
+html body.app :where(small,.small,.muted.small,.prompt-note,.kind-hint,.meta){font-size:max(12px,1em)}
+
+@keyframes fm-drift1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,30px)}}
+@keyframes fm-drift2{0%,100%{transform:translate(0,0)}50%{transform:translate(-70px,-20px)}}
+@keyframes fm-spin{to{transform:rotate(360deg)}}
+@keyframes fm-angle{to{--fm-a:360deg}}
+@keyframes fm-twinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:1;transform:scale(1)}}
+@keyframes fm-shine{0%,60%{left:-60%}100%{left:130%}}
+@keyframes fm-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes fm-build{0%{opacity:0;transform:translateY(8px) scale(.98)}12%,80%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes fm-shimmer{to{transform:translateX(100%)}}
+@keyframes fm-cursor{0%{left:22%;top:30%}25%{left:62%;top:34%}50%{left:30%;top:62%}75%{left:70%;top:66%}100%{left:22%;top:30%}}
+
+@media (max-width:900px){
+  html body.app #home .home-hero{padding-top:24px!important}
+  html body.app #home .home-hero h1,html body.app #home #home-title{font-size:30px!important}
+  html body.app #home .wow{padding:16px;border-radius:16px}
+  html body.app #home .kind-row{flex-direction:column;align-items:stretch}
+  html body.app #home #new-kind.kind-seg{display:flex}
+  html body.app #home #new-kind button{flex:1;justify-content:center;padding:0 6px!important}
+  html body.app #home .kind-hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  html body.app .wow-blob,html body.app .wow-spark,html body.app .wow-ring::before,html body.app #home #new-submit.primary::after,
+  html body.app .pw-b,html body.app .pw-b::after,html body.app .pw-cursor,html body.app .pw-sub .pw-spin,
+  html body.app.in-editor #editor:has(#progress:not(.hidden)) #chat-form.composer{animation:none!important}
+  html body.app .pw-b,html body.app #home .examples .example{opacity:1!important;transform:none!important;animation:none!important}
+}
+
+/* ---------- Fixes after the first look in a real browser ---------- */
+/* The selected tab: older rules paint it white; here the sliding thumb carries the colour. */
+html body.app #home #new-kind button[aria-pressed=true],
+html body.app.in-editor #editor .stage-bar .seg button[aria-pressed=true]{background:transparent!important;box-shadow:none!important;border-color:transparent!important}
+html body.app #home #new-kind .seg-thumb{opacity:1}
+/* Home lines up with the project grid, like the Figma dashboard */
+html body.app #home .home-hero{max-width:none!important;margin:0!important}
+html body.app #home .home-sub{margin-left:0!important;margin-right:0!important;max-width:640px!important}
+html body.app #home .kind-hint{font-family:inherit!important;letter-spacing:0}
+/* A project with no picture yet: its initials in a small white window, not a big label */
+html body.app #home .projects.cards>li .thumb:not(:has(.thumb-img)){align-items:flex-end;font-size:0!important}
+html body.app #home .projects.cards>li .thumb:not(:has(.thumb-img))::before{content:attr(data-initials);display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:6px 6px 0 0;background:rgba(255,255,255,.7);font-size:22px;font-weight:600;letter-spacing:.04em;color:rgba(28,27,31,.45)}
+/* Sidebar "New": part of the dark sidebar */
+html body.app #side #side-new{background:transparent!important;border:1px solid var(--f-chrome-line)!important;color:#fff!important;box-shadow:none!important}
+html body.app #side #side-new:hover{background:var(--f-chrome-2)!important}
+/* Editor chat column: the warm off-white of the Figma builder */
+html body.app.in-editor #editor .chat,html body.app.in-editor #editor .chat #messages{background:var(--c-bg)!important}
+html body.app.in-editor #editor .canvas{background:#EDECE8!important}
+html body.app #home .projects.cards>li .thumb{font-size:0!important}
+html body.app #side .side-nav button#side-new{background:transparent!important;border:1px solid var(--f-chrome-line)!important;color:#fff!important;box-shadow:none!important}
+html body.app #side .side-nav button#side-new:hover{background:var(--f-chrome-2)!important}
+html body.app.in-editor #editor .stage-bar .seg.icons button[aria-pressed=true]{background:var(--f-chrome-line)!important;color:#fff!important;box-shadow:none!important}
+html body.app #home .browser{margin-left:0!important;margin-right:0!important;max-width:none!important;padding-left:0!important;padding-right:0!important}
+html body.app #home .browser{padding-left:24px!important;padding-right:24px!important}
+html body.app #home #new-kind button{white-space:nowrap}
+@media (max-width:900px){
+  html body.app #home .browser{padding-left:16px!important;padding-right:16px!important}
+  html body.app #home #new-kind button{gap:5px;font-size:12.5px!important;padding:0 4px!important}
+  html body.app #home #new-kind svg.cute{width:17px;height:17px}
+}

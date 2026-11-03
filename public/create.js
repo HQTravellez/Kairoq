@@ -121,6 +121,8 @@ function renderSetup(setup){
  }));
 }
 function initials(name){const w=String(name||'').trim().split(/\s+/).filter(Boolean);return ((w[0]||'K')[0]+(w[1]?w[1][0]:'')).toUpperCase()}
+// Project cards: each app's picture sits in a soft colour frame, like the Figma dashboard.
+const FRAMES=['#DFE9E0','#D8CEF3','#F0D3BE','#DCE5EE','#E9E4C9','#EADCE6'];
 function renderProjects(projects){
  state.projects=projects;
  text($('project-count'),projects.length?projects.length+' project'+(projects.length===1?'':'s'):'');
@@ -129,6 +131,8 @@ function renderProjects(projects){
  for(const p of projects){
   const li=document.createElement('li'),thumb=el('div','thumb',initials(p.name)),open=document.createElement('button'),meta=document.createElement('span');
   thumb.setAttribute('aria-hidden','true');
+  thumb.dataset.initials=initials(p.name);
+  thumb.style.setProperty('--frame',FRAMES[[...String(p.id||p.name)].reduce((a,c)=>a+c.charCodeAt(0),0)%FRAMES.length]);
   // The app's own picture when there is one (project-thumbs.js); the initials stay underneath.
   if(p.thumb){const img=document.createElement('img');img.src=p.thumb;img.alt='';img.loading='lazy';img.decoding='async';img.className='thumb-img';img.onerror=()=>img.remove();thumb.append(img)}
   open.type='button';open.className='open';open.textContent=p.name;open.onclick=()=>openProject(p.id);
@@ -207,6 +211,7 @@ const home={kind:'site',typing:null};
 function setKind(kind){
  home.kind=KINDS[kind]?kind:'site';
  for(const b of document.querySelectorAll('#new-kind button'))b.setAttribute('aria-pressed',String(b.dataset.kind===home.kind));
+ text($('kind-hint'),{site:'A website people visit',app:'An app with sign-in and saved data',phone:'For iPhone and Android'}[home.kind]);
  const ex=$('examples');ex.replaceChildren();
  for(const t of KINDS[home.kind].examples){const b=el('button','example',t);b.type='button';b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)}
  typeExamples();
@@ -224,6 +229,7 @@ function typeExamples(){
  home.typing=setTimeout(tick,500);
 }
 for(const b of document.querySelectorAll('#new-kind button'))b.onclick=()=>setKind(b.dataset.kind);
+text($('home-date'),new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}));
 $('new-prompt').addEventListener('focus',()=>{clearTimeout(home.typing);$('new-prompt').placeholder=KINDS[home.kind].examples[0]});
 $('new-prompt').addEventListener('blur',typeExamples);
 // A new app from the home box: the editor opens straight away and any quick questions, then
@@ -330,7 +336,7 @@ async function askThenBuild(prompt){
  // The answers go with the request; the picked look becomes the project's colours and fonts; then
  // the plan (build-plan.js) is shown with Review, Skip and Approve, and the build starts on Approve.
  const request=answers=>answers.length?prompt+'\n\nDetails from the owner:\n'+answers.map(x=>'- '+x.q+' '+x.a.join(', ')).join('\n'):prompt;
- const go=(answers,plan)=>{mine.remove();card.remove();planWaiting(false);send(plan?withPlan(request(answers),plan):request(answers),'build')};
+ const go=(answers,plan)=>{mine.remove();card.remove();planWaiting(false);state.firstBuild=true;send(plan?withPlan(request(answers),plan):request(answers),'build')};
  const build=async(answers,look)=>{
   if(look)await api('/projects/'+project.id+'/look',{method:'POST',body:{look,prompt,three_d:look.three_d||'none'}}).catch(err=>console.warn('look',err.message));
   if(answers.length){mine.replaceWith(mine=messageItem({role:'user',text:request(answers)}))}
@@ -469,14 +475,33 @@ function withPlan(req,p){
   +((p.left_out||[]).length?'\nLeft out for now: '+p.left_out.join('; '):'')
   +(p.picked?'\nCharacter: the owner picked the ready-made 3D model "'+p.picked+'" (in this project\'s 3D files). Show it with Model3D and use its own animations; never draw the character from shapes or SVG.':'');
 }
-// While the plan waits, the preview says so instead of showing the bare starter.
+// While the plan waits, and while the first version is built, the preview shows the app being
+// put together (blocks appear, a cursor moves, a shimmer runs) instead of the bare starter.
+function previewWait(id,title,sub,spin){
+ let box=$(id);
+ if(!box){
+  box=el('div','pw');box.id=id;box.setAttribute('role','status');
+  const win=el('div','pw-win'),top=el('div','pw-top'),body=el('div','pw-body'),cur=el('span','pw-cursor');
+  top.append(el('i'),el('i'),el('i'),el('b'));
+  for(const k of ['nav','hero','pic','c1','c2','c3','line','btn'])body.append(el('span','pw-b '+k));
+  cur.innerHTML='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 1l11 6-5 1.5L6 14z"/></svg>';
+  win.append(top,body,cur);
+  const txt=el('div','pw-text'),t=el('p','pw-title'),s2=el('p','pw-sub');
+  txt.append(t,s2);box.append(win,txt);$('canvas').append(box);
+ }
+ const t=box.querySelector('.pw-title'),s2=box.querySelector('.pw-sub');
+ if(t.textContent!==title)t.textContent=title;
+ const line=s2.querySelector('.pw-line')||el('span','pw-line');
+ if(line.textContent!==sub)line.textContent=sub;
+ if(!s2.contains(line))s2.replaceChildren(...(spin?[el('span','pw-spin'),line]:[line]));
+}
 function planWaiting(on){
- let box=$('plan-wait');
- if(!on){box?.remove();return}
- if(box)return;
- box=el('div','plan-wait');box.id='plan-wait';box.setAttribute('role','status');
- box.append(el('p','plan-wait-title','Your app will appear here'),el('p','plan-wait-sub','Approve the plan to start building.'));
- $('canvas').append(box);
+ if(!on){$('plan-wait')?.remove();return}
+ previewWait('plan-wait','Your app will appear here','Approve the plan to start building.',false);
+}
+function buildWaiting(label){
+ if(!label){$('build-wait')?.remove();return}
+ previewWait('build-wait','Building your app',label,true);
 }
 // Run on your phone (react-native-app.js): Expo Snack gives a QR code the Expo Go app opens.
 $('run-phone').onclick=async()=>{
@@ -549,6 +574,7 @@ async function openProject(id,{pendingText,job}={}){
  const previousProject=state.project&&state.project.id;
  state.project=project;
  if(previousProject&&previousProject!==project.id)window.kairoqBrowserPane?.reset();
+ if(previousProject&&previousProject!==project.id){buildWaiting(null);state.firstBuild=false}
  if(account)renderCredits(account);
  show('editor');history.replaceState(null,'','/create?'+(EMBED?'embed=1&':'')+'project='+encodeURIComponent(id));
  if(window.parent!==window)window.parent.postMessage({kairoq:'project',id:project.id,name:project.name},location.origin);
@@ -1539,7 +1565,7 @@ function secs(ms){return typeof ms==='number'&&ms>=0?' in '+(ms<10000?(ms/1000).
 function renderBuildOverlay(j){
  const overlay=$('build-overlay');
  if(!overlay)return;
- if(!j||j.mode==='discuss'||j.status==='complete'||j.status==='failed'){overlay.classList.add('hidden');return}
+ if(!j||j.mode==='discuss'||j.status==='complete'||j.status==='failed'){overlay.classList.add('hidden');buildWaiting(null);state.firstBuild=false;return}
  const card=overlay.querySelector('.bo-card');
  const shown=j.preview&&j.preview.version;
  const files=work.files.length;
@@ -1550,6 +1576,8 @@ function renderBuildOverlay(j){
  if(line.textContent!==label)line.textContent=label;
  if(!card.contains(spin))card.replaceChildren(spin,line);
  overlay.classList.remove('first');overlay.classList.remove('hidden');
+ // First build: nothing to show yet, so the preview shows the app being put together.
+ if(state.firstBuild&&!shown)buildWaiting(label);else{buildWaiting(null);if(shown)state.firstBuild=false}
 }
 function liveStatus(j){
  const p=phaseOf(j);
