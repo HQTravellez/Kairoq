@@ -618,6 +618,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    const unchanged=Boolean(job.result&&job.result.unchanged)&&!problem;
    // An answer instead of a change (a question that reached the builder) is always free.
    if(job.result&&job.result.answered&&!job.refunded){job.refunded=true;if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: an answer, nothing was changed','refund:'+job.id)}catch{}}
+   // A build that never got past the starter page saved nothing, so it is always free.
+   if(job.result&&job.result.not_built&&!job.refunded){job.refunded=true;job.free='Nothing was built, so it was free.';if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: nothing was built','refund:'+job.id)}catch{}}
    if(mode!=='discuss'&&!job.refunded&&payWhenWorks()&&notWorking&&(payMode()==='refund'||unchanged)){
     // Refund mode (or a change that changed nothing): the change itself is free.
     job.free=problem==='checks'?'This change broke a saved check, so it was free.':problem==='errors'?'This change still shows errors in the browser, so it was free.':'Nothing changed, so it was free.';
