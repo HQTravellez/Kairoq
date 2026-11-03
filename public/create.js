@@ -12,11 +12,11 @@ async function api(path,{method='GET',body}={}){
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
- for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen','ideas-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
- const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
+ const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||screen==='ideas-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
@@ -24,11 +24,12 @@ function show(screen){
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api','side-ideas'])$(b).removeAttribute('aria-current');
  if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
  if(screen==='plugins-screen')$('side-plugins').setAttribute('aria-current','page');
  if(screen==='leads-screen')$('side-leads').setAttribute('aria-current','page');
  if(screen==='api-screen')$('side-api').setAttribute('aria-current','page');
+ if(screen==='ideas-screen')$('side-ideas').setAttribute('aria-current','page');
  if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -355,6 +356,68 @@ $('ac-form').onsubmit=async e=>{
   const {body:_b,headers:_h,fields:_f,...brief}=result;apiUi.history=[brief,...apiUi.history].slice(0,20);acPill();renderApi();
  }catch(err){text($('ac-error'),err.message)}
  finally{btn.disabled=false;text(btn,'Try it')}
+};
+// ---------- Idea board (a full page) ----------
+// Ideas for one project from project-ideas.js. Each card shows the facts it rests on; "Build this"
+// opens the project and sends the idea as a normal build.
+const ideasUi={projects:[],id:null,d:null,tab:'all'};
+const IMPACT_LABEL={high:'High impact',medium:'Medium',low:'Small'};
+function ideaPrice(){const t=(state.me?.tiers||[]).find(x=>x.id===(state.tier||'standard'))||(state.me?.tiers||[])[0];return state.me?.viewer?.kind==='customer'&&t?t.credits:0}
+function renderIdeasPage(){
+ const d=ideasUi.d,p=ideasUi.projects.find(x=>x.id===ideasUi.id);
+ text($('id-crumb'),p?p.name:'Pick a project');
+ const when=$('id-when');when.hidden=!(d&&d.at);if(d&&d.at)text(when,'Updated '+when_(d.at));
+ const cost=state.me?.viewer?.kind==='customer'?state.me.discuss_credits:0;
+ text($('id-refresh'),(d&&d.at?'Refresh ideas':'Get ideas')+(cost?' · '+cost+' credit'+(cost===1?'':'s'):''));
+ $('id-refresh').disabled=!p||p.role==='viewer';
+ const tabs=$('id-tabs'),list=$('id-list');tabs.replaceChildren();list.replaceChildren();
+ if(!p){list.append(el('p','tp-empty',ideasUi.projects.length?'Pick a project.':'Make a project first, then come back for ideas.'));return}
+ if(!d||!d.ideas.length){list.append(el('p','tp-empty',d&&d.at?'You have gone through every idea. Refresh for new ones.':'No ideas yet for this project. Press Get ideas.'));return}
+ const groups=Object.keys(d.groups).filter(g=>d.ideas.some(x=>x.group===g));
+ if(ideasUi.tab!=='all'&&!groups.includes(ideasUi.tab))ideasUi.tab='all';
+ for(const g of ['all',...groups]){const n=g==='all'?d.ideas.length:d.ideas.filter(x=>x.group===g).length;const b=el('button',null,g==='all'?'All ideas':d.groups[g]);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(ideasUi.tab===g));b.append(el('span','n',String(n)));b.onclick=()=>{ideasUi.tab=g;renderIdeasPage()};tabs.append(b)}
+ const price=ideaPrice();
+ for(const g of groups){
+  if(ideasUi.tab!=='all'&&ideasUi.tab!==g)continue;
+  const sec=el('section','id-group');sec.append(el('p','ac-label',d.groups[g]));
+  const ul=el('ul','tp-grid');
+  for(const x of d.ideas.filter(i=>i.group===g)){
+   const li=el('li','tp-card id-card'),top=el('div','tp-card-top');
+   top.append(el('span','tp-name',x.title),el('span','ld-fit'+(x.impact==='high'?' strong':''),IMPACT_LABEL[x.impact]||x.impact));
+   const why=el('details','id-why'),sm=el('summary',null,x.why);const ul2=el('ul');for(const f of x.facts)ul2.append(el('li',null,f));why.append(sm,ul2);
+   const foot=el('div','tp-card-foot ld-actions');
+   foot.append(el('span','small','1 build'+(price?' · '+price+' credits':'')),el('span','tp-grow'));
+   const no=el('button','link-btn','Not now');no.type='button';no.onclick=async()=>{no.disabled=true;try{ideasUi.d=await api('/projects/'+p.id+'/ideas',{method:'POST',body:{action:'dismiss',id:x.id}});renderIdeasPage()}catch(err){text($('id-error'),err.message);no.disabled=false}};
+   const go=el('button','primary','Build this');go.type='button';go.disabled=p.role==='viewer';
+   go.onclick=async()=>{go.disabled=true;try{await openProject(p.id);await send(x.title+': '+x.what,'build')}catch(err){text($('id-error'),err.message);go.disabled=false}};
+   foot.append(no,go);
+   li.append(top,el('p','tp-desc',x.what),why,foot);ul.append(li);
+  }
+  sec.append(ul);list.append(sec);
+ }
+}
+const when_=iso=>{const d=new Date(iso),h=(Date.now()-d)/3600000;return h<1?'just now':h<24&&d.getDate()===new Date().getDate()?'today, '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):d.toLocaleDateString([],{month:'short',day:'numeric'})};
+async function loadIdeas(){
+ ideasUi.d=null;renderIdeasPage();if(!ideasUi.id)return;
+ try{ideasUi.d=await api('/projects/'+ideasUi.id+'/ideas')}catch(err){text($('id-error'),err.message)}
+ renderIdeasPage();
+}
+async function openIdeas(){
+ show('ideas-screen');text($('id-error'),'');text($('id-status'),'');
+ try{
+  const {projects}=await api('/projects');ideasUi.projects=projects||[];
+  const sel=$('id-project');sel.replaceChildren();for(const p of ideasUi.projects)sel.append(new Option(p.name,p.id));
+  if(!ideasUi.projects.some(p=>p.id===ideasUi.id))ideasUi.id=(state.project&&ideasUi.projects.some(p=>p.id===state.project.id)?state.project.id:ideasUi.projects[0]?.id)||null;
+  sel.value=ideasUi.id||'';await loadIdeas();
+ }catch(err){text($('id-error'),err.message)}
+}
+$('side-ideas').onclick=openIdeas;
+$('id-project').onchange=e=>{ideasUi.id=e.target.value;ideasUi.tab='all';text($('id-error'),'');loadIdeas()};
+$('id-refresh').onclick=async()=>{
+ const b=$('id-refresh');b.disabled=true;text($('id-error'),'');text($('id-status'),'Looking at the app and its facts…');
+ try{ideasUi.d=await api('/projects/'+ideasUi.id+'/ideas',{method:'POST',body:{action:'refresh'}});ideasUi.tab='all';text($('id-status'),'');refreshCredits?.()}
+ catch(err){text($('id-status'),'');text($('id-error'),err.message)}
+ finally{renderIdeasPage()}
 };
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');

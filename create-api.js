@@ -62,7 +62,7 @@ function ownedProject(v,id,need='owner'){
  if(RANK[role]<RANK[need])throw Object.assign(Error(need==='owner'?'Only the project owner can do that':'You have view-only access to this project'),{status:403});
  return{meta,role};
 }
-const NEED={'POST:/rating':'editor','GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/figmaexport':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
+const NEED={'GET:/ideas':'viewer','POST:/ideas':'editor','POST:/rating':'editor','GET:':'viewer','GET:/database':'owner','POST:/database':'owner','DELETE:/database':'owner','POST:/look':'editor','POST:/plan':'editor','POST:/figmaexport':'editor','POST:/phone':'editor','GET:/stores':'owner','POST:/stores':'owner','GET:/storefile':'viewer','GET:/thumb':'viewer','PATCH:':'editor','DELETE:':'owner','GET:/data':'viewer','POST:/askdata':'editor','GET:/assistant':'viewer','POST:/assistant':'editor','DELETE:/assistant':'editor','GET:/records':'viewer','DELETE:/records':'editor','GET:/automations':'viewer','POST:/automations':'editor',
  'POST:/safari':'viewer','POST:/chat':'editor','GET:/assets':'viewer','POST:/assets':'editor','DELETE:/assets':'editor','GET:/asset':'viewer',
  'GET:/models':'viewer','POST:/models':'editor','DELETE:/models':'editor','GET:/model':'viewer',
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
@@ -1423,6 +1423,17 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
   if(action==='/poster'&&method==='GET'){
    const html=require('./launch-kit').poster(builder.loadMeta(id),{origin:publicOrigin(req)});
    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:"});res.end(html);return true;
+  }
+  // Idea board (project-ideas.js): what to build next, each idea backed by facts about this app.
+  if(action==='/ideas'&&method==='GET')return send(res,200,require('./project-ideas').view(builder.loadMeta(id))),true;
+  if(action==='/ideas'&&method==='POST'){
+   const b=await readJson(req,2000),I=require('./project-ideas');
+   if(b.action==='dismiss')return send(res,200,I.dismiss(id,b.id)),true;
+   limitedKey('ideas:'+id,6,3600000);
+   const price=intEnv('KAIROQ_DISCUSS_CREDITS',1),ref='ideas:'+id+':'+Date.now();
+   if(v.kind==='customer'&&price>0)accounts.charge(v.account.id,price,'Idea board','grow-'+ref);
+   try{return send(res,200,{...await I.refresh(id,{callModel}),credits:v.kind==='customer'?price:0}),true}
+   catch(e){if(v.kind==='customer'&&price>0)try{accounts.grant(v.account.id,price,'Refund: ideas failed','grow-refund-'+ref)}catch{}throw e}
   }
   if(action==='/grow'&&method==='POST'){
    const b=await readJson(req,40000),search=require('./site-search');
