@@ -21,7 +21,7 @@ test("the Home box holds the switch, with an icon on each choice", () => {
   const box = html.slice(html.indexOf('<div class="wow">'), html.indexOf('<div class="examples" id="examples">'));
   assert.match(box, /<div class="wow-ring">\s*<form id="new-form" class="prompt-box">/);
   assert.match(box, /id="new-kind"/, "the switch is inside the box");
-  assert.equal((box.match(/<svg class="cute"/g) || []).length, 3, "Web app, Phone app and Website each have an icon");
+  assert.equal((box.match(/<svg class="kind-ico"/g) || []).length, 3, "Web app, Phone app and Website each have a line icon");
   assert.match(box, /id="kind-hint"/);
   const js = read("create.js");
   assert.match(js, /text\(\$\('kind-hint'\),\{site:/);
@@ -62,4 +62,17 @@ test("Home and the editor follow the Figma frames: breadcrumb, project header, c
   assert.match(js, /el\('details','pj-menu'\)/, "Delete sits in the ··· menu");
   const css = read("ui/forma.css");
   assert.match(css, /\.tabs-seg \.lbl\{display:inline!important/);
+});
+
+test("the editor follows the App builder frame: light second rows, a browser window with the real address, the starter scene", () => {
+  const js = read("create.js");
+  assert.match(js, /function formaRows\(\)/);
+  assert.match(js, /c\.append\(el\('b',null,'Chat with Kairoq'\)\)/);
+  assert.match(js, /url=live\?String\(p\.urls\[0\]\):location\.host\+\(state\.previewBase\|\|p\.preview_url\|\|''\)/, "the address is the real one, not made up");
+  assert.match(js, /starterWaiting\(Boolean\(project\.starter\)&&!job&&!active_job\)/);
+  assert.match(js, /if\(url&&url!==state\.previewBase\)starterWaiting\(false\)/);
+  assert.match(fs.readFileSync(path.join(__dirname, "..", "create-api.js"), "utf8"), /starter=require\('\.\/react-design'\)\.isUntouchedStarter/);
+  const css = read("ui/forma.css");
+  assert.match(css, /#messages>li\.assistant::before\{content:"Kairoq"!important/);
+  assert.match(css, /\.fm-sub \.tabs-seg button\[aria-pressed=true\]\{color:var\(--c-accent\)!important\}/);
 });

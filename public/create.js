@@ -501,6 +501,41 @@ $('ag-form').onsubmit=async e=>{
 };
 $('pj-search').oninput=()=>state.projects&&renderProjects(state.projects);
 $('pj-sort').onchange=()=>state.projects&&renderProjects(state.projects);
+// ---------- The editor laid out like the Figma "App builder" frame ----------
+// Row 1 (dark): project name on the left, More, Share and Publish on the right.
+// Row 2 (light): "Chat with Kairoq" over the chat; Preview · Code · Data and the preview's own
+// tools over the stage. The preview sits in a browser window with its address, and
+// "Live preview · v7" under it. Built once from the existing controls, so every handler stays.
+function formaRows(){
+ const stage=document.querySelector('#editor .stage'),bar=stage?.querySelector('.stage-bar');
+ if(!bar||stage.querySelector('.fm-sub'))return refreshWindow();
+ const sub=el('div','fm-sub');
+ const tabs=bar.querySelector('.tabs-seg'),tools=$('preview-bar-tools'),vis=$('visual-toggle'),tests=$('kq-tests-tab');
+ if(tabs)sub.append(tabs);if(tests&&tabs&&!tabs.contains(tests))tabs.append(tests);
+ sub.append(el('span','fm-grow'));if(vis)sub.append(vis);if(tools)sub.append(tools);
+ bar.after(sub);
+ sub.addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
+ const chat=document.querySelector('#editor .chat'),head=chat?.querySelector('.chat-head');
+ if(head&&!chat.querySelector('.fm-chat-sub')){const c=el('div','fm-chat-sub');c.append(el('b',null,'Chat with Kairoq'));head.after(c)}
+ const dev=$('device');
+ if(dev&&!dev.querySelector('.fm-win')){
+  const win=el('div','fm-win'),re=el('button','fm-win-btn'),addr=el('span','fm-addr'),op=el('button','fm-win-btn');
+  re.type='button';re.setAttribute('aria-label','Reload the preview');re.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>';re.onclick=()=>$('refresh').click();
+  op.type='button';op.setAttribute('aria-label','Open in a new tab');op.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';op.onclick=()=>{const h=$('open').href;if(h)window.open(h,'_blank','noopener')};
+  addr.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="fm-addr-text"></span>';
+  win.append(re,addr,op);dev.prepend(win);
+  const foot=el('div','fm-foot');foot.append(el('span','fm-live'),el('span',null,''),el('span','fm-grow'),el('span','fm-size',''));foot.querySelector('span:nth-child(2)').id='fm-version';foot.querySelector('.fm-size').id='fm-size';dev.append(foot);
+ }
+ refreshWindow();
+}
+function refreshWindow(){
+ const p=state.project;if(!p||!$('fm-addr-text'))return;
+ // The real address of what is on screen: the live site once published, otherwise this preview.
+ const live=p.published&&p.urls&&p.urls[0],url=live?String(p.urls[0]):location.host+(state.previewBase||p.preview_url||'');
+ text($('fm-addr-text'),String(url).replace(/^https?:\/\//,''));
+ text($('fm-version'),'Live preview · v'+(p.current_version||1));
+ const d=$('device');text($('fm-size'),d&&d.classList.contains('mobile')?'Phone':'Desktop · Fit to view');
+}
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
@@ -592,7 +627,7 @@ function slideSegs(){
  for(const seg of document.querySelectorAll('#editor .seg,#home .kind-seg')){
   if(seg.querySelector('.seg-thumb'))continue;
   const thumb=document.createElement('span');thumb.className='seg-thumb';thumb.setAttribute('aria-hidden','true');seg.prepend(thumb);seg.classList.add('sliding');
-  const place=()=>{const on=seg.querySelector('button[aria-pressed="true"]');if(!on||!on.offsetWidth){thumb.style.opacity='0';return}thumb.style.opacity='1';thumb.style.width=on.offsetWidth+'px';thumb.style.transform='translateX('+(on.offsetLeft-thumb.offsetParent.clientLeft)+'px)'};
+  const place=()=>{const on=seg.querySelector('button[aria-pressed="true"]');if(!on||!on.offsetWidth){thumb.style.opacity='0';return}thumb.style.opacity='1';thumb.style.width=on.offsetWidth+'px';thumb.style.transform='translateX('+(on.offsetLeft-(thumb.offsetParent?thumb.offsetParent.clientLeft:0))+'px)'};
   new MutationObserver(place).observe(seg,{attributes:true,subtree:true,attributeFilter:['aria-pressed','class','hidden']});
   if(window.ResizeObserver)new ResizeObserver(place).observe(seg);
   requestAnimationFrame(place);
@@ -804,6 +839,12 @@ function planWaiting(on){
  if(!on){$('plan-wait')?.remove();return}
  previewWait('plan-wait','Your app will appear here','Approve the plan to start building.',false);
 }
+// A new project still shows Kairoq's starter page: the preview plays the "app being put
+// together" scene instead, until the first real version arrives.
+function starterWaiting(on){
+ if(!on){$('start-wait')?.remove();return}
+ previewWait('start-wait','Your app will appear here','Describe it in the chat. You will watch it come together here.',false);
+}
 function buildWaiting(label){
  if(!label){$('build-wait')?.remove();return}
  previewWait('build-wait','Building your app',label,true);
@@ -888,6 +929,8 @@ async function openProject(id,{pendingText,job}={}){
  if(!state.projects)api('/projects').then(r=>renderRecents(r.projects)).catch(()=>{});else markRecent(id);
  renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
+ starterWaiting(Boolean(project.starter)&&!job&&!active_job);
+ formaRows();
  renderVersions();
  device(Boolean(project.mobile&&project.mobile.enabled)||Boolean(project.native));
  $('run-phone').classList.toggle('hidden',!project.native);$('stores-open').classList.toggle('hidden',!project.native);
@@ -1138,12 +1181,13 @@ function renderVersions(){
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.broken?'⚠ did not load · ':'')+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
-function setPreview(url){if(!url)return;$('frame-next')?.remove();state.previewBase=url;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
+function setPreview(url){if(!url)return;setTimeout(()=>refreshWindow&&refreshWindow(),0);$('frame-next')?.remove();state.previewBase=url;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
 // A new version is loaded behind the one on screen and swapped in once it has drawn, so the
 // preview never flashes white, and it opens on the page the owner was looking at.
 function routeFor(url){const r=state.previewRoute||'';return r&&/\/v\/\d+\/$/.test(url)?url+r:url}
 function swapPreview(url){
  const old=$('frame');
+ if(url&&url!==state.previewBase)starterWaiting(false);
  if(!url||url===state.previewBase)return;
  if(!old||!old.getAttribute('src')||old.classList.contains('hidden')||!old.offsetWidth)return setPreview(url);
  $('frame-next')?.remove();
