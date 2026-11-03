@@ -510,12 +510,28 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   return{version:fresh.current_version,message,unchanged:true,changed:[],steps:steps.length,runtime_errors:[],...(researchOnly?{research:true}:{}),preview_url:builder.previewUrl(fresh)};
  }
  const unchanged=()=>Object.keys(work).length===Object.keys(base).length&&Object.keys(work).every(k=>base[k]===work[k]);
+ // A first build that never got past the starter page (only the design colours changed) is not a
+ // result: nothing is saved, nothing is charged, and the reply says what happened.
+ const starterStill=()=>!researchOnly&&require('./react-design').isUntouchedStarter(base)&&!Object.keys({...base,...work}).some(k=>k!=='src/index.css'&&base[k]!==work[k]);
+ let invalidTotal=0,writersFailed=false;
+ function notBuilt(){
+  checkpointStore.clear(id);
+  if(built)fs.rmSync(built.dir,{recursive:true,force:true});
+  const facts={steps:steps.length,unreadable:invalidTotal,writers_failed:writersFailed,files_written:Object.keys(work).filter(k=>base[k]!==work[k])};
+  const why=facts.unreadable?'my replies came back too large to read '+facts.unreadable+' time'+(facts.unreadable===1?'':'s')+(facts.writers_failed?', after the first all-at-once write also failed':''):facts.writers_failed?'the first all-at-once write failed and I ran out of steps before writing it piece by piece':'I ran out of steps before writing it';
+  const message="I didn't get to build this. The page is still the starter: "+why+'. Nothing was saved and you were not charged.';
+  builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',failed:true,retry:text,not_built:facts,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}],{startedAt});
+  const fresh=builder.loadMeta(id);
+  executionLedger.complete(id,text,{verified:false,version:fresh.current_version,message});
+  return{version:fresh.current_version,message,unchanged:true,not_built:facts,changed:[],steps:steps.length,runtime_errors:[],preview_url:builder.previewUrl(fresh)};
+ }
 
  // A first build is written by parallel writers (parallel-writers.js): one plan, one writer per
  // section at the same time. The agent then builds, tests and fixes as usual.
  if(!researchOnly&&!checkpoint&&require('./parallel-writers').enabled()&&require('./react-design').isUntouchedStarter(work)){
   report({status:'writing',step:0});
   const pw=await require('./parallel-writers').write({system:messages[0].content,intro:introMsg.content,callModel,tier,signal,onNote:t=>tl.add({t:'note',icon:'code',text:t})});
+  if(!pw){writersFailed=true;tl.add({t:'note',icon:'code',text:'The first version could not be written all at once; writing it step by step'});messages.push({role:'user',content:'The all-at-once first write did not work. Write the app yourself now, 2 or 3 files per step (App.jsx and the main page first), then build_and_test.'})}
   if(pw){
    const r=await tool({tool:'write_files',files:pw.files});
    messages.push({role:'assistant',content:JSON.stringify({thought:'Kairoq wrote the first version in parallel from one plan.',actions:[{tool:'write_files',files:Object.fromEntries(Object.keys(pw.files).map(n=>[n,'(written)']))}]})},
@@ -533,10 +549,10 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   const reply=await callModel({messages,temperature:0.2,maxOutputTokens:32000,signal,tier,onToken:()=>{},onReasoning:(_d,all)=>{reasoning=all;if(onThinking)onThinking(all)}},parseStepSafe);
   if(!reply.invalid)tl.add({t:'think',ms:Date.now()-asked,title:reply.thought,text:reasoning});
   if(reply.invalid){
-   invalidReplies++;
+   invalidReplies++;invalidTotal++;
    steps.push({n:step,thought:'',actions:['Reply was not valid JSON'],summary:'Reply was not valid JSON'});
    if(invalidReplies>=3)break;
-   messages.push({role:'assistant',content:reply.raw||'(empty)'},{role:'user',content:'Your reply could not be used ('+reply.invalid+'). Reply with ONLY a JSON object: {"thought":"...","actions":[{"tool":"...", ...}]}. Use the finish tool when the task is done.'});
+   messages.push({role:'assistant',content:reply.raw||'(empty)'},{role:'user',content:'Your reply could not be used ('+reply.invalid+'). '+(invalidTotal>=1?'Keep replies small: write at most 2 files per step, and split a long file into a short first version you extend with edit_files. ':'')+'Reply with ONLY a JSON object: {"thought":"...","actions":[{"tool":"...", ...}]}. Use the finish tool when the task is done.'});
    continue;
   }
   invalidReplies=0;
@@ -561,6 +577,7 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
      message=require('./browser-chat-routing').capabilityAnswer({browser:false,search:false});
     if(researchOnly&&webAttempted&&!webObserved&&/\bworked|success|verified|confirmed\b/i.test(message))
      message='The browser/search attempt did not produce verified page evidence. '+message;
+    if(starterStill()){finishWarned=true;results.push('finish: the app you were asked for has not been written yet (src/App.jsx is still the starter page). Write it now with write_files, then build_and_test.');continue}
     if(unchanged()){finished=noChange(message);break}
     if(dirty||!built){const r=await buildAndTest({});results.push(r.text);if(r.image)image=r.image}
     if(!built||dirty){results.push('finish: your latest changes do not build yet. Fix the problems above, then finish.');continue}
@@ -652,6 +669,7 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   messages.push({role:'user',content:image?[{type:'text',text:body},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+image}}]:body});
  }
  // Out of steps: keep the work if it builds.
+ if(starterStill())return notBuilt();
  if(unchanged())return noChange(steps.at(-1)?.thought||'Stopped without changes.');
  if(dirty||!built)await buildAndTest({});
  if(!built)throw Object.assign(Error('The agent stopped after '+steps.length+' steps and the project does not build.'),{status:422});
