@@ -3,7 +3,7 @@
 // what happened (the Pulse page: the agent's replies kept coming back too large to read).
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),os=require("node:os"),path=require("node:path");
 const root=fs.mkdtempSync(path.join(os.tmpdir(),"kairoq-honest-"));
-Object.assign(process.env,{KAIROQ_REACT_PROJECTS_DIR:root,KAIROQ_AUTONOMY_DIR:path.join(root,"learning"),KAIROQ_DESIGN_BRIEF:"off",KAIROQ_PARALLEL_WRITERS:"off"});
+Object.assign(process.env,{KAIROQ_REACT_PROJECTS_DIR:root,KAIROQ_AUTONOMY_DIR:path.join(root,"learning"),KAIROQ_DESIGN_BRIEF:"off",KAIROQ_PARALLEL_WRITERS:"off",KAIROQ_AGENT_REPLY:"off"});
 const agent=require("../react-agent"),builder=require("../react-builder");
 
 test("replies that cannot be read: no version is saved and the message says why",async()=>{

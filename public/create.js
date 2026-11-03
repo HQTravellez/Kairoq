@@ -1428,7 +1428,8 @@ function verdictParts(raw){
   if(pass)tested.push(NAMES[r.label]+(detail?' · '+detail:''));
   else todo.push(NAMES[r.label]+': '+(detail.replace(/^failed/,'').trim()||'did not pass'));
  }
- if(unresolved&&unresolved!=='none')todo.push(unresolved);
+ // The open problem in its own words says more than "Looks right: did not pass"; show that instead.
+ if(unresolved&&unresolved!=='none'){for(let i=todo.length-1;i>=0;i--)if(/: did not pass$/.test(todo[i]))todo.splice(i,1);todo.push(unresolved)}
  let notes=String(m[3]||'').trim();
  notes=notes.replace(/^Stopped after (\d+) steps?\.\s*(The last changes did not build, so the last working build was saved\.)?\s*/,(_,n,kept)=>'I used all '+n+' rounds before every check passed'+(kept?', so the last working build is what you see':'')+'. ');
  const repairs=Number((rows.find(r=>r.label==='Repair attempts')||{}).value)||0;
@@ -1437,10 +1438,12 @@ function verdictParts(raw){
 function verdictCard(raw,msg={}){
  const v=verdictParts(raw);if(!v)return null;
  const out=[];
- const head=el('p','verdict-head '+(v.ok?'ok':'draft'));
- head.append(el('span','vmark',v.ok?'✓':'!'),el('span',null,v.ok?'Built and checked.':'Draft ready. Some checks did not pass yet, so try it in the preview.'));
- out.push(head);
+ // Kairoq Agent's own words lead (agent-reply.js writes them from the facts); the verdict is a
+ // small tag under them, not a stock sentence.
  if(v.notes)out.push(renderMarkdown(v.notes));
+ const head=el('p','verdict-head tag '+(v.ok?'ok':'draft'));
+ head.append(el('span','vmark',v.ok?'✓':'!'),el('span',null,v.ok?'Checked':'Draft · some checks still open'));
+ out.push(head);
  const section=(title,items,cls)=>{if(!items.length)return;const box=el('div','writeup '+cls);box.append(el('p','writeup-title',title));const ul=el('ul','verdict-rows '+cls);for(const t of items){const li=el('li',cls==='todo'?'bad':cls==='tested'?'ok':'');li.append(el('span','vmark',cls==='todo'?'✗':cls==='tested'?'✓':'•'),el('span',null,t));ul.append(li)}box.append(ul);out.push(box)};
  const pages=[...new Set((msg.timeline||[]).filter(e=>e.t==='edit').map(e=>pageName(e.file)).filter(Boolean))];
  section("What's there",pages,'pages');

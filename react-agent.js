@@ -464,7 +464,7 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   }
   return{text:'Unknown tool "'+t+'". Use one of the listed tools.'};
  }
- function save(message,{stopped=false}={}){
+ async function save(message,{stopped=false,open=[]}={}){
   const files=built.files;
   builder.writeJson(path.join(built.dir,'files.json'),files);
   const changed=Object.keys(files).filter(k=>base[k]!==files[k]).concat(Object.keys(base).filter(k=>!Object.hasOwn(files,k)));
@@ -475,7 +475,12 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   const completion=require('./engineering-completion-gate').evaluate({built,dirty,inspect,lastTest,checks:lastSavedChecks,requirements:ownerRequirements,unitTests:lastUnitTests,files,review:lastReview,reviewRequired,
     visualQuality:lastVisualQuality,visualRequired,repairs:repairAttempts});
   const responseContract=require('./agent-response-contract');
-  message=responseContract.guard(text,message,{technical:responseContract.technicalRequest(text)});
+  // Kairoq Agent words the closing message itself from these facts (agent-reply.js). The
+  // agent's own finish note is one input; its private reasoning never is.
+  const reply=require('./agent-reply');
+  const pages=[...new Set(changed.map(f=>/(?:^|\/)(?:pages|screens|routes)\/(?:.*\/)?([^/]+)\.(?:jsx?|tsx?)$/i.exec(f)).filter(Boolean).map(m=>m[1].replace(/(Page|Screen|View|Route)$/,'').replace(/([a-z0-9])([A-Z])/g,'$1 $2').toLowerCase()).filter(w=>w&&!/^(index|_app|layout)$/.test(w)))];
+  const written=await reply.write({callModel,tier,signal,facts:reply.facts({request:text,outcome:completion.verified&&!stopped?'verified':stopped?'stopped':'draft',changed,pages,verification:completion,errors,open,steps:steps.length,summary:stopped?'':message})});
+  message=responseContract.guard(text,written.text,{technical:responseContract.technicalRequest(text)});
   message=require('./engineering-completion-gate').resultMessage(message,completion);
   fresh.versions.push({n:built.n,at:now,summary:message.slice(0,200),changed,tier,agent:{steps:steps.length,stopped,verified:completion.verified,verification_issues:completion.issues,verification_evidence:completion.evidence,...(lastUnitTests?{unit_tests:{ok:lastUnitTests.ok,ran:lastUnitTests.ran,passed:lastUnitTests.passed,failed:lastUnitTests.failed,files:lastUnitTests.files}}:{}),...(lastReview?{engineering_review:{ok:lastReview.ok,standards:lastReview.standards,spec:lastReview.spec}}:{})},...(errors.length?{runtime_errors:errors}:{})});
   fresh.current_version=built.n;
@@ -514,12 +519,12 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
  // result: nothing is saved, nothing is charged, and the reply says what happened.
  const starterStill=()=>!researchOnly&&require('./react-design').isUntouchedStarter(base)&&!Object.keys({...base,...work}).some(k=>k!=='src/index.css'&&base[k]!==work[k]);
  let invalidTotal=0,writersFailed=false;
- function notBuilt(){
+ async function notBuilt(){
   checkpointStore.clear(id);
   if(built)fs.rmSync(built.dir,{recursive:true,force:true});
   const facts={steps:steps.length,unreadable:invalidTotal,writers_failed:writersFailed,files_written:Object.keys(work).filter(k=>base[k]!==work[k])};
-  const why=facts.unreadable?'my replies came back too large to read '+facts.unreadable+' time'+(facts.unreadable===1?'':'s')+(facts.writers_failed?', after the first all-at-once write also failed':''):facts.writers_failed?'the first all-at-once write failed and I ran out of steps before writing it piece by piece':'I ran out of steps before writing it';
-  const message="I didn't get to build this. The page is still the starter: "+why+'. Nothing was saved and you were not charged.';
+  const reply=require('./agent-reply');
+  const {text:message}=await reply.write({callModel,tier,signal,facts:reply.facts({request:text,outcome:'not_built',notBuilt:facts,steps:steps.length,charged:false})});
   builder.addMessages(id,[{role:'user',text,mode:'agent'},{role:'assistant',text:message,mode:'agent',failed:true,retry:text,not_built:facts,steps:steps.map(s=>s.summary).slice(-40),timeline:tl.stored(),duration_ms:tl.elapsed()}],{startedAt});
   const fresh=builder.loadMeta(id);
   executionLedger.complete(id,text,{verified:false,version:fresh.current_version,message});
@@ -648,7 +653,7 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
     if(onlyCapped&&lastReview?.blocking?.length)open.push('The independent review still had '+lastReview.blocking.length+' open finding(s) after '+reviewBlocks+' round'+(reviewBlocks===1?'':'s')+': '+lastReview.blocking.map(x=>(x.file?x.file+': ':'')+x.message).join(' ').slice(0,600));
     if(onlyCapped&&lastVisualQuality&&!lastVisualQuality.passed)open.push('The look check still found: '+require('./visual-quality-gate').failureText(lastVisualQuality).slice(0,600));
     if(onlyCapped&&late&&verdict.issues.some(i=>/not (executed|evaluated)/i.test(i)))open.push('I stopped at the '+maxMinutes+'-minute budget, so '+verdict.issues.filter(i=>/not (executed|evaluated)/i.test(i)).map(i=>i.replace(/\.$/,'').toLowerCase()).join(' and ')+'.');
-    finished=save(open.length?message+' '+open.join(' '):message);break;
+    finished=await save(message,{open});break;
    }
    try{
     const r=await tool(a),resultText=clip(r.text,20000);results.push(resultText);if(r.image)image=r.image;
@@ -669,7 +674,7 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   messages.push({role:'user',content:image?[{type:'text',text:body},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+image}}]:body});
  }
  // Out of steps: keep the work if it builds.
- if(starterStill())return notBuilt();
+ if(starterStill())return await notBuilt();
  if(unchanged())return noChange(steps.at(-1)?.thought||'Stopped without changes.');
  if(dirty||!built)await buildAndTest({});
  if(!built)throw Object.assign(Error('The agent stopped after '+steps.length+' steps and the project does not build.'),{status:422});
@@ -688,8 +693,8 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
     tl.add({t:'test',ok:lastVisualQuality.passed,text:lastVisualQuality.passed?'Visual quality passed':'Visual quality needs repair',detail:lastVisualQuality.passed?[]:[visualGate.failureText(lastVisualQuality)]})}
   }catch(e){if(e.name==='AbortError'||signal?.aborted)throw e}
  }
- if(dirty)return save('Stopped after '+steps.length+' steps. The last changes did not build, so the last working build was saved. '+(steps.at(-1)?.thought||''),{stopped:true});
- return save('Stopped after '+steps.length+' steps. '+(steps.at(-1)?.thought||''),{stopped:true});
+ if(dirty)return await save('',{stopped:true,open:['The last changes did not build, so the last working build was kept.']});
+ return await save('',{stopped:true});
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token);await wb.close().catch(()=>{})}
 }
