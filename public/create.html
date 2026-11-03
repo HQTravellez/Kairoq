@@ -21,10 +21,10 @@
 <link rel="stylesheet" href="/ui/screens.css?v=2">
 <link rel="stylesheet" href="/ui/chat.css?v=2">
 <link rel="stylesheet" href="/ui/dialogs.css?v=2">
-<link rel="stylesheet" href="/ui/tools.css?v=2">
+<link rel="stylesheet" href="/ui/tools.css?v=3">
 <link rel="stylesheet" href="/ui/browser.css?v=2">
-<link rel="stylesheet" href="/ui/tool-pages.css?v=6">
-<link rel="stylesheet" href="/ui/forma.css?v=8">
+<link rel="stylesheet" href="/ui/tool-pages.css?v=7">
+<link rel="stylesheet" href="/ui/forma.css?v=9">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -47,6 +47,7 @@
     <button type="button" id="side-projects"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Projects</button>
     <button type="button" id="side-templates"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 9h16M9 9v12"/></svg>Templates</button>
     <button type="button" id="side-connectors"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v4"/></svg>Connectors</button>
+    <button type="button" id="side-settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 14H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 10h.1a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1z"/></svg>Settings &amp; usage</button>
     <p class="side-label side-group">Tools</p>
     <button type="button" id="side-chat" class="hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Chat</button>
     <button type="button" id="side-memory"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a3.5 3.5 0 0 0-3.4 4.3A3.5 3.5 0 0 0 4 13a3.5 3.5 0 0 0 3 5.5A3 3 0 0 0 12 20V5a2.5 2.5 0 0 0-2.5-2z"/><path d="M14.5 3a3.5 3.5 0 0 1 3.4 4.3A3.5 3.5 0 0 1 20 13a3.5 3.5 0 0 1-3 5.5A3 3 0 0 1 12 20"/></svg>Memory</button>
@@ -596,6 +597,77 @@
   <ul class="tp-grid cn-grid" id="cn-grid" aria-live="polite"></ul>
   <p class="tp-foot cn-safe"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.4 3.4 8.3 8 9 4.6-.7 8-4.6 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Keys you add are encrypted and never shown again. Disconnect a service whenever you want.</p>
 </section>
+
+<section class="screen hidden tp" id="templates-screen" aria-labelledby="tg-title">
+  <div class="tp-crumbs"><span>Workspace</span><span aria-hidden="true">/</span><b>Templates</b><span class="tp-grow"></span><a href="https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md" target="_blank" rel="noopener">Template guide ↗</a></div>
+  <header class="tp-head tg-head">
+    <div><p class="tp-kicker">A little inspiration goes a long way</p><h1 id="tg-title">Find your starting point.</h1><p class="tp-sub">Thoughtfully designed. Fully working. Ready for your own twist.</p></div>
+  </header>
+  <div class="tp-tools tg-tools">
+    <label class="tp-search tg-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="tg-search" type="search" placeholder="Search templates by name, idea or kind…" aria-label="Search templates"></label>
+  </div>
+  <div class="tp-tabs tg-tabs" id="tg-tabs" role="tablist" aria-label="Template kinds"></div>
+  <p class="tg-count" id="tg-count"></p>
+  <p class="error" id="tg-error" role="alert"></p>
+  <div class="templates gallery tg-grid" id="tg-grid" aria-live="polite"></div>
+</section>
+
+<section class="screen hidden tp" id="pricing-screen" aria-labelledby="pr-title">
+  <div class="tp-crumbs"><span>Workspace</span><span aria-hidden="true">/</span><b>Plans and credits</b><span class="tp-grow"></span><a href="#" id="pr-settings">Settings &amp; usage</a></div>
+  <header class="pr-head">
+    <p class="tp-kicker">Plans and credits</p>
+    <h1 id="pr-title">A plan for where you’re going.</h1>
+    <p class="tp-sub">Start with free credits. Pay for changes, not seats: every plan includes the full builder.</p>
+  </header>
+  <div class="pr-grid" id="pr-grid"></div>
+  <p class="error" id="pr-error" role="alert"></p>
+  <div class="pr-packs hidden" id="pr-packs-wrap">
+    <div class="pr-packs-head"><h2>Need a little more room?</h2><p class="tp-sub">One-time credit top-ups. They never expire.</p></div>
+    <div class="pr-packs-list" id="pr-packs"></div>
+  </div>
+  <h2 class="pr-h2">Questions, answered.</h2>
+  <div class="pr-faq" id="pr-faq"></div>
+</section>
+
+<section class="screen hidden tp" id="settings-screen" aria-labelledby="st-title">
+  <div class="tp-crumbs"><span>Workspace</span><span aria-hidden="true">/</span><b>Settings &amp; usage</b><span class="tp-grow"></span><a href="#" id="st-plans-link">Plans and credits</a></div>
+  <header class="tp-head">
+    <div><h1 id="st-title">A little workspace housekeeping.</h1><p class="tp-sub">Your account, credits and plan, all in one place.</p></div>
+  </header>
+  <div class="tp-tabs st-tabs" role="tablist" aria-label="Settings sections">
+    <button type="button" role="tab" id="st-tab-overview" aria-selected="true">Overview</button>
+    <button type="button" role="tab" id="st-tab-history" aria-selected="false">Credit history</button>
+  </div>
+  <p class="error" id="st-error" role="alert"></p>
+  <div id="st-overview">
+    <div class="st-top">
+      <div class="st-card st-account">
+        <div class="st-card-head"><h2>Your account</h2><span class="muted small" id="st-role"></span></div>
+        <div class="st-who"><span class="st-avatar" id="st-avatar" aria-hidden="true">K</span><div><b id="st-email"></b><span class="muted small" id="st-since"></span></div></div>
+        <dl class="st-facts" id="st-facts"></dl>
+      </div>
+      <div class="st-plan" id="st-plan">
+        <div class="st-plan-head"><h2>Your plan</h2><span class="st-active" id="st-plan-status"></span></div>
+        <div class="st-plan-row"><b id="st-plan-name"></b><span id="st-plan-price"></span></div>
+        <p id="st-plan-lines"></p>
+        <div class="st-plan-foot"><span id="st-plan-renew"></span></div>
+        <div class="st-plan-actions"><button class="primary" type="button" id="st-change">See plans</button><button class="st-manage hidden" type="button" id="st-billing">Manage billing ↗</button></div>
+      </div>
+    </div>
+    <div class="st-usage-head"><h2>Usage</h2><span class="muted small" id="st-window"></span></div>
+    <div class="st-usage" id="st-usage"></div>
+    <div class="st-card st-where">
+      <div class="st-where-main"><h3>Where your credits went</h3><div class="st-bar" id="st-bar"></div><ul class="st-legend" id="st-legend"></ul></div>
+      <div class="st-more hidden" id="st-more"><h3>Need a little more room?</h3><p class="muted small" id="st-more-text"></p><button type="button" class="st-link" id="st-more-btn">Buy credits →</button></div>
+    </div>
+  </div>
+  <div id="st-history" class="hidden">
+    <div class="st-table-wrap"><table class="st-table"><thead><tr><th>What</th><th>When</th><th class="st-num">Credits</th></tr></thead><tbody id="st-rows"></tbody></table></div>
+    <p class="muted small" id="st-history-note"></p>
+  </div>
+  <p class="tp-foot st-safe"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Payments are handled by Stripe. Kairoq never sees or stores your card.</p>
+</section>
+
 
 <section class="screen hidden" id="editor" data-pane="chat">
   <div class="phone-panes" id="phone-panes" role="tablist" aria-label="Editor panes">
@@ -1588,17 +1660,6 @@
   </form>
 </dialog>
 
-<dialog id="plans-dialog">
-  <form method="dialog" class="dialog">
-    <h2>Plans</h2>
-    <p class="muted small" id="plan-current"></p>
-    <div class="plans compact" id="plans-list"></div>
-    <div class="row"><button class="ghost hidden" id="billing" type="button">Manage billing</button></div>
-    <p class="error" id="plans-error" role="alert"></p>
-    <div class="row end"><button class="ghost" value="close">Close</button></div>
-  </form>
-</dialog>
-
 <dialog id="buy-dialog">
   <form method="dialog" class="dialog">
     <h2>Buy credits</h2>
@@ -1612,7 +1673,7 @@
 <script src="/voice-builder.js" defer></script>
 <script src="/create-look.js?v=6"></script>
 <script src="/builder-browser-pane.js?v=7"></script>
-<script src="/create.js?v=20261116"></script>
+<script src="/create.js?v=20261117"></script>
 <script src="/builder-split-preview.js?v=4"></script>
 </body>
 </html>

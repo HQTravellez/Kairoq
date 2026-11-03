@@ -1341,7 +1341,7 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
   }
   if(route==='/credits'&&method==='GET'){
    if(v.kind!=='customer')return send(res,200,{unlimited:true,history:[]}),true;
-   return send(res,200,{account:accounts.fromRequest(req),history:accounts.history(v.account.id)}),true;
+   return send(res,200,{account:accounts.fromRequest(req),history:accounts.history(v.account.id,200)}),true;
   }
   if(route==='/subscribe'&&method==='POST'){
    if(v.kind!=='customer')throw Object.assign(Error('The owner account does not use plans'),{status:400});

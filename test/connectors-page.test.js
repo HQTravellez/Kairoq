@@ -6,7 +6,7 @@ const read = f => fs.readFileSync(path.join(__dirname, "..", "public", f), "utf8
 
 test("the sidebar opens a Connectors page in the Figma layout", () => {
   const html = read("create.html");
-  assert.match(html, /id="side-connectors">[\s\S]*?Connectors<\/button>\n    <p class="side-label side-group">Tools<\/p>/, "under Projects and Templates, like Figma");
+  assert.match(html, /id="side-templates">[\s\S]*?Templates<\/button>\n    <button type="button" id="side-connectors">/, "under Projects and Templates, like Figma");
   for (const id of ["cn-project", "cn-search", "cn-tabs", "cn-grid", "cn-count"]) assert.match(html, new RegExp('id="' + id + '"'));
   assert.match(html, /<h1 id="cn-title">Good tools\. Better together\.<\/h1>/);
 });

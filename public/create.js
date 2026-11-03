@@ -12,11 +12,11 @@ async function api(path,{method='GET',body}={}){
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
- for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen','ideas-screen','agents-screen','connectors-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen','ideas-screen','agents-screen','connectors-screen','templates-screen','pricing-screen','settings-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
- const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||screen==='ideas-screen'||screen==='agents-screen'||screen==='connectors-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
+ const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||screen==='ideas-screen'||screen==='agents-screen'||screen==='connectors-screen'||screen==='templates-screen'||screen==='pricing-screen'||screen==='settings-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
@@ -24,7 +24,7 @@ function show(screen){
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api','side-ideas','side-agents','side-connectors'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api','side-ideas','side-agents','side-connectors','side-settings'])$(b).removeAttribute('aria-current');
  if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
  if(screen==='plugins-screen')$('side-plugins').setAttribute('aria-current','page');
  if(screen==='leads-screen')$('side-leads').setAttribute('aria-current','page');
@@ -32,7 +32,9 @@ function show(screen){
  if(screen==='ideas-screen')$('side-ideas').setAttribute('aria-current','page');
  if(screen==='agents-screen')$('side-agents').setAttribute('aria-current','page');
  if(screen==='connectors-screen')$('side-connectors').setAttribute('aria-current','page');
- if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
+ if(screen==='templates-screen')$('side-templates').setAttribute('aria-current','page');
+ if(screen==='settings-screen'||screen==='pricing-screen')$('side-settings').setAttribute('aria-current','page');
+ if(screen==='home')$('side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
 function text(el,value){el.textContent=value==null?'':String(value)}
@@ -211,7 +213,6 @@ $('tab-projects').onclick=()=>homeTab('projects');$('tab-templates').onclick=()=
 $('new-template').onclick=()=>{homeTab('templates');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
 $('side-new').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();else homeTab('projects');$('home').scrollTo({top:0,behavior:'smooth'});$('new-prompt').focus()};
 $('side-projects').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();homeTab('projects');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
-$('side-templates').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();homeTab('templates');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
 // ---------- Plugins and skills (a full page) ----------
 // The account's skill library (built-in and its own). A skill switched on is used in every
 // project (the same "all projects" setting as the Design dialog). Counts are real: nothing shown
@@ -601,6 +602,128 @@ async function openConnectors(){
 $('side-connectors').onclick=openConnectors;
 $('cn-project').onchange=e=>{cnUi.id=e.target.value;text($('cn-error'),'');loadConnectors()};
 $('cn-search').oninput=e=>{cnUi.q=e.target.value.trim();renderConnectors()};
+// ---------- Templates, Pricing, Settings & usage (Figma "Template gallery", "Pricing", "Workspace settings") ----------
+// Full pages built only from real data: the template list, the plans and packs Ka set in Railway,
+// and the account's credit ledger. Nothing here invents counts, invoices or usage.
+const tgUi={cat:'All',q:''};
+async function openTemplates(){
+ show('templates-screen');text($('tg-error'),'');
+ try{if(!state.templates){const r=await api('/templates');state.templates=r.templates||[];state.sponsored=r.sponsored||[]}renderTemplatePage()}
+ catch(err){text($('tg-error'),err.message)}
+}
+function renderTemplatePage(){
+ const all=state.templates||[],cats=[...new Set(all.map(t=>t.category).filter(Boolean))];
+ if(tgUi.cat!=='All'&&!cats.includes(tgUi.cat))tgUi.cat='All';
+ const tabs=$('tg-tabs');tabs.replaceChildren();
+ for(const c of ['All',...cats]){const b=el('button',null,c==='All'?'All templates':c);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(tgUi.cat===c));b.onclick=()=>{tgUi.cat=c;renderTemplatePage()};tabs.append(b)}
+ const q=tgUi.q.toLowerCase();
+ const list=all.filter(t=>(tgUi.cat==='All'||t.category===tgUi.cat)&&(!q||(t.name+' '+t.description+' '+t.category).toLowerCase().includes(q)));
+ text($('tg-count'),list.length+' template'+(list.length===1?'':'s')+' to make your own');
+ const grid=$('tg-grid');grid.replaceChildren();
+ for(const t of list)grid.append(templateCard(t,id=>{show('home');startFromTemplate(id)}));
+ if(!list.length)grid.append(el('p','tp-empty','No templates match that. Try another word, or describe your app on Home.'));
+}
+$('side-templates').onclick=openTemplates;
+$('tg-search').oninput=e=>{tgUi.q=e.target.value.trim();renderTemplatePage()};
+
+function openPricing(){
+ show('pricing-screen');text($('pr-error'),'');
+ const me=state.me||{},account=me.viewer?.account||null,current=account?.plan||null;
+ const grid=$('pr-grid');grid.replaceChildren();
+ const card=(name,price,per,lines,btn,dark)=>{
+  const c=el('div','pr-card'+(dark?' dark':''));
+  const top=el('div','pr-card-top');top.append(el('h3',null,name));if(dark&&account)top.append(el('span','pr-badge','Your plan'));c.append(top);
+  const p=el('div','pr-price');p.append(el('b',null,price));if(per)p.append(el('span',null,per));c.append(p);
+  if(btn)c.append(btn);
+  const ul=el('ul');for(const l of lines)ul.append(el('li',null,l));c.append(ul);return c;
+ };
+ const freeBtn=el('button','pr-btn',account?(current?'Included':'Your plan'):'Start for free');freeBtn.type='button';freeBtn.disabled=Boolean(account);
+ grid.append(card('Free',(me.free_credits||0)+' credits','to start',['Every feature included','Publish to a Kairoq address','No card needed'],freeBtn,Boolean(account)&&!current));
+ for(const p of me.plans||[]){
+  const mine=current===p.id,b=el('button','pr-btn'+(mine?'':' primary'),mine?'Current plan':'Choose '+p.name);b.type='button';b.disabled=mine||!me.subscriptions;
+  b.onclick=async()=>{b.disabled=true;try{const {url}=await api('/subscribe',{method:'POST',body:{plan:p.id}});location.href=url}catch(err){text($('pr-error'),err.message);b.disabled=false}};
+  const m=/^(\S+)\s*(.*)$/.exec(p.label||'');
+  grid.append(card(p.name,m?m[1]:p.credits+' credits',m?m[2]:'a month',[p.credits+' credits every month',...(p.features||[])],b,mine));
+ }
+ const packs=me.purchases?(me.packs||[]):[];
+ $('pr-packs-wrap').classList.toggle('hidden',!packs.length);
+ const pl=$('pr-packs');pl.replaceChildren();
+ for(const p of packs){
+  const b=el('button','pr-pack');b.type='button';b.append(el('b',null,p.credits+' credits'),el('span',null,p.name),el('em',null,p.label||'Buy'));
+  b.onclick=async()=>{b.disabled=true;try{const {url}=await api('/checkout',{method:'POST',body:{pack:p.id}});location.href=url}catch(err){text($('pr-error'),err.message);b.disabled=false}};
+  pl.append(b);
+ }
+ const per=(me.tiers||[]).filter(t=>t.enabled!==false).map(t=>t.credits+' credit'+(t.credits===1?'':'s')+' ('+t.label+')').join(', ');
+ const faq=[
+  ['What is a credit?','One credit pays for one change to your app. A message costs '+(per||'a few credits')+(me.discuss_credits?'; a question without changes costs '+me.discuss_credits+'.':'.')+' Visual edits are free.'],
+  ['What if a change fails?','If a change does not work, or nothing is saved, the credits go back to you. If a change breaks your app, the next fix of that problem is free.'],
+  ['Can I change plans later?',me.subscriptions?'Yes. Pick another plan here, or open Manage billing from Settings & usage to change or cancel.':'Paid plans are not open yet. Free credits and top-ups work today.']
+ ];
+ const f=$('pr-faq');f.replaceChildren();
+ for(const [q,a] of faq){const d=el('div','pr-q');d.append(el('h3',null,q),el('p',null,a));f.append(d)}
+}
+$('plans-open').onclick=openPricing;
+$('pr-settings').onclick=e=>{e.preventDefault();openSettings()};
+
+const stUi={tab:'overview'};
+async function openSettings(){
+ show('settings-screen');text($('st-error'),'');stTab(stUi.tab);
+ const me=state.me||{},v=me.viewer;
+ let credits={history:[]},projects=[];
+ try{[credits,{projects}]=await Promise.all([api('/credits'),api('/projects')])}catch(err){text($('st-error'),err.message)}
+ const account=credits.account||v?.account||null,owner=v?.kind==='owner';
+ const email=owner?'Owner account':account?.email||'';
+ text($('st-email'),email);text($('st-avatar'),(email||'K')[0].toUpperCase());
+ text($('st-since'),account?.created_at?'Joined '+new Date(account.created_at).toLocaleDateString([], {dateStyle:'medium'}):'');
+ text($('st-role'),owner?'You run this Kairoq':'');
+ const facts=$('st-facts');facts.replaceChildren();
+ const fact=(k,val)=>{facts.append(el('dt',null,k),el('dd',null,val))};
+ if(account)fact('Email',account.email_verified?'Verified':'Not verified yet');
+ fact('Projects',String(projects.length));
+ fact('Published',String(projects.filter(p=>p.published).length));
+ // Plan card
+ const plan=(me.plans||[]).find(p=>p.id===account?.plan);
+ text($('st-plan-name'),owner?'Owner':plan?plan.name:'Free');
+ text($('st-plan-price'),owner?'':plan?(plan.label||''):'');
+ text($('st-plan-status'),owner?'Unlimited':account?.plan?cap(account.plan_status||'active'):'Active');
+ text($('st-plan-lines'),owner?'Building costs you no credits.':plan?[plan.credits+' credits every month',...(plan.features||[])].join(' · '):'Every feature included · Pay as you go with credits');
+ text($('st-plan-renew'),account?.plan_renews_at?'Renews '+new Date(account.plan_renews_at).toLocaleDateString([], {dateStyle:'medium'}):'');
+ $('st-change').classList.toggle('hidden',owner||!(me.plans||[]).length);
+ text($('st-change'),account?.plan?'Change plan':'See plans');
+ $('st-billing').classList.toggle('hidden',!account?.billing);
+ // Usage: from the ledger only.
+ const hist=credits.history||[],since=Date.now()-30*864e5,recent=hist.filter(h=>Date.parse(h.at)>=since);
+ const spent=recent.filter(h=>h.delta<0).reduce((n,h)=>n-h.delta,0);
+ const back=recent.filter(h=>h.delta>0&&/^(Refund|Free:)/.test(h.reason)).reduce((n,h)=>n+h.delta,0);
+ text($('st-window'),'Last 30 days');
+ const u=$('st-usage');u.replaceChildren();
+ const tile=(label,big,small,note,pct)=>{const t=el('div','st-card st-tile');t.append(el('span','st-tile-label',label));const b=el('div','st-big');b.append(el('b',null,big));if(small)b.append(el('span',null,small));t.append(b);if(pct!=null){const m=el('div','st-meter');const i=el('i');i.style.width=Math.max(0,Math.min(100,pct))+'%';m.append(i);t.append(m)}t.append(el('span','st-note',note));u.append(t)};
+ if(owner)tile('Credits','Unlimited','','You run this Kairoq',null);
+ else{const left=account?.credits??0,cap2=plan?plan.credits:null;tile('Credits left',String(left),cap2?'/ '+cap2:'',cap2?Math.max(0,cap2-left)+' used of this month’s '+cap2:'Top up any time',cap2?left/cap2*100:null)}
+ tile('Credits used',String(spent),'',back?back+' came back as refunds or free changes':'Nothing refunded',null);
+ tile('Projects',String(projects.length),'',projects.filter(p=>p.published).length+' published',null);
+ // Where they went: group spending by what it was for.
+ const groups=new Map();for(const h of recent)if(h.delta<0){const k=String(h.reason||'Other').replace(/\s*\(.*\)$/,'').split(':')[0].trim()||'Other';groups.set(k,(groups.get(k)||0)-h.delta)}
+ const sorted=[...groups.entries()].sort((a,b)=>b[1]-a[1]),top=sorted.slice(0,3),rest=sorted.slice(3).reduce((n,x)=>n+x[1],0);if(rest)top.push(['Other',rest]);
+ const bar=$('st-bar'),leg=$('st-legend');bar.replaceChildren();leg.replaceChildren();
+ top.forEach(([k,n],i)=>{const s=el('i','s'+i);s.style.flexGrow=n;s.title=k+': '+n;bar.append(s);const li=el('li','s'+i);li.append(el('b',null,k),document.createTextNode(' '+n));leg.append(li)});
+ if(!top.length)leg.append(el('li','st-none','No credits spent in the last 30 days.'));
+ const packs=me.purchases?(me.packs||[]):[];
+ $('st-more').classList.toggle('hidden',!packs.length||owner);
+ if(packs.length)text($('st-more-text'),packs.map(p=>p.credits+' credits'+(p.label?' for '+p.label:'')).join(' · ')+'. They never expire.');
+ // History table
+ const rows=$('st-rows');rows.replaceChildren();
+ for(const h of hist){const tr=el('tr');tr.append(el('td',null,h.reason||''),el('td',null,new Date(h.at).toLocaleDateString([], {dateStyle:'medium'})),el('td','st-num '+(h.delta<0?'neg':'pos'),(h.delta>0?'+':'')+h.delta));rows.append(tr)}
+ text($('st-history-note'),owner?'The owner account does not use credits.':hist.length?'Your latest '+hist.length+' credit moves.':'No credit moves yet.');
+}
+function stTab(t){stUi.tab=t;$('st-tab-overview').setAttribute('aria-selected',String(t==='overview'));$('st-tab-history').setAttribute('aria-selected',String(t==='history'));$('st-overview').classList.toggle('hidden',t!=='overview');$('st-history').classList.toggle('hidden',t!=='history')}
+$('st-tab-overview').onclick=()=>stTab('overview');
+$('st-tab-history').onclick=()=>stTab('history');
+$('side-settings').onclick=openSettings;
+$('st-change').onclick=openPricing;
+$('st-plans-link').onclick=e=>{e.preventDefault();openPricing()};
+$('st-more-btn').onclick=openPricing;
+$('st-billing').onclick=async()=>{try{const {url}=await api('/billing',{method:'POST'});location.href=url}catch(err){text($('st-error'),err.message)}};
 // ---------- First project (Figma "First project onboarding") ----------
 // A new account with no projects sees this on Home instead of the prompt box. It starts the
 // same flow as the prompt (questions, plan, build); the name and "what for" go with it.
@@ -2723,21 +2846,6 @@ $('nav-start').onclick=()=>{if($('auth').classList.contains('hidden')){location.
  for(const t of document.querySelectorAll('.landing .tile'))t.addEventListener('pointermove',e=>{const r=t.getBoundingClientRect();t.style.setProperty('--mx',(e.clientX-r.left)+'px');t.style.setProperty('--my',(e.clientY-r.top)+'px')});
 
 })();
-$('plans-open').onclick=()=>{
- text($('plans-error'),'');
- const account=state.me.viewer?.account||{};
- text($('plan-current'),account.plan?'Current plan: '+planName(account.plan)+' ('+(account.plan_status||'active')+')'+(account.plan_renews_at?' · renews '+when(account.plan_renews_at):''):'You are on the free plan.');
- const wrap=$('plans-list');wrap.replaceChildren();
- for(const p of state.me.plans||[]){
-  const btn=Object.assign(document.createElement('button'),{type:'button',className:'primary',textContent:account.plan===p.id?'Current plan':'Choose '+p.name});
-  btn.disabled=account.plan===p.id;
-  btn.onclick=async()=>{btn.disabled=true;try{const {url}=await api('/subscribe',{method:'POST',body:{plan:p.id}});location.href=url}catch(err){text($('plans-error'),err.message);btn.disabled=false}};
-  const card=planCard(p.name,p.label||p.credits+' credits / month',[p.credits+' credits every month',...p.features],btn);if(account.plan===p.id)card.classList.add('current');wrap.append(card);
- }
- $('billing').classList.toggle('hidden',!account.billing);
- $('plans-dialog').showModal();
-};
-$('billing').onclick=async()=>{try{const {url}=await api('/billing',{method:'POST'});location.href=url}catch(err){text($('plans-error'),err.message)}};
 
 // ---------- roles, sharing, team ----------
 function applyRole(){
@@ -3816,7 +3924,7 @@ async function renderAdmin(given){
 $('side-admin').onclick=openAdmin;
 // Dialog shell (docs/DESIGN-SYSTEM.md, public/ui/dialogs.css): each settings-type dialog gets a
 // close (×) button in its top-right corner. It sits outside the form, so Enter in a field never hits it.
-for(const id of ['settings','connectors','apps','integrations','publish','team','design','mobile','phone','stores','key','plans','buy','explain','memory','admin']){
+for(const id of ['settings','connectors','apps','integrations','publish','team','design','mobile','phone','stores','key','buy','explain','memory','admin']){
  const d=$(id+'-dialog');if(!d||d.querySelector(':scope>.kq-dlg-x'))continue;
  const x=document.createElement('button');x.type='button';x.className='kq-dlg-x';x.setAttribute('aria-label','Close');
  x.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';

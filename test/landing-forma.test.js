@@ -14,7 +14,7 @@ test("the button beats the old square send button, and is full width on a phone"
   const css = read("ui/forma.css");
   assert.match(css, /body:not\(\.app\) #auth #landing-form \.send\.fm-build\{width:auto!important/);
   assert.match(css, /@media \(max-width:900px\)\{[\s\S]*?#landing-form \.send\.fm-build\{width:100%!important/);
-  assert.match(read("create.html"), /\/ui\/forma\.css\?v=8/);
+  assert.match(read("create.html"), /\/ui\/forma\.css\?v=\d+/);
 });
 
 test("no made-up customer logos or quotes on the page", () => {
