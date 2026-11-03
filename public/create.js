@@ -181,10 +181,11 @@ function renderProjects(projects){
 function renderRecents(projects){
  const list=$('recents');list.replaceChildren();
  if(!projects.length){list.append(el('li','empty','Your projects will show up here.'));return}
- for(const p of projects.slice(0,14)){
+ // Like Lovable: the five most recent, each with its first letter, then "See all projects".
+ for(const p of projects.slice(0,5)){
   const li=document.createElement('li'),b=document.createElement('button');
   li.dataset.id=p.id;if(p.published)li.classList.add('live');if(state.project&&state.project.id===p.id)li.classList.add('active');
-  b.type='button';b.append(el('i','diamond'),el('span',null,p.name));b.title=p.name;b.onclick=()=>openProject(p.id);
+  b.type='button';b.append(el('i','r-tile',(String(p.name||'?').trim()[0]||'?').toUpperCase()),el('span',null,p.name));b.title=p.name;b.onclick=()=>openProject(p.id);
   li.append(b);
   if(p.role==='owner'){
    const del=el('button','recent-delete','×');del.type='button';del.title='Delete '+p.name;del.setAttribute('aria-label','Delete project '+p.name);
@@ -202,6 +203,7 @@ function renderRecents(projects){
   }
   list.append(li);
  }
+ if(projects.length>5){const li=el('li','see-all'),b=el('button',null,'See all projects');b.type='button';b.onclick=()=>$('side-projects').click();li.append(b);list.append(li)}
 }
 function markRecent(id){for(const li of $('recents').children)li.classList.toggle('active',li.dataset.id===id)}
 function homeTab(which){
