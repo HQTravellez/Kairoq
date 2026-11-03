@@ -64,13 +64,13 @@ test('in the editor: questions, the plan, Approve, and the build gets the answer
   await page.click('#new-kind [data-kind="site"]');
   await page.fill('#new-prompt','An iPhone app like Quiver: kids color a page and a 3D animal comes alive');
   await page.click('#new-submit');
-  // Every question in one card, the recommended answer filled in; a row opens its options.
+  // Every question as a numbered card with its options shown, the recommended one picked (Figma chat).
   await page.waitForSelector('.ask-card .q',{timeout:20000});
   assert.match(await page.locator('.ask-card .agent-name').innerText(),/Kairoq Agent/);
   assert.equal(await page.locator('.q').count(),2);
   assert.equal(await page.locator('.q-answer').first().innerText(),'Coloring comes alive','the recommended answer is pre-filled');
-  await page.locator('.q-answer').nth(1).click();
-  assert.match(await page.locator('.q').nth(1).locator('.ask-opt').first().innerText(),/Kids: watch and play \(Recommended\)\s+A child scans a page/);
+  // the options are already shown
+  assert.match(await page.locator('.q').nth(1).locator('.ask-opt').first().innerText(),/Kids: watch and play\s+Recommended\s+A child scans a page/);
   await page.locator('.q').nth(1).locator('.ask-other').fill('Kids and parents together');
   assert.equal(await page.locator('.q-answer').nth(1).innerText(),'Kids and parents together');
   await page.click('.ask-next');
