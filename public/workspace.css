@@ -234,7 +234,6 @@ body.in-editor:not(.side-open) .side{display:none}
  .tabs-seg button{padding:5px 0;width:34px;justify-content:center}
  .tabs-seg .lbl{display:none}
  #versions{max-width:165px}
- #share-open{display:none}
 }
 body.in-editor.side-open .stage-bar .bar-spacer{min-width:4px}
 

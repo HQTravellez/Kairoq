@@ -168,3 +168,9 @@ test("while Kairoq thinks its status uses playful words that change; concrete st
   assert.match(js, /setInterval\(\(\)=>\{if\(document\.hidden\)return;for\(const n of document\.querySelectorAll\('\[data-think\]'\)\)/);
   assert.match(read("ui/forma.css"), /@keyframes tw-in\{/);
 });
+
+test("Share stays in the top bar on laptops; only phones hide it (it is in the More menu there)", () => {
+  const ws = read("workspace.css");
+  assert.doesNotMatch(/@media \(max-width:1380px\)\{[^}]*\}/.exec(ws)[0], /#share-open\{display:none\}/);
+  assert.match(ws, /\.stage-bar #share-open\{display:none\}/, "still hidden on phones");
+});
