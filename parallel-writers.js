@@ -10,9 +10,11 @@
 
 const MAX_SECTIONS=8,SECTION_FILE=/^src\/(components|pages|sections)\/[\w/-]+\.jsx$/,SHARED_FILE=/^src\/(App\.jsx|lib\/[\w/-]+\.(js|jsx)|data\/[\w/-]+\.(js|json))$/;
 
-// On by default; KAIROQ_PARALLEL_WRITERS=off turns it off. Under node --test it is off unless a test
-// turns it on, so tests written for one agent keep their scripted replies.
-function enabled(){const v=process.env.KAIROQ_PARALLEL_WRITERS;return v==='on'||(v!=='off'&&!process.env.NODE_TEST_CONTEXT)}
+// Off by default: like Emergent and Lovable, the agent builds a first version in small steps
+// (2-3 files, build, test, next part) instead of writing the whole app at once. On the live Pulse
+// build the all-at-once write failed and the agent never recovered. KAIROQ_PARALLEL_WRITERS=on
+// turns this back on.
+function enabled(){return process.env.KAIROQ_PARALLEL_WRITERS==='on'}
 
 function parseJson(content){
  const t=String(typeof content==='string'?content:JSON.stringify(content||'')).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');
