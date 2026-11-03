@@ -183,4 +183,18 @@ html body.app .ac-t{font-size:12px;color:var(--f-mut2,#716F77)}
   html body.app .ac-t{display:none}
   html body.app .ac-fields td.ac-path{width:50%}
 }
+
+/* ---------- Idea board ---------- */
+html body.app .id-group{margin-bottom:26px}
+html body.app .id-group>.ac-label{margin:0 0 10px}
+html body.app .id-card .tp-name{white-space:normal}
+html body.app .id-card .tp-desc{min-height:0;color:var(--c-ink-2,#3C3A42)}
+html body.app .id-why{font-size:12px;color:var(--c-ink-3,#625F68)}
+html body.app .id-why summary{list-style:none;cursor:pointer;display:flex;gap:6px;line-height:1.5}
+html body.app .id-why summary::-webkit-details-marker{display:none}
+html body.app .id-why summary::before{content:"";flex:none;width:6px;height:6px;margin-top:6px;border-radius:3px;background:var(--c-accent,#7552E8)}
+html body.app .id-why ul{margin:8px 0 0;padding:8px 10px 8px 24px;border-radius:8px;background:var(--c-bg,#F7F6F2)}
+html body.app .id-why li+li{margin-top:4px}
+html body.app .id-why ul::before{content:"Based on";display:block;margin:0 0 4px -14px;font-weight:600;color:var(--c-ink-2,#3C3A42)}
+@media (max-width:900px){html body.app #ideas-screen .ld-find .primary{grid-column:span 2}html body.app .tp-crumbs>a{display:none}}
 @media (prefers-reduced-motion:reduce){html body.app .ld-draft,html body.app .tp-card,html body.app .tp-sw::after,html body.app .tp-panel{transition:none!important;animation:none!important}}
