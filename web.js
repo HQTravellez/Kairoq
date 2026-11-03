@@ -135,7 +135,20 @@ function subjectsOf(topic){
  const m=t.match(/^(.+?)\s+(?:and|vs\.?|versus|or|with|against)\s+(.+?)(?:\s+(?:for|in|on|to|as)\s+.*)?$/i);
  if(!m)return[];
  return[m[1],m[2]].map(x=>x.trim().split(/\s+/).slice(-3).join(' ')).filter(x=>keyWords(x).length);
+function searchQuery(text){
+ return String(text||'').split('\n').filter(l=>l.trim()&&!/^Browser continuity:/i.test(l)).join(' ')
+  .replace(/\b(i want you to|i want you|can you|could you|please|then tell me|and tell me|tell me|for me|check and|research and|researcha?\w*|and check|nd check|nd then)\b/gi,' ')
+  // "show it as a table", "research it", "look it up", "in a table format": how to answer, not what to search.
+  .replace(/\b(?:and\s+)?(?:show|put|give|present|format|make)\s+(?:it|this|that|them|me|the results?)?\s*(?:as|in|into)\s+(?:a\s+)?(?:table|list|chart|bullets?)(?:\s+format)?\b/gi,' ')
+  .replace(/\b(?:in|as)\s+(?:a\s+)?table(?:\s+format)?\b/gi,' ')
+  .replace(/\b(?:research|check|look\s+up|search|find)\s+(?:it|this|that|them)\b/gi,' ')
+  .replace(/\s+(?:it|this|that)\s*(?=[.?!]|$)/gi,' ')
+  .replace(/[.?!]+/g,' ')
+  .replace(/\s+/g,' ').trim().slice(0,200);
 }
+const STOP=new Set('compare comparison versus between which what when where with from that this your their about best small large firm company business free paid good tool tools software review reviews price prices pricing cost costs plan plans online latest current today research table should would could does have will just like make show give tell more most than then also into over under the and for are you how why'.split(' '));
+function keyWords(q){return[...new Set(String(q||'').toLowerCase().match(/[a-z0-9][a-z0-9-]{3,}/g)||[])].filter(w=>!STOP.has(w))}
+function relevant(urls,q){const words=keyWords(q);if(!words.length)return urls;return urls.filter(u=>{const s=String(u).toLowerCase();return words.some(w=>s.includes(w))})}
 function plainPlan(text){
  const links=linksIn(text);
  if(links.length)return links.map(u=>({open:u}));
@@ -194,6 +207,10 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
      blocks.push(good.length||!urls.length?searchText(q,good):'Search results for "'+q+'": nothing about the question (skipped '+urls.map(hostOf).join(', ')+').');
      const want=it.openTop===undefined?1:Math.max(0,Number(it.openTop)||0);let got=0;
      for(const u of good){if(got>=want||ops>=maxOps)break;if(await openUrl(u))got++}
+     const urls=(await webSearch(q)).slice(0,6);blocks.push(searchText(q,urls));
+     // Only read results that are about the question: their address shares a key word with it
+     // ("wave", "xero"), so a search that drifts (text-compare tools for "compare") is not read.
+     for(const u of relevant(urls,q).slice(0,Math.max(0,Number(it.openTop)||0))){if(ops>=maxOps)break;await openUrl(u)}
     }catch(e){blocks.push('Search for "'+q+'" failed: '+String(e.message||e).slice(0,200))}
    }else if(typeof it.open==='string'&&it.open.trim())await openUrl(it.open.trim());
   }
@@ -215,6 +232,7 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
   }
   // A search with no page read yet: read the top result so the answer rests on a real page.
   if(!sources.length&&canSearch&&!pasted.length&&ops<maxOps)await run(plainPlan(text));
+  if(!sources.length&&canSearch&&!pasted.length&&ops<maxOps&&!steps.some(t=>/^Searching the web/.test(t))){const q=searchQuery(text);if(q.length>=3)await run([{search:q,openTop:2}])}
   step(sources.length?'Done: read '+sources.length+' page'+(sources.length===1?'':'s'):'Done');
  }finally{await browser.close().catch(()=>{})}
  if(!blocks.length)return{context:'',sources:[]};
@@ -223,3 +241,4 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
 }
 
 module.exports={createBrowser,describePage,searchText,needsWeb,parseWeb,gather,clip,hostOf,linksIn,searchQuery,topicOf,keyWords,relevant,subjectsOf,blockedPage,plainPlan};
+module.exports={createBrowser,describePage,searchText,needsWeb,parseWeb,gather,clip,hostOf,linksIn,searchQuery,plainPlan,keyWords,relevant};

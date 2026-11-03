@@ -91,3 +91,23 @@ test("Discuss answers like a consultant: direct answer first, tables for compari
  assert.match(prompt,/cite the pages as \[1\], \[2\]/);
  assert.match(prompt,/never say you researched/);
 });
+
+test("search phrases drop how-to-answer words, and only results about the question are read",async()=>{
+ assert.equal(web.searchQuery("Compare Wave and Xero for a small accounting firm. Research it and show it as a table."),"Compare Wave and Xero for a small accounting firm");
+ assert.deepEqual(web.keyWords("Compare Wave and Xero for a small accounting firm"),["wave","xero","accounting"]);
+ const opened=[];
+ const out=await web.gather("Compare Wave and Xero for a small accounting firm. Research it and show it as a table.",{
+  callModel:async()=>{throw Error("no model")},
+  webSearch:async()=>["https://www.diffchecker.com/text-compare/","http://127.0.0.1:9/xero","https://text-compare.com/","http://127.0.0.1:9/wave"],
+  browseSite:async(u,o)=>{opened.push(u);return fakeBrowse({...PAGES,"http://127.0.0.1:9/xero":{title:"Xero plans",text:"Xero plans"},"http://127.0.0.1:9/wave":{title:"Wave pricing",text:"Wave pricing"}})(u,o)}
+ });
+ assert.deepEqual(opened,["http://127.0.0.1:9/xero","http://127.0.0.1:9/wave"],"text-compare tools are skipped");
+ assert.deepEqual(out.sources.map(s=>s.title),["Xero plans","Wave pricing"]);
+});
+
+test("a new chat from the home page is greeted like a person, not asked what 'New chat' should do",()=>{
+ const S=require("../builder-smalltalk");
+ const r=S.reply("greeting",{name:"New chat",messages:[],versions:[]});
+ assert.match(r,/^Hi! What would you like to build, or talk through first\?/);
+ assert.doesNotMatch(r,/New chat should do/);
+});
