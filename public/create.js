@@ -12,11 +12,11 @@ async function api(path,{method='GET',body}={}){
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
- for(const id of ['auth','home','editor','share-screen','check-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
- const app=screen==='home'||screen==='editor'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
+ const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
@@ -24,8 +24,9 @@ function show(screen){
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates','side-check'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins'])$(b).removeAttribute('aria-current');
  if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
+ if(screen==='plugins-screen')$('side-plugins').setAttribute('aria-current','page');
  if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -196,6 +197,73 @@ $('new-template').onclick=()=>{homeTab('templates');$('browser').scrollIntoView(
 $('side-new').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();else homeTab('projects');$('home').scrollTo({top:0,behavior:'smooth'});$('new-prompt').focus()};
 $('side-projects').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();homeTab('projects');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
 $('side-templates').onclick=async()=>{if($('home').classList.contains('hidden'))await loadHome();homeTab('templates');$('browser').scrollIntoView({behavior:'smooth',block:'start'})};
+// ---------- Plugins and skills (a full page) ----------
+// The account's skill library (built-in and its own). A skill switched on is used in every
+// project (the same "all projects" setting as the Design dialog). Counts are real: nothing shown
+// here is made up.
+const plugins={list:[],tab:'All',q:''};
+const PL_GROUPS=['Styles','Page types','Craft','Your skills'];
+const plGroup=sk=>{if(sk.source!=='builtin')return'Your skills';const g=String(sk.group||'Styles').trim();return g[0].toUpperCase()+g.slice(1)};
+const plInitials=n=>{const w=String(n||'?').replace(/[^A-Za-z0-9 ]+/g,' ').trim().split(/\s+/);return((w[0]||'?')[0]+((w[1]||w[0]||'')[w[1]?0:1]||'')).toUpperCase().replace(/^(.)(.)$/,(m,a,b)=>a+b.toLowerCase())};
+function renderPlugins(){
+ const owner=state.me?.viewer?.kind==='owner'||state.me?.viewer?.kind==='customer';
+ const on=plugins.list.filter(s=>s.always).length;
+ const pill=$('pl-count');pill.hidden=!plugins.list.length;text(pill,on+' turned on');
+ const tabs=$('pl-tabs');tabs.replaceChildren();
+ // Known groups first, then any other group a skill names (counts always add up to All).
+ const groups=[...new Set([...PL_GROUPS,...plugins.list.map(plGroup)])];
+ if(plugins.tab!=='All'&&!plugins.list.some(s=>plGroup(s)===plugins.tab))plugins.tab='All';
+ for(const g of ['All',...groups]){
+  const n=g==='All'?plugins.list.length:plugins.list.filter(s=>plGroup(s)===g).length;
+  if(!n&&g!=='All')continue;
+  const b=el('button',null,g==='All'?'All plugins':g);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(plugins.tab===g));
+  b.append(el('span','n',String(n)));b.onclick=()=>{plugins.tab=g;renderPlugins()};tabs.append(b);
+ }
+ const q=plugins.q.toLowerCase();
+ const shown=plugins.list.filter(s=>(plugins.tab==='All'||plGroup(s)===plugins.tab)&&(!q||(s.name+' '+s.description).toLowerCase().includes(q)));
+ const grid=$('pl-grid');grid.replaceChildren();
+ for(const sk of shown){
+  const li=el('li','tp-card'),top=el('div','tp-card-top'),g=plGroup(sk);
+  const ic=el('span','tp-ic g'+Math.max(0,PL_GROUPS.indexOf(g)),plInitials(sk.name));ic.setAttribute('aria-hidden','true');
+  const nm=el('span','tp-name',sk.name);nm.append(el('small',null,g+(sk.source==='github'?' · GitHub':'')));
+  top.append(ic,nm);
+  const foot=el('div','tp-card-foot');
+  foot.append(el('span','small',sk.always?'On for all projects':'Off'));
+  if(sk.url){const a=el('a',null,'Source');a.href=sk.url;a.target='_blank';a.rel='noopener';foot.append(a)}
+  if(owner&&sk.source!=='builtin'){const del=el('button','link-btn','Remove');del.type='button';del.onclick=async()=>{if(!confirm('Remove the skill "'+sk.name+'"?'))return;text($('pl-error'),'');try{await api('/skills',{method:'DELETE',body:{id:sk.id}});await loadPlugins()}catch(err){text($('pl-error'),err.message)}};foot.append(del)}
+  foot.append(el('span','tp-grow'));
+  const sw=el('button','tp-sw');sw.type='button';sw.setAttribute('role','switch');sw.setAttribute('aria-checked',String(sk.always));sw.setAttribute('aria-label',sk.name+(sk.always?' is on':' is off'));sw.disabled=!owner;
+  sw.onclick=async()=>{const next=!sk.always;sw.disabled=true;sw.setAttribute('aria-checked',String(next));text($('pl-error'),'');
+   try{const r=await api('/skills/default',{method:'POST',body:{id:sk.id,on:next}});plugins.list=r.skills;renderPlugins()}catch(err){sw.setAttribute('aria-checked',String(sk.always));sw.disabled=false;text($('pl-error'),err.message)}};
+  foot.append(sw);
+  li.append(top,el('p','tp-desc',sk.description||''),foot);grid.append(li);
+ }
+ $('pl-empty').classList.toggle('hidden',shown.length>0||!plugins.list.length);
+ $('pl-add-open').classList.toggle('hidden',!owner);
+}
+async function loadPlugins(){const r=await api('/skills');plugins.list=r.skills||[];renderPlugins()}
+async function openPlugins(){
+ show('plugins-screen');text($('pl-error'),'');
+ if(!plugins.list.length)$('pl-grid').replaceChildren(el('li','tp-empty','Loading…'));
+ try{await loadPlugins()}catch(err){$('pl-grid').replaceChildren();text($('pl-error'),err.message)}
+}
+$('side-plugins').onclick=openPlugins;
+$('pl-search').oninput=e=>{plugins.q=e.target.value.trim();renderPlugins()};
+const plAddClose=()=>{$('pl-add').classList.add('hidden');$('pl-add').reset();$('pl-choices').replaceChildren();text($('pl-status'),'')};
+$('pl-add-open').onclick=()=>{const f=$('pl-add');f.classList.toggle('hidden');if(!f.classList.contains('hidden'))$('pl-url').focus()};
+$('pl-add-cancel').onclick=plAddClose;
+async function plAdd(path){
+ const url=$('pl-url').value.trim(),body=url?{url,path}:{text:$('pl-text').value};
+ if(!url&&!body.text.trim())return text($('pl-status'),'Paste a GitHub link or the skill text.');
+ text($('pl-status'),'Adding…');text($('pl-error'),'');$('pl-choices').replaceChildren();
+ try{
+  const r=await api('/skills',{method:'POST',body});
+  if(r.choices){text($('pl-status'),'This repository has '+r.choices.length+' skills. Pick one:');for(const c of r.choices){const b=el('button',null,c.name);b.type='button';b.onclick=()=>plAdd(c.path);$('pl-choices').append(b)}return}
+  plAddClose();await loadPlugins();text($('pl-error'),'');
+  text($('pl-status'),'');plugins.tab='Your skills';renderPlugins();
+ }catch(err){text($('pl-status'),'');text($('pl-error'),err.message)}
+}
+$('pl-add').onsubmit=e=>{e.preventDefault();plAdd()};
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
