@@ -117,7 +117,9 @@ test("work and replies like Emergent: step rows, a finished line, next steps tha
   assert.match(js, /el\('span','agent-done-t','Kairoq Agent finished'\)/);
   assert.match(js, /b\.onclick=\(\)=>\{const t=\$\('chat-input'\);t\.value=ask;/, "a next step goes into the message box, nothing is spent");
   assert.match(css, /#messages \.rail \.ev\{position:relative;display:flex!important/);
-  assert.match(css, /#chat-form \.idea-chip\.idea-row\{display:inline-flex!important[^}]*border-radius:999px/);
+  // Like Lovable: next steps are small pills above the message box, not rows inside it.
+  assert.match(css, /#editor \.composer-ideas \.idea-chip\{[^}]*border-radius:999px/);
+  assert.match(read("create.html"), /id="composer-ideas"[^>]*><\/div>\n\s*<form id="chat-form"/);
 });
 
 test("settings live in the preview area like Emergent: Connectors, Payments, Secrets, Monitoring from real project data", () => {

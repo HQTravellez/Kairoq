@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="/ui/tools.css?v=3">
 <link rel="stylesheet" href="/ui/browser.css?v=2">
 <link rel="stylesheet" href="/ui/tool-pages.css?v=9">
-<link rel="stylesheet" href="/ui/forma.css?v=44">
+<link rel="stylesheet" href="/ui/forma.css?v=45">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -711,35 +711,33 @@
     </form>
     <!-- While Kairoq works: one line above the message box, like Lovable ("Yoga studio: Building the schedule page"). -->
     <div class="ks-strip hidden" id="ks-strip" role="status" aria-live="polite"><span class="ks-strip-dot" aria-hidden="true"></span><span class="ks-strip-text"><b id="ks-strip-name"></b><span id="ks-strip-line"></span></span><button type="button" class="ks-strip-stop" id="ks-strip-stop" aria-label="Stop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg></button></div>
+    <div class="composer-ideas hidden" id="composer-ideas" aria-label="Suggested next steps"></div>
     <form id="chat-form" class="composer">
-      <div class="composer-ideas hidden" id="composer-ideas" aria-label="Suggested next steps"></div>
       <div class="attachments hidden" id="attachments"></div>
       <textarea id="chat-input" rows="1" placeholder="Ask for a change: add a pricing section, make the header sticky…" required></textarea>
       <div class="composer-bar">
         <button type="button" class="ghost icon-btn clip" id="attach-clip" title="Attach images or files: screenshots, PDF, Word, text, CSV" aria-label="Attach images or files"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/></svg></button>
         <details class="menu up" id="menu-plus">
           <summary aria-label="Add to your message" title="Images, Figma, a reference site, or a design polish">+</summary>
-          <div class="menu-panel">
-            <p class="menu-note">Add</p>
-            <button type="button" id="attach"><b>Files and images</b><span>Screenshots, PDF, Word, text or CSV for the AI to use</span></button>
-            <button type="button" id="figma-open"><b>Figma</b><span>Build a Figma frame</span></button>
-            <button type="button" id="ref-open"><b>Reference</b><span>Your own version of a site, repo or screenshots</span></button>
-            <button type="button" id="voice-insert"><b>Insert transcript</b><span>Use a recording transcribed in Voice studio</span></button>
-            <p class="menu-note">Tools</p>
-            <button type="button" id="integrations-open"><b>Integrations</b><span>Payments, booking, email and more from our partners</span></button>
-            <button type="button" id="polish"><b>Polish the design</b><span>Screenshot the app and fix what looks off</span></button>
-            <a href="/voice.html" target="_blank" rel="noopener"><b>Voice studio</b><span>Generate narration and transcribe recordings</span></a>
-            <p class="menu-note">Settings</p>
-            <button type="button" id="builder-model-open"><b>Model</b><span>Auto · Recommended</span></button>
-            <button type="button" id="builder-advanced-open"><b>Advanced controls</b><span>Project settings and integrations</span></button>
+          <div class="menu-panel plus-panel">
+            <label class="plus-search"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" id="plus-search" placeholder="Search…" aria-label="Search the add menu" autocomplete="off"></label>
+            <button type="button" id="attach" title="Screenshots, PDF, Word, text or CSV"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/></svg><b>Attach files</b></button>
+            <button type="button" id="plus-connectors" title="Payments, email, GitHub and more"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/></svg><b>Connectors</b></button>
+            <button type="button" id="integrations-open" title="Booking, payments and partner tools"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM16.5 13v7M13 16.5h7"/></svg><b>Integrations</b></button>
+            <button type="button" id="figma-open" title="Build a screen from a Figma frame"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h3v6H9a3 3 0 0 1 0-6zM12 3h3a3 3 0 0 1 0 6h-3zM9 9h3v6H9a3 3 0 0 1 0-6zM15 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM9 15h3v3a3 3 0 1 1-3-3z"/></svg><b>Figma</b></button>
+            <button type="button" id="ref-open" title="Your own version of a site or repo"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><b>Reference site</b></button>
+            <button type="button" id="polish" title="Screenshot the app and fix what looks off"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 15 9M14 4v3M19 9h-3M17.5 5.5l-2 2M9 3l.7 1.6L11.3 5l-1.6.7L9 7.3l-.7-1.6L6.7 5l1.6-.7z"/></svg><b>Polish the design</b></button>
+            <button type="button" id="voice-insert" title="Use a recording from Voice studio"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg><b>Voice transcript</b></button>
+            <a href="/voice.html" target="_blank" rel="noopener" title="Generate narration and transcribe recordings"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg><b>Voice studio</b></a>
+            <button type="button" id="builder-model-open" hidden><b>Model</b></button>
+            <button type="button" id="builder-advanced-open" hidden><b>Advanced controls</b></button>
           </div>
         </details>
-        <button type="button" class="ghost icon-btn cn-spin" id="composer-connect" title="Connectors: payments, email, GitHub and more" aria-label="Connectors"><span class="cn-spin-ico" aria-hidden="true"></span></button>
+        <button type="button" class="ghost icon-btn cn-spin" id="composer-connect" hidden title="Connectors: payments, email, GitHub and more" aria-label="Connectors"><span class="cn-spin-ico" aria-hidden="true"></span></button>
         <details class="menu up pick" id="menu-mode">
           <summary aria-label="Mode"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg><span id="mode-label">Build</span></summary>
           <div class="menu-panel" role="menu">
-            <p class="menu-note">How Kairoq should work on your next message</p>
-            <button type="button" id="mode-build" aria-pressed="true"><b>Build</b><span>Makes the change now and tests it in a browser</span></button>
+                        <button type="button" id="mode-build" aria-pressed="true"><b>Build</b><span>Makes the change now and tests it in a browser</span></button>
             <button type="button" id="mode-discuss" aria-pressed="false"><b>Discuss</b><span>Talk it through and plan first. Nothing in the app changes</span></button>
             <button type="button" id="mode-agent" aria-pressed="false"><b>Agent</b><span>Works in steps: writes code, tests it, reads logs and fixes until done</span></button>
           </div>
@@ -1695,7 +1693,7 @@
 <script src="/voice-builder.js" defer></script>
 <script src="/create-look.js?v=7"></script>
 <script src="/builder-browser-pane.js?v=7"></script>
-<script src="/create.js?v=20261153"></script>
+<script src="/create.js?v=20261154"></script>
 <script src="/builder-split-preview.js?v=4"></script>
 </body>
 </html>
