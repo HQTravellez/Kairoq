@@ -788,3 +788,30 @@ html body.app.in-editor #editor .mg-search input{flex:1;height:100%!important;bo
 html body.app.in-editor #editor .mg-search svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;color:var(--f-mut2,#716F77)}
 html body.app.in-editor #editor #manage .muted.small{font-size:12.5px!important;line-height:1.5!important;color:var(--c-ink-3,#625F68)!important}
 @media (max-width:820px){html body.app.in-editor #editor .mg-publish{flex-direction:column;align-items:flex-start}}
+/* ---------- Model menu, share popover and the floating preview bar, like Emergent ---------- */
+html body.app.in-editor #editor #tier-panel .model-when{margin:0 0 6px!important;padding:6px 8px;border-radius:7px;background:#F4F3EF;font-size:11.5px;color:var(--c-ink-3,#625F68)}
+html body.app.in-editor #editor #tier-panel .model-tag.cost{background:#F1EFEA!important;color:var(--c-ink-3,#625F68)!important}
+html body.app.in-editor #editor #tier-panel .model-tag.costly{background:#FDECE6!important;color:#B4532A!important}
+html body.app.in-editor #editor .share-pop-pic{margin:-2px -2px 10px;border-radius:10px;overflow:hidden;border:1px solid var(--c-line,#E6E4DF);aspect-ratio:16/9;background:#F4F3EF}
+html body.app.in-editor #editor .share-pop-pic img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+html body.app.in-editor #editor .share-pop-pic.hidden,html body.app.in-editor #editor .share-pop-social.hidden{display:none!important}
+html body.app.in-editor #editor .share-pop-social{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+html body.app.in-editor #editor .share-on{display:flex;align-items:center;justify-content:center;height:32px;border-radius:8px;background:#F4F3EF;color:var(--c-ink,#1C1B1F);font-size:12.5px;font-weight:500;text-decoration:none}
+html body.app.in-editor #editor .share-on:hover{background:#EAE7E1}
+html body.app.in-editor #editor #canvas{position:relative}
+html body.app.in-editor #editor .pv-float{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:4px;padding:4px;border-radius:12px;background:rgba(255,255,255,.96);border:1px solid var(--c-line,#E6E4DF);box-shadow:0 12px 30px -14px rgba(36,35,41,.45);backdrop-filter:blur(8px);transition:transform .25s var(--f-ease,ease),opacity .2s ease}
+html body.app.in-editor #editor #canvas[data-view]:not([data-view=preview])>.pv-float{display:none!important}
+html body.app.in-editor #editor .pv-float :is(#visual-toggle,.pv-btn){display:inline-flex!important;align-items:center;gap:6px;height:30px!important;min-width:30px;padding:0 9px!important;border:0!important;border-radius:8px!important;background:transparent!important;box-shadow:none!important;color:var(--c-ink-2,#3C3A42)!important;font:500 12.5px Inter,sans-serif!important;cursor:pointer;justify-content:center}
+html body.app.in-editor #editor .pv-float :is(#visual-toggle,.pv-btn):hover{background:#F1EFEA!important}
+html body.app.in-editor #editor .pv-float :is(#visual-toggle,.pv-btn)[aria-pressed=true]{background:var(--f-lilac,#ECE8F3)!important;color:var(--c-accent,#7552E8)!important}
+html body.app.in-editor #editor .pv-float svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+html body.app.in-editor #editor .pv-float .seg.icons{display:flex!important;gap:2px;padding:0 4px!important;margin:0!important;border:0!important;border-left:1px solid var(--c-line,#E6E4DF)!important;border-right:1px solid var(--c-line,#E6E4DF)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+html body.app.in-editor #editor .pv-float .seg.icons button{width:30px!important;height:30px!important;padding:0!important;border-radius:8px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--c-ink-3,#625F68)!important}
+html body.app.in-editor #editor .pv-float .seg.icons button[aria-pressed=true]{background:#F1EFEA!important;color:var(--c-ink,#1C1B1F)!important}
+html body.app.in-editor #editor .pv-float .seg.icons .seg-thumb{display:none!important}
+html body.app.in-editor #editor .pv-float .pv-fold svg{transition:transform .25s var(--f-ease,ease)}
+html body.app.in-editor #editor .pv-float.min>:not(.pv-fold){display:none!important}
+html body.app.in-editor #editor .pv-float.min .pv-fold svg{transform:rotate(180deg)}
+html body.app.in-editor #editor .pv-float.min{transform:translate(-50%,0);opacity:.85}
+html body.app.in-editor #editor .stage.pv-full{position:fixed!important;inset:0!important;z-index:80!important;background:var(--c-bg,#F7F6F2)!important;width:auto!important;height:auto!important;max-width:none!important;border-radius:0!important}
+@media (max-width:820px){html body.app.in-editor #editor .pv-float{bottom:10px}html body.app.in-editor #editor .pv-float .pv-lbl{display:none}}

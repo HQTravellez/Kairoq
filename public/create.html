@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="/ui/tools.css?v=3">
 <link rel="stylesheet" href="/ui/browser.css?v=2">
 <link rel="stylesheet" href="/ui/tool-pages.css?v=7">
-<link rel="stylesheet" href="/ui/forma.css?v=13">
+<link rel="stylesheet" href="/ui/forma.css?v=14">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -795,12 +795,14 @@
       <div class="share-pop-wrap">
       <button class="ghost" id="share-open" type="button" aria-expanded="false" aria-controls="share-pop">Share</button>
       <div class="share-pop hidden" id="share-pop" role="dialog" aria-label="Share">
+        <div class="share-pop-pic hidden" id="share-pop-pic"></div>
         <p class="share-pop-title">Share a preview</p>
         <div class="share-pop-off" id="share-pop-off"><p>Anyone with the link sees a live preview. They can't change anything.</p><button type="button" class="ghost" id="share-pop-on">Create link</button></div>
         <div class="share-pop-on hidden" id="share-pop-link"><div class="share-pop-row"><input id="share-pop-url" readonly aria-label="Preview link"><button type="button" class="ghost" id="share-pop-copy">Copy link</button></div>
           <label class="check"><input type="checkbox" id="share-pop-remix"> Let them copy the app into their account</label>
           <button type="button" class="link-btn" id="share-pop-stop">Stop sharing</button></div>
         <div class="share-pop-live" id="share-pop-live"></div>
+        <div class="share-pop-social hidden" id="share-pop-social" aria-label="Share on"></div>
         <button type="button" class="primary" id="share-pop-publish">Publish your site</button>
         <button type="button" class="link-btn" id="share-pop-team">Invite teammates</button>
         <p class="error" id="share-pop-error" role="alert"></p>
@@ -1684,7 +1686,7 @@
 <script src="/voice-builder.js" defer></script>
 <script src="/create-look.js?v=7"></script>
 <script src="/builder-browser-pane.js?v=7"></script>
-<script src="/create.js?v=20261120"></script>
+<script src="/create.js?v=20261121"></script>
 <script src="/builder-split-preview.js?v=4"></script>
 </body>
 </html>

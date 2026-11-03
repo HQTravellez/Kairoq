@@ -529,7 +529,26 @@ function formaRows(){
   win.append(re,addr,op);dev.prepend(win);
   const foot=el('div','fm-foot');foot.append(el('span','fm-live'),el('span',null,''),el('span','fm-grow'),el('span','fm-size',''));foot.querySelector('span:nth-child(2)').id='fm-version';foot.querySelector('.fm-size').id='fm-size';dev.append(foot);
  }
+ previewFloat();
  refreshWindow();
+}
+// Like Emergent: a small floating bar on the preview with Edit, Desktop / Phone and Full screen.
+// The buttons are the editor's own (moved here), so they work exactly as before.
+function previewFloat(){
+ const canvas=$('canvas');if(!canvas||canvas.querySelector('.pv-float'))return;
+ const bar=el('div','pv-float');bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Preview tools');
+ const vis=$('visual-toggle');if(vis){if(!vis.querySelector('.pv-lbl'))vis.append(el('span','pv-lbl','Edit'));bar.append(vis)}
+ const seg=$('preview-bar-tools')?.querySelector('.seg.icons');if(seg)bar.append(seg);
+ const full=el('button','pv-btn');full.type='button';full.title='Full screen';full.setAttribute('aria-label','Full screen');full.setAttribute('aria-pressed','false');
+ full.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+ const stage=document.querySelector('#editor .stage');
+ const setFull=on=>{stage?.classList.toggle('pv-full',on);full.setAttribute('aria-pressed',String(on));full.title=on?'Exit full screen':'Full screen'};
+ full.onclick=()=>setFull(!stage?.classList.contains('pv-full'));
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&stage?.classList.contains('pv-full'))setFull(false)});
+ const fold=el('button','pv-btn pv-fold');fold.type='button';fold.title='Hide the tools';fold.setAttribute('aria-label','Hide the preview tools');
+ fold.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+ fold.onclick=()=>{const min=bar.classList.toggle('min');fold.title=min?'Show the tools':'Hide the tools';fold.setAttribute('aria-label',min?'Show the preview tools':'Hide the preview tools')};
+ bar.append(full,fold);canvas.append(bar);
 }
 function refreshWindow(){
  const p=state.project;if(!p||!$('fm-addr-text'))return;
@@ -1561,6 +1580,11 @@ function renderSharePop(){
  text($('share-pop-copy'),'Copy link');
  const live=$('share-pop-live');live.replaceChildren();
  if(p.published){const a=el('a',null,location.origin+'/sites/'+p.published.slug+'/');a.href=a.textContent;a.target='_blank';a.rel='noopener';live.append(el('span','muted small','Live at '),a)}
+ // Like Emergent's Share: a picture of the app, and share-on links for its public address.
+ const pic=$('share-pop-pic');pic.replaceChildren();pic.classList.toggle('hidden',!p.thumb);
+ if(p.thumb){const img=el('img');img.src=p.thumb;img.alt='';img.loading='lazy';img.onerror=()=>pic.classList.add('hidden');pic.append(img)}
+ const pub=p.published?location.origin+'/sites/'+p.published.slug+'/':on?location.origin+p.share.url:'',soc=$('share-pop-social');soc.replaceChildren();soc.classList.toggle('hidden',!pub);
+ if(pub)for(const [name,href] of [['X','https://twitter.com/intent/tweet?url='],['Facebook','https://www.facebook.com/sharer/sharer.php?u='],['LinkedIn','https://www.linkedin.com/sharing/share-offsite/?url=']]){const a=el('a','share-on',name);a.href=href+encodeURIComponent(pub);a.target='_blank';a.rel='noopener noreferrer';a.setAttribute('aria-label','Share on '+name);soc.append(a)}
  text($('share-pop-publish'),p.published?'Publish changes':'Publish your site');
  $('share-pop-team').classList.toggle('hidden',state.project.role!=='owner');
 }
@@ -2032,6 +2056,7 @@ function renderTiers(){
  const usable=models.filter(m=>m.enabled),all=[...usable,...freeModels];
  if(!all.some(m=>m.id===state.model))state.model='auto';
  const panel=$('tier-panel');panel.replaceChildren();
+ panel.append(el('p','model-when','Model changes apply from your next message'));
  const q=el('input','model-search');q.type='search';q.placeholder='Search '+(all.length>8?all.length+' models':'models');q.setAttribute('aria-label','Search models');panel.append(q);
  const list=el('div','model-list');panel.append(list);
  const row=m=>{
@@ -2041,6 +2066,8 @@ function renderTiers(){
   if(m.free===true||m.credits===0)name.append(el('i','model-tag free','Free'));
   body.append(name,el('span',null,m.note||''));b.append(modelMark(m),body);
   if(m.credits)b.title=m.credits+' credit'+(m.credits===1?'':'s')+' a message'+(m.costlier?' (costlier)':'');
+  if(m.credits&&m.id!=='auto')name.append(el('i','model-tag cost',m.credits+' credit'+(m.credits===1?'':'s')));
+  if(m.costlier)name.append(el('i','model-tag costly','Costlier'));
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
   return b;
  };
