@@ -2707,9 +2707,12 @@ async function watch(job){
   state.runtimeErrors=[];
   renderMessages();renderVersions();
   if(wasLive){const k=state.project.messages.length-1;if(k>=0&&state.project.messages[k].role==='assistant')openDetail(k);else closeDetail()}
-  if(done.mode!=='discuss'){if(project.preview_url!==state.previewBase)swapPreview(project.preview_url);if(done.status==='complete'&&!done.problem&&project.preview_url){const ready=el('li','assistant preview-ready','Preview ready');ready.setAttribute('role','status');$('messages').append(ready)}}
+  if(done.mode!=='discuss'){if(project.preview_url!==state.previewBase)swapPreview(project.preview_url);// "Preview ready" only when this run made a new version; a run that built nothing says so itself.
+  const builtNothing=Boolean(done.result&&done.result.not_built);
+  if(done.status==='complete'&&!done.problem&&!builtNothing&&project.preview_url){const ready=el('li','assistant preview-ready','Preview ready');ready.setAttribute('role','status');$('messages').append(ready)}}
   if(done.problem)$('messages').append(messageItem({role:'assistant',text:(done.problem==='checks'?'This change still breaks a saved check. Use Fix it or describe the problem.':'This change still shows errors in the browser. Use Fix it to repair them.')+(done.free?' '+done.free:'')+(done.fix_on_us?' The fix is on us: the next Fix costs nothing.':'')}));
-  else if(done.free)$('messages').append(messageItem({role:'assistant',text:done.free}));
+  // The not-built message already says nothing was charged; a second "it was free" line repeats it.
+  else if(done.free&&!(done.result&&done.result.not_built))$('messages').append(messageItem({role:'assistant',text:done.free}));
   if(done.model_fallback)$('messages').append(messageItem({role:'assistant',text:done.model_fallback}));
   if(done.result&&done.result.polish_error)$('messages').append(messageItem({role:'assistant',text:done.result.polish_error}));
   if(done.result&&done.result.reference&&done.mode==='agent')$('messages').append(messageItem({role:'assistant',text:referenceReport(done.result.reference)}));
