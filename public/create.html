@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="/ui/tools.css?v=3">
 <link rel="stylesheet" href="/ui/browser.css?v=2">
 <link rel="stylesheet" href="/ui/tool-pages.css?v=7">
-<link rel="stylesheet" href="/ui/forma.css?v=20">
+<link rel="stylesheet" href="/ui/forma.css?v=24">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -702,6 +702,8 @@
       <p class="error" id="visual-error" role="alert"></p>
       <div class="row end"><button class="ghost" id="visual-cancel" type="button">Done editing</button></div>
     </form>
+    <!-- While Kairoq works: one line above the message box, like Lovable ("Yoga studio: Building the schedule page"). -->
+    <div class="ks-strip hidden" id="ks-strip" role="status" aria-live="polite"><span class="ks-strip-dot" aria-hidden="true"></span><span class="ks-strip-text"><b id="ks-strip-name"></b><span id="ks-strip-line"></span></span><button type="button" class="ks-strip-stop" id="ks-strip-stop" aria-label="Stop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg></button></div>
     <form id="chat-form" class="composer">
       <div class="composer-ideas hidden" id="composer-ideas" aria-label="Suggested next steps"></div>
       <div class="attachments hidden" id="attachments"></div>
@@ -1686,7 +1688,7 @@
 <script src="/voice-builder.js" defer></script>
 <script src="/create-look.js?v=7"></script>
 <script src="/builder-browser-pane.js?v=7"></script>
-<script src="/create.js?v=20261126"></script>
+<script src="/create.js?v=20261130"></script>
 <script src="/builder-split-preview.js?v=4"></script>
 </body>
 </html>

@@ -770,6 +770,7 @@ $('ob-form').onsubmit=async e=>{
  try{await askThenBuild(what+'\n\nIt is for '+onboardFor()+'.',$('ob-name').value)}catch(err){text($('ob-error'),err.message)}finally{go.disabled=false}
 };
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
+$('ks-strip-stop').onclick=()=>$('stop-job').click();
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
 // ui/screens: on a phone the menu is a drawer; a tap outside it closes it.
@@ -1307,10 +1308,14 @@ function messageItem(m,last,index){
    const rail=el('ol','rail done'),fold=el('div','fold');fold.append(rail);
    // Like Emergent: each step is a slim row (an icon, what was done, the file); an edit opens its diff.
    // The latest reply shows its steps; older replies keep them folded.
-   const fill=()=>{if(!rail.childElementCount)for(const e of tl.filter(e=>e.t!=='think'||e.text))rail.append(eventRow(e,{expand:true,version:m.version}))};
+   const fill=()=>{if(!rail.childElementCount)for(const e of tl.filter(e=>e.t!=='say'&&(e.t!=='think'||e.text||e.note)))rail.append(eventRow(e,{expand:true,version:m.version}))};
    b.onclick=()=>{fill();const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
    li.append(b,fold);
   }
+  // Like Lovable: what Kairoq said while it worked (a grey heading, its line under it, the
+  // thinking folded), then one card for the change (Details, Preview), then its message.
+  const story=storyRows(tl);if(story)li.append(story);
+  if(m.version&&index>=0)li.append(resultCard(m,index));
   const verdict=verdictCard(m.text,m);
   if(verdict)li.append(...verdict);else li.append(renderMarkdown(readable(m.text)));
   // The builder's open question: one click answers it and builds (asking was free).
@@ -1337,7 +1342,7 @@ function messageItem(m,last,index){
    li.append(q,el('p','q-hint','Pick an idea to build it, or tell me what you want.'));
   }
   // The same steps already fold out under "Worked for …"; list them here only when that line is absent.
-  const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan');
+  const acts=tl.filter(e=>e.t!=='think'&&e.t!=='plan'&&e.t!=='say');
   if(acts.length&&!((thoughtMs!=null||tl.length)&&index>=0)){
    const d=el('details','acts'),s=el('summary');s.append(icon('down','toggle'),el('span',null,summarize(tl)||acts.length+' steps'));
    d.append(s,rail(acts.slice(0,30),{}));li.append(d);
@@ -1431,6 +1436,40 @@ function verdictParts(raw){
  notes=notes.replace(/^Stopped after (\d+) steps?\.\s*(The last changes did not build, so the last working build was saved\.)?\s*/,(_,n,kept)=>'I used all '+n+' rounds before every check passed'+(kept?', so the last working build is what you see':'')+'. ');
  const repairs=Number((rows.find(r=>r.label==='Repair attempts')||{}).value)||0;
  return{ok,tested,todo,notes,repairs};
+}
+function storyRow(e){
+ const row=el('div','ks-step');
+ if(e.title){
+  const h=el('button','ks-head',e.title);h.type='button';
+  if(e.note){h.append(icon('chev','ks-chev'));h.setAttribute('aria-expanded','false');
+   h.onclick=()=>{const open=h.getAttribute('aria-expanded')!=='true';h.setAttribute('aria-expanded',String(open));let n=row.querySelector('.ks-note');if(open&&!n){n=el('div','ks-note');n.append(icon('think'),el('p',null,e.note));h.after(n)}else if(!open&&n)n.remove()}}
+  else h.disabled=true;
+  row.append(h);
+ }
+ if(e.text){const p=el('p','ks-say');inlineMd(p,e.text);row.append(p)}
+ return row;
+}
+// The line above the message box while a job runs: the project, then what Kairoq is doing now
+// (its latest heading, or the stage in plain words). Stop is the editor's own Stop.
+function liveStrip(j){
+ const s=$('ks-strip');if(!s)return;
+ if(!j||j.status==='complete'||j.status==='failed'){s.classList.add('hidden');return}
+ // Present tense, what is happening now (the chat above already has the past-tense headings).
+ const line=liveStatus(j);
+ text($('ks-strip-name'),(state.project?.name||'Kairoq')+': ');
+ const t=$('ks-strip-line');if(t.textContent!==line){t.textContent=line;t.classList.remove('in');void t.offsetWidth;t.classList.add('in')}
+ s.classList.remove('hidden');
+}
+function storyRows(tl){const says=(tl||[]).filter(e=>e.t==='say'&&(e.text||e.title));if(!says.length)return null;const box=el('div','ks-story');for(const e of says)box.append(storyRow(e));return box}
+// The change as one card: its title, Details (the steps and files) and Preview (that version).
+function resultCard(m,index){
+ const title=m.title||String((state.project?.versions||[]).find(v=>v.n===m.version)?.title||'')||'Version '+m.version;
+ const card=el('div','ks-card'),head=el('div','ks-card-head');
+ head.append(el('span','ks-card-title',title),el('span','ks-card-v','v'+m.version));
+ const row=el('div','ks-card-btns'),det=el('button','ks-btn','Details'),pre=el('button','ks-btn','Preview');det.type=pre.type='button';
+ det.onclick=()=>openDetail(index,'timeline');
+ pre.onclick=()=>{if($('versions'))$('versions').value=String(m.version);setPreview(previewFor(m.version));const tab=document.querySelector('#phone-panes [data-pane=preview]');if(tab&&getComputedStyle($('phone-panes')).display!=='none')tab.click()};
+ row.append(det,pre);card.append(head,row);return card;
 }
 function verdictCard(raw,msg={}){
  const v=verdictParts(raw);if(!v)return null;
@@ -2248,7 +2287,12 @@ function eventRow(e,{expand=false,version=null,live=false}={}){
  const name=e.t==='note'?(e.icon||'note'):e.t;row.append(icon(name));
  const main=el('div','ev-main'),head=el('div','ev-head');main.append(head);row.append(main);
  let more=null;
- if(e.t==='think'){
+ // Kairoq Agent's one line to the owner between steps (react-agent.js "say"): plain text, no pill.
+ if(e.t==='say'){const p=el('li','ev ev-say');const t=el('p','ev-say-text');inlineMd(t,e.text||'');p.append(t);return p}
+ if(e.t==='think'&&e.note!==undefined){
+  head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secsShort(e.ms||0)));
+  if(e.note)more=()=>el('p','ev-thought',e.note);
+ }else if(e.t==='think'){
   if(e.title){const t=el('div','ev-title');inlineMd(t,e.title);main.insertBefore(t,head)}
   head.append(el('span','ev-label',live&&e.live?'Thinking…':'Thought for '+secsShort(e.ms||0)));
   if(e.text)more=()=>el('p','ev-thought',e.text);
@@ -2407,6 +2451,9 @@ function renderWork(j){
  const events=liveEvents(j),cut=Math.max(0,events.length-8);
  if(cut){const more=el('li','ev ev-more');const b=el('button','link-btn',cut+' earlier step'+(cut===1?'':'s'));b.type='button';b.onclick=()=>openDetail('live');more.append(b);r.append(more)}
  for(const e of events.slice(cut))r.append(eventRow(e,{live:true}));
+ // What Kairoq says while it works (its headings and lines), and one line above the message box.
+ {const old=li.querySelector('.ks-story');const st=storyRows(j.events||[]);if(st){st.classList.add('live');if(old)old.replaceWith(st);else li.querySelector('.rail.live').after(st)}else old?.remove()}
+ liveStrip(j);
  if(phaseOf(j)==='thinking'||(j.status==='writing'&&!(st&&st.chars))){const row=el('li','ev ev-think live');row.append(icon('think'));const main=el('div','ev-main'),head=el('div','ev-head');head.append(el('span','ev-label','Thinking'),dots());main.append(head);row.append(main);r.append(row)}
  li.querySelector('.stages').classList.add('hidden');
  const msg=li.querySelector('.work-msg');
@@ -2511,7 +2558,7 @@ async function watch(job){
   }
  });
  if(state.watchToken!==watchToken||state.project?.id!==id)return done;
- clearInterval(work.timer);renderBuildOverlay(null);
+ clearInterval(work.timer);renderBuildOverlay(null);liveStrip(null);
  const wasLive=detailState.source==='live';
  $('stream')?.remove();
  try{if(done&&state.project&&state.project.id===id){

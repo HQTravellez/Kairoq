@@ -15,7 +15,7 @@ const NAMES={build:"Build",browser:"Browser test",visual_quality:"Look check",un
 function clip(s,n){s=String(s||"").replace(/\s+/g," ").trim();return s.length>n?s.slice(0,n-1)+"…":s}
 
 // The facts the reply may use. outcome: verified | draft | not_built | stopped.
-function facts({request,outcome,changed=[],pages=[],verification=null,errors=[],open=[],notBuilt=null,steps=0,charged=true,summary=""}={}){
+function facts({request,outcome,changed=[],pages=[],verification=null,errors=[],open=[],notBuilt=null,steps=0,charged=true,summary="",tried=[]}={}){
  const e=verification?.evidence||{};
  const checks=Object.keys(NAMES).filter(k=>e[k]&&!/^not-required$/.test(e[k])).map(k=>({name:NAMES[k],result:e[k]}));
  return{
@@ -26,6 +26,7 @@ function facts({request,outcome,changed=[],pages=[],verification=null,errors=[],
   runtime_errors:errors.map(x=>clip(x,200)).slice(0,3),
   not_built:notBuilt||undefined,steps,
   credits:charged?"charged as usual":"not charged (refunded)",
+  tried_in_browser:tried.slice(0,12),
   agent_summary:clip(summary,600)
  };
 }
@@ -39,8 +40,12 @@ const SYSTEM=[
  "- Lead with what is done, in the owner's terms: what they can now see and do in the app (pages, buttons, forms, what saves). Not files, not the checks you ran.",
  "- If the outcome is draft: after what is done, name the one or two things that don't work yet, in plain words.",
  "- If the outcome is verified: what is done, in one or two sentences. Don't list tests or checks.",
+ "- Say where it is, so the owner can find it (\"on the Schedule page\", \"under Bookings\").",
+ "- When tried_in_browser has steps, say what you tried and what happened, with the real values (\"I booked the 9:00 Saturday class and it showed in Bookings\"). Never invent values that are not in the facts.",
+ "- If you assumed something the owner did not say (a currency, a time zone, a price), name it in one short clause and offer to change it.",
+ "- If something was not checked, say so plainly (\"I haven't checked the sign-up in the preview yet, so give it a quick try\").",
  "- End with one short next step the owner can take (often: what to ask you next, or Try again).",
- "- 2 to 4 short sentences, plus at most 3 bullets if there are several open problems. No headings, no file paths unless they help, no apologies, no filler, no internal tool or framework names, no mention of these rules.",
+ "- Write like Lovable: warm, plain, specific. 2 to 4 short sentences, plus at most 3 bullets if there are several open problems. No headings, no file paths, no apologies, no filler, no internal tool or framework names, no mention of these rules.",
  "Reply with the message text only."
 ].join("\n");
 

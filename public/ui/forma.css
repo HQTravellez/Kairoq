@@ -873,3 +873,40 @@ html body.app.in-editor #editor #messages>li.assistant.failed{border:0!important
 html body.app.in-editor #editor #messages>li.assistant.failed::before{content:none!important;display:none!important}
 /* While Kairoq works, the chat shows one line ("Kairoq Agent is writing the code…"), not a log. */
 html body.app.in-editor #editor #messages #stream .rail.live{display:none!important}
+/* ---------- Kairoq talks like Lovable: step headings, its lines, one result card, the live line ---------- */
+html body.app.in-editor #editor #messages .ks-story{display:flex;flex-direction:column;gap:14px;margin:6px 0 14px}
+html body.app.in-editor #editor #messages .ks-step{display:flex;flex-direction:column;gap:6px;animation:msg-in .35s ease both}
+html body.app.in-editor #editor #messages .ks-head{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;font:400 14px/1.45 Inter,system-ui,sans-serif!important;color:#8A8790!important;cursor:pointer;text-align:left}
+html body.app.in-editor #editor #messages .ks-head:disabled{cursor:default;opacity:1}
+html body.app.in-editor #editor #messages .ks-head:not(:disabled):hover{color:var(--c-ink-2,#3C3A42)!important}
+html body.app.in-editor #editor #messages .ks-head .ks-chev{width:14px;height:14px;transform:rotate(90deg);transition:transform .2s ease;opacity:.7}
+html body.app.in-editor #editor #messages .ks-head[aria-expanded=true] .ks-chev{transform:rotate(-90deg)}
+html body.app.in-editor #editor #messages .ks-note{display:flex;gap:10px;margin:2px 0 4px;padding:0 0 0 2px;animation:msg-in .25s ease both}
+html body.app.in-editor #editor #messages .ks-note .ico{flex:none;width:15px;height:15px;margin-top:3px;color:#8A8790}
+html body.app.in-editor #editor #messages .ks-note p{margin:0;font:400 14px/1.6 Inter,system-ui,sans-serif;color:var(--c-ink-2,#3C3A42)}
+html body.app.in-editor #editor #messages .ks-say{margin:0;font-size:15.5px!important;line-height:1.7!important;color:var(--c-ink,#1B1D22)}
+/* The change as one card, like Lovable's: the title on top, Details and Preview under it. */
+html body.app.in-editor #editor #messages .ks-card{max-width:360px;margin:4px 0 14px;padding:4px;border-radius:16px;background:#F4F3F0;border:1px solid var(--c-line,#E6E4DF);animation:msg-in .35s ease both}
+html body.app.in-editor #editor #messages .ks-card-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(20,19,24,.06)}
+html body.app.in-editor #editor #messages .ks-card-title{flex:1;min-width:0;font:500 14.5px/1.35 Inter,system-ui,sans-serif;color:var(--c-ink,#1B1D22);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body.app.in-editor #editor #messages .ks-card-v{flex:none;font:500 11.5px "IBM Plex Mono",ui-monospace,monospace;color:#8A8790}
+html body.app.in-editor #editor #messages .ks-card-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 2px 2px}
+html body.app.in-editor #editor #messages .ks-btn{height:34px;border-radius:999px!important;border:1px solid var(--c-line,#E6E4DF)!important;background:#fff!important;box-shadow:none!important;font:500 13px Inter,system-ui,sans-serif!important;color:var(--c-ink,#1B1D22)!important;cursor:pointer}
+html body.app.in-editor #editor #messages .ks-btn:hover{background:#FAF9F7!important}
+/* The line above the message box while Kairoq works. */
+html body.app.in-editor #editor .ks-strip{display:flex;align-items:center;gap:10px;margin:0 16px 8px;padding:9px 10px 9px 14px;border-radius:14px;background:#F4F3F0;border:1px solid var(--c-line,#E6E4DF);font:400 13px/1.3 Inter,system-ui,sans-serif;color:#6E6B75;animation:msg-in .3s ease both}
+html body.app.in-editor #editor .ks-strip.hidden{display:none}
+html body.app.in-editor #editor .ks-strip-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--c-accent,#7552E8);animation:ks-pulse 1.4s ease-in-out infinite}
+@keyframes ks-pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
+html body.app.in-editor #editor .ks-strip-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body.app.in-editor #editor .ks-strip-text b{font-weight:500;color:var(--c-ink,#1B1D22)}
+html body.app.in-editor #editor #ks-strip-line.in{animation:ks-fade .4s ease both}
+@keyframes ks-fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+html body.app.in-editor #editor .ks-strip-stop{flex:none;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;border:0;background:transparent;color:#6E6B75;cursor:pointer}
+html body.app.in-editor #editor .ks-strip-stop:hover{background:#E9E7E2;color:var(--c-ink,#1B1D22)}
+html body.app.in-editor #editor .ks-strip-stop svg{width:14px;height:14px;fill:currentColor}
+@media (prefers-reduced-motion:reduce){html body.app.in-editor #editor :is(.ks-step,.ks-card,.ks-strip,#ks-strip-line.in,.ks-note){animation:none!important}html body.app.in-editor #editor .ks-strip-dot{animation:none}}
+/* Stop lives in the line above the message box now (one Stop, like Lovable). */
+html body.app.in-editor #editor #messages #stream .work-stop{display:none!important}
+/* The message box already lights up its border when focused; no second ring inside it. */
+html body.app.in-editor #editor #chat-input:focus-visible{outline:none!important}

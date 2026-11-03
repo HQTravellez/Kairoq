@@ -70,7 +70,7 @@ test('Agent mode records reads, edits, builds and its thoughts',async()=>{
  const callModel=async(opts,parse)=>parse(JSON.stringify(steps.shift()));
  const r=await agent.run(meta.id,'Add a heading',{callModel});
  const tl=r.timeline;
- assert.deepEqual(tl.filter(e=>e.t==='think').map(e=>e.title),['Look at the page first.','Add a heading.']);
+ assert.deepEqual(tl.filter(e=>e.t==='think').map(e=>e.note),['Look at the page first.','Add a heading.']);
  assert.deepEqual(tl.find(e=>e.t==='read').files,['src/App.jsx']);
  assert.equal(tl.find(e=>e.t==='edit').file,'src/App.jsx');
  assert.ok(tl.some(e=>e.t==='build'&&e.ok));
