@@ -626,3 +626,47 @@ html body.app.in-editor.asking #editor #messages .ask-wait-ic{animation:ad-pulse
 html body.app.in-editor #editor .ad-opt.ad-radio .ad-box{border-radius:50%}
 html body.app.in-editor #editor :is(.ad-opt:has(input[type=radio]),.ad-opt.ad-radio).on .ad-box::after{left:3.5px;top:3.5px;width:6px;height:6px;border:0;border-radius:50%;background:#fff;transform:none}
 @media (max-width:820px){html body.app.in-editor #editor #messages .ask-wait-s{display:none}}
+/* ---------- Plan card and look picker, slim like the question panel ---------- */
+html body.app.in-editor #editor #messages>li.plan-card,html body.app.in-editor #editor #messages>li.ask-card:has(.brand-opts){background:#fff!important;border:1px solid var(--c-line,#E6E4DF)!important;border-radius:12px!important;padding:14px 16px!important;box-shadow:0 1px 2px rgba(36,35,41,.05)!important}
+html body.app.in-editor #editor #messages .plan-card .agent-head{margin:0 0 10px!important;padding:0!important;border:0!important}
+html body.app.in-editor #editor #messages .plan-card .plan-top{display:flex!important;align-items:center;gap:8px;margin:0 0 6px!important;padding:0!important;border:0!important}
+html body.app.in-editor #editor #messages .plan-card .plan-kicker{margin:0!important;font:500 11px "IBM Plex Mono",ui-monospace,monospace!important;letter-spacing:.1em;text-transform:uppercase;color:var(--c-accent,#7552E8)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-meta{margin-left:0!important;padding:1px 8px;border-radius:999px;background:#F4F3EF;font-size:11px!important;color:var(--f-mut2,#716F77)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-title{margin:0 0 4px!important;font-size:15px!important;font-weight:600!important;line-height:1.35!important;color:var(--c-ink,#1C1B1F)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-summary{margin:0 0 12px!important;font-size:13px!important;line-height:1.55!important;color:var(--c-ink-3,#625F68)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-research{margin:0 0 8px!important;font-size:12px!important;color:var(--f-green,#328368)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-more{font-size:13px!important}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot{display:flex!important;align-items:center;gap:8px!important;margin:4px -16px -14px!important;padding:10px 16px!important;border-top:1px solid var(--c-line,#E6E4DF)!important;background:#FBFAF8;border-radius:0 0 12px 12px}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot>*+*{margin-left:0!important}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot .ask-next{flex:none!important;width:auto!important;min-width:0!important;height:32px!important;padding:0 14px!important;border-radius:8px!important;border:0!important;background:var(--c-accent,#7552E8)!important;color:#fff!important;font:500 13px Inter,sans-serif!important;box-shadow:none!important}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot .ask-next:hover:not(:disabled){background:#6643DA!important}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot .ask-next:disabled{opacity:.5}
+html body.app.in-editor #editor #messages .plan-card .ask-foot .plan-review{flex:none!important;width:auto!important;height:32px!important;padding:0 12px!important;border-radius:8px!important;border:0!important;background:#EFEDE8!important;color:var(--c-ink,#1C1B1F)!important;font:500 13px Inter,sans-serif!important;box-shadow:none!important}
+html body.app.in-editor #editor #messages .plan-card .ask-foot .plan-review:hover{background:#E6E3DC!important}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot .ask-gap{flex:1!important}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot .ask-link{height:32px;padding:0 6px!important;border:0!important;background:none!important;box-shadow:none!important;font-size:12px!important;color:var(--f-mut2,#716F77)!important}
+html body.app.in-editor #editor #messages :is(.plan-card,.ask-card) .ask-foot .ask-link:hover{color:var(--c-ink,#1C1B1F)!important}
+/* Look picker */
+html body.app.in-editor #editor #messages .ask-card:has(.brand-opts) .ask-intro{margin:0 0 8px!important;font-size:14px!important;font-weight:600!important;color:var(--c-ink,#1C1B1F)!important}
+html body.app.in-editor #editor #messages .brand-opts{display:flex!important;flex-direction:column!important;gap:1px!important;margin:0 -6px 6px!important;grid-template-columns:none!important}
+html body.app.in-editor #editor #messages .brand-opt{display:flex!important;flex-direction:row!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:36px!important;height:auto!important;padding:7px 10px!important;border:0!important;border-radius:8px!important;background:transparent!important;box-shadow:none!important;text-align:left!important;cursor:pointer;transition:background .15s ease}
+html body.app.in-editor #editor #messages .brand-opt:hover,html body.app.in-editor #editor #messages .brand-opt.on{background:#F4F3EF!important}
+html body.app.in-editor #editor #messages .brand-opt .ad-box{border-radius:50%}
+html body.app.in-editor #editor #messages .brand-opt.on .ad-box{background:var(--c-accent,#7552E8);border-color:var(--c-accent,#7552E8)}
+html body.app.in-editor #editor #messages .brand-opt.on .ad-box::after{content:"";position:absolute;left:3.5px;top:3.5px;width:6px;height:6px;border-radius:50%;background:#fff}
+html body.app.in-editor #editor #messages .brand-words{flex:1;min-width:0;font-size:13px;line-height:1.45;color:var(--f-mut2,#716F77)}
+html body.app.in-editor #editor #messages .brand-words b{display:inline!important;font-weight:500!important;font-size:13px!important;color:var(--c-ink,#1C1B1F)!important}
+html body.app.in-editor #editor #messages .brand-hint{display:inline!important;font-size:13px!important;color:var(--f-mut2,#716F77)!important}
+html body.app.in-editor #editor #messages .brand-body{margin:0!important}
+html body.app.in-editor #editor #messages :is(.brand-why,.brand-note,.brand-got){margin:8px 0!important;font-size:12.5px!important;line-height:1.55!important;color:var(--c-ink-3,#625F68)!important}
+html body.app.in-editor #editor #messages .brand-body .lk-page{zoom:.6;max-height:360px;overflow:hidden;border:1px solid var(--c-line,#E6E4DF);border-radius:16px;margin:8px 0 6px;box-shadow:none!important}
+html body.app.in-editor #editor #messages .brand-tools{display:flex!important;align-items:center;gap:14px!important;margin:4px 0 6px!important}
+html body.app.in-editor #editor #messages .brand-tools :is(.lk-btn,.lk-link){height:auto!important;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;font:500 12px Inter,sans-serif!important;color:var(--c-accent,#7552E8)!important;text-decoration:none!important;cursor:pointer}
+html body.app.in-editor #editor #messages .brand-tools :is(.lk-btn,.lk-link):hover{text-decoration:underline!important}
+html body.app.in-editor #editor #messages .brand-row{display:flex;gap:8px;align-items:center}
+html body.app.in-editor #editor #messages .brand-row .brand-url{flex:1;height:34px!important;border-radius:8px!important;font-size:13px!important}
+html body.app.in-editor #editor #messages .brand-row .lk-btn{height:34px!important;padding:0 12px!important;border-radius:8px!important;font-size:13px!important}
+@media (max-width:820px){html body.app.in-editor #editor #messages .plan-card .ask-foot{flex-wrap:wrap}}
+html body.app.in-editor #editor #messages .brand-opt{outline:none!important}
+html body.app.in-editor #editor #messages .brand-opt:focus-visible{box-shadow:0 0 0 3px rgba(117,82,232,.22)!important}
+html body.app.in-editor #editor #messages .brand-opt.on{box-shadow:none!important;border:0!important}

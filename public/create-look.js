@@ -295,7 +295,7 @@ async function step({card,count,name,prompt,onBuild,onBack,onSkip}){
  };
  function draw(){
   const look=st.picked;
-  const opt=(id,title,sub)=>h('button',{type:'button',class:'brand-opt'+(st.mode===id?' on':''),'aria-pressed':String(st.mode===id),onclick:()=>{st.mode=id;if(id==='kairoq'){st.list=picks();st.at=0;st.picked=st.list[0]}if(id==='mine'&&data.brand)st.picked=data.brand;draw()}},h('b',null,title),h('span',null,sub));
+  const opt=(id,title,sub,tag)=>h('button',{type:'button',class:'brand-opt'+(st.mode===id?' on':''),'aria-pressed':String(st.mode===id),onclick:()=>{st.mode=id;if(id==='kairoq'){st.list=picks();st.at=0;st.picked=st.list[0]}if(id==='mine'&&data.brand)st.picked=data.brand;draw()}},h('span',{class:'ad-box','aria-hidden':'true'}),h('span',{class:'brand-words'},h('b',null,title),' ',h('span',{class:'brand-hint'},sub),tag?' ':null,tag?h('span',{class:'ad-tag'},tag):null));
   const body=h('div',{class:'brand-body'});
   if(st.mode==='mine'){
    const input=h('input',{type:'url',class:'brand-url',placeholder:'yourbusiness.com','aria-label':'Your website',value:'',onkeydown:e=>{if(e.key==='Enter'){e.preventDefault();readSite(input)}}});
@@ -324,7 +324,7 @@ async function step({card,count,name,prompt,onBuild,onBack,onSkip}){
    h('p',{class:'ask-intro'},'One more thing: do you have a brand?'),
    h('div',{class:'brand-opts',role:'group','aria-label':'Brand'},
     opt('mine','Use my brand','Your website, or your logo and colours'),
-    opt('kairoq','Design it for me'+(st.mode==='kairoq'||!data.brand?' (Recommended)':''),'Kairoq picks a direction for this business and shows it'),
+    opt('kairoq','Design it for me','Kairoq picks a direction for this business and shows it',data.brand?null:'Suggested'),
     opt('words','I\'ll describe it','"warm, like a Scandinavian bakery"')),
    body,foot);
  }
