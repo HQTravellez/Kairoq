@@ -844,3 +844,17 @@ html body.app.in-editor #editor #messages .agent-done-tick svg{width:11px;height
   html body.app.in-editor #editor :is(.pw.leaving,.pw.leaving .pw-matrix,#messages>li.user.enter,#messages .agent-done-line){animation:none!important}
   html body.app.in-editor #editor #messages .agent-done-tick svg{animation:none!important;stroke-dashoffset:0}
 }
+/* ---------- The preview's "taking a moment" notice: one small bar, not a paragraph ---------- */
+html body.app.in-editor #editor #preview-notice:not(.hidden){position:absolute!important;top:58px!important;left:50%!important;transform:translateX(-50%);z-index:5;width:auto!important;max-width:calc(100% - 32px);margin:0!important;padding:6px 6px 6px 14px!important;display:flex!important;flex-direction:column;gap:4px;border-radius:14px!important;background:rgba(255,255,255,.96)!important;border:1px solid var(--c-line,#E6E4DF)!important;box-shadow:0 12px 30px -16px rgba(36,35,41,.4)!important;backdrop-filter:blur(8px);font-size:13px!important;line-height:1.4;color:var(--c-ink,#1C1B1F)!important;animation:pn-in .35s var(--f-ease-out,cubic-bezier(.2,.8,.2,1)) both}
+@keyframes pn-in{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translateX(-50%)}}
+html body.app.in-editor #editor #preview-notice .pn-row{display:flex;align-items:center;gap:6px;white-space:nowrap}
+html body.app.in-editor #editor #preview-notice .pn-dot{width:8px;height:8px;border-radius:50%;flex:none;background:#D99A1E;animation:pn-pulse 1.6s ease-in-out infinite;margin-right:2px}
+@keyframes pn-pulse{50%{box-shadow:0 0 0 4px rgba(217,154,30,.18)}}
+html body.app.in-editor #editor #preview-notice .pn-text{font-weight:500;margin-right:6px}
+html body.app.in-editor #editor #preview-notice .pn-btn{display:inline-grid!important;place-items:center;height:28px!important;min-width:28px;padding:0 8px!important;border:0!important;border-radius:8px!important;background:#F4F3EF!important;box-shadow:none!important;color:var(--c-ink-2,#3C3A42)!important;font:500 12.5px Inter,sans-serif!important;text-decoration:none!important;cursor:pointer}
+html body.app.in-editor #editor #preview-notice .pn-btn:hover{background:#EAE7E1!important;color:var(--c-ink,#1C1B1F)!important;text-decoration:none!important}
+html body.app.in-editor #editor #preview-notice .pn-btn:disabled{opacity:.5}
+html body.app.in-editor #editor #preview-notice .pn-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+html body.app.in-editor #editor #preview-notice .pn-status:not(:empty){font-size:12px;color:var(--f-mut2,#716F77);margin:0 6px}
+html body.app.in-editor #editor #preview-notice .preview-diagnosis:not(:empty){display:block;margin:0 8px 4px 16px!important;font-size:12px!important;font-weight:400!important;color:var(--c-ink-3,#625F68)!important;white-space:normal;max-width:420px}
+@media (prefers-reduced-motion:reduce){html body.app.in-editor #editor #preview-notice:not(.hidden),html body.app.in-editor #editor #preview-notice .pn-dot{animation:none!important}}

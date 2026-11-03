@@ -152,3 +152,11 @@ test("dot-matrix motion: the working grid follows the phase, the preview shows a
   assert.match(css, /@keyframes pw-dissolve\{/);
   assert.match(css, /@media \(prefers-reduced-motion:reduce\)\{\n  html body\.app \.k-grid\[data-p\] i\{animation:none!important/);
 });
+
+test("the preview's slow-load notice is one small bar, not a paragraph", () => {
+  const html = read("create.html");
+  assert.match(html, /<span class="pn-text">Preview is taking a moment<\/span>/);
+  for (const id of ["preview-reload", "preview-rebuild", "preview-open", "preview-diagnosis", "preview-rebuild-status"]) assert.match(html, new RegExp('id="' + id + '"'));
+  assert.doesNotMatch(html, /say "the preview is blank" in the chat/);
+  assert.match(read("ui/forma.css"), /#preview-notice:not\(\.hidden\)\{position:absolute!important;top:58px!important;/);
+});
