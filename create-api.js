@@ -68,7 +68,7 @@ const NEED={'GET:/ideas':'viewer','POST:/ideas':'editor','POST:/rating':'editor'
  'GET:/settings':'owner','POST:/settings':'owner','GET:/download':'editor','GET:/github':'owner','POST:/push':'owner','POST:/pull':'owner',
  'POST:/inspect':'viewer','POST:/visual':'editor','POST:/fix':'editor','GET:/file':'viewer','POST:/restore':'editor',
  'POST:/publish':'editor','POST:/unpublish':'owner','POST:/domains':'owner','POST:/verify':'owner','DELETE:/domains':'owner',
- 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','GET:/oauth':'owner','POST:/oauth':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/apis':'viewer','POST:/apis':'editor','DELETE:/apis':'editor','POST:/apitry':'editor','POST:/apicheck':'editor','POST:/apirules':'editor','POST:/apicurl':'editor','POST:/apitest':'editor','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
+ 'GET:/mobile':'viewer','POST:/mobile':'editor','GET:/qr':'viewer','GET:/previewqr':'viewer','GET:/appicon':'viewer','GET:/figma':'editor','POST:/figma':'editor','GET:/security':'viewer','GET:/sql':'viewer','POST:/sql':'owner','GET:/logs':'viewer','POST:/knowledge':'editor','GET:/secrets':'owner','GET:/oauth':'owner','POST:/oauth':'owner','POST:/secrets':'owner','GET:/members':'owner','POST:/members':'owner','DELETE:/members':'owner','POST:/share':'owner','GET:/analytics':'viewer','POST:/seo':'editor','GET:/design':'viewer','POST:/design':'editor','POST:/images':'editor','GET:/checks':'viewer','POST:/checks':'editor','DELETE:/checks':'editor','GET:/reference':'viewer','POST:/reference':'editor','GET:/refshot':'viewer','GET:/changes':'viewer','GET:/synthetic':'viewer','POST:/synthetic':'editor','POST:/explain':'editor','GET:/launch':'viewer','POST:/launch':'editor','GET:/grow':'viewer','POST:/source':'editor','GET:/memory':'viewer','POST:/grow':'editor','GET:/poster':'viewer','GET:/guard':'viewer','POST:/guard':'owner','GET:/videos':'viewer','POST:/videos':'editor','DELETE:/videos':'editor','GET:/video':'viewer','GET:/apis':'viewer','POST:/apis':'editor','DELETE:/apis':'editor','POST:/apitry':'editor','POST:/apicheck':'editor','POST:/apirules':'editor','POST:/apicurl':'editor','POST:/apitest':'editor','GET:/explodes':'viewer','POST:/explodes':'editor','DELETE:/explodes':'editor','GET:/explodefile':'viewer','GET:/watch':'viewer','POST:/watch':'editor'};
 function listFor(v){
  return builder.list().filter(p=>{if(p.owner===v.owner)return true;if(v.kind!=='customer'||!verifiedMember(v.account))return false;try{return(builder.loadMeta(p.id).members||[]).some(m=>m.email===v.account.email)}catch{return false}})
   .map(p=>({...p,thumb:require('./project-thumbs').url(p),role:p.owner===v.owner?'owner':(builder.loadMeta(p.id).members||[]).find(m=>m.email===v.account.email).role}));
@@ -618,6 +618,8 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
    const unchanged=Boolean(job.result&&job.result.unchanged)&&!problem;
    // An answer instead of a change (a question that reached the builder) is always free.
    if(job.result&&job.result.answered&&!job.refunded){job.refunded=true;if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: an answer, nothing was changed','refund:'+job.id)}catch{}}
+   // A build that never got past the starter page saved nothing, so it is always free.
+   if(job.result&&job.result.not_built&&!job.refunded){job.refunded=true;job.free='Nothing was built, so it was free.';if(v.kind==='customer'&&credits>0)try{accounts.grant(v.account.id,credits,'Free: nothing was built','refund:'+job.id)}catch{}}
    if(mode!=='discuss'&&!job.refunded&&payWhenWorks()&&notWorking&&(payMode()==='refund'||unchanged)){
     // Refund mode (or a change that changed nothing): the change itself is free.
     job.free=problem==='checks'?'This change broke a saved check, so it was free.':problem==='errors'?'This change still shows errors in the browser, so it was free.':'Nothing changed, so it was free.';
@@ -1657,6 +1659,14 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
    return send(res,200,{result:await require('./react-sql').run.query(builder.projectDir(id),String(b.query||''),Array.isArray(b.params)?b.params:[])}),true;
   }
   // Mobile app settings, the QR code to open the published app on a phone, and its icon.
+  // A QR code for this preview, so the owner can open it on a phone while building (the preview
+  // address carries the project's unguessable preview key, like a share link).
+  if(action==='/previewqr'&&method==='GET'){
+   const meta=builder.loadMeta(id),u=builder.previewUrl(meta);
+   if(!u)throw Object.assign(Error('There is no preview yet'),{status:409});
+   const url=origin(req)+u;
+   res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'"});res.end(require('./react-mobile').qrSvg(url));return true;
+  }
   if(action==='/mobile'||action==='/qr'||action==='/appicon'){
    const mobile=require('./react-mobile'),meta=builder.loadMeta(id),urls=require('./react-hosting').siteUrls(meta);
    const best=urls?(urls.domains[0]||urls.subdomain||urls.path):null;
