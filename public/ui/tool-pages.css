@@ -1,0 +1,89 @@
+/* Tool pages in Ka's Figma layout (the "F" shape): breadcrumb bar, big heading with a subtitle and
+   a status pill, a search and filter row, tabs, then a grid of cards. Plugins is the first page;
+   Sales Agent, API checker, Idea board and Agent builder reuse the same pieces. Colours come from
+   the Forma tokens in forma.css (--c-* and --f-* on body.app). */
+
+html body.app .tp{background:var(--c-bg,#F7F6F2);padding:0 36px 48px;box-sizing:border-box;min-width:0;color:var(--c-ink,#1C1B1F)}
+html body.app .tp.hidden{display:none!important}
+html body.app .tp .tp-grow{flex:1}
+html body.app .tp-crumbs{height:56px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--c-line,#E6E4DF);font-size:12px;color:var(--c-ink-3,#625F68)}
+html body.app .tp-crumbs b{font-weight:500;color:var(--c-ink,#1C1B1F)}
+html body.app .tp-crumbs a{color:var(--c-ink-3,#625F68);text-decoration:none}
+html body.app .tp-crumbs a:hover{color:var(--c-accent,#7552E8)}
+html body.app .tp-head{display:flex;align-items:flex-start;gap:16px;padding:36px 0 22px}
+html body.app .tp-head>div{flex:1;min-width:0}
+html body.app .tp-head h1{margin:0;font-size:38px;font-weight:500;letter-spacing:-.02em;line-height:1.15;color:var(--c-ink,#1C1B1F)}
+html body.app .tp-sub{margin:8px 0 0;font-size:14px;color:var(--c-ink-3,#625F68);max-width:640px}
+html body.app .tp-pill{display:inline-flex;align-items:center;gap:6px;flex:none;margin-top:10px;border-radius:999px;padding:3px 10px;font-size:12px;background:var(--f-green-bg,#E8F3ED);color:var(--f-green,#328368)}
+html body.app .tp-pill::before{content:"";width:6px;height:6px;border-radius:3px;background:currentColor}
+html body.app .tp-pill[hidden]{display:none}
+
+html body.app .tp-tools{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+html body.app .tp-search{width:260px;max-width:100%;height:36px;display:flex;align-items:center;gap:8px;border:1px solid var(--c-line-2,#DEDBD5);background:#fff;border-radius:8px;padding:0 12px;box-sizing:border-box;color:var(--f-mut2,#716F77)}
+html body.app .tp-search:focus-within{border-color:var(--c-accent,#7552E8);box-shadow:0 0 0 3px rgba(117,82,232,.14)}
+html body.app .tp-search svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+html body.app .tp-search input{border:0!important;outline:none!important;box-shadow:none!important;background:none!important;font:inherit;font-size:13px;width:100%;padding:0!important;height:auto!important;color:var(--c-ink,#1C1B1F)}
+html body.app .tp-tools .primary{height:36px;padding:0 14px;border-radius:8px;font-size:13px}
+
+html body.app .tp-tabs{display:flex;gap:4px;margin-bottom:18px;overflow-x:auto;scrollbar-width:none}
+html body.app .tp-tabs::-webkit-scrollbar{display:none}
+html body.app .tp-tabs button{flex:none;border:0!important;background:transparent!important;box-shadow:none!important;height:auto!important;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:500;color:var(--c-ink-3,#625F68);cursor:pointer;transition:background var(--f-fast,.18s),color var(--f-fast,.18s)}
+html body.app .tp-tabs button:hover{background:rgba(36,35,41,.06)!important;color:var(--c-ink,#1C1B1F)}
+html body.app .tp-tabs button[aria-selected=true]{background:var(--f-chrome,#242329)!important;color:#fff!important}
+html body.app .tp-tabs button .n{margin-left:6px;opacity:.6}
+
+html body.app .tp-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+html body.app .tp-card{background:#fff;border:1px solid var(--c-line,#E6E4DF);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:8px;min-width:0;transition:transform var(--f-mid,.32s) var(--f-ease,ease),box-shadow var(--f-mid,.32s)}
+html body.app .tp-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px -20px rgba(36,35,41,.35)}
+html body.app .tp-card-top{display:flex;align-items:center;gap:10px;min-width:0}
+html body.app .tp-ic{width:36px;height:36px;border-radius:9px;background:var(--f-lilac,#ECE8F3);color:var(--c-accent,#7552E8);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex:none}
+html body.app .tp-ic.g1{background:var(--f-sage,#DFE9E0);color:#2F6B55}
+html body.app .tp-ic.g2{background:var(--f-peach,#F0D3BE);color:#8A4B22}
+html body.app .tp-ic.g3{background:#DCE5EE;color:#2E5578}
+html body.app .tp-name{font-weight:600;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+html body.app .tp-name small{display:block;font-size:12px;font-weight:400;color:var(--f-mut2,#716F77)}
+html body.app .tp-desc{margin:0;color:var(--c-ink-3,#625F68);font-size:13px;line-height:1.5;min-height:40px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+html body.app .tp-card-foot{display:flex;align-items:center;gap:10px;margin-top:auto}
+html body.app .tp-card-foot .small{font-size:12px;color:var(--f-mut2,#716F77)}
+html body.app .tp-card-foot .link-btn{font-size:12px;padding:0;height:auto;border:0;background:none;color:var(--c-ink-3,#625F68);cursor:pointer}
+html body.app .tp-card-foot .link-btn:hover{color:#B3261E}
+html body.app .tp-card-foot a{font-size:12px;color:var(--c-ink-3,#625F68)}
+
+/* The on/off switch from the Figma file */
+html body.app .tp-sw{position:relative;width:36px;height:20px;flex:none;border:0;border-radius:10px;padding:0;background:#D9D7D1;cursor:pointer;transition:background var(--f-fast,.18s)}
+html body.app .tp-sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:7px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.18);transition:left var(--f-mid,.32s) var(--f-ease,ease)}
+html body.app .tp-sw[aria-checked=true]{background:var(--c-accent,#7552E8)}
+html body.app .tp-sw[aria-checked=true]::after{left:19px}
+html body.app .tp-sw:disabled{opacity:.5;cursor:default}
+
+/* Add a skill */
+html body.app .tp-panel{background:#fff;border:1px solid var(--c-line,#E6E4DF);border-radius:10px;padding:18px;margin-bottom:18px;display:flex;flex-direction:column;gap:12px;animation:fm-rise var(--f-mid,.32s) var(--f-ease-out,ease)}
+html body.app .tp-panel.hidden{display:none}
+html body.app .tp-panel-title{margin:0;font-weight:600;font-size:14px}
+html body.app .tp-panel label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--c-ink-2,#3C3A42)}
+html body.app .tp-panel input,html body.app .tp-panel textarea{font:inherit;font-size:13px;font-weight:400;border:1px solid var(--c-line-2,#DEDBD5);border-radius:8px;padding:9px 12px;background:#fff;color:var(--c-ink,#1C1B1F)}
+html body.app .tp-panel textarea{resize:vertical;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px}
+html body.app .tp-row{display:flex;align-items:center;gap:10px}
+html body.app .tp-row .small{font-size:12px;color:var(--c-ink-3,#625F68)}
+html body.app .tp-choices{display:flex;flex-wrap:wrap;gap:6px}
+html body.app .tp-choices button{border:1px solid var(--c-line-2,#DEDBD5);background:#fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer}
+html body.app .tp-choices button:hover{border-color:var(--c-accent,#7552E8)}
+
+html body.app .tp-empty,html body.app .tp-foot{color:var(--f-mut2,#716F77);font-size:12px;margin:18px 0 0}
+html body.app .tp-empty.hidden{display:none}
+html body.app .tp .error:empty{display:none}
+
+@media (max-width:1100px){html body.app .tp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){
+  html body.app .tp{padding:0 16px 32px}
+  html body.app .tp-crumbs{height:44px}
+  html body.app .tp-head{padding:20px 0 16px;flex-direction:column;gap:10px}
+  html body.app .tp-head h1{font-size:28px}
+  html body.app .tp-pill{margin-top:0}
+  html body.app .tp-tools{flex-wrap:wrap}
+  html body.app .tp-search{width:100%;flex:1 1 100%}
+  html body.app .tp-tools .tp-grow{display:none}
+  html body.app .tp-tools .primary{flex:1}
+  html body.app .tp-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){html body.app .tp-card,html body.app .tp-sw::after,html body.app .tp-panel{transition:none!important;animation:none!important}}
