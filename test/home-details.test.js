@@ -1,14 +1,12 @@
 "use strict";
-// Home details: rarely used tools sit under "More tools" (opened when one of them is the current
-// page), Plugins has its own icon, and the project search lines up with the tabs and sort.
+// Home details: Plugins has its own icon, and the project search lines up with the tabs and sort.
+// (The tools now live in the account menu; see calm-sidebar.test.js.)
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path");
 const read=f=>fs.readFileSync(path.join(__dirname,"../public",f),"utf8");
-test("sidebar: More tools group, distinct Plugins icon",()=>{
- const html=read("create.html"),more=html.slice(html.indexOf('id="side-more"'),html.indexOf('</details>',html.indexOf('id="side-more"')));
- for(const id of ["side-plugins","side-api","side-check","side-admin"])assert.match(more,new RegExp('id="'+id+'"'));
- assert.doesNotMatch(more,/id="side-docs"/,"Help stays visible");
- assert.match(read("create.js"),/if\(document\.querySelector\('#side-more \[aria-current\]'\)\)\$\('side-more'\)\.open=true;/);
- const icon=id=>(new RegExp('id="'+id+'"><svg[^>]*>(.*?)</svg>').exec(html)||[])[1];
+test("sidebar: Plugins has its own icon",()=>{
+ const html=read("create.html");
+ const icon=id=>(new RegExp('id="'+id+'"[^>]*><svg[^>]*>(.*?)</svg>').exec(html)||[])[1];
+ assert.ok(icon("side-plugins")&&icon("side-connectors"));
  assert.notEqual(icon("side-plugins"),icon("side-connectors"));
 });
 test("project search sits on the same line as the tabs and sort",()=>{
