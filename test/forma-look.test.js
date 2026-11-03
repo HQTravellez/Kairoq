@@ -160,3 +160,11 @@ test("the preview's slow-load notice is one small bar, not a paragraph", () => {
   assert.doesNotMatch(html, /say "the preview is blank" in the chat/);
   assert.match(read("ui/forma.css"), /#preview-notice:not\(\.hidden\)\{position:absolute!important;top:58px!important;/);
 });
+
+test("while Kairoq thinks its status uses playful words that change; concrete steps keep their own words", () => {
+  const js = read("create.js");
+  assert.match(js, /const THINK_WORDS=\['musing','noodling','tinkering',/);
+  assert.match(js, /if\(phaseOf\(j\)==='thinking'&&!\(j\.mode==='discuss'&&j\.stream&&j\.stream\.text\)\)sayThinking\(stx,'is '\);else\{const st0=liveStatus\(j\);delete stx\.dataset\.think;/);
+  assert.match(js, /setInterval\(\(\)=>\{if\(document\.hidden\)return;for\(const n of document\.querySelectorAll\('\[data-think\]'\)\)/);
+  assert.match(read("ui/forma.css"), /@keyframes tw-in\{/);
+});
