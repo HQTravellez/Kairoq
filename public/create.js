@@ -128,12 +128,17 @@ function renderSetup(setup){
 function initials(name){const w=String(name||'').trim().split(/\s+/).filter(Boolean);return ((w[0]||'K')[0]+(w[1]?w[1][0]:'')).toUpperCase()}
 // Project cards: each app's picture sits in a soft colour frame, like the Figma dashboard.
 const FRAMES=['#DFE9E0','#D8CEF3','#F0D3BE','#DCE5EE','#E9E4C9','#EADCE6'];
+const ago=iso=>{const m=Math.round((Date.now()-new Date(iso))/60000);if(!(m>=0))return'';if(m<1)return'just now';if(m<60)return m+' minute'+(m===1?'':'s')+' ago';const h=Math.round(m/60);if(h<24)return h+' hour'+(h===1?'':'s')+' ago';const d=Math.round(h/24);return d===1?'yesterday':d<7?d+' days ago':new Date(iso).toLocaleDateString([],{month:'short',day:'numeric'})};
 function renderProjects(projects){
  state.projects=projects;
- text($('project-count'),projects.length?projects.length+' project'+(projects.length===1?'':'s'):'');
+ text($('project-count'),projects.length||'');
  const list=$('projects');list.replaceChildren();
  if(!projects.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects yet. Describe one above, or start from a template.';list.append(li)}
- for(const p of projects){
+ // Search and sort, as in the Figma dashboard ("Search projects…", "Last edited").
+ const q=($('pj-search')?.value||'').trim().toLowerCase(),byName=$('pj-sort')?.value==='name';
+ const shown=projects.filter(p=>!q||String(p.name).toLowerCase().includes(q)).sort((a,b)=>byName?String(a.name).localeCompare(String(b.name)):String(b.updated_at).localeCompare(String(a.updated_at)));
+ if(projects.length&&!shown.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects match "'+q+'".';list.append(li)}
+ for(const p of shown){
   const li=document.createElement('li'),thumb=el('div','thumb',initials(p.name)),open=document.createElement('button'),meta=document.createElement('span');
   thumb.setAttribute('aria-hidden','true');
   thumb.dataset.initials=initials(p.name);
@@ -141,11 +146,14 @@ function renderProjects(projects){
   // The app's own picture when there is one (project-thumbs.js); the initials stay underneath.
   if(p.thumb){const img=document.createElement('img');img.src=p.thumb;img.alt='';img.loading='lazy';img.decoding='async';img.className='thumb-img';img.onerror=()=>img.remove();thumb.append(img)}
   open.type='button';open.className='open';open.textContent=p.name;open.onclick=()=>openProject(p.id);
-  meta.className='meta';meta.textContent='v'+p.current_version+' · '+when(p.updated_at);
+  // Card body like the Figma dashboard: name and a ··· menu, then Published or Draft and when it was edited.
+  meta.className='meta';
+  const st=el('span','pj-status'+(p.published?' live':''),p.published?'Published':'Draft');
+  meta.append(st,el('span','pj-when','Edited '+ago(p.updated_at)));
   li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
   if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
-  if(p.published){const b=document.createElement('span');b.className='badge live';b.textContent='Live';li.append(b)}
   if(p.role==='owner'){
+   const menu=el('details','pj-menu'),sum=el('summary',null,'···');sum.setAttribute('aria-label','More for '+p.name);menu.append(sum);menu.onclick=e=>e.stopPropagation();
    const del=el('button','ghost link-btn','Delete');
    del.type='button';del.setAttribute('aria-label','Delete project '+p.name);
    del.onclick=async e=>{
@@ -158,7 +166,7 @@ function renderProjects(projects){
      await loadHome();
     }catch(err){del.disabled=false;del.textContent='Delete';alert('Could not delete project: '+err.message)}
    };
-   li.append(del);
+   menu.append(del);li.append(menu);
   }
   list.append(li);
  }
@@ -194,6 +202,7 @@ function homeTab(which){
  state.homeTab=which;
  $('tab-projects').setAttribute('aria-selected',String(which==='projects'));$('tab-templates').setAttribute('aria-selected',String(which==='templates'));
  $('projects').classList.toggle('hidden',which!=='projects');$('home-templates').classList.toggle('hidden',which!=='templates');
+ $('pj-search').closest('label').classList.toggle('hidden',which!=='projects');$('pj-sort').classList.toggle('hidden',which!=='projects');
  if(!$('home').classList.contains('hidden')){$('side-projects').toggleAttribute('aria-current',which==='projects');$('side-templates').toggleAttribute('aria-current',which==='templates')}
 }
 $('tab-projects').onclick=()=>homeTab('projects');$('tab-templates').onclick=()=>homeTab('templates');
@@ -490,6 +499,8 @@ $('ag-form').onsubmit=async e=>{
  try{const ask=agRequest();await openProject(agentsUi.id);await send(ask,'build');$('ag-form').reset();$('ag-form').classList.add('hidden')}
  catch(err){text($('ag-error'),err.message)}finally{b.disabled=false}
 };
+$('pj-search').oninput=()=>state.projects&&renderProjects(state.projects);
+$('pj-sort').onchange=()=>state.projects&&renderProjects(state.projects);
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});

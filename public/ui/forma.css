@@ -239,3 +239,50 @@ html body.app #home #new-kind button{white-space:nowrap}
   html body.app.in-editor #editor #web-browser-pane.kb .kb-tabs{border-top:1px solid var(--f-chrome-line)!important}
   html body.app.in-editor #editor #web-browser-pane.kb .kb-tabs .kb-icon{color:#fff!important}
 }
+
+/* ---------- Closer to the Figma frames (Project dashboard, App builder) ---------- */
+/* Home: the "Workspace / Projects" bar on top, like every Forma frame */
+html body.app #home .home-crumbs{margin:0 24px;padding:0}
+html body.app #home .home-crumbs .tp-grow{flex:1}
+html body.app #home .home-hero{padding-top:28px!important}
+/* Projects header: text tabs with a count, search and sort, no boxed switch */
+html body.app #home .browser-tabs{display:flex!important;align-items:center;gap:4px!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin-bottom:18px!important;width:auto!important}
+html body.app #home .browser-tabs>button{height:30px!important;padding:0 10px!important;border:0!important;border-radius:7px!important;background:transparent!important;box-shadow:none!important;font-size:13px!important;font-weight:500!important;color:var(--f-mut2)!important}
+html body.app #home .browser-tabs>button[aria-selected=true]{color:var(--c-ink)!important;font-size:15px!important}
+html body.app #home .browser-tabs>button .n{margin-left:5px;font-size:12px;font-weight:400;color:var(--f-mut2);vertical-align:super}
+html body.app #home .browser-tabs>button .n:empty{display:none}
+html body.app #home .browser-tabs .seg-thumb{display:none!important}
+html body.app #home .browser-tabs .tp-grow{flex:1}
+html body.app #home .browser-tabs>button{width:auto!important;min-width:0!important;white-space:nowrap!important;flex:none!important;position:static!important}
+html body.app #home #pj-sort{flex:none!important;width:auto!important}
+html body.app #home .pj-search{width:220px;height:34px}
+html body.app #home .pj-search.hidden,html body.app #home #pj-sort.hidden{display:none}
+html body.app #home #pj-sort{height:34px;border:1px solid var(--c-line-2)!important;border-radius:8px!important;background:#fff!important;padding:0 10px!important;font:500 12px Inter,sans-serif;color:var(--c-ink-2);box-shadow:none!important}
+/* Cards: picture on top, then name with a ··· menu, then Published or Draft and when it was edited */
+html body.app #home .projects.cards>li{position:relative;display:grid!important;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"thumb thumb" "name menu" "meta meta";row-gap:6px;padding:0 0 14px!important}
+html body.app #home .projects.cards>li .thumb{grid-area:thumb;aspect-ratio:16/8.5!important;padding:12px 16px 0!important}
+html body.app #home .projects.cards>li .open{grid-area:name;margin-top:6px;font-size:14px!important;font-weight:600!important;color:var(--c-ink)!important;text-align:left;background:none!important;border:0!important;padding:0 14px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body.app #home .projects.cards>li .meta{grid-area:meta;display:flex!important;align-items:center;gap:8px;font-size:12px!important}
+html body.app #home .pj-status{border-radius:999px;padding:1px 9px;font-size:12px;font-weight:500;background:var(--f-lilac);color:#4A33A8}
+html body.app #home .pj-status.live{background:var(--f-green-bg);color:var(--f-green)}
+html body.app #home .pj-when{margin-left:auto;color:var(--f-mut2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body.app #home .pj-menu{grid-area:menu;position:relative;margin:6px 10px 0 0;align-self:center}
+html body.app #home .pj-menu>summary{list-style:none;cursor:pointer;width:28px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--f-mut2);font-size:14px;letter-spacing:1px}
+html body.app #home .pj-menu>summary::-webkit-details-marker{display:none}
+html body.app #home .pj-menu>summary:hover,html body.app #home .pj-menu[open]>summary{background:var(--c-raise);color:var(--c-ink)}
+html body.app #home .pj-menu>button{position:absolute;right:0;top:28px;z-index:5;min-width:120px;height:34px!important;padding:0 12px!important;border:1px solid var(--c-line)!important;border-radius:8px!important;background:#fff!important;box-shadow:0 12px 30px -12px rgba(36,35,41,.35)!important;color:#B3261E!important;font-size:13px!important;text-align:left;text-decoration:none!important;opacity:1!important;visibility:visible!important}
+html body.app #home .projects.cards>li>.link-btn,html body.app #home .projects.cards>li>.badge.live{display:none!important}
+/* Editor: the view tabs read "Preview / Code / Data" like the Figma builder, not icons alone */
+@media (min-width:901px){
+  html body.app.in-editor #editor .stage-bar .tabs-seg .lbl{display:inline!important;font-size:12px!important}
+  html body.app.in-editor #editor .stage-bar .tabs-seg button{width:auto!important;padding:0 10px!important;gap:6px!important;display:inline-flex!important;align-items:center}
+  html body.app.in-editor #editor .stage-bar #versions{max-width:220px!important;min-width:110px;text-overflow:ellipsis}
+}
+@media (max-width:900px){
+  html body.app #home .home-crumbs{margin:0 16px}
+  html body.app #home .browser-tabs{flex-wrap:wrap}
+  html body.app #home .pj-search{order:5;width:100%;flex:1 1 100%;margin-top:8px}
+  html body.app #home #pj-sort{order:4}
+}
+html body.app #home #browser .browser-tabs>button[aria-selected=true],html body.app #home #browser .browser-tabs>button[aria-selected=false]{background:transparent!important;box-shadow:none!important;border:0!important}
+@media (max-width:900px){html body.app #home .projects.cards{grid-template-columns:minmax(0,1fr)!important}}

@@ -50,3 +50,16 @@ test("on a phone the top is one dark band and the browser stays open while watch
   assert.match(css, /\.phone-panes button\[aria-selected=true\]\{background:#fff!important/);
   assert.match(read("builder-browser-pane.js"), /editor\.dataset\.pane==="browser"\)return;/);
 });
+
+test("Home and the editor follow the Figma frames: breadcrumb, project header, card body, worded view tabs", () => {
+  const html = read("create.html");
+  assert.match(html, /class="tp-crumbs home-crumbs"><span>Workspace<\/span><span aria-hidden="true">\/<\/span><b>Projects<\/b>/);
+  assert.match(html, /id="tab-projects" aria-selected="true">All projects<span class="n" id="project-count"><\/span>/);
+  assert.match(html, /id="pj-search"/); assert.match(html, /id="pj-sort"/);
+  const js = read("create.js");
+  assert.match(js, /p\.published\?'Published':'Draft'/);
+  assert.match(js, /'Edited '\+ago\(p\.updated_at\)/);
+  assert.match(js, /el\('details','pj-menu'\)/, "Delete sits in the ··· menu");
+  const css = read("ui/forma.css");
+  assert.match(css, /\.tabs-seg \.lbl\{display:inline!important/);
+});

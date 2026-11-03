@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="/ui/tools.css?v=2">
 <link rel="stylesheet" href="/ui/browser.css?v=2">
 <link rel="stylesheet" href="/ui/tool-pages.css?v=5">
-<link rel="stylesheet" href="/ui/forma.css?v=2">
+<link rel="stylesheet" href="/ui/forma.css?v=3">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -354,6 +354,7 @@
 <!-- Project list / new project -->
 <section class="screen hidden" id="home">
   <div class="home">
+    <div class="tp-crumbs home-crumbs"><span>Workspace</span><span aria-hidden="true">/</span><b>Projects</b><span class="tp-grow"></span><a href="https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md" target="_blank" rel="noopener">Help ↗</a></div>
     <div class="home-hero">
       <p class="home-date" id="home-date"></p>
       <h1 id="home-title">What should we build?</h1>
@@ -387,9 +388,11 @@
     </div>
     <div class="browser" id="browser">
       <div class="browser-tabs" role="tablist" aria-label="Your workspace">
-        <button type="button" role="tab" id="tab-projects" aria-selected="true">My projects</button>
+        <button type="button" role="tab" id="tab-projects" aria-selected="true">All projects<span class="n" id="project-count"></span></button>
         <button type="button" role="tab" id="tab-templates" aria-selected="false">Templates</button>
-        <span class="muted small" id="project-count"></span>
+        <span class="tp-grow"></span>
+        <label class="tp-search pj-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pj-search" type="search" placeholder="Search projects…" aria-label="Search projects"></label>
+        <select id="pj-sort" aria-label="Sort projects"><option value="edited">Last edited</option><option value="name">Name</option></select>
       </div>
       <p class="notice hidden" id="verify-notice">Please confirm your email address. <button class="ghost link-btn" id="verify-resend" type="button">Send the link again</button></p>
       <ul class="projects cards" id="projects"></ul>
@@ -1542,7 +1545,7 @@
 <script src="/voice-builder.js" defer></script>
 <script src="/create-look.js?v=6"></script>
 <script src="/builder-browser-pane.js?v=6"></script>
-<script src="/create.js?v=20261112"></script>
+<script src="/create.js?v=20261113"></script>
 <script src="/builder-split-preview.js?v=4"></script>
 </body>
 </html>
