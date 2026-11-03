@@ -1521,13 +1521,13 @@ function watchPreview(){state.previewReady=false;$('preview-notice').classList.a
 // browser is blocking it.
 async function diagnosePreview(){
  if(!state.project||state.diagnosing)return;state.diagnosing=true;
- const out=$('preview-diagnosis');text(out,'Checking the preview in Kairoq\'s own browser…');
+ const out=$('preview-diagnosis');text(out,'Checking it in Kairoq\'s browser…');
  try{
   const r=await api('/projects/'+state.project.id+'/diagnose',{method:'POST',body:{version:previewVersion()}});
   if(state.previewReady)return text(out,'');
   if(r.skipped)text(out,'');
-  else if(!r.errors.length)text(out,'It works in Kairoq\'s own browser, so something in this browser is blocking it: try Open it in a new tab, turn off ad or script blockers for this site, or try another browser.');
-  else{text(out,'It fails in Kairoq\'s own browser too: '+r.errors[0].slice(0,220)+(r.errors.length>1?' (and '+(r.errors.length-1)+' more)':'')+'. Use Fix it above: the fix is on us.');for(const e of r.errors)if(!state.runtimeErrors.includes(e)&&state.runtimeErrors.length<10)state.runtimeErrors.push(e);renderErrors()}
+  else if(!r.errors.length)text(out,'It works in Kairoq\'s browser, so something here is blocking it. Try opening it in a new tab.');
+  else{text(out,'The app has an error: '+r.errors[0].slice(0,140)+'. Use Fix it above, it\'s free.');for(const e of r.errors)if(!state.runtimeErrors.includes(e)&&state.runtimeErrors.length<10)state.runtimeErrors.push(e);renderErrors()}
  }catch(err){text(out,'')}
  finally{state.diagnosing=false}
 }
