@@ -2,6 +2,12 @@
    the live page). Loaded after the other ui/*.css files, so these rules win. */
 body.app.in-editor #editor #web-browser-pane.kb{display:flex;flex-direction:column;background:#fff!important;border-left:1px solid var(--c-line)!important;color:var(--c-ink);min-width:0}
 body.app.in-editor #editor #web-browser-pane.kb.hidden{display:none!important}
+/* Phone: the Browser tab always shows the browser, even when it is closed on a computer */
+@media (max-width:900px){
+ body.app.in-editor #editor[data-pane=browser] #web-browser-pane.kb,
+ body.app.in-editor #editor[data-pane=browser] #web-browser-pane.kb.hidden{display:flex!important;flex-direction:column;border-left:0!important}
+ body.app.in-editor #editor[data-pane=browser] #web-browser-pane.kb .kb-view{flex:1 1 auto;min-height:0}
+}
 #web-browser-pane.kb svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
 /* Tab strip */

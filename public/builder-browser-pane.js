@@ -61,7 +61,7 @@
  }
  function fold(){
   clearTimeout(foldTimer);
-  if(byHand||Date.now()-lastUserAt<15000||(live&&live.driver==="you"))return;
+  if(byHand||Date.now()-lastUserAt<15000||(live&&live.driver==="you")||editor.dataset.pane==="browser")return;  // not while someone watches it on a phone
   close();
   const c=chip(),host=String((live&&live.url)||current?.url||"").replace(/^https?:\/\/(www\.)?/,"").split("/")[0];
   c.querySelector("span").textContent="Browser"+(host?" · "+host:"");c.classList.remove("hidden");
@@ -109,6 +109,11 @@
  shot.addEventListener("click",e=>{shot.focus();send({type:"click",...point(e)})});
  let wheel=0,wheelTimer=null;
  shot.addEventListener("wheel",e=>{e.preventDefault();wheel+=e.deltaY;if(!wheelTimer)wheelTimer=setTimeout(()=>{send({type:"scroll",dy:Math.round(wheel)});wheel=0;wheelTimer=null},120)},{passive:false});
+ // On a phone a finger swipe scrolls the page (a tap is still a click).
+ let touchY=null;
+ shot.addEventListener("touchstart",e=>{touchY=e.touches[0].clientY},{passive:true});
+ shot.addEventListener("touchmove",e=>{if(touchY==null)return;e.preventDefault();const y=e.touches[0].clientY,r=shot.getBoundingClientRect(),h=(live&&live.height)||800;wheel+=Math.round((touchY-y)*h/r.height);touchY=y;if(!wheelTimer)wheelTimer=setTimeout(()=>{send({type:"scroll",dy:wheel});wheel=0;wheelTimer=null},120)},{passive:false});
+ shot.addEventListener("touchend",()=>{touchY=null});
  const KEYS=new Set(["Enter","Escape","Tab","Backspace","Delete","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","PageUp","PageDown","Home","End"]);
  let typed="",typeTimer=null;
  shot.addEventListener("keydown",e=>{

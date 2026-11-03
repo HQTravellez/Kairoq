@@ -43,3 +43,10 @@ test("project cards sit in a colour frame and the browser pane folds when idle",
   assert.match(pane, /if\(byHand\|\|Date\.now\(\)-lastUserAt<15000/, "never folds while you are using it");
   assert.match(pane, /reopen\.onclick=\(\)=>\{byHand=true;open\(\)\}/);
 });
+
+test("on a phone the top is one dark band and the browser stays open while watched", () => {
+  const css = read("ui/forma.css");
+  assert.match(css, /\.phone-panes\{background:var\(--f-chrome\)!important/);
+  assert.match(css, /\.phone-panes button\[aria-selected=true\]\{background:#fff!important/);
+  assert.match(read("builder-browser-pane.js"), /editor\.dataset\.pane==="browser"\)return;/);
+});

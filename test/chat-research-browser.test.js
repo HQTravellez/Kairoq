@@ -99,7 +99,7 @@ test("search phrases drop how-to-answer words, and only results about the questi
  const out=await web.gather("Compare Wave and Xero for a small accounting firm. Research it and show it as a table.",{
   callModel:async()=>{throw Error("no model")},
   webSearch:async()=>["https://www.diffchecker.com/text-compare/","http://127.0.0.1:9/xero","https://text-compare.com/","http://127.0.0.1:9/wave"],
-  browseSite:async(u,o)=>{opened.push(u);return fakeBrowse({...PAGES,"http://127.0.0.1:9/xero":{title:"Xero plans",text:"Xero plans"},"http://127.0.0.1:9/wave":{title:"Wave pricing",text:"Wave pricing"}})(u,o)}
+  browseSite:async(u,o)=>{opened.push(u);return fakeBrowse({...PAGES,"http://127.0.0.1:9/xero":{title:"Xero plans",text:"Xero plans: Ignite, Grow and Comprehensive, priced per month."},"http://127.0.0.1:9/wave":{title:"Wave pricing",text:"Wave pricing: the Starter plan is free; Pro is paid monthly."}})(u,o)}
  });
  assert.deepEqual(opened,["http://127.0.0.1:9/xero","http://127.0.0.1:9/wave"],"text-compare tools are skipped");
  assert.deepEqual(out.sources.map(s=>s.title),["Xero plans","Wave pricing"]);
@@ -110,4 +110,11 @@ test("a new chat from the home page is greeted like a person, not asked what 'Ne
  const r=S.reply("greeting",{name:"New chat",messages:[],versions:[]});
  assert.match(r,/^Hi! What would you like to build, or talk through first\?/);
  assert.doesNotMatch(r,/New chat should do/);
+});
+
+test("on a phone the Browser tab shows the browser, and a swipe scrolls the page",()=>{
+ const css=fs.readFileSync(path.join(root,"public/ui/browser.css"),"utf8");
+ assert.match(css,/@media \(max-width:900px\)\{[\s\S]*#editor\[data-pane=browser\] #web-browser-pane\.kb\.hidden\{display:flex!important/);
+ const js=fs.readFileSync(path.join(root,"public/builder-browser-pane.js"),"utf8");
+ assert.match(js,/shot\.addEventListener\("touchmove"/);
 });
