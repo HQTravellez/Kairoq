@@ -74,12 +74,34 @@ function normFiles(a){
  else if(a&&typeof a==='object'){const p=pick(a,PATH_KEYS),c=pick(a,CODE_KEYS);if(p&&c!==undefined)out[p]=c}
  return out;
 }
-function parseStepSafe(content){try{return parseStep(content)}catch(e){const raw=typeof content==='string'?content:JSON.stringify(content);const cut=/^\s*(```(json)?\s*)?\{/.test(raw||'')&&!/\}\s*(```)?\s*$/.test(raw||'');return{invalid:cut?'it was cut off because it was too long; write at most 2 or 3 files per step and continue':String(e.message||e),thought:'',actions:[],raw:String(raw||'').slice(0,400)}}}
+// Models often send JSON that is almost right: real line breaks or tabs inside a string
+// (common when they write a whole file), backslashes JSON does not allow (\' or \$), or a
+// comma before } or ]. Fix only those, outside of which the text is left exactly as sent.
+function repairJson(t){
+ let out='',inStr=false;
+ for(let i=0;i<t.length;i++){
+  const c=t[i];
+  if(inStr){
+   if(c==='\\'){const n=t[i+1];if(n!==undefined&&'"\\/bfnrtu'.includes(n)&&!(n==='u'&&!/^[0-9a-fA-F]{4}$/.test(t.slice(i+2,i+6)))){out+=c+n;i++}else out+='\\\\';continue}
+   if(c==='"'){inStr=false;out+=c;continue}
+   if(c==='\n'){out+='\\n';continue}
+   if(c==='\r'){out+='\\r';continue}
+   if(c==='\t'){out+='\\t';continue}
+   if(c<' '){out+='\\u'+c.charCodeAt(0).toString(16).padStart(4,'0');continue}
+   out+=c;continue;
+  }
+  if(c==='"'){inStr=true;out+=c;continue}
+  if(c===','){let j=i+1;while(/\s/.test(t[j]||''))j++;if(t[j]==='}'||t[j]===']')continue}
+  out+=c;
+ }
+ return out;
+}
+function parseStepSafe(content,model){try{return parseStep(content)}catch(e){const raw=typeof content==='string'?content:JSON.stringify(content);const cut=/^\s*(```(json)?\s*)?\{/.test(raw||'')&&!/\}\s*(```)?\s*$/.test(raw||'');const invalid=cut?'it was cut off because it was too long; write at most 2 or 3 files per step and continue':String(e.message||e);console.warn('[agent] unusable reply'+(model?' from '+model:'')+': '+invalid.slice(0,120)+' | '+String(raw||'').length+' chars | starts: '+JSON.stringify(String(raw||'').slice(0,160))+' | ends: '+JSON.stringify(String(raw||'').slice(-120)));return{invalid,thought:'',actions:[],raw:String(raw||'').slice(0,400),...(model?{model:String(model)}:{})}}}
 function parseStep(content){
  let v=content;
  if(typeof v==='string'){
   const t=v.trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');
-  try{v=JSON.parse(t)}catch{const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<=a)throw Error('Agent reply was not JSON');v=JSON.parse(t.slice(a,b+1))}
+  try{v=JSON.parse(t)}catch{const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<=a)throw Error('Agent reply was not JSON');const body=t.slice(a,b+1);try{v=JSON.parse(body)}catch(e){const fixed=repairJson(body);if(fixed===body)throw e;v=JSON.parse(fixed)}}
  }
  if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Agent reply was not a JSON object');
  let actions=Array.isArray(v.actions)?v.actions:v.tool?[v]:[];
@@ -578,7 +600,7 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   if(!reply.invalid){if((reply.say||reply.step)&&reply.say!==lastSay){lastSay=reply.say;tl.add({t:'say',title:reply.step||'',text:reply.say,note:reply.thought})}tl.add({t:'think',ms:Date.now()-asked,note:reply.thought})}
   if(reply.invalid){
    invalidReplies++;invalidTotal++;
-   steps.push({n:step,thought:'',actions:['Reply was not valid JSON'],summary:'Reply was not valid JSON'});
+   steps.push({n:step,thought:'',actions:['Reply was not valid JSON'],summary:'Reply was not valid JSON',reason:String(reply.invalid).slice(0,160),...(reply.model?{model:reply.model}:{})});
    if(invalidReplies>=3)break;
    messages.push({role:'assistant',content:reply.raw||'(empty)'},{role:'user',content:'Your reply could not be used ('+reply.invalid+'). '+(invalidTotal>=1?'Keep replies small: write at most 2 files per step, and split a long file into a short first version you extend with edit_files. ':'')+'Reply with ONLY a JSON object: {"thought":"...","actions":[{"tool":"...", ...}]}. Use the finish tool when the task is done.'});
    continue;
@@ -721,4 +743,4 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token);await wb.close().catch(()=>{})}
 }
-module.exports={normFiles,contextBudget,run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
+module.exports={repairJson,normFiles,contextBudget,run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
