@@ -858,3 +858,8 @@ html body.app.in-editor #editor #preview-notice .pn-btn svg{width:14px;height:14
 html body.app.in-editor #editor #preview-notice .pn-status:not(:empty){font-size:12px;color:var(--f-mut2,#716F77);margin:0 6px}
 html body.app.in-editor #editor #preview-notice .preview-diagnosis:not(:empty){display:block;margin:0 8px 4px 16px!important;font-size:12px!important;font-weight:400!important;color:var(--c-ink-3,#625F68)!important;white-space:normal;max-width:420px}
 @media (prefers-reduced-motion:reduce){html body.app.in-editor #editor #preview-notice:not(.hidden),html body.app.in-editor #editor #preview-notice .pn-dot{animation:none!important}}
+/* The playful thinking word fades in when it changes */
+html body.app .tw-in{animation:tw-in .45s var(--f-ease-out,ease-out) both}
+@keyframes tw-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+html body.app .status-text.tw-in,html body.app .think-line span.tw-in{display:inline-block}
+@media (prefers-reduced-motion:reduce){html body.app .tw-in{animation:none!important}}

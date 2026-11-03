@@ -894,7 +894,7 @@ function agentHead(label){
 }
 // A short line under a reply: what the agent did to get there ("Thought it through, used 3 tools").
 function workLine(text){return el('p','work-line',text)}
-function thinkLine(text){const p=el('p','ask-head think-line');p.append(el('span',null,text),dots());return p}
+function thinkLine(text){const p=el('p','ask-head think-line'),t=el('span',null,text||'');if(!text)sayThinking(t);p.append(t,dots());return p}
 async function askThenBuild(prompt,chosenName){
  const name=String(chosenName||'').trim()||shortName(prompt);
  const {project}=await api('/projects',{method:'POST',body:{name}});
@@ -904,7 +904,7 @@ async function askThenBuild(prompt,chosenName){
  const card=document.createElement('li');card.className='assistant ask-card';
  card.classList.add('enter');card.dataset.dir='0';
  const started=Date.now(),worked=()=>'Worked for '+Math.max(1,Math.round((Date.now()-started)/1000))+'s';
- card.append(agentHead('Reading your request…'),thinkLine('Thinking it through'));list.append(card);
+ card.append(agentHead('Reading your request…'),thinkLine());list.append(card);
  const {opening='',questions=[]}=await api('/clarify',{method:'POST',body:{prompt,tier:state.tier}}).catch(()=>({opening:'',questions:[]}));
  // The answers go with the request; the picked look becomes the project's colours and fonts; then
  // the plan (build-plan.js) is shown with Review, Skip and Approve, and the build starts on Approve.
@@ -2289,6 +2289,13 @@ function summarize(events){
  return[reads&&'read '+reads+' file'+(reads===1?'':'s'),edits&&'edited '+edits+' file'+(edits===1?'':'s'),tests.length&&(tests.at(-1).ok?'tested in a browser':'browser test found problems'),fixes&&'fixed '+fixes+' problem'+(fixes===1?'':'s')].filter(Boolean).join(' · ').replace(/^./,c=>c.toUpperCase());
 }
 // ---------- live: the chat shows a status line and the latest activity ----------
+// While Kairoq thinks, its status says it in a playful word that changes every few seconds
+// ("Kairoq Agent is noodling…"). Concrete steps (writing, building, testing) keep their own words.
+const THINK_WORDS=['musing','noodling','tinkering','pondering','mulling it over','percolating','brewing ideas','connecting the dots','doodling','puzzling it out','sketching','chewing on it'];
+function thinkWord(){return THINK_WORDS[Math.floor(Date.now()/3200)%THINK_WORDS.length]}
+function thinkText(lead){const w=thinkWord();return lead+(lead?w:w[0].toUpperCase()+w.slice(1))+'…'}
+function sayThinking(node,lead=''){if(!node)return;node.dataset.think=lead;const t=thinkText(lead);if(node.textContent!==t)node.textContent=t}
+setInterval(()=>{if(document.hidden)return;for(const n of document.querySelectorAll('[data-think]')){const t=thinkText(n.dataset.think);if(n.textContent!==t){n.textContent=t;n.classList.remove('tw-in');void n.offsetWidth;n.classList.add('tw-in')}}},800);
 // Three breathing dots: shown wherever Kairoq is thinking.
 function dots(){const d=el('span','k-dots');d.setAttribute('aria-hidden','true');d.append(el('i'),el('i'),el('i'));return d}
 // The working mark beside the agent's name: a 4×4 grid of dots that breathes in a wave.
@@ -2309,7 +2316,7 @@ function workCard(){
  let li=$('stream');
  if(!li){
   li=el('li','assistant work');li.id='stream';
-  const status=el('button','status-line');status.type='button';status.append(workingMark(),el('span','agent-name','Kairoq Agent'),el('span','status-text','is thinking…'),icon('chev'));status.onclick=()=>openDetail('live');
+  const status=el('button','status-line');status.type='button';status.append(workingMark(),el('span','agent-name','Kairoq Agent'),(()=>{const t=el('span','status-text');sayThinking(t,'is ');return t})(),icon('chev'));status.onclick=()=>openDetail('live');
   const head=el('div','work-head');head.append(status,el('span','work-time'));const stop=el('button','ghost work-stop','Stop');stop.type='button';stop.onclick=()=>$('stop-job').click();head.append(stop);
   // Like Lovable: one status line, then what Kairoq says and plans; the step checklist stays in Details.
   li.append(head,el('div','work-msg hidden'),el('ol','stages'),el('p','work-think hidden'),el('ol','rail live'));
@@ -2403,7 +2410,7 @@ function renderWork(j){
  if(j.thinking)work.thinking=j.thinking;
  // "Kairoq Agent is building the application…", like a person at work.
  const kg=li.querySelector('.k-grid'),pat=gridPattern(j);if(kg&&kg.dataset.p!==pat)kg.dataset.p=pat;
- const st0=liveStatus(j);text(li.querySelector('.status-text'),'is '+st0.charAt(0).toLowerCase()+st0.slice(1).replace(/\u2026?$/,'')+'\u2026');
+ const stx=li.querySelector('.status-text');if(phaseOf(j)==='thinking'&&!(j.mode==='discuss'&&j.stream&&j.stream.text))sayThinking(stx,'is ');else{const st0=liveStatus(j);delete stx.dataset.think;text(stx,'is '+st0.charAt(0).toLowerCase()+st0.slice(1).replace(/\u2026?$/,'')+'\u2026')}
  const ask=j.mode==='discuss';
  li.querySelector('.stages').replaceWith(ask?el('ol','stages hidden'):stageList(j));
  const th=li.querySelector('.work-think'),thought='';th.classList.toggle('hidden',!thought);text(th,thought);
