@@ -91,7 +91,7 @@ test('out of rounds with a working build: Kairoq runs the review itself and the 
   return parse(JSON.stringify(steps.shift()||{thought:'Still looking.',actions:[{tool:'read_files',paths:['src/App.jsx']}]}));
  };
  const r=await agent.run(meta.id,'Add a members page with a list',{callModel,maxSteps:2});
- assert.match(r.message,/Stopped after \d+ steps/);
+ assert.match(r.message,/ran out of rounds/);
  assert.equal(reviews.length,2,'both reviewers ran after the rounds were used up');
  assert.ok(r.timeline.some(e=>e.t==='test'&&e.text==='Standards + Spec review passed'),JSON.stringify(r.timeline.map(e=>e.text||e.t)));
  assert.equal(r.verification.evidence.engineering_review,'passed');

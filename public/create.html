@@ -25,6 +25,9 @@
 <link rel="stylesheet" href="/ui/browser.css?v=2">
 <link rel="stylesheet" href="/ui/tool-pages.css?v=7">
 <link rel="stylesheet" href="/ui/forma.css?v=23">
+<link rel="stylesheet" href="/ui/forma.css?v=22">
+<link rel="stylesheet" href="/ui/forma.css?v=21">
+<link rel="stylesheet" href="/ui/forma.css?v=20">
 </head>
 <body>
 <header class="bar" id="top-bar">
@@ -670,6 +673,13 @@
 
 
 <section class="screen hidden" id="editor" data-pane="chat">
+  <!-- Phone only (like the Figma "Phone builder chat" frame): back, the project, Publish, menu. -->
+  <div class="ph-bar" id="ph-bar">
+    <button type="button" class="ph-back" id="ph-back" aria-label="Back to projects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="ph-title"><span class="ph-name" id="ph-name"></span><span class="ph-saved" id="ph-saved">All changes saved</span></div>
+    <button type="button" class="ph-publish" id="ph-publish">Publish</button>
+    <button type="button" class="ph-more" id="ph-more" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+  </div>
   <div class="phone-panes" id="phone-panes" role="tablist" aria-label="Editor panes">
     <button type="button" role="tab" data-pane="chat" aria-selected="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Chat</button>
     <button type="button" role="tab" data-pane="preview" aria-selected="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
@@ -1687,6 +1697,9 @@
 <script src="/create-look.js?v=7"></script>
 <script src="/builder-browser-pane.js?v=7"></script>
 <script src="/create.js?v=20261129"></script>
+<script src="/create.js?v=20261128"></script>
+<script src="/create.js?v=20261127"></script>
+<script src="/create.js?v=20261126"></script>
 <script src="/builder-split-preview.js?v=4"></script>
 </body>
 </html>
