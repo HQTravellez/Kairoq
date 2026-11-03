@@ -196,5 +196,15 @@ html body.app .id-why summary::before{content:"";flex:none;width:6px;height:6px;
 html body.app .id-why ul{margin:8px 0 0;padding:8px 10px 8px 24px;border-radius:8px;background:var(--c-bg,#F7F6F2)}
 html body.app .id-why li+li{margin-top:4px}
 html body.app .id-why ul::before{content:"Based on";display:block;margin:0 0 4px -14px;font-weight:600;color:var(--c-ink-2,#3C3A42)}
-@media (max-width:900px){html body.app #ideas-screen .ld-find .primary{grid-column:span 2}html body.app .tp-crumbs>a{display:none}}
+@media (max-width:900px){html body.app :is(#ideas-screen,#agents-screen) .ld-find .primary{grid-column:span 2}html body.app .tp-crumbs>a{display:none}}
+
+/* ---------- Agent builder ---------- */
+html body.app .tp-panel select{font:inherit;font-size:13px;font-weight:400;height:38px;border:1px solid var(--c-line-2,#DEDBD5);border-radius:8px;padding:0 10px;background:#fff;color:var(--c-ink,#1C1B1F)}
+html body.app #ag-at-wrap.hidden{display:none}
+html body.app .ag-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+html body.app .ag-chip{border-radius:999px;padding:4px 10px;font-size:12px;border:1px solid var(--c-line,#E6E4DF);color:var(--f-mut2,#716F77);background:#fff}
+html body.app #ag-list .tp-card-top>.ld-chip{margin-left:auto;flex:none}
+html body.app .ag-chip.on{border-color:transparent;background:var(--f-lilac,#ECE8F3);color:#4A33A8}
+html body.app .tp-panel .ag-check{flex-direction:row!important;align-items:center;gap:8px!important;font-size:13px!important}
+html body.app .tp-panel .ag-check input{accent-color:var(--c-accent,#7552E8);width:16px;height:16px;margin:0}
 @media (prefers-reduced-motion:reduce){html body.app .ld-draft,html body.app .tp-card,html body.app .tp-sw::after,html body.app .tp-panel{transition:none!important;animation:none!important}}
