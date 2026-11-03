@@ -12,11 +12,11 @@ async function api(path,{method='GET',body}={}){
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
- for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
- const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
+ const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
@@ -24,9 +24,10 @@ function show(screen){
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads'])$(b).removeAttribute('aria-current');
  if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
  if(screen==='plugins-screen')$('side-plugins').setAttribute('aria-current','page');
+ if(screen==='leads-screen')$('side-leads').setAttribute('aria-current','page');
  if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -3117,54 +3118,103 @@ const LEAD_STATUS={new:'New',drafted:'Draft in outbox',contacted:'Emailed',repli
 function forViewer(msg){return state.me&&state.me.viewer&&state.me.viewer.kind==='owner'?msg:String(msg||'').replace(/\s*\((?:set )?KAIROQ_[A-Z0-9_]+\)/g,'')}
 async function leadsAction(fn){text($('leads-error'),'');try{const d=await fn();if(d&&d.leads)renderLeads(d);else await loadLeads()}catch(err){text($('leads-error'),forViewer(err.message))}}
 async function loadLeads(){renderLeads(await api('/outreach'))}
+// The page keeps the last view so tabs and "Read draft" redraw without asking the server again.
+const leadsUi={d:null,tab:'new',open:new Set()};
+const LD_TABS=[['new','New',l=>l.status==='new'],['drafted','Draft ready',l=>l.status==='drafted'],['contacted','Contacted',l=>l.status==='contacted'],['replied','Replied',l=>l.status==='replied'],['closed','Closed',l=>['skipped','not_interested','opted_out','bounced'].includes(l.status)]];
+// Fit is only the signals the owner ticked that Kairoq actually saw on the lead's own website.
+function leadFit(l,d){const seen=(l.observations||[]).filter(o=>o.value&&(d.settings.signals||[]).includes(o.code));return{n:seen.length,labels:seen.map(o=>(d.signals.find(x=>x.code===o.code)||{}).label).filter(Boolean)}}
 function renderLeads(d){
- const s=d.settings||{};
- $('leads-offer').value=s.offer||'';$('leads-customers').value=s.customers||'';$('leads-sender').value=s.sender||'';$('leads-business').value=s.sender_business||'';$('leads-address').value=s.address||'';$('leads-reply').value=s.reply_to||'';
+ leadsUi.d=d;const s=d.settings||{};
+ for(const [id,v] of [['leads-offer',s.offer],['leads-customers',s.customers],['leads-sender',s.sender],['leads-business',s.sender_business],['leads-address',s.address],['leads-reply',s.reply_to]])if(document.activeElement!==$(id))$(id).value=v||'';
  text($('leads-missing'),d.missing.length?'Add '+d.missing.join(', ')+' before emails can be written.':'');
- if(d.missing.length)$('leads-settings-box').open=true;
+ $('ld-about-dot').classList.toggle('hidden',!d.missing.length);
  const sig=$('leads-signals');sig.textContent='';
- for(const x of d.signals){const l=el('label','check small');const c=document.createElement('input');c.type='checkbox';c.value=x.code;c.checked=s.signals.includes(x.code);l.append(c,' '+x.label+' ',el('span','muted',x.why));sig.append(l)}
- const kind=$('leads-kind');if(!kind.options.length)for(const k of d.kinds){const o=document.createElement('option');o.value=k;o.textContent=k.replace(/_/g,' ');kind.append(o)}
- text($('leads-sending'),d.paused?'Sending is paused: '+d.paused.reason:!d.sending_ready?'Sending needs its own address (set up by the Kairoq admin); until then, copy approved emails into your own email.':d.stats.sent+' sent, '+d.stats.bounced+' bounced, up to '+d.daily+' a day');
+ for(const x of d.signals){const l=el('label','ld-sig');const c=document.createElement('input');c.type='checkbox';c.value=x.code;c.checked=s.signals.includes(x.code);const t=el('span');t.append(el('b',null,x.label),el('small',null,x.why));l.append(c,t);sig.append(l)}
+ const kind=$('leads-kind');if(!kind.options.length)for(const k of d.kinds){const o=document.createElement('option');o.value=k;o.textContent=cap(k.replace(/_/g,' '));kind.append(o)}
+ const pill=$('leads-sending');pill.hidden=false;pill.classList.toggle('warn',Boolean(d.paused||!d.sending_ready));
+ text(pill,d.paused?'Sending paused':!d.sending_ready?'You send approved emails yourself':d.stats.sent+' sent · up to '+d.daily+' a day');
+ pill.title=d.paused?'Sending is paused: '+d.paused.reason:!d.sending_ready?'Sending needs its own address (set up by the Kairoq admin). Until then, copy approved emails into your own email.':d.stats.bounced+' bounced';
+ const sub=$('ld-sub');sub.replaceChildren();
+ if(s.customers){sub.append('Looking for ',el('b',null,s.customers),'. ')}else sub.append('Kairoq lists local businesses, reads their own websites and writes a short, honest first email. ');
+ sub.append(el('b',null,'Nothing is sent until you approve it.'));
  text($('leads-attribution'),d.attribution);
- const out=$('leads-outbox');out.textContent='';
- const items=d.outbox.filter(o=>o.status!=='rejected');
- if(!items.length)out.append(el('li','muted small','No emails yet. Write one from a lead below.'));
- for(const o of items){
-  const li=el('li','lead-mail');const lead=d.leads.find(l=>l.id===o.lead);
-  li.append(el('p','small',(lead?lead.name+' · ':'')+o.to+' · '+({waiting:'Waiting for you',approved:'Approved',blocked:'Needs a fix',sent:'Sent'}[o.status]||o.status)));
-  const subj=document.createElement('input');subj.value=o.subject;subj.maxLength=120;subj.disabled=o.status==='sent';subj.setAttribute('aria-label','Subject');
-  const body=document.createElement('textarea');body.value=o.text;body.rows=8;body.disabled=o.status==='sent';body.setAttribute('aria-label','Email');
-  li.append(subj,body);
-  if(o.reasons&&o.reasons.length)li.append(el('p','error small',o.reasons.join(' ')));
-  if(o.status!=='sent'){
-   const row=el('div','row');
-   const save=el('button','ghost link-btn','Save changes');save.type='button';save.onclick=()=>leadsAction(()=>api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'edit',subject:subj.value,text:body.value}}));
-   const ok=el('button','primary',o.status==='approved'?'Send now':'Approve');ok.type='button';
-   ok.onclick=()=>leadsAction(async()=>{await api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'edit',subject:subj.value,text:body.value}});if(o.status==='approved'){if(!confirm('Send this email to '+o.to+' now?'))return;await api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'send'}})}else await api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'approve'}})});
-   const copy=el('button','ghost link-btn','Copy');copy.type='button';copy.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText('To: '+o.to+'\nSubject: '+subj.value+'\n\n'+body.value);
-   const no=el('button','ghost link-btn','Discard');no.type='button';no.onclick=()=>leadsAction(()=>api('/outreach/outbox/'+o.id,{method:'POST',body:{action:'reject'}}));
-   row.append(ok,save,copy,no);li.append(row);
-  }
-  out.append(li);
- }
- const list=$('leads-list');list.textContent='';
- if(!d.leads.length)list.append(el('li','muted small','No leads yet. Pick a kind of business and a place, then Find.'));
- for(const l of d.leads){
-  const li=el('li');
-  const head=el('p','small');head.append(el('b',null,l.name),' · '+l.kind.replace(/_/g,' ')+(l.address?' · '+l.address:'')+' · score '+(l.score||0)+' · '+(LEAD_STATUS[l.status]||l.status));li.append(head);
-  const seen=(l.observations||[]).filter(o=>o.value).map(o=>(d.signals.find(x=>x.code===o.code)||{}).label).filter(Boolean);
-  li.append(el('p','muted small',[l.website||'No website',l.email?l.email+' ('+l.email_source+')':'No published email',l.phone,seen.join(', ')].filter(Boolean).join(' · ')));
-  const row=el('div','row');
-  if(l.website&&!l.profiled_at){const b=el('button','ghost link-btn','Read their website');b.type='button';b.onclick=()=>leadsAction(()=>api('/outreach/leads/'+l.id+'/profile',{method:'POST'}));row.append(b)}
-  if(l.email&&['new','skipped'].includes(l.status)){const b=el('button','ghost link-btn','Write an email');b.type='button';b.onclick=async()=>{b.disabled=true;text($('leads-status'),'Writing…');await leadsAction(()=>api('/outreach/leads/'+l.id+'/draft',{method:'POST'}));text($('leads-status'),'')};row.append(b)}
-  if(l.status==='contacted')for(const [st,label] of [['replied','They replied'],['not_interested','Not interested'],['opted_out','Asked to stop'],['bounced','Bounced']]){const b=el('button','ghost link-btn',label);b.type='button';b.onclick=()=>leadsAction(()=>api('/outreach/leads/'+l.id,{method:'POST',body:{status:st}}));row.append(b)}
-  li.append(row);list.append(li);
- }
+ const tabs=$('ld-tabs');tabs.replaceChildren();
+ for(const [key,label,match] of LD_TABS){const n=d.leads.filter(match).length;const b=el('button',null,label);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(leadsUi.tab===key));b.append(el('span','n',String(n)));b.onclick=()=>{leadsUi.tab=key;renderLeads(leadsUi.d)};tabs.append(b)}
+ const match=(LD_TABS.find(t=>t[0]===leadsUi.tab)||LD_TABS[0])[2];
+ const shown=d.leads.filter(match),grid=$('ld-grid');grid.replaceChildren();
+ if(!shown.length)grid.append(el('li','tp-empty',d.leads.length?'Nothing here yet.':'No leads yet. Pick a kind of business and a place, then Find.'));
+ for(const l of shown)grid.append(leadCard(l,d));
 }
-$('side-leads').onclick=async()=>{text($('leads-error'),'');$('leads-dialog').showModal();try{await loadLeads()}catch(err){text($('leads-error'),err.message)}};
-$('leads-save').onclick=()=>leadsAction(async()=>{const d=await api('/outreach/settings',{method:'POST',body:{offer:$('leads-offer').value,customers:$('leads-customers').value,sender:$('leads-sender').value,sender_business:$('leads-business').value,address:$('leads-address').value,reply_to:$('leads-reply').value.trim(),signals:[...$('leads-signals').querySelectorAll('input:checked')].map(c=>c.value)}});text($('leads-saved'),'Saved');setTimeout(()=>text($('leads-saved'),''),2000);return d});
-$('leads-search').onclick=async()=>{const b=$('leads-search');b.disabled=true;text($('leads-status'),'Looking on the map…');await leadsAction(async()=>{const d=await api('/outreach/search',{method:'POST',body:{kind:$('leads-kind').value,area:$('leads-area').value.trim()}});text($('leads-status'),'Found '+d.added+' new '+d.kind.replace(/_/g,' ')+' in '+d.area+'.');return d});b.disabled=false};
+function leadCard(l,d){
+ const li=el('li','tp-card ld-card'),top=el('div','tp-card-top'),fit=leadFit(l,d);
+ const ic=el('span','tp-ic',plInitials(l.name));ic.setAttribute('aria-hidden','true');
+ const nm=el('span','tp-name',l.name);nm.append(el('small',null,[cap(l.kind.replace(/_/g,' ')),l.address].filter(Boolean).join(' · ')));
+ top.append(ic,nm);
+ if(fit.n)top.append(el('span','ld-fit'+(fit.n>=2?' strong':''),fit.n>=2?'Strong fit':'Good fit'));
+ li.append(top);
+ const why=fit.labels.length?fit.labels.join(' · '):l.profiled_at?'None of your signals seen on their website.':l.website?'Website not read yet.':'No website listed.';
+ li.append(el('p','tp-desc',why));
+ const contact=el('p','ld-contact');
+ contact.append(l.email?el('span',null,l.email):el('span','ld-none','No published email'));
+ if(l.website){const a=el('a',null,l.website.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''));a.href=l.website;a.target='_blank';a.rel='noopener nofollow';contact.append(a)}
+ li.append(contact);
+ const mail=d.outbox.find(o=>o.lead===l.id&&o.status!=='rejected'&&o.status!=='sent');
+ const foot=el('div','tp-card-foot ld-actions');
+ const btn=(label,cls,fn)=>{const b=el('button',cls,label);b.type='button';b.onclick=async()=>{b.disabled=true;try{await fn()}finally{b.disabled=false}};foot.append(b);return b};
+ if(l.status==='new'){
+  if(l.website&&!l.profiled_at)btn('Read their website','ghost tp-btn',()=>leadsAction(()=>api('/outreach/leads/'+l.id+'/profile',{method:'POST'})));
+  if(l.email)btn('Write an email','primary',async()=>{text($('leads-status'),'Writing an email to '+l.name+'…');await leadsAction(()=>api('/outreach/leads/'+l.id+'/draft',{method:'POST'}));text($('leads-status'),'');leadsUi.tab='drafted';leadsUi.open.add(l.id);renderLeads(leadsUi.d)});
+  else if(l.profiled_at||!l.website)foot.append(el('span','ld-chip','Needs a contact'));
+  foot.append(el('span','tp-grow'));
+  btn('Skip','link-btn',()=>leadsAction(()=>api('/outreach/leads/'+l.id,{method:'POST',body:{status:'skipped'}})));
+ }else if(l.status==='drafted'&&mail){
+  const st={waiting:'Draft ready',approved:'Approved',blocked:'Needs a fix'}[mail.status]||mail.status;
+  foot.append(el('span','ld-chip'+(mail.status==='blocked'?' bad':' ok'),st));foot.append(el('span','tp-grow'));
+  const openIt=leadsUi.open.has(l.id);
+  btn(openIt?'Hide draft':'Read draft','ghost tp-btn',()=>{openIt?leadsUi.open.delete(l.id):leadsUi.open.add(l.id);renderLeads(leadsUi.d)});
+  if(openIt){
+   const box=el('div','ld-draft');
+   box.append(el('p','ld-to','To '+mail.to));
+   const subj=document.createElement('input');subj.value=mail.subject;subj.maxLength=120;subj.setAttribute('aria-label','Subject');
+   const body=document.createElement('textarea');body.value=mail.text;body.rows=9;body.setAttribute('aria-label','Email');
+   box.append(subj,body);
+   if(mail.reasons&&mail.reasons.length)box.append(el('p','error small',mail.reasons.join(' ')));
+   const row=el('div','tp-row');
+   const mk=(label,cls,fn)=>{const b=el('button',cls,label);b.type='button';b.onclick=fn;row.append(b);return b};
+   mk('Discard','link-btn',()=>leadsAction(()=>api('/outreach/outbox/'+mail.id,{method:'POST',body:{action:'reject'}})));
+   mk('Copy','link-btn',()=>navigator.clipboard&&navigator.clipboard.writeText('To: '+mail.to+'\nSubject: '+subj.value+'\n\n'+body.value).then(()=>text($('leads-status'),'Copied.')));
+   row.append(el('span','tp-grow'));
+   mk('Save changes','ghost tp-btn',()=>leadsAction(()=>api('/outreach/outbox/'+mail.id,{method:'POST',body:{action:'edit',subject:subj.value,text:body.value}})));
+   const sendable=mail.status==='approved'&&d.sending_ready&&!d.paused;
+   mk(mail.status==='approved'?(sendable?'Send now':'Approved'):d.sending_ready&&!d.paused?'Approve and send':'Approve','primary',()=>leadsAction(async()=>{
+    await api('/outreach/outbox/'+mail.id,{method:'POST',body:{action:'edit',subject:subj.value,text:body.value}});
+    if(mail.status!=='approved'){await api('/outreach/outbox/'+mail.id,{method:'POST',body:{action:'approve'}});if(!d.sending_ready||d.paused){text($('leads-status'),'Approved. Copy it into your own email to send it.');return}}
+    if(!d.sending_ready||d.paused)return;
+    if(!confirm('Send this email to '+mail.to+' now?'))return;
+    await api('/outreach/outbox/'+mail.id,{method:'POST',body:{action:'send'}});
+   })).disabled=mail.status==='approved'&&!sendable;
+   box.append(row);li.append(foot,box);return li;
+  }
+ }else if(l.status==='contacted'){
+  foot.append(el('span','ld-chip ok','Emailed'));foot.append(el('span','tp-grow'));
+  for(const [st,label] of [['replied','They replied'],['not_interested','Not interested'],['opted_out','Asked to stop'],['bounced','Bounced']])btn(label,'link-btn',()=>leadsAction(()=>api('/outreach/leads/'+l.id,{method:'POST',body:{status:st}})));
+ }else{
+  foot.append(el('span','ld-chip',LEAD_STATUS[l.status]||l.status));foot.append(el('span','tp-grow'));
+  if(['skipped','not_interested','replied'].includes(l.status))btn('Move to New','link-btn',()=>leadsAction(()=>api('/outreach/leads/'+l.id,{method:'POST',body:{status:'new'}})));
+ }
+ li.append(foot);return li;
+}
+async function openLeads(){
+ show('leads-screen');text($('leads-error'),'');
+ if(!leadsUi.d)$('ld-grid').replaceChildren(el('li','tp-empty','Loading…'));
+ try{await loadLeads();if(leadsUi.d.missing.length&&!leadsUi.d.leads.length)$('ld-about').classList.remove('hidden')}catch(err){$('ld-grid').replaceChildren();text($('leads-error'),forViewer(err.message))}
+}
+$('side-leads').onclick=openLeads;
+$('ld-about-open').onclick=()=>$('ld-about').classList.toggle('hidden');
+$('ld-about-close').onclick=()=>$('ld-about').classList.add('hidden');
+$('ld-about').onsubmit=e=>e.preventDefault();
+$('leads-save').onclick=()=>leadsAction(async()=>{const d=await api('/outreach/settings',{method:'POST',body:{offer:$('leads-offer').value,customers:$('leads-customers').value,sender:$('leads-sender').value,sender_business:$('leads-business').value,address:$('leads-address').value,reply_to:$('leads-reply').value.trim(),signals:[...$('leads-signals').querySelectorAll('input:checked')].map(c=>c.value)}});text($('leads-saved'),'Saved.');return d});
+$('leads-search').onclick=async()=>{const b=$('leads-search');b.disabled=true;text($('leads-status'),'Looking on the map…');await leadsAction(async()=>{const d=await api('/outreach/search',{method:'POST',body:{kind:$('leads-kind').value,area:$('leads-area').value.trim()}});text($('leads-status'),'Found '+d.added+' new '+d.kind.replace(/_/g,' ')+' in '+d.area+'.');leadsUi.tab='new';return d});b.disabled=false};
 $('mem-enabled').onchange=()=>memoryAction({action:'enabled',enabled:$('mem-enabled').checked});
 $('mem-add').onclick=()=>{const t=$('mem-new').value.trim();if(!t)return;$('mem-new').value='';memoryAction({action:'add_preference',text:t})};
 $('mem-new').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('mem-add').click()}});

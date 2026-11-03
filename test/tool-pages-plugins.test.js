@@ -17,7 +17,7 @@ test("the sidebar opens a full Plugins page in the Figma layout", () => {
 
 test("switches use the account skill setting and counts come from the real list", () => {
   const js = read("create.js");
-  assert.match(js, /'plugins-screen'\]\)\$\(id\)\.classList\.toggle/);
+  assert.match(js, /'plugins-screen'[^\]]*\]\)\$\(id\)\.classList\.toggle/);
   assert.match(js, /api\('\/skills\/default',\{method:'POST',body:\{id:sk\.id,on:next\}\}\)/);
   assert.match(js, /const on=plugins\.list\.filter\(s=>s\.always\)\.length;/);
   assert.match(js, /sw\.setAttribute\('role','switch'\)/);

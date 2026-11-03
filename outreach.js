@@ -189,7 +189,7 @@ async function send(owner,id,{deliver,now=Date.now()}={}){
 }
 // What happened next, marked by the owner: replied, not interested, opted out, bounced.
 function mark(owner,id,status){
- if(!['replied','not_interested','opted_out','bounced','new'].includes(status))throw fail(400,'Unknown status');
+ if(!['replied','not_interested','opted_out','bounced','new','skipped'].includes(status))throw fail(400,'Unknown status');
  const st=load(owner),l=st.leads.find(x=>x.id===id);if(!l)throw fail(404,'Unknown lead');
  const was=l.status;l.status=status;
  if((status==='opted_out'||status==='bounced')&&l.email){st.suppressed=[...new Set([...(st.suppressed||[]),l.email.toLowerCase()])];for(const o of st.outbox)if(o.lead===id&&o.status!=='sent')o.status='rejected'}
