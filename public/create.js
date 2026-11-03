@@ -768,27 +768,29 @@ async function askThenBuild(prompt){
   card.append(agentHead(worked()));
   card.append(el('p','ask-intro',opening||'A few quick things before I plan the build. I\'ve filled in what I\'d suggest; change anything, then confirm.'));
   card.append(workLine('Read your request · '+questions.length+' question'+(questions.length===1?'':'s')+', my suggestion filled in · free'));
-  const box=el('div','qs');
+  const box=el('div','qs fm-qs');
   questions.forEach((q,at)=>{
-   const row=el('div','q');row.dataset.open='false';
-   const lab=el('button','q-label',q.q);lab.type='button';lab.setAttribute('aria-expanded','false');
+   const row=el('div','q fm-q');row.dataset.open='true';
+   const lab=el('button','q-label',(at+1)+'. '+q.q);lab.type='button';lab.setAttribute('aria-expanded','true');
    const shown=()=>{const a=[...picked[at],...(other[at].trim()?[other[at].trim()]:[])];return a.length?a.join(', '):'Choose…'};
    const val=el('div','q-answer',shown());
-   const opts=el('div','ask-opts hidden');
+   const opts=el('div','ask-opts');
    const mark=()=>{for(const r of opts.querySelectorAll('.ask-opt'))r.classList.toggle('on',r.querySelector('input').checked);val.textContent=shown();val.classList.toggle('q-empty',!picked[at].size&&!other[at].trim())};
    (q.options||[]).forEach((o,i)=>{
     const r=el('label','ask-opt');const input=document.createElement('input');
     input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
     input.onchange=()=>{if(!q.multi){picked[at].clear();other[at]='';own.value=''}input.checked?picked[at].add(o):picked[at].delete(o);mark();if(!q.multi)toggle(false)};
-    const words=el('span','ask-words');words.append(el('span','ask-label',o+(i===q.recommended?' (Recommended)':'')));
+    const words=el('span','ask-words');words.append(el('span','ask-label',o));
+    if(i===q.recommended)words.append(el('span','q-tag','Recommended'));
     if(q.details&&q.details[i])words.append(el('span','ask-detail',q.details[i]));
-    r.append(input,words);opts.append(r);
+    const arrow=el('span','fm-pick');arrow.setAttribute('aria-hidden','true');arrow.innerHTML='<svg viewBox="0 0 24 24"><path d="M17 17 7 7M7 15V7h8"/></svg>';
+    r.append(input,words,arrow);opts.append(r);
    });
    const own=document.createElement('input');own.className='ask-other';own.placeholder='Other…';own.value=other[at];own.setAttribute('aria-label','Another answer');
    own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false}mark()};
    opts.append(own);
-   const toggle=open=>{const o=open??opts.classList.contains('hidden');opts.classList.toggle('hidden',!o);row.dataset.open=String(o);lab.setAttribute('aria-expanded',String(o))};
-   lab.onclick=()=>toggle();val.onclick=()=>toggle();
+   // Every option stays visible, like the Figma chat: picking one only marks it.
+   const toggle=()=>{};
    mark();row.append(lab,val,opts);box.append(row);
   });
   const foot=el('div','ask-foot');
@@ -850,7 +852,9 @@ function characterPick(plan,{projectId,onChange}){
 function fillPlan(card,plan,{onApprove,onSkip,projectId}){
  card.classList.add('plan-card');
  if(plan.searches)card.append(el('p','plan-research','✓ Looked up '+plan.searches+' source'+(plan.searches===1?'':'s')+' before planning'));
- card.append(el('p','plan-kicker','Plan'),el('h3','plan-title',plan.title),el('p','plan-summary',plan.summary));
+ const t=(state.me?.tiers||[]).find(x=>x.id===(state.tier||'standard')),cost=state.me?.viewer?.kind==='customer'&&t?t.credits:0;
+ const top=el('div','plan-top');top.append(el('p','plan-kicker','Plan'),el('span','plan-meta','1 build'+(cost?' · '+cost+' credits':'')));
+ card.append(top,el('h3','plan-title',plan.title),el('p','plan-summary',plan.summary));
  const more=el('div','plan-more hidden');
  const part=(title,items)=>{if(!items.length)return;more.append(el('p','plan-part',title));const ul=el('ul');for(const x of items)ul.append(el('li',null,x));more.append(ul)};
  part('Screens',(plan.screens||[]).map(x=>x.name+(x.what?': '+x.what:'')));
@@ -858,14 +862,14 @@ function fillPlan(card,plan,{onApprove,onSkip,projectId}){
  part('Left for later',plan.left_out||[]);
  if((plan.sources||[]).length){more.append(el('p','plan-part','Looked up'));const ul=el('ul');for(const x of plan.sources){const li=el('li'),a=el('a',null,x.title);a.href=x.url;a.target='_blank';a.rel='noopener';li.append(a);ul.append(li)}more.append(ul)}
  const foot=el('div','ask-foot');
- const review=el('button','plan-review','Review');review.type='button';review.setAttribute('aria-expanded','false');
- review.onclick=()=>{const open=more.classList.toggle('hidden');review.setAttribute('aria-expanded',String(!open));review.textContent=open?'Review':'Hide details'};
+ const review=el('button','plan-review','Review plan');review.type='button';review.setAttribute('aria-expanded','false');
+ review.onclick=()=>{const open=more.classList.toggle('hidden');review.setAttribute('aria-expanded',String(!open));review.textContent=open?'Review plan':'Hide details'};
  const skip=el('button','ask-link','Skip');skip.type='button';skip.title='Build without the plan';skip.onclick=onSkip;
- const ok=el('button','ask-next plan-approve','Approve');ok.type='button';
+ const ok=el('button','ask-next plan-approve','Build it');ok.type='button';
  const needPick=()=>Boolean(plan.characters&&(plan.characters.options||[]).length&&!plan.pick);
- const sync=()=>{ok.disabled=needPick();ok.textContent=needPick()?'Pick a character':'Approve'};
+ const sync=()=>{ok.disabled=needPick();ok.textContent=needPick()?'Pick a character':'Build it'};
  ok.onclick=async()=>{if(needPick())return;ok.disabled=true;ok.textContent='Adding the character…';if(await onApprove()===false)sync()};
- foot.append(review,el('span','ask-gap'),skip,ok);
+ foot.classList.add('plan-foot');foot.append(ok,review,el('span','ask-gap'),skip);
  card.append(more);
  if(plan.characters)card.append(characterPick(plan,{projectId,onChange:sync}));
  card.append(foot);sync();
