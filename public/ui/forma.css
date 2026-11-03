@@ -863,3 +863,30 @@ html body.app .tw-in{animation:tw-in .45s var(--f-ease-out,ease-out) both}
 @keyframes tw-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 html body.app .status-text.tw-in,html body.app .think-line span.tw-in{display:inline-block}
 @media (prefers-reduced-motion:reduce){html body.app .tw-in{animation:none!important}}
+/* ---------- Phone builder, like the Figma "Phone builder chat" frame ---------- */
+html body.app #editor .ph-bar{display:none}
+@media (max-width:900px){
+  /* One dark bar: back, the project and "All changes saved", Publish, menu. */
+  html body.app.in-editor #top-bar{display:none!important}
+  html body.app.in-editor #editor .ph-bar{display:flex;align-items:center;gap:8px;height:56px;padding:0 8px 0 4px;background:var(--f-chrome,#1F1E24);color:#fff;flex:none}
+  html body.app.in-editor #editor .ph-bar button{display:inline-grid;place-items:center;border:0;background:transparent;color:#fff;cursor:pointer}
+  html body.app.in-editor #editor .ph-bar :is(.ph-back,.ph-more){width:40px;height:40px;border-radius:10px}
+  html body.app.in-editor #editor .ph-bar :is(.ph-back,.ph-more):active{background:rgba(255,255,255,.1)}
+  html body.app.in-editor #editor .ph-bar svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  html body.app.in-editor #editor .ph-bar .ph-more svg{fill:currentColor;stroke:none}
+  html body.app.in-editor #editor .ph-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  html body.app.in-editor #editor .ph-name{font:600 15px/1.25 Inter,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body.app.in-editor #editor .ph-saved{font:400 11.5px/1.3 Inter,system-ui,sans-serif;color:var(--f-chrome-mut,#A09DA8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body.app.in-editor #editor .ph-publish{height:34px;padding:0 14px!important;border-radius:9px;background:var(--c-accent,#7552E8)!important;font:600 13px Inter,system-ui,sans-serif}
+  html body.app.in-editor #editor .ph-publish.hidden{display:none}
+  /* Chat / Preview / Browser on a light row under it; the picked one is a soft lilac pill. */
+  html body.app.in-editor #editor .phone-panes{background:#fff!important;padding:8px 12px!important;border-bottom:1px solid var(--c-line,#E6E4DF)!important}
+  html body.app.in-editor #editor .phone-panes button{background:transparent!important;color:var(--c-ink-2,#3C3A42)!important}
+  html body.app.in-editor #editor .phone-panes button[aria-selected=true]{background:var(--f-lilac,#ECE8F3)!important;color:var(--c-accent,#7552E8)!important}
+  /* The back button and name now live in the top bar. */
+  html body.app.in-editor #editor .chat-head{border-top:0!important}
+  html body.app.in-editor #editor .chat-head{display:none!important}
+  /* Preview: Publish is in the top bar; Share and the project menu stay on desktop. */
+  html body.app.in-editor #editor .stage-bar :is(#publish-open,.share-pop-wrap,#menu-project){display:none!important}
+  html body.app.in-editor #editor .stage-bar:not(:has(>:not(.bar-spacer,#publish-open,.share-pop-wrap,#menu-project))){display:none!important}
+}
