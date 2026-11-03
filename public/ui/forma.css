@@ -871,3 +871,5 @@ html body.app.in-editor #editor #messages .verdict-head.tag{width:fit-content!im
    under it — not a red error box. */
 html body.app.in-editor #editor #messages>li.assistant.failed{border:0!important;background:transparent!important;padding:0!important}
 html body.app.in-editor #editor #messages>li.assistant.failed::before{content:none!important;display:none!important}
+/* While Kairoq works, the chat shows one line ("Kairoq Agent is writing the code…"), not a log. */
+html body.app.in-editor #editor #messages #stream .rail.live{display:none!important}
