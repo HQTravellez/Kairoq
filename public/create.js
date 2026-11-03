@@ -3103,7 +3103,7 @@ function planCard(title,price,lines,action){
  return card;
 }
 function renderLanding(){
- renderTemplates($('landing-templates'),id=>{setPending({template:id});openAuth('signup')},id=>{setPending({sponsored:id});openAuth('signup')}).catch(()=>{});
+ renderTemplates($('landing-templates'),id=>{setPending({template:id});openAuth('signup')},id=>{setPending({sponsored:id});openAuth('signup')}).then(trimShowcase).catch(()=>{});
  const wrap=$('landing-plans');wrap.replaceChildren();
  const per=(state.me.tiers||[]).map(t=>t.label+' '+t.credits+' credit'+(t.credits===1?'':'s')).join(', ');
  wrap.append(planCard('Free',(state.me.free_credits||0)+' credits',['Every feature included','Publish to a Kairoq URL','No card needed']));
@@ -3113,8 +3113,18 @@ function renderLanding(){
 }
 $('landing-form').onsubmit=e=>{e.preventDefault();setPending({prompt:$('landing-prompt').value.trim()});openAuth('signup')};
 for(const b of document.querySelectorAll('.hero-chip'))b.onclick=()=>{$('landing-prompt').value=b.textContent.trim();$('landing-prompt').focus()};
+// On a phone the gallery shows three templates (like the Figma phone frame) and "Explore all
+// templates" opens the rest; CSS hides cards marked data-more under 600px only.
+function trimShowcase(){
+ const wrap=$('landing-templates');if(!wrap)return;let n=0;
+ for(const c of wrap.children){if(c.hidden){delete c.dataset.more;continue}if(++n>3)c.dataset.more='';else delete c.dataset.more}
+ let more=$('show-more');
+ if(!more){more=document.createElement('button');more.type='button';more.id='show-more';more.className='show-more';more.onclick=()=>{const all=$('showcase').classList.toggle('show-all');more.textContent=all?'Show fewer':'Explore all templates'};wrap.after(more)}
+ more.textContent=$('showcase').classList.contains('show-all')?'Show fewer':'Explore all templates';
+ more.hidden=n<=3;
+}
 // Template gallery tabs: filter the cards by their category.
-for(const t of document.querySelectorAll('.show-tabs .tab'))t.onclick=()=>{for(const x of document.querySelectorAll('.show-tabs .tab'))x.setAttribute('aria-pressed',String(x===t));const cat=t.dataset.cat||'';for(const card of $('landing-templates').children){const c=(card.dataset.cat||card.querySelector('.cat')?.textContent||'').toLowerCase();card.hidden=Boolean(cat)&&c!==cat}};
+for(const t of document.querySelectorAll('.show-tabs .tab'))t.onclick=()=>{for(const x of document.querySelectorAll('.show-tabs .tab'))x.setAttribute('aria-pressed',String(x===t));const cat=t.dataset.cat||'';for(const card of $('landing-templates').children){const c=(card.dataset.cat||card.querySelector('.cat')?.textContent||'').toLowerCase();card.hidden=Boolean(cat)&&c!==cat}trimShowcase()};
 $('nav-signin').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create#signup';return}openAuth('login')};
 $('nav-start').onclick=()=>{if($('auth').classList.contains('hidden')){location.href='/create';return}$('top').scrollIntoView({behavior:'smooth'});$('landing-prompt').focus()};
 // Landing motion: a typing placeholder, reveal-on-scroll and a cursor glow on the tiles. Nothing here is needed to use the page.
