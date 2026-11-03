@@ -538,7 +538,17 @@ function previewFloat(){
  const canvas=$('canvas');if(!canvas||canvas.querySelector('.pv-float'))return;
  const bar=el('div','pv-float');bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Preview tools');
  const vis=$('visual-toggle');if(vis){if(!vis.querySelector('.pv-lbl'))vis.append(el('span','pv-lbl','Edit'));bar.append(vis)}
- const seg=$('preview-bar-tools')?.querySelector('.seg.icons');if(seg)bar.append(seg);
+ const seg=$('preview-bar-tools')?.querySelector('.seg.icons');
+ // Laptop, phone and tablet, like before: the phone has its own model menu (iPhone 16, Pro Max,
+ // SE, Pixel) and "Real Safari" next to it; both move here from the top toolbar.
+ if(seg){
+  if(!$('tablet')){const t=el('button');t.type='button';t.id='tablet';t.title='Tablet (iPad mini)';t.setAttribute('aria-label','Tablet');t.setAttribute('aria-pressed','false');
+   t.innerHTML='<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="2.5" width="15" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>';
+   t.onclick=()=>{state.deviceModel='ipad';try{localStorage.setItem('kq-device','ipad')}catch{}device(true)};seg.append(t)}
+  $('desktop').title='Laptop';$('desktop').setAttribute('aria-label','Laptop');
+  bar.append(seg);
+  for(const id of ['device-model','safari-shot'])if($(id))bar.append($(id));
+ }
  const full=el('button','pv-btn');full.type='button';full.title='Full screen';full.setAttribute('aria-label','Full screen');full.setAttribute('aria-pressed','false');
  full.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
  const stage=document.querySelector('#editor .stage');
@@ -547,8 +557,21 @@ function previewFloat(){
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&stage?.classList.contains('pv-full'))setFull(false)});
  const fold=el('button','pv-btn pv-fold');fold.type='button';fold.title='Hide the tools';fold.setAttribute('aria-label','Hide the preview tools');
  fold.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
- fold.onclick=()=>{const min=bar.classList.toggle('min');fold.title=min?'Show the tools':'Hide the tools';fold.setAttribute('aria-label',min?'Show the preview tools':'Hide the preview tools')};
- bar.append(full,fold);canvas.append(bar);
+ fold.onclick=()=>{const min=bar.classList.toggle('min');fitDevice();fold.title=min?'Show the tools':'Hide the tools';fold.setAttribute('aria-label',min?'Show the preview tools':'Hide the preview tools')};
+ // Open on your phone: a QR code for this preview (GET /previewqr), like Emergent and Lovable.
+ const qr=el('button','pv-btn pv-qr');qr.type='button';qr.title='Open on your phone';qr.setAttribute('aria-label','Open this preview on your phone');qr.setAttribute('aria-expanded','false');
+ qr.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 14h2M14 18v2M17 17h3v3"/></svg>';
+ const pop=el('div','pv-qr-pop hidden');pop.setAttribute('role','dialog');pop.setAttribute('aria-label','Open on your phone');
+ const img=el('img','pv-qr-img');img.alt='QR code that opens this preview on your phone';img.width=168;img.height=168;
+ const link=el('p','pv-qr-link'),copy=el('button','pv-qr-copy','Copy link');copy.type='button';
+ pop.append(el('p','pv-qr-title','Open on your phone'),img,el('p','pv-qr-hint',"Point your phone's camera at the code."),link,copy);
+ const close=()=>{pop.classList.add('hidden');qr.setAttribute('aria-expanded','false')};
+ qr.onclick=e=>{e.stopPropagation();if(!pop.classList.contains('hidden'))return close();const p=state.project;if(!p||!p.preview_url)return;
+  const url=location.origin+p.preview_url;img.src='/api/create/projects/'+p.id+'/previewqr?v='+(p.current_version||0);text(link,url.replace(/^https?:\/\//,''));
+  copy.onclick=()=>{navigator.clipboard?.writeText(url).then(()=>{text(copy,'Copied');setTimeout(()=>text(copy,'Copy link'),1500)}).catch(()=>{})};
+  pop.classList.remove('hidden');qr.setAttribute('aria-expanded','true')};
+ pop.onclick=e=>e.stopPropagation();document.addEventListener('click',close);document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+ bar.append(qr,full,fold,pop);canvas.append(bar);
 }
 function refreshWindow(){
  const p=state.project;if(!p||!$('fm-addr-text'))return;
@@ -771,6 +794,11 @@ $('ob-form').onsubmit=async e=>{
 };
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('ks-strip-stop').onclick=()=>$('stop-job').click();
+// The phone top bar (#ph-bar): its buttons are the editor's own, so they work exactly as before.
+$('ph-back').onclick=()=>$('back').click();
+$('ph-publish').onclick=()=>$('publish-open').click();
+$('ph-more').onclick=()=>document.body.classList.toggle('side-open');
+setInterval(()=>{const p=state.project;if(!p||!$('ph-name'))return;text($('ph-name'),p.name||'Untitled');text($('ph-saved'),state.job?'Kairoq is working…':'All changes saved');$('ph-publish').classList.toggle('hidden',p.role==='viewer')},800);
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
 // ui/screens: on a phone the menu is a drawer; a tap outside it closes it.
@@ -1585,19 +1613,23 @@ const MODELS={
  ipad:{label:'iPad mini',w:744,h:1133,top:24,urlTop:50,bottom:20,radius:22,island:false,os:'ipados'}};
 state.deviceModel=(()=>{try{return localStorage.getItem('kq-device')||'iphone16'}catch{return'iphone16'}})();
 if(!MODELS[state.deviceModel])state.deviceModel='iphone16';
+// The phone button goes back to the last phone picked (the tablet has its own button).
+state.lastPhone=state.deviceModel==='ipad'?'iphone16':state.deviceModel;
 function fitDevice(){
  const d=$('device'),m=MODELS[state.deviceModel];if(!d||d.classList.contains('desktop')||!m)return;
- const c=$('canvas'),pad=28,bez=m.home?72:24;
- const scale=Math.min(1,(c.clientHeight-pad)/(m.h+bez),(c.clientWidth-pad)/(m.w+24));
+ // Room for the floating preview bar under the device, so it never covers the home bar.
+ const c=$('canvas'),pad=28,bar=c.querySelector('.pv-float:not(.min)')?64:0,bez=m.home?72:24;
+ const scale=Math.min(1,(c.clientHeight-pad-bar)/(m.h+bez),(c.clientWidth-pad)/(m.w+24));
  d.style.setProperty('--dev-scale',String(Math.max(0.3,scale)));
 }
 function device(mobile){
  const m=MODELS[state.deviceModel],d=$('device');
- $('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile));
+ const tablet=mobile&&state.deviceModel==='ipad';
+ $('canvas').classList.toggle('mobile',mobile);$('desktop').setAttribute('aria-pressed',String(!mobile));$('mobile').setAttribute('aria-pressed',String(mobile&&!tablet));$('tablet')?.setAttribute('aria-pressed',String(tablet));
  const hidden=d.classList.contains('hidden');
  d.className='device '+(hidden?'hidden ':'')+(mobile?'phone '+m.os+(m.island?' island':'')+(m.home?' homebutton':''):'desktop');
  for(const [k,v] of Object.entries({'--dev-w':m.w+'px','--dev-h':m.h+'px','--dev-top':m.top+'px','--dev-url':m.urlTop+'px','--dev-bottom':m.bottom+'px','--dev-radius':m.radius+'px'}))d.style.setProperty(k,v);
- $('device-model').classList.toggle('hidden',!mobile);$('device-model').value=state.deviceModel;
+ $('device-model').classList.toggle('hidden',!mobile||tablet);if(!tablet)$('device-model').value=state.deviceModel;
  $('safari-shot').classList.toggle('hidden',!mobile||m.os==='android'||Boolean(state.project&&state.project.native));
  // A native app is not a web page: no browser address bar in its phone frame.
  $('editor').classList.toggle('is-native',Boolean(state.project&&state.project.native));
@@ -1605,8 +1637,8 @@ function device(mobile){
  try{const host=new URL($('frame').src||location.href).host;for(const h of d.querySelectorAll('.dev-host'))h.textContent=state.project&&state.project.published&&state.project.published.slug?state.project.published.slug+'.kairoq.app':host}catch{}
  fitDevice();
 }
-$('desktop').onclick=()=>device(false);$('mobile').onclick=()=>device(true);
-$('device-model').onchange=()=>{state.deviceModel=$('device-model').value;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
+$('desktop').onclick=()=>device(false);$('mobile').onclick=()=>{state.deviceModel=state.lastPhone;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
+$('device-model').onchange=()=>{state.deviceModel=state.lastPhone=$('device-model').value;try{localStorage.setItem('kq-device',state.deviceModel)}catch{}device(true)};
 addEventListener('resize',fitDevice);
 // The preview column changes size when the sidebar, code panel, or browser chrome changes.
 // A window resize listener alone misses those transitions and leaves the iPhone clipped.

@@ -41,7 +41,7 @@ test('enabled by default, off under the test runner unless turned on, and off wi
  assert.equal(PW.enabled(),true);
  const keep=process.env.KAIROQ_PARALLEL_WRITERS;
  process.env.KAIROQ_PARALLEL_WRITERS='off';assert.equal(PW.enabled(),false);
- delete process.env.KAIROQ_PARALLEL_WRITERS;assert.equal(PW.enabled(),!process.env.NODE_TEST_CONTEXT);
+ delete process.env.KAIROQ_PARALLEL_WRITERS;assert.equal(PW.enabled(),false,'off unless turned on: the agent builds in small steps');
  process.env.KAIROQ_PARALLEL_WRITERS=keep;
 });
 
