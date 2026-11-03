@@ -537,10 +537,12 @@ function formaRows(){
 // Like Emergent: a small floating bar on the preview with Edit, Desktop / Phone and Full screen.
 // The buttons are the editor's own (moved here), so they work exactly as before.
 function previewFloat(){
- const canvas=$('canvas');if(!canvas||canvas.querySelector('.pv-float'))return;
+ const canvas=$('canvas');if(!canvas||document.querySelector('#editor .pv-float'))return;
  const bar=el('div','pv-float');bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Preview tools');
  const vis=$('visual-toggle');if(vis){if(!vis.querySelector('.pv-lbl'))vis.append(el('span','pv-lbl','Edit'));bar.append(vis)}
  const seg=$('preview-bar-tools')?.querySelector('.seg.icons');
+ // Found now, while they are still in the page (the bar is not attached yet).
+ const extras=['device-model','safari-shot'].map(id=>$(id)).filter(Boolean);
  // Laptop, phone and tablet, like before: the phone has its own model menu (iPhone 16, Pro Max,
  // SE, Pixel) and "Real Safari" next to it; both move here from the top toolbar.
  if(seg){
@@ -549,7 +551,7 @@ function previewFloat(){
    t.onclick=()=>{state.deviceModel='ipad';try{localStorage.setItem('kq-device','ipad')}catch{}device(true)};seg.append(t)}
   $('desktop').title='Laptop';$('desktop').setAttribute('aria-label','Laptop');
   bar.append(seg);
-  for(const id of ['device-model','safari-shot'])if($(id))bar.append($(id));
+  for(const x of extras)bar.append(x);
  }
  const full=el('button','pv-btn');full.type='button';full.title='Full screen';full.setAttribute('aria-label','Full screen');full.setAttribute('aria-pressed','false');
  full.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
@@ -573,12 +575,25 @@ function previewFloat(){
   copy.onclick=()=>{navigator.clipboard?.writeText(url).then(()=>{text(copy,'Copied');setTimeout(()=>text(copy,'Copy link'),1500)}).catch(()=>{})};
   pop.classList.remove('hidden');qr.setAttribute('aria-expanded','true')};
  pop.onclick=e=>e.stopPropagation();document.addEventListener('click',close);document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
- bar.append(qr,full,fold,pop);canvas.append(bar);
+ bar.append(qr,full,fold,pop);
+ // Like Lovable: on a computer the tools sit in the bar above the preview (next to the version),
+ // so nothing floats over the app; on a phone they float at the bottom of the preview as before.
+ const narrow=window.matchMedia('(max-width:900px)');
+ const place=()=>{const sub=document.querySelector('#editor .fm-sub'),tools=$('preview-bar-tools');
+  // The phone model menu and "Real Safari" only matter in phone view: docked, they sit at the
+  // top left of the preview instead of making the bar too long.
+  if(!narrow.matches&&sub){bar.classList.add('docked');bar.classList.remove('min');sub.insertBefore(bar,tools&&tools.parentElement===sub?tools:null);fold.style.setProperty('display','none','important');
+   let box=canvas.querySelector('.pv-devbox');if(!box){box=el('div','pv-devbox');canvas.append(box)}box.append(...extras)}
+  else{bar.classList.remove('docked');canvas.append(bar);fold.style.removeProperty('display');for(const x of extras)bar.insertBefore(x,qr)}
+  fitDevice()};
+ place();narrow.addEventListener?.('change',place);
 }
 function refreshWindow(){
  const p=state.project;if(!p||!$('fm-addr-text'))return;
  // The real address of what is on screen: the live site once published, otherwise this preview.
- const live=p.published&&p.urls&&p.urls[0],url=live?String(p.urls[0]):location.host+(state.previewBase||p.preview_url||'');
+ // Like Lovable's page picker: the live site's address once published, otherwise just the page ("/"),
+ // not the long internal preview link (that one opens with the button on the right).
+ const live=p.published&&p.urls&&p.urls[0],url=live?String(p.urls[0]):'/';
  text($('fm-addr-text'),String(url).replace(/^https?:\/\//,''));
  text($('fm-version'),'Live preview · v'+(p.current_version||1));
  const d=$('device');text($('fm-size'),d&&d.classList.contains('mobile')?'Phone':'Desktop · Fit to view');
@@ -1511,7 +1526,9 @@ function liveStrip(j){
 function storyRows(tl){const says=(tl||[]).filter(e=>e.t==='say'&&(e.text||e.title));if(!says.length)return null;const box=el('div','ks-story');for(const e of says)box.append(storyRow(e));return box}
 // The change as one card: its title, Details (the steps and files) and Preview (that version).
 function resultCard(m,index){
- const title=m.title||String((state.project?.versions||[]).find(v=>v.n===m.version)?.title||'')||'Version '+m.version;
+ const ver=(state.project?.versions||[]).find(v=>v.n===m.version);
+ // What was built ("Built a tip calculator"), not just "Version 2": the title, else the version's summary.
+ const title=m.title||String(ver?.title||ver?.summary||'').replace(/\.$/,'')||'Version '+m.version;
  const card=el('div','ks-card'),head=el('div','ks-card-head');
  head.append(el('span','ks-card-title',title),el('span','ks-card-v','v'+m.version));
  const row=el('div','ks-card-btns'),det=el('button','ks-btn','Details'),pre=el('button','ks-btn','Preview');det.type=pre.type='button';

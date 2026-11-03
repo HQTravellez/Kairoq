@@ -1044,3 +1044,27 @@ html body.app #side .side-more>summary::after{content:"";margin-left:auto;width:
 html body.app #side .side-more[open]>summary::after{transform:rotate(45deg)}
 html body.app #side .side-more>summary .ico{width:16px;height:16px;flex:none;fill:currentColor;stroke:none}
 html body.app #side .side-more>button{width:100%}
+/* Preview like Lovable: the tools sit in the bar above the preview on a computer (nothing floats over
+   the app), the preview card has room around it, and Edit has space for its label. */
+@media (min-width:901px){
+ html body.app.in-editor #editor .fm-sub>.pv-float.docked{position:relative!important;left:auto!important;bottom:auto!important;transform:none!important;display:flex!important;align-items:center;gap:2px!important;padding:0!important;margin:0 8px 0 0!important;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;z-index:7}
+ html body.app.in-editor #editor .fm-sub>.pv-float.docked .pv-fold{display:none!important}
+ html body.app.in-editor #editor .fm-sub>.pv-float.docked .pv-qr-pop{bottom:auto!important;top:calc(100% + 10px)!important;left:auto!important;right:0!important;margin-left:0!important}
+ html body.app.in-editor #editor .stage:has(#canvas[data-view]:not([data-view=preview])) .fm-sub>.pv-float.docked{display:none!important}
+ html body.app.in-editor #editor #canvas{padding:12px!important}
+ html body.app.in-editor #editor .fm-sub>#preview-bar-tools{min-width:0;flex:0 1 auto}
+}
+@media (min-width:901px) and (max-width:1180px){html body.app.in-editor #editor .fm-sub{gap:4px!important;padding:0 10px!important}html body.app.in-editor #editor .fm-sub #versions{max-width:128px!important;min-width:0!important}html body.app.in-editor #editor .fm-sub .tabs-seg button{padding:0 7px!important;gap:5px!important}html body.app.in-editor #editor .fm-sub>.pv-float.docked{margin-right:2px!important}}
+html body.app.in-editor #editor .pv-float #visual-toggle{width:auto!important;min-width:0!important;padding:0 10px 0 8px!important;gap:6px!important;flex:none}
+html body.app.in-editor #editor .pv-float #visual-toggle .pv-lbl{display:inline!important;white-space:nowrap}
+html body.app.in-editor #editor .pv-float .seg.icons{margin:0 4px!important;padding:0 6px!important}
+@media (min-width:901px){
+ html body.app.in-editor #editor .pv-devbox{position:absolute;top:16px;left:16px;z-index:5;display:flex;align-items:center;gap:4px;padding:3px;border-radius:10px;background:rgba(255,255,255,.96);border:1px solid var(--c-line,#E6E4DF);box-shadow:0 6px 18px -10px rgba(36,35,41,.3)}
+ html body.app.in-editor #editor .pv-devbox:not(:has(> :not(.hidden))){display:none}
+ html body.app.in-editor #editor #canvas[data-view]:not([data-view=preview])>.pv-devbox{display:none!important}
+ html body.app.in-editor #editor .pv-devbox #device-model{height:28px!important;max-width:160px;margin:0!important;padding:0 26px 0 10px!important;border:0!important;border-radius:7px!important;background-color:transparent!important;font:500 12.5px Inter,system-ui,sans-serif!important;color:var(--c-ink,#1C1B1F)!important;box-shadow:none!important}
+ html body.app.in-editor #editor .pv-devbox #safari-shot{height:28px!important;padding:0 10px!important;border:0!important;border-radius:7px!important;background:transparent!important;font:500 12.5px Inter,system-ui,sans-serif!important;color:var(--c-ink-2,#3B3A40)!important;box-shadow:none!important}
+ html body.app.in-editor #editor .pv-devbox :is(#device-model,#safari-shot):hover{background-color:#F1EFEA!important}
+ html body.app.in-editor #editor .pv-devbox :is(#device-model,#safari-shot).hidden{display:none!important}
+}
+@media (max-width:900px){html body.app.in-editor #editor .device.desktop .fm-foot{display:none!important}}
