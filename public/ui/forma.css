@@ -221,3 +221,21 @@ html body.app #home #new-kind button{white-space:nowrap}
   html body.app #home #new-kind button{gap:5px;font-size:12.5px!important;padding:0 4px!important}
   html body.app #home #new-kind svg.cute{width:17px;height:17px}
 }
+
+/* ---------- Phone: one dark band on top (menu, Chat / Preview / Browser, project), like the Figma frames ---------- */
+@media (max-width:900px){
+  html body.app.signed-in #top-bar,html body.app.in-editor #top-bar,html body.app:has(#side-open-btn:not(.hidden)) #top-bar{background:var(--f-chrome)!important;border-bottom:0!important;box-shadow:none!important;backdrop-filter:none!important}
+  html body.app:has(#side-open-btn:not(.hidden)) #top-bar .brand{color:#fff!important}
+  html body.app:has(#side-open-btn:not(.hidden)) #top-bar .brand span{color:var(--f-chrome-mut)!important}
+  html body.app:has(#side-open-btn:not(.hidden)) #top-bar .brand::before{background:linear-gradient(135deg,var(--f-lilac-3),var(--c-accent))!important;color:#fff!important}
+  html body.app:has(#side-open-btn:not(.hidden)) #top-bar #side-open-btn{color:#fff!important;background:transparent!important}
+  html body.app.in-editor #editor .phone-panes{background:var(--f-chrome)!important;border:0!important;margin:0!important;padding:0 12px 10px!important;border-radius:0!important;box-shadow:none!important;gap:4px!important}
+  html body.app.in-editor #editor .phone-panes button{height:36px!important;border-radius:9px!important;background:var(--f-chrome-2)!important;color:var(--f-chrome-ink)!important;font:500 13px/1 Inter,system-ui,sans-serif!important;border:0!important;box-shadow:none!important}
+  html body.app.in-editor #editor .phone-panes button[aria-selected=true]{background:#fff!important;color:var(--c-ink)!important}
+  html body.app.in-editor #editor .phone-panes button[aria-selected=true] .ico{color:var(--c-accent)}
+  html body.app.in-editor #editor .chat-head{border-top:1px solid var(--f-chrome-line)!important}
+  html body.app.in-editor #editor .chat-head #back{color:var(--f-chrome-ink)!important;opacity:1!important}
+  html body.app.in-editor #editor .stage-bar{border-top:1px solid var(--f-chrome-line)!important}
+  html body.app.in-editor #editor #web-browser-pane.kb .kb-tabs{border-top:1px solid var(--f-chrome-line)!important}
+  html body.app.in-editor #editor #web-browser-pane.kb .kb-tabs .kb-icon{color:#fff!important}
+}
