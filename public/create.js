@@ -33,8 +33,7 @@ function show(screen){
  if(screen==='agents-screen')$('side-agents').setAttribute('aria-current','page');
  if(screen==='connectors-screen')$('side-connectors').setAttribute('aria-current','page');
  if(screen==='templates-screen')$('side-templates').setAttribute('aria-current','page');
- // A page under "More tools" keeps that group open so the current page stays visible.
- if(document.querySelector('#side-more [aria-current]'))$('side-more').open=true;
+ $('side-account').open=false; // the account menu closes once you pick a page from it
  if(screen==='settings-screen'||screen==='pricing-screen')$('side-settings').setAttribute('aria-current','page');
  if(screen==='home')$('side-projects').setAttribute('aria-current','page');
 }
@@ -828,6 +827,38 @@ $('ob-form').onsubmit=async e=>{
  const go=$('ob-go');go.disabled=true;
  try{await askThenBuild(what+'\n\nIt is for '+onboardFor()+'.',$('ob-name').value)}catch(err){text($('ob-error'),err.message)}finally{go.disabled=false}
 };
+// Search (⌘K / Ctrl+K), like Lovable: one box that finds your projects, pages and tools as you type.
+// Every result runs the same button the sidebar or account menu has, so nothing new can break.
+const SEARCH_PAGES=[['side-new','New project'],['side-projects','All projects'],['side-templates','Templates'],['side-connectors','Connectors'],['side-settings','Settings & usage'],['side-docs','Help']];
+let searchItems=[],searchAt=0;
+async function openSearch(){
+ const d=$('search-dlg');if(d.open)return;
+ let projects=state.projects;if(!projects){try{projects=(await api('/projects')).projects;state.projects=projects}catch{projects=[]}}
+ const tools=[...document.querySelectorAll('#side-account .acct-panel>button[id^="side-"]:not(.hidden)')].filter(b=>!SEARCH_PAGES.some(([id])=>id===b.id)).map(b=>({label:b.textContent.trim(),kind:'Tool',run:()=>b.click()}));
+ searchItems=[...projects.map(p=>({label:p.name,kind:p.published?'Live':'Project',run:()=>openProject(p.id)})),...SEARCH_PAGES.map(([id,label])=>({label,kind:'Page',run:()=>$(id).click()})),...tools];
+ $('search-input').value='';renderSearch();d.showModal();$('search-input').focus();
+}
+function renderSearch(){
+ const q=$('search-input').value.trim().toLowerCase(),list=$('search-list');list.replaceChildren();
+ const hits=searchItems.filter(x=>!q||x.label.toLowerCase().includes(q)).slice(0,q?10:8);
+ searchAt=Math.min(searchAt,Math.max(0,hits.length-1));
+ if(!hits.length){list.append(el('li','ks-search-empty','Nothing matches "'+$('search-input').value.trim()+'"'));return}
+ hits.forEach((x,i)=>{const li=el('li','ks-search-item'+(i===searchAt?' on':''));li.setAttribute('role','option');li.setAttribute('aria-selected',String(i===searchAt));
+  li.append(el('span','ks-search-label',x.label),el('span','ks-search-kind',x.kind));li.onmousemove=()=>{if(searchAt!==i){searchAt=i;renderSearch()}};li.onclick=()=>pickSearch(x);list.append(li)});
+ list._hits=hits;
+}
+function pickSearch(x){$('search-dlg').close();x.run()}
+$('side-search').onclick=openSearch;
+$('search-input').oninput=()=>{searchAt=0;renderSearch()};
+$('search-input').onkeydown=e=>{const hits=$('search-list')._hits||[];
+ if(e.key==='ArrowDown'){e.preventDefault();searchAt=Math.min(hits.length-1,searchAt+1);renderSearch()}
+ else if(e.key==='ArrowUp'){e.preventDefault();searchAt=Math.max(0,searchAt-1);renderSearch()}
+ else if(e.key==='Enter'&&hits[searchAt]){e.preventDefault();pickSearch(hits[searchAt])}
+ else if(e.key==='Escape'){e.preventDefault();$('search-dlg').close()}};
+$('search-dlg').onclick=e=>{if(e.target===$('search-dlg'))$('search-dlg').close()};
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&!e.altKey&&e.key.toLowerCase()==='k'&&state.me&&state.me.viewer){e.preventDefault();openSearch()}});
+// The account menu closes when you click anywhere else.
+document.addEventListener('click',e=>{const a=$('side-account');if(a.open&&!a.contains(e.target))a.open=false});
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('ks-strip-stop').onclick=()=>$('stop-job').click();
 // The phone top bar (#ph-bar): its buttons are the editor's own, so they work exactly as before.
