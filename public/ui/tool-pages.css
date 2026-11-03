@@ -207,4 +207,22 @@ html body.app #ag-list .tp-card-top>.ld-chip{margin-left:auto;flex:none}
 html body.app .ag-chip.on{border-color:transparent;background:var(--f-lilac,#ECE8F3);color:#4A33A8}
 html body.app .tp-panel .ag-check{flex-direction:row!important;align-items:center;gap:8px!important;font-size:13px!important}
 html body.app .tp-panel .ag-check input{accent-color:var(--c-accent,#7552E8);width:16px;height:16px;margin:0}
+
+/* ---------- Connectors ---------- */
+html body.app .cn-search{margin-left:auto}
+html body.app .cn-card .tp-ic{font-size:15px}
+html body.app .cn-ic[data-id=github]{background:#242329;color:#fff}
+html body.app .cn-ic[data-id=stripe]{background:#635BFF;color:#fff}
+html body.app .cn-ic[data-id=email]{background:#FDF3E3;color:#9A5B0B}
+html body.app .cn-ic[data-id=whatsapp]{background:#E3F6EA;color:#1F8A4C}
+html body.app .cn-ic[data-id=figma]{background:#F6E8F1;color:#A2306E}
+html body.app .cn-on{border-radius:6px;padding:3px 9px;font-size:12px;font-weight:500;background:var(--f-green-bg,#E8F3ED);color:var(--f-green,#328368)}
+html body.app .cn-wait{font-size:12px;color:var(--f-mut2,#716F77)}
+html body.app .cn-more{grid-column:span 2;flex-direction:row!important;align-items:center;gap:16px!important;background:#F1EEF8!important;border-color:transparent!important}
+html body.app .cn-more b{font-size:15px;font-weight:600}
+html body.app .cn-more p{margin:4px 0 8px;font-size:13px;color:var(--c-ink-3,#625F68)}
+html body.app .cn-more .link-btn{color:var(--c-accent,#7552E8)!important;font-size:13px}
+html body.app .cn-safe{display:flex;align-items:center;gap:8px}
+html body.app .cn-safe svg{width:15px;height:15px;fill:none;stroke:var(--f-green,#328368);stroke-width:1.7}
+@media (max-width:900px){html body.app .cn-more{grid-column:auto}html body.app .cn-search{margin-left:0}}
 @media (prefers-reduced-motion:reduce){html body.app .ld-draft,html body.app .tp-card,html body.app .tp-sw::after,html body.app .tp-panel{transition:none!important;animation:none!important}}

@@ -12,11 +12,11 @@ async function api(path,{method='GET',body}={}){
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
- for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen','ideas-screen','agents-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen','ideas-screen','agents-screen','connectors-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
- const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||screen==='ideas-screen'||screen==='agents-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
+ const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||screen==='ideas-screen'||screen==='agents-screen'||screen==='connectors-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
@@ -24,13 +24,14 @@ function show(screen){
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api','side-ideas','side-agents'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api','side-ideas','side-agents','side-connectors'])$(b).removeAttribute('aria-current');
  if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
  if(screen==='plugins-screen')$('side-plugins').setAttribute('aria-current','page');
  if(screen==='leads-screen')$('side-leads').setAttribute('aria-current','page');
  if(screen==='api-screen')$('side-api').setAttribute('aria-current','page');
  if(screen==='ideas-screen')$('side-ideas').setAttribute('aria-current','page');
  if(screen==='agents-screen')$('side-agents').setAttribute('aria-current','page');
+ if(screen==='connectors-screen')$('side-connectors').setAttribute('aria-current','page');
  if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -536,6 +537,69 @@ function refreshWindow(){
  text($('fm-version'),'Live preview · v'+(p.current_version||1));
  const d=$('device');text($('fm-size'),d&&d.classList.contains('mobile')?'Phone':'Desktop · Fit to view');
 }
+// ---------- Connectors (a full page, like the Figma "Connectors" frame) ----------
+// The services one app uses (the same list as the editor's Connectors), each with its real
+// status from the project's settings. Connect opens the project and the right setting.
+const cnUi={projects:[],id:null,settings:null,tab:'All',q:''};
+const CN_GROUP={github:'Code',stripe:'Payments',email:'Communication',secrets:'Keys',figma:'Design',apps:'More apps',partners:'More apps',whatsapp:'Communication',domain:'Publishing',mcp:'Keys'};
+const CN_HOW={github:'Access token',stripe:'API key',email:'Set up on the server',secrets:'API keys',figma:'Frame link',apps:'744 services',partners:'Partner offers',whatsapp:'Phone number',domain:'DNS records',mcp:'Personal key'};
+function cnStatus(c){
+ const s=cnUi.settings,sec=s?.secrets||{};
+ if(c.id==='github')return sec.github_token?.set?'on':'off';
+ if(c.id==='stripe')return sec.stripe_secret_key?.set?'on':'off';
+ if(c.id==='email')return s?.email?'on':'admin';
+ if(c.id==='secrets'){const n=Object.keys(sec).filter(k=>!['github_token','stripe_secret_key','stripe_webhook_secret'].includes(k)).length;return n?'n:'+n:'off'}
+ if(c.id==='whatsapp')return state.me?.whatsapp?'off':'admin';
+ return 'open';
+}
+function renderConnectors(){
+ const p=cnUi.projects.find(x=>x.id===cnUi.id),grid=$('cn-grid');grid.replaceChildren();
+ text($('cn-crumb'),p?p.name:'Pick a project');
+ const list=CONNECTORS.filter(c=>!c.owner||p?.role==='owner');
+ const on=list.filter(c=>{const st=cnStatus(c);return st==='on'||st.startsWith('n:')}).length;
+ const pill=$('cn-count');pill.hidden=!p||!cnUi.settings;text(pill,on+' connected');
+ const groups=[...new Set(list.map(c=>CN_GROUP[c.id]||'More apps'))];
+ if(cnUi.tab!=='All'&&!groups.includes(cnUi.tab))cnUi.tab='All';
+ const tabs=$('cn-tabs');tabs.replaceChildren();
+ for(const g of ['All',...groups]){const b=el('button',null,g==='All'?'All services':g);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(cnUi.tab===g));b.onclick=()=>{cnUi.tab=g;renderConnectors()};tabs.append(b)}
+ if(!p){grid.append(el('li','tp-empty',cnUi.projects.length?'Pick a project.':'Make a project first, then connect services to it.'));return}
+ const q=cnUi.q.toLowerCase();
+ for(const c of list.filter(c=>(cnUi.tab==='All'||(CN_GROUP[c.id]||'More apps')===cnUi.tab)&&(!q||(c.name+' '+c.desc).toLowerCase().includes(q)))){
+  const li=el('li','tp-card cn-card'),top=el('div','tp-card-top'),st=cnStatus(c);
+  const ic=el('span','tp-ic cn-ic',{apps:'+',secrets:'K',mcp:'M'}[c.id]||c.name.slice(0,1));ic.dataset.id=c.id;ic.setAttribute('aria-hidden','true');
+  const nm=el('span','tp-name',c.name);nm.append(el('small',null,CN_GROUP[c.id]||'More apps'));
+  top.append(ic,nm);
+  const foot=el('div','tp-card-foot');foot.append(el('span','small',CN_HOW[c.id]||''),el('span','tp-grow'));
+  if(st==='on')foot.append(el('span','cn-on','✓ Connected'));
+  else if(st.startsWith('n:'))foot.append(el('span','cn-on','✓ '+st.slice(2)+' added'));
+  else if(st==='admin')foot.append(el('span','cn-wait','Set up by your admin'));
+  const go=el('button',st==='on'||st.startsWith('n:')?'link-btn':'ghost tp-btn',st==='on'||st.startsWith('n:')?'Manage':st==='open'?'Open':'Connect');go.type='button';go.disabled=p.role==='viewer';
+  if(st!=='admin')foot.append(go);
+  go.onclick=async()=>{go.disabled=true;try{await openProject(p.id);c.open()}catch(err){text($('cn-error'),err.message)}finally{go.disabled=false}};
+  li.append(top,el('p','tp-desc',c.desc),foot);grid.append(li);
+ }
+ const more=el('li','tp-card cn-more'),mi=el('span','tp-ic','+');mi.setAttribute('aria-hidden','true');
+ const t=el('div');t.append(el('b',null,'Your stack, your way.'),el('p',null,'Missing a service? Pick from 744 apps and say what should happen.'));
+ const ask=el('button','link-btn','Browse 744 apps ↗');ask.type='button';ask.onclick=async()=>{await openProject(p.id);openApps()};t.append(ask);
+ more.append(mi,t);grid.append(more);
+}
+async function loadConnectors(){
+ cnUi.settings=null;renderConnectors();if(!cnUi.id)return;
+ try{cnUi.settings=(await api('/projects/'+cnUi.id+'/settings')).settings}catch(err){text($('cn-error'),err.message)}
+ renderConnectors();
+}
+async function openConnectors(){
+ show('connectors-screen');text($('cn-error'),'');
+ try{
+  const {projects}=await api('/projects');cnUi.projects=projects||[];
+  const sel=$('cn-project');sel.replaceChildren();for(const p of cnUi.projects)sel.append(new Option(p.name,p.id));
+  if(!cnUi.projects.some(p=>p.id===cnUi.id))cnUi.id=(state.project&&cnUi.projects.some(p=>p.id===state.project.id)?state.project.id:cnUi.projects[0]?.id)||null;
+  sel.value=cnUi.id||'';await loadConnectors();
+ }catch(err){text($('cn-error'),err.message)}
+}
+$('side-connectors').onclick=openConnectors;
+$('cn-project').onchange=e=>{cnUi.id=e.target.value;text($('cn-error'),'');loadConnectors()};
+$('cn-search').oninput=e=>{cnUi.q=e.target.value.trim();renderConnectors()};
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
