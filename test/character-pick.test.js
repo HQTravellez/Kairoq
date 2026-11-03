@@ -139,6 +139,8 @@ test('in the editor: the plan shows real characters, Approve waits for a pick, t
  await page.route(/static\.poly\.pizza/,r=>r.fulfill({status:200,contentType:'image/png',body:shot}));
  try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/create',{waitUntil:'domcontentloaded'});
+  // A new account first sees the Figma first-project screen; this test uses the Home prompt box.
+  if(await page.locator('#onboard:not(.hidden)').count())await page.click('#ob-skip');
   await page.fill('#new-prompt','Build an iPhone AR coloring book app for kids with a real animated T-Rex');
   await page.click('#new-submit');
   await page.waitForSelector('.ask-card',{timeout:20000});

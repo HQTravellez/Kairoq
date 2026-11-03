@@ -52,7 +52,7 @@ async function loadMe(){
  const wa=state.me.whatsapp;$('side-wa').classList.toggle('hidden',!(wa&&v&&v.kind==='customer'));$('landing-wa').classList.toggle('hidden',!wa);if(wa)$('landing-wa').href=wa.start;
  $('logout').classList.toggle('hidden',!v||v.kind!=='customer');
  renderCredits(v&&v.account);
- text($('free-note'),state.me.free_credits?'New accounts get '+state.me.free_credits+' free credits. One credit = one change.':'');
+ text($('free-note'),state.me.free_credits?'Start building for free. Your first '+state.me.free_credits+' credits are on us.':'');
  return v;
 }
 function renderCredits(account){
@@ -68,8 +68,8 @@ function setMode(mode){
  $('forgot-form').classList.add('hidden'); // ui/screens: switching tabs leaves the reset-link form
  $('tab-signup').setAttribute('aria-selected',String(mode==='signup'));
  $('tab-login').setAttribute('aria-selected',String(mode==='login'));
- text($('auth-submit'),mode==='signup'?'Create account':'Sign in');
- text($('auth-title'),mode==='signup'?'Create your account':'Sign in');
+ text($('auth-submit'),mode==='signup'?'Create free account':'Sign in');
+ text($('auth-title'),mode==='signup'?'Make room for your ideas.':'Welcome back.');
  $('password').autocomplete=mode==='signup'?'new-password':'current-password';
  $('free-note').classList.toggle('hidden',mode!=='signup');
  text($('auth-error'),'');
@@ -139,6 +139,7 @@ function renderProjects(projects){
  const q=($('pj-search')?.value||'').trim().toLowerCase(),byName=$('pj-sort')?.value==='name';
  const shown=projects.filter(p=>!q||String(p.name).toLowerCase().includes(q)).sort((a,b)=>byName?String(a.name).localeCompare(String(b.name)):String(b.updated_at).localeCompare(String(a.updated_at)));
  if(projects.length&&!shown.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects match "'+q+'".';list.append(li)}
+ renderOnboard(projects);
  for(const p of shown){
   const li=document.createElement('li'),thumb=el('div','thumb',initials(p.name)),open=document.createElement('button'),meta=document.createElement('span');
   thumb.setAttribute('aria-hidden','true');
@@ -600,6 +601,32 @@ async function openConnectors(){
 $('side-connectors').onclick=openConnectors;
 $('cn-project').onchange=e=>{cnUi.id=e.target.value;text($('cn-error'),'');loadConnectors()};
 $('cn-search').oninput=e=>{cnUi.q=e.target.value.trim();renderConnectors()};
+// ---------- First project (Figma "First project onboarding") ----------
+// A new account with no projects sees this on Home instead of the prompt box. It starts the
+// same flow as the prompt (questions, plan, build); the name and "what for" go with it.
+const OB_IDEAS=[['A business dashboard','A dashboard for my business with sales, customers and this week\'s numbers'],['A booking app','A booking app where customers pick a time, pay a deposit and get a confirmation email'],['An AI writing tool','An AI writing tool that turns my notes into polished posts in my brand voice']];
+function onboardFor(){return $('ob-for').querySelector('[aria-checked=true]')?.dataset.for||'my business'}
+function renderOnboard(projects){
+ const skip=(()=>{try{return localStorage.getItem('kairoq-onboard-skip')==='1'}catch{return false}})();
+ const on=Boolean(state.me?.viewer)&&!projects.length&&!skip;
+ $('onboard').classList.toggle('hidden',!on);
+ document.querySelector('#home .home-hero')?.classList.toggle('hidden',on);
+ $('browser').classList.toggle('ob-hide',on);
+ if(!on)return;
+ const ideas=$('ob-ideas');if(!ideas.childElementCount)for(const [label,text_] of OB_IDEAS){const b=el('button','ob-idea',label);b.type='button';b.onclick=()=>{$('ob-what').value=text_;$('ob-what').dispatchEvent(new Event('input'));if(!$('ob-name').value)$('ob-name').value=label.replace(/^An? /,'').replace(/^./,c=>c.toUpperCase())};ideas.append(b)}
+ const t=(state.me?.tiers||[]).find(x=>x.id==='standard')||(state.me?.tiers||[])[0];
+ text($('ob-cost'),state.me?.viewer?.kind==='customer'&&t?'First build: '+t.credits+' credits'+(state.me.free_credits?' of your '+state.me.free_credits+' free':''):'');
+}
+$('ob-for').onclick=e=>{const b=e.target.closest('[data-for]');if(!b)return;for(const x of $('ob-for').children)x.setAttribute('aria-checked',String(x===b))};
+$('ob-what').oninput=()=>text($('ob-count'),$('ob-what').value.length.toLocaleString()+' / 5,000');
+$('ob-templates').onclick=()=>{$('browser').classList.remove('ob-hide');homeTab('templates');$('browser').scrollIntoView({behavior:'smooth'})};
+$('ob-skip').onclick=()=>{try{localStorage.setItem('kairoq-onboard-skip','1')}catch{}renderOnboard(state.projects||[])};
+$('ob-form').onsubmit=async e=>{
+ e.preventDefault();text($('ob-error'),'');
+ const what=$('ob-what').value.trim();if(!what){$('ob-what').focus();return}
+ const go=$('ob-go');go.disabled=true;
+ try{await askThenBuild(what+'\n\nIt is for '+onboardFor()+'.',$('ob-name').value)}catch(err){text($('ob-error'),err.message)}finally{go.disabled=false}
+};
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
@@ -726,8 +753,8 @@ function agentHead(label){
 // A short line under a reply: what the agent did to get there ("Thought it through, used 3 tools").
 function workLine(text){return el('p','work-line',text)}
 function thinkLine(text){const p=el('p','ask-head think-line');p.append(el('span',null,text),dots());return p}
-async function askThenBuild(prompt){
- const name=shortName(prompt);
+async function askThenBuild(prompt,chosenName){
+ const name=String(chosenName||'').trim()||shortName(prompt);
  const {project}=await api('/projects',{method:'POST',body:{name}});
  await openProject(project.id);
  const list=$('messages');list.replaceChildren();
