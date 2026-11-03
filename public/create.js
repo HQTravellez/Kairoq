@@ -1313,14 +1313,15 @@ function messageItem(m,last,index){
   // "Worked for 41s · 9 steps": the steps fold out under it (like a coding agent's log); Details has the rest.
   if((thoughtMs!=null||tl.length)&&index>=0){
    const steps=tl.filter(e=>e.t!=='note'||e.icon).length;
-   const label=m.duration_ms!=null&&steps?'Worked for '+secsShort(m.duration_ms)+' · '+steps+' step'+(steps===1?'':'s'):thoughtMs!=null?'Thought for '+secsShort(thoughtMs):'Worked for '+secsShort(m.duration_ms||0);
+   // Just how long it worked; the steps stay folded behind it (like Lovable and Emergent, the
+   // owner sees the work, then what was done, not a log).
+   const label=m.duration_ms!=null?'Worked for '+secsShort(m.duration_ms):thoughtMs!=null?'Thought for '+secsShort(thoughtMs):'Worked for '+secsShort(0);
    const b=el('button','status-line done');b.type='button';b.setAttribute('aria-expanded','false');b.append(el('span','agent-name','Kairoq Agent'),el('span','status-text',label),icon('chev'));
    const rail=el('ol','rail done'),fold=el('div','fold');fold.append(rail);
    // Like Emergent: each step is a slim row (an icon, what was done, the file); an edit opens its diff.
    // The latest reply shows its steps; older replies keep them folded.
    const fill=()=>{if(!rail.childElementCount)for(const e of tl.filter(e=>e.t!=='think'||e.text))rail.append(eventRow(e,{expand:true,version:m.version}))};
    b.onclick=()=>{fill();const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
-   if(last&&tl.length&&index>=0){fill();fold.classList.add('open');b.setAttribute('aria-expanded','true')}
    li.append(b,fold);
   }
   const verdict=verdictCard(m.text,m);
@@ -1410,7 +1411,9 @@ function messageItem(m,last,index){
   const extra=[...li.children].filter(n=>n.matches('.acts,.design-chip,.memory-chip,.file-chips.done,.msg-meta,.look-note:not(.warn),.check-chip:not(.bad),.agent-steps,.verified.ok,.verified-quiet'));
   // A build folds its extras under "Build details". A chat reply drops its cost line (credits still
   // show in Usage), so most replies have no fold at all; other notes stay folded under "Details".
-  const kept=m.version?extra:extra.filter(n=>{if(n.matches('.msg-meta')){n.remove();return false}return true});
+  // A finished agent build is just its message: no "Build details" fold under it.
+  const quiet=m.version&&verdictParts(m.text);if(quiet)for(const n of extra)n.remove();
+  const kept=quiet?[]:m.version?extra:extra.filter(n=>{if(n.matches('.msg-meta')){n.remove();return false}return true});
   if(kept.length){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...kept);li.append(details);}
  }
  return li;
@@ -1421,12 +1424,6 @@ function messageItem(m,last,index){
 // The finished build as a short write-up, like Emergent: the verdict and one-line result, then
 // "What's there" (the pages written), "What I tested" (the checks that passed), "Not done yet"
 // (what failed or is still open, in plain words) and "Agent finished · 12m 04s".
-function pageName(file){
- const m=/(?:^|\/)(?:pages|screens|routes)\/(?:.*\/)?([^/]+)\.(?:jsx?|tsx?)$/i.exec(String(file||''));
- if(!m||/^(index|_app|_document|layout)$/i.test(m[1]))return null;
- const w=m[1].replace(/(Page|Screen|View|Route)$/,'').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[-_]+/g,' ').trim().toLowerCase();
- return w?w.charAt(0).toUpperCase()+w.slice(1):null;
-}
 function verdictParts(raw){
  const m=/^(VERIFIED BUILD|UNVERIFIED DRAFT)[^\n]*\n+PROOF\n([\s\S]*?)(?:\n\n(?:Builder notes:\s*)?([\s\S]*))?$/.exec(String(raw||'').trim());
  if(!m)return null;
@@ -1441,7 +1438,8 @@ function verdictParts(raw){
   if(pass)tested.push(NAMES[r.label]+(detail?' · '+detail:''));
   else todo.push(NAMES[r.label]+': '+(detail.replace(/^failed/,'').trim()||'did not pass'));
  }
- if(unresolved&&unresolved!=='none')todo.push(unresolved);
+ // The open problem in its own words says more than "Looks right: did not pass"; show that instead.
+ if(unresolved&&unresolved!=='none'){for(let i=todo.length-1;i>=0;i--)if(/: did not pass$/.test(todo[i]))todo.splice(i,1);todo.push(unresolved)}
  let notes=String(m[3]||'').trim();
  notes=notes.replace(/^Stopped after (\d+) steps?\.\s*(The last changes did not build, so the last working build was saved\.)?\s*/,(_,n,kept)=>'I used all '+n+' rounds before every check passed'+(kept?', so the last working build is what you see':'')+'. ');
  const repairs=Number((rows.find(r=>r.label==='Repair attempts')||{}).value)||0;
@@ -1449,21 +1447,9 @@ function verdictParts(raw){
 }
 function verdictCard(raw,msg={}){
  const v=verdictParts(raw);if(!v)return null;
- const out=[];
- const head=el('p','verdict-head '+(v.ok?'ok':'draft'));
- head.append(el('span','vmark',v.ok?'✓':'!'),el('span',null,v.ok?'Built and checked.':'Draft ready. Some checks did not pass yet, so try it in the preview.'));
- out.push(head);
- if(v.notes)out.push(renderMarkdown(v.notes));
- const section=(title,items,cls)=>{if(!items.length)return;const box=el('div','writeup '+cls);box.append(el('p','writeup-title',title));const ul=el('ul','verdict-rows '+cls);for(const t of items){const li=el('li',cls==='todo'?'bad':cls==='tested'?'ok':'');li.append(el('span','vmark',cls==='todo'?'✗':cls==='tested'?'✓':'•'),el('span',null,t));ul.append(li)}box.append(ul);out.push(box)};
- const pages=[...new Set((msg.timeline||[]).filter(e=>e.t==='edit').map(e=>pageName(e.file)).filter(Boolean))];
- section("What's there",pages,'pages');
- section('What I tested',v.tested,'tested');
- section('Not done yet',v.todo,'todo');
- if(msg.duration_ms!=null){
-  const at=msg.at?new Date(msg.at):null,when=at&&!isNaN(at)?' · '+at.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
-  out.push(el('p','agent-finished','Agent finished · '+secsShort(msg.duration_ms)+(v.repairs?' · '+v.repairs+' repair'+(v.repairs===1?'':'s'):'')+when));
- }
- return out;
+ // Only what was done, in Kairoq Agent's own words (agent-reply.js). The checks it ran stay in
+ // the version's data; the chat doesn't list them.
+ return[renderMarkdown(v.notes||(v.ok?'Done.':"Done, but some checks didn't pass yet. Try it in the preview and tell me what to fix."))];
 }
 // "Verified by Kairoq": what its browser tested on this build, like a customer would.
 function verifiedCard(v,checks,added){
@@ -2394,13 +2380,13 @@ function liveStatus(j){
   if(p==='thinking')return did?'Thinking about the next step':'Understanding your idea';
   if(p==='repairing')return'Repairing what the checks found';
   if(p==='checking'||p==='reviewing')return PHASES[p];
-  if(last&&last.t==='edit')return'Editing '+String(last.file||'').replace(/^src\//,'');
+  if(last&&last.t==='edit')return'Writing the code';
   if(last&&last.t==='build')return'Building the preview';
   if(last&&last.t==='test')return'Testing in a browser';
   if(last&&last.t==='note'&&last.icon==='web')return'Reading the web';
   return did?'Working on it':'Understanding your idea';
  }
- if(p==='writing'&&work.current)return'Writing '+work.current.replace(/^src\//,'');
+ if(p==='writing'&&work.current)return'Writing the code';
  return PHASES[p]||'Working';
 }
 function liveEvents(j){

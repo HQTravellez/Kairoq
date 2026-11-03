@@ -1,4 +1,5 @@
 'use strict';
+process.env.KAIROQ_AGENT_REPLY='off'; // counts agent calls; the closing-message writer has its own test
 // Parallel writers: a first build is planned as files and the sections are written at the same
 // time; the agent then builds, tests and finishes. Proven with a real build in Chromium.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),http=require('node:http');
@@ -40,7 +41,7 @@ test('enabled by default, off under the test runner unless turned on, and off wi
  assert.equal(PW.enabled(),true);
  const keep=process.env.KAIROQ_PARALLEL_WRITERS;
  process.env.KAIROQ_PARALLEL_WRITERS='off';assert.equal(PW.enabled(),false);
- delete process.env.KAIROQ_PARALLEL_WRITERS;assert.equal(PW.enabled(),!process.env.NODE_TEST_CONTEXT);
+ delete process.env.KAIROQ_PARALLEL_WRITERS;assert.equal(PW.enabled(),false,'off unless turned on: the agent builds in small steps');
  process.env.KAIROQ_PARALLEL_WRITERS=keep;
 });
 
