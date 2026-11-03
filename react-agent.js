@@ -61,6 +61,19 @@ Work this way, in small steps like a careful engineer: understand the request, r
 }
 
 // Never throws: a reply that is not valid JSON comes back as {invalid} so the loop can ask again.
+// Models send files in a few shapes; all mean the same: {"path":"code"}, [{"path","content"}],
+// {"path":{"content":"code"}}, or one file as {"path","content"} on the action itself. Free models
+// drift between them, and silently dropping the files left every write as "nothing written".
+const PATH_KEYS=['path','file','filename','name'],CODE_KEYS=['content','code','contents','text','source'];
+function pick(o,keys){for(const k of keys)if(typeof o?.[k]==='string')return o[k];return undefined}
+function normFiles(a){
+ const out={};let f=a&&a.files;
+ if(typeof f==='string'){try{f=JSON.parse(f)}catch{f=null}}
+ if(Array.isArray(f)){for(const x of f){const p=pick(x,PATH_KEYS);if(p)out[p]=pick(x,CODE_KEYS)??x?.content}}
+ else if(f&&typeof f==='object'){for(const [k,v] of Object.entries(f))out[k]=typeof v==='string'?v:(v&&typeof v==='object'&&pick(v,CODE_KEYS)!==undefined?pick(v,CODE_KEYS):v)}
+ else if(a&&typeof a==='object'){const p=pick(a,PATH_KEYS),c=pick(a,CODE_KEYS);if(p&&c!==undefined)out[p]=c}
+ return out;
+}
 function parseStepSafe(content){try{return parseStep(content)}catch(e){const raw=typeof content==='string'?content:JSON.stringify(content);const cut=/^\s*(```(json)?\s*)?\{/.test(raw||'')&&!/\}\s*(```)?\s*$/.test(raw||'');return{invalid:cut?'it was cut off because it was too long; write at most 2 or 3 files per step and continue':String(e.message||e),thought:'',actions:[],raw:String(raw||'').slice(0,400)}}}
 function parseStep(content){
  let v=content;
@@ -75,7 +88,8 @@ function parseStep(content){
  // Coalesce adjacent independent file writes before applying the per-turn tool limit.
  // Reads, edits, deletes and overlapping paths retain their explicit ordering.
  const batched=[];
- for(const action of actions.filter(a=>a&&typeof a==='object'&&typeof a.tool==='string').slice(0,64)){
+ for(const raw of actions.filter(a=>a&&typeof a==='object'&&typeof a.tool==='string').slice(0,64)){
+  const action=raw.tool==='write_files'?{tool:'write_files',files:normFiles(raw),...(raw.delete?{delete:raw.delete}:{})}:raw;
   const previous=batched.at(-1),map=action.files;
   if(action.tool==='write_files'&&previous?.tool==='write_files'&&!action.delete&&!previous.delete&&
     map&&typeof map==='object'&&!Array.isArray(map)&&previous.files&&typeof previous.files==='object'&&!Array.isArray(previous.files)&&
@@ -104,7 +118,7 @@ function describe(a){
  if(t==='project_knowledge')return'Updated/read project engineering knowledge';
  if(t==='task_graph')return'Worked the tracer-bullet task graph ('+String(a.action||'status').slice(0,20)+')';
  if(t==='engineering_review')return'Ran independent Standards and Spec reviews';
- if(t==='write_files'){const n=Object.keys(a.files||{});const d=Array.isArray(a.delete)?a.delete:[];return'Wrote '+(n.length?n.join(', '):'nothing')+(d.length?'; deleted '+d.join(', '):'')}
+ if(t==='write_files'){const n=Object.keys(normFiles(a));const d=Array.isArray(a.delete)?a.delete:[];return'Wrote '+(n.length?n.join(', '):'nothing')+(d.length?'; deleted '+d.join(', '):'')}
  if(t==='edit_files'){const f=Object.keys(a.edits||{});return'Edited '+(f.length?f.join(', '):'nothing')}
  if(t==='build_and_test')return'Built and tested the app'+(Array.isArray(a.steps)&&a.steps.length?' ('+a.steps.length+' UI steps)':'');
  if(t==='test_ui')return'Tested in the browser ('+(Array.isArray(a.steps)?a.steps.length:0)+' steps)';
@@ -359,7 +373,7 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
   if(t==='write_files'){
    const eng=require('./engineering-intelligence'),tg=require('./task-graph');
    if(eng.substantial(text)&&!tg.get(id,text))autoGraph();
-   const files=a.files&&typeof a.files==='object'&&!Array.isArray(a.files)?a.files:{};
+   const files=normFiles(a);
    const before={...work};
    const written=[],bad=[];
    for(const [name,code] of Object.entries(files)){if(typeof code!=='string'){bad.push(name+' (content must be a string)');continue}work[name]=code;written.push(name)}
@@ -367,6 +381,9 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
    if(written.length){if(needsRepair){repairAttempts++;needsRepair=false}dirty=true;lastUnitTests=null;lastReview=null;lastVisualQuality=null;require('./project-graph').invalidate(id);checkpointStore.save(id,{instruction:text,baseVersion:meta.current_version,files:work,step:activeStep})}
    tl.edits(before,work);
    const problems=builder.checkProject(work);
+   // Say why nothing was written and show the shape, so the model fixes its next step instead of
+   // concluding the files are read-only (it did, 27 times in a row).
+   if(!written.length&&!bad.length)return{text:'write_files: nothing written because "files" was empty or not in a shape Kairoq reads. Send it as {"tool":"write_files","files":{"src/App.jsx":"the whole file as one string"}}. The project files can be written; this was only the format.'};
    return{text:'write_files: '+(written.length?written.join(', '):'nothing written')+(bad.length?'\nSkipped: '+bad.join(', '):'')+(problems.length?'\nProject problems to fix before building:\n'+problems.slice(0,15).join('\n'):'\nThe project passes static checks.')};
   }
   if(t==='edit_files'){
@@ -704,4 +721,4 @@ async function run(id,instruction,{contextChars=60000,callModel,inspect,webSearc
  }catch(e){if(built&&!builder.loadMeta(id).versions.some(v=>v.n===built.n))fs.rmSync(built.dir,{recursive:true,force:true});throw e}
  finally{builder.clearTesting(id);require('./react-sandbox').destroy(box.token);await wb.close().catch(()=>{})}
 }
-module.exports={contextBudget,run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
+module.exports={normFiles,contextBudget,run,parseStep,parseStepSafe,protocol,htmlToText,describe,maxStepsDefault,recoveryStepsDefault};
