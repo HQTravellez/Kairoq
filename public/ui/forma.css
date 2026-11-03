@@ -873,3 +873,13 @@ html body.app.in-editor #editor .pv-qr-hint{margin:10px 0 4px;font:400 12px/1.4 
 html body.app.in-editor #editor .pv-qr-link{margin:0 0 10px;font:400 11px "IBM Plex Mono",ui-monospace,monospace;color:var(--f-mut2,#716F77);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html body.app.in-editor #editor .pv-qr-copy{height:28px;padding:0 12px;border-radius:8px;border:1px solid var(--c-line,#E6E4DF);background:#fff;font:500 12px Inter,sans-serif;color:var(--c-ink-2,#3C3A42);cursor:pointer}
 html body.app.in-editor #editor .pv-qr-copy:hover{background:#F6F5F2}
+/* Laptop / phone / tablet in the floating preview bar, with the phone model and Real Safari. */
+html body.app.in-editor #editor .pv-float .seg.icons{display:inline-flex!important;gap:2px;padding:0 4px;margin:0 2px;border:0!important;border-left:1px solid var(--c-line,#E6E4DF)!important;border-right:1px solid var(--c-line,#E6E4DF)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+html body.app.in-editor #editor .pv-float .seg.icons button{width:30px!important;height:30px!important;padding:0!important;display:inline-grid!important;place-items:center;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2,#3C3A42)!important;box-shadow:none!important}
+html body.app.in-editor #editor .pv-float .seg.icons button:hover{background:#F1EFEA!important}
+html body.app.in-editor #editor .pv-float .seg.icons button[aria-pressed=true]{background:var(--f-lilac,#ECE8F3)!important;color:var(--c-accent,#7552E8)!important}
+html body.app.in-editor #editor .pv-float .seg.icons .seg-thumb{display:none!important}
+html body.app.in-editor #editor .pv-float #device-model{display:inline-block!important;width:auto!important;max-width:150px;height:30px!important;margin:0!important;padding:0 26px 0 10px!important;border:0!important;border-radius:8px!important;background-color:#F1EFEA!important;font:500 12.5px Inter,sans-serif!important;color:var(--c-ink,#1B1D22)!important;box-shadow:none!important;cursor:pointer}
+html body.app.in-editor #editor .pv-float #safari-shot{display:inline-flex!important;align-items:center;height:30px!important;padding:0 10px!important;border:0!important;border-radius:8px!important;background:transparent!important;font:500 12.5px Inter,sans-serif!important;color:var(--c-ink-2,#3C3A42)!important;white-space:nowrap;box-shadow:none!important}
+html body.app.in-editor #editor .pv-float #safari-shot:hover{background:#F1EFEA!important}
+html body.app.in-editor #editor .pv-float :is(#device-model,#safari-shot).hidden{display:none!important}
