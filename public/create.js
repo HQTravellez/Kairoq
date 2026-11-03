@@ -1307,7 +1307,7 @@ function renderMessages(pendingText){
  if(pendingText){const mine=messageItem({role:'user',text:pendingText});mine.classList.add('enter');list.append(mine)}
  // Like Emergent: a quiet "finished" line under the last piece of work.
  const end=msgs[msgs.length-1];
- if(!pendingText&&!state.job&&end&&end.role==='assistant'&&end.duration_ms!=null&&!end.failed)list.append(doneLine(end));
+ if(!pendingText&&!state.job&&end&&end.role==='assistant'&&end.duration_ms!=null&&!end.failed&&!end.version)list.append(doneLine(end));
  renderIdeas(pendingText?null:msgs[msgs.length-1]);
  list.scrollTop=list.scrollHeight;
  renderErrors();
@@ -1452,7 +1452,9 @@ function messageItem(m,last,index){
   // A finished agent build is just its message: no "Build details" fold under it.
   const quiet=m.version&&verdictParts(m.text);if(quiet)for(const n of extra)n.remove();
   const kept=quiet?[]:m.version?extra:extra.filter(n=>{if(n.matches('.msg-meta')){n.remove();return false}return true});
-  if(kept.length){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...kept);li.append(details);}
+  // When the result card is shown, its Details button already opens the build, so no fold repeats it.
+  const card=li.querySelector('.ks-card');if(card)for(const n of kept)n.remove();
+  if(kept.length&&!card){const details=el('details','message-details'),summary=el('summary',null,m.version?'Build details':'Details');details.append(summary,...kept);li.append(details);}
  }
  return li;
 }
@@ -2640,7 +2642,7 @@ async function watch(job){
   if(state.data)renderData();
  }
  }catch(err){text($('chat-error'),'The operation finished, but the conversation could not refresh. Reopen this project to load your saved messages.');}
- finally{if(state.watchToken===watchToken){state.job=null;work.job=null;busy(false);syncSend();const end=state.project?.messages?.at(-1),list=$('messages');if(end&&end.role==='assistant'&&end.duration_ms!=null&&!end.failed&&list&&!list.querySelector('.agent-done')){list.append(doneLine(end));list.scrollTop=list.scrollHeight}}}
+ finally{if(state.watchToken===watchToken){state.job=null;work.job=null;busy(false);syncSend();const end=state.project?.messages?.at(-1),list=$('messages');if(end&&end.role==='assistant'&&end.duration_ms!=null&&!end.failed&&!end.version&&list&&!list.querySelector('.agent-done')){list.append(doneLine(end));list.scrollTop=list.scrollHeight}}}
  return done;
 }
 // ---------- mobile app ----------
