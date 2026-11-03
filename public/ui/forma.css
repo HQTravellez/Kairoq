@@ -402,3 +402,113 @@ html body.app.in-editor #editor #messages .work-head .status-line:not(.done) .st
 html body.app.in-editor #editor #messages .work-head .work-stop{height:28px!important;border-radius:7px!important;border:1px solid var(--c-line-2)!important;background:#fff!important;font-size:12px!important}
 @keyframes fm-think{from{background-position:100% 0}to{background-position:-150% 0}}
 @media (prefers-reduced-motion:reduce){html body.app.in-editor #editor #messages .work-head .status-line .status-text{animation:none!important;color:var(--c-ink-3)!important;background:none!important}}
+/* ---------- Sign up and sign in, like the Figma "Sign up and sign in" frame ---------- */
+html body dialog.fm-auth[open]{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;display:grid!important;grid-template-columns:1fr 1fr;background:#F7F6F2!important;box-shadow:none!important;overflow:auto;font-family:Inter,system-ui,sans-serif;color:#1C1B1F;animation:fm-rise .32s cubic-bezier(.2,.8,.2,1)}
+html body dialog.fm-auth::backdrop{background:#F7F6F2}
+html body dialog.fm-auth .auth-art{position:relative;display:flex;flex-direction:column;padding:44px 52px;background:#242329;color:#fff;overflow:hidden;min-height:100vh;box-sizing:border-box}
+html body dialog.fm-auth .auth-brand{display:inline-flex;align-items:center;gap:10px;font-size:22px;font-weight:600;letter-spacing:-.01em}
+html body dialog.fm-auth .auth-brand i{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#BCAAFF,#7552E8)}
+html body dialog.fm-auth .auth-kicker{margin:72px 0 22px;font:500 12px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#9A97A1;display:flex;align-items:center;gap:8px}
+html body dialog.fm-auth .auth-kicker::before{content:"";width:6px;height:6px;border-radius:1px;background:#7552E8}
+html body dialog.fm-auth .auth-big{margin:0;font-size:clamp(40px,4.4vw,60px);line-height:1.04;letter-spacing:-.03em;font-weight:500;max-width:520px}
+html body dialog.fm-auth .auth-big.accent{margin-top:22px;color:#BCAAFF}
+html body dialog.fm-auth .auth-lead{margin:26px 0 0;max-width:420px;font-size:15px;line-height:1.6;color:#C9C7CE}
+html body dialog.fm-auth .auth-mock{position:relative;margin-top:auto;padding-top:40px;max-width:440px}
+html body dialog.fm-auth .am-win{position:relative;z-index:1;padding:18px;border-radius:12px;background:#DFE9E0;transform:rotate(-3deg);box-shadow:0 30px 60px -30px rgba(0,0,0,.6);color:#2F3A33;display:flex;flex-direction:column;gap:12px}
+html body dialog.fm-auth .am-win b{font-size:20px;font-weight:500;letter-spacing:-.01em}
+html body dialog.fm-auth .am-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+html body dialog.fm-auth .am-row i{height:44px;border-radius:7px;background:#F0F4EF;font:600 15px Inter,sans-serif;font-style:normal;padding:8px;color:#2F3A33}
+html body dialog.fm-auth .am-row.tall{grid-template-columns:1fr 1fr}
+html body dialog.fm-auth .am-row.tall i{height:70px;background:#B9C9B5}
+html body dialog.fm-auth .am-row.tall i+i{background:#E8D6C2}
+html body dialog.fm-auth .auth-mock::before{content:"";position:absolute;right:-30px;bottom:-40px;width:240px;height:240px;border-radius:50%;background:linear-gradient(160deg,#7552E8,#D8CEF3);opacity:.85}
+html body dialog.fm-auth .am-note{position:absolute;z-index:2;right:10px;bottom:-14px;padding:12px 14px;border-radius:10px;background:#fff;color:#1C1B1F;box-shadow:0 14px 30px -14px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px}
+html body dialog.fm-auth .am-note b{font-size:13px}
+html body dialog.fm-auth .am-note small{font-size:12px;color:#716F77}
+html body dialog.fm-auth .auth-foot{margin-top:48px;font:500 12px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:#716F77;align-self:flex-end}
+/* The form side */
+html body dialog.fm-auth .auth-card{align-self:center;justify-self:center;width:min(380px,calc(100% - 48px));margin:48px 0;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;position:static!important}
+html body dialog.fm-auth .auth-close{position:absolute!important;top:20px;right:24px;width:auto!important;height:auto!important;padding:4px 8px!important;font-size:13px!important;color:#625F68!important;background:transparent!important;border:0!important}
+html body dialog.fm-auth .auth-close::after{content:" Back to Kairoq";font-size:12px}
+html body dialog.fm-auth .tabs{display:grid!important;grid-template-columns:1fr 1fr;gap:0;padding:3px!important;margin:0 0 26px!important;background:#ECEBE6!important;border:0!important;border-radius:9px!important}
+html body dialog.fm-auth .tabs button{height:34px!important;border:0!important;border-radius:7px!important;background:transparent!important;color:#625F68!important;font:500 13px Inter,sans-serif!important;box-shadow:none!important}
+html body dialog.fm-auth .tabs button[aria-selected=true]{background:#fff!important;color:#1C1B1F!important;box-shadow:0 1px 2px rgba(0,0,0,.08)!important}
+html body dialog.fm-auth #auth-title{margin:0 0 6px!important;font-size:30px!important;font-weight:500!important;letter-spacing:-.02em!important;color:#1C1B1F!important;text-align:left!important}
+html body dialog.fm-auth #free-note{order:-1;margin:0 0 18px!important;font-size:13px!important;color:#625F68!important}
+html body dialog.fm-auth form{display:flex;flex-direction:column;gap:14px}
+html body dialog.fm-auth label{display:flex;flex-direction:column;gap:6px;font-size:12px!important;font-weight:600!important;color:#1C1B1F!important}
+html body dialog.fm-auth input{height:42px!important;border:1px solid #DEDBD5!important;border-radius:8px!important;background:#fff!important;padding:0 14px!important;font:400 14px Inter,sans-serif!important;color:#1C1B1F!important;box-shadow:none!important}
+html body dialog.fm-auth input:focus{border-color:#7552E8!important;box-shadow:0 0 0 3px rgba(117,82,232,.14)!important;outline:none}
+html body dialog.fm-auth #auth-submit,html body dialog.fm-auth form .primary{height:44px!important;border-radius:9px!important;background:#7552E8!important;color:#fff!important;border:0!important;font:600 14px Inter,sans-serif!important;box-shadow:0 1px 1px rgba(0,0,0,.08),0 8px 20px -8px rgba(117,82,232,.55)!important}
+html body dialog.fm-auth #auth-submit:hover{background:#5B3DCC!important}
+html body dialog.fm-auth .google{display:flex!important;align-items:center;justify-content:center;gap:8px;height:42px;margin:14px 0 0;border:1px solid #DEDBD5;border-radius:8px;background:#fff;color:#1C1B1F!important;font:500 14px Inter,sans-serif;text-decoration:none}
+html body dialog.fm-auth .google.hidden{display:none!important}
+html body dialog.fm-auth .google:hover{border-color:#7552E8}
+html body dialog.fm-auth .link-btn{align-self:flex-start;color:#625F68!important;font-size:12px!important;background:none!important;border:0!important;padding:0!important}
+html body dialog.fm-auth .error:empty{display:none}
+@media (max-width:900px){
+  html body dialog.fm-auth[open]{grid-template-columns:1fr;align-content:start}
+  html body dialog.fm-auth .auth-art{min-height:0;padding:28px 24px 32px}
+  html body dialog.fm-auth .auth-kicker{margin:28px 0 12px}
+  html body dialog.fm-auth .auth-big{font-size:34px}
+  html body dialog.fm-auth .auth-big.accent{margin-top:10px}
+  html body dialog.fm-auth .auth-lead,html body dialog.fm-auth .auth-mock,html body dialog.fm-auth .auth-foot{display:none}
+  html body dialog.fm-auth .auth-card{margin:28px auto 40px}
+  html body dialog.fm-auth .auth-close{color:#C9C7CE!important}
+}
+html body dialog.fm-auth .auth-card{display:flex!important;flex-direction:column}
+html body dialog.fm-auth .auth-card>.tabs{order:-2}
+html body dialog.fm-auth .auth-card>#auth-title{order:-1}
+html body dialog.fm-auth .auth-close{font-size:0!important;border:0!important;box-shadow:none!important;outline:none!important;border-radius:6px!important}
+html body dialog.fm-auth .auth-close::after{content:"Back to Kairoq";font-size:12px!important;color:inherit}
+html body dialog.fm-auth .auth-close:focus-visible{outline:2px solid #7552E8!important}
+html body dialog.fm-auth #free-note{margin:0 0 6px!important}
+html body dialog.fm-auth form{gap:12px!important}
+
+/* ---------- First project onboarding (Figma frame) ---------- */
+html body.app #home .fm-onboard{padding:36px 24px 28px;max-width:1080px}
+html body.app #home .fm-onboard.hidden,html body.app #home .home-hero.hidden{display:none!important}
+html body.app #home .fm-onboard h1{margin:0;font-size:40px;font-weight:500;letter-spacing:-.02em;color:var(--c-ink)}
+html body.app #home .ob-sub{margin:8px 0 26px;font-size:15px;color:var(--c-ink-3)}
+html body.app #home .ob-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:28px;align-items:start}
+html body.app #home .ob-form{display:flex;flex-direction:column;gap:8px}
+html body.app #home .ob-label{margin:14px 0 2px;font-size:13px;font-weight:600;color:var(--c-ink)}
+html body.app #home .ob-row{display:flex;align-items:baseline;justify-content:space-between}
+html body.app #home .ob-hint{margin:0;font-size:12px;color:var(--f-mut2)}
+html body.app #home .ob-tip::before{content:"💡 ";filter:grayscale(1) opacity(.6)}
+html body.app #home .ob-for{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+html body.app #home .ob-for button{display:flex;align-items:center;gap:8px;height:48px;padding:0 14px;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:#fff!important;color:var(--c-ink-2)!important;font:500 13px Inter,sans-serif;box-shadow:none!important;cursor:pointer}
+html body.app #home .ob-for button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+html body.app #home .ob-for button[aria-checked=true]{background:var(--f-lilac)!important;border-color:var(--c-accent)!important;color:#3C2A86!important}
+html body.app #home .ob-for button[aria-checked=true]::after{content:"✓";margin-left:auto;color:var(--c-accent)}
+html body.app #home #ob-name{height:42px;border:1px solid var(--c-line-2)!important;border-radius:9px!important;background:#fff!important;padding:0 14px!important;font:14px Inter,sans-serif;color:var(--c-ink);box-shadow:none!important}
+html body.app #home .ob-box{position:relative;border:1px solid var(--c-accent);border-radius:12px;background:#fff;padding:12px 14px 30px;box-shadow:0 0 0 3px rgba(117,82,232,.08)}
+html body.app #home #ob-what{width:100%;border:0!important;outline:none!important;box-shadow:none!important;resize:vertical;background:transparent!important;padding:0!important;font:14px/1.6 Inter,sans-serif;color:var(--c-ink)}
+html body.app #home .ob-count{position:absolute;right:12px;bottom:8px;font-size:12px;color:var(--f-mut2)}
+html body.app #home :is(#ob-name,.ob-box):focus-within{border-color:var(--c-accent)!important}
+html body.app #home .ob-ideas{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+html body.app #home .ob-idea{height:40px;padding:0 12px;border:1px solid var(--c-line)!important;border-radius:9px!important;background:#fff!important;color:var(--c-ink-3)!important;font:500 12px Inter,sans-serif;text-align:left;box-shadow:none!important;cursor:pointer}
+html body.app #home .ob-idea::after{content:" ↗"}
+html body.app #home .ob-idea:hover{border-color:var(--c-accent)!important;color:var(--c-ink)!important}
+html body.app #home .ob-card{position:sticky;top:20px;display:flex;flex-direction:column;gap:12px;padding:24px;border-radius:14px;background:var(--f-chrome);color:#fff}
+html body.app #home .ob-kicker{margin:0;font:500 12px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--f-lilac-3)}
+html body.app #home .ob-big{margin:0;font-size:28px;line-height:1.15;font-weight:500;letter-spacing:-.02em}
+html body.app #home .ob-card-sub{margin:0;font-size:13px;line-height:1.6;color:var(--f-chrome-ink)}
+html body.app #home .ob-gets{list-style:none;margin:6px 0;padding:0 0 14px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--f-chrome-line)}
+html body.app #home .ob-gets li{display:flex;align-items:center;gap:10px;font-size:13px;color:#fff}
+html body.app #home .ob-gets li::before{content:"";width:16px;height:16px;flex:none;border-radius:4px;background:var(--f-chrome-2);box-shadow:inset 0 0 0 1px var(--f-chrome-line);background-image:linear-gradient(var(--f-lilac-3),var(--f-lilac-3));background-size:6px 6px;background-position:center;background-repeat:no-repeat}
+html body.app #home .ob-cost{margin:0;font-size:12px;color:var(--f-chrome-ink)}
+html body.app #home .ob-cost:empty{display:none}
+html body.app #home .ob-go{height:46px!important;border-radius:9px!important;font:600 14px Inter,sans-serif!important}
+html body.app #home .ob-safe{margin:0;text-align:center;font-size:12px;color:var(--f-chrome-mut)}
+html body.app #home .ob-foot{display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding-top:18px;border-top:1px solid var(--c-line);font-size:12px;color:var(--f-mut2)}
+html body.app #home .ob-foot .link-btn{color:var(--c-accent)!important;font-size:12px!important;background:none!important;border:0!important;padding:0!important}
+html body.app #home .ob-foot>.link-btn{color:var(--f-mut2)!important}
+@media (max-width:900px){
+  html body.app #home .fm-onboard{padding:24px 16px}
+  html body.app #home .fm-onboard h1{font-size:30px}
+  html body.app #home .ob-grid,html body.app #home .ob-for,html body.app #home .ob-ideas{grid-template-columns:1fr}
+  html body.app #home .ob-card{position:static}
+  html body.app #home .ob-foot{flex-direction:column;align-items:flex-start;gap:10px}
+}
+html body.app #home #browser.ob-hide{display:none!important}html body.app #home .ob-foot .link-btn{text-decoration:none!important}html body.app #home .ob-foot .link-btn:hover{text-decoration:underline!important}

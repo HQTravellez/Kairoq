@@ -58,6 +58,8 @@ test('in the editor: questions, the plan, Approve, and the build gets the answer
  try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/create',{waitUntil:'domcontentloaded'});
   // What to build: the switch changes the examples; a phone app is asked for as one.
+  // A new account first sees the Figma first-project screen; this test uses the Home prompt box.
+  if(await page.locator('#onboard:not(.hidden)').count())await page.click('#ob-skip');
   await page.click('#new-kind [data-kind="phone"]');
   assert.equal(await page.getAttribute('#new-kind [data-kind="phone"]','aria-pressed'),'true');
   assert.match(await page.locator('#examples').innerText(),/iPhone app for my café/);
