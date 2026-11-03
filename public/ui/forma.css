@@ -393,3 +393,12 @@ html body.app.in-editor #editor #messages .plan-card .plan-foot{background:trans
 html body.app.in-editor #editor #messages .ask-card .fm-q .ask-other,html body.app.in-editor #editor #messages .ask-card .fm-q .ask-other:focus{border:1px dashed var(--c-line-2)!important;box-shadow:none!important;outline:none}
 html body.app.in-editor #editor #messages .ask-card .fm-q .ask-other:not(:placeholder-shown){border-style:solid!important;border-color:var(--c-line-2)!important;background:#F4F3EF!important}
 html body.app.in-editor #editor #messages .plan-card .plan-foot{display:flex!important}html body.app.in-editor #editor #messages .plan-card .plan-foot>*+*{margin-left:10px!important}html body.app.in-editor #editor #messages .plan-card{padding-top:12px!important}
+/* ---------- Kairoq thinking: the breathing dot grid in Forma purple, a shimmer on "is thinking…" ---------- */
+html body.app.in-editor #editor #messages>li.work::before{content:none!important;display:none!important}
+html body.app.in-editor #editor #messages>li.work{padding-top:0!important}
+html body.app .k-grid i,html body.app .k-dots i{background:var(--c-accent,#7552E8)!important}
+html body.app.in-editor #editor #messages .work-head .status-line .agent-name{color:var(--c-ink)!important;font-weight:600!important}
+html body.app.in-editor #editor #messages .work-head .status-line:not(.done) .status-text{background:linear-gradient(90deg,var(--c-ink-3) 0%,var(--c-ink-3) 35%,var(--c-accent) 50%,var(--c-ink-3) 65%,var(--c-ink-3) 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:fm-think 2.2s linear infinite}
+html body.app.in-editor #editor #messages .work-head .work-stop{height:28px!important;border-radius:7px!important;border:1px solid var(--c-line-2)!important;background:#fff!important;font-size:12px!important}
+@keyframes fm-think{from{background-position:100% 0}to{background-position:-150% 0}}
+@media (prefers-reduced-motion:reduce){html body.app.in-editor #editor #messages .work-head .status-line .status-text{animation:none!important;color:var(--c-ink-3)!important;background:none!important}}

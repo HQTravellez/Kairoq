@@ -86,3 +86,11 @@ test("the chat's questions, plan and research follow the Figma builder chat", ()
   assert.match(js, /el\('span','plan-meta','1 build'\+\(cost\?' · '\+cost\+' credits':''\)\)/, "the real price, no made-up time");
   assert.match(read("builder-browser-pane.js"), /function researchChip\(href,done\)/);
 });
+
+test("Kairoq's thinking shows: purple breathing dots and a shimmer on 'is thinking…', with no extra label", () => {
+  const css = read("ui/forma.css");
+  assert.match(css, /#messages>li\.work::before\{content:none!important/);
+  assert.match(css, /\.k-grid i,html body\.app \.k-dots i\{background:var\(--c-accent/);
+  assert.match(css, /\.status-line:not\(\.done\) \.status-text\{background:linear-gradient/);
+  assert.match(css, /@keyframes fm-think/);
+});
