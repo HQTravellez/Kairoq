@@ -99,7 +99,7 @@ test("search phrases drop how-to-answer words, and only results about the questi
  const out=await web.gather("Compare Wave and Xero for a small accounting firm. Research it and show it as a table.",{
   callModel:async()=>{throw Error("no model")},
   webSearch:async()=>["https://www.diffchecker.com/text-compare/","http://127.0.0.1:9/xero","https://text-compare.com/","http://127.0.0.1:9/wave"],
-  browseSite:async(u,o)=>{opened.push(u);return fakeBrowse({...PAGES,"http://127.0.0.1:9/xero":{title:"Xero plans",text:"Xero plans"},"http://127.0.0.1:9/wave":{title:"Wave pricing",text:"Wave pricing"}})(u,o)}
+  browseSite:async(u,o)=>{opened.push(u);return fakeBrowse({...PAGES,"http://127.0.0.1:9/xero":{title:"Xero plans",text:"Xero plans: Ignite, Grow and Comprehensive, priced per month."},"http://127.0.0.1:9/wave":{title:"Wave pricing",text:"Wave pricing: the Starter plan is free; Pro is paid monthly."}})(u,o)}
  });
  assert.deepEqual(opened,["http://127.0.0.1:9/xero","http://127.0.0.1:9/wave"],"text-compare tools are skipped");
  assert.deepEqual(out.sources.map(s=>s.title),["Xero plans","Wave pricing"]);
