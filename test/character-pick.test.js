@@ -155,7 +155,7 @@ test('in the editor: the plan shows real characters, Approve waits for a pick, t
   assert.equal(await page.locator('.plan-approve').innerText(),'Pick a character');
   assert.equal(await page.locator('.plan-approve').isDisabled(),true);
   await page.locator('.char-opt').first().click();
-  assert.equal(await page.locator('.plan-approve').innerText(),'Approve');
+  assert.equal(await page.locator('.plan-approve').innerText(),'Build it');
   if(process.env.KAIROQ_SHOT){await page.waitForTimeout(800);await page.evaluate(()=>{const l=document.getElementById('messages');l.scrollTop=l.scrollHeight});await page.screenshot({path:process.env.KAIROQ_SHOT})}
   assert.equal(built.length,0);
   await page.click('.plan-approve');

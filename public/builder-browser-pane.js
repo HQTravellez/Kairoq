@@ -85,9 +85,22 @@
   if(done&&key&&key!==foldedKey){foldedKey=key;clearTimeout(foldTimer);foldTimer=setTimeout(fold,3500)}
   document.getElementById("phone-panes")?.querySelector('[data-pane="browser"]')?.classList.add("live");
   if(href&&(!live||!live.url))setPage(href,data.title);
+ researchChip(href||current?.url,done);
   if(image&&Date.now()-lastFrameAt>3000)setFrame(image);
   setDriving(done?"":last.replace(/^Searching the web for/,"Searching for").slice(0,90));
   if(data.error)setError(data.error);
+ }
+ // In the chat, like the Figma builder: "● Reading xero.com · AI research · 12s ›" while Kairoq
+ // browses; a click opens the browser pane.
+ let chipAt=0;
+ function researchChip(href,done){
+  const card=document.getElementById("stream");if(!card||!href)return;
+  let chip=card.querySelector(".fm-research");
+  if(!chip){chip=document.createElement("button");chip.type="button";chip.className="fm-research";chip.innerHTML='<i></i><span class="fm-r-what"></span><span class="fm-r-meta"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';chip.onclick=()=>{byHand=true;open();if(editor.dataset.pane!==undefined&&window.innerWidth<=900)pick("browser")};chipAt=Date.now();card.querySelector(".work-head")?.after(chip)}
+  const host=String(href).replace(/^https?:\/\/(www\.)?/,"").split("/")[0];
+  chip.querySelector(".fm-r-what").textContent=(done?"Read ":"Reading ")+host;
+  chip.querySelector(".fm-r-meta").textContent="AI research · "+Math.max(1,Math.round((Date.now()-chipAt)/1000))+"s";
+  chip.classList.toggle("done",Boolean(done));
  }
  function steps(){}  // the step log is gone; kept so older callers don't break
  function reset(){clearTimeout(foldTimer);foldedKey="";reopen?.classList.add("hidden");current=null;live=null;shot.removeAttribute("src");shot.classList.add("hidden");empty.classList.remove("hidden");setPage("","New tab");setDriving("");close()}

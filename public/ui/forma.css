@@ -344,6 +344,55 @@ html body.app.in-editor #editor #chat-form.composer::after{content:"Enter to sen
   html body.app.in-editor #editor #chat-form.composer::after{display:none}
 }
 
+/* ---------- The chat's questions and plan, like the Figma "Phone builder chat" frame ---------- */
+/* Each question is its own numbered card with every option shown */
+html body.app.in-editor #editor #messages .ask-card .fm-qs{display:flex;flex-direction:column;gap:12px;border:0!important;background:transparent!important;padding:0!important}
+html body.app.in-editor #editor #messages .ask-card .fm-q{display:flex!important;flex-direction:column;gap:8px;padding:16px!important;background:#fff!important;border:1px solid var(--c-line)!important;border-radius:14px!important;box-shadow:none!important}
+html body.app.in-editor #editor #messages .ask-card .fm-q .q-label{all:unset;display:block;font:600 14px/1.4 Inter,sans-serif;color:var(--c-ink);margin-bottom:2px;cursor:default}
+html body.app.in-editor #editor #messages .ask-card .fm-q .q-answer{display:none!important}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-opts{display:flex!important;flex-direction:column;gap:8px;margin:0!important;padding:0!important;border:0!important;background:transparent!important}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-opt{position:relative;display:flex!important;align-items:center;gap:10px;padding:11px 12px!important;border:1px solid var(--c-line)!important;border-radius:10px!important;background:#fff!important;cursor:pointer;transition:background var(--f-fast),border-color var(--f-fast)}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-opt:hover{border-color:var(--c-line-2)!important;background:#FAF9F6!important}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-opt.on{background:#F4F3EF!important;border-color:var(--c-line-2)!important}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-opt input{position:absolute;opacity:0;pointer-events:none}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-words{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-label{font-size:13px;color:var(--c-ink);font-weight:400}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-detail{font-size:12px;color:var(--f-mut2)}
+html body.app.in-editor #editor #messages .q-tag{display:inline-flex;align-items:center;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:500;background:var(--f-lilac)!important;color:var(--c-accent)!important;border:0!important}
+html body.app.in-editor #editor #messages .fm-pick{flex:none;width:16px;height:16px;color:var(--f-mut2)}
+html body.app.in-editor #editor #messages .fm-pick svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+html body.app.in-editor #editor #messages .ask-opt.on .fm-pick{color:var(--c-ink)}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-other{margin-top:2px!important;height:38px;border:1px dashed var(--c-line-2)!important;border-radius:10px!important;background:transparent!important;padding:0 12px!important;font-size:13px}
+/* Single-answer questions: the old one-question chips look the same */
+html body.app.in-editor #editor #messages .question-options .q-opt{display:flex!important;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px!important;border:1px solid var(--c-line)!important;border-radius:10px!important;background:#fff!important;text-align:left}
+html body.app.in-editor #editor #messages .question-options .q-opt.recommended{background:#F4F3EF!important}
+/* The plan card: "Plan" with its cost, the summary, then Build it */
+html body.app.in-editor #editor #messages .plan-card{background:#fff!important;border:1px solid var(--c-lilac-3,#D8CEF3)!important;border-radius:14px!important;padding:16px!important;box-shadow:0 10px 30px -22px rgba(117,82,232,.5)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+html body.app.in-editor #editor #messages .plan-card .plan-kicker{margin:0!important;font:600 15px Inter,sans-serif!important;color:var(--c-ink)!important;text-transform:none!important;letter-spacing:0!important}
+html body.app.in-editor #editor #messages .plan-card .plan-meta{font-size:12px;color:var(--f-mut2)}
+html body.app.in-editor #editor #messages .plan-card .plan-title{margin:8px 0 4px!important;font:600 13px Inter,sans-serif!important;color:var(--c-ink-2)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-summary{color:var(--c-ink-3)!important;font-size:13px!important;line-height:1.6!important}
+html body.app.in-editor #editor #messages .plan-card .plan-foot{display:flex;align-items:center;gap:10px;margin-top:14px}
+html body.app.in-editor #editor #messages .plan-card .plan-approve{flex:1;height:42px!important;border-radius:9px!important;background:var(--c-accent)!important;color:#fff!important;border:0!important;font:600 13px Inter,sans-serif!important;box-shadow:var(--c-glow)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-approve:hover{background:var(--c-accent-2)!important}
+html body.app.in-editor #editor #messages .plan-card .plan-review{flex:1;height:42px!important;border-radius:9px!important;background:#fff!important;color:var(--c-accent)!important;border:1px solid var(--f-lilac-2)!important;font:600 13px Inter,sans-serif!important}
+html body.app.in-editor #editor #messages .plan-card .plan-foot .ask-gap{display:none}
+html body.app.in-editor #editor #messages .plan-card .plan-foot .ask-link{flex:none;font-size:12px;color:var(--f-mut2)!important}
+/* The research chip while Kairoq reads a site */
+html body.app.in-editor #editor .fm-research{display:flex;align-items:center;gap:8px;width:100%;margin:8px 0 2px;padding:9px 12px!important;border:1px solid var(--f-lilac-2)!important;border-radius:10px!important;background:#fff!important;color:var(--c-accent)!important;font:500 12px Inter,sans-serif;cursor:pointer;box-shadow:none!important;height:auto!important;text-align:left}
+html body.app.in-editor #editor .fm-research i{width:6px;height:6px;border-radius:3px;background:var(--c-accent);flex:none;animation:fm-twinkle 1.6s ease-in-out infinite}
+html body.app.in-editor #editor .fm-research.done i{animation:none;background:var(--f-green)}
+html body.app.in-editor #editor .fm-research .fm-r-what{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body.app.in-editor #editor .fm-research .fm-r-meta{color:var(--f-mut2);font-weight:400}
+html body.app.in-editor #editor .fm-research svg{width:14px;height:14px;fill:none;stroke:var(--f-mut2);stroke-width:1.8}
+html body.app.in-editor #editor .fm-research:hover{border-color:var(--c-accent)!important}
+html body.app.in-editor #editor #messages>li:is(.ask-card,.plan-card)::before{content:none!important;display:none!important}
+html body.app.in-editor #editor #messages>li:is(.ask-card,.plan-card){padding-top:0!important}
+html body.app.in-editor #editor #messages .plan-card .plan-foot{background:transparent!important;border:0!important;box-shadow:none!important;margin:16px 0 0!important;padding:0!important;gap:10px!important;position:static!important}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-other,html body.app.in-editor #editor #messages .ask-card .fm-q .ask-other:focus{border:1px dashed var(--c-line-2)!important;box-shadow:none!important;outline:none}
+html body.app.in-editor #editor #messages .ask-card .fm-q .ask-other:not(:placeholder-shown){border-style:solid!important;border-color:var(--c-line-2)!important;background:#F4F3EF!important}
+html body.app.in-editor #editor #messages .plan-card .plan-foot{display:flex!important}html body.app.in-editor #editor #messages .plan-card .plan-foot>*+*{margin-left:10px!important}html body.app.in-editor #editor #messages .plan-card{padding-top:12px!important}
 /* ---------- Kairoq thinking: the breathing dot grid in Forma purple, a shimmer on "is thinking…" ---------- */
 html body.app.in-editor #editor #messages>li.work::before{content:none!important;display:none!important}
 html body.app.in-editor #editor #messages>li.work{padding-top:0!important}

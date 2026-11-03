@@ -77,6 +77,16 @@ test("the editor follows the App builder frame: light second rows, a browser win
   assert.match(css, /\.fm-sub \.tabs-seg button\[aria-pressed=true\]\{color:var\(--c-accent\)!important\}/);
 });
 
+test("the chat's questions, plan and research follow the Figma builder chat", () => {
+  const js = read("create.js");
+  assert.match(js, /el\('button','q-label',\(at\+1\)\+'\. '\+q\.q\)/, "numbered questions");
+  assert.match(js, /const opts=el\('div','ask-opts'\);/, "options shown, not folded");
+  assert.match(js, /if\(i===q\.recommended\)words\.append\(el\('span','q-tag','Recommended'\)\)/);
+  assert.match(js, /el\('button','ask-next plan-approve','Build it'\)/);
+  assert.match(js, /el\('span','plan-meta','1 build'\+\(cost\?' · '\+cost\+' credits':''\)\)/, "the real price, no made-up time");
+  assert.match(read("builder-browser-pane.js"), /function researchChip\(href,done\)/);
+});
+
 test("Kairoq's thinking shows: purple breathing dots and a shimmer on 'is thinking…', with no extra label", () => {
   const css = read("ui/forma.css");
   assert.match(css, /#messages>li\.work::before\{content:none!important/);
