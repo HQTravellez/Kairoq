@@ -863,6 +863,16 @@ html body.app .tw-in{animation:tw-in .45s var(--f-ease-out,ease-out) both}
 @keyframes tw-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 html body.app .status-text.tw-in,html body.app .think-line span.tw-in{display:inline-block}
 @media (prefers-reduced-motion:reduce){html body.app .tw-in{animation:none!important}}
+/* Open on your phone: the QR code for this preview, above the floating preview bar. */
+html body.app.in-editor #editor .pv-float .pv-btn.pv-qr svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7}
+html body.app.in-editor #editor .pv-qr-pop{position:absolute;bottom:calc(100% + 10px);left:50%;margin-left:-110px;width:220px;box-sizing:border-box;padding:16px;border-radius:14px;background:#fff;border:1px solid var(--c-line,#E6E4DF);box-shadow:0 20px 44px -18px rgba(36,35,41,.45);text-align:center;animation:msg-in .25s ease both}
+html body.app.in-editor #editor .pv-qr-pop.hidden{display:none}
+html body.app.in-editor #editor .pv-qr-title{margin:0 0 10px;font:600 13.5px Inter,sans-serif;color:var(--c-ink,#1B1D22)}
+html body.app.in-editor #editor .pv-qr-img{display:block;width:168px;height:168px;margin:0 auto;border-radius:8px;background:#fff}
+html body.app.in-editor #editor .pv-qr-hint{margin:10px 0 4px;font:400 12px/1.4 Inter,sans-serif;color:var(--c-ink-3,#625F68)}
+html body.app.in-editor #editor .pv-qr-link{margin:0 0 10px;font:400 11px "IBM Plex Mono",ui-monospace,monospace;color:var(--f-mut2,#716F77);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body.app.in-editor #editor .pv-qr-copy{height:28px;padding:0 12px;border-radius:8px;border:1px solid var(--c-line,#E6E4DF);background:#fff;font:500 12px Inter,sans-serif;color:var(--c-ink-2,#3C3A42);cursor:pointer}
+html body.app.in-editor #editor .pv-qr-copy:hover{background:#F6F5F2}
 /* The verdict under Kairoq Agent's own closing words: a small tag, not a sentence. */
 html body.app.in-editor #editor #messages .verdict-head.tag{display:inline-flex!important;align-items:center;gap:6px;margin:8px 0 4px!important;padding:3px 10px 3px 4px;border-radius:999px;background:#F4F5F7;font-size:12px!important;font-weight:500!important;color:#5B616B!important}
 html body.app.in-editor #editor #messages .verdict-head.tag .vmark{width:16px;height:16px;font-size:9.5px}

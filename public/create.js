@@ -548,7 +548,20 @@ function previewFloat(){
  const fold=el('button','pv-btn pv-fold');fold.type='button';fold.title='Hide the tools';fold.setAttribute('aria-label','Hide the preview tools');
  fold.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
  fold.onclick=()=>{const min=bar.classList.toggle('min');fold.title=min?'Show the tools':'Hide the tools';fold.setAttribute('aria-label',min?'Show the preview tools':'Hide the preview tools')};
- bar.append(full,fold);canvas.append(bar);
+ // Open on your phone: a QR code for this preview (GET /previewqr), like Emergent and Lovable.
+ const qr=el('button','pv-btn pv-qr');qr.type='button';qr.title='Open on your phone';qr.setAttribute('aria-label','Open this preview on your phone');qr.setAttribute('aria-expanded','false');
+ qr.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 14h2M14 18v2M17 17h3v3"/></svg>';
+ const pop=el('div','pv-qr-pop hidden');pop.setAttribute('role','dialog');pop.setAttribute('aria-label','Open on your phone');
+ const img=el('img','pv-qr-img');img.alt='QR code that opens this preview on your phone';img.width=168;img.height=168;
+ const link=el('p','pv-qr-link'),copy=el('button','pv-qr-copy','Copy link');copy.type='button';
+ pop.append(el('p','pv-qr-title','Open on your phone'),img,el('p','pv-qr-hint',"Point your phone's camera at the code."),link,copy);
+ const close=()=>{pop.classList.add('hidden');qr.setAttribute('aria-expanded','false')};
+ qr.onclick=e=>{e.stopPropagation();if(!pop.classList.contains('hidden'))return close();const p=state.project;if(!p||!p.preview_url)return;
+  const url=location.origin+p.preview_url;img.src='/api/create/projects/'+p.id+'/previewqr?v='+(p.current_version||0);text(link,url.replace(/^https?:\/\//,''));
+  copy.onclick=()=>{navigator.clipboard?.writeText(url).then(()=>{text(copy,'Copied');setTimeout(()=>text(copy,'Copy link'),1500)}).catch(()=>{})};
+  pop.classList.remove('hidden');qr.setAttribute('aria-expanded','true')};
+ pop.onclick=e=>e.stopPropagation();document.addEventListener('click',close);document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+ bar.append(qr,full,fold,pop);canvas.append(bar);
 }
 function refreshWindow(){
  const p=state.project;if(!p||!$('fm-addr-text'))return;
