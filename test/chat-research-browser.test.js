@@ -111,3 +111,10 @@ test("a new chat from the home page is greeted like a person, not asked what 'Ne
  assert.match(r,/^Hi! What would you like to build, or talk through first\?/);
  assert.doesNotMatch(r,/New chat should do/);
 });
+
+test("on a phone the Browser tab shows the browser, and a swipe scrolls the page",()=>{
+ const css=fs.readFileSync(path.join(root,"public/ui/browser.css"),"utf8");
+ assert.match(css,/@media \(max-width:900px\)\{[\s\S]*#editor\[data-pane=browser\] #web-browser-pane\.kb\.hidden\{display:flex!important/);
+ const js=fs.readFileSync(path.join(root,"public/builder-browser-pane.js"),"utf8");
+ assert.match(js,/shot\.addEventListener\("touchmove"/);
+});
