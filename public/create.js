@@ -12,11 +12,11 @@ async function api(path,{method='GET',body}={}){
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
- for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen','ideas-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen','ideas-screen','agents-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
- const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||screen==='ideas-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
+ const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||screen==='ideas-screen'||screen==='agents-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
@@ -24,12 +24,13 @@ function show(screen){
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api','side-ideas'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api','side-ideas','side-agents'])$(b).removeAttribute('aria-current');
  if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
  if(screen==='plugins-screen')$('side-plugins').setAttribute('aria-current','page');
  if(screen==='leads-screen')$('side-leads').setAttribute('aria-current','page');
  if(screen==='api-screen')$('side-api').setAttribute('aria-current','page');
  if(screen==='ideas-screen')$('side-ideas').setAttribute('aria-current','page');
+ if(screen==='agents-screen')$('side-agents').setAttribute('aria-current','page');
  if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -418,6 +419,76 @@ $('id-refresh').onclick=async()=>{
  try{ideasUi.d=await api('/projects/'+ideasUi.id+'/ideas',{method:'POST',body:{action:'refresh'}});ideasUi.tab='all';text($('id-status'),'');refreshCredits?.()}
  catch(err){text($('id-status'),'');text($('id-error'),err.message)}
  finally{renderIdeasPage()}
+};
+// ---------- Agent builder (a full page) ----------
+// An app's agents are its automations (react-automations.js): shown with their real runs, and
+// "Run now". A new agent is a normal build request, written from the form, so the builder adds
+// the function and its trigger to the app.
+const agentsUi={projects:[],id:null,list:[],data:null};
+function agWhenOptions(){
+ const sel=$('ag-when'),keep=sel.value;sel.replaceChildren();
+ for(const c of agentsUi.data?.collections||[])sel.append(new Option('When a new '+c.name.replace(/_/g,' ')+' record is saved','on:'+c.name));
+ for(const [v,l] of [['day','Every day'],['week-mon','Every Monday'],['hour','Every hour'],['hand','Only when I press Run']])sel.append(new Option(l,v));
+ if([...sel.options].some(o=>o.value===keep))sel.value=keep;
+ $('ag-at-wrap').classList.toggle('hidden',!/^(day|week)/.test(sel.value));
+}
+function agUses(){
+ const box=$('ag-uses');box.replaceChildren();const d=agentsUi.data;if(!d)return;
+ const chip=(label,on,note)=>{const c=el('span','ag-chip'+(on?' on':''),label);if(note)c.title=note;box.append(c)};
+ chip('Its data'+(d.collections.length?': '+d.collections.map(c=>c.name.replace(/_/g,' ')).slice(0,4).join(', '):''),d.collections.length>0);
+ chip(d.features.email?'Email':'Email (not set up yet)',d.features.email,d.features.email?'':'Emails wait in the app outbox until email is set up.');
+ chip(d.features.payments.length?'Payments':'No payments',d.features.payments.length>0);
+ chip('Kairoq AI',true,'Summaries, replies and sorting, inside the app.');
+}
+function agRequest(){
+ const name=$('ag-name').value.trim(),what=$('ag-what').value.trim(),w=$('ag-when').value,at=$('ag-at').value||'09:00';
+ const when=w.startsWith('on:')?'whenever a new record is saved in "'+w.slice(3)+'"':w==='day'?'every day at '+at:w==='week-mon'?'every Monday at '+at:w==='hour'?'every hour':'only when I press Run now (no schedule)';
+ return 'Add an agent to this app called "'+name+'". What it does: '+what+'\nWhen it runs: '+when+'.'+($('ag-ask').checked?'\nIt must never send an email by itself: it saves each email as a draft I approve in the app first.':'')+'\nBuild it as a server function with an automation in src/backend.json, and show its runs to me.';
+}
+function renderAgents(){
+ const p=agentsUi.projects.find(x=>x.id===agentsUi.id),ul=$('ag-list');ul.replaceChildren();
+ text($('ag-crumb'),p?p.name:'Pick a project');
+ const pill=$('ag-count');pill.hidden=!p;if(p)text(pill,agentsUi.list.length?agentsUi.list.length+' agent'+(agentsUi.list.length===1?'':'s'):'No agents yet');
+ $('ag-new-open').disabled=!p||p.role==='viewer';
+ if(!p){ul.append(el('li','tp-empty',agentsUi.projects.length?'Pick a project.':'Make a project first, then add agents to it.'));return}
+ if(!agentsUi.list.length){ul.append(el('li','tp-empty','This app has no agents yet. Press New agent to describe one.'));return}
+ for(const a of agentsUi.list){
+  const li=el('li','tp-card'),top=el('div','tp-card-top');
+  const ic=el('span','tp-ic',plInitials(a.name.replace(/[-_]/g,' ')));ic.setAttribute('aria-hidden','true');
+  const nm=el('span','tp-name',cap(a.name.replace(/[-_]/g,' ')));nm.append(el('small',null,a.on?'When a '+a.collection.replace(/_/g,' ')+' record is '+a.on:a.every==='hour'?'Every hour':(a.every==='week'?'Every '+cap(a.day):'Every day')+' at '+a.at));
+  top.append(ic,nm,el('span','ld-chip'+(a.ok===null?'':a.ok?' ok':' bad'),a.ok===null?'Not run yet':a.ok?'Working':'Failed'));
+  li.append(top);
+  li.append(el('p','tp-desc',a.last_run?'Last run '+when(a.last_run)+(a.last_result?': '+a.last_result:''):'It has not run yet.'+(a.next?' Next: '+when(a.next)+'.':'')));
+  const foot=el('div','tp-card-foot ld-actions');
+  foot.append(el('span','small',a.runs?a.runs+' run'+(a.runs===1?'':'s')+(a.failures?', '+a.failures+' failed':''):'No runs yet'),el('span','tp-grow'));
+  const run=el('button','ghost tp-btn','Run now');run.type='button';run.disabled=p.role==='viewer';
+  run.onclick=async()=>{run.disabled=true;text($('ag-error'),'');try{await api('/projects/'+p.id+'/automations',{method:'POST',body:{name:a.name}});await loadAgents()}catch(err){text($('ag-error'),err.message);run.disabled=false}};
+  foot.append(run);li.append(foot);ul.append(li);
+ }
+}
+async function loadAgents(){
+ agentsUi.list=[];agentsUi.data=null;renderAgents();if(!agentsUi.id)return;
+ try{const [a,d]=await Promise.all([api('/projects/'+agentsUi.id+'/automations'),api('/projects/'+agentsUi.id+'/data')]);agentsUi.list=a.automations||[];agentsUi.data=d}catch(err){text($('ag-error'),err.message)}
+ agWhenOptions();agUses();renderAgents();
+}
+async function openAgents(){
+ show('agents-screen');text($('ag-error'),'');
+ try{
+  const {projects}=await api('/projects');agentsUi.projects=projects||[];
+  const sel=$('ag-project');sel.replaceChildren();for(const p of agentsUi.projects)sel.append(new Option(p.name,p.id));
+  if(!agentsUi.projects.some(p=>p.id===agentsUi.id))agentsUi.id=(state.project&&agentsUi.projects.some(p=>p.id===state.project.id)?state.project.id:agentsUi.projects[0]?.id)||null;
+  sel.value=agentsUi.id||'';await loadAgents();
+ }catch(err){text($('ag-error'),err.message)}
+}
+$('side-agents').onclick=openAgents;
+$('ag-project').onchange=e=>{agentsUi.id=e.target.value;text($('ag-error'),'');loadAgents()};
+$('ag-new-open').onclick=()=>{const f=$('ag-form');f.classList.toggle('hidden');if(!f.classList.contains('hidden')){agWhenOptions();agUses();const t=(state.me?.tiers||[]).find(x=>x.id===(state.tier||'standard'));text($('ag-cost'),state.me?.viewer?.kind==='customer'&&t?'One build · '+t.credits+' credits':'One build');$('ag-name').focus()}};
+$('ag-cancel').onclick=()=>$('ag-form').classList.add('hidden');
+$('ag-when').onchange=()=>$('ag-at-wrap').classList.toggle('hidden',!/^(day|week)/.test($('ag-when').value));
+$('ag-form').onsubmit=async e=>{
+ e.preventDefault();const b=$('ag-create');b.disabled=true;text($('ag-error'),'');
+ try{const ask=agRequest();await openProject(agentsUi.id);await send(ask,'build');$('ag-form').reset();$('ag-form').classList.add('hidden')}
+ catch(err){text($('ag-error'),err.message)}finally{b.disabled=false}
 };
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
