@@ -66,16 +66,22 @@ test('in the editor: questions, the plan, Approve, and the build gets the answer
   await page.click('#new-kind [data-kind="site"]');
   await page.fill('#new-prompt','An iPhone app like Quiver: kids color a page and a 3D animal comes alive');
   await page.click('#new-submit');
-  // Every question as a numbered card with its options shown, the recommended one picked (Figma chat).
-  await page.waitForSelector('.ask-card .q',{timeout:20000});
+  // Questions like Emergent: a slim line in the chat, one question at a time in a panel above the
+  // message box, Kairoq's suggestion already ticked.
+  await page.waitForSelector('.ask-dock .ad-opt',{timeout:20000});
   assert.match(await page.locator('.ask-card .agent-name').innerText(),/Kairoq Agent/);
-  assert.equal(await page.locator('.q').count(),2);
-  assert.equal(await page.locator('.q-answer').first().innerText(),'Coloring comes alive','the recommended answer is pre-filled');
-  // the options are already shown
-  assert.match(await page.locator('.q').nth(1).locator('.ask-opt').first().innerText(),/Kids: watch and play\s+Recommended\s+A child scans a page/);
-  await page.locator('.q').nth(1).locator('.ask-other').fill('Kids and parents together');
-  assert.equal(await page.locator('.q-answer').nth(1).innerText(),'Kids and parents together');
-  await page.click('.ask-next');
+  assert.match(await page.locator('.ask-card .ask-wait').innerText(),/Kairoq has questions for you/);
+  assert.equal(await page.locator('#chat-form').isVisible(),false,'the panel takes the message box\'s place');
+  assert.equal(await page.locator('.ad-count').innerText(),'Question 1 of 2');
+  assert.match(await page.locator('.ad-opt.on').innerText(),/Coloring comes alive/,'the suggested answer is ticked');
+  await page.click('.ad-go');
+  await page.waitForFunction(()=>document.querySelector('.ad-count')?.textContent==='Question 2 of 2');
+  assert.match(await page.locator('.ad-opt').first().innerText(),/Kids: watch and play\s+A child scans a page[\s\S]*Suggested/);
+  await page.locator('.ad-other').fill('Kids and parents together');
+  assert.equal(await page.locator('.ad-opt.on').count(),1,'one answer for a one-answer question');
+  await page.click('.ad-go');
+  await page.waitForFunction(()=>!document.querySelector('.ask-dock'));
+  assert.equal(await page.locator('#chat-form').isVisible(),true,'the message box comes back');
   // The brand step: Kairoq's pick with a real page preview; "Not now" goes on without a look.
   await page.waitForSelector('.brand-opts',{timeout:20000});
   assert.equal(await page.locator('.brand-opt.on b').innerText(),'Design it for me (Recommended)');

@@ -906,51 +906,70 @@ async function askThenBuild(prompt,chosenName){
   showBuildPlan(card,plan,{onApprove:approve,onSkip:()=>go(answers,null),projectId:project.id,head:agentHead(worked())});
   list.scrollTop=list.scrollHeight;
  };
- // Every question in one card, the recommended answer already filled in (like Emergent): the owner
- // reads them, changes any, and confirms once. A question's answers open when its row is clicked.
+ // Questions like Emergent: the chat keeps one slim line ("Kairoq has questions for you"), and the
+ // questions open one at a time in a panel docked above the message box. Kairoq's suggested answer
+ // is already ticked; "Use my suggestions" accepts them all, × skips the questions.
  const picked=questions.map(q=>new Set(Number.isInteger(q.recommended)?[q.options[q.recommended]]:[])),other=questions.map(()=>'');
+ const suggest=()=>questions.forEach((q,i)=>{picked[i].clear();other[i]='';if(Number.isInteger(q.recommended))picked[i].add(q.options[q.recommended])});
  const answers=()=>questions.map((q,i)=>({q:q.q,a:[...picked[i],...(other[i].trim()?[other[i].trim()]:[])]})).filter(x=>x.a.length);
- const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:'One more thing',onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>draw(-1):null});
+ const lookStep=()=>window.KairoqLook.step({card,name,prompt,count:'One more thing',onBuild:look=>build(answers(),look),onSkip:()=>build(answers()),onBack:questions.length?()=>{waiting();openDock(questions.length-1)}:null});
  const next=()=>{if(window.KairoqLook){morph(card,()=>card.append(agentHead(worked()),thinkLine('Thinking about the look')),1);setTimeout(lookStep,STILL?0:170)}else build(answers())};
  // No questions: the opening line says what gets built, then straight on to the brand.
  if(!questions.length){if(opening){morph(card,()=>card.append(agentHead(worked()),el('p','ask-intro',opening)),1);setTimeout(next,STILL?0:900)}else next();return}
- const draw=(dir=1)=>morph(card,()=>{
+ const waiting=()=>morph(card,()=>{
   card.append(agentHead(worked()));
-  card.append(el('p','ask-intro',opening||'A few quick things before I plan the build. I\'ve filled in what I\'d suggest; change anything, then confirm.'));
-  card.append(workLine('Read your request · '+questions.length+' question'+(questions.length===1?'':'s')+', my suggestion filled in · free'));
-  const box=el('div','qs fm-qs');
-  questions.forEach((q,at)=>{
-   const row=el('div','q fm-q');row.dataset.open='true';
-   const lab=el('button','q-label',(at+1)+'. '+q.q);lab.type='button';lab.setAttribute('aria-expanded','true');
-   const shown=()=>{const a=[...picked[at],...(other[at].trim()?[other[at].trim()]:[])];return a.length?a.join(', '):'Choose…'};
-   const val=el('div','q-answer',shown());
-   const opts=el('div','ask-opts');
-   const mark=()=>{for(const r of opts.querySelectorAll('.ask-opt'))r.classList.toggle('on',r.querySelector('input').checked);val.textContent=shown();val.classList.toggle('q-empty',!picked[at].size&&!other[at].trim())};
+  if(opening)card.append(el('p','ask-intro',opening));
+  const row=el('div','ask-wait');
+  row.append(el('span','ask-wait-ic','?'),el('span','ask-wait-t','Kairoq has questions for you'),el('span','ask-wait-s',questions.length+' question'+(questions.length===1?'':'s')+' · waiting for your answers'));
+  card.append(row);list.scrollTop=list.scrollHeight;
+ },1);
+ const openDock=(start=0)=>{
+  document.querySelector('.ask-dock')?.remove();
+  let at=start;
+  const btn=(cls,txt,label)=>{const b=el('button',cls,txt);b.type='button';if(label)b.setAttribute('aria-label',label);return b};
+  const dock=el('section','ask-dock');dock.setAttribute('aria-label','Kairoq has questions for you');
+  const head=el('div','ad-head');head.append(el('span','ad-ic','?'),el('span','ad-title','Kairoq has questions for you'));
+  const x=btn('ad-x','','Skip the questions');x.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';head.append(x);
+  const body=el('div','ad-body'),foot=el('div','ad-foot');
+  const prev=btn('ad-nav','‹','Previous question'),count=el('span','ad-count'),fwd=btn('ad-nav','›','Next question');
+  const auto=btn('ad-auto','Use my suggestions'),go=btn('ad-go ask-next','Next');
+  const navs=el('div','ad-steps');navs.append(prev,count,fwd);foot.append(navs,el('span','ask-gap'),auto,go);
+  dock.append(head,body,foot);
+  const close=()=>{document.body.classList.remove('asking');if(STILL)dock.remove();else{dock.classList.add('leaving');setTimeout(()=>dock.remove(),220)}};
+  const finish=()=>{close();next()};
+  const fill=()=>{
+   const q=questions[at];
+   body.append(el('p','ad-q',q.q));
+   const opts=el('div','ad-opts');
+   const mark=()=>{for(const r of opts.querySelectorAll('.ad-opt'))r.classList.toggle('on',Boolean(r.querySelector('input:checked'))||(r.classList.contains('ad-own')&&Boolean(other[at].trim())))};
    (q.options||[]).forEach((o,i)=>{
-    const r=el('label','ask-opt');const input=document.createElement('input');
-    input.type=q.multi?'checkbox':'radio';input.name='ask'+at;input.checked=picked[at].has(o);
-    input.onchange=()=>{if(!q.multi){picked[at].clear();other[at]='';own.value=''}input.checked?picked[at].add(o):picked[at].delete(o);mark();if(!q.multi)toggle(false)};
-    const words=el('span','ask-words');words.append(el('span','ask-label',o));
-    if(i===q.recommended)words.append(el('span','q-tag','Recommended'));
-    if(q.details&&q.details[i])words.append(el('span','ask-detail',q.details[i]));
-    const arrow=el('span','fm-pick');arrow.setAttribute('aria-hidden','true');arrow.innerHTML='<svg viewBox="0 0 24 24"><path d="M17 17 7 7M7 15V7h8"/></svg>';
-    r.append(input,words,arrow);opts.append(r);
+    const r=el('label','ad-opt');const input=document.createElement('input');
+    input.type=q.multi?'checkbox':'radio';input.name='ad'+at;input.checked=picked[at].has(o);
+    input.onchange=()=>{if(!q.multi){picked[at].clear();other[at]='';own.value=''}input.checked?picked[at].add(o):picked[at].delete(o);mark()};
+    const words=el('span','ad-words');words.append(el('b',null,o));
+    if(q.details&&q.details[i])words.append(' ',el('span','ad-hint',q.details[i]));
+    if(i===q.recommended)words.append(' ',el('span','ad-tag','Suggested'));
+    r.append(input,el('span','ad-box'),words);opts.append(r);
    });
-   const own=document.createElement('input');own.className='ask-other';own.placeholder='Other…';own.value=other[at];own.setAttribute('aria-label','Another answer');
-   own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input'))r.checked=false}mark()};
-   opts.append(own);
-   // Every option stays visible, like the Figma chat: picking one only marks it.
-   const toggle=()=>{};
-   mark();row.append(lab,val,opts);box.append(row);
-  });
-  const foot=el('div','ask-foot');
-  const skip=el('button','ask-link','Not now');skip.type='button';skip.onclick=()=>{for(const s of picked)s.clear();for(let i=0;i<other.length;i++)other[i]='';next()};
-  const ok=el('button','ask-next','Looks right, continue');ok.type='button';ok.onclick=next;
-  foot.append(el('span','ask-gap'),skip,ok);
-  card.append(box,foot);
-  list.scrollTop=list.scrollHeight;
- },dir);
- draw(0);
+   const ownRow=el('label','ad-opt ad-own'+(q.multi?'':' ad-radio'));const own=document.createElement('input');own.className='ad-other';own.placeholder='Something else…';own.value=other[at];own.setAttribute('aria-label','Another answer');
+   own.oninput=()=>{other[at]=own.value;if(own.value.trim()&&!q.multi){picked[at].clear();for(const r of opts.querySelectorAll('input[name]'))r.checked=false}mark()};
+   ownRow.append(el('span','ad-box'),own);opts.append(ownRow);
+   body.append(opts);mark();
+   const last=at===questions.length-1;
+   count.textContent='Question '+(at+1)+' of '+questions.length;
+   prev.disabled=at===0;fwd.disabled=last;go.textContent=last?'Continue':'Next';
+  };
+  const step=d=>{at=Math.max(0,Math.min(questions.length-1,at+d));morph(body,fill,d)};
+  prev.onclick=()=>step(-1);fwd.onclick=()=>step(1);
+  go.onclick=()=>at===questions.length-1?finish():step(1);
+  auto.onclick=()=>{suggest();finish()};
+  x.onclick=()=>{for(const s of picked)s.clear();other.fill('');finish()};
+  dock.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();x.click()}else if(e.key==='Enter'&&!e.shiftKey&&e.target.tagName!=='BUTTON'){e.preventDefault();go.click()}};
+  fill();
+  $('chat-form').before(dock);document.body.classList.add('asking');
+  requestAnimationFrame(()=>dock.querySelector('.ad-opt input:checked,.ad-opt input')?.focus({preventScroll:true}));
+ };
+ waiting();openDock(0);
 }
 // A first request with the owner's answers and the approved plan, shown like superapp: the request,
 // each question small with its answer under it, then the plan's title.
@@ -1134,6 +1153,7 @@ $('store-ios').onclick=e=>storeCall({action:'publish',platform:'ios'},e.currentT
 $('store-android').onclick=e=>storeCall({action:'publish',platform:'android'},e.currentTarget);
 // ---------- editor ----------
 async function openProject(id,{pendingText,job}={}){
+ document.querySelector('.ask-dock')?.remove();document.body.classList.remove('asking');
  const {project,account,active_job}=await api('/projects/'+id);
  const previousProject=state.project&&state.project.id;
  state.project=project;

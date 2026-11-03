@@ -79,9 +79,13 @@ test("the editor follows the App builder frame: light second rows, a browser win
 
 test("the chat's questions, plan and research follow the Figma builder chat", () => {
   const js = read("create.js");
-  assert.match(js, /el\('button','q-label',\(at\+1\)\+'\. '\+q\.q\)/, "numbered questions");
-  assert.match(js, /const opts=el\('div','ask-opts'\);/, "options shown, not folded");
-  assert.match(js, /if\(i===q\.recommended\)words\.append\(el\('span','q-tag','Recommended'\)\)/);
+  // Questions like Emergent: a slim line in the chat, one question at a time docked above the message box.
+  assert.match(js, /el\('span','ask-wait-t','Kairoq has questions for you'\)/);
+  assert.match(js, /\$\('chat-form'\)\.before\(dock\);document\.body\.classList\.add\('asking'\);/);
+  assert.match(js, /count\.textContent='Question '\+\(at\+1\)\+' of '\+questions\.length;/);
+  assert.match(js, /if\(i===q\.recommended\)words\.append\(' ',el\('span','ad-tag','Suggested'\)\)/);
+  assert.match(js, /auto\.onclick=\(\)=>\{suggest\(\);finish\(\)\};/, "Use my suggestions accepts Kairoq's picks");
+  assert.match(read("ui/forma.css"), /html body\.app\.in-editor\.asking #editor #chat-form\{display:none!important\}/);
   assert.match(js, /el\('button','ask-next plan-approve','Build it'\)/);
   assert.match(js, /el\('span','plan-meta','1 build'\+\(cost\?' · '\+cost\+' credits':''\)\)/, "the real price, no made-up time");
   assert.match(read("builder-browser-pane.js"), /function researchChip\(href,done\)/);
