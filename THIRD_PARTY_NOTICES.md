@@ -284,3 +284,7 @@ The image behind the Create home prompt and the editor's top bar is the Carina N
 ## Model maker logos in the chat box
 
 The coloured logos beside the models in the Create chat box come from LobeHub's icon set, `@lobehub/icons-static-svg` (MIT License, https://github.com/lobehub/lobe-icons), loaded by the browser from unpkg at a pinned version. The logos themselves belong to their companies and are shown only to identify the model's maker.
+
+## Service logos on the Connectors page
+
+The GitHub, Stripe, Figma and WhatsApp marks on the Connectors page are SVG paths from Simple Icons (CC0-1.0, https://github.com/simple-icons/simple-icons), copied into `public/create.js`. The logos belong to their companies and are shown only to identify the service being connected.

@@ -573,6 +573,22 @@ function cnStatus(c,s=cnUi.settings){
  if(c.id==='whatsapp')return state.me?.whatsapp?'off':'admin';
  return 'open';
 }
+// Real logos for the brands (paths from Simple Icons, CC0) and plain line icons for the rest,
+// instead of a letter in a coloured square.
+const CN_BRAND={
+ github:{c:'#181717',d:'M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'},
+ stripe:{c:'#635BFF',d:'M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z'},
+ figma:{c:'#F24E1E',d:'M15.852 8.981h-4.588V0h4.588c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.491-4.49 4.491zM12.735 7.51h3.117c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-3.117V7.51zm0 1.471H8.148c-2.476 0-4.49-2.014-4.49-4.49S5.672 0 8.148 0h4.588v8.981zm-4.587-7.51c-1.665 0-3.019 1.355-3.019 3.019s1.354 3.02 3.019 3.02h3.117V1.471H8.148zm4.587 15.019H8.148c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h4.588v8.98zM8.148 8.981c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h3.117V8.981H8.148zM8.172 24c-2.489 0-4.515-2.014-4.515-4.49s2.014-4.49 4.49-4.49h4.588v4.441c0 2.503-2.047 4.539-4.563 4.539zm-.024-7.51a3.023 3.023 0 0 0-3.019 3.019c0 1.665 1.365 3.019 3.044 3.019 1.705 0 3.093-1.376 3.093-3.068v-2.97H8.148zm7.704 0h-.098c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h.098c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.49-4.49 4.49zm-.097-7.509c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h.098c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-.098z'},
+ whatsapp:{c:'#25D366',d:'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z'}};
+const CN_LINE={email:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',secrets:'<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M16 7l2 2M14 9l2 2"/>',apps:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/>',partners:'<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v4"/>',domain:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',mcp:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>'};
+function cnLogo(c){
+ const ic=el('span','tp-ic cn-ic');ic.dataset.id=c.id;ic.setAttribute('aria-hidden','true');
+ const b=CN_BRAND[c.id];
+ if(b){ic.classList.add('brand');ic.innerHTML='<svg viewBox="0 0 24 24"><path fill="'+b.c+'" d="'+b.d+'"/></svg>'}
+ else if(CN_LINE[c.id]){ic.classList.add('line');ic.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+CN_LINE[c.id]+'</svg>'}
+ else ic.textContent=c.name.slice(0,1);
+ return ic;
+}
 function renderConnectors(){
  const p=cnUi.projects.find(x=>x.id===cnUi.id),grid=$('cn-grid');grid.replaceChildren();
  text($('cn-crumb'),p?p.name:'Pick a project');
@@ -587,10 +603,11 @@ function renderConnectors(){
  const q=cnUi.q.toLowerCase();
  for(const c of list.filter(c=>(cnUi.tab==='All'||(CN_GROUP[c.id]||'More apps')===cnUi.tab)&&(!q||(c.name+' '+c.desc).toLowerCase().includes(q)))){
   const li=el('li','tp-card cn-card'),top=el('div','tp-card-top'),st=cnStatus(c);
-  const ic=el('span','tp-ic cn-ic',{apps:'+',secrets:'K',mcp:'M'}[c.id]||c.name.slice(0,1));ic.dataset.id=c.id;ic.setAttribute('aria-hidden','true');
+  const ic=cnLogo(c);
   const nm=el('span','tp-name',c.name);nm.append(el('small',null,CN_GROUP[c.id]||'More apps'));
   top.append(ic,nm);
-  const foot=el('div','tp-card-foot');foot.append(el('span','small',CN_HOW[c.id]||''),el('span','tp-grow'));
+  // "Set up by your admin" already says how; don't repeat it with the method on the left.
+  const foot=el('div','tp-card-foot');foot.append(el('span','small',st==='admin'?'':CN_HOW[c.id]||''),el('span','tp-grow'));
   if(st==='on')foot.append(el('span','cn-on','✓ Connected'));
   else if(st.startsWith('n:'))foot.append(el('span','cn-on','✓ '+st.slice(2)+' added'));
   else if(st==='admin')foot.append(el('span','cn-wait','Set up by your admin'));
@@ -1680,7 +1697,7 @@ async function renderManage(){
    rows.replaceChildren();const words=mgUi.q.toLowerCase();
    for(const c of list.filter(c=>(mgUi.group==='All'||(CN_GROUP[c.id]||'More apps')===mgUi.group)&&(!words||(c.name+' '+c.desc).toLowerCase().includes(words)))){
     const st=settings?cnStatus(c,settings):'open',li=el('li','mg-row');
-    const ic=el('span','tp-ic cn-ic',{apps:'+',secrets:'K',mcp:'M'}[c.id]||c.name.slice(0,1));ic.dataset.id=c.id;ic.setAttribute('aria-hidden','true');
+    const ic=cnLogo(c);
     const t=el('div','mg-row-t');t.append(el('b',null,c.name),el('span',null,c.desc));
     li.append(ic,t);
     const on=st==='on'||st.startsWith('n:');
