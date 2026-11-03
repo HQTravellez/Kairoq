@@ -110,7 +110,9 @@ test("the plan card and look picker are slim like the question panel", () => {
 
 test("work and replies like Emergent: step rows, a finished line, next steps that fill the message box", () => {
   const js = read("create.js"), css = read("ui/forma.css");
-  assert.match(js, /if\(last&&tl\.length&&index>=0\)\{fill\(\);fold\.classList\.add\('open'\)/, "the latest reply shows its steps");
+  // Since #390 the steps stay folded behind "Worked for …" (like Lovable): the chat shows the work, then what was done.
+  assert.doesNotMatch(js, /if\(last&&tl\.length&&index>=0\)\{fill\(\);fold\.classList\.add\('open'\)/, "steps do not open by themselves");
+  assert.match(js, /b\.onclick=\(\)=>\{fill\(\);const open=fold\.classList\.toggle\('open'\)/, "a click on Worked for … opens them");
   assert.match(js, /rail\.append\(eventRow\(e,\{expand:true,version:m\.version\}\)\)/, "an edit opens its diff");
   assert.match(js, /el\('span','agent-done-t','Kairoq Agent finished'\)/);
   assert.match(js, /b\.onclick=\(\)=>\{const t=\$\('chat-input'\);t\.value=ask;/, "a next step goes into the message box, nothing is spent");
