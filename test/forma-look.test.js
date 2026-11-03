@@ -68,7 +68,8 @@ test("the editor follows the App builder frame: light second rows, a browser win
   const js = read("create.js");
   assert.match(js, /function formaRows\(\)/);
   assert.match(js, /c\.append\(el\('b',null,'Chat with Kairoq'\)\)/);
-  assert.match(js, /url=live\?String\(p\.urls\[0\]\):location\.host\+\(state\.previewBase\|\|p\.preview_url\|\|''\)/, "the address is the real one, not made up");
+  // Like Lovable's page picker: the live domain once published, otherwise the page ("/"), never a made-up address.
+  assert.match(js, /url=live\?String\(p\.urls\[0\]\):'\/'/, "the address is the real one, not made up");
   assert.match(js, /starterWaiting\(Boolean\(project\.starter\)&&!job&&!active_job\)/);
   assert.match(js, /if\(url&&url!==state\.previewBase\)starterWaiting\(false\)/);
   assert.match(fs.readFileSync(path.join(__dirname, "..", "create-api.js"), "utf8"), /starter=require\('\.\/react-design'\)\.isUntouchedStarter/);
