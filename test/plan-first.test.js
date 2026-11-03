@@ -84,7 +84,7 @@ test('in the editor: questions, the plan, Approve, and the build gets the answer
   assert.equal(await page.locator('#chat-form').isVisible(),true,'the message box comes back');
   // The brand step: Kairoq's pick with a real page preview; "Not now" goes on without a look.
   await page.waitForSelector('.brand-opts',{timeout:20000});
-  assert.equal(await page.locator('.brand-opt.on b').innerText(),'Design it for me (Recommended)');
+  assert.equal(await page.locator('.brand-opt.on b').innerText(),'Design it for me');
   assert.ok(await page.locator('.lk-page .lk-p-h1').count(),'a page preview, not a sample screen');
   await page.locator('.ask-card button:has-text("Not now")').first().click();
   await page.waitForSelector('.plan-card .plan-title',{timeout:20000});

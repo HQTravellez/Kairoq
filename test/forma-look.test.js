@@ -98,3 +98,12 @@ test("Kairoq's thinking shows: purple breathing dots and a shimmer on 'is thinki
   assert.match(css, /\.status-line:not\(\.done\) \.status-text\{background:linear-gradient/);
   assert.match(css, /@keyframes fm-think/);
 });
+
+test("the plan card and look picker are slim like the question panel", () => {
+  const css = read("ui/forma.css");
+  assert.match(css, /#messages :is\(\.plan-card,\.ask-card\) \.ask-foot \.ask-next\{flex:none!important;width:auto!important;min-width:0!important;height:32px!important/);
+  assert.match(css, /#messages \.brand-opts\{display:flex!important;flex-direction:column!important/);
+  assert.match(css, /#messages \.brand-body \.lk-page\{zoom:\.6;/);
+  const look = read("create-look.js");
+  assert.match(look, /opt\('kairoq','Design it for me','Kairoq picks a direction for this business and shows it',data\.brand\?null:'Suggested'\)/);
+});
