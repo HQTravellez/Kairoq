@@ -1104,3 +1104,18 @@ dialog.ks-search .ks-search-empty{padding:14px 10px;font-size:13.5px;color:#8A88
 html body dialog.ks-search input:is(:focus,:focus-visible){outline:0!important;box-shadow:none!important;border:0!important}
 dialog.ks-search input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 @media (max-width:900px),(hover:none){html body.app #side .side-nav button#side-search .side-kbd,dialog.ks-search kbd{display:none}}
+html body.app #side .side-tools{margin-top:auto!important}
+html body.app #side .side-tools,html body.app #side .side-bottom{flex:none}
+html body.app #side .side-more>button{padding-left:36px!important}
+html body.app #side .side-tools .side-more>summary .ico{width:16px;height:16px;fill:none!important;stroke:currentColor!important;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+/* Steps like Lovable: the heading is as big as the reply but light grey, with an arrow that points
+   right when closed and down when open; the reasoning opens beside a bulb at full size; more air
+   between steps. */
+html body.app.in-editor #editor #messages .ks-story{gap:22px!important;margin:8px 0 18px!important}
+html body.app.in-editor #editor #messages .ks-step{gap:10px!important}
+html body.app.in-editor #editor #messages .ks-head{font:400 15.5px/1.5 Inter,system-ui,sans-serif!important;color:#8E8B94!important;gap:6px!important}
+html body.app.in-editor #editor #messages .ks-head .ks-chev{transform:none!important;width:15px;height:15px}
+html body.app.in-editor #editor #messages .ks-head[aria-expanded=true] .ks-chev{transform:rotate(90deg)!important}
+html body.app.in-editor #editor #messages .ks-note{gap:12px!important;margin:2px 0 6px!important;padding:0 0 0 4px!important}
+html body.app.in-editor #editor #messages .ks-note .ico{width:16px!important;height:16px!important;margin-top:4px!important}
+html body.app.in-editor #editor #messages .ks-note p{font:400 15.5px/1.7 Inter,system-ui,sans-serif!important;color:var(--c-ink-2,#3C3A42)!important}
