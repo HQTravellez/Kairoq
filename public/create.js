@@ -545,8 +545,8 @@ function refreshWindow(){
 const cnUi={projects:[],id:null,settings:null,tab:'All',q:''};
 const CN_GROUP={github:'Code',stripe:'Payments',email:'Communication',secrets:'Keys',figma:'Design',apps:'More apps',partners:'More apps',whatsapp:'Communication',domain:'Publishing',mcp:'Keys'};
 const CN_HOW={github:'Access token',stripe:'API key',email:'Set up on the server',secrets:'API keys',figma:'Frame link',apps:'744 services',partners:'Partner offers',whatsapp:'Phone number',domain:'DNS records',mcp:'Personal key'};
-function cnStatus(c){
- const s=cnUi.settings,sec=s?.secrets||{};
+function cnStatus(c,s=cnUi.settings){
+ const sec=s?.secrets||{};
  if(c.id==='github')return sec.github_token?.set?'on':'off';
  if(c.id==='stripe')return sec.stripe_secret_key?.set?'on':'off';
  if(c.id==='email')return s?.email?'on':'admin';
@@ -1578,14 +1578,131 @@ $('share-pop-publish').onclick=()=>{toggleSharePop(false);$('publish-open').clic
 $('share-pop-team').onclick=()=>{toggleSharePop(false);$('team-open').click()};
 function view(mode){
  state.code=mode==='code';state.data=mode==='data';
- for(const m of ['preview','code','data'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
- $('device').classList.toggle('hidden',mode!=='preview');$('frame').classList.toggle('hidden',mode!=='preview');$('code').classList.toggle('hidden',mode!=='code');$('data').classList.toggle('hidden',mode!=='data');
+ for(const m of ['preview','code','data','manage'])$('view-'+m).setAttribute('aria-pressed',String(m===mode));
+ $('device').classList.toggle('hidden',mode!=='preview');$('frame').classList.toggle('hidden',mode!=='preview');$('code').classList.toggle('hidden',mode!=='code');$('data').classList.toggle('hidden',mode!=='data');$('manage').classList.toggle('hidden',mode!=='manage');$('canvas').dataset.view=mode;
  // The shown view fades in (dark.css .view-in) instead of snapping.
  const shown=$(mode==='preview'?'frame':mode);if(shown&&!STILL){shown.classList.remove('view-in');void shown.offsetWidth;shown.classList.add('view-in')}
  if(mode==='code')renderFiles();
  if(mode==='data')renderData();
+ if(mode==='manage')renderManage();
 }
-$('view-preview').onclick=()=>view('preview');$('view-code').onclick=()=>view('code');$('view-data').onclick=()=>view('data');
+$('view-preview').onclick=()=>view('preview');$('view-code').onclick=()=>view('code');$('view-data').onclick=()=>view('data');$('view-manage').onclick=()=>view('manage');
+// ---------- Settings in the preview area (like Emergent's gear): Connectors, Payments, Secrets,
+// Monitoring. Everything shown is read from the project: connector status from its settings, its
+// own keys (names and last characters only), Stripe's webhook address, visits and server errors.
+const mgUi={tab:'connectors',group:'All',q:''};
+function openManage(tab){
+ if(tab)mgUi.tab=tab;
+ // On a phone the panel lives in the Preview pane.
+ if(matchMedia('(max-width:820px)').matches)document.querySelector('[data-pane="preview"]')?.click();
+ view('manage');
+}
+for(const b of document.querySelectorAll('#manage [data-mg]'))b.onclick=()=>{mgUi.tab=b.dataset.mg;renderManage()};
+$('composer-connect').onclick=()=>openManage('connectors');
+// The Connectors button in the message box shows one service after another, like Emergent's.
+(function(){
+ const box=document.querySelector('#composer-connect .cn-spin-ico');if(!box)return;
+ const SVC=[['S','#635BFF'],['G','#24292F'],['@','#7552E8'],['W','#25D366'],['F','#F24E1E']];
+ let i=0;const draw=()=>{const [t,c]=SVC[i%SVC.length];const n=el('i',null,t);n.style.background=c;box.replaceChildren(n);i++};
+ draw();if(!STILL)setInterval(()=>{if(!document.hidden&&document.body.classList.contains('in-editor'))draw()},2400);
+})();
+async function renderManage(){
+ const body=$('mg-body'),p=state.project;if(!body||!p)return;
+ for(const b of document.querySelectorAll('#manage [data-mg]'))b.toggleAttribute('aria-current',b.dataset.mg===mgUi.tab);
+ const tab=mgUi.tab;
+ const head=(title,sub)=>{const h=el('div','mg-head');h.append(el('h2',null,title),el('p',null,sub));return h};
+ body.replaceChildren(head(...{connectors:['Connectors','Connect the services your app uses.'],payments:['Payments','Take card payments with your own Stripe account.'],secrets:['Secrets','Keys your app uses to talk to other services.'],monitoring:['Monitoring','Visits to your app and problems on its server.']}[tab]),el('p','mg-loading','Loading…'));
+ const done=(...nodes)=>{if(mgUi.tab!==tab)return;body.querySelector('.mg-loading')?.remove();body.append(...nodes)};
+ const fail=err=>done(el('p','error',err.message));
+ let settings=null;
+ if(tab!=='monitoring'){try{settings=(await api('/projects/'+p.id+'/settings')).settings}catch(err){if(tab!=='connectors')return fail(err)}}
+ const owner=p.role==='owner'||!p.role,viewer=p.role==='viewer';
+ if(tab==='connectors'){
+  const list=CONNECTORS.filter(c=>!c.owner||owner);
+  const groups=[...new Set(list.map(c=>CN_GROUP[c.id]||'More apps'))];
+  const find=el('label','tp-search mg-search');find.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+  const q=document.createElement('input');q.type='search';q.placeholder='Search';q.value=mgUi.q;q.setAttribute('aria-label','Search connectors');find.append(q);
+  const pills=el('div','mg-pills'),rows=el('ul','mg-rows');
+  const draw=()=>{
+   pills.replaceChildren();
+   for(const g of ['All',...groups]){const b=el('button',null,g);b.type='button';b.setAttribute('aria-pressed',String(mgUi.group===g));b.onclick=()=>{mgUi.group=g;draw()};pills.append(b)}
+   rows.replaceChildren();const words=mgUi.q.toLowerCase();
+   for(const c of list.filter(c=>(mgUi.group==='All'||(CN_GROUP[c.id]||'More apps')===mgUi.group)&&(!words||(c.name+' '+c.desc).toLowerCase().includes(words)))){
+    const st=settings?cnStatus(c,settings):'open',li=el('li','mg-row');
+    const ic=el('span','tp-ic cn-ic',{apps:'+',secrets:'K',mcp:'M'}[c.id]||c.name.slice(0,1));ic.dataset.id=c.id;ic.setAttribute('aria-hidden','true');
+    const t=el('div','mg-row-t');t.append(el('b',null,c.name),el('span',null,c.desc));
+    li.append(ic,t);
+    const on=st==='on'||st.startsWith('n:');
+    if(st==='admin')li.append(el('span','mg-wait','Set up by your admin'));
+    else{
+     if(on)li.append(el('span','mg-on',st==='on'?'✓ Connected':'✓ '+st.slice(2)+' added'));
+     const go=el('button',on?'mg-link':'mg-add',on?'Manage':st==='open'?'Open':'+ Add');go.type='button';go.disabled=viewer;go.onclick=()=>c.open();li.append(go);
+    }
+    rows.append(li);
+   }
+   if(!rows.childElementCount)rows.append(el('li','mg-empty','Nothing matches. Try "744 apps" for more services.'));
+  };
+  q.oninput=()=>{mgUi.q=q.value.trim();draw()};
+  draw();done(find,pills,rows);
+ }else if(tab==='payments'){
+  const sec=settings?.secrets||{},on=Boolean(sec.stripe_secret_key?.set);
+  const card=el('div','mg-card mg-stripe');const ic=el('span','mg-logo','S');ic.setAttribute('aria-hidden','true');
+  const t=el('div','mg-row-t');t.append(el('b',null,on?'Stripe is connected':'Take payments with Stripe'),el('span',null,on?'Payments go straight to your Stripe account.':'Connect your own Stripe account to take card payments and subscriptions.'));
+  const go=el('button',on?'mg-link':'mg-add',on?'Manage':'Add Stripe');go.type='button';go.disabled=!owner;go.onclick=()=>openSettingsAt('stripe-key');
+  card.append(ic,t,go);
+  const nodes=[card];
+  if(settings?.stripe_webhook_url){
+   const hook=el('div','mg-card mg-field');hook.append(el('b',null,'Webhook address for Stripe'),el('span','muted small','In Stripe, add this address under Developers → Webhooks'+((settings.stripe_events||[]).length?', for: '+settings.stripe_events.join(', ')+'.':'.')));
+   const row=el('div','mg-copy'),inp=document.createElement('input');inp.readOnly=true;inp.value=settings.stripe_webhook_url;inp.setAttribute('aria-label','Webhook address');
+   const cp=el('button','mg-link','Copy');cp.type='button';cp.onclick=async()=>{try{await navigator.clipboard.writeText(inp.value);cp.textContent='Copied';setTimeout(()=>cp.textContent='Copy',1400)}catch{inp.select()}};
+   row.append(inp,cp);hook.append(row);nodes.push(hook);
+  }
+  try{const d=await api('/projects/'+p.id+'/data');if((d.features?.payments||[]).length)nodes.push(el('p','mg-note',(d.payments||[]).length+' purchase'+((d.payments||[]).length===1?'':'s')+' so far, of '+d.features.payments.join(', ')+'.'))}catch{}
+  const faq=el('div','mg-card mg-faq');
+  for(const [q,a] of [['How do I test first?','Use a test key (it starts with sk_test_). Switch to your live key when you are ready to take real money.'],['Where does the money go?','Straight to your own Stripe account. Kairoq does not hold it.'],['Is my key safe?',settings?.encryption?'It is stored encrypted and never shown again after you save it.':'It is never shown again after you save it.']]){const d=el('details');d.append(el('summary',null,q),el('p',null,a));faq.append(d)}
+  nodes.push(faq);done(...nodes);
+ }else if(tab==='secrets'){
+  if(!owner)return done(el('p','mg-note','Only the project owner can see and change its keys.'));
+  let mine=[];try{mine=(await api('/projects/'+p.id+'/secrets')).secrets||[]}catch(err){return fail(err)}
+  const card=el('div','mg-card'),top=el('div','mg-card-top');top.append(el('b',null,'Your keys'),el('span','muted small','Your app’s server functions read these by name. Values are never shown again.'));card.append(top);
+  const rows=el('ul','mg-keys');
+  for(const k of mine){const li=el('li');li.append(el('code',null,k.name),el('span','mg-mask','••••••••'+(k.hint||'')),el('span','muted small',k.at?new Date(k.at).toLocaleDateString([], {dateStyle:'medium'}):''));
+   const rm=el('button','mg-link mg-rm','Remove');rm.type='button';rm.onclick=async()=>{if(!confirmRemove(rm))return;try{await api('/projects/'+p.id+'/secrets',{method:'POST',body:{name:k.name,value:null}});renderManage()}catch(err){text(err_,err.message)}};li.append(rm);rows.append(li)}
+  if(!mine.length)rows.append(el('li','mg-empty','No keys yet.'));
+  const form=el('form','mg-addkey'),nm=document.createElement('input'),val=document.createElement('input');
+  nm.placeholder='NAME, like MAPS_KEY';nm.setAttribute('aria-label','Key name');nm.autocomplete='off';
+  val.type='password';val.placeholder='Value';val.setAttribute('aria-label','Key value');val.autocomplete='off';
+  const add=el('button','mg-add','+ Add');add.type='submit';const err_=el('p','error');
+  form.append(nm,val,add);
+  form.onsubmit=async e=>{e.preventDefault();text(err_,'');add.disabled=true;try{await api('/projects/'+p.id+'/secrets',{method:'POST',body:{name:nm.value,value:val.value}});renderManage()}catch(err){text(err_,err.message);add.disabled=false}};
+  card.append(rows,form,err_);
+  const sys=el('div','mg-card'),st=el('div','mg-card-top');st.append(el('b',null,'Built-in keys'),el('span','muted small','Set from Connectors.'));sys.append(st);
+  const sl=el('ul','mg-keys');const sec=settings?.secrets||{};
+  for(const [k,label] of [['github_token','GitHub'],['stripe_secret_key','Stripe key'],['stripe_webhook_secret','Stripe webhook secret']]){const li=el('li');li.append(el('span',null,label),el('span',sec[k]?.set?'mg-on':'muted small',sec[k]?.set?'✓ Set':'Not set'));sl.append(li)}
+  sys.append(sl);done(card,sys);
+ }else{
+  const live=(p.urls||[]).length>0;
+  const nodes=[];
+  if(!live){const c=el('div','mg-card mg-publish');c.append(el('b',null,'Publish to see real visitors'),el('span','muted small','Visits are counted on your published app.'));const b=el('button','mg-add','Publish');b.type='button';b.disabled=viewer;b.onclick=()=>$('publish-open').click();c.append(b);nodes.push(c)}
+  try{
+   const [{analytics:a},{logs}]=await Promise.all([api('/projects/'+p.id+'/analytics'),api('/projects/'+p.id+'/logs')]);
+   const stats=el('div','mg-stats');
+   const tile=(label,n)=>{const t=el('div','mg-card mg-stat');t.append(el('span','muted small',label),el('b',null,String(n)));return t};
+   stats.append(tile('Visits, 30 days',a.totals?.views||0),tile('Visitors, 30 days',a.totals?.visitors||0),tile('Server problems',(logs||[]).filter(l=>l.level==='error').length));
+   nodes.push(stats);
+   const max=Math.max(1,...a.series.map(x=>x.views)),bars=el('div','mg-card mg-chart');bars.setAttribute('aria-label','Visits per day, last 30 days');
+   for(const x of a.series){const i=el('i');i.style.height=Math.max(2,Math.round(x.views/max*100))+'%';i.title=x.day+': '+x.views+' visit'+(x.views===1?'':'s');bars.append(i)}
+   nodes.push(bars);
+   if((a.referrers||[]).length){const r=el('div','mg-card'),ul=el('ul','mg-keys');r.append(el('b',null,'Where visitors come from'));for(const x of a.referrers){const li=el('li');li.append(el('span',null,x.referrer),el('span','muted small',x.views+' visit'+(x.views===1?'':'s')));ul.append(li)}r.append(ul);nodes.push(r)}
+   const lg=el('div','mg-card'),ul=el('ul','mg-logs');lg.append(el('b',null,'Recent server messages'));
+   for(const l of (logs||[]).slice(-15).reverse()){const li=el('li','lv-'+(l.level||'info'));li.append(el('i'),el('span','mg-log-m',l.message),el('span','muted small',(l.source?l.source+' · ':'')+when(l.at)));ul.append(li)}
+   if(!(logs||[]).length)ul.append(el('li','mg-empty','No problems reported.'));
+   lg.append(ul);nodes.push(lg);
+  }catch(err){nodes.push(el('p','error',err.message))}
+  done(...nodes);
+ }
+}
+function confirmRemove(b){if(b.dataset.sure)return true;b.dataset.sure='1';b.textContent='Remove?';setTimeout(()=>{delete b.dataset.sure;b.textContent='Remove'},3000);return false}
 async function renderData(){
  const d=await api('/projects/'+state.project.id+'/data');
  const list=$('collections');list.replaceChildren();
@@ -3785,18 +3902,7 @@ async function openSettingsAt(id){
  if(el.tagName==='DETAILS')el.open=true;
  el.scrollIntoView({block:'center'});if(el.focus&&el.tagName!=='DETAILS')el.focus({preventScroll:true});
 }
-$('connect-open').onclick=()=>{
- const ul=$('connectors-list');ul.replaceChildren();
- for(const c of CONNECTORS){
-  if(c.owner&&state.project.role!=='owner')continue;
-  const li=el('li','connector'),ico=el('span','connector-ico',c.name.slice(0,1));ico.dataset.id=c.id;
-  const t=el('div','skill-text');t.append(el('b',null,c.name),el('span',null,c.desc));
-  const go=el('button','ghost',c.id==='github'?'Connect':'Open');go.type='button';
-  go.onclick=()=>{if(!['github','stripe','email','secrets','mcp'].includes(c.id))$('connectors-dialog').close();c.open()};
-  li.append(ico,t,go);ul.append(li);
- }
- $('connectors-dialog').showModal();
-};
+$('connect-open').onclick=()=>openManage('connectors');
 // "744 apps" (integrations.js): search a service, pick what should happen, and Kairoq adds it.
 let appsTimer=null;
 const CONNECT_LABEL={key:'Works with an API key',oauth:'Connect with your account (sign in on its own page)',none:'No sign-in needed'};

@@ -117,3 +117,15 @@ test("work and replies like Emergent: step rows, a finished line, next steps tha
   assert.match(css, /#messages \.rail \.ev\{position:relative;display:flex!important/);
   assert.match(css, /#chat-form \.idea-chip\.idea-row\{display:flex!important/);
 });
+
+test("settings live in the preview area like Emergent: Connectors, Payments, Secrets, Monitoring from real project data", () => {
+  const js = read("create.js"), html = read("create.html");
+  assert.match(html, /<button type="button" id="view-manage" aria-pressed="false"/);
+  for (const t of ["connectors", "payments", "secrets", "monitoring"]) assert.match(html, new RegExp('data-mg="' + t + '"'));
+  assert.match(html, /id="composer-connect"/);
+  assert.match(js, /settings=\(await api\('\/projects\/'\+p\.id\+'\/settings'\)\)\.settings/);
+  assert.match(js, /mine=\(await api\('\/projects\/'\+p\.id\+'\/secrets'\)\)\.secrets/);
+  assert.match(js, /api\('\/projects\/'\+p\.id\+'\/analytics'\),api\('\/projects\/'\+p\.id\+'\/logs'\)/);
+  assert.match(js, /\$\('connect-open'\)\.onclick=\(\)=>openManage\('connectors'\);/);
+  assert.match(read("ui/forma.css"), /#canvas\[data-view\]:not\(\[data-view=preview\]\)>#device\{display:none!important\}/);
+});

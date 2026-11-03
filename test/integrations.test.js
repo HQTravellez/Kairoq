@@ -50,7 +50,7 @@ test('"Connect another app": search, pick what should happen, and Kairoq is aske
   await page.goto('http://127.0.0.1:'+server.address().port+'/create?project='+meta.id,{waitUntil:'domcontentloaded'});
   await page.waitForTimeout(1500);
   await page.click('#menu-project summary');await page.click('#connect-open');
-  await page.locator('.connector:has-text("744 apps") button').click();
+  await page.locator('.mg-row:has-text("744 apps") button').click();
   await page.fill('#apps-search','sendgrid');
   await page.waitForSelector('.apps-item:has-text("SendGrid")');
   await page.locator('.apps-item:has-text("SendGrid")').first().click();
@@ -62,7 +62,7 @@ test('"Connect another app": search, pick what should happen, and Kairoq is aske
   for(let i=0;i<100&&!built.length;i++)await new Promise(r=>setTimeout(r,200));
   // A service that signs in with OAuth: "Use your own OAuth app" with the return address.
   await page.click('#menu-project summary');await page.click('#connect-open');
-  await page.locator('.connector:has-text("744 apps") button').click();
+  await page.locator('.mg-row:has-text("744 apps") button').click();
   await page.fill('#apps-search','hubspot');
   await page.waitForSelector('.apps-item:has-text("HubSpot")');await page.locator('.apps-item:has-text("HubSpot")').first().click();
   await page.waitForSelector('.oauth-own');
