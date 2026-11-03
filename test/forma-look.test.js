@@ -76,3 +76,11 @@ test("the editor follows the App builder frame: light second rows, a browser win
   assert.match(css, /#messages>li\.assistant::before\{content:"Kairoq"!important/);
   assert.match(css, /\.fm-sub \.tabs-seg button\[aria-pressed=true\]\{color:var\(--c-accent\)!important\}/);
 });
+
+test("Kairoq's thinking shows: purple breathing dots and a shimmer on 'is thinking…', with no extra label", () => {
+  const css = read("ui/forma.css");
+  assert.match(css, /#messages>li\.work::before\{content:none!important/);
+  assert.match(css, /\.k-grid i,html body\.app \.k-dots i\{background:var\(--c-accent/);
+  assert.match(css, /\.status-line:not\(\.done\) \.status-text\{background:linear-gradient/);
+  assert.match(css, /@keyframes fm-think/);
+});
