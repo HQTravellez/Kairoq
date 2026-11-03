@@ -33,6 +33,8 @@ function show(screen){
  if(screen==='agents-screen')$('side-agents').setAttribute('aria-current','page');
  if(screen==='connectors-screen')$('side-connectors').setAttribute('aria-current','page');
  if(screen==='templates-screen')$('side-templates').setAttribute('aria-current','page');
+ // A page under "More tools" keeps that group open so the current page stays visible.
+ if(document.querySelector('#side-more [aria-current]'))$('side-more').open=true;
  if(screen==='settings-screen'||screen==='pricing-screen')$('side-settings').setAttribute('aria-current','page');
  if(screen==='home')$('side-projects').setAttribute('aria-current','page');
 }

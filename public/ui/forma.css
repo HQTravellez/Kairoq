@@ -1034,3 +1034,13 @@ html body.app .st-plan-foot:has(>span:empty){display:none}
 /* Editor: the version picker shows its whole name ("v1 · Starter page") on a laptop. */
 @media (min-width:1101px){html body.app.in-editor #editor .bar-tools #versions{max-width:240px!important;width:auto!important}}
 @media (max-width:900px){html body.app.in-editor #editor{--ideas-gutter:12px}}
+/* Home details: the project search lines up with the tabs and sort; rarely used tools sit under "More tools". */
+@media (min-width:901px){html body.app #home .pj-search{margin:0!important;align-self:center!important}}
+html body.app #side .side-nav button#side-new .ico{color:#fff!important;opacity:1}
+html body.app #side .side-more>summary{list-style:none;display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:8px;cursor:pointer;color:var(--f-chrome-ink);font:inherit;font-size:14px}
+html body.app #side .side-more>summary::-webkit-details-marker{display:none}
+html body.app #side .side-more>summary:hover{background:var(--f-chrome-2);color:#fff}
+html body.app #side .side-more>summary::after{content:"";margin-left:auto;width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);opacity:.6;transition:transform .15s}
+html body.app #side .side-more[open]>summary::after{transform:rotate(45deg)}
+html body.app #side .side-more>summary .ico{width:16px;height:16px;flex:none;fill:currentColor;stroke:none}
+html body.app #side .side-more>button{width:100%}
