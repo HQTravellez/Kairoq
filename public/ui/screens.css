@@ -284,51 +284,52 @@ body:not(.app) #auth .foot .brand-foot{font-weight:600;color:#1B1D22}
 /* =====================================================================
    6. Sign in / Create account / Reset password (#auth-dialog)
    ===================================================================== */
-body:not(.app) #auth #auth-dialog{width:min(420px,calc(100vw - 32px))!important;max-width:none!important;margin:auto!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;overflow:visible}
-body:not(.app) #auth #auth-dialog::backdrop{background:rgba(17,24,39,.35);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
-body:not(.app) #auth #auth-dialog .auth-card{position:relative;display:flex!important;flex-direction:column;gap:0;width:auto!important;max-width:none!important;margin:0!important;padding:32px 28px 24px!important;background:var(--c-panel)!important;border:0!important;border-radius:16px!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.25),0 0 0 1px rgba(16,24,40,.04)!important;color:var(--c-ink)}
+body:not(.app) #auth #auth-dialog:not(.fm-auth){width:min(420px,calc(100vw - 32px))!important;max-width:none!important;margin:auto!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;overflow:visible}
+body:not(.app) #auth #auth-dialog:not(.fm-auth)::backdrop{background:rgba(17,24,39,.35);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .auth-card{position:relative;display:flex!important;flex-direction:column;gap:0;width:auto!important;max-width:none!important;margin:0!important;padding:32px 28px 24px!important;background:var(--c-panel)!important;border:0!important;border-radius:16px!important;box-shadow:0 24px 48px -16px rgba(16,24,40,.25),0 0 0 1px rgba(16,24,40,.04)!important;color:var(--c-ink)}
 /* The brand mark above the title. */
-body:not(.app) #auth #auth-dialog .auth-card::before{content:"K";display:grid;place-items:center;width:36px;height:36px;margin:0 auto 14px;border-radius:10px;background:var(--c-accent);color:#fff;font:700 16px/1 Geist,ui-sans-serif,system-ui,sans-serif}
-body:not(.app) #auth #auth-dialog #auth-title{margin:0 0 6px!important;padding:0 24px;font-size:20px!important;line-height:1.25!important;font-weight:600!important;letter-spacing:-.01em!important;text-align:center;color:#1B1D22!important}
-body:not(.app) #auth #auth-dialog #auth-title::after{content:"Build apps and websites by chatting.";display:block;margin-top:6px;font-size:14px;font-weight:400;letter-spacing:0;color:var(--c-ink-3)}
-body:not(.app) #auth #auth-dialog .auth-close{position:absolute!important;top:12px!important;right:12px!important;left:auto!important;width:32px!important;height:32px!important;padding:0!important;display:grid!important;place-items:center;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-3)!important;font-size:20px!important;line-height:1!important;box-shadow:none!important;outline:0}
-body:not(.app) #auth #auth-dialog .auth-close:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
-body:not(.app) #auth #auth-dialog .auth-close:focus-visible{outline:2px solid var(--c-accent)!important;outline-offset:1px}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .auth-card::before{content:"K";display:grid;place-items:center;width:36px;height:36px;margin:0 auto 14px;border-radius:10px;background:var(--c-accent);color:#fff;font:700 16px/1 Geist,ui-sans-serif,system-ui,sans-serif}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) #auth-title{margin:0 0 6px!important;padding:0 24px;font-size:20px!important;line-height:1.25!important;font-weight:600!important;letter-spacing:-.01em!important;text-align:center;color:#1B1D22!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) #auth-title::after{content:"Build apps and websites by chatting.";display:block;margin-top:6px;font-size:14px;font-weight:400;letter-spacing:0;color:var(--c-ink-3)}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .auth-close{position:absolute!important;top:12px!important;right:12px!important;left:auto!important;width:32px!important;height:32px!important;padding:0!important;display:grid!important;place-items:center;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-3)!important;font-size:20px!important;line-height:1!important;box-shadow:none!important;outline:0}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .auth-close:hover{background:var(--c-raise)!important;color:var(--c-ink)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .auth-close:focus-visible{outline:2px solid var(--c-accent)!important;outline-offset:1px}
 /* Create account | Sign in: one segmented control, full width. */
-body:not(.app) #auth #auth-dialog .tabs{display:grid!important;grid-template-columns:1fr 1fr;gap:2px;width:100%;margin:20px 0 18px!important;padding:3px!important;border:0!important;border-radius:10px!important;background:var(--c-raise)!important;box-shadow:inset 0 0 0 1px var(--c-line)!important}
-body:not(.app) #auth #auth-dialog .tabs:has(#tab-signup.hidden){grid-template-columns:1fr}
-body:not(.app) #auth #auth-dialog .tabs button{height:32px!important;padding:0 10px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2)!important;font-size:13.5px!important;font-weight:500!important;box-shadow:none!important}
-body:not(.app) #auth #auth-dialog .tabs button[aria-selected=true]{background:var(--c-panel)!important;color:#1B1D22!important;box-shadow:0 1px 2px rgba(16,24,40,.08),0 0 0 1px var(--c-line)!important}
-body:not(.app) #auth #auth-dialog form{display:flex!important;flex-direction:column;gap:14px!important;margin:0!important}
-body:not(.app) #auth #auth-dialog form.hidden{display:none!important}
-body:not(.app) #auth #auth-dialog label{display:flex!important;flex-direction:column;gap:6px!important;font-size:13px!important;font-weight:500!important;color:var(--c-ink-2)!important}
-body:not(.app) #auth #auth-dialog input{height:40px!important;width:100%;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:14.5px!important;box-shadow:none!important;transition:border-color .12s ease,box-shadow .12s ease}
-body:not(.app) #auth #auth-dialog input:focus{outline:0!important;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
-body:not(.app) #auth #auth-dialog .primary{height:40px!important;width:100%;margin-top:4px!important;padding:0 14px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font-size:14px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
-body:not(.app) #auth #auth-dialog .primary:hover{background:var(--c-accent-2)!important}
-body:not(.app) #auth #auth-dialog .primary:disabled{opacity:.6}
-body:not(.app) #auth #auth-dialog .primary:focus-visible{outline:2px solid var(--c-accent);outline-offset:2px}
-body:not(.app) #auth #auth-dialog #free-note{margin:-4px 0 0!important;text-align:center;font-size:12.5px!important;color:var(--c-ink-3)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .tabs{display:grid!important;grid-template-columns:1fr 1fr;gap:2px;width:100%;margin:20px 0 18px!important;padding:3px!important;border:0!important;border-radius:10px!important;background:var(--c-raise)!important;box-shadow:inset 0 0 0 1px var(--c-line)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .tabs:has(#tab-signup.hidden){grid-template-columns:1fr}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .tabs button{height:32px!important;padding:0 10px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--c-ink-2)!important;font-size:13.5px!important;font-weight:500!important;box-shadow:none!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .tabs button[aria-selected=true]{background:var(--c-panel)!important;color:#1B1D22!important;box-shadow:0 1px 2px rgba(16,24,40,.08),0 0 0 1px var(--c-line)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) form{display:flex!important;flex-direction:column;gap:14px!important;margin:0!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) form.hidden{display:none!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) label{display:flex!important;flex-direction:column;gap:6px!important;font-size:13px!important;font-weight:500!important;color:var(--c-ink-2)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) input{height:40px!important;width:100%;padding:0 12px!important;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:var(--c-ink)!important;font-size:14.5px!important;box-shadow:none!important;transition:border-color .12s ease,box-shadow .12s ease}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) input:focus{outline:0!important;border-color:var(--c-accent)!important;box-shadow:0 0 0 3px rgba(10,42,82,.12)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .primary{height:40px!important;width:100%;margin-top:4px!important;padding:0 14px!important;border:0!important;border-radius:10px!important;background:var(--c-accent)!important;color:#fff!important;font-size:14px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,24,40,.12)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .primary:hover{background:var(--c-accent-2)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .primary:disabled{opacity:.6}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .primary:focus-visible{outline:2px solid var(--c-accent);outline-offset:2px}
+/* Behaviour rules (which form shows) apply to every sign-in design; the look rules below are for the older card only, so the Figma sign-in (forma.css, .fm-auth) shows in full. */
+body:not(.app) #auth #auth-dialog:not(.fm-auth) #free-note{margin:-4px 0 0!important;text-align:center;font-size:12.5px!important;color:var(--c-ink-3)!important}
 body:not(.app) #auth #auth-dialog #free-note:empty,body:not(.app) #auth #auth-dialog .error:empty,body:not(.app) #auth #auth-dialog #forgot-status:empty{display:none}
-body:not(.app) #auth #auth-dialog .error{margin:0!important;padding:9px 12px;border-radius:10px;background:rgba(194,65,45,.08);color:#C2412D!important;font-size:13px!important}
-body:not(.app) #auth #auth-dialog #forgot-status{margin:0!important;font-size:13px;color:var(--c-ink-2)}
-body:not(.app) #auth #auth-dialog .link-btn{align-self:center;height:auto!important;padding:2px 4px!important;border:0!important;background:none!important;color:var(--c-ink-2)!important;font-size:13px!important;font-weight:500!important;text-decoration:none!important;box-shadow:none!important}
-body:not(.app) #auth #auth-dialog .link-btn:hover{color:var(--c-accent)!important;text-decoration:underline!important}
-body:not(.app) #auth #auth-dialog #forgot-form>p.muted,body:not(.app) #auth #auth-dialog #reset-form>p.muted{margin:0!important;font-size:13.5px!important;line-height:1.5;color:var(--c-ink-2)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .error{margin:0!important;padding:9px 12px;border-radius:10px;background:rgba(194,65,45,.08);color:#C2412D!important;font-size:13px!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) #forgot-status{margin:0!important;font-size:13px;color:var(--c-ink-2)}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .link-btn{align-self:center;height:auto!important;padding:2px 4px!important;border:0!important;background:none!important;color:var(--c-ink-2)!important;font-size:13px!important;font-weight:500!important;text-decoration:none!important;box-shadow:none!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .link-btn:hover{color:var(--c-accent)!important;text-decoration:underline!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) #forgot-form>p.muted,body:not(.app) #auth #auth-dialog:not(.fm-auth) #reset-form>p.muted{margin:0!important;font-size:13.5px!important;line-height:1.5;color:var(--c-ink-2)!important}
 /* Forgot password is only offered when signing in; while it is open, the sign-in form steps aside. */
 body:not(.app) #auth #auth-dialog:has(#tab-signup[aria-selected=true]) #forgot-open{display:none!important}
 body:not(.app) #auth #auth-dialog:has(#forgot-form:not(.hidden)) #auth-form,body:not(.app) #auth #auth-dialog:has(#reset-form:not(.hidden)) .tabs{display:none!important}
-body:not(.app) #auth #auth-dialog:has(#reset-form:not(.hidden)) #auth-title{margin-bottom:20px!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth):has(#reset-form:not(.hidden)) #auth-title{margin-bottom:20px!important}
 /* Google: a secondary button with an "or" rule above it. */
-body:not(.app) #auth #auth-dialog .google{order:5;display:flex!important;align-items:center;justify-content:center;gap:8px;height:40px;margin-top:18px;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:#1B1D22!important;font-size:14px;font-weight:500;text-decoration:none;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
-body:not(.app) #auth #auth-dialog .google.hidden{display:none!important}
-body:not(.app) #auth #auth-dialog .google:hover{background:var(--c-raise)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .google{order:5;display:flex!important;align-items:center;justify-content:center;gap:8px;height:40px;margin-top:18px;border:1px solid var(--c-line-2)!important;border-radius:10px!important;background:var(--c-panel)!important;color:#1B1D22!important;font-size:14px;font-weight:500;text-decoration:none;box-shadow:0 1px 2px rgba(16,24,40,.05)!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .google.hidden{display:none!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) .google:hover{background:var(--c-raise)!important}
 @media (max-width:640px){
- body:not(.app) #auth #auth-dialog .auth-card{padding:28px 20px 20px!important}
+ body:not(.app) #auth #auth-dialog:not(.fm-auth) .auth-card{padding:28px 20px 20px!important}
 }
-body:not(.app) #auth #auth-dialog:has(#forgot-form:not(.hidden)) #auth-title::after,body:not(.app) #auth #auth-dialog:has(#reset-form:not(.hidden)) #auth-title::after{content:none}
-body:not(.app) #auth #auth-dialog #reset-form>p.muted{display:none!important}
-body:not(.app) #auth #auth-dialog label{margin:0!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth):has(#forgot-form:not(.hidden)) #auth-title::after,body:not(.app) #auth #auth-dialog:not(.fm-auth):has(#reset-form:not(.hidden)) #auth-title::after{content:none}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) #reset-form>p.muted{display:none!important}
+body:not(.app) #auth #auth-dialog:not(.fm-auth) label{margin:0!important}
 @media (max-width:640px){
  body:not(.app) #auth .hero .eyebrow{max-width:calc(100% - 16px);text-align:center;text-wrap:balance;justify-content:center}
  body:not(.app) #auth .hero-trust{gap:6px 14px!important;font-size:12.5px!important}
