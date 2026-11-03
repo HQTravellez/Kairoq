@@ -1189,10 +1189,21 @@ function renderIdeas(m){
  for(const idea of can&&Array.isArray(m.ideas)?m.ideas:[])chips.push({label:idea,ask:/^(add|make|create|build|show|let|use|turn|put|change|connect|allow|improve|redesign|translate|write)\b/i.test(idea)?idea:'Add '+idea.charAt(0).toLowerCase()+idea.slice(1)});
  const ideas=chips.slice(0,3);
  box.classList.toggle('hidden',!ideas.length);
+ // Like Emergent: rows with a +; a click puts the step in the message box to send or change.
  for(const {label:idea,ask} of ideas){
-  const b=el('button','idea-chip',idea);b.type='button';b.title='Build this: '+ask;
-  b.onclick=()=>{box.classList.add('hidden');send(ask,'build')};box.append(b);
+  const b=el('button','idea-chip idea-row');b.type='button';b.title='Add to your message';
+  const plus=el('span','idea-plus');plus.setAttribute('aria-hidden','true');plus.innerHTML='<svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>';
+  b.append(plus,el('span','idea-text',idea));
+  b.onclick=()=>{const t=$('chat-input');t.value=ask;t.dispatchEvent(new Event('input',{bubbles:true}));box.classList.add('hidden');t.focus();t.setSelectionRange(t.value.length,t.value.length)};
+  box.append(b);
  }
+}
+function doneLine(m){
+ const li=el('li','agent-done');li.setAttribute('role','presentation');
+ const t=m.at?new Date(m.at):null,ok=t&&!isNaN(t);
+ li.append(el('span','agent-done-t','Kairoq Agent finished'),el('span','agent-done-line'),el('time','agent-done-at',ok?t.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''));
+ if(ok)li.querySelector('time').dateTime=t.toISOString();
+ return li;
 }
 function renderMessages(pendingText){
  const list=$('messages');list.replaceChildren();
@@ -1201,6 +1212,9 @@ function renderMessages(pendingText){
  const questionIndex=msgs.findLastIndex(m=>m.role==='assistant'&&m.question&&m.question.text===state.project.pending_question?.text);
  msgs.forEach((m,i)=>list.append(messageItem(m,i===msgs.length-1||i===questionIndex,i)));
  if(pendingText)list.append(messageItem({role:'user',text:pendingText}));
+ // Like Emergent: a quiet "finished" line under the last piece of work.
+ const end=msgs[msgs.length-1];
+ if(!pendingText&&!state.job&&end&&end.role==='assistant'&&end.duration_ms!=null&&!end.failed)list.append(doneLine(end));
  renderIdeas(pendingText?null:msgs[msgs.length-1]);
  list.scrollTop=list.scrollHeight;
  renderErrors();
@@ -1243,7 +1257,11 @@ function messageItem(m,last,index){
    const label=m.duration_ms!=null&&steps?'Worked for '+secsShort(m.duration_ms)+' · '+steps+' step'+(steps===1?'':'s'):thoughtMs!=null?'Thought for '+secsShort(thoughtMs):'Worked for '+secsShort(m.duration_ms||0);
    const b=el('button','status-line done');b.type='button';b.setAttribute('aria-expanded','false');b.append(el('span','agent-name','Kairoq Agent'),el('span','status-text',label),icon('chev'));
    const rail=el('ol','rail done'),fold=el('div','fold');fold.append(rail);
-   b.onclick=()=>{if(!rail.childElementCount)for(const e of tl)rail.append(eventRow(e,{expand:false,version:m.version}));const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
+   // Like Emergent: each step is a slim row (an icon, what was done, the file); an edit opens its diff.
+   // The latest reply shows its steps; older replies keep them folded.
+   const fill=()=>{if(!rail.childElementCount)for(const e of tl.filter(e=>e.t!=='think'||e.text))rail.append(eventRow(e,{expand:true,version:m.version}))};
+   b.onclick=()=>{fill();const open=fold.classList.toggle('open');b.setAttribute('aria-expanded',String(open))};
+   if(last&&tl.length&&index>=0){fill();fold.classList.add('open');b.setAttribute('aria-expanded','true')}
    li.append(b,fold);
   }
   const verdict=verdictCard(m.text,m);
@@ -2347,7 +2365,7 @@ async function watch(job){
   if(state.data)renderData();
  }
  }catch(err){text($('chat-error'),'The operation finished, but the conversation could not refresh. Reopen this project to load your saved messages.');}
- finally{if(state.watchToken===watchToken){state.job=null;work.job=null;busy(false);syncSend();}}
+ finally{if(state.watchToken===watchToken){state.job=null;work.job=null;busy(false);syncSend();const end=state.project?.messages?.at(-1),list=$('messages');if(end&&end.role==='assistant'&&end.duration_ms!=null&&!end.failed&&list&&!list.querySelector('.agent-done')){list.append(doneLine(end));list.scrollTop=list.scrollHeight}}}
  return done;
 }
 // ---------- mobile app ----------

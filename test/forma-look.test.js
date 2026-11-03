@@ -107,3 +107,13 @@ test("the plan card and look picker are slim like the question panel", () => {
   const look = read("create-look.js");
   assert.match(look, /opt\('kairoq','Design it for me','Kairoq picks a direction for this business and shows it',data\.brand\?null:'Suggested'\)/);
 });
+
+test("work and replies like Emergent: step rows, a finished line, next steps that fill the message box", () => {
+  const js = read("create.js"), css = read("ui/forma.css");
+  assert.match(js, /if\(last&&tl\.length&&index>=0\)\{fill\(\);fold\.classList\.add\('open'\)/, "the latest reply shows its steps");
+  assert.match(js, /rail\.append\(eventRow\(e,\{expand:true,version:m\.version\}\)\)/, "an edit opens its diff");
+  assert.match(js, /el\('span','agent-done-t','Kairoq Agent finished'\)/);
+  assert.match(js, /b\.onclick=\(\)=>\{const t=\$\('chat-input'\);t\.value=ask;/, "a next step goes into the message box, nothing is spent");
+  assert.match(css, /#messages \.rail \.ev\{position:relative;display:flex!important/);
+  assert.match(css, /#chat-form \.idea-chip\.idea-row\{display:flex!important/);
+});
