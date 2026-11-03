@@ -464,10 +464,14 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
     update({status:'researching'});
     // A short follow-up ("research it and tell me") is about the topic of the owner's last message.
     const askText=browserDecision.execute?browserDecision.message:message;
-    const prevAsk=String(message).trim().split(/\s+/).length<10?[...(builder.loadMeta(id).messages||[])].reverse().find(m=>m.role==='user'&&String(m.text||'').trim()!==String(message).trim()):null;
+    // Only when it names nothing of its own: "search actual xero and wave" is its own topic.
+    const web=require('./web');
+    const prevAsk=String(message).trim().split(/\s+/).length<10&&!web.keyWords(web.topicOf(askText)).length?[...(builder.loadMeta(id).messages||[])].reverse().find(m=>m.role==='user'&&String(m.text||'').trim()!==String(message).trim()):null;
     // Deciding what to look up runs on the free chat route (Kairoq Agent, free pool, NVIDIA, Gemini),
     // and research.js falls back to a plain search when no model answers.
-    research=await require('./web').gather(prevAsk&&!browserDecision.execute?String(prevAsk.text).slice(0,600)+'\n\n'+askText:askText,{callModel:(o,p)=>callModel({...o,tier:'chat',freeOnly:true},p),tier:'chat',signal,webSearch,browseSite,
+    // Each page Kairoq reads streams live into the owner's browser pane while it loads.
+    const live=require('./live-browser'),watched=(u,o)=>(browseSite||require('./runtime-check').session)(u,{...o,onPage:p=>live.watch(v.owner,p,'kairoq')});
+    research=await web.gather(prevAsk&&!browserDecision.execute?String(prevAsk.text).slice(0,600)+'\n\n'+askText:askText,{callModel:(o,p)=>callModel({...o,tier:'chat',freeOnly:true},p),tier:'chat',signal,webSearch,browseSite:browseSite||require('./runtime-check').available()?watched:undefined,
      onProgress:p=>update({status:'researching',progress:p}),
      onBrowser:b=>update({status:'researching',browser:b})
     }).catch(e=>{if(e.name==='AbortError'||signal.aborted)throw e;return{context:'',sources:[]}});
@@ -1198,6 +1202,9 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
    if(method==='GET')return send(res,200,{memory:mem.view(v.owner)}),true;
    if(method==='POST'){const b=await readJson(req,4000);return send(res,200,{memory:mem.edit(v.owner,b,{isOwner:v.kind==='owner'})}),true}
   }
+  // ----- the live browser pane: Kairoq's real browser screen, and the owner's own browsing -----
+  if(route==='/live-browser/stream'&&method==='GET')return require('./live-browser').stream(v.owner,req,res),true;
+  if(route==='/live-browser'&&method==='POST'){limitedKey('live-browser:'+v.owner,900,60000);const b=await readJson(req,2000);return send(res,200,{browser:await require('./live-browser').input(v.owner,b)}),true}
   // ----- web agent: tasks on other websites and watches that repeat them -----
   if(route==='/web-agent'||route.startsWith('/web-agent/')){
    const W=require('./web-tasks'),wm=/^\/web-agent\/watches(?:\/([a-f0-9]{8}))?$/.exec(route),rm=/^\/web-agent\/([0-9a-f-]{36})$/.exec(route);

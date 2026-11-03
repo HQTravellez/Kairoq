@@ -1,0 +1,52 @@
+/* Kairoq's browser pane: laid out like a real browser (tab, back/forward/reload, address bar,
+   the live page). Loaded after the other ui/*.css files, so these rules win. */
+body.app.in-editor #editor #web-browser-pane.kb{display:flex;flex-direction:column;background:#fff!important;border-left:1px solid var(--c-line)!important;color:var(--c-ink);min-width:0}
+body.app.in-editor #editor #web-browser-pane.kb.hidden{display:none!important}
+#web-browser-pane.kb svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* Tab strip */
+#web-browser-pane.kb .kb-tabs{display:flex;align-items:center;gap:6px;height:48px;min-height:48px;padding:0 8px 0 10px;border-bottom:1px solid var(--c-line)}
+#web-browser-pane.kb .kb-tab{display:flex;align-items:center;gap:8px;min-width:0;max-width:240px;height:32px;padding:0 12px;border-radius:9px;background:var(--c-raise);font-size:13px;font-weight:500;color:var(--c-ink)}
+#web-browser-pane.kb .kb-tab-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#web-browser-pane.kb .kb-dot{flex:0 0 7px;width:7px;height:7px;border-radius:999px;background:var(--c-line-2)}
+#web-browser-pane.kb .kb-dot.on{background:#1F8A5B}
+#web-browser-pane.kb .kb-dot.loading{background:var(--c-accent);animation:kb-pulse 1s ease-in-out infinite}
+#web-browser-pane.kb .kb-grow{flex:1}
+#web-browser-pane.kb .kb-icon{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--c-ink-2);cursor:pointer;text-decoration:none;box-shadow:none}
+#web-browser-pane.kb .kb-icon:hover{background:var(--c-raise);color:var(--c-ink)}
+#web-browser-pane.kb .kb-icon.hidden{display:none}
+#web-browser-pane.kb .kb-icon:focus-visible,#web-browser-pane.kb .kb-url:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--c-accent) 18%,transparent)}
+
+/* Address bar */
+#web-browser-pane.kb .kb-bar{display:flex;align-items:center;gap:2px;height:52px;min-height:52px;margin:0;padding:0 10px;border-bottom:1px solid var(--c-line)}
+#web-browser-pane.kb .kb-url{flex:1;min-width:0;height:36px;margin-left:6px;padding:0 14px;border:1px solid var(--c-line-2);border-radius:10px;background:#fff;color:var(--c-ink);font:400 14px/1 Geist,ui-sans-serif,system-ui,sans-serif}
+#web-browser-pane.kb .kb-url::placeholder{color:var(--c-ink-3)}
+#web-browser-pane.kb .kb-url:focus{border-color:var(--c-accent)}
+#web-browser-pane.kb.kb-busy .kb-bar .kb-icon,#web-browser-pane.kb.kb-busy .kb-url{opacity:.55;pointer-events:none}
+
+/* The live page */
+body.app.in-editor #editor #web-browser-pane.kb .web-browser-viewport{position:relative;flex:1;min-height:0;margin:0!important;padding:0;border-radius:0!important;box-shadow:none!important;background:#fff!important;overflow:auto}
+body.app.in-editor #editor #web-browser-pane.kb .web-browser-viewport>img{display:block;width:100%;height:auto;max-height:none;object-fit:initial;background:#fff!important;cursor:default;outline:none}
+body.app.in-editor #editor #web-browser-pane.kb .web-browser-viewport>img.hidden{display:none}
+body.app.in-editor #editor #web-browser-pane.kb .kb-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;color:var(--c-ink-2)!important;font-size:14px!important;line-height:1.5}
+body.app.in-editor #editor #web-browser-pane.kb .kb-empty.hidden{display:none}
+#web-browser-pane.kb .kb-empty svg{width:30px;height:30px;stroke-width:1.3;margin-bottom:6px;color:var(--c-ink-2)}
+body.app.in-editor #editor #web-browser-pane.kb .kb-empty strong{font-size:16px!important;font-weight:500!important;color:var(--c-ink)!important}
+#web-browser-pane.kb .kb-empty span{max-width:300px}
+
+/* "Kairoq is browsing" while research runs: one quiet line, not a log */
+#web-browser-pane.kb .kb-driving{position:sticky;bottom:14px;margin:0 auto;width:max-content;max-width:calc(100% - 28px);display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(27,29,34,.88);color:#fff;font-size:13px;box-shadow:0 12px 32px -12px rgba(16,24,40,.45);backdrop-filter:blur(6px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
+#web-browser-pane.kb .kb-driving.hidden{display:none}
+#web-browser-pane.kb .kb-spin{flex:0 0 12px;width:12px;height:12px;border-radius:999px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:kb-spin .8s linear infinite}
+body.app.in-editor #editor #web-browser-pane.kb .web-browser-status{position:absolute;top:12px;left:12px;right:12px;padding:10px 12px;border-radius:10px!important;background:#fff!important;border:1px solid var(--c-line-2);font:400 13px/1.5 Geist,ui-sans-serif,system-ui,sans-serif!important;color:var(--c-ink)}
+body.app.in-editor #editor #web-browser-pane.kb .web-browser-status.hidden{display:none}
+@keyframes kb-spin{to{transform:rotate(360deg)}}
+@keyframes kb-pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){#web-browser-pane.kb .kb-spin,#web-browser-pane.kb .kb-dot.loading{animation:none}}
+
+/* Under a researched answer: one quiet line of the sites it read */
+body.app.in-editor #editor #messages .sources{display:flex;flex-wrap:wrap;align-items:center;gap:4px 0;margin:12px 0 0!important;font-size:12.5px;color:var(--c-ink-3)}
+body.app.in-editor #editor #messages .sources-label{margin-right:8px;font-size:12.5px!important;font-weight:400!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink-3)!important}
+body.app.in-editor #editor #messages .source{display:inline;height:auto;max-width:none;padding:0;border:0!important;border-radius:0;background:none!important;box-shadow:none!important;color:var(--c-ink-2)!important;font-size:12.5px!important;text-decoration:none}
+body.app.in-editor #editor #messages .source:hover{color:var(--c-ink)!important;text-decoration:underline}
+body.app.in-editor #editor #messages .source+.source::before{content:"·";margin:0 7px;color:var(--c-line-2);display:inline-block;text-decoration:none}

@@ -32,6 +32,7 @@ function createBrowser({browseSite,maxOps=25,viewport}={}){
   available,
   get url(){return url},
   get title(){return last?last.title:''},
+  get text(){return last?last.text:''},
   async open(target){
    if(!available())throw Object.assign(Error('Opening websites needs a browser (Chromium) on this server'),{status:503});
    if(++ops>maxOps)throw Error('Too many web actions in one task ('+maxOps+')');
@@ -92,6 +93,48 @@ function linksIn(text){
  for(const m of String(text||'').matchAll(URL_IN_TEXT)){const u=/^https?:/i.test(m[0])?m[0]:'https://'+m[0];const clean=u.replace(/[.,;:!?]+$/,'');if(!out.includes(clean))out.push(clean)}
  return out.slice(0,3);
 }
+// What to search: the topic only. Greetings, requests to the assistant ("can you", "research it")
+// and how to answer ("show it as a table") are dropped, so "hi compare xero and wave. research it
+// and show it as a table" searches "compare xero and wave", not the whole sentence.
+const FILLER=[
+ /^\s*(?:hi|hello|hey|hiya|yo|ok(?:ay)?|thanks|thank you|so|well|now|also)\b[\s,!.:-]*/i,
+ /\b(?:i want you to|i want you|i need you to|i would like you to|i'd like you to|can you|could you|would you|will you|please|pls|kindly)\b/gi,
+ /\b(?:then |and )?(?:tell|show|give|let) me\b/gi,
+ /\b(?:and\s+)?(?:show|put|give|present|format|make|list)\s+(?:it|this|that|them|me|the results?)?\s*(?:as|in|into)\s+(?:a\s+)?(?:table|list|chart|bullets?|comparison)(?:\s+format)?\b/gi,
+ /\b(?:in|as)\s+(?:a\s+)?(?:table|list)(?:\s+format)?\b/gi,
+ /\b(?:research|check|look\s+up|search|find|google|browse)\s+(?:it|this|that|them)(?:\s+(?:online|on the web|up))?\b/gi,
+ /\b(?:do (?:some |a )?|deep |quick )?research(?:\s+(?:on|about|into))?\b/gi,
+ /\b(?:search|look\s+up|google|browse)(?:\s+(?:the\s+)?(?:web|internet|online))?(?:\s+(?:for|about))?\b/gi,
+ /\b(?:for me|actual|actually|real|properly|online|on the web|on the internet)\b/gi,
+ // Fast typing: "researcha nd check nd then".
+ /\b(?:researcha?\w*|check(?=\s+(?:a?nd|then)\b)|a?nd(?=\s+(?:check|then|tell)\b)|nd)\b/gi,
+];
+function topicOf(text){
+ let t=String(text||'').split('\n').filter(l=>l.trim()&&!/^Browser continuity:/i.test(l)).join(' ');
+ t=t.replace(URL_IN_TEXT,' ');
+ for(const re of FILLER)t=t.replace(re,' ');
+ return t.replace(/[.?!]+/g,' ').replace(/\s+(?:it|this|that|and|then)\s*$/i,' ').replace(/\s+/g,' ').trim().slice(0,200);
+}
+const searchQuery=topicOf;
+const STOP=new Set('compare comparison versus between which what when where with from that this your their about best small large firm firms company business free paid good tool tools software review reviews price prices pricing cost costs plan plans online latest current today research table should would could does have will just like make show give tell more most than then also into over under the and for are you how why want need actual actually real search find check look hello thanks please'.split(' '));
+function keyWords(q){return[...new Set(String(q||'').toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g)||[])].filter(w=>!STOP.has(w))}
+// Sites that are never what a research question is about, unless it names them.
+const OFF_TOPIC=/(?:^|\.)(?:dictionary\.cambridge\.org|merriam-webster\.com|dictionary\.com|thesaurus\.com|collinsdictionary\.com|wordreference\.com|urbandictionary\.com|translate\.google\.[a-z.]+|vocabulary\.com|diffchecker\.com|text-compare\.com|textcompare\.org)$/i;
+function relevant(urls,q){
+ const words=keyWords(q);
+ return urls.filter(u=>{
+  const host=hostOf(u);
+  if(OFF_TOPIC.test(host)&&!words.some(w=>host.includes(w)))return false;
+  if(!words.length)return true;
+  const s=String(u).toLowerCase();return words.some(w=>s.includes(w));
+ });
+}
+// "compare xero and wave", "xero vs wave", "xero or quickbooks": the things being compared.
+function subjectsOf(topic){
+ const t=String(topic||'').replace(/^(?:compare|comparison of|difference between|differences between)\s+/i,'');
+ const m=t.match(/^(.+?)\s+(?:and|vs\.?|versus|or|with|against)\s+(.+?)(?:\s+(?:for|in|on|to|as)\s+.*)?$/i);
+ if(!m)return[];
+ return[m[1],m[2]].map(x=>x.trim().split(/\s+/).slice(-3).join(' ')).filter(x=>keyWords(x).length);
 function searchQuery(text){
  return String(text||'').split('\n').filter(l=>l.trim()&&!/^Browser continuity:/i.test(l)).join(' ')
   .replace(/\b(i want you to|i want you|can you|could you|please|then tell me|and tell me|tell me|for me|check and|research and|researcha?\w*|and check|nd check|nd then)\b/gi,' ')
@@ -109,8 +152,17 @@ function relevant(urls,q){const words=keyWords(q);if(!words.length)return urls;r
 function plainPlan(text){
  const links=linksIn(text);
  if(links.length)return links.map(u=>({open:u}));
- const q=searchQuery(text);
- return q.length>=3?[{search:q,openTop:2}]:[];
+ const topic=topicOf(text);
+ if(topic.length<3)return[];
+ const subj=subjectsOf(topic);
+ if(subj.length===2)return[{search:subj[0]+' vs '+subj[1],openTop:1},{search:subj[0]+' pricing features',openTop:1},{search:subj[1]+' pricing features',openTop:1}];
+ return[{search:topic,openTop:2}];
+}
+// A page the site would not let us read: bot checks, "access denied", empty shells.
+function blockedPage(title,text){
+ return /^(?:just a moment|attention required|access denied|forbidden|403|are you a robot|verify you are human|please wait|security check|one more step)\b/i.test(String(title||'').trim())
+  ||/\b(?:checking your browser|enable javascript and cookies to continue|verify you are (?:a )?human|captcha)\b/i.test(String(text||'').slice(0,600))
+  ||String(text||'').replace(/\s+/g,' ').trim().length<20;
 }
 // Research before answering or building: the model picks what to search and open, Kairoq
 // does it (up to maxOps actions over two rounds) and returns a context block plus the sources.
@@ -122,17 +174,20 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
  const browser=createBrowser({browseSite,maxOps:maxOps+2});
  if(!canSearch&&!browser.available())return{context:'',sources:[]};
  const sources=[],blocks=[],steps=[];let ops=0,last={};
- const seen=new Set();
+ const seen=new Set(),searched=new Set(),topic=topicOf(text);
  const step=(label,frame={})=>{steps.push(label);onProgress(label);last={...last,...frame};onBrowser({...last,steps:steps.map((t,i)=>'Step '+(i+1)+' · '+t),at:new Date().toISOString()})};
+ // Opens a page and keeps it as a source only when it is really readable (not a bot check).
  async function openUrl(u){
-  if(seen.has(u))return;seen.add(u);
-  if(!browser.available()){blocks.push('Opening websites is not available on this server.');return}
+  if(seen.has(u))return false;seen.add(u);
+  if(!browser.available()){blocks.push('Opening websites is not available on this server.');return false}
   ops++;step('Reading '+hostOf(u),{url:u,title:hostOf(u)});
   try{
    const page=await browser.open(u),shot=await browser.screenshot().catch(()=>null);
+   if(blockedPage(browser.title,browser.text)){step('Skipped '+hostOf(u)+' (the site would not let us read it)',{url:browser.url,title:hostOf(u),screenshot:shot||undefined});return false}
    sources.push({url:browser.url,title:browser.title||hostOf(u)});blocks.push(page);
    step('Read '+(browser.title||hostOf(u)).slice(0,80),{url:browser.url,title:browser.title||hostOf(u),screenshot:shot||undefined});
-  }catch(e){blocks.push('Could not open '+u+': '+String(e.message||e).slice(0,200));step('Could not open '+hostOf(u))}
+   return true;
+  }catch(e){blocks.push('Could not open '+u+': '+String(e.message||e).slice(0,200));step('Could not open '+hostOf(u));return false}
  }
  async function run(items){
   for(const it of items){
@@ -140,9 +195,18 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
    signal?.throwIfAborted();
    if(typeof it.search==='string'&&it.search.trim()){
     if(!canSearch){blocks.push('Search is not available on this server.');continue}
-    ops++;const q=it.search.trim().slice(0,240);
+    // The model's searches are cleaned the same way: the topic, never "research it as a table".
+    const q=(topicOf(it.search)||it.search).trim().slice(0,240);
+    if(searched.has(q.toLowerCase()))continue;searched.add(q.toLowerCase());
+    ops++;
     step('Searching the web for "'+q.slice(0,60)+'"',{url:'https://duckduckgo.com/?q='+encodeURIComponent(q),title:'Search: '+q.slice(0,60),screenshot:undefined});
     try{
+     const urls=(await webSearch(q)).slice(0,8);
+     // Only results about the question ("xero", "wave"); dictionaries and text-diff tools never.
+     const good=relevant(urls,q+' '+topic);
+     blocks.push(good.length||!urls.length?searchText(q,good):'Search results for "'+q+'": nothing about the question (skipped '+urls.map(hostOf).join(', ')+').');
+     const want=it.openTop===undefined?1:Math.max(0,Number(it.openTop)||0);let got=0;
+     for(const u of good){if(got>=want||ops>=maxOps)break;if(await openUrl(u))got++}
      const urls=(await webSearch(q)).slice(0,6);blocks.push(searchText(q,urls));
      // Only read results that are about the question: their address shares a key word with it
      // ("wave", "xero"), so a search that drifts (text-compare tools for "compare") is not read.
@@ -167,6 +231,7 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
    if(more.web.length)await run(more.web);
   }
   // A search with no page read yet: read the top result so the answer rests on a real page.
+  if(!sources.length&&canSearch&&!pasted.length&&ops<maxOps)await run(plainPlan(text));
   if(!sources.length&&canSearch&&!pasted.length&&ops<maxOps&&!steps.some(t=>/^Searching the web/.test(t))){const q=searchQuery(text);if(q.length>=3)await run([{search:q,openTop:2}])}
   step(sources.length?'Done: read '+sources.length+' page'+(sources.length===1?'':'s'):'Done');
  }finally{await browser.close().catch(()=>{})}
@@ -175,4 +240,5 @@ async function gather(message,{callModel,tier='standard',signal,webSearch,browse
  return{context,sources:sources.slice(0,8),steps};
 }
 
+module.exports={createBrowser,describePage,searchText,needsWeb,parseWeb,gather,clip,hostOf,linksIn,searchQuery,topicOf,keyWords,relevant,subjectsOf,blockedPage,plainPlan};
 module.exports={createBrowser,describePage,searchText,needsWeb,parseWeb,gather,clip,hostOf,linksIn,searchQuery,plainPlan,keyWords,relevant};

@@ -75,16 +75,18 @@ test("editor contains a separate live browser surface, not an external-site ifra
  assert.match(create,/kairoqBrowserPane\?\.show\(j\.browser\)/);
 });
 
-// Kairoq's browser as the third pane (builder-browser-pane.js): the Browser button, the step log,
-// frames while the builder tests its own app, and one pane at a time on a phone.
-test('the browser pane has a toggle, a step log and phone tabs',()=>{
+// Kairoq's browser as the third pane (builder-browser-pane.js): the Browser button, a real
+// address bar and live screen, frames while the builder tests its own app, one pane on a phone.
+test('the browser pane has a toggle, an address bar, a live screen and phone tabs',()=>{
  const fs=require('fs'),path=require('path');
  const html=fs.readFileSync(path.join(__dirname,'..','public','create.html'),'utf8'),js=fs.readFileSync(path.join(__dirname,'..','public','builder-browser-pane.js'),'utf8'),css=fs.readFileSync(path.join(__dirname,'..','public','theme.css'),'utf8');
  assert.match(html,/id="view-browser"[^>]*aria-pressed="false"/,'a Browser toggle in the stage bar');
- assert.match(html,/<ol class="web-browser-log hidden" id="web-browser-log"/,'the step log under the live view');
+ assert.match(html,/<form class="kb-bar" id="kb-bar"[\s\S]*data-kb="back"[\s\S]*data-kb="forward"[\s\S]*data-kb="reload"[\s\S]*id="web-browser-url" type="text"/,'back, forward, reload and an address bar');
+ assert.doesNotMatch(html,/web-browser-log/,'no step log: one quiet status line instead');
  assert.match(html,/id="phone-panes" role="tablist"[\s\S]*data-pane="chat"[\s\S]*data-pane="preview"[\s\S]*data-pane="browser"/,'Chat | Preview | Browser on a phone');
  assert.match(js,/toggle\?\.addEventListener\("click"/);
- assert.match(js,/if\(data\.steps\)steps\(data\.steps\)/,'frames carry the steps');
+ assert.match(js,/new EventSource\("\/api\/create\/live-browser\/stream"\)/,'the screen streams live');
+ assert.match(js,/send\(\{type:"click",\.\.\.point\(e\)\}\)/,'clicks on the page go through');
  assert.match(js,/editor\.dataset\.pane=name/,'a tab picks the pane');
  assert.match(css,/#editor\[data-pane=browser\]>\.web-browser-pane\{display:flex!important\}/);
  const rb=fs.readFileSync(path.join(__dirname,'..','react-builder.js'),'utf8');
