@@ -40,7 +40,7 @@ test('completed jobs clear busy status after refresh failure and cannot replace 
  const state={project:{id:'old'},lastSent:'hi',attachments:[],tier:'standard'},work={},detailState={source:null},LABELS={complete:'Done'};
  const $=id=>document.getElementById(id),text=(n,s)=>n.textContent=s;
  let isBusy=false,resolveRefresh,rejectRefresh,rendered=0;
- const busy=v=>isBusy=v,refreshCredits=()=>{},closeDetail=()=>{},tickWork=()=>{},renderBuildOverlay=()=>{},syncSend=()=>{},renderMessages=()=>rendered++,renderVersions=()=>{};
+ const busy=v=>isBusy=v,refreshCredits=()=>{},closeDetail=()=>{},tickWork=()=>{},renderBuildOverlay=()=>{},liveStrip=()=>{},syncSend=()=>{},renderMessages=()=>rendered++,renderVersions=()=>{};
  const renderAttachments=()=>{},messageItem=m=>{const p=document.createElement('p');p.textContent=m.text;return p;};
  const api=()=>new Promise((resolve,reject)=>{resolveRefresh=resolve;rejectRefresh=reject;});
  ${source.slice(node.start,node.end)}
