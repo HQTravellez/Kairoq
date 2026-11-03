@@ -140,3 +140,15 @@ test("composer and preview like Emergent: model note and cost, share picture and
   assert.match(css, /#canvas\[data-view\]:not\(\[data-view=preview\]\)>\.pv-float\{display:none!important\}/);
   assert.match(fs.readFileSync(path.join(__dirname, "..", "create-api.js"), "utf8"), /thumb:\(\(\)=>\{try\{return require\('\.\/project-thumbs'\)\.url\(\{id,current_version:meta\.current_version\}\)\}/);
 });
+
+test("dot-matrix motion: the working grid follows the phase, the preview shows a dot field that dissolves, reduced motion stays still", () => {
+  const js = read("create.js"), css = read("ui/forma.css");
+  assert.match(js, /function gridPattern\(j\)\{/);
+  assert.match(js, /if\(kg&&kg\.dataset\.p!==pat\)kg\.dataset\.p=pat;/);
+  assert.match(js, /function dotMatrix\(win\)\{/);
+  assert.match(js, /if\(!c\.isConnected\)\{ro\?\.disconnect\(\);return\}/, "stops when the preview window goes away");
+  assert.match(js, /if\(!document\.hidden\)\{/, "pauses while the tab is hidden");
+  assert.match(css, /\.k-grid\[data-p=write\] i\{animation-duration:1\.1s!important;animation-delay:calc\(var\(--x,0\) \* \.14s\)!important\}/);
+  assert.match(css, /@keyframes pw-dissolve\{/);
+  assert.match(css, /@media \(prefers-reduced-motion:reduce\)\{\n  html body\.app \.k-grid\[data-p\] i\{animation:none!important/);
+});
