@@ -351,3 +351,16 @@ html body.app .st-plan h2{color:#B9B6BF!important;font-weight:500}
 html body.app .st-who .muted.small{display:block;font-size:12px;color:var(--f-mut2,#716F77)}
 html body.app .st-more p{font-size:12px!important;line-height:1.5;color:var(--c-ink-3,#625F68)}
 @media (max-width:820px){html body.app .st-top{display:flex!important;flex-direction:column}html body.app .st-top>*{grid-column:auto!important}}
+/* Real logos (brands) and line icons (the rest) on a quiet tile, like the Figma Connectors frame. */
+html body.app .cn-ic.brand,html body.app .cn-ic.line{background:#fff!important;border:1px solid var(--c-line,#E6E4DF);color:var(--c-ink-2,#3C3A42)!important}
+html body.app .cn-ic.brand svg{width:22px;height:22px}
+html body.app .cn-ic.line{background:#F6F5F2!important}
+html body.app .cn-ic.line svg{width:20px;height:20px}
+@media (max-width:600px){
+  /* Search takes the whole row on a phone. */
+  html body.app .tp-tools.ld-find:has(.cn-search) .tp-field{grid-column:1/-1}
+  html body.app .tp-tools .tp-search.cn-search{grid-column:1/-1;margin-left:0!important;width:100%!important;max-width:none!important;flex:1 1 100%!important;height:42px}
+  html body.app .cn-search input{width:100%}
+}
+html body.app :is(.cn-ic.brand,.cn-ic.line)::before{content:none!important;display:none!important}
+html body.app :is(.cn-ic.brand,.cn-ic.line) svg{flex:none}
