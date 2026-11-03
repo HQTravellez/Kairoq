@@ -9,6 +9,14 @@ async function api(path,{method='GET',body}={}){
  if(!r.ok)throw Object.assign(new Error(data.error||'Request failed ('+r.status+')'),{status:r.status,data});
  return data;
 }
+// Motion on Home (kept short, and off for people who ask for reduced motion):
+// the heading rises in word by word, project cards fade in one after another.
+const CALM=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+function revealTitle(){
+ const h=$('home-title');if(!h||CALM)return;
+ const words=h.textContent.trim().split(/\s+/);h.setAttribute('aria-label',words.join(' '));h.replaceChildren();
+ words.forEach((w,i)=>{const s=el('span','hw',w);s.setAttribute('aria-hidden','true');s.style.setProperty('--i',i);h.append(s);if(i<words.length-1)h.append(' ')});
+}
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
@@ -36,6 +44,7 @@ function show(screen){
  $('side-account').open=false; // the account menu closes once you pick a page from it
  if(screen==='settings-screen'||screen==='pricing-screen')$('side-settings').setAttribute('aria-current','page');
  if(screen==='home')$('side-projects').setAttribute('aria-current','page');
+ if(screen==='home'&&document.getElementById('home')?.classList.contains('hidden')===false)revealTitle();
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
 function text(el,value){el.textContent=value==null?'':String(value)}
@@ -48,7 +57,7 @@ async function loadMe(){
  text($('who'),v?(v.kind==='owner'?'Owner':v.account.email):'');
  const name=v?(v.kind==='owner'?'':v.account.email.split('@')[0].replace(/\d+$/,'').replace(/[._-]+/g,' ').trim().slice(0,24)):'';
  text($('ws-name'),!v?'Kairoq':name?cap(name)+"'s Kairoq":'Kairoq workspace');text($('ws-avatar'),(name||'K')[0].toUpperCase());
- text($('home-title'),name?'What should we build, '+cap(name.split(' ')[0])+'?':'What should we build?');
+ text($('home-title'),name?'What should we build, '+cap(name.split(' ')[0])+'?':'What should we build?');revealTitle();
  $('side-admin').classList.toggle('hidden',!(v&&v.kind==='owner'));
  // The older chat page (Plugins, Skills, Sales Agent) is for the owner only; clients never see it.
  $('side-chat').classList.toggle('hidden',!(v&&v.kind==='owner'));
@@ -143,9 +152,9 @@ function renderProjects(projects){
  const shown=projects.filter(p=>!q||String(p.name).toLowerCase().includes(q)).sort((a,b)=>byName?String(a.name).localeCompare(String(b.name)):String(b.updated_at).localeCompare(String(a.updated_at)));
  if(projects.length&&!shown.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects match "'+q+'".';list.append(li)}
  renderOnboard(projects);
- for(const p of shown){
+ for(const [ci,p] of shown.entries()){
   const li=document.createElement('li'),thumb=el('div','thumb',initials(p.name)),open=document.createElement('button'),meta=document.createElement('span');
-  thumb.setAttribute('aria-hidden','true');
+  thumb.setAttribute('aria-hidden','true');li.style.setProperty('--i',Math.min(ci,11));
   thumb.dataset.initials=initials(p.name);
   thumb.style.setProperty('--frame',FRAMES[[...String(p.id||p.name)].reduce((a,c)=>a+c.charCodeAt(0),0)%FRAMES.length]);
   // The app's own picture when there is one (project-thumbs.js); the initials stay underneath.
@@ -908,6 +917,8 @@ $('new-form').onsubmit=async e=>{
  try{
   const typed=$('new-prompt').value.trim();
   if(!typed)return;
+  // Remember where the prompt was, so it can slide into the chat as the first message.
+  {const r=$('new-prompt').closest('.prompt-box').getBoundingClientRect();state.fly={rect:{left:r.left,top:r.top,width:r.width,height:r.height},text:typed,at:Date.now()}}
   // A greeting ("helo" too) or a question is a conversation, not an app: it opens a new chat in
   // Discuss mode (no design pick, no build) instead of starting a build or reopening the last project.
   const talk=homeTalk(typed);
@@ -916,7 +927,8 @@ $('new-form').onsubmit=async e=>{
    await openProject(project.id);
    $('new-prompt').value='';
    setChatMode('discuss');
-   await send(typed,'discuss');
+   const sending=send(typed,'discuss');flyIn([...document.querySelectorAll('#messages>li.user')].pop());
+   await sending;
    return;
   }
   $('home-error').classList.remove('welcome');
@@ -991,12 +1003,29 @@ function agentHead(label){
 // A short line under a reply: what the agent did to get there ("Thought it through, used 3 tools").
 function workLine(text){return el('p','work-line',text)}
 function thinkLine(text){const p=el('p','ask-head think-line'),t=el('span',null,text||'');if(!text)sayThinking(t);p.append(t,dots());return p}
+// Like Lovable: what you typed on Home slides from the Home box into the chat as your first message,
+// instead of the page just jumping. Skipped for reduced motion or if anything is off screen.
+function flyIn(target){
+ const f=state.fly;state.fly=null;
+ if(!f||!target||CALM||Date.now()-f.at>15000||!document.body.animate)return;
+ requestAnimationFrame(()=>{
+  const to=target.getBoundingClientRect();if(!to.width||!to.height||to.bottom<0||to.top>innerHeight)return;
+  const cs=getComputedStyle(target),g=el('div','fly-ghost',f.text);
+  Object.assign(g.style,{left:f.rect.left+'px',top:f.rect.top+'px',width:f.rect.width+'px',height:f.rect.height+'px'});
+  // The chat may redraw while it flies (a fast reply), so hide the newest message by class, not on the element.
+  const list=$('messages');document.body.append(g);list?.classList.add('fly-wait');
+  const a=g.animate([{left:f.rect.left+'px',top:f.rect.top+'px',width:f.rect.width+'px',height:f.rect.height+'px',backgroundColor:'#ffffff',borderRadius:'18px',fontSize:'18px'},
+   {left:to.left+'px',top:to.top+'px',width:to.width+'px',height:to.height+'px',backgroundColor:cs.backgroundColor,borderRadius:cs.borderRadius||'12px',fontSize:cs.fontSize}],{duration:560,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
+  const done=()=>{list?.classList.remove('fly-wait');g.remove()};a.onfinish=done;a.oncancel=done;setTimeout(done,1200);
+ });
+}
 async function askThenBuild(prompt,chosenName){
  const name=String(chosenName||'').trim()||shortName(prompt);
  const {project}=await api('/projects',{method:'POST',body:{name}});
  await openProject(project.id);
  const list=$('messages');list.replaceChildren();
  let mine=messageItem({role:'user',text:prompt});list.append(mine);
+ flyIn(mine);
  const card=document.createElement('li');card.className='assistant ask-card';
  card.classList.add('enter');card.dataset.dir='0';
  const started=Date.now(),worked=()=>'Worked for '+Math.max(1,Math.round((Date.now()-started)/1000))+'s';

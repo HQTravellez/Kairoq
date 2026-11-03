@@ -1119,3 +1119,18 @@ html body.app.in-editor #editor #messages .ks-head[aria-expanded=true] .ks-chev{
 html body.app.in-editor #editor #messages .ks-note{gap:12px!important;margin:2px 0 6px!important;padding:0 0 0 4px!important}
 html body.app.in-editor #editor #messages .ks-note .ico{width:16px!important;height:16px!important;margin-top:4px!important}
 html body.app.in-editor #editor #messages .ks-note p{font:400 15.5px/1.7 Inter,system-ui,sans-serif!important;color:var(--c-ink-2,#3C3A42)!important}
+/* Motion on Home: the heading rises in word by word; project cards fade in one after another and lift
+   on hover; the Build arrow nudges on hover. All off for reduced motion. */
+@keyframes fm-word{from{opacity:0;transform:translateY(12px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+@keyframes fm-card{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+html body.app #home #home-title .hw{display:inline-block;opacity:0;animation:fm-word .65s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(80ms + var(--i,0)*75ms)}
+html body.app #home .projects.cards>li{animation:fm-card .5s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0)*60ms);transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s ease!important}
+html body.app #home .projects.cards>li:hover{transform:translateY(-4px);box-shadow:0 18px 36px -18px rgba(60,40,140,.35)!important}
+html body.app #home .projects.cards>li .thumb{overflow:hidden}
+html body.app #home .projects.cards>li .thumb-img{transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+html body.app #home .projects.cards>li:hover .thumb-img{transform:scale(1.04)}
+html body.app #home #new-submit.primary svg{transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+html body.app #home #new-submit.primary:hover svg{transform:translateX(3px)}
+.fly-ghost{position:fixed;z-index:300;box-sizing:border-box;padding:12px 14px;overflow:hidden;pointer-events:none;color:#1C1B1F;font-family:Inter,system-ui,sans-serif;line-height:1.5;white-space:pre-wrap;word-break:break-word;box-shadow:0 18px 40px -18px rgba(60,40,140,.35)}
+@media (prefers-reduced-motion:reduce){html body.app #home #home-title .hw,html body.app #home .projects.cards>li{animation:none!important;opacity:1!important}html body.app #home .projects.cards>li:hover,html body.app #home .projects.cards>li:hover .thumb-img{transform:none!important}}
+html body.app.in-editor #editor #messages.fly-wait>li.user:not(:has(~ li.user)){visibility:hidden}
