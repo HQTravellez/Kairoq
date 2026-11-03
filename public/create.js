@@ -128,12 +128,17 @@ function renderSetup(setup){
 function initials(name){const w=String(name||'').trim().split(/\s+/).filter(Boolean);return ((w[0]||'K')[0]+(w[1]?w[1][0]:'')).toUpperCase()}
 // Project cards: each app's picture sits in a soft colour frame, like the Figma dashboard.
 const FRAMES=['#DFE9E0','#D8CEF3','#F0D3BE','#DCE5EE','#E9E4C9','#EADCE6'];
+const ago=iso=>{const m=Math.round((Date.now()-new Date(iso))/60000);if(!(m>=0))return'';if(m<1)return'just now';if(m<60)return m+' minute'+(m===1?'':'s')+' ago';const h=Math.round(m/60);if(h<24)return h+' hour'+(h===1?'':'s')+' ago';const d=Math.round(h/24);return d===1?'yesterday':d<7?d+' days ago':new Date(iso).toLocaleDateString([],{month:'short',day:'numeric'})};
 function renderProjects(projects){
  state.projects=projects;
- text($('project-count'),projects.length?projects.length+' project'+(projects.length===1?'':'s'):'');
+ text($('project-count'),projects.length||'');
  const list=$('projects');list.replaceChildren();
  if(!projects.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects yet. Describe one above, or start from a template.';list.append(li)}
- for(const p of projects){
+ // Search and sort, as in the Figma dashboard ("Search projects…", "Last edited").
+ const q=($('pj-search')?.value||'').trim().toLowerCase(),byName=$('pj-sort')?.value==='name';
+ const shown=projects.filter(p=>!q||String(p.name).toLowerCase().includes(q)).sort((a,b)=>byName?String(a.name).localeCompare(String(b.name)):String(b.updated_at).localeCompare(String(a.updated_at)));
+ if(projects.length&&!shown.length){const li=document.createElement('li');li.className='muted';li.textContent='No projects match "'+q+'".';list.append(li)}
+ for(const p of shown){
   const li=document.createElement('li'),thumb=el('div','thumb',initials(p.name)),open=document.createElement('button'),meta=document.createElement('span');
   thumb.setAttribute('aria-hidden','true');
   thumb.dataset.initials=initials(p.name);
@@ -141,11 +146,14 @@ function renderProjects(projects){
   // The app's own picture when there is one (project-thumbs.js); the initials stay underneath.
   if(p.thumb){const img=document.createElement('img');img.src=p.thumb;img.alt='';img.loading='lazy';img.decoding='async';img.className='thumb-img';img.onerror=()=>img.remove();thumb.append(img)}
   open.type='button';open.className='open';open.textContent=p.name;open.onclick=()=>openProject(p.id);
-  meta.className='meta';meta.textContent='v'+p.current_version+' · '+when(p.updated_at);
+  // Card body like the Figma dashboard: name and a ··· menu, then Published or Draft and when it was edited.
+  meta.className='meta';
+  const st=el('span','pj-status'+(p.published?' live':''),p.published?'Published':'Draft');
+  meta.append(st,el('span','pj-when','Edited '+ago(p.updated_at)));
   li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
   if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
-  if(p.published){const b=document.createElement('span');b.className='badge live';b.textContent='Live';li.append(b)}
   if(p.role==='owner'){
+   const menu=el('details','pj-menu'),sum=el('summary',null,'···');sum.setAttribute('aria-label','More for '+p.name);menu.append(sum);menu.onclick=e=>e.stopPropagation();
    const del=el('button','ghost link-btn','Delete');
    del.type='button';del.setAttribute('aria-label','Delete project '+p.name);
    del.onclick=async e=>{
@@ -158,7 +166,7 @@ function renderProjects(projects){
      await loadHome();
     }catch(err){del.disabled=false;del.textContent='Delete';alert('Could not delete project: '+err.message)}
    };
-   li.append(del);
+   menu.append(del);li.append(menu);
   }
   list.append(li);
  }
@@ -194,6 +202,7 @@ function homeTab(which){
  state.homeTab=which;
  $('tab-projects').setAttribute('aria-selected',String(which==='projects'));$('tab-templates').setAttribute('aria-selected',String(which==='templates'));
  $('projects').classList.toggle('hidden',which!=='projects');$('home-templates').classList.toggle('hidden',which!=='templates');
+ $('pj-search').closest('label').classList.toggle('hidden',which!=='projects');$('pj-sort').classList.toggle('hidden',which!=='projects');
  if(!$('home').classList.contains('hidden')){$('side-projects').toggleAttribute('aria-current',which==='projects');$('side-templates').toggleAttribute('aria-current',which==='templates')}
 }
 $('tab-projects').onclick=()=>homeTab('projects');$('tab-templates').onclick=()=>homeTab('templates');
@@ -490,6 +499,43 @@ $('ag-form').onsubmit=async e=>{
  try{const ask=agRequest();await openProject(agentsUi.id);await send(ask,'build');$('ag-form').reset();$('ag-form').classList.add('hidden')}
  catch(err){text($('ag-error'),err.message)}finally{b.disabled=false}
 };
+$('pj-search').oninput=()=>state.projects&&renderProjects(state.projects);
+$('pj-sort').onchange=()=>state.projects&&renderProjects(state.projects);
+// ---------- The editor laid out like the Figma "App builder" frame ----------
+// Row 1 (dark): project name on the left, More, Share and Publish on the right.
+// Row 2 (light): "Chat with Kairoq" over the chat; Preview · Code · Data and the preview's own
+// tools over the stage. The preview sits in a browser window with its address, and
+// "Live preview · v7" under it. Built once from the existing controls, so every handler stays.
+function formaRows(){
+ const stage=document.querySelector('#editor .stage'),bar=stage?.querySelector('.stage-bar');
+ if(!bar||stage.querySelector('.fm-sub'))return refreshWindow();
+ const sub=el('div','fm-sub');
+ const tabs=bar.querySelector('.tabs-seg'),tools=$('preview-bar-tools'),vis=$('visual-toggle'),tests=$('kq-tests-tab');
+ if(tabs)sub.append(tabs);if(tests&&tabs&&!tabs.contains(tests))tabs.append(tests);
+ sub.append(el('span','fm-grow'));if(vis)sub.append(vis);if(tools)sub.append(tools);
+ bar.after(sub);
+ sub.addEventListener('click',e=>{if(detailState.source!==null&&e.target.closest('button,a'))closeDetail()});
+ const chat=document.querySelector('#editor .chat'),head=chat?.querySelector('.chat-head');
+ if(head&&!chat.querySelector('.fm-chat-sub')){const c=el('div','fm-chat-sub');c.append(el('b',null,'Chat with Kairoq'));head.after(c)}
+ const dev=$('device');
+ if(dev&&!dev.querySelector('.fm-win')){
+  const win=el('div','fm-win'),re=el('button','fm-win-btn'),addr=el('span','fm-addr'),op=el('button','fm-win-btn');
+  re.type='button';re.setAttribute('aria-label','Reload the preview');re.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>';re.onclick=()=>$('refresh').click();
+  op.type='button';op.setAttribute('aria-label','Open in a new tab');op.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';op.onclick=()=>{const h=$('open').href;if(h)window.open(h,'_blank','noopener')};
+  addr.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="fm-addr-text"></span>';
+  win.append(re,addr,op);dev.prepend(win);
+  const foot=el('div','fm-foot');foot.append(el('span','fm-live'),el('span',null,''),el('span','fm-grow'),el('span','fm-size',''));foot.querySelector('span:nth-child(2)').id='fm-version';foot.querySelector('.fm-size').id='fm-size';dev.append(foot);
+ }
+ refreshWindow();
+}
+function refreshWindow(){
+ const p=state.project;if(!p||!$('fm-addr-text'))return;
+ // The real address of what is on screen: the live site once published, otherwise this preview.
+ const live=p.published&&p.urls&&p.urls[0],url=live?String(p.urls[0]):location.host+(state.previewBase||p.preview_url||'');
+ text($('fm-addr-text'),String(url).replace(/^https?:\/\//,''));
+ text($('fm-version'),'Live preview · v'+(p.current_version||1));
+ const d=$('device');text($('fm-size'),d&&d.classList.contains('mobile')?'Phone':'Desktop · Fit to view');
+}
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
@@ -581,7 +627,7 @@ function slideSegs(){
  for(const seg of document.querySelectorAll('#editor .seg,#home .kind-seg')){
   if(seg.querySelector('.seg-thumb'))continue;
   const thumb=document.createElement('span');thumb.className='seg-thumb';thumb.setAttribute('aria-hidden','true');seg.prepend(thumb);seg.classList.add('sliding');
-  const place=()=>{const on=seg.querySelector('button[aria-pressed="true"]');if(!on||!on.offsetWidth){thumb.style.opacity='0';return}thumb.style.opacity='1';thumb.style.width=on.offsetWidth+'px';thumb.style.transform='translateX('+(on.offsetLeft-thumb.offsetParent.clientLeft)+'px)'};
+  const place=()=>{const on=seg.querySelector('button[aria-pressed="true"]');if(!on||!on.offsetWidth){thumb.style.opacity='0';return}thumb.style.opacity='1';thumb.style.width=on.offsetWidth+'px';thumb.style.transform='translateX('+(on.offsetLeft-(thumb.offsetParent?thumb.offsetParent.clientLeft:0))+'px)'};
   new MutationObserver(place).observe(seg,{attributes:true,subtree:true,attributeFilter:['aria-pressed','class','hidden']});
   if(window.ResizeObserver)new ResizeObserver(place).observe(seg);
   requestAnimationFrame(place);
@@ -793,6 +839,12 @@ function planWaiting(on){
  if(!on){$('plan-wait')?.remove();return}
  previewWait('plan-wait','Your app will appear here','Approve the plan to start building.',false);
 }
+// A new project still shows Kairoq's starter page: the preview plays the "app being put
+// together" scene instead, until the first real version arrives.
+function starterWaiting(on){
+ if(!on){$('start-wait')?.remove();return}
+ previewWait('start-wait','Your app will appear here','Describe it in the chat. You will watch it come together here.',false);
+}
 function buildWaiting(label){
  if(!label){$('build-wait')?.remove();return}
  previewWait('build-wait','Building your app',label,true);
@@ -877,6 +929,8 @@ async function openProject(id,{pendingText,job}={}){
  if(!state.projects)api('/projects').then(r=>renderRecents(r.projects)).catch(()=>{});else markRecent(id);
  renderTiers();setChatMode(state.mode);
  renderMessages(pendingText);
+ starterWaiting(Boolean(project.starter)&&!job&&!active_job);
+ formaRows();
  renderVersions();
  device(Boolean(project.mobile&&project.mobile.enabled)||Boolean(project.native));
  $('run-phone').classList.toggle('hidden',!project.native);$('stores-open').classList.toggle('hidden',!project.native);
@@ -1127,12 +1181,13 @@ function renderVersions(){
  for(const v of [...state.project.versions].reverse()){const o=document.createElement('option');o.value=v.n;o.textContent='v'+v.n+' · '+(v.broken?'⚠ did not load · ':'')+(v.summary||'').slice(0,40);if(v.n===state.project.current_version)o.selected=true;sel.append(o)}
 }
 function previewFor(n){return state.project.preview_url.replace(/\/v\/\d+\/$/,'/v/'+n+'/')}
-function setPreview(url){if(!url)return;$('frame-next')?.remove();state.previewBase=url;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
+function setPreview(url){if(!url)return;setTimeout(()=>refreshWindow&&refreshWindow(),0);$('frame-next')?.remove();state.previewBase=url;state.runtimeErrors=[];renderErrors();state.selected=null;renderVisual();$('frame').src=url;$('open').href=url;$('preview-open').href=url;watchPreview()}
 // A new version is loaded behind the one on screen and swapped in once it has drawn, so the
 // preview never flashes white, and it opens on the page the owner was looking at.
 function routeFor(url){const r=state.previewRoute||'';return r&&/\/v\/\d+\/$/.test(url)?url+r:url}
 function swapPreview(url){
  const old=$('frame');
+ if(url&&url!==state.previewBase)starterWaiting(false);
  if(!url||url===state.previewBase)return;
  if(!old||!old.getAttribute('src')||old.classList.contains('hidden')||!old.offsetWidth)return setPreview(url);
  $('frame-next')?.remove();

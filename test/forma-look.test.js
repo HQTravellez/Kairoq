@@ -21,7 +21,7 @@ test("the Home box holds the switch, with an icon on each choice", () => {
   const box = html.slice(html.indexOf('<div class="wow">'), html.indexOf('<div class="examples" id="examples">'));
   assert.match(box, /<div class="wow-ring">\s*<form id="new-form" class="prompt-box">/);
   assert.match(box, /id="new-kind"/, "the switch is inside the box");
-  assert.equal((box.match(/<svg class="cute"/g) || []).length, 3, "Web app, Phone app and Website each have an icon");
+  assert.equal((box.match(/<svg class="kind-ico"/g) || []).length, 3, "Web app, Phone app and Website each have a line icon");
   assert.match(box, /id="kind-hint"/);
   const js = read("create.js");
   assert.match(js, /text\(\$\('kind-hint'\),\{site:/);
@@ -49,4 +49,30 @@ test("on a phone the top is one dark band and the browser stays open while watch
   assert.match(css, /\.phone-panes\{background:var\(--f-chrome\)!important/);
   assert.match(css, /\.phone-panes button\[aria-selected=true\]\{background:#fff!important/);
   assert.match(read("builder-browser-pane.js"), /editor\.dataset\.pane==="browser"\)return;/);
+});
+
+test("Home and the editor follow the Figma frames: breadcrumb, project header, card body, worded view tabs", () => {
+  const html = read("create.html");
+  assert.match(html, /class="tp-crumbs home-crumbs"><span>Workspace<\/span><span aria-hidden="true">\/<\/span><b>Projects<\/b>/);
+  assert.match(html, /id="tab-projects" aria-selected="true">All projects<span class="n" id="project-count"><\/span>/);
+  assert.match(html, /id="pj-search"/); assert.match(html, /id="pj-sort"/);
+  const js = read("create.js");
+  assert.match(js, /p\.published\?'Published':'Draft'/);
+  assert.match(js, /'Edited '\+ago\(p\.updated_at\)/);
+  assert.match(js, /el\('details','pj-menu'\)/, "Delete sits in the ··· menu");
+  const css = read("ui/forma.css");
+  assert.match(css, /\.tabs-seg \.lbl\{display:inline!important/);
+});
+
+test("the editor follows the App builder frame: light second rows, a browser window with the real address, the starter scene", () => {
+  const js = read("create.js");
+  assert.match(js, /function formaRows\(\)/);
+  assert.match(js, /c\.append\(el\('b',null,'Chat with Kairoq'\)\)/);
+  assert.match(js, /url=live\?String\(p\.urls\[0\]\):location\.host\+\(state\.previewBase\|\|p\.preview_url\|\|''\)/, "the address is the real one, not made up");
+  assert.match(js, /starterWaiting\(Boolean\(project\.starter\)&&!job&&!active_job\)/);
+  assert.match(js, /if\(url&&url!==state\.previewBase\)starterWaiting\(false\)/);
+  assert.match(fs.readFileSync(path.join(__dirname, "..", "create-api.js"), "utf8"), /starter=require\('\.\/react-design'\)\.isUntouchedStarter/);
+  const css = read("ui/forma.css");
+  assert.match(css, /#messages>li\.assistant::before\{content:"Kairoq"!important/);
+  assert.match(css, /\.fm-sub \.tabs-seg button\[aria-pressed=true\]\{color:var\(--c-accent\)!important\}/);
 });
