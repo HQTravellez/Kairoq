@@ -1223,6 +1223,9 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
    return send(res,404,{error:'Route not found'}),true;
   }
   // ----- find customers: local businesses, drafts the owner approves, sent from its own address -----
+  // API checker (api-check.js): one guarded call to a public API, explained plainly.
+  if(route==='/api-check'&&method==='GET')return send(res,200,{history:require('./api-check').history(v.owner)}),true;
+  if(route==='/api-check'&&method==='POST'){limitedKey('api-check:'+v.owner,60,600000);const b=await readJson(req,120000);return send(res,200,{result:await require('./api-check').check(v.owner,{url:b.url,method:b.method,headers:b.headers,body:b.body})}),true}
   if(route==='/outreach'||route.startsWith('/outreach/')){
    const O=require('./outreach'),lm=/^\/outreach\/leads\/(osm-[a-z]+-\d+)(?:\/(draft|profile))?$/.exec(route),om=/^\/outreach\/outbox\/([0-9a-f-]{36})$/.exec(route);
    if(route==='/outreach'&&method==='GET')return send(res,200,O.view(v.owner)),true;

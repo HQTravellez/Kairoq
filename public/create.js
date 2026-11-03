@@ -12,11 +12,11 @@ async function api(path,{method='GET',body}={}){
 function show(screen){
  // Inside Kairoq's Home, tell it once the editor is on screen so it lifts its loading panel.
  if(screen==='editor'&&window.parent!==window)try{window.parent.postMessage({kairoq:'ready'},location.origin)}catch{}
- for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen'])$(id).classList.toggle('hidden',id!==screen);
+ for(const id of ['auth','home','editor','share-screen','check-screen','plugins-screen','leads-screen','api-screen'])$(id).classList.toggle('hidden',id!==screen);
  $('bar-project').classList.toggle('hidden',screen!=='editor');
  if(screen!=='check-screen'){clearTimeout(checkState.timer);checkState.id=null}
  $('landing-nav').classList.toggle('hidden',screen!=='auth');
- const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
+ const app=screen==='home'||screen==='editor'||screen==='plugins-screen'||screen==='leads-screen'||screen==='api-screen'||(screen==='check-screen'&&Boolean(state.me&&state.me.viewer));
  document.body.classList.toggle('app',app);document.body.classList.toggle('in-editor',screen==='editor');
  // The home sky follows the clock: a morning sky from 6:00 to 18:00, the night sky otherwise.
  document.body.classList.toggle('day',(()=>{const h=new Date().getHours();return h>=6&&h<18})());
@@ -24,10 +24,11 @@ function show(screen){
  if(screen==='editor'&&!state.sideSet){state.sideSet=true;document.body.classList.remove('side-open')}
  if(window.innerWidth<=820)document.body.classList.remove('side-open');
  $('side-open-btn').classList.toggle('hidden',!app);
- for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads'])$(b).removeAttribute('aria-current');
+ for(const b of ['side-new','side-projects','side-templates','side-check','side-plugins','side-leads','side-api'])$(b).removeAttribute('aria-current');
  if(screen==='check-screen')$('side-check').setAttribute('aria-current','page');
  if(screen==='plugins-screen')$('side-plugins').setAttribute('aria-current','page');
  if(screen==='leads-screen')$('side-leads').setAttribute('aria-current','page');
+ if(screen==='api-screen')$('side-api').setAttribute('aria-current','page');
  if(screen==='home')$(state.homeTab==='templates'?'side-templates':'side-projects').setAttribute('aria-current','page');
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -265,6 +266,96 @@ async function plAdd(path){
  }catch(err){text($('pl-status'),'');text($('pl-error'),err.message)}
 }
 $('pl-add').onsubmit=e=>{e.preventDefault();plAdd()};
+// ---------- API checker (a full page) ----------
+// One call through the server's guarded fetch (api-check.js). Header values are sent once and
+// never saved; history keeps the address, method and outcome.
+const apiUi={result:null,history:[],tab:'result',headers:[]};
+const kb=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB';
+function acHeaderRows(){
+ const box=$('ac-hrows');box.replaceChildren();
+ apiUi.headers.forEach((h,i)=>{
+  const row=el('div','ac-hrow'),k=document.createElement('input'),v=document.createElement('input'),x=el('button','link-btn','Remove');
+  k.placeholder='Name, e.g. Authorization';k.value=h.k;k.oninput=()=>{h.k=k.value;acCount()};k.setAttribute('aria-label','Header name');
+  v.placeholder='Value';v.value=h.v;v.oninput=()=>{h.v=v.value};v.setAttribute('aria-label','Header value');v.autocomplete='off';
+  x.type='button';x.onclick=()=>{apiUi.headers.splice(i,1);acHeaderRows();acCount()};
+  row.append(k,v,x);box.append(row);
+ });
+}
+function acCount(){text($('ac-hcount'),apiUi.headers.filter(h=>h.k.trim()).length)}
+function acPill(){
+ const today=new Date().toDateString(),n=apiUi.history.filter(h=>new Date(h.at).toDateString()===today).length;
+ const pill=$('ac-count');pill.hidden=!n;text(pill,n+' check'+(n===1?'':'s')+' today');
+}
+function renderApi(){
+ const r=apiUi.result,tabs=$('ac-tabs');tabs.replaceChildren();
+ const list=[['result','Result'],['raw','Raw response'],['headers','Headers'],['history','History ('+apiUi.history.length+')']];
+ for(const [k,label] of list){if(!r&&k!=='history')continue;const b=el('button',null,label);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(apiUi.tab===k));b.onclick=()=>{apiUi.tab=k;renderApi()};tabs.append(b)}
+ if(!r&&apiUi.tab!=='history')apiUi.tab=apiUi.history.length?'history':'none';
+ const view=$('ac-view');view.replaceChildren();
+ if(apiUi.tab==='none'){view.append(el('p','tp-empty','Paste an API address above and press Try it.'));return}
+ if(apiUi.tab==='history'){
+  if(!apiUi.history.length){view.append(el('p','tp-empty','No checks yet.'));return}
+  const ul=el('ul','ac-history');
+  for(const h of apiUi.history){
+   const li=el('li'),b=el('button');b.type='button';
+   b.append(el('span','ac-code '+(h.ok?'ok':'bad'),String(h.status)),el('span','ac-m',h.method),el('span','ac-u',h.url),el('span','ac-t',when(h.at)));
+   b.onclick=()=>{$('ac-method').value=h.method;$('ac-url').value=h.url;acBody();$('ac-url').focus()};
+   li.append(b);ul.append(li);
+  }
+  view.append(ul);return;
+ }
+ if(apiUi.tab==='result'){
+  const head=el('div','ac-status');
+  head.append(el('span','ac-code big '+(r.ok?'ok':'bad'),r.status+(r.status_text?' '+r.status_text:'')),el('span','ac-meta',r.ms+' ms · '+kb(r.bytes)+(r.type?' · '+r.type:'')));
+  const card=el('div','tp-card ac-plain');
+  card.append(el('p','ac-label','In plain words'),el('p','ac-words',r.plain));
+  const row=el('div','tp-row');
+  if(r.ok){const use=el('button','primary','Use this in my app');use.type='button';use.onclick=async()=>{
+   const names=r.fields.slice(0,8).map(f=>f.path).join(', ');
+   await loadHome();homeTab('projects');
+   $('new-prompt').value='Use this API in my app: '+r.method+' '+r.url+(names?'. It returns '+names+'.':'.')+' Show ';
+   $('new-prompt').focus();$('home').scrollTo({top:0,behavior:'smooth'});
+  };row.append(use)}
+  card.append(row);
+  view.append(head,card);
+  if(r.fields.length){
+   const t=el('div','tp-card ac-fields');t.append(el('p','ac-label','What you can use'));
+   const tb=el('table');for(const f of r.fields){const tr=el('tr');tr.append(el('td','ac-path',f.path),el('td',null,f.value));tb.append(tr)}
+   t.append(tb);view.append(t);
+  }
+  return;
+ }
+ if(apiUi.tab==='raw'){
+  const box=el('div','tp-card ac-raw'),top=el('div','tp-row'),copy=el('button','link-btn','Copy');copy.type='button';
+  copy.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(r.body).then(()=>text(copy,'Copied'));
+  top.append(el('p','ac-label','Response'+(r.truncated?' (first 200 KB)':'')),el('span','tp-grow'),copy);
+  box.append(top,el('pre',null,r.body||'(empty)'));view.append(box);return;
+ }
+ if(apiUi.tab==='headers'){
+  const box=el('div','tp-card ac-fields');box.append(el('p','ac-label','Headers it sent back'));
+  const tb=el('table');for(const [k,v] of Object.entries(r.headers)){const tr=el('tr');tr.append(el('td','ac-path',k),el('td',null,v));tb.append(tr)}
+  box.append(tb);view.append(box);
+ }
+}
+function acBody(){const m=$('ac-method').value;$('ac-body-wrap').classList.toggle('hidden',m==='GET'||m==='DELETE');if(m!=='GET'&&m!=='DELETE'){$('ac-extra').classList.remove('hidden');$('ac-headers-open').setAttribute('aria-expanded','true')}}
+async function openApiCheck(){
+ show('api-screen');text($('ac-error'),'');renderApi();
+ try{const d=await api('/api-check');apiUi.history=d.history||[];acPill();renderApi()}catch(err){text($('ac-error'),err.message)}
+}
+$('side-api').onclick=openApiCheck;
+$('ac-method').onchange=acBody;
+$('ac-headers-open').onclick=()=>{const p=$('ac-extra'),open=p.classList.toggle('hidden');$('ac-headers-open').setAttribute('aria-expanded',String(!open));if(!apiUi.headers.length){apiUi.headers.push({k:'',v:''});acHeaderRows()}};
+$('ac-hadd').onclick=()=>{apiUi.headers.push({k:'',v:''});acHeaderRows()};
+$('ac-form').onsubmit=async e=>{
+ e.preventDefault();const btn=$('ac-go');btn.disabled=true;text(btn,'Calling…');text($('ac-error'),'');
+ try{
+  const headers={};for(const h of apiUi.headers)if(h.k.trim())headers[h.k.trim()]=h.v;
+  const {result}=await api('/api-check',{method:'POST',body:{url:$('ac-url').value.trim(),method:$('ac-method').value,headers,body:$('ac-body').value}});
+  apiUi.result=result;apiUi.tab='result';
+  const {body:_b,headers:_h,fields:_f,...brief}=result;apiUi.history=[brief,...apiUi.history].slice(0,20);acPill();renderApi();
+ }catch(err){text($('ac-error'),err.message)}
+ finally{btn.disabled=false;text(btn,'Try it')}
+};
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
