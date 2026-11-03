@@ -783,6 +783,11 @@ $('ob-form').onsubmit=async e=>{
  try{await askThenBuild(what+'\n\nIt is for '+onboardFor()+'.',$('ob-name').value)}catch(err){text($('ob-error'),err.message)}finally{go.disabled=false}
 };
 $('side-docs').onclick=()=>window.open('https://github.com/HQTravellez/Kairoq/blob/main/docs/create.md','_blank','noopener');
+// The phone top bar (#ph-bar): its buttons are the editor's own, so they work exactly as before.
+$('ph-back').onclick=()=>$('back').click();
+$('ph-publish').onclick=()=>$('publish-open').click();
+$('ph-more').onclick=()=>document.body.classList.toggle('side-open');
+setInterval(()=>{const p=state.project;if(!p||!$('ph-name'))return;text($('ph-name'),p.name||'Untitled');text($('ph-saved'),state.job?'Kairoq is working…':'All changes saved');$('ph-publish').classList.toggle('hidden',p.role==='viewer')},800);
 $('side-toggle').onclick=()=>document.body.classList.toggle('side-open');$('side-open-btn').onclick=()=>document.body.classList.toggle('side-open');
 $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.closest('button'))document.body.classList.remove('side-open')});
 // ui/screens: on a phone the menu is a drawer; a tap outside it closes it.
