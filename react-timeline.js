@@ -2,7 +2,7 @@
 // The timeline of one change, shown live in the chat and in the Details panel (like Lovable):
 // thoughts, the plan, files read and edited, builds, browser tests, saved checks and fixes.
 // Events: {t, at(ms since start), ...}
-//   think {ms, text}    plan {items}    read {files}    edit {file, kind: created|edited|deleted}
+//   say {text}: the agent's one line to the owner    think {ms, note}    plan {items}    read {files}    edit {file, kind: created|edited|deleted}
 //   build {ok, detail}  test {ok, detail}  check {ok, detail}  fix {text, detail}  note {text, icon}
 const MAX_EVENTS=150;
 function clip(v,n){const s=String(v??'');return s.length>n?s.slice(0,n)+'…':s}
