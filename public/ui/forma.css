@@ -561,3 +561,68 @@ body:not(.app) #auth .foot a,body:not(.app) #auth .foot .brand-foot{color:#C9C7C
   body:not(.app) #auth .hero .eyebrow{font-size:12px!important}
   body:not(.app) #auth .prompt-foot{flex-wrap:wrap;gap:8px}
 }
+/* ---------- Questions docked above the message box, one at a time (like Emergent) ---------- */
+html body.app.in-editor.asking #editor #chat-form{display:none!important}
+html body.app.in-editor #editor .ask-dock{margin:0 16px 14px;background:#fff;border:1px solid var(--c-line,#E6E4DF);border-radius:14px;overflow:hidden;box-shadow:0 18px 40px -24px rgba(36,35,41,.35),0 1px 2px rgba(36,35,41,.06);animation:ad-in .28s var(--f-ease-out,cubic-bezier(.2,.8,.2,1)) both;flex:none}
+html body.app.in-editor #editor .ask-dock.leaving{animation:ad-out .2s ease both}
+@keyframes ad-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes ad-out{to{opacity:0;transform:translateY(10px)}}
+html body.app.in-editor #editor .ad-head{display:flex;align-items:center;gap:8px;padding:9px 10px 9px 14px;background:var(--f-lilac,#ECE8F3)}
+html body.app.in-editor #editor :is(.ad-ic,.ask-wait-ic){width:18px;height:18px;border-radius:50%;background:var(--c-accent,#7552E8);color:#fff;font:600 11px/18px Inter,sans-serif;text-align:center;flex:none}
+html body.app.in-editor #editor .ad-title{flex:1;font-size:13px;font-weight:500;color:var(--c-accent,#7552E8)}
+html body.app.in-editor #editor .ad-x{width:26px;height:26px;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;border-radius:7px!important;color:var(--c-ink-3,#625F68);display:grid;place-items:center;cursor:pointer}
+html body.app.in-editor #editor .ad-x:hover{background:rgba(36,35,41,.07)!important}
+html body.app.in-editor #editor .ad-x svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+html body.app.in-editor #editor .ad-body{padding:14px 10px 8px}
+html body.app.in-editor #editor .ad-body.morphing{transition:height .3s var(--f-ease,ease);overflow:hidden}
+html body.app.in-editor #editor .ad-body>*{animation:ad-step .26s var(--f-ease-out,ease-out) both}
+html body.app.in-editor #editor .ad-body[data-dir="-1"]>*{animation-name:ad-step-back}
+html body.app.in-editor #editor .ad-body>.step-out{animation:none;transition:opacity .14s ease,transform .14s ease;opacity:0!important;transform:translateX(-14px)}
+html body.app.in-editor #editor .ad-body[data-dir="-1"]>.step-out{transform:translateX(14px)}
+@keyframes ad-step{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes ad-step-back{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+html body.app.in-editor #editor .ad-q{margin:0 4px 8px!important;font-size:14px!important;font-weight:600!important;line-height:1.4;color:var(--c-ink,#1C1B1F)!important}
+html body.app.in-editor #editor .ad-opts{display:flex;flex-direction:column;gap:1px}
+html body.app.in-editor #editor .ad-opt{position:relative;display:flex;align-items:center;gap:10px;min-height:36px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:background .15s ease;margin:0!important}
+html body.app.in-editor #editor .ad-opt:hover,html body.app.in-editor #editor .ad-opt.on{background:#F4F3EF}
+html body.app.in-editor #editor .ad-opt input[type=radio],html body.app.in-editor #editor .ad-opt input[type=checkbox]{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+html body.app.in-editor #editor .ad-box{position:relative;width:16px;height:16px;flex:none;border:1.5px solid #C9C6CF;border-radius:4px;background:#fff;box-sizing:border-box;transition:background .15s ease,border-color .15s ease}
+html body.app.in-editor #editor .ad-opt:has(input[type=radio]) .ad-box{border-radius:50%}
+html body.app.in-editor #editor .ad-opt.on .ad-box{background:var(--c-accent,#7552E8);border-color:var(--c-accent,#7552E8)}
+html body.app.in-editor #editor .ad-opt.on .ad-box::after{content:"";position:absolute;left:4.5px;top:1.5px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+html body.app.in-editor #editor .ad-opt input:focus-visible+.ad-box{box-shadow:0 0 0 3px rgba(117,82,232,.22)}
+html body.app.in-editor #editor .ad-words{flex:1;min-width:0;font-size:13px;line-height:1.45;color:var(--c-ink-3,#625F68)}
+html body.app.in-editor #editor .ad-words b{font-weight:500;color:var(--c-ink,#1C1B1F);margin-right:2px}
+html body.app.in-editor #editor .ad-hint{color:var(--f-mut2,#716F77)}
+html body.app.in-editor #editor .ad-tag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--f-lilac,#ECE8F3);color:var(--c-accent,#7552E8);font-size:11px;font-weight:500;vertical-align:1px}
+html body.app.in-editor #editor .ad-own .ad-other{flex:1;min-width:0;height:22px!important;padding:0!important;border:0!important;outline:none!important;box-shadow:none!important;background:transparent!important;font:13px Inter,sans-serif!important;color:var(--c-ink,#1C1B1F)!important}
+html body.app.in-editor #editor .ad-own .ad-other::placeholder{color:var(--f-mut2,#716F77)}
+html body.app.in-editor #editor .ad-foot{display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--c-line,#E6E4DF);background:#FBFAF8}
+html body.app.in-editor #editor .ad-steps{display:flex;align-items:center;gap:2px}
+html body.app.in-editor #editor .ad-nav{width:26px;height:26px;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;border-radius:7px!important;font-size:16px;line-height:1;color:var(--c-ink-3,#625F68);cursor:pointer}
+html body.app.in-editor #editor .ad-nav:hover:not(:disabled){background:rgba(36,35,41,.07)!important}
+html body.app.in-editor #editor .ad-nav:disabled{opacity:.3;cursor:default}
+html body.app.in-editor #editor .ad-count{font-size:12px;color:var(--c-ink-3,#625F68);padding:0 4px;white-space:nowrap}
+html body.app.in-editor #editor .ad-foot .ask-gap{flex:1}
+html body.app.in-editor #editor :is(.ad-auto,.ad-go){height:32px!important;padding:0 14px!important;border-radius:8px!important;font:500 13px Inter,sans-serif!important;cursor:pointer;white-space:nowrap;box-shadow:none!important}
+html body.app.in-editor #editor .ad-auto{border:0!important;background:#EFEDE8!important;color:var(--c-ink,#1C1B1F)!important}
+html body.app.in-editor #editor .ad-auto:hover{background:#E6E3DC!important}
+html body.app.in-editor #editor .ad-go{border:0!important;background:var(--c-accent,#7552E8)!important;color:#fff!important}
+html body.app.in-editor #editor .ad-go:hover{background:#6643DA!important}
+/* The slim line left in the chat while the questions are open */
+html body.app.in-editor #editor #messages .ask-wait{display:flex;align-items:center;gap:10px;margin-top:8px;padding:9px 12px;border:1px solid var(--c-line,#E6E4DF);border-radius:10px;background:#F7F6F2;font-size:13px}
+html body.app.in-editor #editor #messages .ask-wait-t{flex:1;color:var(--c-ink,#1C1B1F);font-weight:500}
+html body.app.in-editor #editor #messages .ask-wait-s{font-size:12px;color:var(--f-mut2,#716F77)}
+html body.app.in-editor.asking #editor #messages .ask-wait-ic{animation:ad-pulse 1.8s ease-in-out infinite}
+@keyframes ad-pulse{50%{box-shadow:0 0 0 5px rgba(117,82,232,.16)}}
+@media (max-width:820px){
+  html body.app.in-editor #editor .ask-dock{margin:0 8px 8px}
+  html body.app.in-editor #editor .ad-foot{flex-wrap:wrap}
+  html body.app.in-editor #editor .ad-foot .ask-gap{display:none}
+  html body.app.in-editor #editor .ad-steps{width:100%;justify-content:center}
+  html body.app.in-editor #editor :is(.ad-auto,.ad-go){flex:1}
+}
+@media (prefers-reduced-motion:reduce){html body.app.in-editor #editor :is(.ask-dock,.ad-body>*){animation:none!important}html body.app.in-editor #editor #messages .ask-wait-ic{animation:none!important}}
+html body.app.in-editor #editor .ad-opt.ad-radio .ad-box{border-radius:50%}
+html body.app.in-editor #editor :is(.ad-opt:has(input[type=radio]),.ad-opt.ad-radio).on .ad-box::after{left:3.5px;top:3.5px;width:6px;height:6px;border:0;border-radius:50%;background:#fff;transform:none}
+@media (max-width:820px){html body.app.in-editor #editor #messages .ask-wait-s{display:none}}
