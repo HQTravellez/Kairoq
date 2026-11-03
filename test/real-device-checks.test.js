@@ -64,7 +64,9 @@ test('Safari on iPhone holds a publish; phone and slow-phone problems are warnin
 test('the editor previews the app inside an iPhone, iPhone SE, Pixel or iPad, with a real Safari screenshot',()=>{
  const html=read('public/create.html'),js=read('public/create.js'),css=read('public/create.css'),api=read('create-api.js');
  for(const id of ['device','frame','device-model','safari-shot','dev-shot'])assert.match(html,new RegExp('id="'+id+'"'));
- for(const m of ['iphone16','iphone16max','iphonese','pixel','ipad'])assert.match(html,new RegExp('value="'+m+'"'));
+ for(const m of ['iphone16','iphone16max','iphonese','pixel'])assert.match(html,new RegExp('value="'+m+'"'));
+ // The iPad has its own Tablet button in the preview bar.
+ assert.match(require('fs').readFileSync(require('path').join(__dirname,'..','public','create.js'),'utf8'),/t\.id='tablet'[\s\S]{0,400}state\.deviceModel='ipad'/);
  assert.match(js,/iphone16:\{label:'iPhone 16',w:393,h:852/);
  assert.match(js,/api\('\/projects\/'\+state\.project\.id\+'\/safari'/);
  assert.match(css,/\.device\.phone\.island \.dev-island/);

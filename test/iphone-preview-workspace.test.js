@@ -11,10 +11,10 @@ test("phone chrome stylesheet is loaded in Create",()=>{
 });
 test("desktop/phone/device controls are wired and the phone frame scales to its canvas",()=>{
  assert.match(ui,/\$\('desktop'\)\.onclick=\(\)=>device\(false\)/);
- assert.match(ui,/\$\('mobile'\)\.onclick=\(\)=>device\(true\)/);
+ assert.match(ui,/\$\('mobile'\)\.onclick=\(\)=>\{state\.deviceModel=state\.lastPhone;[^\n]*device\(true\)\}/);
  assert.match(ui,/\$\('device-model'\)\.onchange=/);
  assert.match(ui,/function fitDevice\(\)/);
- assert.match(ui,/Math\.min\(1,\(c\.clientHeight-pad\)/);
+ assert.match(ui,/Math\.min\(1,\(c\.clientHeight-pad-bar\)/);
  assert.match(ui,/new ResizeObserver\(\(\)=>fitDevice\(\)\)/);
  assert.match(ui,/previewObserver\.observe\(\$\('canvas'\)\)/);
 });
