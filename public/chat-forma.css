@@ -1,0 +1,145 @@
+/* Kairoq's main page (/): the chat, the command centre and the studio in Ka's Figma design
+   ("Forma"), the same look as the builder (/create, ui/forma.css): a dark top band and sidebar
+   (#242329), warm off-white ground, purple for actions (#7552E8), lilac message bubbles, Inter
+   with IBM Plex Mono for small labels. Loaded last on index.html instead of chat-dark.css; it
+   re-points the tokens the older layers read, then fixes the places they hard-coded colours. */
+:root,body,body:is(.simple-mode,html body:not(#fm-a):not(#fm-b) .advanced-mode),html body:not(#fm-a):not(#fm-b).advanced-mode{
+  --bg:#F7F6F2;--panel:#FFFFFF;--sidebar:#242329;--border:#E6E4DF;--text:#1C1B1F;--muted:#625F68;--soft:#716F77;
+  --green:#328368;--red:#B3261E;--user:#ECE8F3;--hover:rgba(117,82,232,.06);--accent:#7552E8;--accent-2:#5B3DCC;
+  --k-card:#FFFFFF;--k-line:#E6E4DF;--k-line-strong:#DEDBD5;--k-ink:#1C1B1F;--k-ink-2:#3C3A42;--k-ink-3:#625F68;--k-hover:rgba(117,82,232,.06);
+  --k-good:#328368;--k-good-bg:#E8F3ED;--k-warn:#9A5B0B;--k-warn-bg:#FDF3E3;
+  --k-muted:#625F68;--k-wine:#7552E8;--k-wine-d:#5B3DCC;--k-wine-tint:#ECE8F3;--k-faint:#716F77;--k-font:Inter,ui-sans-serif,system-ui,sans-serif;
+  --k-surface:#FFFFFF;--k-accent:#7552E8;--k-col:#F7F6F2;--k-bg:#F7F6F2;--k-panel:#FFFFFF;--k-soft:#F4F4F2;--k-bubble:#ECE8F3;
+  --kq-accent:#7552E8;--kq-panel:#FFFFFF;--kq-line:#E6E4DF;--kq-ink:#1C1B1F;--kq-muted:#625F68;
+  --fm-chrome:#242329;--fm-chrome-2:#2E2D33;--fm-chrome-line:#3C3A42;--fm-chrome-ink:#C9C7CE;--fm-chrome-mut:#9A97A1;
+  --fm-lilac:#ECE8F3;--fm-lilac-2:#D8CEF3;--fm-lilac-3:#BCAAFF;--fm-peach:#F0D3BE;
+}
+html,body{background:#F7F6F2!important;color:#1C1B1F!important;color-scheme:light;font-family:Inter,ui-sans-serif,system-ui,sans-serif!important}
+html body:not(#fm-a):not(#fm-b) :where(button,input,textarea,select,h1,h2,h3,h4,p,span,a,li,label,summary,strong,b,div){font-family:inherit}
+html body:not(#fm-a):not(#fm-b)::before,html body:not(#fm-a):not(#fm-b)::after{display:none!important}
+::selection{background:rgba(117,82,232,.22)}
+:focus-visible{outline:2px solid #7552E8!important;outline-offset:2px}
+html body:not(#fm-a):not(#fm-b) .app,html body:not(#fm-a):not(#fm-b) .main,html body:not(#fm-a):not(#fm-b) .command-center-view,html body:not(#fm-a):not(#fm-b) .cc-shell,html body:not(#fm-a):not(#fm-b) .kh-shell,html body:not(#fm-a):not(#fm-b) .messages,html body:not(#fm-a):not(#fm-b) .build-view,html body:not(#fm-a):not(#fm-b) .studio-view,html body:not(#fm-a):not(#fm-b) .plugins-view,html body:not(#fm-a):not(#fm-b) .testing-ground-view,html body:not(#fm-a):not(#fm-b) .browser-workspace{background:#F7F6F2!important;color:#1C1B1F}
+
+/* Home hero: warm, calm, the glass K tinted to the Forma purple */
+html body:not(#fm-a):not(#fm-b) .main[data-view=command]>.kh-sky,html body:not(#fm-a):not(#fm-b) .kh-sky{background:#F7F6F2!important;background-image:radial-gradient(600px 360px at 78% 30%,rgba(216,206,243,.75),transparent 70%),radial-gradient(420px 300px at 92% 70%,rgba(240,211,190,.55),transparent 70%)!important}
+html body:not(#fm-a):not(#fm-b) .kh-sky::before,html body:not(#fm-a):not(#fm-b) .kh-sky::after,html body:not(#fm-a):not(#fm-b) .main[data-view=command]>.kh-sky::before,html body:not(#fm-a):not(#fm-b) .main[data-view=command]>.kh-sky::after{display:none!important}
+html body:not(#fm-a):not(#fm-b) .kh-sky i{display:none!important}
+html body:not(#fm-a):not(#fm-b) .kh-hero-art,html body:not(#fm-a):not(#fm-b) .kh-art,html body:not(#fm-a):not(#fm-b) .kh-hero img,html body:not(#fm-a):not(#fm-b) .kh-hero svg.kh-mark,html body:not(#fm-a):not(#fm-b) .kh-k{filter:hue-rotate(40deg) saturate(1.1)}
+html body:not(#fm-a):not(#fm-b) .kh-hero h1,html body:not(#fm-a):not(#fm-b) #khGreeting{color:#1C1B1F!important;font-weight:500!important;letter-spacing:-.02em!important}
+html body:not(#fm-a):not(#fm-b) .kh-hero h1 em{color:#7552E8!important;font-style:normal}
+html body:not(#fm-a):not(#fm-b) .kh-hero p,html body:not(#fm-a):not(#fm-b) .kh-sub,html body:not(#fm-a):not(#fm-b) .kh-note,html body:not(#fm-a):not(#fm-b) .topbar-subtitle{color:#625F68!important}
+html body:not(#fm-a):not(#fm-b) .kh-kicker,html body:not(#fm-a):not(#fm-b) .kh-eyebrow,html body:not(#fm-a):not(#fm-b) .kh-gallery-heading .kicker{color:#7552E8!important;font-family:"IBM Plex Mono",ui-monospace,monospace!important;letter-spacing:.14em!important}
+
+/* Dark top band with the project tabs, like the Figma frames */
+html body:not(#fm-a):not(#fm-b) .topbar,html body:not(#fm-a):not(#fm-b) .simple-topbar{background:#242329!important;border-bottom:0!important;box-shadow:none!important;color:#fff}
+html body:not(#fm-a):not(#fm-b) .workspace-brand,html body:not(#fm-a):not(#fm-b) .workspace-brand span{color:#fff!important}
+html body:not(#fm-a):not(#fm-b) .workspace-brand .mark,html body:not(#fm-a):not(#fm-b) .workspace-brand img,html body:not(#fm-a):not(#fm-b) .workspace-brand [class*=logo]{filter:hue-rotate(40deg)}
+html body:not(#fm-a):not(#fm-b) .workspace-project-tabs>*,html body:not(#fm-a):not(#fm-b) .workspace-project-tabs button,html body:not(#fm-a):not(#fm-b) .workspace-project-tabs a{background:transparent!important;color:#C9C7CE!important;border-color:transparent!important;box-shadow:none!important}
+html body:not(#fm-a):not(#fm-b) .workspace-project-tabs>*:hover,html body:not(#fm-a):not(#fm-b) .workspace-project-tabs button:hover{background:#2E2D33!important;color:#fff!important}
+html body:not(#fm-a):not(#fm-b) .workspace-project-tabs [aria-selected=true],html body:not(#fm-a):not(#fm-b) .workspace-project-tabs .active,html body:not(#fm-a):not(#fm-b) .workspace-project-tabs .on{background:#3C3A42!important;color:#fff!important}
+html body:not(#fm-a):not(#fm-b) .topbar .icon-btn,html body:not(#fm-a):not(#fm-b) .topbar button.icon-btn,html body:not(#fm-a):not(#fm-b) #sidebarToggle,html body:not(#fm-a):not(#fm-b) #settingsBtn{color:#C9C7CE!important;background:transparent!important;border-color:transparent!important}
+html body:not(#fm-a):not(#fm-b) .topbar .icon-btn:hover{background:#2E2D33!important;color:#fff!important}
+
+/* Sidebar: dark, the chat list grouped by day */
+html body:not(#fm-a):not(#fm-b) .sidebar.kn,html body:not(#fm-a):not(#fm-b) .sidebar{background:#242329!important;color:#C9C7CE!important;border-right:0!important}
+html body:not(#fm-a):not(#fm-b) .sidebar.kn a,html body:not(#fm-a):not(#fm-b) .sidebar.kn button,html body:not(#fm-a):not(#fm-b) .sidebar a,html body:not(#fm-a):not(#fm-b) .sidebar button{color:#C9C7CE!important;background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+html body:not(#fm-a):not(#fm-b) .sidebar.kn a:hover,html body:not(#fm-a):not(#fm-b) .sidebar.kn button:hover,html body:not(#fm-a):not(#fm-b) .sidebar.kn .active,html body:not(#fm-a):not(#fm-b) .sidebar.kn [aria-current],html body:not(#fm-a):not(#fm-b) .sidebar a:hover,html body:not(#fm-a):not(#fm-b) .sidebar button:hover,html body:not(#fm-a):not(#fm-b) .sidebar .active{background:#2E2D33!important;color:#fff!important}
+html body:not(#fm-a):not(#fm-b) .sidebar #newChat{border:1px solid #3C3A42!important;color:#fff!important}
+html body:not(#fm-a):not(#fm-b) .sidebar input,html body:not(#fm-a):not(#fm-b) .sidebar #chatSearch{background:#2E2D33!important;border:1px solid #3C3A42!important;color:#fff!important}
+html body:not(#fm-a):not(#fm-b) .sidebar input::placeholder{color:#9A97A1!important}
+html body:not(#fm-a):not(#fm-b) .sidebar :is(h2,html body:not(#fm-a):not(#fm-b) h3,html body:not(#fm-a):not(#fm-b) .label,html body:not(#fm-a):not(#fm-b) .section-label,html body:not(#fm-a):not(#fm-b) .kn-label,html body:not(#fm-a):not(#fm-b) .kn-group){color:#9A97A1!important;font-family:"IBM Plex Mono",ui-monospace,monospace!important;font-size:12px!important;letter-spacing:.12em!important;text-transform:uppercase}
+html body:not(#fm-a):not(#fm-b) .sidebar-footer,html body:not(#fm-a):not(#fm-b) .usage-mini,html body:not(#fm-a):not(#fm-b) #hermesFooter{color:#9A97A1!important;border-color:#3C3A42!important;background:transparent!important}
+html body:not(#fm-a):not(#fm-b) .kn-hint{color:#9A97A1!important}
+
+/* Composer: white, purple send, the Ask / Web app / Mobile app switch */
+html body:not(#fm-a):not(#fm-b) .kh-modes{background:#F4F2FA!important;border:1px solid #EBE7F6!important;border-radius:10px!important}
+html body:not(#fm-a):not(#fm-b) .kh-mode{color:#3C3A42!important;background:transparent!important}
+html body:not(#fm-a):not(#fm-b) .kh-mode[aria-selected=true]{background:#242329!important;color:#fff!important;box-shadow:0 4px 12px -6px rgba(36,35,41,.6)!important}
+html body:not(#fm-a):not(#fm-b) .kh-mode svg{color:currentColor!important}
+html body:not(#fm-a):not(#fm-b) .composer-shell,html body:not(#fm-a):not(#fm-b) .kh-composer-slot .composer-shell{background:transparent!important;box-shadow:none!important}
+html body:not(#fm-a):not(#fm-b) .composer,html body:not(#fm-a):not(#fm-b) .kh-composer-slot .composer{background:#fff!important;border:1px solid #D8D4E6!important;border-radius:14px!important;box-shadow:0 18px 50px -24px rgba(117,82,232,.45)!important}
+html body:not(#fm-a):not(#fm-b) .composer:focus-within{border-color:#7552E8!important;box-shadow:0 0 0 3px rgba(117,82,232,.14),0 18px 50px -24px rgba(117,82,232,.45)!important}
+html body:not(#fm-a):not(#fm-b) .composer textarea,html body:not(#fm-a):not(#fm-b) #input,html body:not(#fm-a):not(#fm-b) #composerInput{background:transparent!important;color:#1C1B1F!important;border:0!important;box-shadow:none!important}
+html body:not(#fm-a):not(#fm-b) .composer textarea::placeholder{color:#625F68!important;opacity:1}
+html body:not(#fm-a):not(#fm-b) .composer-tools button,html body:not(#fm-a):not(#fm-b) .inline-controls button,html body:not(#fm-a):not(#fm-b) .composer .tool,html body:not(#fm-a):not(#fm-b) .composer .chip{background:transparent!important;color:#3C3A42!important;border-color:transparent!important}
+html body:not(#fm-a):not(#fm-b) .composer-tools button:hover,html body:not(#fm-a):not(#fm-b) .inline-controls button:hover{background:#F4F4F2!important}
+html body:not(#fm-a):not(#fm-b) .composer-tools button[aria-pressed=true],html body:not(#fm-a):not(#fm-b) .inline-controls button[aria-pressed=true],html body:not(#fm-a):not(#fm-b) .composer .tool.on{background:#ECE8F3!important;color:#4A33A8!important}
+html body:not(#fm-a):not(#fm-b) #modelPickerBtn,html body:not(#fm-a):not(#fm-b) .model-pill,html body:not(#fm-a):not(#fm-b) .kq-model-btn{background:#fff!important;color:#3C3A42!important;border:1px solid #DEDBD5!important}
+html body:not(#fm-a):not(#fm-b) #sendBtn,html body:not(#fm-a):not(#fm-b) .send-btn,html body:not(#fm-a):not(#fm-b) .composer button[type=submit],html body:not(#fm-a):not(#fm-b) .composer .send{background:#7552E8!important;color:#fff!important;border:0!important;box-shadow:0 1px 1px rgba(0,0,0,.08),0 8px 20px -8px rgba(117,82,232,.55)!important}
+html body:not(#fm-a):not(#fm-b) #sendBtn:hover,html body:not(#fm-a):not(#fm-b) .send-btn:hover{background:#5B3DCC!important}
+html body:not(#fm-a):not(#fm-b) #sendBtn:disabled,html body:not(#fm-a):not(#fm-b) .send-btn:disabled{background:#D8CEF3!important;box-shadow:none!important}
+
+/* Starting points, cards and lists */
+html body:not(#fm-a):not(#fm-b) .kh-pills button,html body:not(#fm-a):not(#fm-b) .kh-starting-points button,html body:not(#fm-a):not(#fm-b) .kh-pill{background:transparent!important;color:#1C1B1F!important;border-color:#E6E4DF!important}
+html body:not(#fm-a):not(#fm-b) .kh-pills button:hover{background:#fff!important}
+html body:not(#fm-a):not(#fm-b) .kh-pills .num,html body:not(#fm-a):not(#fm-b) .kh-pills small,html body:not(#fm-a):not(#fm-b) .kh-pills span.sub{color:#716F77!important}
+html body:not(#fm-a):not(#fm-b) .kh-card,html body:not(#fm-a):not(#fm-b) .cc-card,html body:not(#fm-a):not(#fm-b) .kh-work .kh-card,html body:not(#fm-a):not(#fm-b) .open-loops-panel,html body:not(#fm-a):not(#fm-b) .work-studio-panel,html body:not(#fm-a):not(#fm-b) .cc-team-panel,html body:not(#fm-a):not(#fm-b) .atlas-capability-panel,html body:not(#fm-a):not(#fm-b) .atlas-budget-panel{background:#fff!important;border:1px solid #E6E4DF!important;border-radius:10px!important;box-shadow:none!important;color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .kh-card-head,html body:not(#fm-a):not(#fm-b) .kh-card h2,html body:not(#fm-a):not(#fm-b) .kh-card h3,html body:not(#fm-a):not(#fm-b) .kh-card b{color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .kh-list,html body:not(#fm-a):not(#fm-b) .kh-list li,html body:not(#fm-a):not(#fm-b) .kh-list a,html body:not(#fm-a):not(#fm-b) .kh-figures,html body:not(#fm-a):not(#fm-b) .kh-field{color:#3C3A42!important;border-color:#E6E4DF!important}
+html body:not(#fm-a):not(#fm-b) .kh-list li:hover,html body:not(#fm-a):not(#fm-b) .kh-list a:hover{background:#F4F4F2!important}
+html body:not(#fm-a):not(#fm-b) .kh-work a,html body:not(#fm-a):not(#fm-b) .kh-apps a,html body:not(#fm-a):not(#fm-b) .kh-gallery-heading a{color:#7552E8!important}
+html body:not(#fm-a):not(#fm-b) .kh-gallery-heading h2,html body:not(#fm-a):not(#fm-b) .kh-gallery-heading h3{color:#1C1B1F!important;font-weight:500!important}
+html body:not(#fm-a):not(#fm-b) .kh-grid .kh-card img,html body:not(#fm-a):not(#fm-b) .kh-apps img{border-radius:6px}
+html body:not(#fm-a):not(#fm-b) .free-pill,html body:not(#fm-a):not(#fm-b) .pill,html body:not(#fm-a):not(#fm-b) .badge{background:#ECE8F3!important;color:#4A33A8!important;border-color:transparent!important}
+html body:not(#fm-a):not(#fm-b) .free-pill{background:#E8F3ED!important;color:#328368!important}
+
+/* Messages: lilac user bubbles, plain answers, tables like the Figma chat */
+html body:not(#fm-a):not(#fm-b) .messages .msg,html body:not(#fm-a):not(#fm-b) .message,html body:not(#fm-a):not(#fm-b) .msg-row{color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .message.user,html body:not(#fm-a):not(#fm-b) .msg.user,html body:not(#fm-a):not(#fm-b) .bubble.user,html body:not(#fm-a):not(#fm-b) .messages .user .bubble{background:#ECE8F3!important;color:#1C1B1F!important;border:0!important;border-radius:12px!important}
+html body:not(#fm-a):not(#fm-b) .messages .assistant,html body:not(#fm-a):not(#fm-b) .message.assistant,html body:not(#fm-a):not(#fm-b) .msg.assistant{background:transparent!important;color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .messages pre,html body:not(#fm-a):not(#fm-b) pre{background:#242329!important;color:#E9E7EE!important;border:0!important;border-radius:8px!important;font-family:"IBM Plex Mono",ui-monospace,monospace!important}
+html body:not(#fm-a):not(#fm-b) .messages :not(pre)>code,html body:not(#fm-a):not(#fm-b) :not(pre)>code{background:#F1EEF8!important;color:#4A33A8!important;border-radius:4px;padding:1px 5px;font-family:"IBM Plex Mono",ui-monospace,monospace!important}
+html body:not(#fm-a):not(#fm-b) .messages a,html body:not(#fm-a):not(#fm-b) .msg a{color:#7552E8!important}
+html body:not(#fm-a):not(#fm-b) .messages .status-line,html body:not(#fm-a):not(#fm-b) .status-bar,html body:not(#fm-a):not(#fm-b) .thinking,html body:not(#fm-a):not(#fm-b) .step{color:#625F68!important}
+html body:not(#fm-a):not(#fm-b) .messages .tool-card,html body:not(#fm-a):not(#fm-b) .tool-call,html body:not(#fm-a):not(#fm-b) .approval-card,html body:not(#fm-a):not(#fm-b) .agent-run,html body:not(#fm-a):not(#fm-b) .agent-plan,html body:not(#fm-a):not(#fm-b) .agent-status{background:#fff!important;border:1px solid #E6E4DF!important;color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .messages table,html body:not(#fm-a):not(#fm-b) .msg table,html body:not(#fm-a):not(#fm-b) .message table{border-collapse:separate!important;border-spacing:0!important;width:100%;border:1px solid #E6E4DF!important;border-radius:10px!important;overflow:hidden;background:#fff!important;font-size:13px}
+html body:not(#fm-a):not(#fm-b) .messages th,html body:not(#fm-a):not(#fm-b) .msg th,html body:not(#fm-a):not(#fm-b) .message th{text-align:left;font-weight:500!important;color:#625F68!important;font-size:12px;padding:9px 14px!important;background:#FAF9F6!important;border:0!important;border-bottom:1px solid #ECEBE6!important}
+html body:not(#fm-a):not(#fm-b) .messages td,html body:not(#fm-a):not(#fm-b) .msg td,html body:not(#fm-a):not(#fm-b) .message td{padding:10px 14px!important;border:0!important;border-bottom:1px solid #F0EFEA!important;color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .messages tr:last-child td,html body:not(#fm-a):not(#fm-b) .msg tr:last-child td{border-bottom:0!important}
+
+/* Menus, pickers and dialogs */
+html body:not(#fm-a):not(#fm-b) .kq-picker,html body:not(#fm-a):not(#fm-b) .kq-plus-menu,html body:not(#fm-a):not(#fm-b) .kq-edit-list,html body:not(#fm-a):not(#fm-b) .menu,html body:not(#fm-a):not(#fm-b) .dropdown,html body:not(#fm-a):not(#fm-b) .popover,html body:not(#fm-a):not(#fm-b) dialog,html body:not(#fm-a):not(#fm-b) .modal,html body:not(#fm-a):not(#fm-b) .sheet{background:#fff!important;color:#1C1B1F!important;border:1px solid #E6E4DF!important;box-shadow:0 24px 60px -24px rgba(36,35,41,.35)!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker input,html body:not(#fm-a):not(#fm-b) .kq-picker-search,html body:not(#fm-a):not(#fm-b) .kq-picker [type=search]{background:#F7F6F2!important;color:#1C1B1F!important;border:1px solid #E6E4DF!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker-list .section,html body:not(#fm-a):not(#fm-b) .kq-picker .section,html body:not(#fm-a):not(#fm-b) .kq-section{color:#716F77!important;font-family:"IBM Plex Mono",ui-monospace,monospace!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker-list button,html body:not(#fm-a):not(#fm-b) .kq-picker-list .item,html body:not(#fm-a):not(#fm-b) .kq-item{color:#1C1B1F!important;background:transparent!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker-list button:hover,html body:not(#fm-a):not(#fm-b) .kq-picker-list .item:hover,html body:not(#fm-a):not(#fm-b) .kq-item:hover,html body:not(#fm-a):not(#fm-b) .kq-item.on,html body:not(#fm-a):not(#fm-b) .kq-picker-list .selected{background:#F1EEF8!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker-list .tag,html body:not(#fm-a):not(#fm-b) .kq-tag,html body:not(#fm-a):not(#fm-b) .kq-item .tag{background:#F4F4F2!important;color:#625F68!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker-list .tag.free,html body:not(#fm-a):not(#fm-b) .kq-tag.free,html body:not(#fm-a):not(#fm-b) .tag.free{background:#E8F3ED!important;color:#328368!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker-list .tag.paid,html body:not(#fm-a):not(#fm-b) .kq-tag.paid,html body:not(#fm-a):not(#fm-b) .tag.paid,html body:not(#fm-a):not(#fm-b) .kq-price{background:#ECE8F3!important;color:#4A33A8!important}
+html body:not(#fm-a):not(#fm-b) .kq-picker .muted,html body:not(#fm-a):not(#fm-b) .kq-picker small,html body:not(#fm-a):not(#fm-b) .kq-item small,html body:not(#fm-a):not(#fm-b) .kq-item .sub{color:#716F77!important}
+html body:not(#fm-a):not(#fm-b) dialog::backdrop{background:rgba(36,35,41,.4)!important}
+html body:not(#fm-a):not(#fm-b) input,html body:not(#fm-a):not(#fm-b) textarea,html body:not(#fm-a):not(#fm-b) select{background:#fff;color:#1C1B1F;border-color:#DEDBD5}
+html body:not(#fm-a):not(#fm-b) input::placeholder,html body:not(#fm-a):not(#fm-b) textarea::placeholder{color:#716F77}
+html body:not(#fm-a):not(#fm-b) button.primary,html body:not(#fm-a):not(#fm-b) .primary,html body:not(#fm-a):not(#fm-b) .btn-primary,html body:not(#fm-a):not(#fm-b) .kh-cta{background:#7552E8!important;color:#fff!important;border-color:transparent!important}
+html body:not(#fm-a):not(#fm-b) button.primary:hover,html body:not(#fm-a):not(#fm-b) .primary:hover{background:#5B3DCC!important}
+html body:not(#fm-a):not(#fm-b) button.ghost,html body:not(#fm-a):not(#fm-b) .ghost,html body:not(#fm-a):not(#fm-b) .btn-ghost,html body:not(#fm-a):not(#fm-b) .secondary{background:#fff;color:#1C1B1F;border-color:#DEDBD5}
+html body:not(#fm-a):not(#fm-b) .login-overlay{background:#F7F6F2!important}
+html body:not(#fm-a):not(#fm-b) hr{border-color:#E6E4DF!important}
+html body:not(#fm-a):not(#fm-b) .muted,html body:not(#fm-a):not(#fm-b) .small,html body:not(#fm-a):not(#fm-b) .hint,html body:not(#fm-a):not(#fm-b) .kh-note{color:#625F68}
+
+@media (max-width:900px){
+  html body:not(#fm-a):not(#fm-b) .kh-hero h1,html body:not(#fm-a):not(#fm-b) #khGreeting{font-size:clamp(34px,10vw,48px)!important}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* Places the older layers paint by element (from a look in a real browser) */
+html body:not(#fm-a):not(#fm-b) header.topbar.simple-topbar{background:#242329!important;border-bottom:0!important}
+html body:not(#fm-a):not(#fm-b) .workspace-brand>span:first-child,html body:not(#fm-a):not(#fm-b) .workspace-brand .brand-mark{background:linear-gradient(135deg,#BCAAFF,#7552E8)!important;color:#fff!important;box-shadow:none!important}
+html body:not(#fm-a):not(#fm-b) .workspace-tab,html body:not(#fm-a):not(#fm-b) .workspace-tab *{color:#C9C7CE!important}
+html body:not(#fm-a):not(#fm-b) .workspace-tab{background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+html body:not(#fm-a):not(#fm-b) .workspace-tab:is(.active,[aria-selected=true],.on,.is-active),html body:not(#fm-a):not(#fm-b) #workspaceHomeTab:is(.active,[aria-selected=true]){background:#3C3A42!important}
+html body:not(#fm-a):not(#fm-b) .workspace-tab:is(.active,[aria-selected=true],.on,.is-active) *{color:#fff!important}
+html body:not(#fm-a):not(#fm-b) #khGreeting em{color:#7552E8!important}
+html body:not(#fm-a):not(#fm-b) #sendBtn.send-btn{background:#7552E8!important}
+html body:not(#fm-a):not(#fm-b) .kh-modes .kh-mode{background:transparent!important;color:#3C3A42!important}
+html body:not(#fm-a):not(#fm-b) .kh-modes .kh-mode:is([aria-selected=true],[aria-pressed=true],.on,.active){background:#242329!important;color:#fff!important}
+html body:not(#fm-a):not(#fm-b) .kh-pill,html body:not(#fm-a):not(#fm-b) .kh-pill *{color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .kh-pill small,html body:not(#fm-a):not(#fm-b) .kh-pill span span{color:#716F77!important}
+html body:not(#fm-a):not(#fm-b) .kh-gallery-heading h2{color:#1C1B1F!important}
+html body:not(#fm-a):not(#fm-b) .kh-gallery-heading a,html body:not(#fm-a):not(#fm-b) .kh-apps a{color:#7552E8!important}
+html body:not(#fm-a):not(#fm-b) .kh-kicker,html body:not(#fm-a):not(#fm-b) .kh-eyebrow{color:#7552E8!important}
+html body:not(#fm-a):not(#fm-b) .kh-hero::before{color:#7552E8!important;font-family:"IBM Plex Mono",ui-monospace,monospace!important}
+html body:not(#fm-a):not(#fm-b) .kh-gallery-new,html body:not(#fm-a):not(#fm-b) .kh-gallery-new *{color:#7552E8!important}
+html body:not(#fm-a):not(#fm-b) .workspace-tab-dot.home-dot{background:#BCAAFF!important}
+html body:not(#fm-a):not(#fm-b) .sidebar :is(.brand,.sidebar-brand,.kn-brand,.logo,[class*=brand]) :is(span,b,strong),html body:not(#fm-a):not(#fm-b) .sidebar :is(.brand,.sidebar-brand,.kn-brand,[class*=brand]){color:#fff!important}
