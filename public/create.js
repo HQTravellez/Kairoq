@@ -2262,6 +2262,8 @@ function renderTiers(){
   const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+m.id).toLowerCase();
   if(m.note)b.title=m.note;
   b.append(modelMark(m),el('b','m-name',m.label));
+  // A free model says so with one quiet word on the right, no box or section.
+  if(m.free===true||m.credits===0)b.append(el('span','m-free','Free'));
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
   return b;
  };

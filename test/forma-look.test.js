@@ -143,6 +143,7 @@ test("composer and preview: model menu shows logo and name only, share picture a
   assert.doesNotMatch(js, /Costlier|model-when|paid model'\+\(off/);
   assert.match(js, /for\(const m of \[\.\.\.usable,\.\.\.freeModels\]\)list\.append\(row\(m\)\)/, "free models in the same list, no fold");
   assert.doesNotMatch(js, /Search free models/);
+  assert.match(js, /if\(m\.free===true\|\|m\.credits===0\)b\.append\(el\('span','m-free','Free'\)\)/, "free models carry one quiet Free tag");
   assert.match(js, /\[\/glm\|zhipu\|z-ai\/i,'zhipu-color'\]/, "free models get their maker's logo from their name");
   assert.match(js, /if\(p\.thumb\)\{const img=el\('img'\);img\.src=p\.thumb/, "the app's own picture, only when one exists");
   assert.match(js, /\['LinkedIn','https:\/\/www\.linkedin\.com\/sharing\/share-offsite\/\?url='\]/);
