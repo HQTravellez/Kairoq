@@ -46,7 +46,8 @@ const SYSTEM=[
  "- If something was not checked, say so plainly (\"I haven't checked the sign-up in the preview yet, so give it a quick try\").",
  "- End with one short next step the owner can take (often: what to ask you next, or Try again).",
  "- Write like Lovable: warm, plain, specific. 2 to 4 short sentences, plus at most 3 bullets if there are several open problems. No headings, no file paths, no apologies, no filler, no internal tool or framework names, no mention of these rules.",
- "Reply with the message text only."
+ "- Unless the outcome is not_built, after the message add exactly 2 lines, each a next step the owner might ask for in 3 to 6 words: IDEA: Test calculation edge cases",
+ "Reply with the message text only (and the IDEA lines)."
 ].join("\n");
 
 // Problems with a draft, or [] when it is fine.
@@ -80,6 +81,12 @@ function factual(f){
  return [head,what].filter(Boolean).join(" ")+open+" Try it in the preview and tell me what to fix first.";
 }
 
+// "IDEA: Test calculation edge cases" lines become the suggestion pills above the message box.
+function splitIdeas(text){
+ const keep=[],ideas=[];
+ for(const l of String(text||"").split("\n")){const m=/^\s*[-*]?\s*IDEA\s*:\s*(.+)$/i.exec(l);if(m)ideas.push(m[1].trim().replace(/[.\s]+$/,"").slice(0,60));else keep.push(l)}
+ return{text:keep.join("\n").trim(),ideas:[...new Set(ideas)].filter(x=>x.length>=4).slice(0,3)};
+}
 async function write({callModel,facts:f,tier="standard",signal}={}){
  if(process.env.KAIROQ_AGENT_REPLY==="off"||typeof callModel!=="function")return{text:factual(f),source:"factual"};
  const user="FACTS:\n"+JSON.stringify(f,null,1);
@@ -88,11 +95,12 @@ async function write({callModel,facts:f,tier="standard",signal}={}){
   let draft="";
   try{draft=String(await callModel({messages,temperature:0.3,maxOutputTokens:600,tier,signal},t=>String(t||""))||"").trim()}
   catch(e){if(e?.name==="AbortError"||signal?.aborted)throw e;break}
-  const bad=check(draft,f);
-  if(!bad.length)return{text:draft,source:"model"};
+  const {text:body,ideas}=splitIdeas(draft);
+  const bad=check(body,f);
+  if(!bad.length)return{text:body,ideas:f.outcome==="not_built"?[]:ideas,source:"model"};
   messages=[...messages,{role:"assistant",content:draft.slice(0,1500)},{role:"user",content:"That message does not match the facts: "+bad.join("; ")+". Rewrite it using only the FACTS."}];
  }
  return{text:factual(f),source:"factual"};
 }
 
-module.exports={facts,write,check,factual,SYSTEM};
+module.exports={facts,write,check,factual,splitIdeas,SYSTEM};

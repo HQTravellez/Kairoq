@@ -1156,3 +1156,5 @@ html body.app.in-editor #editor #messages .md :is(ul,ol){padding-left:20px!impor
 html body.app.in-editor #editor #messages .md li{margin:2px 0!important}
 html body.app.in-editor #editor #messages .plan-card .plan-kicker{font:600 14px/1.4 Inter,system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--c-ink,#1C1B1F)!important}
 html body.app.in-editor #editor #messages>li.assistant::before,html body.app.in-editor #editor #messages>li.assistant:first-child::before{content:"✦ Kairoq"!important;font:500 13px/1.3 Inter,system-ui,sans-serif!important}
+/* Suggestions above the message box, like Lovable: white pills you can read at a glance. */
+html body.app.in-editor #editor .composer-ideas .idea-chip{height:34px!important;max-width:320px;padding:0 15px!important;border-radius:999px!important;border:1px solid var(--c-line-2,#DEDBD5)!important;background:#fff!important;color:var(--c-ink,#1C1B1F)!important;font:400 14px/1 Inter,system-ui,sans-serif!important;box-shadow:0 1px 2px rgba(28,27,31,.05)!important}
