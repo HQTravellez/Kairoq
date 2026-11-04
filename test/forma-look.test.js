@@ -135,10 +135,11 @@ test("settings live in the preview area like Emergent: Connectors, Payments, Sec
   assert.match(read("ui/forma.css"), /#canvas\[data-view\]:not\(\[data-view=preview\]\)>#device\{display:none!important\}/);
 });
 
-test("composer and preview: model menu shows name and credits only, share picture and links, floating preview bar", () => {
+test("composer and preview: model menu shows logo and name only, share picture and links, floating preview bar", () => {
   const js = read("create.js"), css = read("ui/forma.css");
-  // Like Lovable: one line per model, name and cost; no notes, badges or "not available" footer.
-  assert.match(js, /b\.append\(modelMark\(m\),el\('b','m-name',m\.label\),el\('span','m-cost',cost\)\)/);
+  // Like Lovable: one line per model, logo and name; no notes, badges or "not available" footer.
+  assert.match(js, /b\.append\(modelMark\(m\),el\('b','m-name',m\.label\)\)/);
+  assert.doesNotMatch(js, /el\('span','m-cost',cost\)/, "no credits in the menu");
   assert.doesNotMatch(js, /Costlier|model-when|paid model'\+\(off/);
   assert.match(js, /el\('b','m-name','Free models'\)/, "free models folded behind one line");
   assert.match(js, /if\(p\.thumb\)\{const img=el\('img'\);img\.src=p\.thumb/, "the app's own picture, only when one exists");

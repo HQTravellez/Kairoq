@@ -283,7 +283,7 @@ The image behind the Create home prompt and the editor's top bar is the Carina N
 
 ## Model maker logos in the chat box
 
-The coloured logos beside the models in the Create chat box come from LobeHub's icon set, `@lobehub/icons-static-svg` (MIT License, https://github.com/lobehub/lobe-icons), loaded by the browser from unpkg at a pinned version. The logos themselves belong to their companies and are shown only to identify the model's maker.
+The coloured logos beside the models in the Create chat box come from LobeHub's icon set, `@lobehub/icons-static-svg` (MIT License, https://github.com/lobehub/lobe-icons), version 1.101.0, copied into `public/ui/model-logos/` so they load from Kairoq itself. The logos themselves belong to their companies and are shown only to identify the model's maker.
 
 ## Service logos on the Connectors page
 

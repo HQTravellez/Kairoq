@@ -2223,7 +2223,7 @@ $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>s
 // The maker's mark beside a model: the real coloured logo from LobeHub's icon set
 // (@lobehub/icons-static-svg, MIT, pinned version; THIRD_PARTY_NOTICES), with a lettered square
 // behind it until it loads or when there is none.
-const MARK_BASE='https://unpkg.com/@lobehub/icons-static-svg@1.101.0/icons/';
+const MARK_BASE='/ui/model-logos/';
 const MARK_FILES={anthropic:'claude-color',openai:'openai',google:'gemini-color',meta:'meta-color','meta-llama':'meta-color',deepseek:'deepseek-color',mistralai:'mistral-color',mistral:'mistral-color',qwen:'qwen-color',nvidia:'nvidia-color',microsoft:'microsoft-color','x-ai':'xai',xai:'xai',cohere:'cohere-color',perplexity:'perplexity-color',amazon:'aws-color',moonshotai:'moonshot',moonshot:'moonshot',minimax:'minimax-color','z-ai':'zhipu-color',zai:'zhipu-color',baidu:'baidu-color',bytedance:'bytedance-color',tencent:'tencent-color',ai21:'ai21',nousresearch:'nousresearch',liquid:'liquid',huggingface:'huggingface-color',openrouter:'openrouter'};
 function modelMark(m,small){
  const p=(m&&m.provider)||{},key=String(p.key||'').toLowerCase(),box=el('span','m-mark'+(small?' small':''));
@@ -2235,8 +2235,8 @@ function modelMark(m,small){
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
- // The model menu, like Lovable's: one short line per model, its name and what a message costs,
- // a tick on the chosen one. The free models (often dozens) sit behind one "Free models" line,
+ // The model menu, like Lovable's: one short line per model, its logo and name, a tick on the
+ // chosen one; no costs, notes or badges. The free models (often dozens) sit behind one "Free models" line,
  // with a search box once opened.
  const models=state.me.models||[{id:'auto',label:'Auto',enabled:true}];
  const freeModels=(state.me.free_models||[]).filter(m=>!models.some(x=>x.id===m.id));
@@ -2247,8 +2247,7 @@ function renderTiers(){
  const row=m=>{
   const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+m.id).toLowerCase();
   if(m.note)b.title=m.note;
-  const cost=m.id==='auto'?'':m.free===true||m.credits===0?'Free':m.credits?m.credits+' credit'+(m.credits===1?'':'s'):'';
-  b.append(modelMark(m),el('b','m-name',m.label),el('span','m-cost',cost));
+  b.append(modelMark(m),el('b','m-name',m.label));
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
   return b;
  };
