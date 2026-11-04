@@ -2235,35 +2235,36 @@ function modelMark(m,small){
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
- // The model menu, like Emergent's: a search box, "Recommended" (Auto and the named models that
- // can run here) with the maker's mark, then every free model (the free pool and OpenRouter's
- // free models, 650+), one grey line each, a tick on the chosen one and the cost on hover.
- const models=state.me.models||[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true}];
+ // The model menu, like Lovable's: one short line per model, its name and what a message costs,
+ // a tick on the chosen one. The free models (often dozens) sit behind one "Free models" line,
+ // with a search box once opened.
+ const models=state.me.models||[{id:'auto',label:'Auto',enabled:true}];
  const freeModels=(state.me.free_models||[]).filter(m=>!models.some(x=>x.id===m.id));
  const usable=models.filter(m=>m.enabled),all=[...usable,...freeModels];
  if(!all.some(m=>m.id===state.model))state.model='auto';
  const panel=$('tier-panel');panel.replaceChildren();
- panel.append(el('p','model-when','Model changes apply from your next message'));
- const q=el('input','model-search');q.type='search';q.placeholder='Search '+(all.length>8?all.length+' models':'models');q.setAttribute('aria-label','Search models');panel.append(q);
  const list=el('div','model-list');panel.append(list);
  const row=m=>{
-  const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+(m.note||'')+' '+m.id).toLowerCase();
-  const body=el('span','m-body'),name=el('b',null,m.label);
-  if(m.id==='auto')name.append(el('i','model-tag top','Recommended'));
-  if(m.free===true||m.credits===0)name.append(el('i','model-tag free','Free'));
-  body.append(name,el('span',null,m.note||''));b.append(modelMark(m),body);
-  if(m.credits)b.title=m.credits+' credit'+(m.credits===1?'':'s')+' a message'+(m.costlier?' (costlier)':'');
-  if(m.credits&&m.id!=='auto')name.append(el('i','model-tag cost',m.credits+' credit'+(m.credits===1?'':'s')));
-  if(m.costlier)name.append(el('i','model-tag costly','Costlier'));
+  const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',String(m.id===state.model));b.dataset.name=(m.label+' '+m.id).toLowerCase();
+  if(m.note)b.title=m.note;
+  const cost=m.id==='auto'?'':m.free===true||m.credits===0?'Free':m.credits?m.credits+' credit'+(m.credits===1?'':'s'):'';
+  b.append(modelMark(m),el('b','m-name',m.label),el('span','m-cost',cost));
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
   return b;
  };
- const section=(title,items)=>{if(!items.length)return;const h=el('p','menu-note model-section',title);list.append(h);for(const m of items)list.append(row(m))};
- section('Recommended',usable);
- section('Free models ('+freeModels.length+')',freeModels);
- const off=models.length-usable.length;
- if(off)panel.append(el('p','menu-note model-off',off+' paid model'+(off===1?' is':'s are')+' not available on this account'));
- q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const n of list.children){if(n.tagName==='P'){n.hidden=Boolean(t);continue}n.hidden=Boolean(t)&&!n.dataset.name.includes(t)}};
+ for(const m of usable)list.append(row(m));
+ if(freeModels.length){
+  const pickedFree=freeModels.some(m=>m.id===state.model);
+  const more=document.createElement('button');more.type='button';more.className='model-more';more.setAttribute('aria-expanded',String(pickedFree));
+  more.append(el('b','m-name','Free models'),el('span','m-cost',String(freeModels.length)));
+  const box=el('div','model-free');box.hidden=!pickedFree;
+  const q=el('input','model-search');q.type='search';q.placeholder='Search free models';q.setAttribute('aria-label','Search free models');
+  const flist=el('div','model-list');for(const m of freeModels)flist.append(row(m));
+  box.append(q,flist);
+  more.onclick=()=>{box.hidden=!box.hidden;more.setAttribute('aria-expanded',String(!box.hidden));if(!box.hidden)q.focus()};
+  q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const n of flist.children)n.hidden=Boolean(t)&&!n.dataset.name.includes(t)};
+  panel.append(more,box);
+ }
  const cur=all.find(m=>m.id===state.model)||usable[0];
  const lbl=$('tier-label');lbl.replaceChildren(modelMark(cur,true),document.createTextNode(cur?cur.label:'Auto'));
 

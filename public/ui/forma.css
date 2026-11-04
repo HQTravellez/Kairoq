@@ -1134,3 +1134,13 @@ html body.app #home #new-submit.primary:hover svg{transform:translateX(3px)}
 .fly-ghost{position:fixed;z-index:300;box-sizing:border-box;padding:12px 14px;overflow:hidden;pointer-events:none;color:#1C1B1F;font-family:Inter,system-ui,sans-serif;line-height:1.5;white-space:pre-wrap;word-break:break-word;box-shadow:0 18px 40px -18px rgba(60,40,140,.35)}
 @media (prefers-reduced-motion:reduce){html body.app #home #home-title .hw,html body.app #home .projects.cards>li{animation:none!important;opacity:1!important}html body.app #home .projects.cards>li:hover,html body.app #home .projects.cards>li:hover .thumb-img{transform:none!important}}
 html body.app.in-editor #editor #messages.fly-wait>li.user:not(:has(~ li.user)){visibility:hidden}
+/* Model menu, Lovable-style: one line per model, name left, cost right; free models folded. */
+html body.app.in-editor #editor #chat-form #tier-panel :is(.model-list>button,.model-more){display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:0!important;height:auto!important;padding:7px 34px 7px 8px!important;position:relative;border:0!important;background:none;border-radius:8px!important;text-align:left;cursor:pointer}
+html body.app.in-editor #editor #chat-form #tier-panel :is(.model-list>button,.model-more):hover{background:var(--c-raise,#F4F2EE)!important}
+html body.app.in-editor #editor #chat-form #tier-panel .m-name{flex:1;min-width:0;font:500 13.5px/1.3 Inter,system-ui,sans-serif!important;color:var(--c-ink,#1A1A1F)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body.app.in-editor #editor #chat-form #tier-panel .m-cost{flex:none;font:400 12.5px/1.3 Inter,system-ui,sans-serif!important;color:var(--c-ink-3,#8A8890)!important;white-space:nowrap}
+html body.app.in-editor #editor #chat-form #tier-panel .model-more{margin-top:4px!important;border-top:1px solid var(--c-line,#ECEAE5)!important;border-radius:0 0 8px 8px!important;padding-top:9px!important}
+html body.app.in-editor #editor #chat-form #tier-panel .model-more .m-cost::after{content:" ›"}
+html body.app.in-editor #editor #chat-form #tier-panel .model-more[aria-expanded="true"] .m-cost::after{content:" ⌄"}
+html body.app.in-editor #editor #chat-form #tier-panel .model-free .model-list{max-height:220px}
+html body.app.in-editor #editor #chat-form #tier-panel .model-free[hidden]{display:none!important}
