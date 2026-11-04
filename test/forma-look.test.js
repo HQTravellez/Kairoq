@@ -141,7 +141,9 @@ test("composer and preview: model menu shows logo and name only, share picture a
   assert.match(js, /b\.append\(modelMark\(m\),el\('b','m-name',m\.label\)\)/);
   assert.doesNotMatch(js, /el\('span','m-cost',cost\)/, "no credits in the menu");
   assert.doesNotMatch(js, /Costlier|model-when|paid model'\+\(off/);
-  assert.match(js, /el\('b','m-name','Free models'\)/, "free models folded behind one line");
+  assert.match(js, /for\(const m of \[\.\.\.usable,\.\.\.freeModels\]\)list\.append\(row\(m\)\)/, "free models in the same list, no fold");
+  assert.doesNotMatch(js, /Search free models/);
+  assert.match(js, /\[\/glm\|zhipu\|z-ai\/i,'zhipu-color'\]/, "free models get their maker's logo from their name");
   assert.match(js, /if\(p\.thumb\)\{const img=el\('img'\);img\.src=p\.thumb/, "the app's own picture, only when one exists");
   assert.match(js, /\['LinkedIn','https:\/\/www\.linkedin\.com\/sharing\/share-offsite\/\?url='\]/);
   assert.match(js, /function previewFloat\(\)\{/);
@@ -181,4 +183,24 @@ test("Share stays in the top bar on laptops; only phones hide it (it is in the M
   const ws = read("workspace.css");
   assert.doesNotMatch(/@media \(max-width:1380px\)\{[^}]*\}/.exec(ws)[0], /#share-open\{display:none\}/);
   assert.match(ws, /\.stage-bar #share-open\{display:none\}/, "still hidden on phones");
+});
+
+test("chat text like the Figma App builder frame: one font and size, no bold runs or code chips", () => {
+  const css = read("ui/forma.css"), prompt = fs.readFileSync(path.join(__dirname, "..", "react-builder.js"), "utf8");
+  assert.match(css, /#messages :is\(\.md,li\.user\) :is\(strong,b\)\{font-weight:400!important\}/);
+  assert.match(css, /#messages :is\(\.md,li\.user\) :not\(pre\)>code\{font:inherit!important/);
+  assert.match(css, /#messages \.md\{font:400 14px\/1\.6 Inter/);
+  assert.match(css, /content:"✦ Kairoq"!important/);
+  assert.match(prompt, /No bold, no headings, no "Label:" lead-ins, and no code formatting for ordinary words/);
+  assert.doesNotMatch(prompt, /Bold only the few words that carry the decision/);
+});
+
+test("home in the F-shape of the Figma dashboard: 3 big cards, one line about each app, ideas under the prompt", () => {
+  const css = read("ui/forma.css"), js = read("create.js"), builder = fs.readFileSync(path.join(__dirname, "..", "react-builder.js"), "utf8");
+  assert.match(css, /#home \.projects\.cards\{display:grid!important;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+  assert.match(css, /#home \.browser-tabs>button:first-child\{padding-left:0!important\}/, "All projects lines up with the heading");
+  assert.match(js, /el\('span','spark-lead','Need a spark\?'\)/);
+  assert.match(js, /el\('button','example spark-more','Browse templates ↗'\)/);
+  assert.match(js, /const about=el\('span','pj-about',p\.about\|\|''\)/);
+  assert.match(builder, /preview_url:previewUrl\(m\),about:about\(m\)\}/);
 });

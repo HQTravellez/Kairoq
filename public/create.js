@@ -164,7 +164,10 @@ function renderProjects(projects){
   meta.className='meta';
   const st=el('span','pj-status'+(p.published?' live':''),p.published?'Published':'Draft');
   meta.append(st,el('span','pj-when','Edited '+ago(p.updated_at)));
-  li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
+  // One line about the app, as in the Figma dashboard; drafts also say they are not published.
+  const about=el('span','pj-about',p.about||'');
+  li.append(thumb,open,about,meta);
+  if(!p.published)li.append(el('span','pj-site','Not published'));li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
   if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
   if(p.role==='owner'){
    const menu=el('details','pj-menu'),sum=el('summary',null,'···');sum.setAttribute('aria-label','More for '+p.name);menu.append(sum);menu.onclick=e=>e.stopPropagation();
@@ -881,6 +884,8 @@ $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.close
 document.addEventListener('click',e=>{if(window.innerWidth<=900&&document.body.classList.contains('side-open')&&!e.target.closest('#side,#side-open-btn,#side-toggle')){document.body.classList.remove('side-open');e.preventDefault();e.stopPropagation()}},true);
 // What to build (like superapp's first question): a website, a web app or a phone app. Each has
 // its own examples, typed into the empty box one after another (they stop when you type or focus).
+// Short names for the "Need a spark?" row under the prompt (Figma dashboard), same order as examples.
+const SPARK={site:['Restaurant site','Renovation landing page','Photo portfolio'],app:['CRM','Salon bookings','Café inventory'],phone:['Café order-ahead','Gym bookings','Tour guide']};
 const KINDS={
  site:{prefix:'',examples:['A restaurant site with the menu, opening hours and reservations','A landing page for my renovation company with photos and a quote form','A portfolio for my photography studio with bookings']},
  app:{prefix:'',examples:['A CRM to track leads, deals and follow-ups','A booking system for my salon with staff calendars','An inventory tracker for my café with low-stock alerts']},
@@ -891,7 +896,9 @@ function setKind(kind){
  for(const b of document.querySelectorAll('#new-kind button'))b.setAttribute('aria-pressed',String(b.dataset.kind===home.kind));
  text($('kind-hint'),{site:'A website people visit',app:'An app with sign-in and saved data',phone:'For iPhone and Android'}[home.kind]);
  const ex=$('examples');ex.replaceChildren();
- for(const t of KINDS[home.kind].examples){const b=el('button','example',t);b.type='button';b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)}
+ ex.append(el('span','spark-lead','Need a spark?'));
+ KINDS[home.kind].examples.forEach((t,i)=>{const b=el('button','example',SPARK[home.kind][i]||t);b.type='button';b.title=t;b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)});
+ const more=el('button','example spark-more','Browse templates ↗');more.type='button';more.onclick=()=>{$('tab-templates').click();$('browser').scrollIntoView({behavior:'smooth',block:'start'})};ex.append(more);
  typeExamples();
 }
 function typeExamples(){
@@ -2226,19 +2233,24 @@ $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>s
 // (@lobehub/icons-static-svg, MIT, pinned version; THIRD_PARTY_NOTICES), with a lettered square
 // behind it until it loads or when there is none.
 const MARK_BASE='/ui/model-logos/';
+// Free models often come without a maker (the local pool says "Local"): the logo comes from the
+// model's own name instead (glm → Zhipu, kimi → Moonshot, gpt-oss → OpenAI, nemotron → NVIDIA…).
+const MARK_BY_NAME=[[/^(?:kairoq|openrouter free|auto)/i,''],[/glm|zhipu|z-ai/i,'zhipu-color'],[/kimi/i,'kimi-color'],[/gpt-oss|openai/i,'openai'],[/nemotron|nvidia/i,'nvidia-color'],[/minimax/i,'minimax-color'],[/deepseek/i,'deepseek-color'],[/mistral|devstral|codestral/i,'mistral-color'],[/gemma/i,'gemma-color'],[/gemini|lyria|google/i,'gemini-color'],[/mimo|xiaomi/i,'xiaomimimo'],[/qwen/i,'qwen-color'],[/llama|muse|meta/i,'meta-color'],[/cohere|north/i,'cohere-color'],[/liquid|lfm/i,'liquid'],[/hermes|nous/i,'nousresearch']];
+function markFile(m){const p=(m&&m.provider)||{},key=String(p.key||'').toLowerCase();if(MARK_FILES[key])return MARK_FILES[key];const n=String((m&&m.label)||'')+' '+String((m&&m.id)||'');const hit=MARK_BY_NAME.find(([re])=>re.test(n));return hit?hit[1]:''}
 const MARK_FILES={anthropic:'claude-color',openai:'openai',google:'gemini-color',meta:'meta-color','meta-llama':'meta-color',deepseek:'deepseek-color',mistralai:'mistral-color',mistral:'mistral-color',qwen:'qwen-color',nvidia:'nvidia-color',microsoft:'microsoft-color','x-ai':'xai',xai:'xai',cohere:'cohere-color',perplexity:'perplexity-color',amazon:'aws-color',moonshotai:'moonshot',moonshot:'moonshot',minimax:'minimax-color','z-ai':'zhipu-color',zai:'zhipu-color',baidu:'baidu-color',bytedance:'bytedance-color',tencent:'tencent-color',ai21:'ai21',nousresearch:'nousresearch',liquid:'liquid',huggingface:'huggingface-color',openrouter:'openrouter'};
 function modelMark(m,small){
  const p=(m&&m.provider)||{},key=String(p.key||'').toLowerCase(),box=el('span','m-mark'+(small?' small':''));
- const letter=el('span','m-letter',m&&m.id==='auto'?'✦':(p.name||m&&m.label||'?').charAt(0).toUpperCase());box.append(letter);
- const file=MARK_FILES[key];
+ const file=m&&m.id!=='auto'?markFile(m):'';
+ const auto=m&&(m.id==='auto'||/^(?:kairoq local auto|openrouter free auto)/i.test(String(m.label||'')));
+ const letter=el('span','m-letter',auto?'✦':(m&&m.label||p.name||'?').charAt(0).toUpperCase());box.append(letter);
  if(file&&m.id!=='auto'){const img=document.createElement('img');img.alt='';img.loading='lazy';img.src=MARK_BASE+file+'.svg';img.onerror=()=>img.remove();box.append(img)}
  return box;
 }
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
- // The model menu, like Lovable's: one short line per model, its logo and name, a tick on the
- // chosen one; no costs, notes or badges. The free models (often dozens) sit behind one "Free models" line,
+ // The model menu, like Lovable's: one list, one short line per model with its logo and name and a
+ // tick on the chosen one; no costs, notes, badges or sections. The free models (often dozens) sit behind one "Free models" line,
  // with a search box once opened.
  const models=state.me.models||[{id:'auto',label:'Auto',enabled:true}];
  const freeModels=(state.me.free_models||[]).filter(m=>!models.some(x=>x.id===m.id));
@@ -2253,19 +2265,8 @@ function renderTiers(){
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
   return b;
  };
- for(const m of usable)list.append(row(m));
- if(freeModels.length){
-  const pickedFree=freeModels.some(m=>m.id===state.model);
-  const more=document.createElement('button');more.type='button';more.className='model-more';more.setAttribute('aria-expanded',String(pickedFree));
-  more.append(el('b','m-name','Free models'),el('span','m-cost',String(freeModels.length)));
-  const box=el('div','model-free');box.hidden=!pickedFree;
-  const q=el('input','model-search');q.type='search';q.placeholder='Search free models';q.setAttribute('aria-label','Search free models');
-  const flist=el('div','model-list');for(const m of freeModels)flist.append(row(m));
-  box.append(q,flist);
-  more.onclick=()=>{box.hidden=!box.hidden;more.setAttribute('aria-expanded',String(!box.hidden));if(!box.hidden)q.focus()};
-  q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const n of flist.children)n.hidden=Boolean(t)&&!n.dataset.name.includes(t)};
-  panel.append(more,box);
- }
+ // Free models continue the same list, same rows (Ka: no separate fold or search box).
+ for(const m of [...usable,...freeModels])list.append(row(m));
  const cur=all.find(m=>m.id===state.model)||usable[0];
  const lbl=$('tier-label');lbl.replaceChildren(modelMark(cur,true),document.createTextNode(cur?cur.label:'Auto'));
 
