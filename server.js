@@ -7002,6 +7002,22 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
     try{return await callOpenRouterBuilder(opts,parse)}
     catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[check] website-check models failed, using the usual route: "+String(err.message||err).slice(0,200))}
   }
+  // Auto builds go to the paid models first when they are switched on (Claude for design and code,
+  // then DeepSeek): the free pool, the Ollama model, Experiential and the free OpenRouter models
+  // below are only the backup, used when no paid model can run (cap reached, no credits, outage).
+  if(paidBuildsFirst(opts)){
+    // Experiential Labs stays the first writer when its key is set (the owner's choice).
+    if(builderProvider()==="experiential"){
+      try{return await experiential.callProject(opts,{enforceBudget,recordUsage,parse})}
+      catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[builder] Experiential could not run, trying the paid models: "+String(err.message||err).slice(0,200))}
+    }
+    try{return await callOpenRouterBuilder({...opts,paidOnly:true},parse)}
+    catch(err){
+      if(err.name==="AbortError"||opts.signal?.aborted)throw err;
+      console.log("[builder] paid models could not run, using the free backup: "+String(err.message||err).slice(0,240));
+      opts={...opts,skipPaid:true};
+    }
+  }
   // FreeLLMAPI is an internal Standard-build pool. It gets one attempt; if the result is
   // malformed or unavailable, Kairoq continues into the existing paid/free fallback chain.
   const freePool=require("./freellmapi");
@@ -7034,7 +7050,7 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
   }
   // Experiential first; when it is out (its free daily allowance, busy, or Kairoq's own budget for
   // it), the free models below take over instead of the build or check failing.
-  if(builderProvider()==="experiential"){
+  if(builderProvider()==="experiential"&&!opts.skipPaid){
     try{return await experiential.callProject(opts,{enforceBudget,recordUsage,parse})}
     catch(err){
       if(err.name==="AbortError"||opts.signal?.aborted)throw err;
@@ -7043,7 +7059,7 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
     }
   }
   // Muse Spark writes Standard builds before the free models when paid builds are on (its own cap).
-  if(museReady()&&!require("./quality").top()&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&(!opts.tier||opts.tier==="standard"||opts.tier==="vision")){
+  if(museReady()&&!opts.skipPaid&&!require("./quality").top()&&process.env.KAIROQ_BUILDER_PAID_APPROVED==="true"&&(!opts.tier||opts.tier==="standard"||opts.tier==="vision")){
     try{const r=await callMuse(opts);return parse(r.text,r.model)}
     catch(err){if(err.name==="AbortError"||opts.signal?.aborted)throw err;console.log("[builder] Muse failed, using the usual models: "+String(err.message||err).slice(0,200))}
   }
@@ -7157,16 +7173,23 @@ async function callFastBuilder(fb,opts,parse){
   if(!String(content||"").trim())throw Error("Empty response; finish="+(last&&last.choices[0].finish_reason));
   return parse(content,fb.model);
 }
-const retiredFreeModels=new Set();let budgetWarned=false;
+const retiredFreeModels=new Set();let budgetWarned=false,openRouterNoCreditsUntil=0;
+// Paid builds are on (Ka's choice, Nov 2026: paid models build, free ones are the backup) unless
+// KAIROQ_BUILDER_MODE=free-first, paid builds are not approved, or no paid model can be reached.
+function paidBuildsFirst(opts={},env=process.env){
+  if(opts.freeOnly||opts.skipPaid||opts.only||!(!opts.tier||opts.tier==="standard"))return false;
+  if(env.KAIROQ_BUILDER_PAID_APPROVED!=="true"||String(env.KAIROQ_BUILDER_MODE||"paid-first").toLowerCase()==="free-first")return false;
+  return Boolean(env.OPENROUTER_API_KEY)||require("./anthropic").configured(env);
+}
 async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   const anthropic=require("./anthropic"),direct=anthropic.configured();
   const freeOnly=async()=>parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   if(!process.env.OPENROUTER_API_KEY&&!direct)return freeOnly();
-  const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
+  const mode=String(process.env.KAIROQ_BUILDER_MODE||"paid-first").toLowerCase();
   // openrouter/free picks whichever free model is up right now, so it goes first; a named free
   // model OpenRouter has retired ("unavailable for free") is skipped from then on.
   const freeCandidates=[...new Set(["openrouter/free",...(process.env.KAIROQ_BUILDER_FREE_MODEL?[String(process.env.KAIROQ_BUILDER_FREE_MODEL)]:[]),...String(process.env.KAIROQ_BUILDER_FREE_FALLBACKS||"").split(",").map(m=>m.trim()).filter(m=>m.endsWith(":free"))])].filter(m=>!retiredFreeModels.has(m));
-  const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
+  const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"anthropic/claude-sonnet-5.5"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"deepseek/deepseek-v3.2"),"deepseek/deepseek-v3.2"];
   const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
   // A model the owner picked by name (opts.only) is a paid choice in itself, whatever the mode.
   // freeOnly (builder chat, learning notes): never a paid model, whatever the build mode.
@@ -7201,7 +7224,11 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
     const viaAnthropic=direct&&anthropic.isClaude(model);
-    if(!free&&!allowPaid)continue;
+    if(!free&&(!allowPaid||opts.skipPaid))continue;
+    if(free&&opts.paidOnly)continue;
+    // OpenRouter said the account has no credits: its paid models are skipped for 15 minutes
+    // (Claude still runs on the Anthropic key), instead of failing on every step of every build.
+    if(!free&&!viaAnthropic&&Date.now()<openRouterNoCreditsUntil){errors.push(model+": OpenRouter has no credits");continue}
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
       // Pro and Max models can write whole apps in one reply, so they get a larger output cap.
@@ -7252,6 +7279,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       // Do not iterate through other providers or retry after an avoidable long delay.
       if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(e.message||e)))throw e;
       if(free&&/unavailable for free|no endpoints found/i.test(String(e.message||e)))retiredFreeModels.add(model);
+      if(!free&&!viaAnthropic&&/insufficient credits|never purchased credits/i.test(String(e.message||e)))openRouterNoCreditsUntil=Date.now()+15*60000;
       if(!free&&/monthly ai cost limit reached/i.test(String(e.message||e))&&!budgetWarned){budgetWarned=true;console.warn("[builder-model] MONTHLY_COST_LIMIT_USD is reached: paid models are off until it is raised or the month ends; builds use the free models.")}
       console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160));
     }
