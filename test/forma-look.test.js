@@ -192,3 +192,13 @@ test("chat text like the Figma App builder frame: one font and size, no bold run
   assert.match(prompt, /No bold, no headings, no "Label:" lead-ins, and no code formatting for ordinary words/);
   assert.doesNotMatch(prompt, /Bold only the few words that carry the decision/);
 });
+
+test("home in the F-shape of the Figma dashboard: 3 big cards, one line about each app, ideas under the prompt", () => {
+  const css = read("ui/forma.css"), js = read("create.js"), builder = fs.readFileSync(path.join(__dirname, "..", "react-builder.js"), "utf8");
+  assert.match(css, /#home \.projects\.cards\{display:grid!important;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+  assert.match(css, /#home \.browser-tabs>button:first-child\{padding-left:0!important\}/, "All projects lines up with the heading");
+  assert.match(js, /el\('span','spark-lead','Need a spark\?'\)/);
+  assert.match(js, /el\('button','example spark-more','Browse templates ↗'\)/);
+  assert.match(js, /const about=el\('span','pj-about',p\.about\|\|''\)/);
+  assert.match(builder, /preview_url:previewUrl\(m\),about:about\(m\)\}/);
+});

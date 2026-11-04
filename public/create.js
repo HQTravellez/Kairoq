@@ -164,7 +164,10 @@ function renderProjects(projects){
   meta.className='meta';
   const st=el('span','pj-status'+(p.published?' live':''),p.published?'Published':'Draft');
   meta.append(st,el('span','pj-when','Edited '+ago(p.updated_at)));
-  li.append(thumb,open,meta);li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
+  // One line about the app, as in the Figma dashboard; drafts also say they are not published.
+  const about=el('span','pj-about',p.about||'');
+  li.append(thumb,open,about,meta);
+  if(!p.published)li.append(el('span','pj-site','Not published'));li.onclick=e=>{if(e.target===li||e.target===thumb||e.target===meta)openProject(p.id)};
   if(p.role&&p.role!=='owner'){const b=document.createElement('span');b.className='role-badge';b.textContent='Shared · '+p.role;li.append(b)}
   if(p.role==='owner'){
    const menu=el('details','pj-menu'),sum=el('summary',null,'···');sum.setAttribute('aria-label','More for '+p.name);menu.append(sum);menu.onclick=e=>e.stopPropagation();
@@ -881,6 +884,8 @@ $('side').addEventListener('click',e=>{if(window.innerWidth<=820&&e.target.close
 document.addEventListener('click',e=>{if(window.innerWidth<=900&&document.body.classList.contains('side-open')&&!e.target.closest('#side,#side-open-btn,#side-toggle')){document.body.classList.remove('side-open');e.preventDefault();e.stopPropagation()}},true);
 // What to build (like superapp's first question): a website, a web app or a phone app. Each has
 // its own examples, typed into the empty box one after another (they stop when you type or focus).
+// Short names for the "Need a spark?" row under the prompt (Figma dashboard), same order as examples.
+const SPARK={site:['Restaurant site','Renovation landing page','Photo portfolio'],app:['CRM','Salon bookings','Café inventory'],phone:['Café order-ahead','Gym bookings','Tour guide']};
 const KINDS={
  site:{prefix:'',examples:['A restaurant site with the menu, opening hours and reservations','A landing page for my renovation company with photos and a quote form','A portfolio for my photography studio with bookings']},
  app:{prefix:'',examples:['A CRM to track leads, deals and follow-ups','A booking system for my salon with staff calendars','An inventory tracker for my café with low-stock alerts']},
@@ -891,7 +896,9 @@ function setKind(kind){
  for(const b of document.querySelectorAll('#new-kind button'))b.setAttribute('aria-pressed',String(b.dataset.kind===home.kind));
  text($('kind-hint'),{site:'A website people visit',app:'An app with sign-in and saved data',phone:'For iPhone and Android'}[home.kind]);
  const ex=$('examples');ex.replaceChildren();
- for(const t of KINDS[home.kind].examples){const b=el('button','example',t);b.type='button';b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)}
+ ex.append(el('span','spark-lead','Need a spark?'));
+ KINDS[home.kind].examples.forEach((t,i)=>{const b=el('button','example',SPARK[home.kind][i]||t);b.type='button';b.title=t;b.onclick=()=>{$('new-prompt').value=t;$('new-prompt').focus()};ex.append(b)});
+ const more=el('button','example spark-more','Browse templates ↗');more.type='button';more.onclick=()=>{$('tab-templates').click();$('browser').scrollIntoView({behavior:'smooth',block:'start'})};ex.append(more);
  typeExamples();
 }
 function typeExamples(){
