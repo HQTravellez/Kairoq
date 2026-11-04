@@ -509,7 +509,19 @@ function list(owner){
  if(!fs.existsSync(ROOT()))return[];
  return fs.readdirSync(ROOT()).filter(d=>/^[a-f0-9]{12}$/.test(d)).map(d=>readJson(path.join(ROOT(),d,'project.json'),null)).filter(m=>m&&(owner===undefined||m.owner===owner)).map(summary).sort((a,b)=>b.updated_at.localeCompare(a.updated_at));
 }
-function summary(m){return{id:m.id,name:m.name,owner:m.owner,current_version:m.current_version,updated_at:m.updated_at,published:m.published,preview_url:previewUrl(m)}}
+// One line about the app for its card (the Figma dashboard): the first thing the owner asked for,
+// its first sentence, without repeating the name.
+function about(m){
+ const first=(m.messages||[]).find(x=>x&&x.role==='user'&&x.text);if(!first)return'';
+ let t=String(first.text).replace(/\s+/g,' ').trim();
+ const name=String(m.name||'').trim();
+ if(name&&t.toLowerCase().startsWith(name.toLowerCase()))t=t.slice(name.length).replace(/^[\s:,.\-–—]+/,'');
+ t=(t.split(/(?<=[.!?])\s/)[0]||'').trim();
+ if(!t)return'';
+ t=t.charAt(0).toUpperCase()+t.slice(1);
+ return t.length>90?t.slice(0,89).replace(/\s+\S*$/,'')+'…':t;
+}
+function summary(m){return{id:m.id,name:m.name,owner:m.owner,current_version:m.current_version,updated_at:m.updated_at,published:m.published,preview_url:previewUrl(m),about:about(m)}}
 function previewUrl(m,n=m.current_version){return n?'/builder/p/'+m.id+'-'+m.preview_key+'/v/'+n+'/':null}
 // Messages for the editor. Long reasoning is kept in full only on the last few messages.
 function lightMessages(list){
