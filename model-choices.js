@@ -42,7 +42,10 @@ function named(env=process.env){
  if(raw.toLowerCase()==='off')return[];
  return raw?parse(raw):DEFAULTS.map(m=>({...m}));
 }
-function list(env=process.env){
+// ownKey: the customer brought their own OpenRouter key (byok.js), so every OpenRouter model can
+// run on it whatever Kairoq's own settings; Muse Spark (Meta's API) is not on OpenRouter.
+function list(env=process.env,{ownKey=false}={}){
+ if(ownKey)return list(env).map(m=>m.id==='auto'||m.provider==='meta'?m:{...m,enabled:true});
  const max=Math.max(0,...named(env).map(m=>m.credits));
  return[{id:'auto',label:'Auto',note:'Kairoq picks the model for you',enabled:true},
   ...named(env).map(m=>({...m,enabled:modelReady(m,env),costlier:m.credits>=max&&max>=10,provider:m.provider||providerOf(m.id)}))];
@@ -74,10 +77,10 @@ function freeReady(m,env=process.env){
  return Boolean(env.OPENROUTER_API_KEY);
 }
 // The named model for a request, or null for Auto (unknown or unavailable ids mean Auto).
-function pick(id,env=process.env){
+function pick(id,env=process.env,{ownKey=false}={}){
  if(!id||id==='auto')return null;
  const m=named(env).find(x=>x.id===id);
- if(m)return modelReady(m,env)?m:null;
+ if(m)return modelReady(m,env)||(ownKey&&m.provider!=='meta')?m:null;
  const f=freeCatalog.find(x=>x.id===id);
  return f&&freeReady(f,env)?f:null;
 }

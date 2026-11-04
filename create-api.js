@@ -417,14 +417,18 @@ function startJob(v,id,{message,mode='build',tier='standard',model=null,images=[
  // The fix of a change that did not work is on Kairoq, once per problem.
  const onUs=fixing&&Boolean(sig)&&payMode()==='fix'&&Boolean(before.free_fix)&&before.free_fix.sig===sig;
  if(before.free_fix&&(onUs||!fixing&&mode!=='discuss')){delete before.free_fix;builder.saveMeta(before)}
- const choices=require('./model-choices'),chosen=choices.pick(model);
+ // Bring your own key: the customer's own OpenRouter key runs this message, at no Kairoq credits.
+ const ownKey=v.kind==='customer'?require('./byok').get(v.account.id):null;
+ const choices=require('./model-choices'),chosen=choices.pick(model,process.env,{ownKey:Boolean(ownKey)});
  if(model&&model!=='auto'&&!chosen)throw Object.assign(Error('The selected model '+String(model).slice(0,100)+' is not available. Choose another model or explicitly select Auto; Kairoq will not silently switch models.'),{status:409});
- const credits=onUs?0:cost({mode,tier,images:images.length>0,model:chosen})+extraCredits;
- const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,execution_mode:executionMode,credits,status:'queued',seq:0,created_at:new Date().toISOString(),ask:String(message||'').trim().slice(0,400),...(onUs?{on_us:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
+ const credits=onUs||ownKey?0:cost({mode,tier,images:images.length>0,model:chosen})+extraCredits;
+ const job={id:crypto.randomUUID(),projectId:id,owner:v.owner,mode,tier,execution_mode:executionMode,credits,status:'queued',seq:0,created_at:new Date().toISOString(),ask:String(message||'').trim().slice(0,400),...(onUs?{on_us:true}:{}),...(ownKey?{own_key:true}:{}),...(chosen?{model:chosen.id,model_label:chosen.label}:{})};
  const update=patch=>{Object.assign(job,patch);job.seq++};
  // Every model call for this message goes to the chosen model first; if it cannot run, the
  // usual builder (Auto) does the work and the chat says so.
  if(chosen){const base=callModel;callModel=(o,p)=>base({...o,model:chosen.id,onFallback:e=>{if(!job.model_fallback)job.model_fallback=chosen.label+' was not available ('+String(e&&e.message||e).slice(0,140)+'), so Auto was used.'}},p)}
+ // Every model call of this message goes through the customer's own key (never Kairoq's paid keys).
+ if(ownKey){const base=callModel;callModel=(o,p)=>base({...o,ownKey:ownKey.key},p)}
  // When every model fails once, the server tries them all again; the chat says so meanwhile.
  {const base=callModel,RETRY='Trying another model…';callModel=async(o,p)=>{try{return await base({...o,onRetry:()=>update({progress:RETRY})},p)}finally{if(job.progress===RETRY)update({progress:null})}}}
  // Customers pay up front, before anything is saved; credits are refunded if the job fails.
@@ -1094,7 +1098,7 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
    // remembered here so a pick by id can be checked (model-choices.pick).
    let catalog=[];
    if(typeof listModels==='function'){try{catalog=require('./model-choices').remember(await listModels())}catch(e){console.warn('[create] model catalogue: '+String(e.message||e).slice(0,160))}}
-   return send(res,200,{free_models:catalog.map(m=>({id:m.id,label:m.label,note:m.note,provider:m.provider})),viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(),discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},explode_generation:{enabled:require('./explode-video').configured(process.env,{images:Boolean(generateImage)}),credits:require('./explode-video').prices()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
+   return send(res,200,{free_models:catalog.map(m=>({id:m.id,label:m.label,note:m.note,provider:m.provider})),viewer:v?{kind:v.kind,account:v.account}:null,...(v&&v.kind==='owner'?{storage:require('./storage').status(),setup:require('./setup-status').items()}:{}),signups:process.env.KAIROQ_BUILDER_SIGNUPS!=='closed',packs:accounts.packs().map(({price,...p})=>p),plans:accounts.plans().map(({price,...p})=>p),purchases:accounts.stripeConfigured(),subscriptions:accounts.stripeReady()&&accounts.plans().length>0,free_credits:accounts.freeCredits(),google:require('./google-oauth').configured(),whatsapp:require('./whatsapp').enabled()?{start:require('./whatsapp').chatLink('Hi Kairoq, build me ')}:null,email_ready:accounts.mailReady(),tiers:tiers().map(({id,label,credits,enabled})=>({id,label,credits,enabled})),models:require('./model-choices').list(process.env,{ownKey:Boolean(v&&v.kind==='customer'&&require('./byok').status(v.account.id).set)}),own_key:v&&v.kind==='customer'?require('./byok').status(v.account.id):null,discuss_credits:intEnv('KAIROQ_DISCUSS_CREDITS',1),agent_multiplier:agentMultiplier(),image_credits:intEnv('KAIROQ_IMAGE_CREDITS',1),image_generation:{enabled:Boolean(generateImage),credits:generatedImageCredits()},video_generation:{enabled:require('./video-gen').configured(),credits:require('./video-gen').credits()},explode_generation:{enabled:require('./explode-video').configured(process.env,{images:Boolean(generateImage)}),credits:require('./explode-video').prices()},design_review:Boolean(designShots),polish_credits:polishCredits()}),true;
   }
   if(route==='/auth/google'&&method==='GET'){
    const google=require('./google-oauth'),url=google.startUrl({kind:'kairoq'},origin(req));
@@ -1340,6 +1344,14 @@ async function handle(req,res,{isOwner,callModel,secure,listModels,checkRuntime,
    if(method==='GET')return send(res,200,{keys:accounts.listApiKeys(who)}),true;
    if(method==='POST'){const b=await readJson(req,2000);return send(res,201,{created:accounts.createApiKey(who,b.name),keys:accounts.listApiKeys(who)}),true}
    if(method==='DELETE'){const b=await readJson(req,2000);return send(res,200,{keys:accounts.revokeApiKey(who,b.id)}),true}
+  }
+  // Bring your own key (byok.js): a customer's own OpenRouter key; their usage bills them.
+  if(route==='/own-key'){
+   if(v.kind!=='customer')throw Object.assign(Error('The owner account uses the server\'s keys in Railway.'),{status:400});
+   const byok=require('./byok');
+   if(method==='GET')return send(res,200,{own_key:byok.status(v.account.id)}),true;
+   if(method==='POST'){limitedKey('own-key:'+v.account.id,10,3600000);const b=await readJson(req,4000);return send(res,200,{own_key:await byok.save(v.account.id,b.key)}),true}
+   if(method==='DELETE')return send(res,200,{own_key:byok.remove(v.account.id)}),true;
   }
   if(route==='/credits'&&method==='GET'){
    if(v.kind!=='customer')return send(res,200,{unlimited:true,history:[]}),true;

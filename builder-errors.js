@@ -6,6 +6,8 @@ const BUSY_TEXT='The free models could not finish this one, even after trying ag
 const BUILD_TEXT='I couldn\'t finish this change, even after several tries, so your app is as it was. Press Try again: it often works the second time.';
 function plain(err){
  const raw=String((err&&err.message)||err||'').trim();
+ // The customer's own key failed: say so in its own words (it names the key, not "free models").
+ if(/^Your own AI key could not run this message/.test(raw))return{text:raw.slice(0,600),busy:false,raw};
  if(!raw||BUSY.test(raw))return{text:BUSY_TEXT,busy:true,raw};
  // The builder's own edits did not fit after every attempt: the owner never sees code or files.
  if(/^The change could not be built after \d+ attempts/.test(raw))return{text:BUILD_TEXT,busy:false,raw};

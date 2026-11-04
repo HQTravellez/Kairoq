@@ -521,8 +521,9 @@ async function callFreeLlmJSON({messages,temperature=0.1}={}){
   }
 }
 
-function openRouterHeaders(extra = {}) {
-  const key = process.env.OPENROUTER_API_KEY;
+// keyOverride: a customer's own OpenRouter key (byok.js) instead of Kairoq's.
+function openRouterHeaders(extra = {}, keyOverride = "") {
+  const key = keyOverride || process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY is missing. Add it to .env and restart.");
   return {
     Authorization: `Bearer ${key}`,
@@ -6976,7 +6977,20 @@ async function callBuilderModel(opts={},parse=parseDeveloperResponse){
   }
 }
 function retryableModelError(err){return!/KAIROQ_|budget|switched off|needs an? |not set up|No free LLM route|Start a local model|configure/i.test(String(err&&err.message||err))}
+// Bring your own key (byok.js): the customer's own OpenRouter key runs every call of their message,
+// paid-first like Auto. Kairoq's keys, free pool and spending caps are not used, and when their key
+// cannot run (no credits, invalid) the message says so instead of switching to Kairoq's models.
+async function callOwnKey(opts,ownKey,parse){
+  const {model,onFallback,...rest}=opts;
+  try{return await callOpenRouterBuilder({...rest,...(model?{only:model}:{}),tier:rest.tier==="chat"?"standard":rest.tier,apiKey:ownKey},parse)}
+  catch(err){
+    if(err.name==="AbortError"||opts.signal?.aborted)throw err;
+    const why=String(err.message||err).replace(/^No coding model returned usable project files\.\s*/,"").replace(/sk-or-[A-Za-z0-9-]+/g,"[key]").slice(0,240);
+    throw Object.assign(Error("Your own AI key could not run this message: "+why+". Check the key and its credits at openrouter.ai, or remove it in Settings to use Kairoq's models."),{ownKey:true});
+  }
+}
 async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
+  if(opts.ownKey){const {ownKey,...rest}=opts;return callOwnKey(rest,ownKey,parse)}
   // A model the owner picked by name in the chat box (model-choices.js) goes through OpenRouter
   // first; when it cannot run (no key, paid builds off, budget, provider error) Auto takes over.
   if(opts.model){
@@ -7182,9 +7196,9 @@ function paidBuildsFirst(opts={},env=process.env){
   return Boolean(env.OPENROUTER_API_KEY)||require("./anthropic").configured(env);
 }
 async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
-  const anthropic=require("./anthropic"),direct=anthropic.configured();
+  const anthropic=require("./anthropic"),own=Boolean(opts.apiKey),direct=!own&&anthropic.configured();
   const freeOnly=async()=>parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
-  if(!process.env.OPENROUTER_API_KEY&&!direct)return freeOnly();
+  if(!own&&!process.env.OPENROUTER_API_KEY&&!direct)return freeOnly();
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"paid-first").toLowerCase();
   // openrouter/free picks whichever free model is up right now, so it goes first; a named free
   // model OpenRouter has retired ("unavailable for free") is skipped from then on.
@@ -7194,10 +7208,12 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   // A model the owner picked by name (opts.only) is a paid choice in itself, whatever the mode.
   // freeOnly (builder chat, learning notes): never a paid model, whatever the build mode.
   let allowPaid=!opts.freeOnly&&(mode==="premium"||mode==="paid-first"||Boolean(opts.only)) && process.env.KAIROQ_BUILDER_PAID_APPROVED==="true";
+  // The customer's own key pays for its own calls: Kairoq's approval and caps do not apply to it.
+  if(own)allowPaid=!opts.freeOnly;
   const errors=[];
   const onlyFree=Boolean(opts.only)&&(/:free$/.test(opts.only)||opts.only==="openrouter/free");
   if(opts.only&&!allowPaid&&!onlyFree)throw Error("paid builds are switched off (KAIROQ_BUILDER_PAID_APPROVED)");
-  if(allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
+  if(!own&&allowPaid&&builderMonthlyLimit>0&&(await usageTotals({purpose:"developer-build"})).monthly>=builderMonthlyLimit){allowPaid=false;errors.push("builder monthly budget reached ($"+builderMonthlyLimit.toFixed(2)+"); using free models")}
   // Website checks and AI customers (tier "check"): a cheap, reliable paid model first (a few cents a
   // check), with its own monthly cap and the free models behind it; builds are not affected.
   const checkTier=opts.tier==="check",checkLimit=Number(process.env.KAIROQ_CHECK_MONTHLY_LIMIT_USD??20);
@@ -7218,8 +7234,8 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   const fastFirst=opts.fast&&allowPaid&&(!opts.tier||opts.tier==="standard")?String(process.env.KAIROQ_FAST_MODELS??"google/gemini-2.5-flash").split(",").map(m=>m.trim()).filter(Boolean):[];
   const models=opts.only?[opts.only]:opts.tier==="chat"?freeCandidates.filter((m,i,a)=>m&&a.indexOf(m)===i):[...designFirst,...fastFirst,...ordered].filter((m,i,a)=>m&&a.indexOf(m)===i);
   // With an Anthropic key but no OpenRouter key, only the Claude models can run.
-  const runnable=process.env.OPENROUTER_API_KEY?models:models.filter(m=>anthropic.isClaude(m));
-  if(!process.env.OPENROUTER_API_KEY&&!runnable.length)return freeOnly();
+  const runnable=own||process.env.OPENROUTER_API_KEY?models:models.filter(m=>anthropic.isClaude(m));
+  if(!own&&!process.env.OPENROUTER_API_KEY&&!runnable.length)return freeOnly();
   for(const model of runnable){
     opts.signal?.throwIfAborted();
     const free=model.endsWith(":free")||model==="openrouter/free";
@@ -7228,7 +7244,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
     if(free&&opts.paidOnly)continue;
     // OpenRouter said the account has no credits: its paid models are skipped for 15 minutes
     // (Claude still runs on the Anthropic key), instead of failing on every step of every build.
-    if(!free&&!viaAnthropic&&Date.now()<openRouterNoCreditsUntil){errors.push(model+": OpenRouter has no credits");continue}
+    if(!own&&!free&&!viaAnthropic&&Date.now()<openRouterNoCreditsUntil){errors.push(model+": OpenRouter has no credits");continue}
     try{
       const input=Math.ceil(JSON.stringify(opts.messages||[]).length/3);
       // Pro and Max models can write whole apps in one reply, so they get a larger output cap.
@@ -7238,7 +7254,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       const maxOutput=Number.isInteger(opts.maxOutputTokens)?Math.max(512,Math.min(outputCap,opts.maxOutputTokens)):(opts.only?Math.min(outputCap,24000):10000);
       let rates=free?[0,0]:model.includes("gemini-2.5-flash")?[0.3,2.5]:model.includes("deepseek")||model.includes("qwen")?[0.5,1.5]:opts.tier==="max"||designModel?[10,50]:[5,25];
       if(viaAnthropic)rates=anthropic.rates(model,rates);
-      if(!free){
+      if(!free&&!own){
         const totals=await enforceBudget();
         const reserve=(input*rates[0]+maxOutput*rates[1])/1000000;
         if((DAILY_COST_LIMIT_USD>0&&totals.daily+reserve>DAILY_COST_LIMIT_USD)||(MONTHLY_COST_LIMIT_USD>0&&totals.monthly+reserve>MONTHLY_COST_LIMIT_USD))throw Error("Application budget insufficient");
@@ -7258,7 +7274,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
           lastData={choices:[{message:{content:r.content},finish_reason:r.finish}],usage:r.usage};
           return{content:r.content,finish:r.finish};
         }
-        const response=await fetch(OR_CHAT,{method:"POST",headers:openRouterHeaders(),signal:require("./builder-response-policy").requestSignal(opts,{premium,stream}),body:JSON.stringify({model,...(opts.cacheKey?{session_id:String(opts.cacheKey).slice(0,128)}:{}),messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
+        const response=await fetch(OR_CHAT,{method:"POST",headers:own?openRouterHeaders({},opts.apiKey):openRouterHeaders(),signal:require("./builder-response-policy").requestSignal(opts,{premium,stream}),body:JSON.stringify({model,...(opts.cacheKey?{session_id:String(opts.cacheKey).slice(0,128)}:{}),messages:require("./builder-costs").withCacheBreakpoints(msgs,model),temperature:opts.temperature??0.3,max_tokens:maxOutput,reasoning:{effort:"low"},usage:{include:true},...(stream?{stream:true}:{})})});
         const data=stream&&response.ok&&response.body?await readChatStream(response.body,onTok||(()=>{}),opts.onReasoning):await response.json().catch(()=>({}));
         if(!response.ok)throw Error(data.error?.message||"Provider HTTP "+response.status);
         const message=data.choices?.[0]?.message||{};
@@ -7266,7 +7282,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
         const text=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(v=>v.text||"").join(""):"";
         const cost=Number(data.usage?.cost||0);
         if(free&&cost>0)throw Error("Free request unexpectedly billed");
-        if(!free)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:checkTier?"site-check":"developer-build",model,tier:opts.tier||"standard",...(designModel?{design:true}:{})});
+        if(!free&&!own)await recordUsage({...data.usage,cost:cost||((Number(data.usage?.prompt_tokens)||input)*rates[0]+(Number(data.usage?.completion_tokens)||maxOutput)*rates[1])/1000000},{purpose:checkTier?"site-check":"developer-build",model,tier:opts.tier||"standard",...(designModel?{design:true}:{})});
         lastData=data;
         return{content:text,finish:data.choices?.[0]?.finish_reason};
       };
@@ -7279,7 +7295,7 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       // Do not iterate through other providers or retry after an avoidable long delay.
       if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(e.message||e)))throw e;
       if(free&&/unavailable for free|no endpoints found/i.test(String(e.message||e)))retiredFreeModels.add(model);
-      if(!free&&!viaAnthropic&&/insufficient credits|never purchased credits/i.test(String(e.message||e)))openRouterNoCreditsUntil=Date.now()+15*60000;
+      if(!own&&!free&&!viaAnthropic&&/insufficient credits|never purchased credits/i.test(String(e.message||e)))openRouterNoCreditsUntil=Date.now()+15*60000;
       if(!free&&/monthly ai cost limit reached/i.test(String(e.message||e))&&!budgetWarned){budgetWarned=true;console.warn("[builder-model] MONTHLY_COST_LIMIT_USD is reached: paid models are off until it is raised or the month ends; builds use the free models.")}
       console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160));
     }
