@@ -182,3 +182,13 @@ test("Share stays in the top bar on laptops; only phones hide it (it is in the M
   assert.doesNotMatch(/@media \(max-width:1380px\)\{[^}]*\}/.exec(ws)[0], /#share-open\{display:none\}/);
   assert.match(ws, /\.stage-bar #share-open\{display:none\}/, "still hidden on phones");
 });
+
+test("chat text like the Figma App builder frame: one font and size, no bold runs or code chips", () => {
+  const css = read("ui/forma.css"), prompt = fs.readFileSync(path.join(__dirname, "..", "react-builder.js"), "utf8");
+  assert.match(css, /#messages :is\(\.md,li\.user\) :is\(strong,b\)\{font-weight:400!important\}/);
+  assert.match(css, /#messages :is\(\.md,li\.user\) :not\(pre\)>code\{font:inherit!important/);
+  assert.match(css, /#messages \.md\{font:400 14px\/1\.6 Inter/);
+  assert.match(css, /content:"✦ Kairoq"!important/);
+  assert.match(prompt, /No bold, no headings, no "Label:" lead-ins, and no code formatting for ordinary words/);
+  assert.doesNotMatch(prompt, /Bold only the few words that carry the decision/);
+});
