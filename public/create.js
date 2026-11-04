@@ -1578,6 +1578,8 @@ function storyRow(e){
 // (its latest heading, or the stage in plain words). Stop is the editor's own Stop.
 function liveStrip(j){
  const s=$('ks-strip');if(!s)return;
+ // Off (Ka, Nov 2026): the chat already shows what Kairoq is doing; the box shows suggestions.
+ s.classList.add('hidden');return;
  if(!j||j.status==='complete'||j.status==='failed'){s.classList.add('hidden');return}
  // Present tense, what is happening now (the chat above already has the past-tense headings).
  const line=liveStatus(j);

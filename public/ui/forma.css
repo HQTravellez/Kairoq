@@ -1144,3 +1144,5 @@ html body.app.in-editor #editor #chat-form #tier-panel .model-more .m-cost::afte
 html body.app.in-editor #editor #chat-form #tier-panel .model-more[aria-expanded="true"] .m-cost::after{content:" ⌄"}
 html body.app.in-editor #editor #chat-form #tier-panel .model-free .model-list{max-height:220px}
 html body.app.in-editor #editor #chat-form #tier-panel .model-free[hidden]{display:none!important}
+/* Suggestions above the message box, like Lovable: white pills you can read at a glance. */
+html body.app.in-editor #editor .composer-ideas .idea-chip{height:34px!important;max-width:320px;padding:0 15px!important;border-radius:999px!important;border:1px solid var(--c-line-2,#DEDBD5)!important;background:#fff!important;color:var(--c-ink,#1C1B1F)!important;font:400 14px/1 Inter,system-ui,sans-serif!important;box-shadow:0 1px 2px rgba(28,27,31,.05)!important}
