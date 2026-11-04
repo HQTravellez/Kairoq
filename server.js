@@ -7007,12 +7007,16 @@ async function callBuilderModelOnce(opts={},parse=parseDeveloperResponse){
   const freePool=require("./freellmapi");
   if(freePool.enabled()&&String(process.env.FREELLMAPI_BUILDS||"on").toLowerCase()!=="off"&&(!opts.tier||opts.tier==="standard")){
     try{
-      const r=await freePool.complete(opts.messages,{
+      // A reply cut off at the provider's length limit is continued where it stopped (as for the
+      // OpenRouter models), instead of reaching the agent as half a JSON reply.
+      let used="";
+      const ask=async msgs=>{const r=await freePool.complete(msgs,{
         coding:true,temperature:opts.temperature??0.2,
         maxTokens:Math.min(32000,Number(opts.maxOutputTokens)||16000),
-        signal:opts.signal,reasoningEffort:"low"
-      });
-      return parse(r.text,"freellm/"+r.model);
+        signal:opts.signal,reasoningEffort:"low",...(used?{model:used}:{})
+      });used=used||r.model;return{content:r.text,finish:r.finish}};
+      const {content}=await require("./model-continue").complete(ask,opts.messages);
+      return parse(content,"freellm/"+used);
     }catch(err){
       if(err.name==="AbortError"||opts.signal?.aborted)throw err;
       console.log("[builder] FreeLLMAPI pool failed, continuing: "+String(err.message||err).slice(0,200));
@@ -7153,12 +7157,15 @@ async function callFastBuilder(fb,opts,parse){
   if(!String(content||"").trim())throw Error("Empty response; finish="+(last&&last.choices[0].finish_reason));
   return parse(content,fb.model);
 }
+const retiredFreeModels=new Set();let budgetWarned=false;
 async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
   const anthropic=require("./anthropic"),direct=anthropic.configured();
   const freeOnly=async()=>parse===parseDeveloperResponse?callFreeLlmJSON(opts):parse(await callFreeLlmJSON(opts),"local");
   if(!process.env.OPENROUTER_API_KEY&&!direct)return freeOnly();
   const mode=String(process.env.KAIROQ_BUILDER_MODE||"free-first").toLowerCase();
-  const freeCandidates=[...new Set([String(process.env.KAIROQ_BUILDER_FREE_MODEL||"nvidia/nemotron-3-super-120b-a12b:free"),"openrouter/free",...String(process.env.KAIROQ_BUILDER_FREE_FALLBACKS||"").split(",").map(m=>m.trim()).filter(m=>m.endsWith(":free"))])];
+  // openrouter/free picks whichever free model is up right now, so it goes first; a named free
+  // model OpenRouter has retired ("unavailable for free") is skipped from then on.
+  const freeCandidates=[...new Set(["openrouter/free",...(process.env.KAIROQ_BUILDER_FREE_MODEL?[String(process.env.KAIROQ_BUILDER_FREE_MODEL)]:[]),...String(process.env.KAIROQ_BUILDER_FREE_FALLBACKS||"").split(",").map(m=>m.trim()).filter(m=>m.endsWith(":free"))])].filter(m=>!retiredFreeModels.has(m));
   const paidCandidates=[String(process.env.KAIROQ_BUILDER_MODEL||"deepseek/deepseek-v3.2"),String(process.env.KAIROQ_BUILDER_FALLBACK_MODEL||"qwen/qwen3-coder"),"deepseek/deepseek-v3.2"];
   const builderMonthlyLimit=Number(process.env.KAIROQ_BUILDER_MONTHLY_LIMIT_USD??100);
   // A model the owner picked by name (opts.only) is a paid choice in itself, whatever the mode.
@@ -7244,6 +7251,8 @@ async function callOpenRouterBuilder(opts={},parse=parseDeveloperResponse){
       // Budget errors are deterministic configuration failures, not transient model outages.
       // Do not iterate through other providers or retry after an avoidable long delay.
       if(/(?:application|builder) (?:monthly )?budget insufficient/i.test(String(e.message||e)))throw e;
+      if(free&&/unavailable for free|no endpoints found/i.test(String(e.message||e)))retiredFreeModels.add(model);
+      if(!free&&/monthly ai cost limit reached/i.test(String(e.message||e))&&!budgetWarned){budgetWarned=true;console.warn("[builder-model] MONTHLY_COST_LIMIT_USD is reached: paid models are off until it is raised or the month ends; builds use the free models.")}
       console.warn("[builder-model]",model,String(e.message||e).slice(0,180));errors.push(model+": "+String(e.message||e).slice(0,160));
     }
   }
