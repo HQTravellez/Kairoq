@@ -1180,3 +1180,4 @@ html body.app #home .home-sub{margin:8px 0 0!important}
 html body.app #home .home-hero .wow{margin-top:24px!important}
 html body.app #home #browser{margin-top:32px!important}
 html body.app #home .browser-tabs>button:first-child{padding-left:0!important}
+html body.app.in-editor #editor #chat-form #tier-panel .m-free{flex:none;font:400 12px/1 Inter,system-ui,sans-serif;color:var(--f-mut2,#716F77)}
