@@ -2233,19 +2233,24 @@ $('mode-build').onclick=()=>setChatMode('build');$('mode-discuss').onclick=()=>s
 // (@lobehub/icons-static-svg, MIT, pinned version; THIRD_PARTY_NOTICES), with a lettered square
 // behind it until it loads or when there is none.
 const MARK_BASE='/ui/model-logos/';
+// Free models often come without a maker (the local pool says "Local"): the logo comes from the
+// model's own name instead (glm → Zhipu, kimi → Moonshot, gpt-oss → OpenAI, nemotron → NVIDIA…).
+const MARK_BY_NAME=[[/^(?:kairoq|openrouter free|auto)/i,''],[/glm|zhipu|z-ai/i,'zhipu-color'],[/kimi/i,'kimi-color'],[/gpt-oss|openai/i,'openai'],[/nemotron|nvidia/i,'nvidia-color'],[/minimax/i,'minimax-color'],[/deepseek/i,'deepseek-color'],[/mistral|devstral|codestral/i,'mistral-color'],[/gemma/i,'gemma-color'],[/gemini|lyria|google/i,'gemini-color'],[/mimo|xiaomi/i,'xiaomimimo'],[/qwen/i,'qwen-color'],[/llama|muse|meta/i,'meta-color'],[/cohere|north/i,'cohere-color'],[/liquid|lfm/i,'liquid'],[/hermes|nous/i,'nousresearch']];
+function markFile(m){const p=(m&&m.provider)||{},key=String(p.key||'').toLowerCase();if(MARK_FILES[key])return MARK_FILES[key];const n=String((m&&m.label)||'')+' '+String((m&&m.id)||'');const hit=MARK_BY_NAME.find(([re])=>re.test(n));return hit?hit[1]:''}
 const MARK_FILES={anthropic:'claude-color',openai:'openai',google:'gemini-color',meta:'meta-color','meta-llama':'meta-color',deepseek:'deepseek-color',mistralai:'mistral-color',mistral:'mistral-color',qwen:'qwen-color',nvidia:'nvidia-color',microsoft:'microsoft-color','x-ai':'xai',xai:'xai',cohere:'cohere-color',perplexity:'perplexity-color',amazon:'aws-color',moonshotai:'moonshot',moonshot:'moonshot',minimax:'minimax-color','z-ai':'zhipu-color',zai:'zhipu-color',baidu:'baidu-color',bytedance:'bytedance-color',tencent:'tencent-color',ai21:'ai21',nousresearch:'nousresearch',liquid:'liquid',huggingface:'huggingface-color',openrouter:'openrouter'};
 function modelMark(m,small){
  const p=(m&&m.provider)||{},key=String(p.key||'').toLowerCase(),box=el('span','m-mark'+(small?' small':''));
- const letter=el('span','m-letter',m&&m.id==='auto'?'✦':(p.name||m&&m.label||'?').charAt(0).toUpperCase());box.append(letter);
- const file=MARK_FILES[key];
+ const file=m&&m.id!=='auto'?markFile(m):'';
+ const auto=m&&(m.id==='auto'||/^(?:kairoq local auto|openrouter free auto)/i.test(String(m.label||'')));
+ const letter=el('span','m-letter',auto?'✦':(m&&m.label||p.name||'?').charAt(0).toUpperCase());box.append(letter);
  if(file&&m.id!=='auto'){const img=document.createElement('img');img.alt='';img.loading='lazy';img.src=MARK_BASE+file+'.svg';img.onerror=()=>img.remove();box.append(img)}
  return box;
 }
 function renderTiers(){
  const sel=$('tier');sel.replaceChildren();
  for(const t of state.me.tiers||[]){const o=document.createElement('option');o.value=t.id;o.disabled=!t.enabled;o.textContent=t.label+(t.enabled?'':' (off)');o.title=t.credits+' credit'+(t.credits===1?'':'s')+' per message';if(t.id===state.tier)o.selected=true;sel.append(o)}
- // The model menu, like Lovable's: one short line per model, its logo and name, a tick on the
- // chosen one; no costs, notes or badges. The free models (often dozens) sit behind one "Free models" line,
+ // The model menu, like Lovable's: one list, one short line per model with its logo and name and a
+ // tick on the chosen one; no costs, notes, badges or sections. The free models (often dozens) sit behind one "Free models" line,
  // with a search box once opened.
  const models=state.me.models||[{id:'auto',label:'Auto',enabled:true}];
  const freeModels=(state.me.free_models||[]).filter(m=>!models.some(x=>x.id===m.id));
@@ -2260,19 +2265,8 @@ function renderTiers(){
   b.onclick=()=>{state.model=m.id;try{localStorage.setItem('kairoq-model',m.id)}catch{}$('menu-tier').open=false;renderTiers()};
   return b;
  };
- for(const m of usable)list.append(row(m));
- if(freeModels.length){
-  const pickedFree=freeModels.some(m=>m.id===state.model);
-  const more=document.createElement('button');more.type='button';more.className='model-more';more.setAttribute('aria-expanded',String(pickedFree));
-  more.append(el('b','m-name','Free models'),el('span','m-cost',String(freeModels.length)));
-  const box=el('div','model-free');box.hidden=!pickedFree;
-  const q=el('input','model-search');q.type='search';q.placeholder='Search free models';q.setAttribute('aria-label','Search free models');
-  const flist=el('div','model-list');for(const m of freeModels)flist.append(row(m));
-  box.append(q,flist);
-  more.onclick=()=>{box.hidden=!box.hidden;more.setAttribute('aria-expanded',String(!box.hidden));if(!box.hidden)q.focus()};
-  q.oninput=()=>{const t=q.value.trim().toLowerCase();for(const n of flist.children)n.hidden=Boolean(t)&&!n.dataset.name.includes(t)};
-  panel.append(more,box);
- }
+ // Free models continue the same list, same rows (Ka: no separate fold or search box).
+ for(const m of [...usable,...freeModels])list.append(row(m));
  const cur=all.find(m=>m.id===state.model)||usable[0];
  const lbl=$('tier-label');lbl.replaceChildren(modelMark(cur,true),document.createTextNode(cur?cur.label:'Auto'));
 
