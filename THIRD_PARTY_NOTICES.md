@@ -288,3 +288,7 @@ The coloured logos beside the models in the Create chat box come from LobeHub's 
 ## Service logos on the Connectors page
 
 The GitHub, Stripe, Figma and WhatsApp marks on the Connectors page are SVG paths from Simple Icons (CC0-1.0, https://github.com/simple-icons/simple-icons), copied into `public/create.js`. The logos belong to their companies and are shown only to identify the service being connected.
+
+## ECC: coding rules for working on this repo
+
+`.claude/rules/ecc/` holds the `rules/common` and `rules/typescript` folders of ECC by Affaan Mustafa, https://github.com/affaan-m/ECC, unmodified (revision `d2ef2680`), licensed under the MIT License (full text in `licenses/ecc-LICENSE.txt`). They guide Claude Code when it works on Kairoq; they are not part of the running app.

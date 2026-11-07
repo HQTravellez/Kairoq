@@ -19,6 +19,12 @@ It runs on Railway at kairoq-production.up.railway.app. Read this file before ev
   2. **Keep it simple**: the smallest solution that works; no speculative extras.
   3. **Change only what's needed**: touch only the files and lines the task needs.
   4. **Prove it**: define what "done" means first, then run the tests and report real results.
+- **ECC rules** in `.claude/rules/ecc/` (common + typescript, from affaan-m/ECC, MIT) load
+  every session. Follow them, but **this file wins** where they differ: a short plain plan
+  instead of PRD documents; report the tests actually run instead of a coverage number;
+  their `ecc:*` agents are not installed, so do those steps yourself; keep the
+  `Co-Authored-By` line; don't refactor existing big files or add packages (such as Zod)
+  just to match a rule.
 - **Crisp, plain answers.** Short replies, plain words, no jargon. Lead with the answer.
 - **Wire things in for real.** When Ka shares a GitHub project, say honestly whether it fits;
   if it does, integrate it properly (not hidden behind a flag nobody turns on). Check the
